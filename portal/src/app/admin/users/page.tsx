@@ -4,14 +4,14 @@ import { useEffect, useState } from "react";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AdminSidebar } from "@/components/AdminSidebar";
 import { createClient } from "@/lib/supabase/client";
-import type { Member } from "@/lib/membershipTypes";
+import type { User } from "@/lib/types/membershipTypes";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
 
-type UserRecord = Member & { id?: string };
+type UserRecord = User & { id?: string };
 
 type SortOption = "name" | "email";
 

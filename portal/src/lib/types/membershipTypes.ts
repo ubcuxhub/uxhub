@@ -26,7 +26,7 @@ export const membershipTiers: Record<string, MembershipTier> = {
   faculty: { display: "Faculty", price: 18.0, ubcStudent: false },
 };
 
-export interface Member {
+export interface User {
   email: string;
   name: string;
   phone: string;
