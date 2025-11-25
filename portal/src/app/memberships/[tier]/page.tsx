@@ -1,4 +1,4 @@
-import { membershipTiers } from "@/lib/membershipTypes";
+import { membershipTiers } from "@/lib/types/membershipTypes";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import PaymentForm from "@/components/PaymentForm";

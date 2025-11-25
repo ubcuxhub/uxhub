@@ -2,12 +2,12 @@
 
 import { createContext, useContext, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Member } from "@/lib/membershipTypes";
+import { User } from "@/lib/types/membershipTypes";
 
 const supabase = createClient();
 
 interface UserContextType {
-  user: Member | null;
+  user: User | null;
   loading: boolean;
   refreshUser: () => Promise<void>;
 }
@@ -21,7 +21,7 @@ const UserContext = createContext<UserContextType>({
 export const useUser = () => useContext(UserContext);
 
 export function UserProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<Member | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   const loadUser = async () => {

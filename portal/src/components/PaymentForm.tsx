@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MembershipTier } from "@/lib/membershipTypes";
+import { MembershipTier } from "@/lib/types/membershipTypes";
 
 interface PaymentFormProps {
   tier: MembershipTier;
