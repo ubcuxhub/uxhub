@@ -60,17 +60,19 @@ create table event_prices ( -- new
     updated_at timestamp with time zone default now()
 );
 
-create table register_for_event ( -- new
+create table event_registrations ( -- new
     id uuid primary key default gen_random_uuid(),
     event_id uuid not null,
     foreign key (event_id) references events(id) on delete cascade,
     user_id uuid not null,
     foreign key (user_id) references user_info(id) on delete cascade,
+    reviewed_by admin_user_id uuid,
+    foreign key (reviewed_by) references user_info(id) on delete cascade,
     accepted boolean default false,
     attending boolean default false,
     checked_in boolean default false,
     checked_in_at timestamp with time zone,
-    submitted_at timestamp with time zone default now(),
+    created_at timestamp with time zone default now(),
     updated_at timestamp with time zone default now()
 );
 
