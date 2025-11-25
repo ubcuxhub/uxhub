@@ -12,9 +12,10 @@ create table user_info (
     preferred_pronouns text,  -- new
     newsletter boolean default false, -- changed from text to boolean
 
-    membership_type_id uuid not null, -- change to reference to membership_types table, so that each type can have its own features, price, and description.
-    foreign key (membership_type_id) references membership_types(id) on delete restrict, -- added
-    role_access text default 'basic',
+    -- membership_type_id uuid not null, -- change to reference to membership_types table, so that each type can have its own features, price, and description.
+    -- foreign key (membership_type_id) references membership_types(id) on delete restrict, -- added
+    membership_type text not null, -- "NonUbc", "Innovator", "Explorer", "Faculty"
+    role_access text default 'basic', -- "basic", "admin"
     auth_user_id uuid not null,
     foreign key (auth_user_id) references auth.users(id) on delete cascade,
     created_at timestamp with time zone default now(),
@@ -22,18 +23,20 @@ create table user_info (
     -- order_date date, -- removed
 );
 
-create table membership_types ( -- new
-    id uuid primary key default gen_random_uuid(),
-    name text not null,
-    description text not null,
-    features text[],
-    price decimal(10, 2) not null
-);
+-- create table membership_types ( -- new
+--     id uuid primary key default gen_random_uuid(),
+--     name text not null,
+--     description text not null,
+--     features text[],
+--     price decimal(10, 2) not null
+-- );
 
 create table events (
     id uuid primary key default gen_random_uuid(),
     name text not null,
     description text not null, -- added
+    regular_price decimal(10, 2) not null,
+    member_price decimal(10, 2) default 0 not null,
     location_building text,
     location_room text,
     location_address_url text,
@@ -45,17 +48,6 @@ create table events (
     image_url text,
 
     is_active boolean default true,
-    created_at timestamp with time zone default now(),
-    updated_at timestamp with time zone default now()
-);
-
-create table event_prices ( -- new
-    id uuid primary key default gen_random_uuid(),
-    event_id uuid not null,
-    foreign key (event_id) references events(id) on delete cascade,
-    membership_type_id uuid not null,
-    foreign key (membership_type_id) references membership_types(id) on delete cascade,
-    price decimal(10, 2) not null,
     created_at timestamp with time zone default now(),
     updated_at timestamp with time zone default now()
 );
