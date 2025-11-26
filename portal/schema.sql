@@ -58,8 +58,6 @@ create table event_registrations ( -- new
     foreign key (event_id) references events(id) on delete cascade,
     user_id uuid not null,
     foreign key (user_id) references user_info(id) on delete cascade,
-    reviewed_by admin_user_id uuid,
-    foreign key (reviewed_by) references user_info(id) on delete cascade,
     accepted boolean default false,
     attending boolean default false,
     checked_in boolean default false,
@@ -71,11 +69,11 @@ create table event_registrations ( -- new
 create table event_application_questions (
     id uuid primary key default gen_random_uuid(),
     event_id uuid not null,
-    -- type text not null, -- "textbox", "dropdown" -> for future
-    -- dropdown_options text[], -> for future
     foreign key (event_id) references events(id) on delete cascade,
     question text not null,
+    response text not null, -- "text", "single_select", "multi_select"
     max_char_limit int,
+    response_options text[], -- for single_select and multi_select types
     created_at timestamp with time zone default now(),
     updated_at timestamp with time zone default now()
 );
@@ -84,6 +82,8 @@ create table event_application_responses ( -- new
     id uuid primary key default gen_random_uuid(),
     event_application_question_id uuid not null,
     foreign key (event_application_question_id) references event_application_questions(id) on delete cascade,
+    event_registration_id uuid not null,
+    foreign key (event_registration_id) references event_registrations(id) on delete cascade,
     response text not null,
     created_at timestamp with time zone default now(),
     updated_at timestamp with time zone default now()
