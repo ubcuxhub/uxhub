@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/client";
 import type {
@@ -533,15 +534,43 @@ export const EventCreateModify = ({
   return (
     <Card className="max-w-4xl">
       <CardHeader>
-        <CardTitle>
-          {title ?? (eventId ? "Modify Event" : "Create Event")}
-        </CardTitle>
-        <CardDescription>
-          {description ??
-            (eventId
-              ? "Update the details for this event."
-              : "Provide the details for the new event.")}
-        </CardDescription>
+        <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+          <div className="flex-1">
+            <CardTitle>
+              {title ?? (eventId ? "Modify Event" : "Create Event")}
+            </CardTitle>
+            <CardDescription>
+              {description ??
+                (eventId
+                  ? "Update the details for this event."
+                  : "Provide the details for the new event.")}
+            </CardDescription>
+          </div>
+          {eventId && (
+            <div className="flex flex-col gap-2 md:flex-row md:ml-4">
+              <Button
+                type="button"
+                variant="outline"
+                asChild
+                className="w-full md:w-auto"
+              >
+                <Link href={`/admin/events/${eventId}/check-in`}>
+                  Check-In
+                </Link>
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                asChild
+                className="w-full md:w-auto"
+              >
+                <Link href={`/admin/events/${eventId}/review-applications`}>
+                  Review Applications
+                </Link>
+              </Button>
+            </div>
+          )}
+        </div>
       </CardHeader>
       <CardContent>
         {loadingEvent ? (
