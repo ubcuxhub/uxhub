@@ -12,12 +12,10 @@ create table user_info (
     preferred_pronouns text,  -- new
     newsletter boolean default false, -- changed from text to boolean
 
-    membership_type_id uuid not null, -- change to reference to membership_types table.
-    foreign key (membership_type_id) references membership_types(id) on delete restrict, -- added
+    membership_type_id uuid not null references membership_types(id) on delete restrict, -- change to reference to membership_types table.
     -- membership_type text not null, -- "nonUbc", "innovator", "explorer", "faculty"
     role_access text default 'basic', -- "basic", "admin"
-    auth_user_id uuid not null,
-    foreign key (auth_user_id) references auth.users(id) on delete cascade,
+    auth_user_id uuid not null references auth.users(id) on delete cascade,
     created_at timestamp with time zone default now(),
     updated_at timestamp with time zone default now()
     -- order_date date, -- removed
@@ -54,15 +52,32 @@ create table events (
 
 create table event_registrations ( -- new
     id uuid primary key default gen_random_uuid(),
-    event_id uuid not null,
-    foreign key (event_id) references events(id) on delete cascade,
-    user_id uuid not null,
-    foreign key (user_id) references user_info(id) on delete cascade,
-    reviewed_by admin_user_id uuid,
-    foreign key (reviewed_by) references user_info(id) on delete cascade,
+    event_id uuid not null references events(id) on delete cascade,
+    user_id uuid not null references user_info(id) on delete cascade,
+    reviewed_by uuid references user_info(id) on delete cascade,
     accepted boolean default false, -- the user is given an offer to attend the event
     attending boolean default false, -- the user has accepted the offer to attend the event
-    checked_in boolean default false, -- the user has checked in at the event
+    -- checked_in boolean default false, -- the user has checked in at the event
+    -- checked_in_at timestamp with time zone,
+    created_at timestamp with time zone default now(),
+    updated_at timestamp with time zone default now()
+);
+
+create table check_in_sessions ( -- specific sessions of an event that can be checked in for
+    id uuid primary key default gen_random_uuid(),
+    event_id uuid not null references events(id) on delete cascade,
+    name text not null, -- e.g. 'Day 1', 'Lunch', 'Day 2'
+    start_time timestamp with time zone,
+    end_time timestamp with time zone,
+    created_at timestamp with time zone default now(),
+    updated_at timestamp with time zone default now()
+);
+
+create table check_ins (
+    id uuid primary key default gen_random_uuid(),
+    event_registration_id uuid not null references event_registrations(id) on delete cascade,
+    check_in_session_id uuid not null references check_in_sessions(id) on delete cascade,
+    checked_in boolean default false,
     checked_in_at timestamp with time zone,
     created_at timestamp with time zone default now(),
     updated_at timestamp with time zone default now()
@@ -70,10 +85,9 @@ create table event_registrations ( -- new
 
 create table event_application_questions (
     id uuid primary key default gen_random_uuid(),
-    event_id uuid not null,
+    event_id uuid not null references events(id) on delete cascade,
     -- type text not null, -- "textbox", "dropdown" -> for future
     -- dropdown_options text[], -> for future
-    foreign key (event_id) references events(id) on delete cascade,
     question text not null,
     max_char_limit int,
     created_at timestamp with time zone default now(),
@@ -82,8 +96,7 @@ create table event_application_questions (
 
 create table event_application_responses ( -- new
     id uuid primary key default gen_random_uuid(),
-    event_application_question_id uuid not null,
-    foreign key (event_application_question_id) references event_application_questions(id) on delete cascade,
+    event_application_question_id uuid not null references event_application_questions(id) on delete cascade,
     response text not null,
     created_at timestamp with time zone default now(),
     updated_at timestamp with time zone default now()
