@@ -42,10 +42,25 @@ export default function Events() {
       {loadingEvents ? (
         <p>Loading events...</p>
       ) : (
-        <div>
-          {events.map((event) => (
-            <div key={event.name}>{event.name}</div>
-          ))}
+        <div className="space-y-4">
+          {events.map((event) => {
+            const eventWithId = event as Event & { id: string };
+            return (
+              <div
+                key={eventWithId.id}
+                className="border rounded-lg p-4 hover:bg-muted/50 cursor-pointer"
+                onClick={() => router.push(`/events/${eventWithId.id}`)}
+              >
+                <h3 className="font-semibold text-lg">{event.name}</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {event.event_date} at {event.event_time}
+                </p>
+                {event.description && (
+                  <p className="text-sm mt-2 line-clamp-2">{event.description}</p>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
       <Button onClick={() => router.push("/profile")}>View profile</Button>
