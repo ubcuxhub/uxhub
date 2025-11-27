@@ -27,6 +27,7 @@ export const membershipTiers: Record<string, MembershipTier> = {
 };
 
 export interface User {
+  id: string; // UUID from user_info table
   email: string;
   name: string;
   phone: string;

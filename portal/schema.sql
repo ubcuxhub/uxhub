@@ -89,7 +89,9 @@ create table event_application_questions (
     -- type text not null, -- "textbox", "dropdown" -> for future
     -- dropdown_options text[], -> for future
     question text not null,
+    response text not null, -- "text", "single_select", "multi_select"
     max_char_limit int,
+    response_options text[], -- for single_select and multi_select types
     created_at timestamp with time zone default now(),
     updated_at timestamp with time zone default now()
 );

@@ -123,13 +123,39 @@ const AdminEventsManager = () => {
                         {event.description}
                       </p>
                     </CardContent>
-                    <CardFooter className="flex items-center justify-between">
-                      <div className="text-sm font-medium">
-                        ${Number(event.price ?? 0).toFixed(2)}
+                    <CardFooter className="flex flex-col gap-2">
+                      <div className="flex items-center justify-between w-full">
+                        <div className="text-sm font-medium">
+                          ${Number(event.price ?? 0).toFixed(2)}
+                        </div>
+                        <Button asChild variant="outline" size="sm">
+                          <Link href={`/admin/events/${event.id}`}>Modify</Link>
+                        </Button>
                       </div>
-                      <Button asChild variant="outline" size="sm">
-                        <Link href={`/admin/events/${event.id}`}>Modify</Link>
-                      </Button>
+                      <div className="flex gap-2 w-full">
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                        >
+                          <Link href={`/admin/events/${event.id}/check-in`}>
+                            Check-In
+                          </Link>
+                        </Button>
+                        <Button
+                          asChild
+                          variant="outline"
+                          size="sm"
+                          className="flex-1"
+                        >
+                          <Link
+                            href={`/admin/events/${event.id}/review-applications`}
+                          >
+                            Applications
+                          </Link>
+                        </Button>
+                      </div>
                     </CardFooter>
                   </Card>
                 ))}
