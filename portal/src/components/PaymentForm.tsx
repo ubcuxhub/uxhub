@@ -138,6 +138,12 @@ export default function PaymentForm({ tier }: PaymentFormProps) {
     }
   };
 
+  // Determine if UBC student field is needed based on tier name convention or description
+  const isUbcStudentTier =
+    tier.name.toLowerCase().includes("student") ||
+    tier.name.toLowerCase().includes("innovator") ||
+    tier.name.toLowerCase().includes("explorer");
+
   return (
     <div className="max-w-md mx-auto mt-8 p-6 border rounded-2xl shadow-sm bg-white/5 backdrop-blur-md">
       <h2 className="text-xl font-semibold mb-4 text-center">
@@ -158,7 +164,7 @@ export default function PaymentForm({ tier }: PaymentFormProps) {
           required
           className="w-full px-3 py-2 border rounded-md bg-white/10"
         />
-        {tier.ubcStudent ? (
+        {isUbcStudentTier ? (
           <input
             id="studentNumber"
             placeholder="Student Number"

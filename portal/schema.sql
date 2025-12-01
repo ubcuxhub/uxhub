@@ -28,7 +28,9 @@ create table user_info (
     dietary_restrictions text,
     preferred_pronouns text,
     newsletter boolean default false,
-    membership_type_id uuid not null references membership_types(id) on delete restrict,
+    membership_type_id uuid references membership_types(id) on delete restrict,
+    membership_expires_at timestamp with time zone, --new
+    membership_pre_ordered_type_id uuid references membership_types(id) on delete restrict, --new
     role_access role_access_enum default 'basic',
     created_at timestamp with time zone default now(),
     updated_at timestamp with time zone default now()

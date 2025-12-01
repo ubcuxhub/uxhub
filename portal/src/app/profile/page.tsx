@@ -21,6 +21,12 @@ import { cn } from "@/lib/utils";
 
 const supabase = createClient();
 
+const USER_TYPES = [
+  { value: "ubcStudent", label: "UBC Student" },
+  { value: "faculty", label: "Faculty" },
+  { value: "nonUbc", label: "Non-UBC" },
+];
+
 const Profile = () => {
   const { user, refreshUser } = useUser();
   const router = useRouter();
@@ -32,6 +38,10 @@ const Profile = () => {
     faculty: "",
     major: "",
     year: "",
+    dietary_restrictions: "",
+    preferred_pronouns: "",
+    newsletter: false,
+    user_type: "ubcStudent",
   });
   const [loading, setLoading] = useState(false);
 
@@ -44,6 +54,10 @@ const Profile = () => {
         faculty: user.faculty || "",
         major: user.major || "",
         year: user.year || "",
+        dietary_restrictions: user.dietary_restrictions || "",
+        preferred_pronouns: user.preferred_pronouns || "",
+        newsletter: user.newsletter || false,
+        user_type: user.user_type || "ubcStudent",
       });
     }
   }, [user]);
@@ -64,6 +78,10 @@ const Profile = () => {
           faculty: formData.faculty || null,
           major: formData.major || null,
           year: formData.year || null,
+          dietary_restrictions: formData.dietary_restrictions || null,
+          preferred_pronouns: formData.preferred_pronouns || null,
+          newsletter: formData.newsletter,
+          user_type: formData.user_type,
         })
         .eq("auth_user_id", user.auth_user_id);
 
@@ -207,6 +225,55 @@ const Profile = () => {
                 )}
               </div>
               <div className="space-y-2">
+                <Label className="text-muted-foreground">
+                  Preferred Pronouns
+                </Label>
+                {isEditing ? (
+                  <Input
+                    value={formData.preferred_pronouns}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        preferred_pronouns: e.target.value,
+                      })
+                    }
+                    onKeyDown={handleKeyDown}
+                    placeholder="e.g. she/her"
+                  />
+                ) : (
+                  <div className="font-medium min-h-10 flex items-center">
+                    {user.preferred_pronouns || "-"}
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">User Type</Label>
+                {isEditing ? (
+                  <Select
+                    value={formData.user_type}
+                    onValueChange={(value: string) =>
+                      setFormData({ ...formData, user_type: value })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select user type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {USER_TYPES.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="font-medium min-h-10 flex items-center">
+                    {USER_TYPES.find((t) => t.value === user.user_type)
+                      ?.label || user.user_type}
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
                 <Label className="text-muted-foreground">Student Number</Label>
                 {isEditing ? (
                   <Input
@@ -291,6 +358,56 @@ const Profile = () => {
                 ) : (
                   <div className="font-medium min-h-10 flex items-center">
                     {user.year || "-"}
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">
+                  Dietary Restrictions
+                </Label>
+                {isEditing ? (
+                  <Input
+                    value={formData.dietary_restrictions}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        dietary_restrictions: e.target.value,
+                      })
+                    }
+                    onKeyDown={handleKeyDown}
+                    placeholder="e.g. Vegetarian, Gluten-free"
+                  />
+                ) : (
+                  <div className="font-medium min-h-10 flex items-center">
+                    {user.dietary_restrictions || "None"}
+                  </div>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label className="text-muted-foreground">
+                  Subscribe me to thenewsletter!
+                </Label>
+                {isEditing ? (
+                  <Select
+                    value={formData.newsletter ? "true" : "false"}
+                    onValueChange={(value: string) =>
+                      setFormData({
+                        ...formData,
+                        newsletter: value === "true",
+                      })
+                    }
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="true">Yes</SelectItem>
+                      <SelectItem value="false">No</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="font-medium min-h-10 flex items-center">
+                    {user.newsletter ? "Yes" : "No"}
                   </div>
                 )}
               </div>
