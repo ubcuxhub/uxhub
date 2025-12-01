@@ -39,7 +39,8 @@ export function EventDetailsCard({ event }: EventDetailsCardProps) {
               Date & Time
             </p>
             <p className="text-base">
-              {event.event_date} at {event.event_time}
+              {event.start_date} at {event.start_time}
+              {event.end_date && event.end_time && ` - ${event.end_date} at ${event.end_time}`}
             </p>
           </div>
           <div>
@@ -64,7 +65,9 @@ export function EventDetailsCard({ event }: EventDetailsCardProps) {
           </div>
           <div>
             <p className="text-sm font-medium text-muted-foreground">Price</p>
-            <p className="text-base">${Number(event.price ?? 0).toFixed(2)}</p>
+            <p className="text-base">
+              ${Number(event.regular_price ?? 0).toFixed(2)} (Regular) / ${Number(event.member_price ?? 0).toFixed(2)} (Member)
+            </p>
           </div>
           <div>
             <p className="text-sm font-medium text-muted-foreground">

@@ -111,7 +111,8 @@ const AdminEventsManager = () => {
                       </CardTitle>
                       <CardDescription className="flex flex-col gap-1 text-xs">
                         <span>
-                          {event.event_date} ・ {event.event_time}
+                          {event.start_date} ・ {event.start_time}
+                          {event.end_date && event.end_time && ` - ${event.end_date} ・ ${event.end_time}`}
                         </span>
                         <span className="line-clamp-1">
                           {event.location_building} {event.location_room}
@@ -126,7 +127,7 @@ const AdminEventsManager = () => {
                     <CardFooter className="flex flex-col gap-2">
                       <div className="flex items-center justify-between w-full">
                         <div className="text-sm font-medium">
-                          ${Number(event.price ?? 0).toFixed(2)}
+                          ${Number(event.regular_price ?? 0).toFixed(2)} / ${Number(event.member_price ?? 0).toFixed(2)}
                         </div>
                         <Button asChild variant="outline" size="sm">
                           <Link href={`/admin/events/${event.id}`}>Modify</Link>

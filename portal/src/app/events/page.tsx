@@ -24,7 +24,7 @@ export default function Events() {
       const { data } = await supabase
         .from("events")
         .select("*")
-        .order("event_date", { ascending: true });
+        .order("start_date", { ascending: true });
       setEvents(data ?? []);
       setLoadingEvents(false);
     }
@@ -53,7 +53,8 @@ export default function Events() {
               >
                 <h3 className="font-semibold text-lg">{event.name}</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {event.event_date} at {event.event_time}
+                  {event.start_date} at {event.start_time}
+                  {event.end_date && event.end_time && ` - ${event.end_date} at ${event.end_time}`}
                 </p>
                 {event.description && (
                   <p className="text-sm mt-2 line-clamp-2">{event.description}</p>

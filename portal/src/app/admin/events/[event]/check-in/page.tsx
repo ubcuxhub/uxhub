@@ -470,7 +470,7 @@ export default function CheckInPage() {
           <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 py-8 px-8">
             {/* Header */}
             <div className="flex items-center justify-between">
-              <div>
+              <div>2
                 <Button asChild variant="outline" className="mb-4">
                   <Link href={`/admin/events/${eventId}`}>← Back to Event</Link>
                 </Button>
@@ -512,7 +512,8 @@ export default function CheckInPage() {
                           Date & Time
                         </p>
                         <p className="text-base">
-                          {event.event_date} at {event.event_time}
+                          {event.start_date} at {event.start_time}
+                          {event.end_date && event.end_time && ` - ${event.end_date} at ${event.end_time}`}
                         </p>
                       </div>
                       <div>
@@ -536,7 +537,7 @@ export default function CheckInPage() {
                           Price
                         </p>
                         <p className="text-base">
-                          ${Number(event.price ?? 0).toFixed(2)}
+                          ${Number(event.regular_price ?? 0).toFixed(2)} (Regular) / ${Number(event.member_price ?? 0).toFixed(2)} (Member)
                         </p>
                       </div>
                     </div>

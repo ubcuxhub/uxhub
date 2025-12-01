@@ -1,11 +1,14 @@
 export interface Event {
-  event_time: string;
-  event_date: string;
+  start_time: string;
+  start_date: string;
+  end_time?: string;
+  end_date?: string;
   name: string;
   location_building: string;
   location_room: string;
   location_address_url: string;
-  price: number;
+  regular_price: number;
+  member_price: number;
   check_in_events: CheckInEvent[];
   description: string;
   application_template?: ApplicationQuestionTemplate[];

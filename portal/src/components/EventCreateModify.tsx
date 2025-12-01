@@ -32,12 +32,15 @@ interface EventCreateModifyProps {
 
 interface EventFormState {
   name: string;
-  event_date: string;
-  event_time: string;
+  start_date: string;
+  start_time: string;
+  end_date: string;
+  end_time: string;
   location_building: string;
   location_room: string;
   location_address_url: string;
-  price: string;
+  regular_price: string;
+  member_price: string;
   description: string;
   max_capacity: string;
   image_url: string;
@@ -46,12 +49,15 @@ interface EventFormState {
 
 const defaultFormState: EventFormState = {
   name: "",
-  event_date: "",
-  event_time: "",
+  start_date: "",
+  start_time: "",
+  end_date: "",
+  end_time: "",
   location_building: "",
   location_room: "",
   location_address_url: "",
-  price: "",
+  regular_price: "",
+  member_price: "",
   description: "",
   max_capacity: "",
   image_url: "",
@@ -115,14 +121,20 @@ export const EventCreateModify = ({
 
       setFormState({
         name: data.name ?? "",
-        event_date: data.event_date ?? "",
-        event_time: data.event_time ?? "",
+        start_date: data.start_date ?? "",
+        start_time: data.start_time ?? "",
+        end_date: data.end_date ?? "",
+        end_time: data.end_time ?? "",
         location_building: data.location_building ?? "",
         location_room: data.location_room ?? "",
         location_address_url: data.location_address_url ?? "",
-        price:
-          data.price !== null && data.price !== undefined
-            ? String(data.price)
+        regular_price:
+          data.regular_price !== null && data.regular_price !== undefined
+            ? String(data.regular_price)
+            : "",
+        member_price:
+          data.member_price !== null && data.member_price !== undefined
+            ? String(data.member_price)
             : "",
         description: data.description ?? "",
         max_capacity:
@@ -133,11 +145,46 @@ export const EventCreateModify = ({
         created_at: data.created_at ?? "",
       });
 
-      setCheckInEvents(
-        Array.isArray(data.check_in_events) && data.check_in_events.length > 0
-          ? data.check_in_events
-          : [{ name: "", location: "", date: "", time: "" }]
-      );
+      // Fetch check-in sessions from check_in_sessions table
+      const { data: checkInSessionsData, error: checkInSessionsError } =
+        await supabase
+          .from("check_in_sessions")
+          .select("*")
+          .eq("event_id", eventId)
+          .order("start_time", { ascending: true });
+
+      if (checkInSessionsError) {
+        console.error(
+          "Error fetching check-in sessions:",
+          checkInSessionsError
+        );
+        setCheckInEvents([{ name: "", location: "", date: "", time: "" }]);
+      } else if (checkInSessionsData && checkInSessionsData.length > 0) {
+        // Convert database timestamps to UI format (date/time strings)
+        const convertedSessions = checkInSessionsData.map((session) => {
+          const startDate = session.start_time
+            ? new Date(session.start_time)
+            : null;
+
+          return {
+            name: session.name || "",
+            location: "", // Location is not stored in check_in_sessions table
+            date: startDate
+              ? startDate.toISOString().split("T")[0]
+              : "",
+            time: startDate
+              ? startDate.toTimeString().slice(0, 5)
+              : "",
+          };
+        });
+        setCheckInEvents(
+          convertedSessions.length > 0
+            ? convertedSessions
+            : [{ name: "", location: "", date: "", time: "" }]
+        );
+      } else {
+        setCheckInEvents([{ name: "", location: "", date: "", time: "" }]);
+      }
 
       // Fetch application questions from event_application_questions table
       const { data: questionsData, error: questionsError } = await supabase
@@ -160,7 +207,7 @@ export const EventCreateModify = ({
         setApplicationTemplate(
           questionsData.map((q) => ({
             question: q.question ?? "",
-            response: (q.response as ResponseType) ?? ResponseType.text,
+            response: (q.response_type as ResponseType) ?? ResponseType.text,
             max_char_limit: q.max_char_limit ?? 0,
             response_options: q.response_options ?? [],
           }))
@@ -342,8 +389,8 @@ export const EventCreateModify = ({
 
   const validateForm = () => {
     if (!formState.name.trim()) return "Event name is required.";
-    if (!formState.event_date) return "Event date is required.";
-    if (!formState.event_time) return "Event time is required.";
+    if (!formState.start_date) return "Event start date is required.";
+    if (!formState.start_time) return "Event start time is required.";
     // location_building and location_room are now optional
     if (!formState.location_address_url.trim())
       return "Location address URL is required.";
@@ -351,10 +398,10 @@ export const EventCreateModify = ({
     if (!formState.max_capacity) return "Max capacity is required.";
     if (
       !checkInEvents.every(
-        (item) => item.name && item.location && item.date && item.time
+        (item) => item.name && item.date && item.time
       )
     )
-      return "All check-in events require name, location, date, and time.";
+      return "All check-in events require name, date, and time.";
 
     // Validate application questions and track errors per question
     const newQuestionErrors: Record<number, string> = {};
@@ -393,9 +440,12 @@ export const EventCreateModify = ({
       return "Please fix the errors in application questions.";
     }
 
-    if (!formState.price.trim()) return "Price is required.";
-    if (Number.isNaN(Number(formState.price)))
-      return "Price must be a valid number.";
+    if (!formState.regular_price.trim()) return "Regular price is required.";
+    if (Number.isNaN(Number(formState.regular_price)))
+      return "Regular price must be a valid number.";
+    if (!formState.member_price.trim()) return "Member price is required.";
+    if (Number.isNaN(Number(formState.member_price)))
+      return "Member price must be a valid number.";
 
     return null;
   };
@@ -412,12 +462,12 @@ export const EventCreateModify = ({
     }
 
     setIsSubmitting(true);
-    // Prepare payload without application_template
+    // Prepare payload without application_template and check_in_events
     const payload = {
       ...formState,
-      price: Number(formState.price),
-      max_capacity: String(formState.max_capacity),
-      check_in_events: checkInEvents,
+      regular_price: Number(formState.regular_price),
+      member_price: Number(formState.member_price),
+      max_capacity: Number(formState.max_capacity),
       created_at: formState.created_at || new Date().toISOString(),
     };
 
@@ -446,6 +496,67 @@ export const EventCreateModify = ({
 
     const finalEventId = data.id;
 
+    // Helper function to convert date/time strings to timestamp
+    const convertToTimestamp = (dateStr: string, timeStr: string): string | null => {
+      if (!dateStr || !timeStr) return null;
+      try {
+        const dateTimeStr = `${dateStr}T${timeStr}:00`;
+        const date = new Date(dateTimeStr);
+        return date.toISOString();
+      } catch {
+        return null;
+      }
+    };
+
+    // Handle check-in sessions: delete old ones and create new ones
+    if (eventId) {
+      // Delete existing check-in sessions
+      const { error: deleteSessionsError } = await supabase
+        .from("check_in_sessions")
+        .delete()
+        .eq("event_id", eventId);
+
+      if (deleteSessionsError) {
+        setError(
+          `Failed to delete existing check-in sessions: ${deleteSessionsError.message}`
+        );
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
+    // Insert new check-in sessions
+    const validCheckInEvents = checkInEvents.filter(
+      (event) => event.name && event.date && event.time
+    );
+
+    if (validCheckInEvents.length > 0) {
+      const sessionsToInsert = validCheckInEvents.map((event) => {
+        const startTimestamp = convertToTimestamp(event.date, event.time);
+        // For end_time, we'll use the same date/time (can be updated later if needed)
+        const endTimestamp = convertToTimestamp(event.date, event.time);
+
+        return {
+          event_id: finalEventId,
+          name: event.name,
+          start_time: startTimestamp,
+          end_time: endTimestamp,
+        };
+      });
+
+      const { error: sessionsError } = await supabase
+        .from("check_in_sessions")
+        .insert(sessionsToInsert);
+
+      if (sessionsError) {
+        setError(
+          `Failed to save check-in sessions: ${sessionsError.message}`
+        );
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
     // If updating, delete existing application questions
     if (eventId) {
       const { error: deleteError } = await supabase
@@ -472,13 +583,14 @@ export const EventCreateModify = ({
           const questionData: {
             event_id: string;
             question: string;
-            response: string;
+            response_type: string;
             max_char_limit?: number;
             response_options?: string[];
+            is_required?: boolean;
           } = {
             event_id: finalEventId,
             question: q.question,
-            response: q.response,
+            response_type: q.response,
           };
 
           if (q.response === ResponseType.text) {
@@ -592,45 +704,85 @@ export const EventCreateModify = ({
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="price">
-                  Price <span className="text-red-500">*</span>
+                <Label htmlFor="regular_price">
+                  Regular Price <span className="text-red-500">*</span>
                 </Label>
                 <Input
-                  id="price"
+                  id="regular_price"
                   type="number"
                   min="0"
                   step="0.01"
-                  value={formState.price}
-                  onChange={(e) => handleFieldChange("price", e.target.value)}
+                  value={formState.regular_price}
+                  onChange={(e) => handleFieldChange("regular_price", e.target.value)}
                   required
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="event_date">
-                  Event Date <span className="text-red-500">*</span>
+                <Label htmlFor="member_price">
+                  Member Price <span className="text-red-500">*</span>
                 </Label>
                 <Input
-                  id="event_date"
+                  id="member_price"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={formState.member_price}
+                  onChange={(e) => handleFieldChange("member_price", e.target.value)}
+                  required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="start_date">
+                  Start Date <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="start_date"
                   type="date"
-                  value={formState.event_date}
+                  value={formState.start_date}
                   onChange={(e) =>
-                    handleFieldChange("event_date", e.target.value)
+                    handleFieldChange("start_date", e.target.value)
                   }
                   required
                 />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="event_time">
-                  Event Time <span className="text-red-500">*</span>
+                <Label htmlFor="start_time">
+                  Start Time <span className="text-red-500">*</span>
                 </Label>
                 <Input
-                  id="event_time"
+                  id="start_time"
                   type="time"
-                  value={formState.event_time}
+                  value={formState.start_time}
                   onChange={(e) =>
-                    handleFieldChange("event_time", e.target.value)
+                    handleFieldChange("start_time", e.target.value)
                   }
                   required
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="end_date">
+                  End Date
+                </Label>
+                <Input
+                  id="end_date"
+                  type="date"
+                  value={formState.end_date}
+                  onChange={(e) =>
+                    handleFieldChange("end_date", e.target.value)
+                  }
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="end_time">
+                  End Time
+                </Label>
+                <Input
+                  id="end_time"
+                  type="time"
+                  value={formState.end_time}
+                  onChange={(e) =>
+                    handleFieldChange("end_time", e.target.value)
+                  }
                 />
               </div>
               <div className="grid gap-2">
@@ -711,8 +863,8 @@ export const EventCreateModify = ({
                 <div>
                   <h3 className="text-lg font-semibold">Check-In Events</h3>
                   <p className="text-sm text-muted-foreground">
-                    Provide the check-in details for attendees. Each entry must
-                    include a location, date, and time.
+                    Provide the check-in session details for attendees. Each entry must
+                    include a name, date, and time.
                   </p>
                 </div>
                 <Button
@@ -746,7 +898,7 @@ export const EventCreateModify = ({
                     <div className="grid gap-3 md:grid-cols-3">
                       <div className="grid gap-2">
                         <Label htmlFor={`check_location_${index}`}>
-                          Location <span className="text-red-500">*</span>
+                          Location
                         </Label>
                         <Input
                           id={`check_location_${index}`}
@@ -758,7 +910,7 @@ export const EventCreateModify = ({
                               e.target.value
                             )
                           }
-                          required
+                          placeholder="Optional"
                         />
                       </div>
                       <div className="grid gap-2">
