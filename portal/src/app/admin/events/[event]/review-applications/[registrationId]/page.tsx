@@ -11,8 +11,8 @@ import type { Event } from "@/lib/types/eventTypes";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Card, CardContent } from "@/components/ui/card";
-import { ArrowLeft } from "lucide-react";
 import type { ApplicationStatus } from "@/components/ApplicationListCard";
+import { BackButton } from "@/components/BackButton";
 import { ApplicationResponseCard } from "@/components/ApplicationResponseCard";
 import { ApplicantInfoCard } from "@/components/ApplicantInfoCard";
 import { StatusUpdateSection } from "@/components/StatusUpdateSection";
@@ -266,14 +266,11 @@ export default function ApplicationReviewPage() {
                   {event.name}
                 </p>
               </div>
-              <Button asChild variant="outline" className="w-fit">
-                <Link
-                  href={`/admin/events/${eventId}/review-applications?filter=pending`}
-                >
-                  <ArrowLeft className="mr-2 h-4 w-4" />
-                  Back to Applications
-                </Link>
-              </Button>
+              <BackButton
+                link={`/admin/events/${eventId}/review-applications?filter=pending`}
+                label="Back to Applications"
+                className="w-fit"
+              />
             </div>
 
             {/* Applicant Information */}

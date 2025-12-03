@@ -1,13 +1,11 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import Link from "next/link";
 import { useParams } from "next/navigation";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { AdminSidebar } from "@/components/AdminSidebar";
 import { createClient } from "@/lib/supabase/client";
 import type { Event } from "@/lib/types/eventTypes";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -16,6 +14,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
+import { BackButton } from "@/components/BackButton";
 import { CheckInTable } from "@/components/CheckInTable";
 import {
   fetchCheckInSessions,
@@ -360,9 +359,11 @@ export default function CheckInPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
               <div>
-                <Button asChild variant="outline" className="mb-4">
-                  <Link href={`/admin/events`}>← Back to Events</Link>
-                </Button>
+                <BackButton
+                  link="/admin/events"
+                  label="Back to Events"
+                  className="mb-4"
+                />
                 <h1 className="text-2xl font-semibold">Check-In Management</h1>
                 <p className="text-sm text-muted-foreground">
                   Manage attendee check-ins for this event
@@ -381,9 +382,11 @@ export default function CheckInPage() {
                 </CardHeader>
                 <CardContent>
                   <p className="text-destructive">{error}</p>
-                  <Button asChild className="mt-4">
-                    <Link href="/admin/events">Back to Events</Link>
-                  </Button>
+                  <BackButton
+                    link="/admin/events"
+                    label="Back to Events"
+                    className="mt-4"
+                  />
                 </CardContent>
               </Card>
             ) : event ? (

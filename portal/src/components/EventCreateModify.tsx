@@ -27,6 +27,8 @@ import { RegistrationTimes } from "@/components/event-form/RegistrationTimes";
 import { CheckInEventsSection } from "@/components/event-form/CheckInEventsSection";
 import { ApplicationQuestionsSection } from "@/components/event-form/ApplicationQuestionsSection";
 import { Skeleton } from "@/components/ui/skeleton";
+import { BackButton } from "@/components/BackButton";
+import { DeleteEventModal } from "@/components/DeleteEventModal";
 
 interface EventCreateModifyProps {
   eventId?: string;
@@ -132,6 +134,8 @@ export const EventCreateModify = ({
   const [questionErrors, setQuestionErrors] = useState<Record<number, string>>(
     {}
   );
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Restore state from sessionStorage on mount (only for new events)
   useEffect(() => {
@@ -831,6 +835,76 @@ export const EventCreateModify = ({
     }
   };
 
+  const handleDeleteEvent = async () => {
+    if (!eventId) return;
+
+    setIsDeleting(true);
+    setError(null);
+
+    try {
+      // Delete related check-in sessions first
+      const { error: deleteCheckInError } = await supabase
+        .from("check_in_sessions")
+        .delete()
+        .eq("event_id", eventId);
+
+      if (deleteCheckInError) {
+        setError(
+          `Failed to delete check-in sessions: ${deleteCheckInError.message}`
+        );
+        setIsDeleting(false);
+        return;
+      }
+
+      // Delete related application questions
+      const { error: deleteQuestionsError } = await supabase
+        .from("event_application_questions")
+        .delete()
+        .eq("event_id", eventId);
+
+      if (deleteQuestionsError) {
+        setError(
+          `Failed to delete application questions: ${deleteQuestionsError.message}`
+        );
+        setIsDeleting(false);
+        return;
+      }
+
+      // Delete event registrations
+      const { error: deleteRegistrationsError } = await supabase
+        .from("event_registrations")
+        .delete()
+        .eq("event_id", eventId);
+
+      if (deleteRegistrationsError) {
+        setError(
+          `Failed to delete event registrations: ${deleteRegistrationsError.message}`
+        );
+        setIsDeleting(false);
+        return;
+      }
+
+      // Finally, delete the event itself
+      const { error: deleteEventError } = await supabase
+        .from("events")
+        .delete()
+        .eq("id", eventId);
+
+      if (deleteEventError) {
+        setError(`Failed to delete event: ${deleteEventError.message}`);
+        setIsDeleting(false);
+        return;
+      }
+
+      // Success - redirect to events page
+      setShowDeleteModal(false);
+      router.push("/admin/events");
+    } catch {
+      setError("An unexpected error occurred while deleting the event.");
+      setIsDeleting(false);
+    }
+  };
+
   return (
     <Card className="max-w-4xl">
       <CardHeader>
@@ -867,9 +941,11 @@ export const EventCreateModify = ({
                 </Link>
               </Button>
 
-              <Button asChild variant="outline" className="mb-4">
-                <Link href={`/admin/events`}>Back to Events</Link>
-              </Button>
+              <BackButton
+                link="/admin/events"
+                label="Back to Events"
+                className="mb-4"
+              />
             </div>
           )}
         </div>
@@ -1074,7 +1150,7 @@ export const EventCreateModify = ({
               <p className="text-sm text-green-600">{successMessage}</p>
             )}
 
-            <CardFooter className="px-0">
+            <CardFooter className="px-0 flex gap-2">
               <Button
                 type="submit"
                 disabled={isSubmitting}
@@ -1088,10 +1164,34 @@ export const EventCreateModify = ({
                   ? "Update Event"
                   : "Create Event"}
               </Button>
+              {eventId && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => setShowDeleteModal(true)}
+                  disabled={isSubmitting || isDeleting}
+                  className="w-full md:w-auto"
+                >
+                  Delete Event
+                </Button>
+              )}
             </CardFooter>
           </form>
         )}
       </CardContent>
+      {eventId && (
+        <DeleteEventModal
+          eventName={formState.name}
+          isOpen={showDeleteModal}
+          onClose={() => {
+            setShowDeleteModal(false);
+            setError(null);
+          }}
+          onConfirm={handleDeleteEvent}
+          isDeleting={isDeleting}
+          error={error}
+        />
+      )}
     </Card>
   );
 };
