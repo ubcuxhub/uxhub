@@ -1,8 +1,6 @@
 import { AdminSidebar } from "@/components/AdminSidebar";
 import EventCreateModify from "@/components/EventCreateModify";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import { Button } from "@/components/ui/button";
-import Link from "next/link";
 import React from "react";
 
 interface EventViewProps {

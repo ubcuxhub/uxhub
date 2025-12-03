@@ -21,7 +21,6 @@ import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { Checkbox } from "@/components/ui/checkbox";
 
-
 interface RegistrationWithUser {
   id: string;
   event_id: string;
@@ -485,6 +484,7 @@ export default function CheckInPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
               <div>
+                2
                 <Button asChild variant="outline" className="mb-4">
                   <Link href={`/admin/events`}>← Back to Events</Link>
                 </Button>

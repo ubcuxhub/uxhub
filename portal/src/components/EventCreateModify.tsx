@@ -518,6 +518,11 @@ export const EventCreateModify = ({
 
   const validateForm = () => {
     if (!formState.name.trim()) return "Event name is required.";
+    if (!formState.start_date) return "Event start date is required.";
+    if (!formState.start_time) return "Event start time is required.";
+    // location_building and location_room are now optional
+    if (!formState.location_address_url.trim())
+      return "Location address URL is required.";
     if (!formState.description.trim()) return "Description is required.";
     if (!formState.regular_price.trim()) return "Regular price is required.";
     if (Number.isNaN(Number(formState.regular_price)))
@@ -569,6 +574,13 @@ export const EventCreateModify = ({
     if (Object.keys(newQuestionErrors).length > 0) {
       return "Please fix the errors in application questions.";
     }
+
+    if (!formState.regular_price.trim()) return "Regular price is required.";
+    if (Number.isNaN(Number(formState.regular_price)))
+      return "Regular price must be a valid number.";
+    if (!formState.member_price.trim()) return "Member price is required.";
+    if (Number.isNaN(Number(formState.member_price)))
+      return "Member price must be a valid number.";
 
     return null;
   };
@@ -758,6 +770,7 @@ export const EventCreateModify = ({
             response_type: string;
             max_char_limit?: number;
             response_options?: string[];
+            is_required?: boolean;
           } = {
             event_id: finalEventId,
             question: q.question,

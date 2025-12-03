@@ -94,4 +94,3 @@ export function EventDetailsCard({ event }: EventDetailsCardProps) {
     </Card>
   );
 }
-
