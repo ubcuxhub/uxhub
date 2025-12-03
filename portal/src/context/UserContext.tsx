@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { User } from "@/lib/types/membershipTypes";
 
@@ -23,9 +23,13 @@ export const useUser = () => useContext(UserContext);
 export function UserProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const hasUser = useRef(false);
 
-  const loadUser = async () => {
-    setLoading(true);
+  const loadUser = async (silent = false) => {
+    // Only set loading if this is not a silent refresh and we don't have a user yet
+    if (!silent && !hasUser.current) {
+      setLoading(true);
+    }
 
     const {
       data: { session },
@@ -34,8 +38,11 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     const authUser = session?.user;
     if (!authUser) {
       // async defer to avoid hook mismatch
-      setTimeout(() => setUser(null), 0);
-      setLoading(false);
+      setTimeout(() => {
+        setUser(null);
+        hasUser.current = false;
+        setLoading(false);
+      }, 0);
       return;
     }
 
@@ -48,8 +55,10 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
     setTimeout(() => {
       if (error) {
         setUser(null);
+        hasUser.current = false;
       } else {
         setUser(member);
+        hasUser.current = true;
       }
       setLoading(false);
     }, 0);
@@ -57,26 +66,38 @@ export function UserProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Defer initial load to avoid synchronous setState warnings
-    setTimeout(() => loadUser(), 0);
+    setTimeout(() => loadUser(false), 0);
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      // Ignore TOKEN_REFRESHED events - they don't require a full reload
+      // and are common when tab regains focus
+      if (event === "TOKEN_REFRESHED" && hasUser.current) {
+        return;
+      }
+
       if (!session?.user) {
         setTimeout(() => {
           setUser(null);
+          hasUser.current = false;
+          setLoading(false);
         }, 0);
         return;
       }
 
-      setTimeout(() => loadUser(), 0);
+      // Use silent refresh if we already have a user (prevents loading flicker)
+      const shouldBeSilent = hasUser.current && event === "TOKEN_REFRESHED";
+      setTimeout(() => loadUser(shouldBeSilent), 0);
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
   return (
-    <UserContext.Provider value={{ user, loading, refreshUser: loadUser }}>
+    <UserContext.Provider
+      value={{ user, loading, refreshUser: () => loadUser(false) }}
+    >
       {children}
     </UserContext.Provider>
   );

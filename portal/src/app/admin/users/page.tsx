@@ -10,6 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type UserRecord = User & { id?: string };
 
@@ -29,6 +36,9 @@ const AdminUsersManager = () => {
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
+  const [membershipTypes, setMembershipTypes] = useState<
+    Array<{ id: string; name: string }>
+  >([]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -39,14 +49,39 @@ const AdminUsersManager = () => {
       try {
         const { data, error } = await supabase
           .from("user_info")
-          .select("*")
+          .select(
+            `
+            *,
+            membership_types!membership_type_id(name)
+          `
+          )
           .order("name", { ascending: true });
 
         if (error) {
           setError(error.message);
         } else {
-          setUsers((data ?? []) as UserRecord[]);
-          setFilteredUsers((data ?? []) as UserRecord[]);
+          // Transform data to extract membership_type_name from joined data
+          const transformedData = (data ?? []).map(
+            (user: {
+              membership_types: { name: string } | { name: string }[] | null;
+              [key: string]: unknown;
+            }) => {
+              let membershipTypeName: string | null = null;
+              if (user.membership_types) {
+                if (Array.isArray(user.membership_types)) {
+                  membershipTypeName = user.membership_types[0]?.name || null;
+                } else {
+                  membershipTypeName = user.membership_types.name || null;
+                }
+              }
+              return {
+                ...user,
+                membership_type_name: membershipTypeName,
+              };
+            }
+          );
+          setUsers(transformedData as unknown as UserRecord[]);
+          setFilteredUsers(transformedData as unknown as UserRecord[]);
         }
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
@@ -55,7 +90,26 @@ const AdminUsersManager = () => {
       }
     };
 
+    const fetchMembershipTypes = async () => {
+      const supabase = createClient();
+      try {
+        const { data, error } = await supabase
+          .from("membership_types")
+          .select("id, name")
+          .order("name", { ascending: true });
+
+        if (error) {
+          console.error("Error fetching membership types:", error);
+        } else {
+          setMembershipTypes(data || []);
+        }
+      } catch (err) {
+        console.error("Error fetching membership types:", err);
+      }
+    };
+
     fetchUsers();
+    fetchMembershipTypes();
   }, []);
 
   useEffect(() => {
@@ -96,7 +150,12 @@ const AdminUsersManager = () => {
     currentValue: string | number | null
   ) => {
     setEditingField(field);
-    setEditValue(currentValue?.toString() ?? "");
+    // For membership_type_id, use "__none__" if null/empty, otherwise use the ID
+    if (field === "membership_type_id") {
+      setEditValue(currentValue?.toString() || "__none__");
+    } else {
+      setEditValue(currentValue?.toString() ?? "");
+    }
   };
 
   const handleEditCancel = () => {
@@ -120,6 +179,20 @@ const AdminUsersManager = () => {
         updateData[field] = parseInt(editValue, 10) || null;
       }
 
+      // For membership_type_id, we need to update both the ID and refresh the name
+      if (field === "membership_type_id") {
+        if (editValue === "__none__" || editValue === "") {
+          updateData.membership_type_id = null;
+        } else {
+          const membershipType = membershipTypes.find(
+            (mt) => mt.id === editValue
+          );
+          if (membershipType) {
+            updateData.membership_type_id = editValue;
+          }
+        }
+      }
+
       const { error } = await supabase
         .from("user_info")
         .update(updateData)
@@ -128,7 +201,28 @@ const AdminUsersManager = () => {
       if (error) throw error;
 
       // Update local state
-      const updatedUser = { ...selectedUser, [field]: updateData[field] };
+      let updatedUser = { ...selectedUser, [field]: updateData[field] };
+
+      // If updating membership_type_id, also update the name
+      if (field === "membership_type_id") {
+        if (editValue === "__none__" || editValue === "") {
+          updatedUser = {
+            ...updatedUser,
+            membership_type_id: null,
+            membership_type_name: null,
+          };
+        } else {
+          const membershipType = membershipTypes.find(
+            (mt) => mt.id === editValue
+          );
+          updatedUser = {
+            ...updatedUser,
+            membership_type_id: editValue || null,
+            membership_type_name: membershipType?.name || null,
+          };
+        }
+      }
+
       setSelectedUser(updatedUser);
 
       // Update users list
@@ -190,6 +284,77 @@ const AdminUsersManager = () => {
               size="sm"
               variant="ghost"
               onClick={() => handleEditStart(field, value ?? null)}
+              className="h-6 px-2 text-xs"
+            >
+              Edit
+            </Button>
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const renderMembershipTypeField = () => {
+    const isEditing = editingField === "membership_type_id";
+    const displayValue = selectedUser?.membership_type_name || "None";
+
+    return (
+      <div className="space-y-2">
+        <Label className="text-sm font-medium">Membership Type</Label>
+        {isEditing ? (
+          <div className="flex gap-2">
+            <Select
+              value={editValue}
+              onValueChange={(value: string) => setEditValue(value)}
+            >
+              <SelectTrigger className="flex-1">
+                <SelectValue placeholder="Select membership type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__none__">None</SelectItem>
+                {membershipTypes.map((mt) => (
+                  <SelectItem key={mt.id} value={mt.id}>
+                    {mt.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button
+              size="sm"
+              onClick={() => handleEditSave("membership_type_id")}
+              disabled={isSaving}
+            >
+              Save
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleEditCancel}
+              disabled={isSaving}
+            >
+              Cancel
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm">
+            <span
+              className={
+                !selectedUser?.membership_type_name
+                  ? "text-muted-foreground"
+                  : ""
+              }
+            >
+              {displayValue}
+            </span>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() =>
+                handleEditStart(
+                  "membership_type_id",
+                  selectedUser?.membership_type_id ?? null
+                )
+              }
               className="h-6 px-2 text-xs"
             >
               Edit
@@ -320,11 +485,7 @@ const AdminUsersManager = () => {
                     <CardTitle>Membership Information</CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-4">
-                    {renderEditableField(
-                      "Membership Type",
-                      "membership_type",
-                      selectedUser.membership_type
-                    )}
+                    {renderMembershipTypeField()}
                     {renderEditableField(
                       "Order Date",
                       "order_date",

@@ -80,9 +80,7 @@ export function useEventApplication(
           .insert({
             event_id: eventId,
             user_id: userId,
-            accepted: false,
-            attending: false,
-            checked_in: false,
+            status: "pending",
           })
           .select("id")
           .single();
@@ -90,19 +88,24 @@ export function useEventApplication(
         if (regError) {
           if (regError.code === "23505") {
             // If unique constraint violation, try to fetch the existing registration
-            const { data: existingRegAfterError, error: fetchError } = await supabase
-              .from("event_registrations")
-              .select("id")
-              .eq("event_id", eventId)
-              .eq("user_id", userId)
-              .maybeSingle();
+            const { data: existingRegAfterError, error: fetchError } =
+              await supabase
+                .from("event_registrations")
+                .select("id")
+                .eq("event_id", eventId)
+                .eq("user_id", userId)
+                .maybeSingle();
 
             if (fetchError || !existingRegAfterError) {
-              throw new Error("You have already registered for this event, but we couldn't retrieve your registration.");
+              throw new Error(
+                "You have already registered for this event, but we couldn't retrieve your registration."
+              );
             }
             regId = existingRegAfterError.id;
           } else {
-            throw new Error(`Failed to create registration: ${regError.message}`);
+            throw new Error(
+              `Failed to create registration: ${regError.message}`
+            );
           }
         } else if (newRegistration?.id) {
           regId = newRegistration.id;
@@ -111,65 +114,15 @@ export function useEventApplication(
 
       // Validate that we have a registration ID before proceeding
       if (!regId) {
-        throw new Error("Failed to create or retrieve event registration. Please try again.");
+        throw new Error(
+          "Failed to create or retrieve event registration. Please try again."
+        );
       }
 
-      // Create or get event_application record
-      let applicationId: string | null = null;
-
-      // Check if application already exists for this registration
-      const { data: existingApplication, error: appCheckError } = await supabase
-        .from("event_applications")
-        .select("id")
-        .eq("event_registration_id", regId)
-        .maybeSingle();
-
-      if (appCheckError && appCheckError.code !== "PGRST116") {
-        console.warn("Warning: Could not check existing application:", appCheckError);
-      }
-
-      if (existingApplication?.id) {
-        applicationId = existingApplication.id;
-      } else {
-        // Create new application record
-        const { data: newApplication, error: appError } = await supabase
-          .from("event_applications")
-          .insert({
-            event_registration_id: regId,
-            status: "pending",
-          })
-          .select("id")
-          .single();
-
-        if (appError) {
-          // If unique constraint violation, try to fetch existing
-          if (appError.code === "23505") {
-            const { data: existingAppAfterError, error: fetchAppError } = await supabase
-              .from("event_applications")
-              .select("id")
-              .eq("event_registration_id", regId)
-              .maybeSingle();
-
-            if (fetchAppError || !existingAppAfterError) {
-              throw new Error(`Failed to create application: ${appError.message}`);
-            }
-            applicationId = existingAppAfterError.id;
-          } else {
-            throw new Error(`Failed to create application: ${appError.message}`);
-          }
-        } else if (newApplication?.id) {
-          applicationId = newApplication.id;
-        }
-      }
-
-      if (!applicationId) {
-        throw new Error("Failed to create or retrieve event application. Please try again.");
-      }
-
-      // Get question IDs and question text in order
+      // Get question IDs in order
       const { data: questionRecords, error: questionsError } = await supabase
         .from("event_application_questions")
-        .select("id, question")
+        .select("id")
         .eq("event_id", eventId)
         .order("created_at", { ascending: true });
 
@@ -181,58 +134,84 @@ export function useEventApplication(
         throw new Error("No questions found for this event");
       }
 
-      // Prepare responses to insert
-      const responsesToInsert = prepareResponseData(
+      // Prepare responses to upsert
+      const responsesToUpsert = prepareResponseData(
         questionRecords,
         responses,
-        regId,
-        applicationId
+        regId
       );
 
-      // Delete existing responses if updating (delete by both registration and application ID)
-      const { error: deleteError } = await supabase
-        .from("event_application_responses")
-        .delete()
-        .eq("event_registration_id", regId)
-        .eq("application_id", applicationId);
-
-      if (deleteError && deleteError.code !== "PGRST116") {
-        console.warn("Warning: Could not delete existing responses:", deleteError);
+      // Validate all responses have required IDs before upserting
+      const invalidResponsesToUpsert = responsesToUpsert.filter(
+        (r) => !r.event_registration_id || !r.event_application_question_id
+      );
+      if (invalidResponsesToUpsert.length > 0) {
+        throw new Error(
+          `Cannot save responses: ${invalidResponsesToUpsert.length} response(s) missing registration ID or question ID`
+        );
       }
 
-      // Validate all responses have required IDs before inserting
-      const invalidResponsesToInsert = responsesToInsert.filter(
-        (r) => !r.event_registration_id || !r.application_id
-      );
-      if (invalidResponsesToInsert.length > 0) {
-        throw new Error(
-          `Cannot save responses: ${invalidResponsesToInsert.length} response(s) missing registration ID or application ID`
+      // Fetch existing responses for this registration
+      const { data: existingResponses, error: fetchExistingError } =
+        await supabase
+          .from("event_application_responses")
+          .select("event_application_question_id")
+          .eq("event_registration_id", regId);
+
+      if (fetchExistingError && fetchExistingError.code !== "PGRST116") {
+        console.warn(
+          "Warning: Could not fetch existing responses:",
+          fetchExistingError
         );
+      }
+
+      const existingQuestionIds = new Set(
+        (existingResponses || []).map((r) => r.event_application_question_id)
+      );
+
+      // Separate responses into updates and inserts
+      const responsesToUpdate = responsesToUpsert.filter((r) =>
+        existingQuestionIds.has(r.event_application_question_id as string)
+      );
+      const responsesToInsert = responsesToUpsert.filter(
+        (r) =>
+          !existingQuestionIds.has(r.event_application_question_id as string)
+      );
+
+      // Update existing responses
+      if (responsesToUpdate.length > 0) {
+        for (const response of responsesToUpdate) {
+          const { error: updateError } = await supabase
+            .from("event_application_responses")
+            .update({ response: response.response })
+            .eq("event_registration_id", regId)
+            .eq(
+              "event_application_question_id",
+              response.event_application_question_id
+            );
+
+          if (updateError) {
+            throw new Error(
+              `Failed to update response: ${updateError.message}`
+            );
+          }
+        }
       }
 
       // Insert new responses
-      const { data: insertedResponses, error: insertError } = await supabase
-        .from("event_application_responses")
-        .insert(responsesToInsert)
-        .select("id, event_registration_id, application_id");
+      if (responsesToInsert.length > 0) {
+        const { data: insertedResponses, error: insertError } = await supabase
+          .from("event_application_responses")
+          .insert(responsesToInsert)
+          .select("id, event_registration_id, event_application_question_id");
 
-      if (insertError) {
-        throw new Error(`Failed to save responses: ${insertError.message}`);
-      }
+        if (insertError) {
+          throw new Error(`Failed to insert responses: ${insertError.message}`);
+        }
 
-      // Verify responses were saved with required IDs
-      if (!insertedResponses || insertedResponses.length === 0) {
-        throw new Error("Responses were not saved. Please try again.");
-      }
-
-      const invalidResponses = insertedResponses.filter(
-        (r) => !r.event_registration_id || !r.application_id
-      );
-      if (invalidResponses.length > 0) {
-        console.error(
-          "Warning: Some responses were saved without registration ID or application ID:",
-          invalidResponses
-        );
+        if (!insertedResponses || insertedResponses.length === 0) {
+          throw new Error("Responses were not inserted. Please try again.");
+        }
       }
 
       setSuccessMessage("Application submitted successfully!");

@@ -71,7 +71,7 @@ export function useEventDetail(
           const formattedQuestions: ApplicationQuestionTemplate[] =
             questionsData.map((q) => ({
               question: q.question ?? "",
-              response: (q.response as ResponseType) ?? ResponseType.text,
+              response: (q.response_type as ResponseType) ?? ResponseType.text,
               max_char_limit: q.max_char_limit ?? 0,
               response_options: q.response_options ?? [],
             }));
