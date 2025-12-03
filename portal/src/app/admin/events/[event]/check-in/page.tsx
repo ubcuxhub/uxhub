@@ -21,13 +21,12 @@ import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 import { Checkbox } from "@/components/ui/checkbox";
 
-type EventRecord = Event & { id: string };
 
 interface RegistrationWithUser {
   id: string;
   event_id: string;
   user_id: string;
-  accepted: boolean;
+  status: string; // enum: "pending", "accepted", "declined"
   attending: boolean;
   checked_in: boolean;
   checked_in_at: string | null;
@@ -61,7 +60,9 @@ async function fetchRegistrationsWithUsers(
   const authUserIds = registrationsData.map((reg) => reg.user_id);
   const { data: usersData, error: usersError } = await supabase
     .from("user_info")
-    .select("auth_user_id, name, email, phone, student_number, faculty, major, membership_type")
+    .select(
+      "auth_user_id, name, email, phone, student_number, faculty, major, membership_type"
+    )
     .in("auth_user_id", authUserIds);
 
   if (usersError) throw usersError;
@@ -175,19 +176,17 @@ function RegistrationCard({
                   Checked In
                 </Badge>
               )}
-              {reg.accepted && <Badge variant="secondary">Accepted</Badge>}
+              {reg.status === "accepted" && (
+                <Badge variant="secondary">Accepted</Badge>
+              )}
               {reg.attending && <Badge variant="outline">Attending</Badge>}
             </div>
             <div className="text-sm text-muted-foreground space-y-0.5">
               <p>{user.email}</p>
               {user.phone && <p>Phone: {user.phone}</p>}
-              {user.student_number && (
-                <p>Student #: {user.student_number}</p>
-              )}
+              {user.student_number && <p>Student #: {user.student_number}</p>}
               {(user.faculty || user.major) && (
-                <p>
-                  {[user.faculty, user.major].filter(Boolean).join(" • ")}
-                </p>
+                <p>{[user.faculty, user.major].filter(Boolean).join(" • ")}</p>
               )}
               {user.membership_type && (
                 <p className="text-xs">Membership: {user.membership_type}</p>
@@ -227,15 +226,19 @@ export default function CheckInPage() {
   const eventId = params?.event as string;
   const supabase = useMemo(() => createClient(), []);
 
-  const [event, setEvent] = useState<EventRecord | null>(null);
-  const [registrations, setRegistrations] = useState<RegistrationWithUser[]>([]);
+  const [event, setEvent] = useState<Event | null>(null);
+  const [registrations, setRegistrations] = useState<RegistrationWithUser[]>(
+    []
+  );
   const [filteredRegistrations, setFilteredRegistrations] = useState<
     RegistrationWithUser[]
   >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterCheckedIn, setFilterCheckedIn] = useState<"all" | "checked" | "unchecked">("all");
+  const [filterCheckedIn, setFilterCheckedIn] = useState<
+    "all" | "checked" | "unchecked"
+  >("all");
   const [updatingIds, setUpdatingIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
@@ -265,7 +268,7 @@ export default function CheckInPage() {
           return;
         }
 
-        setEvent(eventData as EventRecord);
+        setEvent(eventData as Event);
 
         // Fetch registrations with user info
         const transformedRegistrations = await fetchRegistrationsWithUsers(
@@ -342,7 +345,10 @@ export default function CheckInPage() {
     setFilteredRegistrations(filtered);
   }, [registrations, searchQuery, filterCheckedIn]);
 
-  const handleToggleCheckIn = async (registrationId: string, currentlyCheckedIn: boolean) => {
+  const handleToggleCheckIn = async (
+    registrationId: string,
+    currentlyCheckedIn: boolean
+  ) => {
     if (updatingIds.has(registrationId)) return;
 
     setUpdatingIds((prev) => new Set(prev).add(registrationId));
@@ -402,13 +408,19 @@ export default function CheckInPage() {
     );
 
     if (toUpdate.length === 0) {
-      alert(`All filtered registrations are already ${checkIn ? "checked in" : "checked out"}.`);
+      alert(
+        `All filtered registrations are already ${
+          checkIn ? "checked in" : "checked out"
+        }.`
+      );
       return;
     }
 
     if (
       !confirm(
-        `Are you sure you want to ${checkIn ? "check in" : "check out"} ${toUpdate.length} registration(s)?`
+        `Are you sure you want to ${checkIn ? "check in" : "check out"} ${
+          toUpdate.length
+        } registration(s)?`
       )
     ) {
       return;
@@ -456,7 +468,9 @@ export default function CheckInPage() {
   const stats = useMemo(() => {
     const total = registrations.length;
     const checkedIn = registrations.filter((reg) => reg.checked_in).length;
-    const accepted = registrations.filter((reg) => reg.accepted).length;
+    const accepted = registrations.filter(
+      (reg) => reg.status === "accepted"
+    ).length;
     const attending = registrations.filter((reg) => reg.attending).length;
 
     return { total, checkedIn, accepted, attending };
@@ -472,7 +486,7 @@ export default function CheckInPage() {
             <div className="flex items-center justify-between">
               <div>
                 <Button asChild variant="outline" className="mb-4">
-                  <Link href={`/admin/events/${eventId}`}>← Back to Event</Link>
+                  <Link href={`/admin/events`}>← Back to Events</Link>
                 </Button>
                 <h1 className="text-2xl font-semibold">Check-In Management</h1>
                 <p className="text-sm text-muted-foreground">
@@ -512,7 +526,25 @@ export default function CheckInPage() {
                           Date & Time
                         </p>
                         <p className="text-base">
-                          {event.event_date} at {event.event_time}
+                          {event.start_date && event.start_time
+                            ? `${new Date(event.start_date).toLocaleDateString(
+                                "en-US",
+                                {
+                                  year: "numeric",
+                                  month: "short",
+                                  day: "numeric",
+                                }
+                              )} at ${event.start_time}`
+                            : event.start_date
+                            ? new Date(event.start_date).toLocaleDateString(
+                                "en-US",
+                                {
+                                  year: "numeric",
+                                  month: "short",
+                                  day: "numeric",
+                                }
+                              )
+                            : "TBD"}
                         </p>
                       </div>
                       <div>
@@ -529,14 +561,22 @@ export default function CheckInPage() {
                         <p className="text-sm font-medium text-muted-foreground">
                           Max Capacity
                         </p>
-                        <p className="text-base">{event.max_capacity} attendees</p>
+                        <p className="text-base">
+                          {event.max_capacity} attendees
+                        </p>
                       </div>
                       <div>
                         <p className="text-sm font-medium text-muted-foreground">
                           Price
                         </p>
                         <p className="text-base">
-                          ${Number(event.price ?? 0).toFixed(2)}
+                          ${Number(event.regular_price ?? 0).toFixed(2)}
+                          {event.member_price !== event.regular_price && (
+                            <span className="text-muted-foreground ml-1">
+                              / ${Number(event.member_price ?? 0).toFixed(2)}{" "}
+                              member
+                            </span>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -553,7 +593,9 @@ export default function CheckInPage() {
                     value={stats.checkedIn}
                     subtitle={
                       stats.total > 0
-                        ? `${Math.round((stats.checkedIn / stats.total) * 100)}%`
+                        ? `${Math.round(
+                            (stats.checkedIn / stats.total) * 100
+                          )}%`
                         : "0%"
                     }
                     valueClassName="text-green-600"

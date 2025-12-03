@@ -29,7 +29,7 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
         const { data, error } = await supabase
           .from("events")
           .select("*")
-          .order("event_date", { ascending: true });
+          .order("start_date", { ascending: true });
 
         if (error) throw error;
         setEvents((data ?? []) as EventRecord[]);

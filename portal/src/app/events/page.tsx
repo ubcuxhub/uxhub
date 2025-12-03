@@ -8,6 +8,7 @@ import { Event } from "@/lib/types/eventTypes";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { Button } from "@/components/ui/button";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { EventCard } from "@/components/EventCard";
 
 export default function Events() {
   const { user } = useUser();
@@ -21,11 +22,17 @@ export default function Events() {
 
     async function fetchEvents() {
       setLoadingEvents(true);
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("events")
         .select("*")
-        .order("event_date", { ascending: true });
-      setEvents(data ?? []);
+        .order("start_date", { ascending: true });
+
+      if (error) {
+        console.error("Error fetching events:", error);
+        setEvents([]);
+      } else {
+        setEvents((data ?? []) as Event[]);
+      }
       setLoadingEvents(false);
     }
 
@@ -41,26 +48,18 @@ export default function Events() {
 
       {loadingEvents ? (
         <p>Loading events...</p>
+      ) : events.length === 0 ? (
+        <p>No events available.</p>
       ) : (
-        <div className="space-y-4">
-          {events.map((event) => {
-            const eventWithId = event as Event & { id: string };
-            return (
-              <div
-                key={eventWithId.id}
-                className="border rounded-lg p-4 hover:bg-muted/50 cursor-pointer"
-                onClick={() => router.push(`/events/${eventWithId.id}`)}
-              >
-                <h3 className="font-semibold text-lg">{event.name}</h3>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {event.event_date} at {event.event_time}
-                </p>
-                {event.description && (
-                  <p className="text-sm mt-2 line-clamp-2">{event.description}</p>
-                )}
-              </div>
-            );
-          })}
+        <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
+          {events.map((event) => (
+            <EventCard
+              key={event.id}
+              event={event}
+              variant="default"
+              onClick={() => router.push(`/events/${event.id}`)}
+            />
+          ))}
         </div>
       )}
       <Button onClick={() => router.push("/profile")}>View profile</Button>
