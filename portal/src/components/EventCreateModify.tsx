@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -18,10 +18,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { ImageUpload } from "@/components/ImageUpload";
+import { BasicEventInfo } from "@/components/event-form/BasicEventInfo";
+import { EventPricing } from "@/components/event-form/EventPricing";
+import { EventLocation } from "@/components/event-form/EventLocation";
+import { EventSchedule } from "@/components/event-form/EventSchedule";
+import { RegistrationTimes } from "@/components/event-form/RegistrationTimes";
+import { CheckInEventsSection } from "@/components/event-form/CheckInEventsSection";
+import { ApplicationQuestionsSection } from "@/components/event-form/ApplicationQuestionsSection";
+import { Skeleton } from "@/components/ui/skeleton";
+import { BackButton } from "@/components/BackButton";
+import { DeleteEventModal } from "@/components/DeleteEventModal";
 
 interface EventCreateModifyProps {
   eventId?: string;
@@ -32,37 +39,68 @@ interface EventCreateModifyProps {
 
 interface EventFormState {
   name: string;
+  description: string;
+  regular_price: string;
+  member_price: string;
+  location_building: string;
+  location_room: string;
+  location_address_url: string;
   start_date: string;
   start_time: string;
   end_date: string;
   end_time: string;
-  location_building: string;
-  location_room: string;
-  location_address_url: string;
-  regular_price: string;
-  member_price: string;
-  description: string;
   max_capacity: string;
   image_url: string;
+  registration_start_time: string;
+  registration_end_time: string;
   created_at: string;
 }
 
 const defaultFormState: EventFormState = {
   name: "",
+  description: "",
+  regular_price: "",
+  member_price: "",
+  location_building: "",
+  location_room: "",
+  location_address_url: "",
   start_date: "",
   start_time: "",
   end_date: "",
   end_time: "",
-  location_building: "",
-  location_room: "",
-  location_address_url: "",
-  regular_price: "",
-  member_price: "",
-  description: "",
   max_capacity: "",
   image_url: "",
+  registration_start_time: "",
+  registration_end_time: "",
   created_at: "",
 };
+
+// Helper function to convert timestamptz to datetime-local format
+// Converts UTC timestamptz to local datetime-local string
+const timestamptzToDatetimeLocal = (timestamptz: string | null): string => {
+  if (!timestamptz) return "";
+  const date = new Date(timestamptz);
+  // Get local date components
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+};
+
+// Helper function to convert datetime-local to timestamptz format
+// Converts local datetime-local string to UTC timestamptz
+const datetimeLocalToTimestamptz = (datetimeLocal: string): string | null => {
+  if (!datetimeLocal) return null;
+  // Create date from local datetime string (browser interprets as local time)
+  const date = new Date(datetimeLocal);
+  // Return as ISO string (UTC)
+  return date.toISOString();
+};
+
+// Add a storage key constant after the defaultFormState
+const STORAGE_KEY = "event_create_form_draft";
 
 export const EventCreateModify = ({
   eventId,
@@ -72,10 +110,12 @@ export const EventCreateModify = ({
 }: EventCreateModifyProps) => {
   const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
+  const isInitialMount = useRef(true);
+  const hasRestoredState = useRef(false);
 
   const [formState, setFormState] = useState<EventFormState>(defaultFormState);
   const [checkInEvents, setCheckInEvents] = useState<CheckInEvent[]>([
-    { name: "", location: "", date: "", time: "" },
+    { name: "", start_time: "", end_time: "" },
   ]);
   const [applicationTemplate, setApplicationTemplate] = useState<
     ApplicationQuestionTemplate[]
@@ -94,6 +134,75 @@ export const EventCreateModify = ({
   const [questionErrors, setQuestionErrors] = useState<Record<number, string>>(
     {}
   );
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Restore state from sessionStorage on mount (only for new events)
+  useEffect(() => {
+    if (eventId) {
+      // If editing an existing event, clear any draft
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem(STORAGE_KEY);
+      }
+      hasRestoredState.current = true;
+      return;
+    }
+
+    // Only restore on initial mount
+    if (
+      isInitialMount.current &&
+      !hasRestoredState.current &&
+      typeof window !== "undefined"
+    ) {
+      try {
+        const saved = sessionStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          // Defer state updates to avoid cascading renders
+          setTimeout(() => {
+            setFormState(parsed.formState || defaultFormState);
+            setCheckInEvents(
+              parsed.checkInEvents || [
+                { name: "", start_time: "", end_time: "" },
+              ]
+            );
+            setApplicationTemplate(
+              parsed.applicationTemplate || [
+                {
+                  question: "",
+                  response: ResponseType.text,
+                  max_char_limit: 0,
+                  response_options: [],
+                },
+              ]
+            );
+          }, 0);
+        }
+      } catch (error) {
+        console.error("Error restoring form state:", error);
+        // Clear corrupted data
+        sessionStorage.removeItem(STORAGE_KEY);
+      }
+      hasRestoredState.current = true;
+    }
+    isInitialMount.current = false;
+  }, [eventId]);
+
+  // Persist state to sessionStorage (only for new events)
+  useEffect(() => {
+    if (eventId || !hasRestoredState.current) return; // Don't save if editing or before initial restore
+
+    try {
+      const stateToSave = {
+        formState,
+        checkInEvents,
+        applicationTemplate,
+      };
+      sessionStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+    } catch (error) {
+      console.error("Error saving form state:", error);
+    }
+  }, [formState, checkInEvents, applicationTemplate, eventId]);
 
   useEffect(() => {
     const fetchExistingEvent = async () => {
@@ -121,13 +230,7 @@ export const EventCreateModify = ({
 
       setFormState({
         name: data.name ?? "",
-        start_date: data.start_date ?? "",
-        start_time: data.start_time ?? "",
-        end_date: data.end_date ?? "",
-        end_time: data.end_time ?? "",
-        location_building: data.location_building ?? "",
-        location_room: data.location_room ?? "",
-        location_address_url: data.location_address_url ?? "",
+        description: data.description ?? "",
         regular_price:
           data.regular_price !== null && data.regular_price !== undefined
             ? String(data.regular_price)
@@ -136,12 +239,24 @@ export const EventCreateModify = ({
           data.member_price !== null && data.member_price !== undefined
             ? String(data.member_price)
             : "",
-        description: data.description ?? "",
+        location_building: data.location_building ?? "",
+        location_room: data.location_room ?? "",
+        location_address_url: data.location_address_url ?? "",
+        start_date: data.start_date ?? "",
+        start_time: data.start_time ?? "",
+        end_date: data.end_date ?? "",
+        end_time: data.end_time ?? "",
         max_capacity:
           data.max_capacity !== null && data.max_capacity !== undefined
             ? String(data.max_capacity)
             : "",
         image_url: data.image_url ?? "",
+        registration_start_time: timestamptzToDatetimeLocal(
+          data.registration_start_time
+        ),
+        registration_end_time: timestamptzToDatetimeLocal(
+          data.registration_end_time
+        ),
         created_at: data.created_at ?? "",
       });
 
@@ -158,32 +273,17 @@ export const EventCreateModify = ({
           "Error fetching check-in sessions:",
           checkInSessionsError
         );
-        setCheckInEvents([{ name: "", location: "", date: "", time: "" }]);
+        setCheckInEvents([{ name: "", start_time: "", end_time: "" }]);
       } else if (checkInSessionsData && checkInSessionsData.length > 0) {
-        // Convert database timestamps to UI format (date/time strings)
-        const convertedSessions = checkInSessionsData.map((session) => {
-          const startDate = session.start_time
-            ? new Date(session.start_time)
-            : null;
-
-          return {
-            name: session.name || "",
-            location: "", // Location is not stored in check_in_sessions table
-            date: startDate
-              ? startDate.toISOString().split("T")[0]
-              : "",
-            time: startDate
-              ? startDate.toTimeString().slice(0, 5)
-              : "",
-          };
-        });
         setCheckInEvents(
-          convertedSessions.length > 0
-            ? convertedSessions
-            : [{ name: "", location: "", date: "", time: "" }]
+          checkInSessionsData.map((session) => ({
+            name: session.name ?? "",
+            start_time: timestamptzToDatetimeLocal(session.start_time),
+            end_time: timestamptzToDatetimeLocal(session.end_time),
+          }))
         );
       } else {
-        setCheckInEvents([{ name: "", location: "", date: "", time: "" }]);
+        setCheckInEvents([{ name: "", start_time: "", end_time: "" }]);
       }
 
       // Fetch application questions from event_application_questions table
@@ -273,7 +373,7 @@ export const EventCreateModify = ({
     resetSuccessMessage();
     setCheckInEvents((prev) => [
       ...prev,
-      { name: "", location: "", date: "", time: "" },
+      { name: "", start_time: "", end_time: "" },
     ]);
   };
 
@@ -387,6 +487,39 @@ export const EventCreateModify = ({
     setApplicationTemplate((prev) => prev.filter((_, idx) => idx !== index));
   };
 
+  const handleResponseTypeChange = (
+    index: number,
+    newResponseType: ResponseType
+  ) => {
+    resetSuccessMessage();
+    // Clear error for this question when response type changes
+    setQuestionErrors((prev) => {
+      const newErrors = { ...prev };
+      delete newErrors[index];
+      return newErrors;
+    });
+    // Update response type and initialize appropriate fields
+    setApplicationTemplate((prev) =>
+      prev.map((q, idx) =>
+        idx === index
+          ? {
+              ...q,
+              response: newResponseType,
+              ...(newResponseType === ResponseType.multi_select ||
+              newResponseType === ResponseType.single_select
+                ? {
+                    response_options: q.response_options || [],
+                  }
+                : {}),
+              ...(newResponseType === ResponseType.text && q.max_char_limit <= 0
+                ? { max_char_limit: 100 }
+                : {}),
+            }
+          : q
+      )
+    );
+  };
+
   const validateForm = () => {
     if (!formState.name.trim()) return "Event name is required.";
     if (!formState.start_date) return "Event start date is required.";
@@ -395,13 +528,19 @@ export const EventCreateModify = ({
     if (!formState.location_address_url.trim())
       return "Location address URL is required.";
     if (!formState.description.trim()) return "Description is required.";
+    if (!formState.regular_price.trim()) return "Regular price is required.";
+    if (Number.isNaN(Number(formState.regular_price)))
+      return "Regular price must be a valid number.";
+    if (!formState.member_price.trim()) return "Member price is required.";
+    if (Number.isNaN(Number(formState.member_price)))
+      return "Member price must be a valid number.";
     if (!formState.max_capacity) return "Max capacity is required.";
     if (
       !checkInEvents.every(
-        (item) => item.name && item.date && item.time
+        (item) => item.name && item.start_time && item.end_time
       )
     )
-      return "All check-in events require name, date, and time.";
+      return "All check-in sessions require name, start time, and end time.";
 
     // Validate application questions and track errors per question
     const newQuestionErrors: Record<number, string> = {};
@@ -462,17 +601,69 @@ export const EventCreateModify = ({
     }
 
     setIsSubmitting(true);
-    // Prepare payload without application_template and check_in_events
-    const payload = {
-      ...formState,
+    // Prepare payload
+    const payload: {
+      name: string;
+      description: string;
+      regular_price: number;
+      member_price: number;
+      max_capacity: number;
+      created_at: string;
+      location_building?: string;
+      location_room?: string;
+      location_address_url?: string;
+      start_date?: string;
+      start_time?: string;
+      end_date?: string;
+      end_time?: string;
+      image_url?: string | null;
+      registration_start_time?: string | null;
+      registration_end_time?: string | null;
+    } = {
+      name: formState.name,
+      description: formState.description,
       regular_price: Number(formState.regular_price),
       member_price: Number(formState.member_price),
       max_capacity: Number(formState.max_capacity),
       created_at: formState.created_at || new Date().toISOString(),
     };
 
-    if (!formState.image_url) {
-      (payload as { image_url?: string | null }).image_url = null;
+    // Add optional fields only if they have values
+    if (formState.location_building) {
+      payload.location_building = formState.location_building;
+    }
+    if (formState.location_room) {
+      payload.location_room = formState.location_room;
+    }
+    if (formState.location_address_url) {
+      payload.location_address_url = formState.location_address_url;
+    }
+    if (formState.start_date) {
+      payload.start_date = formState.start_date;
+    }
+    if (formState.start_time) {
+      payload.start_time = formState.start_time;
+    }
+    if (formState.end_date) {
+      payload.end_date = formState.end_date;
+    }
+    if (formState.end_time) {
+      payload.end_time = formState.end_time;
+    }
+    if (formState.image_url) {
+      payload.image_url = formState.image_url;
+    } else {
+      payload.image_url = null;
+    }
+    if (formState.registration_start_time) {
+      payload.registration_start_time = datetimeLocalToTimestamptz(
+        formState.registration_start_time
+      );
+    }
+    if (formState.registration_end_time) {
+      payload.registration_end_time = datetimeLocalToTimestamptz(
+        formState.registration_end_time
+      );
     }
 
     // First, insert or update the event
@@ -496,69 +687,21 @@ export const EventCreateModify = ({
 
     const finalEventId = data.id;
 
-    // Helper function to convert date/time strings to timestamp
-    const convertToTimestamp = (dateStr: string, timeStr: string): string | null => {
-      if (!dateStr || !timeStr) return null;
-      try {
-        const dateTimeStr = `${dateStr}T${timeStr}:00`;
-        const date = new Date(dateTimeStr);
-        return date.toISOString();
-      } catch {
-        return null;
-      }
-    };
-
-    // Handle check-in sessions: delete old ones and create new ones
+    // If updating, delete existing check-in sessions and application questions
     if (eventId) {
-      // Delete existing check-in sessions
-      const { error: deleteSessionsError } = await supabase
+      const { error: deleteCheckInError } = await supabase
         .from("check_in_sessions")
         .delete()
         .eq("event_id", eventId);
 
-      if (deleteSessionsError) {
+      if (deleteCheckInError) {
         setError(
-          `Failed to delete existing check-in sessions: ${deleteSessionsError.message}`
+          `Failed to delete existing check-in sessions: ${deleteCheckInError.message}`
         );
         setIsSubmitting(false);
         return;
       }
-    }
 
-    // Insert new check-in sessions
-    const validCheckInEvents = checkInEvents.filter(
-      (event) => event.name && event.date && event.time
-    );
-
-    if (validCheckInEvents.length > 0) {
-      const sessionsToInsert = validCheckInEvents.map((event) => {
-        const startTimestamp = convertToTimestamp(event.date, event.time);
-        // For end_time, we'll use the same date/time (can be updated later if needed)
-        const endTimestamp = convertToTimestamp(event.date, event.time);
-
-        return {
-          event_id: finalEventId,
-          name: event.name,
-          start_time: startTimestamp,
-          end_time: endTimestamp,
-        };
-      });
-
-      const { error: sessionsError } = await supabase
-        .from("check_in_sessions")
-        .insert(sessionsToInsert);
-
-      if (sessionsError) {
-        setError(
-          `Failed to save check-in sessions: ${sessionsError.message}`
-        );
-        setIsSubmitting(false);
-        return;
-      }
-    }
-
-    // If updating, delete existing application questions
-    if (eventId) {
       const { error: deleteError } = await supabase
         .from("event_application_questions")
         .delete()
@@ -568,6 +711,51 @@ export const EventCreateModify = ({
         setError(`Failed to delete existing questions: ${deleteError.message}`);
         setIsSubmitting(false);
         return;
+      }
+    }
+
+    // Insert check-in sessions if there are any
+    if (checkInEvents.length > 0) {
+      // Filter out empty sessions (where name, start_time, or end_time is empty)
+      const validSessions = checkInEvents.filter(
+        (session) =>
+          session.name.trim() &&
+          session.start_time.trim() &&
+          session.end_time.trim()
+      );
+
+      if (validSessions.length > 0) {
+        const sessionsToInsert = validSessions
+          .map((session) => {
+            const startTime = datetimeLocalToTimestamptz(session.start_time);
+            const endTime = datetimeLocalToTimestamptz(session.end_time);
+            // Only include if both times are valid
+            if (startTime && endTime) {
+              return {
+                event_id: finalEventId,
+                name: session.name,
+                start_time: startTime,
+                end_time: endTime,
+              };
+            }
+            return null;
+          })
+          .filter(
+            (session): session is NonNullable<typeof session> =>
+              session !== null
+          );
+
+        const { error: checkInSessionsError } = await supabase
+          .from("check_in_sessions")
+          .insert(sessionsToInsert);
+
+        if (checkInSessionsError) {
+          setError(
+            `Failed to save check-in sessions: ${checkInSessionsError.message}`
+          );
+          setIsSubmitting(false);
+          return;
+        }
       }
     }
 
@@ -624,8 +812,12 @@ export const EventCreateModify = ({
     );
     setIsSubmitting(false);
     if (!eventId) {
+      // Clear persisted state after successful creation
+      if (typeof window !== "undefined") {
+        sessionStorage.removeItem(STORAGE_KEY);
+      }
       setFormState(defaultFormState);
-      setCheckInEvents([{ name: "", location: "", date: "", time: "" }]);
+      setCheckInEvents([{ name: "", start_time: "", end_time: "" }]);
       setApplicationTemplate([
         {
           question: "",
@@ -640,6 +832,76 @@ export const EventCreateModify = ({
       onSuccess(finalEventId);
     } else {
       router.refresh();
+    }
+  };
+
+  const handleDeleteEvent = async () => {
+    if (!eventId) return;
+
+    setIsDeleting(true);
+    setError(null);
+
+    try {
+      // Delete related check-in sessions first
+      const { error: deleteCheckInError } = await supabase
+        .from("check_in_sessions")
+        .delete()
+        .eq("event_id", eventId);
+
+      if (deleteCheckInError) {
+        setError(
+          `Failed to delete check-in sessions: ${deleteCheckInError.message}`
+        );
+        setIsDeleting(false);
+        return;
+      }
+
+      // Delete related application questions
+      const { error: deleteQuestionsError } = await supabase
+        .from("event_application_questions")
+        .delete()
+        .eq("event_id", eventId);
+
+      if (deleteQuestionsError) {
+        setError(
+          `Failed to delete application questions: ${deleteQuestionsError.message}`
+        );
+        setIsDeleting(false);
+        return;
+      }
+
+      // Delete event registrations
+      const { error: deleteRegistrationsError } = await supabase
+        .from("event_registrations")
+        .delete()
+        .eq("event_id", eventId);
+
+      if (deleteRegistrationsError) {
+        setError(
+          `Failed to delete event registrations: ${deleteRegistrationsError.message}`
+        );
+        setIsDeleting(false);
+        return;
+      }
+
+      // Finally, delete the event itself
+      const { error: deleteEventError } = await supabase
+        .from("events")
+        .delete()
+        .eq("id", eventId);
+
+      if (deleteEventError) {
+        setError(`Failed to delete event: ${deleteEventError.message}`);
+        setIsDeleting(false);
+        return;
+      }
+
+      // Success - redirect to events page
+      setShowDeleteModal(false);
+      router.push("/admin/events");
+    } catch {
+      setError("An unexpected error occurred while deleting the event.");
+      setIsDeleting(false);
     }
   };
 
@@ -666,9 +928,7 @@ export const EventCreateModify = ({
                 asChild
                 className="w-full md:w-auto"
               >
-                <Link href={`/admin/events/${eventId}/check-in`}>
-                  Check-In
-                </Link>
+                <Link href={`/admin/events/${eventId}/check-in`}>Check-In</Link>
               </Button>
               <Button
                 type="button"
@@ -680,504 +940,217 @@ export const EventCreateModify = ({
                   Review Applications
                 </Link>
               </Button>
+
+              <BackButton
+                link="/admin/events"
+                label="Back to Events"
+                className="mb-4"
+              />
             </div>
           )}
         </div>
       </CardHeader>
       <CardContent>
         {loadingEvent ? (
-          <p className="text-sm text-muted-foreground">
-            Loading event details...
-          </p>
-        ) : (
-          <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
+          <div className="flex flex-col gap-6">
+            {/* Basic Event Info Skeleton */}
             <section className="grid gap-4 md:grid-cols-2">
               <div className="grid gap-2">
-                <Label htmlFor="name">
-                  Event Name <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="name"
-                  value={formState.name}
-                  onChange={(e) => handleFieldChange("name", e.target.value)}
-                  required
-                />
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-10 w-full" />
               </div>
               <div className="grid gap-2">
-                <Label htmlFor="regular_price">
-                  Regular Price <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="regular_price"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formState.regular_price}
-                  onChange={(e) => handleFieldChange("regular_price", e.target.value)}
-                  required
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="member_price">
-                  Member Price <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="member_price"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formState.member_price}
-                  onChange={(e) => handleFieldChange("member_price", e.target.value)}
-                  required
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="start_date">
-                  Start Date <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="start_date"
-                  type="date"
-                  value={formState.start_date}
-                  onChange={(e) =>
-                    handleFieldChange("start_date", e.target.value)
-                  }
-                  required
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="start_time">
-                  Start Time <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="start_time"
-                  type="time"
-                  value={formState.start_time}
-                  onChange={(e) =>
-                    handleFieldChange("start_time", e.target.value)
-                  }
-                  required
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="end_date">
-                  End Date
-                </Label>
-                <Input
-                  id="end_date"
-                  type="date"
-                  value={formState.end_date}
-                  onChange={(e) =>
-                    handleFieldChange("end_date", e.target.value)
-                  }
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="end_time">
-                  End Time
-                </Label>
-                <Input
-                  id="end_time"
-                  type="time"
-                  value={formState.end_time}
-                  onChange={(e) =>
-                    handleFieldChange("end_time", e.target.value)
-                  }
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="max_capacity">
-                  Max Capacity <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="max_capacity"
-                  type="number"
-                  min="0"
-                  value={formState.max_capacity}
-                  onChange={(e) =>
-                    handleFieldChange("max_capacity", e.target.value)
-                  }
-                  required
-                />
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-10 w-full" />
               </div>
               <div className="grid gap-2 md:col-span-2">
-                <ImageUpload
-                  value={formState.image_url}
-                  onChange={(path) => handleFieldChange("image_url", path)}
-                  eventName={formState.name || "event"}
-                  disabled={isSubmitting}
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="location_building">Location Building</Label>
-                <Input
-                  id="location_building"
-                  value={formState.location_building}
-                  onChange={(e) =>
-                    handleFieldChange("location_building", e.target.value)
-                  }
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="location_room">Location Room</Label>
-                <Input
-                  id="location_room"
-                  value={formState.location_room}
-                  onChange={(e) =>
-                    handleFieldChange("location_room", e.target.value)
-                  }
-                />
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-24 w-full" />
               </div>
               <div className="grid gap-2 md:col-span-2">
-                <Label htmlFor="location_address_url">
-                  Location Address URL <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="location_address_url"
-                  type="url"
-                  value={formState.location_address_url}
-                  onChange={(e) =>
-                    handleFieldChange("location_address_url", e.target.value)
-                  }
-                  required
-                />
-              </div>
-              <div className="grid gap-2 md:col-span-2">
-                <Label htmlFor="description">
-                  Description <span className="text-red-500">*</span>
-                </Label>
-                <textarea
-                  id="description"
-                  className="min-h-[120px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                  value={formState.description}
-                  onChange={(e) =>
-                    handleFieldChange("description", e.target.value)
-                  }
-                  required
-                />
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-40 w-full" />
               </div>
             </section>
 
-            <section className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold">Check-In Events</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Provide the check-in session details for attendees. Each entry must
-                    include a name, date, and time.
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={addCheckInEvent}
-                  className="shrink-0"
-                >
-                  Add
-                </Button>
+            {/* Event Pricing Skeleton */}
+            <section className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-2">
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-10 w-full" />
               </div>
-              <div className="flex flex-col gap-4">
-                {checkInEvents.map((item, index) => (
-                  <div
-                    key={`check-in-${index}`}
-                    className="grid gap-3 rounded-lg border p-4"
-                  >
-                    <div className="grid gap-2">
-                      <Label htmlFor={`check_name_${index}`}>
-                        Name <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        id={`check_name_${index}`}
-                        value={item.name}
-                        onChange={(e) =>
-                          updateCheckInEvent(index, "name", e.target.value)
-                        }
-                        required
-                      />
-                    </div>
-                    <div className="grid gap-3 md:grid-cols-3">
-                      <div className="grid gap-2">
-                        <Label htmlFor={`check_location_${index}`}>
-                          Location
-                        </Label>
-                        <Input
-                          id={`check_location_${index}`}
-                          value={item.location}
-                          onChange={(e) =>
-                            updateCheckInEvent(
-                              index,
-                              "location",
-                              e.target.value
-                            )
-                          }
-                          placeholder="Optional"
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor={`check_date_${index}`}>
-                          Date <span className="text-red-500">*</span>
-                        </Label>
-                        <Input
-                          id={`check_date_${index}`}
-                          type="date"
-                          value={item.date}
-                          onChange={(e) =>
-                            updateCheckInEvent(index, "date", e.target.value)
-                          }
-                          required
-                        />
-                      </div>
-                      <div className="grid gap-2">
-                        <Label htmlFor={`check_time_${index}`}>
-                          Time <span className="text-red-500">*</span>
-                        </Label>
-                        <Input
-                          id={`check_time_${index}`}
-                          type="time"
-                          value={item.time}
-                          onChange={(e) =>
-                            updateCheckInEvent(index, "time", e.target.value)
-                          }
-                          required
-                        />
-                      </div>
-                    </div>
-                    <div className="flex justify-end">
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className="text-red-500 hover:text-red-600"
-                        onClick={() => removeCheckInEvent(index)}
-                        disabled={checkInEvents.length === 1}
-                      >
-                        Remove
-                      </Button>
-                    </div>
-                  </div>
-                ))}
+              <div className="grid gap-2">
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-10 w-full" />
               </div>
             </section>
 
-            <section className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold">
-                    Application Questions
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    Define any application questions attendees must answer.
-                    (Optional)
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={addApplicationQuestion}
-                  className="shrink-0"
-                >
-                  Add
-                </Button>
+            {/* Event Schedule Skeleton */}
+            <section className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-10 w-full" />
               </div>
-              <div className="flex flex-col gap-4">
-                {applicationTemplate.map((question, index) => (
-                  <div
-                    key={`application-${index}`}
-                    className="grid gap-3 rounded-lg border p-4 md:grid-cols-3"
-                  >
-                    <div className="grid gap-2 md:col-span-2">
-                      <Label htmlFor={`question_${index}`}>
-                        Question <span className="text-red-500">*</span>
-                      </Label>
-                      <Input
-                        id={`question_${index}`}
-                        value={question.question}
-                        onChange={(e) =>
-                          updateApplicationQuestion(
-                            index,
-                            "question",
-                            e.target.value
-                          )
-                        }
-                        required
-                        className={
-                          questionErrors[index]
-                            ? "border-red-500 focus-visible:ring-red-500"
-                            : ""
-                        }
-                      />
-                      {questionErrors[index] && (
-                        <p className="text-sm text-red-500">
-                          {questionErrors[index]}
-                        </p>
-                      )}
-                    </div>
-                    <div className="grid gap-2">
-                      <Label htmlFor={`response_${index}`}>Response Type</Label>
-                      <select
-                        id={`response_${index}`}
-                        className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                        value={question.response}
-                        onChange={(e) => {
-                          const newResponseType = e.target
-                            .value as ResponseType;
-                          resetSuccessMessage();
-                          // Clear error for this question when response type changes
-                          setQuestionErrors((prev) => {
-                            const newErrors = { ...prev };
-                            delete newErrors[index];
-                            return newErrors;
-                          });
-                          // Update response type and initialize appropriate fields
-                          setApplicationTemplate((prev) =>
-                            prev.map((q, idx) =>
-                              idx === index
-                                ? {
-                                    ...q,
-                                    response: newResponseType,
-                                    ...(newResponseType ===
-                                      ResponseType.multi_select ||
-                                    newResponseType ===
-                                      ResponseType.single_select
-                                      ? {
-                                          response_options:
-                                            q.response_options || [],
-                                        }
-                                      : {}),
-                                    ...(newResponseType === ResponseType.text &&
-                                    q.max_char_limit <= 0
-                                      ? { max_char_limit: 100 }
-                                      : {}),
-                                  }
-                                : q
-                            )
-                          );
-                        }}
-                        required
-                      >
-                        {Object.values(ResponseType).map((value) => (
-                          <option key={value} value={value}>
-                            {value.replace("_", " ")}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="grid gap-2 md:col-span-3">
-                      {question.response === ResponseType.text ? (
-                        <div className="grid gap-2 md:grid-cols-3">
-                          <div className="grid gap-2 md:col-span-1">
-                            <Label htmlFor={`max_char_limit_${index}`}>
-                              Max Character Limit{" "}
-                              <span className="text-red-500">*</span>
-                            </Label>
-                            <Input
-                              id={`max_char_limit_${index}`}
-                              type="number"
-                              min="1"
-                              value={question.max_char_limit}
-                              onChange={(e) =>
-                                updateApplicationQuestion(
-                                  index,
-                                  "max_char_limit",
-                                  Number(e.target.value)
-                                )
-                              }
-                              required
-                              className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            />
-                          </div>
-                          <div className="md:col-span-2 flex items-end justify-end">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              className="text-red-500 hover:text-red-600"
-                              onClick={() => removeApplicationQuestion(index)}
-                            >
-                              Remove
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="grid gap-3">
-                          <div className="flex items-center justify-between">
-                            <Label>Response Options</Label>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => addResponseOption(index)}
-                            >
-                              Add Option
-                            </Button>
-                          </div>
-                          <div className="flex flex-col gap-2">
-                            {(question.response_options || []).map(
-                              (option, optionIndex) => (
-                                <div
-                                  key={`option-${index}-${optionIndex}`}
-                                  className="flex gap-2"
-                                >
-                                  <Input
-                                    value={option}
-                                    onChange={(e) =>
-                                      updateResponseOption(
-                                        index,
-                                        optionIndex,
-                                        e.target.value
-                                      )
-                                    }
-                                    placeholder="Enter option text"
-                                    required
-                                  />
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    className="text-red-500 hover:text-red-600 shrink-0"
-                                    onClick={() =>
-                                      removeResponseOption(index, optionIndex)
-                                    }
-                                    disabled={
-                                      (question.response_options || [])
-                                        .length === 0
-                                    }
-                                  >
-                                    Remove
-                                  </Button>
-                                </div>
-                              )
-                            )}
-                            {(!question.response_options ||
-                              question.response_options.length === 0) && (
-                              <p className="text-sm text-muted-foreground">
-                                No options added. Click &quot;Add Option&quot;
-                                to add selection options.
-                              </p>
-                            )}
-                          </div>
-                          <div className="flex justify-end">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              className="text-red-500 hover:text-red-600"
-                              onClick={() => removeApplicationQuestion(index)}
-                            >
-                              Remove Question
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
+              <div className="grid gap-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+              <div className="grid gap-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+              <div className="grid gap-2">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-10 w-full" />
               </div>
             </section>
+
+            {/* Event Location Skeleton */}
+            <section className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+              <div className="grid gap-2">
+                <Skeleton className="h-4 w-28" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+              <div className="grid gap-2 md:col-span-2">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            </section>
+
+            {/* Registration Times Skeleton */}
+            <section className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-2">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+              <div className="grid gap-2">
+                <Skeleton className="h-4 w-40" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            </section>
+
+            {/* Check-In Events Section Skeleton */}
+            <section className="grid gap-4">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-5 w-40" />
+                <Skeleton className="h-9 w-32" />
+              </div>
+              <div className="border rounded-lg p-4 space-y-4">
+                <div className="grid gap-4 md:grid-cols-3">
+                  <div className="grid gap-2">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Skeleton className="h-4 w-28" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                  <div className="grid gap-2">
+                    <Skeleton className="h-4 w-24" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Application Questions Section Skeleton */}
+            <section className="grid gap-4">
+              <div className="flex items-center justify-between">
+                <Skeleton className="h-5 w-48" />
+                <Skeleton className="h-9 w-36" />
+              </div>
+              <div className="border rounded-lg p-4 space-y-4">
+                <div className="grid gap-4">
+                  <div className="grid gap-2">
+                    <Skeleton className="h-4 w-32" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                  <div className="grid gap-2 md:grid-cols-2">
+                    <div className="grid gap-2">
+                      <Skeleton className="h-4 w-28" />
+                      <Skeleton className="h-10 w-full" />
+                    </div>
+                    <div className="grid gap-2">
+                      <Skeleton className="h-4 w-32" />
+                      <Skeleton className="h-10 w-full" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Submit Button Skeleton */}
+            <div className="flex justify-start">
+              <Skeleton className="h-10 w-32" />
+            </div>
+          </div>
+        ) : (
+          <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
+            <BasicEventInfo
+              name={formState.name}
+              description={formState.description}
+              max_capacity={formState.max_capacity}
+              image_url={formState.image_url}
+              isSubmitting={isSubmitting}
+              onFieldChange={handleFieldChange}
+            />
+
+            <EventPricing
+              regular_price={formState.regular_price}
+              member_price={formState.member_price}
+              onFieldChange={handleFieldChange}
+            />
+
+            <EventSchedule
+              start_date={formState.start_date}
+              start_time={formState.start_time}
+              end_date={formState.end_date}
+              end_time={formState.end_time}
+              onFieldChange={handleFieldChange}
+            />
+
+            <EventLocation
+              location_building={formState.location_building}
+              location_room={formState.location_room}
+              location_address_url={formState.location_address_url}
+              onFieldChange={handleFieldChange}
+            />
+
+            <RegistrationTimes
+              registration_start_time={formState.registration_start_time}
+              registration_end_time={formState.registration_end_time}
+              onFieldChange={handleFieldChange}
+            />
+
+            <CheckInEventsSection
+              checkInEvents={checkInEvents}
+              onAdd={addCheckInEvent}
+              onRemove={removeCheckInEvent}
+              onUpdate={updateCheckInEvent}
+            />
+
+            <ApplicationQuestionsSection
+              applicationTemplate={applicationTemplate}
+              questionErrors={questionErrors}
+              onAdd={addApplicationQuestion}
+              onRemove={removeApplicationQuestion}
+              onUpdate={updateApplicationQuestion}
+              onAddResponseOption={addResponseOption}
+              onUpdateResponseOption={updateResponseOption}
+              onRemoveResponseOption={removeResponseOption}
+              onResponseTypeChange={handleResponseTypeChange}
+            />
 
             {error && <p className="text-sm text-red-500">{error}</p>}
             {successMessage && (
               <p className="text-sm text-green-600">{successMessage}</p>
             )}
 
-            <CardFooter className="px-0">
+            <CardFooter className="px-0 flex gap-2">
               <Button
                 type="submit"
                 disabled={isSubmitting}
@@ -1191,10 +1164,34 @@ export const EventCreateModify = ({
                   ? "Update Event"
                   : "Create Event"}
               </Button>
+              {eventId && (
+                <Button
+                  type="button"
+                  variant="destructive"
+                  onClick={() => setShowDeleteModal(true)}
+                  disabled={isSubmitting || isDeleting}
+                  className="w-full md:w-auto"
+                >
+                  Delete Event
+                </Button>
+              )}
             </CardFooter>
           </form>
         )}
       </CardContent>
+      {eventId && (
+        <DeleteEventModal
+          eventName={formState.name}
+          isOpen={showDeleteModal}
+          onClose={() => {
+            setShowDeleteModal(false);
+            setError(null);
+          }}
+          onConfirm={handleDeleteEvent}
+          isDeleting={isDeleting}
+          error={error}
+        />
+      )}
     </Card>
   );
 };

@@ -8,20 +8,11 @@ import { AdminSidebar } from "@/components/AdminSidebar";
 import { createClient } from "@/lib/supabase/client";
 import type { Event } from "@/lib/types/eventTypes";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
-
-type EventRecord = Event & { id: string };
+import { EventCard } from "@/components/EventCard";
 
 const AdminEventsManager = () => {
-  const [events, setEvents] = useState<EventRecord[]>([]);
+  const [events, setEvents] = useState<Event[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,10 +27,12 @@ const AdminEventsManager = () => {
         .select("*")
         .order("created_at", { ascending: false });
 
+      console.log(data);
+
       if (error) {
         setError(error.message);
       } else {
-        setEvents((data ?? []) as EventRecord[]);
+        setEvents((data ?? []) as Event[]);
       }
 
       setIsLoading(false);
@@ -90,75 +83,7 @@ const AdminEventsManager = () => {
             ) : (
               <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
                 {events.map((event) => (
-                  <Card key={event.id} className="overflow-hidden">
-                    {event.image_url ? (
-                      <div className="h-40 w-full overflow-hidden bg-muted">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={event.image_url}
-                          alt={event.name}
-                          className="h-full w-full object-cover"
-                        />
-                      </div>
-                    ) : (
-                      <div className="flex h-40 w-full items-center justify-center bg-muted text-sm text-muted-foreground">
-                        No image available
-                      </div>
-                    )}
-                    <CardHeader>
-                      <CardTitle className="line-clamp-1">
-                        {event.name}
-                      </CardTitle>
-                      <CardDescription className="flex flex-col gap-1 text-xs">
-                        <span>
-                          {event.start_date} ・ {event.start_time}
-                          {event.end_date && event.end_time && ` - ${event.end_date} ・ ${event.end_time}`}
-                        </span>
-                        <span className="line-clamp-1">
-                          {event.location_building} {event.location_room}
-                        </span>
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="line-clamp-3 text-sm text-muted-foreground">
-                        {event.description}
-                      </p>
-                    </CardContent>
-                    <CardFooter className="flex flex-col gap-2">
-                      <div className="flex items-center justify-between w-full">
-                        <div className="text-sm font-medium">
-                          ${Number(event.regular_price ?? 0).toFixed(2)} / ${Number(event.member_price ?? 0).toFixed(2)}
-                        </div>
-                        <Button asChild variant="outline" size="sm">
-                          <Link href={`/admin/events/${event.id}`}>Modify</Link>
-                        </Button>
-                      </div>
-                      <div className="flex gap-2 w-full">
-                        <Button
-                          asChild
-                          variant="outline"
-                          size="sm"
-                          className="flex-1"
-                        >
-                          <Link href={`/admin/events/${event.id}/check-in`}>
-                            Check-In
-                          </Link>
-                        </Button>
-                        <Button
-                          asChild
-                          variant="outline"
-                          size="sm"
-                          className="flex-1"
-                        >
-                          <Link
-                            href={`/admin/events/${event.id}/review-applications`}
-                          >
-                            Applications
-                          </Link>
-                        </Button>
-                      </div>
-                    </CardFooter>
-                  </Card>
+                  <EventCard key={event.id} event={event} variant="admin" />
                 ))}
               </div>
             )}

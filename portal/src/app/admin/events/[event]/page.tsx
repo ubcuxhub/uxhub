@@ -18,7 +18,7 @@ const Page: React.FC<EventViewProps> = async ({ params }) => {
       <div className="flex h-screen">
         <AdminSidebar />
         <div className="flex-1 overflow-y-auto">
-          <div className="flex w-full justify-center py-10">
+          <div className="flex w-full justify-center py-10 gap-4">
             <EventCreateModify eventId={eventId} />
           </div>
         </div>

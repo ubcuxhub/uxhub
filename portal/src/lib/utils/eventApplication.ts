@@ -13,7 +13,7 @@ export async function ensureUserInfo(
   // Check if user_info exists
   const { data: existingUserInfo, error: fetchError } = await supabase
     .from("user_info")
-    .select("auth_user_id")
+    .select("id")
     .eq("auth_user_id", sessionUserId)
     .maybeSingle();
 
@@ -29,8 +29,8 @@ export async function ensureUserInfo(
   }
 
   // If user_info exists, return the auth_user_id
-  if (existingUserInfo?.auth_user_id) {
-    return existingUserInfo.auth_user_id;
+  if (existingUserInfo?.id) {
+    return existingUserInfo.id;
   }
 
   // Create user_info if it doesn't exist
@@ -65,22 +65,18 @@ export async function ensureUserInfo(
 }
 
 /**
- * Prepares response data for insertion into event_application_responses
+ * Prepares response data for upsert into event_application_responses
  */
 export function prepareResponseData(
-  questionRecords: Array<{ id: string; question: string }>,
+  questionRecords: Array<{ id: string }>,
   responses: Record<string, string | string[]>,
-  registrationId: string,
-  applicationId: string
+  registrationId: string
 ): Array<Record<string, unknown>> {
   // Validate registration ID is provided
   if (!registrationId) {
-    throw new Error("Registration ID is required to save application responses");
-  }
-
-  // Validate application ID is provided
-  if (!applicationId) {
-    throw new Error("Application ID is required to save application responses");
+    throw new Error(
+      "Registration ID is required to save application responses"
+    );
   }
 
   return questionRecords.map((questionRecord, index) => {
@@ -88,6 +84,7 @@ export function prepareResponseData(
     const responseValue = responses[questionId];
 
     // Convert response to string format for 'response' column
+    // Arrays (multi_select) are converted to comma-separated strings
     let responseText: string;
     if (Array.isArray(responseValue)) {
       responseText = responseValue.join(", ");
@@ -95,21 +92,12 @@ export function prepareResponseData(
       responseText = responseValue || "";
     }
 
-    // Build response data
+    // Build response data - only include required fields
     const responseData: Record<string, unknown> = {
       event_application_question_id: questionRecord.id,
       event_registration_id: registrationId,
-      application_id: applicationId, // Link to event_applications table
-      question: questionRecord.question || "",
       response: responseText,
     };
-
-    // Handle 'answer' column - it's JSON type
-    if (Array.isArray(responseValue)) {
-      responseData.answer = responseValue; // JSON array
-    } else {
-      responseData.answer = responseText; // JSON string
-    }
 
     return responseData;
   });

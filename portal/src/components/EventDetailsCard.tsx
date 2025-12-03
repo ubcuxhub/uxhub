@@ -7,10 +7,8 @@ import {
 } from "@/components/ui/card";
 import type { Event } from "@/lib/types/eventTypes";
 
-type EventRecord = Event & { id: string };
-
 interface EventDetailsCardProps {
-  event: EventRecord;
+  event: Event;
 }
 
 export function EventDetailsCard({ event }: EventDetailsCardProps) {
@@ -39,8 +37,19 @@ export function EventDetailsCard({ event }: EventDetailsCardProps) {
               Date & Time
             </p>
             <p className="text-base">
-              {event.start_date} at {event.start_time}
-              {event.end_date && event.end_time && ` - ${event.end_date} at ${event.end_time}`}
+              {event.start_date && event.start_time
+                ? `${new Date(event.start_date).toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  })} at ${event.start_time}`
+                : event.start_date
+                ? new Date(event.start_date).toLocaleDateString("en-US", {
+                    year: "numeric",
+                    month: "short",
+                    day: "numeric",
+                  })
+                : "TBD"}
             </p>
           </div>
           <div>
@@ -66,7 +75,12 @@ export function EventDetailsCard({ event }: EventDetailsCardProps) {
           <div>
             <p className="text-sm font-medium text-muted-foreground">Price</p>
             <p className="text-base">
-              ${Number(event.regular_price ?? 0).toFixed(2)} (Regular) / ${Number(event.member_price ?? 0).toFixed(2)} (Member)
+              ${Number(event.regular_price ?? 0).toFixed(2)}
+              {event.member_price !== event.regular_price && (
+                <span className="text-muted-foreground ml-1">
+                  / ${Number(event.member_price ?? 0).toFixed(2)} member
+                </span>
+              )}
             </p>
           </div>
           <div>
@@ -80,4 +94,3 @@ export function EventDetailsCard({ event }: EventDetailsCardProps) {
     </Card>
   );
 }
-

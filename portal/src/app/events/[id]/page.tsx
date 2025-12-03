@@ -18,6 +18,7 @@ import { Spinner } from "@/components/ui/spinner";
 import Link from "next/link";
 import { useEventDetail } from "@/hooks/useEventDetail";
 import { useEventApplication } from "@/hooks/useEventApplication";
+import { BackButton } from "@/components/BackButton";
 
 export default function EventDetailPage() {
   const params = useParams();
@@ -72,9 +73,7 @@ export default function EventDetailPage() {
             </CardHeader>
             <CardContent>
               <p className="text-destructive">{error}</p>
-              <Button asChild className="mt-4">
-                <Link href="/events">Back to Events</Link>
-              </Button>
+              <BackButton link="/events" label="Back to Events" className="mt-4" />
             </CardContent>
           </Card>
         </div>
@@ -89,9 +88,7 @@ export default function EventDetailPage() {
   return (
     <ProtectedRoute>
       <div className="container mx-auto max-w-7xl py-10 space-y-6">
-        <Button asChild variant="outline">
-          <Link href="/events">← Back to Events</Link>
-        </Button>
+        <BackButton link="/events" label="Back to Events" />
 
         {/* Side-by-side layout: Event Details and Application Form */}
         <div className="grid gap-6 lg:grid-cols-2">
