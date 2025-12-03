@@ -33,7 +33,8 @@ export interface User {
   phone: string;
   order_date?: string | null;
   student_number?: number | null;
-  membership_type?: string | null;
+  membership_type_id?: string | null;
+  membership_type_name?: string | null; // Joined from membership_types table
   newsletter?: string | null;
   auth_user_id: string; // UUID linked to auth.users.id
   faculty?: string;
