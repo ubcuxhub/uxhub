@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+*.js.map
+*.d.ts
+!src/**/*.d.ts
+
+# TypeScript
+*.tsbuildinfo
+
+# Turbo
+.turbo/
+
+# Storybook
+storybook-static/
+
+# OS
+.DS_Store
