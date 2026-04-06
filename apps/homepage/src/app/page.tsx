@@ -1,14 +1,14 @@
 "use client";
 
 import DotGrid from "@/components/DotGrid";
-import HeroSection from "@/home-page-sections/HeroSection";
-import MailingList from "@/home-page-sections/MailingListSection";
-import Navbar from "@/home-page-sections/Navbar";
-import WhoWeAreSection from "@/home-page-sections/WhoWeAreSection";
-import LogoCarousel from "@/home-page-sections/LogoCarousel";
-import EventsSection from "@/home-page-sections/EventsSection";
-import TeamSection from "@/home-page-sections/TeamSection";
-import Footer from "@/home-page-sections/Footer";
+import HeroSection from "@/homepage-sections/HeroSection";
+import MailingList from "@/homepage-sections/MailingListSection";
+import Navbar from "@/homepage-sections/Navbar";
+import WhoWeAreSection from "@/homepage-sections/WhoWeAreSection";
+import LogoCarousel from "@/homepage-sections/LogoCarousel";
+import EventsSection from "@/homepage-sections/EventsSection";
+import TeamSection from "@/homepage-sections/TeamSection";
+import Footer from "@/homepage-sections/Footer";
 
 export default function Home() {
   return (
@@ -38,7 +38,6 @@ export default function Home() {
       <div className="relative z-10 pt-24">
         <Footer />
       </div>
-
     </main>
   );
 }
