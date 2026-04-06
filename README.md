@@ -4,8 +4,11 @@ This repo contains all UX Hub's projects:
 
 ```
 uxhub/
-├── portal/    # Student Portal — membership sign-ups and event payments
-└── website/   # ubcuxhub.ca — the public-facing club homepage
+├── apps/
+│   ├── homepage/   # ubcuxhub.ca — public-facing club website
+│   └── portal/     # Student Portal — membership sign-ups and event payments
+└── packages/
+    └── ui/         # Shared component library
 ```
 
 Admin Account:
