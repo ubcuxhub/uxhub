@@ -1,5 +1,10 @@
 {
   "name": "uxhub",
   "private": true,
-  "packageManager": "pnpm@10.6.2"
+  "packageManager": "pnpm@10.6.2",
+  "scripts": {
+    "dev:homepage": "pnpm --filter homepage dev",
+    "dev:portal": "pnpm --filter portal dev",
+    "build": "pnpm -r build"
+  }
 }

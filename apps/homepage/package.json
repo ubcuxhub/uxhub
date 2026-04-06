@@ -1,5 +1,5 @@
 {
-  "name": "uxhub-website",
+  "name": "homepage",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -13,6 +13,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@radix-ui/react-select": "^2.2.6",
+    "@uxhub/ui": "workspace:^",
     "framer-motion": "^12.19.1",
     "gsap": "^3.13.0",
     "lucide-react": "^0.544.0",
