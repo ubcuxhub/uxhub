@@ -4,7 +4,7 @@ import DotGrid from "@/components/DotGrid";
 import HeroSection from "@/home-page-sections/HeroSection";
 import MailingList from "@/home-page-sections/MailingListSection";
 import Navbar from "@/home-page-sections/Navbar";
-import AboutUsSection from "@/home-page-sections/AboutUsSection";
+import WhoWeAreSection from "@/home-page-sections/WhoWeAreSection";
 import LogoCarousel from "@/home-page-sections/LogoCarousel";
 import EventsSection from "@/home-page-sections/EventsSection";
 import TeamSection from "@/home-page-sections/TeamSection";
@@ -29,7 +29,7 @@ export default function Home() {
       <div className="relative z-10 flex flex-col gap-40">
         <HeroSection />
         <MailingList />
-        <AboutUsSection />
+        <WhoWeAreSection />
         <LogoCarousel />
         <EventsSection />
         <TeamSection />

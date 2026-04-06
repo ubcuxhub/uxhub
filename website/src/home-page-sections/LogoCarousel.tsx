@@ -11,9 +11,22 @@ interface Logo {
 
 const LogoCarousel: React.FC = () => {
   const logos: Logo[] = [
-    { name: "Steve's Poke Bar", src: "/logos/stevespoke.png", alt: "Steve's Poke Bar" },
-    { name: "Google Cloud", src: "/logos/googlecloud.png", alt: "Google Cloud" },
-    { name: "Microsoft", src: "/logos/microsoft.png", alt: "Microsoft", padding_y: "py-2" },
+    {
+      name: "Steve's Poke Bar",
+      src: "/logos/stevespoke.png",
+      alt: "Steve's Poke Bar",
+    },
+    {
+      name: "Google Cloud",
+      src: "/logos/googlecloud.png",
+      alt: "Google Cloud",
+    },
+    {
+      name: "Microsoft",
+      src: "/logos/microsoft.png",
+      alt: "Microsoft",
+      padding_y: "py-2",
+    },
     { name: "Willowtree", src: "/logos/willowtree.png", alt: "Willowtree" },
     { name: "Notion", src: "/logos/notion.png", alt: "Notion" },
     { name: "TD Bank", src: "/logos/td.png", alt: "TD Bank" },
@@ -71,7 +84,8 @@ const LogoCarousel: React.FC = () => {
   return (
     <div className="w-full overflow-hidden">
       <p className="pb-12 px-[5%] text-center text-[16px] font-medium">
-        Proudly partnered with startups, clubs, and companies across UBC and beyond
+        Proudly partnered with startups, clubs, and companies across UBC and
+        beyond
       </p>
 
       {/* Container with background and relative positioning */}

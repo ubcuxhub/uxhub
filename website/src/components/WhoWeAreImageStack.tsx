@@ -3,7 +3,7 @@
 import React from "react";
 import Image from "next/image";
 
-const AboutImageStack = () => {
+const WhoWeAreImageStack = () => {
   return (
     <div className="flex flex-col md:flex-row items-center justify-center gap-8 md:gap-12">
 
@@ -58,4 +58,4 @@ const AboutImageStack = () => {
   );
 };
 
-export default AboutImageStack;
+export default WhoWeAreImageStack;

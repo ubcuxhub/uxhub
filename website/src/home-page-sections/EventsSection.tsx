@@ -1,6 +1,8 @@
 import React from "react";
-import EventCard from "../components/EventCard";
 import Button from "@/components/Button";
+import EventCard from "@/components/EventCard";
+import { EVENTS } from "@/lib/events";
+import type { Event as SiteEvent } from "@/types";
 
 const EventsSection: React.FC = () => {
   const triangleIcon = (
@@ -42,6 +44,11 @@ const EventsSection: React.FC = () => {
     </svg>
   );
 
+  const iconByType: Record<SiteEvent["icon"], React.ReactNode> = {
+    triangle: triangleIcon,
+    star: starIcon,
+  };
+
   return (
     <div id="events" className="px-[5%] md:px-[20%]">
       <div className="mb-8">
@@ -55,21 +62,19 @@ const EventsSection: React.FC = () => {
 
       {/* event cards */}
       <div className="flex flex-col md:flex-row">
-        <EventCard
-          imageSrc="/events/event1.png"
-          imageAlt="Design Archetypes Event"
-          buttonText="office tour"
-          buttonIcon={triangleIcon}
-        />
-
-        <div className="md:w-[5%] h-8"></div>
-
-        <EventCard
-          imageSrc="/events/event2.png"
-          imageAlt="UXATHON 2025 Event"
-          buttonText="competition"
-          buttonIcon={starIcon}
-        />
+        {EVENTS.map((event, index) => (
+          <React.Fragment key={event.imageSrc}>
+            <EventCard
+              imageSrc={event.imageSrc}
+              imageAlt={event.imageAlt}
+              buttonText={event.buttonText}
+              buttonIcon={iconByType[event.icon]}
+            />
+            {index < EVENTS.length - 1 && (
+              <div className="md:w-[5%] h-8" aria-hidden="true"></div>
+            )}
+          </React.Fragment>
+        ))}
       </div>
 
       {/* CTA */}
