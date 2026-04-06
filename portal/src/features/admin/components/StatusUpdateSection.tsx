@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import type { ApplicationStatus } from "../types/applicationTypes";
+import type { ApplicationStatus } from "@/features/events/types/applicationTypes";
 import { X, Check } from "lucide-react";
 
 interface StatusUpdateSectionProps {

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-import { AdminSidebar } from "@/features/admin";
+import { AdminPageSkeleton, AdminSidebar } from "@/features/admin";
 import { ProtectedRoute } from "@/features/auth";
 import { EventCard, type Event } from "@/features/events";
 import { createClient } from "@/lib/supabase/client";
@@ -41,7 +41,7 @@ const AdminEventsManager = () => {
   }, []);
 
   return (
-    <ProtectedRoute admin>
+    <ProtectedRoute admin loadingFallback={<AdminPageSkeleton />}>
       <div className="flex h-screen">
         <AdminSidebar />
         <div className="flex-1 overflow-y-auto">
@@ -82,7 +82,16 @@ const AdminEventsManager = () => {
             ) : (
               <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
                 {events.map((event) => (
-                  <EventCard key={event.id} event={event} variant="admin" />
+                  <EventCard
+                    key={event.id}
+                    event={event}
+                    variant="admin"
+                    adminLinks={{
+                      editHref: `/admin/events/${event.id}`,
+                      checkInHref: `/admin/events/${event.id}/check-in`,
+                      applicationsHref: `/admin/events/${event.id}/review-applications`,
+                    }}
+                  />
                 ))}
               </div>
             )}

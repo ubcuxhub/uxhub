@@ -5,7 +5,7 @@ import Link from "next/link";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faChevronLeft } from "@fortawesome/free-solid-svg-icons";
 import { createClient } from "@/lib/supabase/client";
-import type { Event } from "@/features/events";
+import type { Event } from "@/features/events/types/eventTypes";
 import { cn } from "@/lib/utils";
 import { Spinner } from "@/components/ui/spinner";
 

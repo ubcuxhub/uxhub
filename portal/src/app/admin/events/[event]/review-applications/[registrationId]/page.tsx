@@ -3,15 +3,15 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { AdminSidebar } from "@/features/admin";
-import { ProtectedRoute } from "@/features/auth";
 import {
+  AdminPageSkeleton,
+  AdminSidebar,
   ApplicantInfoCard,
   ApplicationResponseCard,
   StatusUpdateSection,
-  type ApplicationStatus,
-} from "@/features/applications";
-import { type Event } from "@/features/events";
+} from "@/features/admin";
+import { ProtectedRoute } from "@/features/auth";
+import { type ApplicationStatus, type Event } from "@/features/events";
 import { createClient } from "@/lib/supabase/client";
 import { useUser } from "@/context/UserContext";
 import { Button } from "@/components/ui/button";
@@ -213,7 +213,7 @@ export default function ApplicationReviewPage() {
 
   if (loading) {
     return (
-      <ProtectedRoute admin>
+      <ProtectedRoute admin loadingFallback={<AdminPageSkeleton />}>
         <div className="flex h-screen">
           <AdminSidebar />
           <div className="flex-1 overflow-y-auto">
@@ -228,7 +228,7 @@ export default function ApplicationReviewPage() {
 
   if (error && !registration) {
     return (
-      <ProtectedRoute admin>
+      <ProtectedRoute admin loadingFallback={<AdminPageSkeleton />}>
         <div className="flex h-screen">
           <AdminSidebar />
           <div className="flex-1 overflow-y-auto">
@@ -255,7 +255,7 @@ export default function ApplicationReviewPage() {
   }
 
   return (
-    <ProtectedRoute admin>
+    <ProtectedRoute admin loadingFallback={<AdminPageSkeleton />}>
       <div className="flex h-screen">
         <AdminSidebar />
         <div className="flex-1 overflow-y-auto">

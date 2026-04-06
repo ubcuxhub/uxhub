@@ -3,16 +3,17 @@
 import { useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/context/UserContext";
-import { AdminPageSkeleton } from "@/features/admin";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   admin?: boolean;
+  loadingFallback?: React.ReactNode;
 }
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   admin = false,
+  loadingFallback,
 }) => {
   const { user, loading } = useUser();
   const router = useRouter();
@@ -33,12 +34,14 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   }, [access, router]);
 
   if (access === "loading") {
-    return admin ? (
-      <AdminPageSkeleton />
-    ) : (
-      <div className="flex items-center justify-center h-screen text-gray-500">
-        Loading...
-      </div>
+    return (
+      <>
+        {loadingFallback || (
+          <div className="flex items-center justify-center h-screen text-gray-500">
+            Loading...
+          </div>
+        )}
+      </>
     );
   }
 

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ensureUserInfo } from "@/lib/queries/user";
 import { prepareResponseData } from "../helpers/eventApplication";
-import type { User } from "@/lib/types/membershipTypes";
+import type { User } from "@/features/auth";
 
 interface UseEventApplicationResult {
   isSubmitting: boolean;

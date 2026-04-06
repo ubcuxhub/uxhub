@@ -1,6 +1,6 @@
 "use client";
 import { ProtectedRoute } from "@/features/auth";
-import { MembershipTier } from "@/lib/types/membershipTypes";
+import type { MembershipTier } from "@/features/memberships";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,10 +22,10 @@ export default function MembershipsPage() {
   const { user } = useUser();
   const [membershipTiers, setMembershipTiers] = useState<MembershipTier[]>([]);
   const [loading, setLoading] = useState(true);
-  const supabase = createClient();
 
   useEffect(() => {
     const fetchMembershipTiers = async () => {
+      const supabase = createClient();
       try {
         const { data, error } = await supabase
           .from("membership_types")

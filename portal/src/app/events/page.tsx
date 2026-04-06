@@ -8,7 +8,7 @@ import { LogoutButton, ProtectedRoute } from "@/features/auth";
 import { EventCard, type Event } from "@/features/events";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { CalendarDays, User, Sparkles } from "lucide-react";
+import { CalendarDays, User } from "lucide-react";
 
 function EventCardSkeleton() {
   return (

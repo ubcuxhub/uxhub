@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { User } from "@/lib/types/membershipTypes";
+import type { User } from "@/features/auth";
 
 const supabase = createClient();
 

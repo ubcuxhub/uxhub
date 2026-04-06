@@ -12,7 +12,7 @@ export async function fetchCheckInSessions(
     .from("check_in_sessions")
     .select("id, name, start_time, end_time")
     .eq("event_id", eventId)
-    .order("start_time", { ascending: true, nullsLast: true });
+    .order("start_time", { ascending: true });
 
   if (error) throw error;
   return (data || []) as CheckInSession[];
@@ -42,9 +42,11 @@ export async function fetchAttendingRegistrations(
     (reg: {
       id: string;
       user_id: string;
-      user_info: { name: string; email: string } | null;
+      user_info: { name: string; email: string }[] | null;
     }) => {
-      const userInfo = reg.user_info;
+      const userInfo = Array.isArray(reg.user_info)
+        ? reg.user_info[0] || null
+        : reg.user_info;
       return {
         id: reg.id,
         user_id: reg.user_id,

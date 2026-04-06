@@ -16,12 +16,18 @@ interface EventCardProps {
   event: Event;
   variant?: "default" | "admin";
   onClick?: () => void;
+  adminLinks?: {
+    editHref: string;
+    checkInHref: string;
+    applicationsHref: string;
+  };
 }
 
 export function EventCard({
   event,
   variant = "default",
   onClick,
+  adminLinks,
 }: EventCardProps) {
   // Format date and time for display
   const formatDate = (date: string | null | undefined) => {
@@ -110,13 +116,20 @@ export function EventCard({
           </div>
           <div className="flex gap-2 w-full">
             <Button asChild variant="outline" size="sm">
-              <Link href={`/admin/events/${event.id}`}>Modify</Link>
+              <Link href={adminLinks?.editHref || `/admin/events/${event.id}`}>Modify</Link>
             </Button>
             <Button asChild variant="outline" size="sm" className="flex-1">
-              <Link href={`/admin/events/${event.id}/check-in`}>Check-In</Link>
+              <Link href={adminLinks?.checkInHref || `/admin/events/${event.id}/check-in`}>
+                Check-In
+              </Link>
             </Button>
             <Button asChild variant="outline" size="sm" className="flex-1">
-              <Link href={`/admin/events/${event.id}/review-applications`}>
+              <Link
+                href={
+                  adminLinks?.applicationsHref ||
+                  `/admin/events/${event.id}/review-applications`
+                }
+              >
                 Applications
               </Link>
             </Button>

@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/client";
 import type {
   ApplicationStatus,
   GroupedRegistration,
-} from "@/features/applications";
+} from "@/features/events/types/applicationTypes";
 
 /**
  * Fetches event registrations and groups them by user_id

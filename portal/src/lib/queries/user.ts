@@ -1,14 +1,18 @@
 import { createClient } from "@/lib/supabase/client";
-import type { User } from "@/lib/types/membershipTypes";
 
 const supabase = createClient();
+
+interface UserInfoSeed {
+  email?: string;
+  name?: string;
+}
 
 /**
  * Ensures user_info record exists, creating it if necessary
  */
 export async function ensureUserInfo(
   sessionUserId: string,
-  user: User | null
+  user: UserInfoSeed | null
 ): Promise<string> {
   // Check if user_info exists
   const { data: existingUserInfo, error: fetchError } = await supabase

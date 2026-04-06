@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import {
   ResponseType,
   type ApplicationQuestionTemplate,
-} from "../../types/eventTypes";
+} from "@/features/events/types/eventTypes";
 
 interface ApplicationQuestionsSectionProps {
   applicationTemplate: ApplicationQuestionTemplate[];

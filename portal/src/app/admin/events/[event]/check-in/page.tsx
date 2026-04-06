@@ -2,16 +2,17 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
-import { AdminSidebar } from "@/features/admin";
-import { ProtectedRoute } from "@/features/auth";
 import {
+  AdminPageSkeleton,
+  AdminSidebar,
   CheckInTable,
   fetchAttendingRegistrations,
   fetchCheckInSessions,
   fetchCheckInStatuses,
   type AttendingRegistration,
   type CheckInSession,
-} from "@/features/check-ins";
+} from "@/features/admin";
+import { ProtectedRoute } from "@/features/auth";
 import { type Event } from "@/features/events";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -351,7 +352,7 @@ export default function CheckInPage() {
   }, [allRegistrations, checkInStatuses]);
 
   return (
-    <ProtectedRoute admin>
+    <ProtectedRoute admin loadingFallback={<AdminPageSkeleton />}>
       <div className="flex h-screen">
         <AdminSidebar />
         <div className="flex-1 overflow-y-auto">

@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { ApplicationStatus } from "../types/applicationTypes";
+import type { ApplicationStatus } from "@/features/events/types/applicationTypes";
 import { Clock, X, Check, User, Mail, Calendar } from "lucide-react";
 
 interface ApplicantInfoCardProps {

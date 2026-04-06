@@ -2,15 +2,14 @@
 
 import { useRouter } from "next/navigation";
 
-import { AdminSidebar } from "@/features/admin";
+import { AdminPageSkeleton, AdminSidebar, EventCreateModify } from "@/features/admin";
 import { ProtectedRoute } from "@/features/auth";
-import { EventCreateModify } from "@/features/events";
 
 const AdminCreateEventPage = () => {
   const router = useRouter();
 
   return (
-    <ProtectedRoute admin>
+    <ProtectedRoute admin loadingFallback={<AdminPageSkeleton />}>
       <div className="flex h-screen">
         <AdminSidebar />
         <div className="flex-1 overflow-y-auto">

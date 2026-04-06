@@ -8,8 +8,8 @@ import { createClient } from "@/lib/supabase/client";
 import {
   ResponseType,
   type ApplicationQuestionTemplate,
-} from "../types/eventTypes";
-import type { CheckInSessionDraft } from "@/features/check-ins";
+} from "@/features/events/types/eventTypes";
+import type { CheckInSessionDraft } from "../types/checkInTypes";
 import {
   Card,
   CardContent,

@@ -6,12 +6,10 @@ import { ProtectedRoute } from "@/features/auth";
 import {
   EventDetailsCard,
   EventStatusCard,
-  useEventDetail,
-} from "@/features/events";
-import {
   EventApplicationForm,
   useEventApplication,
-} from "@/features/applications";
+  useEventDetail,
+} from "@/features/events";
 import { MessageCard } from "@/components/shared/MessageCard";
 import {
   Card,
@@ -19,9 +17,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import Link from "next/link";
 import { BackButton } from "@/components/shared/BackButton";
 
 export default function EventDetailPage() {

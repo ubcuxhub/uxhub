@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { ApplicationStatus } from "../types/applicationTypes";
+import type { ApplicationStatus } from "@/features/events/types/applicationTypes";
 import { Clock, X, Check } from "lucide-react";
 
 interface ApplicationListCardProps {

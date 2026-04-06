@@ -7,7 +7,7 @@ import {
   type Event,
   type ApplicationQuestionTemplate,
 } from "../types/eventTypes";
-import type { User } from "@/lib/types/membershipTypes";
+import type { User } from "@/features/auth";
 
 type EventRecord = Event & { id: string };
 

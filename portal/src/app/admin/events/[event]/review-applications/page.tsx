@@ -2,13 +2,12 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import { AdminSidebar } from "@/features/admin";
+import { AdminPageSkeleton, AdminSidebar, ApplicationListCard } from "@/features/admin";
 import { ProtectedRoute } from "@/features/auth";
 import {
-  ApplicationListCard,
   type ApplicationStatus,
   type GroupedRegistration,
-} from "@/features/applications";
+} from "@/features/events";
 import { type Event } from "@/features/events";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -130,7 +129,7 @@ export default function ReviewApplicationsPage() {
   };
 
   return (
-    <ProtectedRoute admin>
+    <ProtectedRoute admin loadingFallback={<AdminPageSkeleton />}>
       <div className="flex h-screen">
         <AdminSidebar />
         <div className="flex-1 overflow-y-auto">

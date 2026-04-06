@@ -1,4 +1,5 @@
 "use client";
+import { AdminPageSkeleton } from "@/features/admin";
 import { ProtectedRoute } from "@/features/auth";
 
 import { useEffect } from "react";
@@ -12,7 +13,7 @@ const AuthDashboard = () => {
   }, [router]);
 
   return (
-    <ProtectedRoute admin>
+    <ProtectedRoute admin loadingFallback={<AdminPageSkeleton />}>
       <p>Redirecting to admin events...</p>
     </ProtectedRoute>
   );

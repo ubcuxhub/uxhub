@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MembershipTier } from "@/lib/types/membershipTypes";
+import type { MembershipTier } from "../types/membershipTypes";
 
 interface PaymentFormProps {
   tier: MembershipTier;
@@ -18,7 +18,6 @@ export default function PaymentForm({ tier }: PaymentFormProps) {
   const [cardLoaded, setCardLoaded] = useState(false);
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [message, setMessage] = useState("");
-  const [payments, setPayments] = useState<any>(null);
   const [card, setCard] = useState<any>(null);
 
   useEffect(() => {
@@ -50,7 +49,6 @@ export default function PaymentForm({ tier }: PaymentFormProps) {
           process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID!
         );
         if (!isMounted) return;
-        setPayments(paymentsInstance);
 
         const cardInstance = await paymentsInstance.card();
         await cardInstance.attach("#card-container");
