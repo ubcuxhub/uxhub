@@ -11,6 +11,5 @@ uxhub/
     └── ui/         # Shared component library
 ```
 
-Admin Account:
-[ubcuxhub@gmail.com](mailto:ubcuxhub@gmail.com)  
-the@maz1ngP0rtal!
+
+

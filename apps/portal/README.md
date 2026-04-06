@@ -1,3 +1,9 @@
+# UX Hub Student Portal
+
+Admin Account:
+ubcuxhub@gmail.com
+the@maz1ngP0rtal!
+
 # How to Run Supabase Migrations
 
 ```
