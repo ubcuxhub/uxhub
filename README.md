@@ -10,6 +10,3 @@ uxhub/
 └── packages/
     └── ui/         # Shared component library
 ```
-
-
-
