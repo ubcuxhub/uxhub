@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 // import { Geist, Geist_Mono } from "next/font/google";
 import { DM_Sans, Lora } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -47,6 +48,7 @@ export default function RootLayout({
     >
       <body className={`${dmSans.className} font-sans text-black text-[16px]`}>
         {children}
+        <Analytics />
       </body>
     </html>
   );
