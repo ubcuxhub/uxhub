@@ -1,38 +1,10 @@
 "use client";
 import React, { useRef, useEffect } from "react";
 import Image from "next/image";
-
-interface Logo {
-  name: string;
-  src: string;
-  alt: string;
-  padding_y?: string; // e.g., "py-2"
-}
+import { SPONSOR_LOGOS } from "@/lib/sponsors";
 
 const LogoCarousel: React.FC = () => {
-  const logos: Logo[] = [
-    {
-      name: "Steve's Poke Bar",
-      src: "/logos/stevespoke.png",
-      alt: "Steve's Poke Bar",
-    },
-    {
-      name: "Google Cloud",
-      src: "/logos/googlecloud.png",
-      alt: "Google Cloud",
-    },
-    {
-      name: "Microsoft",
-      src: "/logos/microsoft.png",
-      alt: "Microsoft",
-      padding_y: "py-2",
-    },
-    { name: "Willowtree", src: "/logos/willowtree.png", alt: "Willowtree" },
-    { name: "Notion", src: "/logos/notion.png", alt: "Notion" },
-    { name: "TD Bank", src: "/logos/td.png", alt: "TD Bank" },
-    { name: "Red Bull", src: "/logos/redbull.png", alt: "Red Bull" },
-    { name: "Rain Shine", src: "/logos/rainorshine.png", alt: "Rain Shine" },
-  ];
+  const logos = SPONSOR_LOGOS;
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const duplicatedLogos = [...logos, ...logos];

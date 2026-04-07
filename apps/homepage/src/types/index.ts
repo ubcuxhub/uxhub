@@ -1,3 +1,10 @@
+export interface Logo {
+  name: string;
+  src: string;
+  alt: string;
+  padding_y?: string;
+}
+
 export interface TeamMember {
   name: string;
   role: string;

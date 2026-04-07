@@ -1,4 +1,4 @@
-# ruWelcome to UX Hub ✨
+# Welcome to UX Hub ✨
 
 This repo contains all UX Hub's projects:
 

@@ -21,8 +21,10 @@ export const metadata: Metadata = {
   description: "A collaborative whiteboard and design hub",
   icons: {
     icon: [
-      { url: "/icon-dark.svg", media: "(prefers-color-scheme: light)" },
-      { url: "/icon-light.svg", media: "(prefers-color-scheme: dark)" },
+      { url: "/favicon/favicon.ico", sizes: "any" },
+      { url: "/favicon/icon-dark.svg" },
+      { url: "/favicon/icon-dark.svg", media: "(prefers-color-scheme: light)" },
+      { url: "/favicon/icon-light.svg", media: "(prefers-color-scheme: dark)" },
     ],
   },
 };
@@ -43,9 +45,7 @@ export default function RootLayout({
       lang="en"
       className={`${dmSans.variable} ${lora.variable} antialiased`}
     >
-      <body
-        className={`${dmSans.className} font-sans text-black text-[16px]`}
-      >
+      <body className={`${dmSans.className} font-sans text-black text-[16px]`}>
         {children}
       </body>
     </html>
