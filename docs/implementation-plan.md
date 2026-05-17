@@ -10,7 +10,7 @@ A single Next.js application covering UBC UX Hub's full digital surface:
 ## Repo Structure
 
 ```python
-ubcux/
+uxhub/
 ├── app/
 │   ├── (marketing)/                       # Public site, no auth
 │   │   ├── page.tsx                       # Homepage
@@ -175,3 +175,4 @@ ubcuxhub.com/admin/purchases/ord_abc456
 ```
 ubcuxhub.com/api/square/webhook
 ```
+
