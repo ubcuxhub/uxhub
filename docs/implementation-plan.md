@@ -62,10 +62,14 @@ ubcux/
 │   │       └── layout.tsx                 # requireAdmin
 │   │
 │   ├── (auth)/
-│   │   ├── login/page.tsx
-│   │   ├── signup/page.tsx
-│   │   ├── forgot-password/page.tsx
-│   │   └── callback/route.ts              # Supabase OAuth callback
+│   │   └── auth/
+│   │       ├── login/page.tsx
+│   │       ├── sign-up/page.tsx
+│   │       ├── sign-up-success/page.tsx
+│   │       ├── forgot-password/page.tsx
+│   │       ├── update-password/page.tsx
+│   │       ├── error/page.tsx
+│   │       └── confirm/route.ts           # Supabase email confirmation
 │   │
 │   └── api/                               # Webhooks & third-party callbacks only
 │       └── square/webhook/route.ts
@@ -128,10 +132,13 @@ ubcuxhub.com/membership
 ### Auth — `(auth)`
 
 ```
-ubcuxhub.com/login
-ubcuxhub.com/signup
-ubcuxhub.com/forgot-password
-ubcuxhub.com/auth/callback
+ubcuxhub.com/auth/login
+ubcuxhub.com/auth/sign-up
+ubcuxhub.com/auth/sign-up-success
+ubcuxhub.com/auth/forgot-password
+ubcuxhub.com/auth/update-password
+ubcuxhub.com/auth/error
+ubcuxhub.com/auth/confirm
 ```
 
 ### Student portal — `(student)`
