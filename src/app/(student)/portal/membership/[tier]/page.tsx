@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ProtectedRoute } from "@/features/auth";
 import { PaymentForm, type MembershipTier } from "@/features/memberships";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, Check } from "lucide-react";
@@ -36,8 +35,7 @@ async function page({ params }: { params: Promise<{ tier: string }> }) {
   }).format(tierData.price);
 
   return (
-    <ProtectedRoute>
-      <div className="container mx-auto py-10 max-w-5xl px-4">
+    <div className="container mx-auto py-10 max-w-5xl px-4">
         <div className="mb-6">
           <Button
             variant="ghost"
@@ -112,8 +110,7 @@ async function page({ params }: { params: Promise<{ tier: string }> }) {
             </p>
           </div>
         </div>
-      </div>
-    </ProtectedRoute>
+    </div>
   );
 }
 

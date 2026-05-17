@@ -12,7 +12,7 @@ import WhoWeAreSection from "@/features/marketing/sections/WhoWeAreSection";
 
 export default function Home() {
   return (
-    <main className="marketing-home bg-white">
+    <main className="bg-white">
       <Navbar />
 
       <div className="fixed inset-0 z-0 h-full w-full pointer-events-none">

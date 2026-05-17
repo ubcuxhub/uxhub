@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/context/UserContext";
 import { createClient } from "@/lib/supabase/client";
-import { LogoutButton, ProtectedRoute } from "@/features/auth";
+import { LogoutButton } from "@/features/auth";
 import { EventCard, type Event } from "@/features/events";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -82,8 +82,7 @@ export default function Events() {
     user?.name?.split(" ")[0] || user?.email?.split("@")[0] || "there";
 
   return (
-    <ProtectedRoute>
-      <div className="min-h-screen bg-linear-to-b from-background to-muted/20">
+    <div className="min-h-screen bg-linear-to-b from-background to-muted/20">
         {/* Header */}
         <header className="border-b bg-background/80 backdrop-blur-sm sticky top-0 z-10">
           <div className="container mx-auto max-w-6xl px-4 py-4 flex items-center justify-between">
@@ -168,7 +167,6 @@ export default function Events() {
             </p>
           </div>
         </footer>
-      </div>
-    </ProtectedRoute>
+    </div>
   );
 }

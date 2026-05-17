@@ -20,10 +20,18 @@ const UserContext = createContext<UserContextType>({
 
 export const useUser = () => useContext(UserContext);
 
-export function UserProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
-  const hasUser = useRef(false);
+interface UserProviderProps {
+  children: React.ReactNode;
+  initialUser?: User | null;
+}
+
+export function UserProvider({
+  children,
+  initialUser = null,
+}: UserProviderProps) {
+  const [user, setUser] = useState<User | null>(initialUser);
+  const [loading, setLoading] = useState(!initialUser);
+  const hasUser = useRef(Boolean(initialUser));
 
   const loadUser = async (silent = false) => {
     // Only set loading if this is not a silent refresh and we don't have a user yet

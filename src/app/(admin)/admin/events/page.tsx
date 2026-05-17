@@ -3,8 +3,6 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-import { AdminPageSkeleton, AdminSidebar } from "@/features/admin";
-import { ProtectedRoute } from "@/features/auth";
 import { EventCard, type Event } from "@/features/events";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -41,11 +39,7 @@ const AdminEventsManager = () => {
   }, []);
 
   return (
-    <ProtectedRoute admin loadingFallback={<AdminPageSkeleton />}>
-      <div className="flex h-screen">
-        <AdminSidebar />
-        <div className="flex-1 overflow-y-auto">
-          <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 py-8 px-8">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 py-8 px-8">
             <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <h1 className="text-2xl font-semibold">Events Dashboard</h1>
@@ -95,10 +89,7 @@ const AdminEventsManager = () => {
                 ))}
               </div>
             )}
-          </div>
-        </div>
-      </div>
-    </ProtectedRoute>
+    </div>
   );
 };
 

@@ -3,7 +3,6 @@ import { FACULTIES, YEAR_LEVELS } from "@/lib/constants";
 import { useUser } from "@/context/UserContext";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
-import { ProtectedRoute } from "@/features/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -106,8 +105,7 @@ const Profile = () => {
   if (!user) return null;
 
   return (
-    <ProtectedRoute>
-      <div className="container mx-auto max-w-2xl py-10 space-y-6">
+    <div className="container mx-auto max-w-2xl py-10 space-y-6">
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-bold">My Profile</h1>
         </div>
@@ -414,8 +412,7 @@ const Profile = () => {
             </div>
           </CardContent>
         </Card>
-      </div>
-    </ProtectedRoute>
+    </div>
   );
 };
 

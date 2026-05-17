@@ -3,8 +3,6 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import {
-  AdminPageSkeleton,
-  AdminSidebar,
   CheckInTable,
   fetchAttendingRegistrations,
   fetchCheckInSessions,
@@ -12,7 +10,6 @@ import {
   type AttendingRegistration,
   type CheckInSession,
 } from "@/features/admin";
-import { ProtectedRoute } from "@/features/auth";
 import { type Event } from "@/features/events";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -352,11 +349,7 @@ export default function CheckInPage() {
   }, [allRegistrations, checkInStatuses]);
 
   return (
-    <ProtectedRoute admin loadingFallback={<AdminPageSkeleton />}>
-      <div className="flex h-screen">
-        <AdminSidebar />
-        <div className="flex-1 overflow-y-auto">
-          <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 py-8 px-8">
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 py-8 px-8">
             {/* Header */}
             <div className="flex items-center justify-between">
               <div>
@@ -504,9 +497,6 @@ export default function CheckInPage() {
                 </Card>
               </>
             ) : null}
-          </div>
-        </div>
-      </div>
-    </ProtectedRoute>
+    </div>
   );
 }

@@ -2,27 +2,19 @@
 
 import { useRouter } from "next/navigation";
 
-import { AdminPageSkeleton, AdminSidebar, EventCreateModify } from "@/features/admin";
-import { ProtectedRoute } from "@/features/auth";
+import { EventCreateModify } from "@/features/admin";
 
 const AdminCreateEventPage = () => {
   const router = useRouter();
 
   return (
-    <ProtectedRoute admin loadingFallback={<AdminPageSkeleton />}>
-      <div className="flex h-screen">
-        <AdminSidebar />
-        <div className="flex-1 overflow-y-auto">
-          <div className="flex w-full justify-center py-10">
-            <EventCreateModify
-              onSuccess={() => router.push("/admin/events")}
-              title="Create a New Event"
-              description="Complete the form below to add a new event to the gallery."
-            />
-          </div>
-        </div>
-      </div>
-    </ProtectedRoute>
+    <div className="flex w-full justify-center py-10">
+      <EventCreateModify
+        onSuccess={() => router.push("/admin/events")}
+        title="Create a New Event"
+        description="Complete the form below to add a new event to the gallery."
+      />
+    </div>
   );
 };
 

@@ -1,5 +1,4 @@
 "use client";
-import { ProtectedRoute } from "@/features/auth";
 import type { MembershipTier } from "@/features/memberships";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -73,8 +72,7 @@ export default function MembershipsPage() {
   };
 
   return (
-    <ProtectedRoute>
-      <div className="container mx-auto py-10 max-w-5xl">
+    <div className="container mx-auto py-10 max-w-5xl">
         <h1 className="text-3xl font-bold mb-8 text-center">
           Choose Your Membership
         </h1>
@@ -146,7 +144,6 @@ export default function MembershipsPage() {
             );
           })}
         </div>
-      </div>
-    </ProtectedRoute>
+    </div>
   );
 }

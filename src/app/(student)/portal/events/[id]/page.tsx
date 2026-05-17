@@ -2,7 +2,6 @@
 
 import { useParams } from "next/navigation";
 import { useUser } from "@/context/UserContext";
-import { ProtectedRoute } from "@/features/auth";
 import {
   EventDetailsCard,
   EventStatusCard,
@@ -53,31 +52,27 @@ export default function EventDetailPage() {
 
   if (loading) {
     return (
-      <ProtectedRoute>
-        <div className="container mx-auto max-w-4xl py-10">
-          <div className="flex items-center justify-center py-12">
-            <Spinner size="lg" />
-          </div>
+      <div className="container mx-auto max-w-4xl py-10">
+        <div className="flex items-center justify-center py-12">
+          <Spinner size="lg" />
         </div>
-      </ProtectedRoute>
+      </div>
     );
   }
 
   if (error && !event) {
     return (
-      <ProtectedRoute>
-        <div className="container mx-auto max-w-4xl py-10">
-          <Card>
-            <CardHeader>
-              <CardTitle>Error</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-destructive">{error}</p>
-              <BackButton link="/portal/events" label="Back to Events" className="mt-4" />
-            </CardContent>
-          </Card>
-        </div>
-      </ProtectedRoute>
+      <div className="container mx-auto max-w-4xl py-10">
+        <Card>
+          <CardHeader>
+            <CardTitle>Error</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-destructive">{error}</p>
+            <BackButton link="/portal/events" label="Back to Events" className="mt-4" />
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
@@ -86,8 +81,7 @@ export default function EventDetailPage() {
   }
 
   return (
-    <ProtectedRoute>
-      <div className="container mx-auto max-w-7xl py-10 space-y-6">
+    <div className="container mx-auto max-w-7xl py-10 space-y-6">
         <BackButton link="/portal/events" label="Back to Events" />
 
         {/* Side-by-side layout: Event Details and Application Form */}
@@ -117,7 +111,6 @@ export default function EventDetailPage() {
             </div>
           )}
         </div>
-      </div>
-    </ProtectedRoute>
+    </div>
   );
 }

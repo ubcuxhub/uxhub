@@ -94,14 +94,14 @@ ubcux/
 │   │   ├── client.ts                      # Browser client
 │   │   ├── server.ts                      # Server client (cookie-bound)
 │   │   ├── admin.ts                       # Service role — server-only
-│   │   └── middleware.ts                  # Session refresh helper
+│   │   └── proxy.ts                       # Session refresh helper
 │   ├── square/
 │   │   └── client.ts                      # Square SDK client — server-only
 │   ├── auth/
 │   │   └── guards.ts                      # requireAuth, requireAdmin
 │   └── utils.ts
 │
-├── middleware.ts                          # Refreshes Supabase session
+├── proxy.ts                               # Refreshes Supabase session
 │
 ├── supabase/
 │   ├── migrations/                        # SQL migrations (version-controlled)
@@ -113,7 +113,7 @@ ubcux/
 
 **Server actions for your own mutations; `/api` only for third parties.** Square webhooks, OAuth callbacks, anything an external system calls — those need `/api/.../route.ts`. Your own forms (purchase a ticket, create an event) should use server actions colocated in `features/<domain>/actions.ts`. Less boilerplate, type-safe end to end.
 
-**Middleware does session refresh, not gatekeeping.** Next's `middleware.ts` should call Supabase's session-refresh helper on every request (otherwise tokens expire mid-session). Put the actual "is this user allowed here" checks in route group layouts, where you have full server context and can redirect cleanly.
+**Proxy does session refresh, not gatekeeping.** Next's `proxy.ts` should call Supabase's session-refresh helper on matched requests (otherwise tokens expire mid-session). Put the actual "is this user allowed here" checks in route group layouts, where you have full server context and can redirect cleanly.
 
 ## URL Conventions
 

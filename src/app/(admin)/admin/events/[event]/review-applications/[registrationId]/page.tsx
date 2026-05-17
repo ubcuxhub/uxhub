@@ -4,13 +4,10 @@ import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import {
-  AdminPageSkeleton,
-  AdminSidebar,
   ApplicantInfoCard,
   ApplicationResponseCard,
   StatusUpdateSection,
 } from "@/features/admin";
-import { ProtectedRoute } from "@/features/auth";
 import { type ApplicationStatus, type Event } from "@/features/events";
 import { createClient } from "@/lib/supabase/client";
 import { useUser } from "@/context/UserContext";
@@ -213,40 +210,26 @@ export default function ApplicationReviewPage() {
 
   if (loading) {
     return (
-      <ProtectedRoute admin loadingFallback={<AdminPageSkeleton />}>
-        <div className="flex h-screen">
-          <AdminSidebar />
-          <div className="flex-1 overflow-y-auto">
-            <div className="flex items-center justify-center py-12">
-              <Spinner size="lg" />
-            </div>
-          </div>
-        </div>
-      </ProtectedRoute>
+      <div className="flex items-center justify-center py-12">
+        <Spinner size="lg" />
+      </div>
     );
   }
 
   if (error && !registration) {
     return (
-      <ProtectedRoute admin loadingFallback={<AdminPageSkeleton />}>
-        <div className="flex h-screen">
-          <AdminSidebar />
-          <div className="flex-1 overflow-y-auto">
-            <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 py-8 px-8">
-              <div className="rounded-lg border border-destructive/50 p-10 text-center text-sm text-destructive">
-                {error}
-              </div>
-              <Button asChild variant="outline">
-                <Link
-                  href={`/admin/events/${eventId}/review-applications?filter=pending`}
-                >
-                  Back to Applications
-                </Link>
-              </Button>
-            </div>
-          </div>
+      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 py-8 px-8">
+        <div className="rounded-lg border border-destructive/50 p-10 text-center text-sm text-destructive">
+          {error}
         </div>
-      </ProtectedRoute>
+        <Button asChild variant="outline">
+          <Link
+            href={`/admin/events/${eventId}/review-applications?filter=pending`}
+          >
+            Back to Applications
+          </Link>
+        </Button>
+      </div>
     );
   }
 
@@ -255,11 +238,8 @@ export default function ApplicationReviewPage() {
   }
 
   return (
-    <ProtectedRoute admin loadingFallback={<AdminPageSkeleton />}>
-      <div className="flex h-screen">
-        <AdminSidebar />
-        <div className="flex-1 overflow-y-auto">
-          <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 py-8 px-8">
+    <>
+      <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 py-8 px-8">
             {/* Header with Back Button */}
             <div className="flex items-center justify-between">
               <div>
@@ -326,8 +306,6 @@ export default function ApplicationReviewPage() {
               onStatusUpdate={handleStatusUpdate}
               error={error}
             />
-          </div>
-        </div>
       </div>
 
       {/* Success Overlay */}
@@ -337,6 +315,6 @@ export default function ApplicationReviewPage() {
           onClose={() => setSuccessMessage(null)}
         />
       )}
-    </ProtectedRoute>
+    </>
   );
 }

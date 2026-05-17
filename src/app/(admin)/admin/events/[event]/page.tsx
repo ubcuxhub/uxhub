@@ -1,5 +1,4 @@
-import { AdminPageSkeleton, AdminSidebar, EventCreateModify } from "@/features/admin";
-import { ProtectedRoute } from "@/features/auth";
+import { EventCreateModify } from "@/features/admin";
 import React from "react";
 
 interface EventViewProps {
@@ -13,16 +12,9 @@ const Page: React.FC<EventViewProps> = async ({ params }) => {
   const eventId = slug.event;
 
   return (
-    <ProtectedRoute admin loadingFallback={<AdminPageSkeleton />}>
-      <div className="flex h-screen">
-        <AdminSidebar />
-        <div className="flex-1 overflow-y-auto">
-          <div className="flex w-full justify-center py-10 gap-4">
-            <EventCreateModify eventId={eventId} />
-          </div>
-        </div>
-      </div>
-    </ProtectedRoute>
+    <div className="flex w-full justify-center py-10 gap-4">
+      <EventCreateModify eventId={eventId} />
+    </div>
   );
 };
 

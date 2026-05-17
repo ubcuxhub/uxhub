@@ -2,8 +2,6 @@
 
 import { useEffect, useState } from "react";
 import {
-  AdminPageSkeleton,
-  AdminSidebar,
   UserDetailsPanel,
   UserDirectoryPanel,
   type MembershipTypeOption,
@@ -11,7 +9,6 @@ import {
   type SortOption,
   type UserRecord,
 } from "@/features/admin";
-import { ProtectedRoute } from "@/features/auth";
 import { createClient } from "@/lib/supabase/client";
 
 const AdminUsersManager = () => {
@@ -218,10 +215,7 @@ const AdminUsersManager = () => {
   };
 
   return (
-    <ProtectedRoute admin loadingFallback={<AdminPageSkeleton />}>
-      <div className="flex h-screen">
-        <AdminSidebar />
-        <div className="flex-1 overflow-hidden flex">
+    <div className="flex min-h-full overflow-hidden">
           <UserDirectoryPanel
             users={filteredUsers}
             selectedUser={selectedUser}
@@ -246,9 +240,7 @@ const AdminUsersManager = () => {
             onEditSave={handleEditSave}
             onValueChange={setEditValue}
           />
-        </div>
-      </div>
-    </ProtectedRoute>
+    </div>
   );
 };
 
