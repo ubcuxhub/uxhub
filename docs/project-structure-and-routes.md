@@ -120,59 +120,59 @@ uxhub/
 ### Public — `(marketing)`
 
 ```
-ubcuxhub.com/
-ubcuxhub.com/about
-ubcuxhub.com/team
-ubcuxhub.com/contact
-ubcuxhub.com/events
-ubcuxhub.com/events/portfolio-night-2026
-ubcuxhub.com/membership
+ubcuxhub.ca/
+ubcuxhub.ca/about
+ubcuxhub.ca/team
+ubcuxhub.ca/contact
+ubcuxhub.ca/events
+ubcuxhub.ca/events/portfolio-night-2026
+ubcuxhub.ca/membership
 ```
 
 ### Auth — `(auth)`
 
 ```
-ubcuxhub.com/auth/login
-ubcuxhub.com/auth/sign-up
-ubcuxhub.com/auth/sign-up-success
-ubcuxhub.com/auth/forgot-password
-ubcuxhub.com/auth/update-password
-ubcuxhub.com/auth/error
-ubcuxhub.com/auth/confirm
+ubcuxhub.ca/auth/login
+ubcuxhub.ca/auth/sign-up
+ubcuxhub.ca/auth/sign-up-success
+ubcuxhub.ca/auth/forgot-password
+ubcuxhub.ca/auth/update-password
+ubcuxhub.ca/auth/error
+ubcuxhub.ca/auth/confirm
 ```
 
 ### Student portal — `(student)`
 
 ```
-ubcuxhub.com/portal
-ubcuxhub.com/portal/events
-ubcuxhub.com/portal/events/thinkbox-office-tour/checkout
-ubcuxhub.com/portal/events/thinkbox-office-tour/confirmation?order=ord_abc123
-ubcuxhub.com/portal/membership
-ubcuxhub.com/portal/membership/[plan]/checkout
-ubcuxhub.com/portal/membership/[plan]/confirmation?order=ord_abc456 # plan = [innovator, explorer, faculty, non-ubc]
-ubcuxhub.com/portal/purchases
-ubcuxhub.com/portal/purchases/ord_abc123
-ubcuxhub.com/portal/profile
+ubcuxhub.ca/portal
+ubcuxhub.ca/portal/events
+ubcuxhub.ca/portal/events/thinkbox-office-tour/checkout
+ubcuxhub.ca/portal/events/thinkbox-office-tour/confirmation?order=ord_abc123
+ubcuxhub.ca/portal/membership
+ubcuxhub.ca/portal/membership/[plan]/checkout
+ubcuxhub.ca/portal/membership/[plan]/confirmation?order=ord_abc456 # plan = [innovator, explorer, faculty, non-ubc]
+ubcuxhub.ca/portal/purchases
+ubcuxhub.ca/portal/purchases/ord_abc123
+ubcuxhub.ca/portal/profile
 ```
 
 ### Admin — `(admin)`
 
 ```
-ubcuxhub.com/admin/events
-ubcuxhub.com/admin/events/new
-ubcuxhub.com/admin/events/uxathon-2026
-ubcuxhub.com/admin/events/uxathon-2026/edit
-ubcuxhub.com/admin/events/uxathon-2026/attendees/usr_abc123
-ubcuxhub.com/admin/users
-ubcuxhub.com/admin/users/usr_xyz789
-ubcuxhub.com/admin/purchases
-ubcuxhub.com/admin/purchases/ord_abc456
+ubcuxhub.ca/admin/events
+ubcuxhub.ca/admin/events/new
+ubcuxhub.ca/admin/events/uxathon-2026
+ubcuxhub.ca/admin/events/uxathon-2026/edit
+ubcuxhub.ca/admin/events/uxathon-2026/attendees/usr_abc123
+ubcuxhub.ca/admin/users
+ubcuxhub.ca/admin/users/usr_xyz789
+ubcuxhub.ca/admin/purchases
+ubcuxhub.ca/admin/purchases/ord_abc456
 ```
 
 ### API — webhooks only
 
 ```
-ubcuxhub.com/api/square/webhook
+ubcuxhub.ca/api/square/webhook
 ```
 
