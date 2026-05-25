@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { PaymentForm, type MembershipTier } from "@/features/memberships";
+import { PaymentForm } from "@/features/memberships";
 import { Button } from "@/components/ui/button";
 import { ChevronLeft, Check } from "lucide-react";
 import {
@@ -27,7 +27,7 @@ async function page({ params }: { params: Promise<{ tier: string }> }) {
     notFound();
   }
 
-  const tierData = membershipTier as MembershipTier;
+  const tierData = membershipTier;
 
   const formattedPrice = new Intl.NumberFormat("en-CA", {
     style: "currency",

@@ -7,7 +7,7 @@ import {
   type ApplicationStatus,
   type GroupedRegistration,
 } from "@/features/events";
-import { type Event } from "@/features/events";
+import { type EventRow } from "@/features/events";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +31,7 @@ export default function ReviewApplicationsPage() {
     return filters;
   }, [initialFilter]);
 
-  const [event, setEvent] = useState<Event | null>(null);
+  const [event, setEvent] = useState<EventRow | null>(null);
   const [registrations, setRegistrations] = useState<GroupedRegistration[]>([]);
   const [filteredRegistrations, setFilteredRegistrations] = useState<
     GroupedRegistration[]
@@ -69,7 +69,7 @@ export default function ReviewApplicationsPage() {
           return;
         }
 
-        setEvent(eventData as Event);
+        setEvent(eventData);
 
         // Fetch registrations grouped by user
         const groupedRegistrations = await fetchEventRegistrationsGroupedByUser(

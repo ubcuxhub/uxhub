@@ -9,6 +9,7 @@ import {
   ResponseType,
   type ApplicationQuestionTemplate,
 } from "@/features/events/types/eventTypes";
+import type { EventApplicationQuestionInsert } from "@/types/models";
 import type { CheckInSessionDraft } from "../types/checkInTypes";
 import {
   Card,
@@ -768,14 +769,7 @@ export const EventCreateModify = ({
 
       if (validQuestions.length > 0) {
         const questionsToInsert = validQuestions.map((q) => {
-          const questionData: {
-            event_id: string;
-            question: string;
-            response_type: string;
-            max_char_limit?: number;
-            response_options?: string[];
-            is_required?: boolean;
-          } = {
+          const questionData: EventApplicationQuestionInsert = {
             event_id: finalEventId,
             question: q.question,
             response_type: q.response,

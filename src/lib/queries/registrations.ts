@@ -45,7 +45,7 @@ export async function fetchEventRegistrationsGroupedByUser(
         user_id: userId,
         name: userInfo?.name ?? "Unknown User",
         email: userInfo?.email ?? "",
-        applicationDate: reg.created_at,
+        applicationDate: reg.created_at ?? "",
         status,
         registrationId: reg.id,
       });

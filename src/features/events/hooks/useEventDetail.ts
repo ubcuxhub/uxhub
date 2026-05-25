@@ -4,15 +4,13 @@ import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
 import {
   ResponseType,
-  type Event,
+  type EventRow,
   type ApplicationQuestionTemplate,
 } from "../types/eventTypes";
-import type { User } from "@/features/auth";
-
-type EventRecord = Event & { id: string };
+import type { UserInfoRow } from "@/features/auth";
 
 interface UseEventDetailResult {
-  event: EventRecord | null;
+  event: EventRow | null;
   questions: ApplicationQuestionTemplate[];
   loading: boolean;
   error: string | null;
@@ -22,11 +20,11 @@ interface UseEventDetailResult {
 
 export function useEventDetail(
   eventId: string | undefined,
-  user: User | null,
+  user: UserInfoRow | null,
   userLoading: boolean
 ): UseEventDetailResult {
   const supabase = useMemo(() => createClient(), []);
-  const [event, setEvent] = useState<EventRecord | null>(null);
+  const [event, setEvent] = useState<EventRow | null>(null);
   const [questions, setQuestions] = useState<ApplicationQuestionTemplate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +58,7 @@ export function useEventDetail(
           return;
         }
 
-        setEvent(eventData as EventRecord);
+        setEvent(eventData);
 
         // Fetch application questions
         const { data: questionsData, error: questionsError } = await supabase

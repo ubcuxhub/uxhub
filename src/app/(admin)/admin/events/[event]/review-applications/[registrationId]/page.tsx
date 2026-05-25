@@ -8,7 +8,7 @@ import {
   ApplicationResponseCard,
   StatusUpdateSection,
 } from "@/features/admin";
-import { type ApplicationStatus, type Event } from "@/features/events";
+import { type ApplicationStatus, type EventRow } from "@/features/events";
 import { createClient } from "@/lib/supabase/client";
 import { useUser } from "@/context/UserContext";
 import { Button } from "@/components/ui/button";
@@ -55,7 +55,7 @@ export default function ApplicationReviewPage() {
 
   const [registration, setRegistration] = useState<Registration | null>(null);
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null);
-  const [event, setEvent] = useState<Event | null>(null);
+  const [event, setEvent] = useState<EventRow | null>(null);
   const [responses, setResponses] = useState<ResponseWithQuestion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -119,7 +119,7 @@ export default function ApplicationReviewPage() {
           throw new Error("Event not found");
         }
 
-        setEvent(eventData as Event);
+        setEvent(eventData);
 
         // Fetch responses with joined questions
         const { data: responsesData, error: responsesError } = await supabase

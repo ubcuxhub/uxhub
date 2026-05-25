@@ -1,4 +1,6 @@
-export type ApplicationStatus = "pending" | "declined" | "accepted";
+export type { ApplicationStatus } from "@/types/models";
+
+import type { ApplicationStatus } from "@/types/models";
 
 export interface GroupedRegistration {
   user_id: string;

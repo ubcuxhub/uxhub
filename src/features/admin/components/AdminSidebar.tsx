@@ -5,11 +5,11 @@ import Link from "next/link";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faChevronLeft } from "@fortawesome/free-solid-svg-icons";
 import { createClient } from "@/lib/supabase/client";
-import type { Event } from "@/features/events/types/eventTypes";
+import type { EventRow } from "@/features/events/types/eventTypes";
 import { cn } from "@/lib/utils";
 import { Spinner } from "@/components/ui/spinner";
 
-type EventRecord = Event & { id: string };
+type EventRecord = EventRow;
 
 interface AdminSidebarProps {
   className?: string;
@@ -32,7 +32,7 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
           .order("start_date", { ascending: true });
 
         if (error) throw error;
-        setEvents((data ?? []) as EventRecord[]);
+        setEvents(data ?? []);
       } catch (err) {
         console.error("Error fetching events:", err);
       } finally {

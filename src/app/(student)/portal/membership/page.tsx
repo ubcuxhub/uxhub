@@ -1,5 +1,5 @@
 "use client";
-import type { MembershipTier } from "@/features/memberships";
+import type { MembershipTypeRow } from "@/features/memberships";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,7 +19,9 @@ import { Check } from "lucide-react";
 export default function MembershipsPage() {
   const router = useRouter();
   const { user } = useUser();
-  const [membershipTiers, setMembershipTiers] = useState<MembershipTier[]>([]);
+  const [membershipTiers, setMembershipTiers] = useState<MembershipTypeRow[]>(
+    []
+  );
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {

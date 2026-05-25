@@ -94,7 +94,8 @@ uxhub/
 │   │   ├── client.ts                      # Browser client
 │   │   ├── server.ts                      # Server client (cookie-bound)
 │   │   ├── admin.ts                       # Service role — server-only
-│   │   └── proxy.ts                       # Session refresh helper
+│   │   ├── proxy.ts                       # Session refresh helper
+│   │   └── database.types.ts              # Generated via `supabase gen types`
 │   ├── square/
 │   │   └── client.ts                      # Square SDK client — server-only
 │   ├── auth/
@@ -105,8 +106,7 @@ uxhub/
 │
 ├── supabase/
 │   ├── migrations/                        # SQL migrations (version-controlled)
-│   ├── seed.sql
-│   └── types.ts                           # Generated via `supabase gen types`
+│   └── seed.sql
 │
 └── ...
 ```
@@ -175,4 +175,3 @@ ubcuxhub.ca/admin/purchases/ord_abc456
 ```
 ubcuxhub.ca/api/square/webhook
 ```
-
