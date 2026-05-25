@@ -1,14 +1,14 @@
 "use client";
 
 import DotGrid from "@/features/marketing/components/DotGrid";
-import EventsSection from "@/features/marketing/sections/EventsSection";
-import Footer from "@/features/marketing/sections/Footer";
-import HeroSection from "@/features/marketing/sections/HeroSection";
-import LogoCarousel from "@/features/marketing/sections/LogoCarousel";
-import MailingList from "@/features/marketing/sections/MailingListSection";
-import Navbar from "@/features/marketing/sections/Navbar";
-import TeamSection from "@/features/marketing/sections/TeamSection";
-import WhoWeAreSection from "@/features/marketing/sections/WhoWeAreSection";
+import EventsSection from "@/features/marketing/homepage-sections/EventsSection";
+import Footer from "@/features/marketing/homepage-sections/Footer";
+import HeroSection from "@/features/marketing/homepage-sections/HeroSection";
+import LogoCarousel from "@/features/marketing/homepage-sections/LogoCarousel";
+import MailingList from "@/features/marketing/homepage-sections/MailingListSection";
+import Navbar from "@/features/marketing/homepage-sections/Navbar";
+import TeamSection from "@/features/marketing/homepage-sections/TeamSection";
+import WhoWeAreSection from "@/features/marketing/homepage-sections/WhoWeAreSection";
 
 export default function Home() {
   return (
