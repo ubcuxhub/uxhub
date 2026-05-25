@@ -2,7 +2,7 @@ import React from "react";
 import Button from "@/features/marketing/components/Button";
 import EventCard from "@/features/marketing/components/EventCard";
 import { EVENTS } from "@/features/marketing/lib/events";
-import type { Event as SiteEvent } from "@/features/marketing/types";
+import type { MarketingEventCard } from "@/features/marketing/types";
 
 const EventsSection: React.FC = () => {
   const triangleIcon = (
@@ -44,7 +44,7 @@ const EventsSection: React.FC = () => {
     </svg>
   );
 
-  const iconByType: Record<SiteEvent["icon"], React.ReactNode> = {
+  const iconByType: Record<MarketingEventCard["icon"], React.ReactNode> = {
     triangle: triangleIcon,
     star: starIcon,
   };

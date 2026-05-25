@@ -3,13 +3,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-import { EventCard, type Event } from "@/features/events";
+import { EventCard, type EventRow } from "@/features/events";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
 const AdminEventsManager = () => {
-  const [events, setEvents] = useState<Event[]>([]);
+  const [events, setEvents] = useState<EventRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,7 +29,7 @@ const AdminEventsManager = () => {
       if (error) {
         setError(error.message);
       } else {
-        setEvents((data ?? []) as Event[]);
+        setEvents(data ?? []);
       }
 
       setIsLoading(false);

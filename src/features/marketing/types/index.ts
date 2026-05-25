@@ -12,7 +12,7 @@ export interface TeamMember {
   roleEmoji: string;
 }
 
-export interface Event {
+export interface MarketingEventCard {
   imageSrc: string;
   imageAlt: string;
   buttonText: string;

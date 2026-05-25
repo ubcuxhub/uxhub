@@ -2,12 +2,12 @@
 
 import { createContext, useContext, useEffect, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { User } from "@/features/auth";
+import type { UserInfoRow } from "@/features/auth";
 
 const supabase = createClient();
 
 interface UserContextType {
-  user: User | null;
+  user: UserInfoRow | null;
   loading: boolean;
   refreshUser: () => Promise<void>;
 }
@@ -22,14 +22,14 @@ export const useUser = () => useContext(UserContext);
 
 interface UserProviderProps {
   children: React.ReactNode;
-  initialUser?: User | null;
+  initialUser?: UserInfoRow | null;
 }
 
 export function UserProvider({
   children,
   initialUser = null,
 }: UserProviderProps) {
-  const [user, setUser] = useState<User | null>(initialUser);
+  const [user, setUser] = useState<UserInfoRow | null>(initialUser);
   const [loading, setLoading] = useState(!initialUser);
   const hasUser = useRef(Boolean(initialUser));
 

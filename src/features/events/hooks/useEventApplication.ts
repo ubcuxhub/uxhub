@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ensureUserInfo } from "@/lib/queries/user";
 import { prepareResponseData } from "../helpers/eventApplication";
-import type { User } from "@/features/auth";
+import type { UserInfoRow } from "@/features/auth";
 
 interface UseEventApplicationResult {
   isSubmitting: boolean;
@@ -14,7 +14,7 @@ interface UseEventApplicationResult {
   submitApplication: (
     eventId: string,
     responses: Record<string, string | string[]>,
-    user: User | null,
+    user: UserInfoRow | null,
     existingRegistrationId: string | null,
     onSuccess?: () => void
   ) => Promise<void>;
@@ -38,7 +38,7 @@ export function useEventApplication(
   const submitApplication = async (
     eventId: string,
     responses: Record<string, string | string[]>,
-    user: User | null,
+    user: UserInfoRow | null,
     existingRegistrationId: string | null,
     onSuccess?: () => void
   ) => {

@@ -1,6 +1,6 @@
-import type { User } from "@/features/auth/types/userTypes";
+import type { UserInfoRow } from "@/features/auth/types/userTypes";
 
-export type UserRecord = User & {
+export type UserRecord = UserInfoRow & {
   id?: string;
   membership_type_name?: string | null;
   order_date?: string | null;

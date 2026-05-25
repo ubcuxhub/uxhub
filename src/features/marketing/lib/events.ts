@@ -1,6 +1,6 @@
-import type { Event } from "@/features/marketing/types";
+import type { MarketingEventCard } from "@/features/marketing/types";
 
-export const EVENTS: Event[] = [
+export const EVENTS: MarketingEventCard[] = [
   {
     imageSrc: "/events/event1.png",
     imageAlt: "Design Archetypes Event",

@@ -1,11 +1,16 @@
+import type {
+  EventApplicationQuestionRow,
+  EventApplicationResponseInsert,
+} from "@/types/models";
+
 /**
  * Prepares response data for upsert into event_application_responses
  */
 export function prepareResponseData(
-  questionRecords: Array<{ id: string }>,
+  questionRecords: Pick<EventApplicationQuestionRow, "id">[],
   responses: Record<string, string | string[]>,
   registrationId: string
-): Array<Record<string, unknown>> {
+): EventApplicationResponseInsert[] {
   if (!registrationId) {
     throw new Error(
       "Registration ID is required to save application responses"
@@ -24,7 +29,7 @@ export function prepareResponseData(
       responseText = responseValue || "";
     }
 
-    const responseData: Record<string, unknown> = {
+    const responseData: EventApplicationResponseInsert = {
       event_application_question_id: questionRecord.id,
       event_registration_id: registrationId,
       response: responseText,

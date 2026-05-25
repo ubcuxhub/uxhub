@@ -10,8 +10,9 @@ import {
   type AttendingRegistration,
   type CheckInSession,
 } from "@/features/admin";
-import { type Event } from "@/features/events";
+import { type EventRow } from "@/features/events";
 import { createClient } from "@/lib/supabase/client";
+import type { EventRegistrationRow } from "@/types/models";
 import {
   Card,
   CardContent,
@@ -58,7 +59,7 @@ export default function CheckInPage() {
   const eventId = params?.event as string;
   const supabase = useMemo(() => createClient(), []);
 
-  const [event, setEvent] = useState<Event | null>(null);
+  const [event, setEvent] = useState<EventRow | null>(null);
   const [checkInSessions, setCheckInSessions] = useState<CheckInSession[]>([]);
   const [attendingRegistrations, setAttendingRegistrations] = useState<
     AttendingRegistration[]
@@ -74,14 +75,7 @@ export default function CheckInPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [updatingCells, setUpdatingCells] = useState<Set<string>>(new Set());
   const [allRegistrations, setAllRegistrations] = useState<
-    Array<{
-      id: string;
-      event_id: string;
-      user_id: string;
-      status: string;
-      attending: boolean;
-      created_at: string;
-    }>
+    EventRegistrationRow[]
   >([]);
 
   // Fetch all data
@@ -112,7 +106,7 @@ export default function CheckInPage() {
           return;
         }
 
-        setEvent(eventData as Event);
+        setEvent(eventData);
 
         // Fetch all registrations for statistics
         const { data: allRegsData, error: allRegsError } = await supabase
