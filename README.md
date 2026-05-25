@@ -20,6 +20,8 @@ pnpm install
 pnpm dev
 ```
 
+Duplicate the `.env.example`, rename it to `.env.local`, and populate the values (which can be found here: https://www.notion.so/Env-36a2f9f09f188041a555c36b7a1b2bd1?v=35e2f9f09f18818e8a4a000c8317ade4&source=copy_link)
+
 The app runs at `http://localhost:3000` by default.
 
 ## Commands
