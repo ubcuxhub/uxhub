@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
 
-import type { User } from "@/features/auth";
+import type { UserInfoRow } from "@/features/auth";
 import { createClient } from "@/lib/supabase/server";
 
-export async function requireAuth(): Promise<User> {
+export async function requireAuth(): Promise<UserInfoRow> {
   const supabase = await createClient();
 
   const {
@@ -25,10 +25,10 @@ export async function requireAuth(): Promise<User> {
     redirect("/auth/login");
   }
 
-  return userInfo as User;
+  return userInfo;
 }
 
-export async function requireAdmin(): Promise<User> {
+export async function requireAdmin(): Promise<UserInfoRow> {
   const user = await requireAuth();
 
   if (user.role_access !== "admin") {

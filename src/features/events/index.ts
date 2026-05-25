@@ -6,7 +6,9 @@ export { useEventDetail } from "./hooks/useEventDetail";
 export { useEventApplication } from "./hooks/useEventApplication";
 export { prepareResponseData } from "./helpers/eventApplication";
 export type {
-  Event,
+  EventInsert,
+  EventRow,
+  EventUpdate,
   EventApplication,
   ApplicationQuestionResponse,
   ApplicationQuestionTemplate,

@@ -12,4 +12,4 @@ export const FACULTIES = [
   "Other",
 ] as const;
 
-export const YEAR_LEVELS = ["1", "2", "3", "4", "5+", "Graduate"] as const;
+export const YEAR_LEVELS = ["1", "2", "3", "4", "5+"] as const;

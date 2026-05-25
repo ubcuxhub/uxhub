@@ -1,9 +1,6 @@
-export interface CheckInSession {
-  id: string;
-  name: string;
-  start_time: string | null;
-  end_time: string | null;
-}
+import type { CheckInSessionRow } from "@/types/models";
+
+export type CheckInSession = CheckInSessionRow;
 
 export interface CheckInSessionDraft {
   name: string;

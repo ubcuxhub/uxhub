@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { Event } from "../types/eventTypes";
+import type { EventRow } from "../types/eventTypes";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/card";
 
 interface EventCardProps {
-  event: Event;
+  event: EventRow;
   variant?: "default" | "admin";
   onClick?: () => void;
   adminLinks?: {

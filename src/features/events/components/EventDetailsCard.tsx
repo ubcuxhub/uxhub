@@ -5,10 +5,10 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import type { Event } from "../types/eventTypes";
+import type { EventRow } from "../types/eventTypes";
 
 interface EventDetailsCardProps {
-  event: Event;
+  event: EventRow;
 }
 
 export function EventDetailsCard({ event }: EventDetailsCardProps) {

@@ -17,20 +17,34 @@ import { useState, useEffect } from "react";
 import { Pencil } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
+import type { UniversityYear, UserType } from "@/types/models";
 
 const supabase = createClient();
 
-const USER_TYPES = [
+const USER_TYPES: Array<{ value: UserType; label: string }> = [
   { value: "ubcStudent", label: "UBC Student" },
   { value: "faculty", label: "Faculty" },
   { value: "nonUbc", label: "Non-UBC" },
 ];
 
+type ProfileFormData = {
+  name: string;
+  phone: string;
+  student_number: string;
+  faculty: string;
+  major: string;
+  year: UniversityYear | "";
+  dietary_restrictions: string;
+  preferred_pronouns: string;
+  newsletter: boolean;
+  user_type: UserType;
+};
+
 const Profile = () => {
   const { user, refreshUser } = useUser();
   const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ProfileFormData>({
     name: "",
     phone: "",
     student_number: "",
@@ -82,7 +96,7 @@ const Profile = () => {
           newsletter: formData.newsletter,
           user_type: formData.user_type,
         })
-        .eq("auth_user_id", user.auth_user_id);
+        .eq("id", user.id);
 
       if (error) throw error;
 
@@ -126,7 +140,7 @@ const Profile = () => {
               <div className="space-y-1">
                 <Label className="text-muted-foreground">Type</Label>
                 <div className="font-medium capitalize">
-                  {user.membership_type || "None"}
+                  {user.membership_type_id ? "Active" : "None"}
                 </div>
               </div>
               {user.role_access === "admin" && (
@@ -249,7 +263,7 @@ const Profile = () => {
                 {isEditing ? (
                   <Select
                     value={formData.user_type}
-                    onValueChange={(value: string) =>
+                    onValueChange={(value: UserType) =>
                       setFormData({ ...formData, user_type: value })
                     }
                   >
@@ -338,7 +352,7 @@ const Profile = () => {
                 {isEditing ? (
                   <Select
                     value={formData.year}
-                    onValueChange={(value: string) =>
+                    onValueChange={(value: UniversityYear) =>
                       setFormData({ ...formData, year: value })
                     }
                   >

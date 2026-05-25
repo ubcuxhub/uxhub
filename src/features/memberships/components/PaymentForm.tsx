@@ -2,10 +2,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { MembershipTier } from "../types/membershipTypes";
+import type { MembershipTypeRow } from "../types/membershipTypes";
 
 interface PaymentFormProps {
-  tier: MembershipTier;
+  tier: MembershipTypeRow;
 }
 
 declare global {

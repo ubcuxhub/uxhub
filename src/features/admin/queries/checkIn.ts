@@ -38,23 +38,15 @@ export async function fetchAttendingRegistrations(
   if (error) throw error;
   if (!data || data.length === 0) return [];
 
-  return data.map(
-    (reg: {
-      id: string;
-      user_id: string;
-      user_info: { name: string; email: string }[] | null;
-    }) => {
-      const userInfo = Array.isArray(reg.user_info)
-        ? reg.user_info[0] || null
-        : reg.user_info;
-      return {
-        id: reg.id,
-        user_id: reg.user_id,
-        user_name: userInfo?.name || "Unknown User",
-        user_email: userInfo?.email || "",
-      };
-    }
-  );
+  return data.map((reg) => {
+    const userInfo = reg.user_info;
+    return {
+      id: reg.id,
+      user_id: reg.user_id,
+      user_name: userInfo?.name || "Unknown User",
+      user_email: userInfo?.email || "",
+    };
+  });
 }
 
 export async function fetchCheckInStatuses(

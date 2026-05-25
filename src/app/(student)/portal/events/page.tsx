@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useUser } from "@/context/UserContext";
 import { createClient } from "@/lib/supabase/client";
 import { LogoutButton } from "@/features/auth";
-import { EventCard, type Event } from "@/features/events";
+import { EventCard, type EventRow } from "@/features/events";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CalendarDays, User } from "lucide-react";
@@ -52,7 +52,7 @@ export default function Events() {
   const { user } = useUser();
   const router = useRouter();
 
-  const [events, setEvents] = useState<Event[]>([]);
+  const [events, setEvents] = useState<EventRow[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
 
   useEffect(() => {
@@ -69,7 +69,7 @@ export default function Events() {
         console.error("Error fetching events:", error);
         setEvents([]);
       } else {
-        setEvents((data ?? []) as Event[]);
+        setEvents(data ?? []);
       }
       setLoadingEvents(false);
     }
