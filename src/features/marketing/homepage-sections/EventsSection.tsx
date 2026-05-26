@@ -81,7 +81,7 @@ const EventsSection: React.FC = () => {
       <div className="text-center flex justify-center pt-16">
         <Button
           variant="primary"
-          onClick={() => (window.location.href = "/under-construction")}
+          onClick={() => (window.location.href = "/events")}
         >
           SEE MORE EVENTS
         </Button>
