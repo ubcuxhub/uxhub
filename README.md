@@ -54,3 +54,5 @@ Guidelines:
 - Keep migrations small and focused.
 - Use descriptive migration names.
 - Avoid mixing `db pull` and `db push` in the same workflow.
+
+test
