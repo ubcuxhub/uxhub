@@ -252,6 +252,7 @@ export type Database = {
           registration_end_time: string | null
           registration_start_time: string | null
           regular_price: number
+          slug: string
           start_date: string | null
           start_time: string | null
           updated_at: string | null
@@ -272,6 +273,7 @@ export type Database = {
           registration_end_time?: string | null
           registration_start_time?: string | null
           regular_price: number
+          slug: string
           start_date?: string | null
           start_time?: string | null
           updated_at?: string | null
@@ -292,6 +294,7 @@ export type Database = {
           registration_end_time?: string | null
           registration_start_time?: string | null
           regular_price?: number
+          slug?: string
           start_date?: string | null
           start_time?: string | null
           updated_at?: string | null
@@ -306,6 +309,7 @@ export type Database = {
           id: string
           name: string
           price: number
+          slug: string
           updated_at: string | null
         }
         Insert: {
@@ -315,6 +319,7 @@ export type Database = {
           id?: string
           name: string
           price: number
+          slug: string
           updated_at?: string | null
         }
         Update: {
@@ -324,6 +329,7 @@ export type Database = {
           id?: string
           name?: string
           price?: number
+          slug?: string
           updated_at?: string | null
         }
         Relationships: []

@@ -1,6 +1,9 @@
 import { SignUpForm } from "@/features/auth";
+import { redirectIfAuthenticated } from "@/lib/auth/guards";
 
-export default function Page() {
+export default async function Page() {
+  await redirectIfAuthenticated();
+
   return (
     <SignUpForm />
   );

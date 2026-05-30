@@ -5,8 +5,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { redirectIfAuthenticated } from "@/lib/auth/guards";
 
-export default function Page() {
+export default async function Page() {
+  await redirectIfAuthenticated();
+
   return (
     <div className="flex flex-col gap-6">
       <Card>
