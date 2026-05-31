@@ -28,6 +28,18 @@ export async function requireAuth(): Promise<UserInfoRow> {
   return userInfo;
 }
 
+export async function redirectIfAuthenticated(redirectTo = "/portal/events") {
+  const supabase = await createClient();
+
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
+
+  if (authUser) {
+    redirect(redirectTo);
+  }
+}
+
 export async function requireAdmin(): Promise<UserInfoRow> {
   const user = await requireAuth();
 

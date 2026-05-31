@@ -30,6 +30,7 @@ import { ApplicationQuestionsSection } from "./event-form/ApplicationQuestionsSe
 import { Skeleton } from "@/components/ui/skeleton";
 import { BackButton } from "@/components/shared/BackButton";
 import { DeleteEventModal } from "./DeleteEventModal";
+import { createUniqueSlug, slugify } from "@/lib/slug";
 
 interface EventCreateModifyProps {
   eventId?: string;
@@ -602,9 +603,35 @@ export const EventCreateModify = ({
     }
 
     setIsSubmitting(true);
+
+    let eventSlug: string | undefined;
+
+    if (!eventId) {
+      const normalizedBaseSlug = slugify(formState.name);
+      const baseSlug =
+        normalizedBaseSlug === "item" ? "event" : normalizedBaseSlug;
+      const { data: existingSlugs, error: slugFetchError } = await supabase
+        .from("events")
+        .select("slug")
+        .ilike("slug", `${baseSlug}%`);
+
+      if (slugFetchError) {
+        setError(`Failed to prepare event slug: ${slugFetchError.message}`);
+        setIsSubmitting(false);
+        return;
+      }
+
+      eventSlug = createUniqueSlug(
+        formState.name,
+        existingSlugs?.map((item) => item.slug) ?? [],
+        "event"
+      );
+    }
+
     // Prepare payload
     const payload: {
       name: string;
+      slug?: string;
       description: string;
       regular_price: number;
       member_price: number;
@@ -628,6 +655,10 @@ export const EventCreateModify = ({
       max_capacity: Number(formState.max_capacity),
       created_at: formState.created_at || new Date().toISOString(),
     };
+
+    if (eventSlug) {
+      payload.slug = eventSlug;
+    }
 
     // Add optional fields only if they have values
     if (formState.location_building) {
@@ -670,7 +701,10 @@ export const EventCreateModify = ({
     // First, insert or update the event
     const query = eventId
       ? supabase.from("events").update(payload).eq("id", eventId)
-      : supabase.from("events").insert(payload);
+      : supabase.from("events").insert({
+          ...payload,
+          slug: eventSlug ?? "event",
+        });
 
     const { data, error: upsertError } = await query.select("id").maybeSingle();
 

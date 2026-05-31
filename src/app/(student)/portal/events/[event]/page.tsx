@@ -22,7 +22,7 @@ import { BackButton } from "@/components/shared/BackButton";
 export default function EventDetailPage() {
   const params = useParams();
   const { user, loading: userLoading, refreshUser } = useUser();
-  const eventId = params?.id as string;
+  const eventId = params?.event as string;
 
   const {
     event,
@@ -69,7 +69,11 @@ export default function EventDetailPage() {
           </CardHeader>
           <CardContent>
             <p className="text-destructive">{error}</p>
-            <BackButton link="/portal/events" label="Back to Events" className="mt-4" />
+            <BackButton
+              link="/portal/events"
+              label="Back to Events"
+              className="mt-4"
+            />
           </CardContent>
         </Card>
       </div>
@@ -81,36 +85,33 @@ export default function EventDetailPage() {
   }
 
   return (
-    <div className="container mx-auto max-w-7xl py-10 space-y-6">
-        <BackButton link="/portal/events" label="Back to Events" />
+    <div className="container mx-auto max-w-7xl space-y-6 py-10">
+      <BackButton link="/portal/events" label="Back to Events" />
 
-        {/* Side-by-side layout: Event Details and Application Form */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          {/* Event Details Card */}
-          <div className="space-y-6">
-            <EventDetailsCard event={event} />
-            <EventStatusCard
-              hasApplied={hasApplied}
-              hasQuestions={questions.length > 0}
-            />
-          </div>
-
-          {/* Application Form - Right Side */}
-          {questions.length > 0 && (
-            <div className="space-y-4">
-              <EventApplicationForm
-                eventId={eventId}
-                questions={questions}
-                onSubmit={handleSubmitApplication}
-                isSubmitting={isSubmitting}
-              />
-              {submitError && <MessageCard type="error" message={submitError} />}
-              {successMessage && (
-                <MessageCard type="success" message={successMessage} />
-              )}
-            </div>
-          )}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="space-y-6">
+          <EventDetailsCard event={event} />
+          <EventStatusCard
+            hasApplied={hasApplied}
+            hasQuestions={questions.length > 0}
+          />
         </div>
+
+        {questions.length > 0 ? (
+          <div className="space-y-4">
+            <EventApplicationForm
+              eventId={eventId}
+              questions={questions}
+              onSubmit={handleSubmitApplication}
+              isSubmitting={isSubmitting}
+            />
+            {submitError ? <MessageCard type="error" message={submitError} /> : null}
+            {successMessage ? (
+              <MessageCard type="success" message={successMessage} />
+            ) : null}
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }

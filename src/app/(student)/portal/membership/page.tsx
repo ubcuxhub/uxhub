@@ -128,13 +128,13 @@ export default function MembershipsPage() {
                   <Button
                     className="w-full"
                     variant={isCurrent ? "outline" : "default"}
-                    disabled={!isPurchasable}
-                    onClick={() => {
-                      if (!isCurrent) {
-                        router.push(`/portal/membership/${tier.id}`);
-                      }
-                    }}
-                  >
+                      disabled={!isPurchasable}
+                      onClick={() => {
+                        if (!isCurrent) {
+                          router.push(`/portal/membership/${tier.slug}/checkout`);
+                        }
+                      }}
+                    >
                     {isCurrent
                       ? "Expires at..."
                       : isPurchasable

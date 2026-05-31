@@ -150,7 +150,9 @@ export default function Events() {
                     <EventCard
                       event={event}
                       variant="default"
-                      onClick={() => router.push(`/portal/events/${event.id}`)}
+                      onClick={() =>
+                        router.push(`/portal/events/${event.slug}/checkout`)
+                      }
                     />
                   </div>
                 ))}
