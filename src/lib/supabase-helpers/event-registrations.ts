@@ -1,6 +1,9 @@
 import type { DbClient } from "./types";
 import { TABLES } from "./tables";
-import { fetchUserInfoContactsByIds } from "./users";
+import {
+  fetchUserInfoContactsByIds,
+  type UserInfoContact,
+} from "./users";
 import type {
   EventRegistrationRow,
   EventRegistrationUpdate,
@@ -120,9 +123,15 @@ export async function fetchEventRegistrationsGroupedByUser(
   if (registrationsError) throw registrationsError;
   if (!registrationsData || registrationsData.length === 0) return [];
 
-  const userIds = [...new Set(registrationsData.map((reg) => reg.user_id))];
+  const userIds = Array.from(
+    new Set<string>(
+      registrationsData.map((reg: EventRegistrationRow) => reg.user_id)
+    )
+  );
   const usersData = await fetchUserInfoContactsByIds(supabase, userIds);
-  const userMap = new Map(usersData.map((user) => [user.id, user]));
+  const userMap = new Map(
+    usersData.map((user: UserInfoContact) => [user.id, user])
+  );
 
   const groupedMap = new Map<string, GroupedRegistration>();
 

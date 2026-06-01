@@ -64,7 +64,7 @@ export async function fetchEventSlugsByPrefix(
     .ilike("slug", `${prefix}%`);
 
   if (error) throw error;
-  return (data ?? []).map((row) => row.slug);
+  return (data ?? []).map((row: Pick<EventRow, "slug">) => row.slug);
 }
 
 export async function insertEvent(

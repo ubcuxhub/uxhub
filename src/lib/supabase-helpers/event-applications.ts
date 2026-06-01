@@ -3,6 +3,7 @@ import { TABLES } from "./tables";
 import type {
   EventApplicationQuestionInsert,
   EventApplicationQuestionRow,
+  EventApplicationResponseRow,
   EventApplicationResponseInsert,
 } from "@/types/models";
 
@@ -118,7 +119,10 @@ export async function fetchAnsweredQuestionIds(
     throw error;
   }
 
-  return (data ?? []).map((row) => row.event_application_question_id);
+  return (data ?? []).map(
+    (row: Pick<EventApplicationResponseRow, "event_application_question_id">) =>
+      row.event_application_question_id
+  );
 }
 
 export async function updateApplicationResponse(

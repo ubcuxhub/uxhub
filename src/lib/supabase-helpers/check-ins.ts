@@ -1,10 +1,23 @@
 import type { DbClient } from "./types";
 import { TABLES } from "./tables";
-import type { CheckInSessionInsert } from "@/types/models";
+import type {
+  CheckInSessionInsert,
+  EventRegistrationRow,
+} from "@/types/models";
 import type {
   AttendingRegistration,
   CheckInSession,
 } from "@/features/admin/types/checkInTypes";
+
+type AttendingRegistrationQueryRow = Pick<
+  EventRegistrationRow,
+  "id" | "user_id"
+> & {
+  user_info: {
+    name: string | null;
+    email: string | null;
+  } | null;
+};
 
 export async function fetchCheckInSessions(
   supabase: DbClient,
@@ -40,7 +53,7 @@ export async function fetchAttendingRegistrations(
   if (error) throw error;
   if (!data || data.length === 0) return [];
 
-  return data.map((reg) => {
+  return data.map((reg: AttendingRegistrationQueryRow) => {
     const userInfo = reg.user_info;
     return {
       id: reg.id,
@@ -69,7 +82,9 @@ export async function fetchCheckInStatuses(
     return new Map();
   }
 
-  const registrationIds = registrationsData.map((reg) => reg.id);
+  const registrationIds = registrationsData.map(
+    (reg: Pick<EventRegistrationRow, "id">) => reg.id
+  );
 
   const { data, error } = await supabase
     .from(TABLES.checkIns)
