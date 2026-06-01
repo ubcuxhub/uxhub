@@ -6,10 +6,33 @@ import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/client";
 import {
+  deleteEvent,
+  fetchEventById,
+  fetchEventSlugsByPrefix,
+  insertEvent,
+  updateEvent,
+} from "@/lib/supabase-helpers/events";
+import {
+  deleteCheckInSessionsForEvent,
+  fetchCheckInSessions,
+  insertCheckInSessions,
+} from "@/lib/supabase-helpers/check-ins";
+import {
+  deleteApplicationQuestionsForEvent,
+  fetchApplicationQuestions,
+  insertApplicationQuestions,
+} from "@/lib/supabase-helpers/event-applications";
+import { deleteRegistrationsForEvent } from "@/lib/supabase-helpers/event-registrations";
+import {
   ResponseType,
   type ApplicationQuestionTemplate,
 } from "@/features/events/types/eventTypes";
-import type { EventApplicationQuestionInsert } from "@/types/models";
+import type {
+  CheckInSessionInsert,
+  EventApplicationQuestionInsert,
+  EventInsert,
+  EventUpdate,
+} from "@/types/models";
 import type { CheckInSessionDraft } from "../types/checkInTypes";
 import {
   Card,
@@ -212,14 +235,12 @@ export const EventCreateModify = ({
 
       setLoadingEvent(true);
       setError(null);
-      const { data, error } = await supabase
-        .from("events")
-        .select("*")
-        .eq("id", eventId)
-        .maybeSingle();
 
-      if (error) {
-        setError(error.message);
+      let data;
+      try {
+        data = await fetchEventById(supabase, eventId);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load event.");
         setLoadingEvent(false);
         return;
       }
@@ -263,58 +284,57 @@ export const EventCreateModify = ({
       });
 
       // Fetch check-in sessions from check_in_sessions table
-      const { data: checkInSessionsData, error: checkInSessionsError } =
-        await supabase
-          .from("check_in_sessions")
-          .select("*")
-          .eq("event_id", eventId)
-          .order("start_time", { ascending: true });
-
-      if (checkInSessionsError) {
+      try {
+        const checkInSessionsData = await fetchCheckInSessions(
+          supabase,
+          eventId
+        );
+        if (checkInSessionsData.length > 0) {
+          setCheckInEvents(
+            checkInSessionsData.map((session) => ({
+              name: session.name ?? "",
+              start_time: timestamptzToDatetimeLocal(session.start_time),
+              end_time: timestamptzToDatetimeLocal(session.end_time),
+            }))
+          );
+        } else {
+          setCheckInEvents([{ name: "", start_time: "", end_time: "" }]);
+        }
+      } catch (checkInSessionsError) {
         console.error(
           "Error fetching check-in sessions:",
           checkInSessionsError
         );
         setCheckInEvents([{ name: "", start_time: "", end_time: "" }]);
-      } else if (checkInSessionsData && checkInSessionsData.length > 0) {
-        setCheckInEvents(
-          checkInSessionsData.map((session) => ({
-            name: session.name ?? "",
-            start_time: timestamptzToDatetimeLocal(session.start_time),
-            end_time: timestamptzToDatetimeLocal(session.end_time),
-          }))
-        );
-      } else {
-        setCheckInEvents([{ name: "", start_time: "", end_time: "" }]);
       }
 
       // Fetch application questions from event_application_questions table
-      const { data: questionsData, error: questionsError } = await supabase
-        .from("event_application_questions")
-        .select("*")
-        .eq("event_id", eventId)
-        .order("created_at", { ascending: true });
-
-      if (questionsError) {
-        console.error("Error fetching application questions:", questionsError);
-        setApplicationTemplate([
-          {
-            question: "",
-            response: ResponseType.text,
-            max_char_limit: 0,
-            response_options: [],
-          },
-        ]);
-      } else if (questionsData && questionsData.length > 0) {
-        setApplicationTemplate(
-          questionsData.map((q) => ({
-            question: q.question ?? "",
-            response: (q.response_type as ResponseType) ?? ResponseType.text,
-            max_char_limit: q.max_char_limit ?? 0,
-            response_options: q.response_options ?? [],
-          }))
+      try {
+        const questionsData = await fetchApplicationQuestions(
+          supabase,
+          eventId
         );
-      } else {
+        if (questionsData.length > 0) {
+          setApplicationTemplate(
+            questionsData.map((q) => ({
+              question: q.question ?? "",
+              response: (q.response_type as ResponseType) ?? ResponseType.text,
+              max_char_limit: q.max_char_limit ?? 0,
+              response_options: q.response_options ?? [],
+            }))
+          );
+        } else {
+          setApplicationTemplate([
+            {
+              question: "",
+              response: ResponseType.text,
+              max_char_limit: 0,
+              response_options: [],
+            },
+          ]);
+        }
+      } catch (questionsError) {
+        console.error("Error fetching application questions:", questionsError);
         setApplicationTemplate([
           {
             question: "",
@@ -610,22 +630,21 @@ export const EventCreateModify = ({
       const normalizedBaseSlug = slugify(formState.name);
       const baseSlug =
         normalizedBaseSlug === "item" ? "event" : normalizedBaseSlug;
-      const { data: existingSlugs, error: slugFetchError } = await supabase
-        .from("events")
-        .select("slug")
-        .ilike("slug", `${baseSlug}%`);
 
-      if (slugFetchError) {
-        setError(`Failed to prepare event slug: ${slugFetchError.message}`);
+      let existingSlugs: string[];
+      try {
+        existingSlugs = await fetchEventSlugsByPrefix(supabase, baseSlug);
+      } catch (slugFetchError) {
+        const message =
+          slugFetchError instanceof Error
+            ? slugFetchError.message
+            : "Unknown error";
+        setError(`Failed to prepare event slug: ${message}`);
         setIsSubmitting(false);
         return;
       }
 
-      eventSlug = createUniqueSlug(
-        formState.name,
-        existingSlugs?.map((item) => item.slug) ?? [],
-        "event"
-      );
+      eventSlug = createUniqueSlug(formState.name, existingSlugs, "event");
     }
 
     // Prepare payload
@@ -699,51 +718,45 @@ export const EventCreateModify = ({
     }
 
     // First, insert or update the event
-    const query = eventId
-      ? supabase.from("events").update(payload).eq("id", eventId)
-      : supabase.from("events").insert({
-          ...payload,
-          slug: eventSlug ?? "event",
-        });
-
-    const { data, error: upsertError } = await query.select("id").maybeSingle();
-
-    if (upsertError) {
-      setError(upsertError.message);
+    let finalEventId: string;
+    try {
+      const result = eventId
+        ? await updateEvent(supabase, eventId, payload as EventUpdate)
+        : await insertEvent(supabase, {
+            ...payload,
+            slug: eventSlug ?? "event",
+          } as EventInsert);
+      finalEventId = result.id;
+    } catch (upsertError) {
+      setError(
+        upsertError instanceof Error
+          ? upsertError.message
+          : "No event id returned from Supabase."
+      );
       setIsSubmitting(false);
       return;
     }
-
-    if (!data?.id) {
-      setError("No event id returned from Supabase.");
-      setIsSubmitting(false);
-      return;
-    }
-
-    const finalEventId = data.id;
 
     // If updating, delete existing check-in sessions and application questions
     if (eventId) {
-      const { error: deleteCheckInError } = await supabase
-        .from("check_in_sessions")
-        .delete()
-        .eq("event_id", eventId);
-
-      if (deleteCheckInError) {
-        setError(
-          `Failed to delete existing check-in sessions: ${deleteCheckInError.message}`
-        );
+      try {
+        await deleteCheckInSessionsForEvent(supabase, eventId);
+      } catch (deleteCheckInError) {
+        const message =
+          deleteCheckInError instanceof Error
+            ? deleteCheckInError.message
+            : "Unknown error";
+        setError(`Failed to delete existing check-in sessions: ${message}`);
         setIsSubmitting(false);
         return;
       }
 
-      const { error: deleteError } = await supabase
-        .from("event_application_questions")
-        .delete()
-        .eq("event_id", eventId);
-
-      if (deleteError) {
-        setError(`Failed to delete existing questions: ${deleteError.message}`);
+      try {
+        await deleteApplicationQuestionsForEvent(supabase, eventId);
+      } catch (deleteError) {
+        const message =
+          deleteError instanceof Error ? deleteError.message : "Unknown error";
+        setError(`Failed to delete existing questions: ${message}`);
         setIsSubmitting(false);
         return;
       }
@@ -780,14 +793,17 @@ export const EventCreateModify = ({
               session !== null
           );
 
-        const { error: checkInSessionsError } = await supabase
-          .from("check_in_sessions")
-          .insert(sessionsToInsert);
-
-        if (checkInSessionsError) {
-          setError(
-            `Failed to save check-in sessions: ${checkInSessionsError.message}`
+        try {
+          await insertCheckInSessions(
+            supabase,
+            sessionsToInsert as CheckInSessionInsert[]
           );
+        } catch (checkInSessionsError) {
+          const message =
+            checkInSessionsError instanceof Error
+              ? checkInSessionsError.message
+              : "Unknown error";
+          setError(`Failed to save check-in sessions: ${message}`);
           setIsSubmitting(false);
           return;
         }
@@ -821,14 +837,14 @@ export const EventCreateModify = ({
           return questionData;
         });
 
-        const { error: questionsError } = await supabase
-          .from("event_application_questions")
-          .insert(questionsToInsert);
-
-        if (questionsError) {
-          setError(
-            `Failed to save application questions: ${questionsError.message}`
-          );
+        try {
+          await insertApplicationQuestions(supabase, questionsToInsert);
+        } catch (questionsError) {
+          const message =
+            questionsError instanceof Error
+              ? questionsError.message
+              : "Unknown error";
+          setError(`Failed to save application questions: ${message}`);
           setIsSubmitting(false);
           return;
         }
@@ -871,55 +887,53 @@ export const EventCreateModify = ({
 
     try {
       // Delete related check-in sessions first
-      const { error: deleteCheckInError } = await supabase
-        .from("check_in_sessions")
-        .delete()
-        .eq("event_id", eventId);
-
-      if (deleteCheckInError) {
-        setError(
-          `Failed to delete check-in sessions: ${deleteCheckInError.message}`
-        );
+      try {
+        await deleteCheckInSessionsForEvent(supabase, eventId);
+      } catch (deleteCheckInError) {
+        const message =
+          deleteCheckInError instanceof Error
+            ? deleteCheckInError.message
+            : "Unknown error";
+        setError(`Failed to delete check-in sessions: ${message}`);
         setIsDeleting(false);
         return;
       }
 
       // Delete related application questions
-      const { error: deleteQuestionsError } = await supabase
-        .from("event_application_questions")
-        .delete()
-        .eq("event_id", eventId);
-
-      if (deleteQuestionsError) {
-        setError(
-          `Failed to delete application questions: ${deleteQuestionsError.message}`
-        );
+      try {
+        await deleteApplicationQuestionsForEvent(supabase, eventId);
+      } catch (deleteQuestionsError) {
+        const message =
+          deleteQuestionsError instanceof Error
+            ? deleteQuestionsError.message
+            : "Unknown error";
+        setError(`Failed to delete application questions: ${message}`);
         setIsDeleting(false);
         return;
       }
 
       // Delete event registrations
-      const { error: deleteRegistrationsError } = await supabase
-        .from("event_registrations")
-        .delete()
-        .eq("event_id", eventId);
-
-      if (deleteRegistrationsError) {
-        setError(
-          `Failed to delete event registrations: ${deleteRegistrationsError.message}`
-        );
+      try {
+        await deleteRegistrationsForEvent(supabase, eventId);
+      } catch (deleteRegistrationsError) {
+        const message =
+          deleteRegistrationsError instanceof Error
+            ? deleteRegistrationsError.message
+            : "Unknown error";
+        setError(`Failed to delete event registrations: ${message}`);
         setIsDeleting(false);
         return;
       }
 
       // Finally, delete the event itself
-      const { error: deleteEventError } = await supabase
-        .from("events")
-        .delete()
-        .eq("id", eventId);
-
-      if (deleteEventError) {
-        setError(`Failed to delete event: ${deleteEventError.message}`);
+      try {
+        await deleteEvent(supabase, eventId);
+      } catch (deleteEventError) {
+        const message =
+          deleteEventError instanceof Error
+            ? deleteEventError.message
+            : "Unknown error";
+        setError(`Failed to delete event: ${message}`);
         setIsDeleting(false);
         return;
       }

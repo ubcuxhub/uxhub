@@ -13,7 +13,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { BackButton } from "@/components/shared/BackButton";
-import { fetchEventRegistrationsGroupedByUser } from "@/lib/queries/registrations";
+import { fetchEventById } from "@/lib/supabase-helpers/events";
+import { fetchEventRegistrationsGroupedByUser } from "@/lib/supabase-helpers/event-registrations";
 
 export default function ReviewApplicationsPage() {
   const params = useParams();
@@ -51,17 +52,7 @@ export default function ReviewApplicationsPage() {
 
       try {
         // Fetch event
-        const { data: eventData, error: eventError } = await supabase
-          .from("events")
-          .select("*")
-          .eq("id", eventId)
-          .maybeSingle();
-
-        if (eventError) {
-          setError(eventError.message);
-          setLoading(false);
-          return;
-        }
+        const eventData = await fetchEventById(supabase, eventId);
 
         if (!eventData) {
           setError("Event not found");

@@ -10,7 +10,8 @@ import {
 } from "@/components/ui/card";
 import { CheckoutSummaryCard } from "@/components/shared/CheckoutSummaryCard";
 import { requireAuth } from "@/lib/auth/guards";
-import { getEventBySlug } from "@/lib/queries/checkout";
+import { createClient } from "@/lib/supabase/server";
+import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-CA", {
@@ -40,7 +41,8 @@ export default async function EventCheckoutPage({
 }: EventCheckoutPageProps) {
   const { event: slug } = await params;
   const user = await requireAuth();
-  const event = await getEventBySlug(slug);
+  const supabase = await createClient();
+  const event = await fetchEventBySlug(supabase, slug);
 
   if (!event) {
     notFound();

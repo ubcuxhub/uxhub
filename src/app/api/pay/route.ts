@@ -1,10 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SECRET_KEY!
-);
+import { adminUpdateMembershipByEmail } from "@/lib/supabase-helpers/admin-server";
 
 export async function POST(req: Request) {
   try {
@@ -80,13 +75,10 @@ export async function POST(req: Request) {
     const today = new Date();
     const formattedDate = today.toISOString().split("T")[0].replace(/-/g, "/");
 
-    const { error: updateError } = await supabase
-      .from("user_info")
-      .update({
-        membership_type: tier.display,
-        order_date: formattedDate,
-      })
-      .eq("email", email);
+    const { error: updateError } = await adminUpdateMembershipByEmail(email, {
+      membership_type: tier.display,
+      order_date: formattedDate,
+    });
 
     if (updateError) {
       console.error("Supabase update error:", updateError);

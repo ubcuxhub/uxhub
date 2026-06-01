@@ -9,7 +9,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { CheckoutSummaryCard } from "@/components/shared/CheckoutSummaryCard";
-import { getMembershipTypeBySlug } from "@/lib/queries/checkout";
+import { createClient } from "@/lib/supabase/server";
+import { fetchMembershipTypeBySlug } from "@/lib/supabase-helpers/memberships";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-CA", {
@@ -26,7 +27,8 @@ export default async function MembershipCheckoutPage({
   params,
 }: MembershipCheckoutPageProps) {
   const { membership: plan } = await params;
-  const membershipType = await getMembershipTypeBySlug(plan);
+  const supabase = await createClient();
+  const membershipType = await fetchMembershipTypeBySlug(supabase, plan);
 
   if (!membershipType) {
     notFound();

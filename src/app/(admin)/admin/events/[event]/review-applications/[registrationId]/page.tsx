@@ -10,6 +10,13 @@ import {
 } from "@/features/admin";
 import { type ApplicationStatus, type EventRow } from "@/features/events";
 import { createClient } from "@/lib/supabase/client";
+import { fetchEventById } from "@/lib/supabase-helpers/events";
+import {
+  fetchEventRegistrationById,
+  updateEventRegistration,
+} from "@/lib/supabase-helpers/event-registrations";
+import { fetchApplicationResponsesForRegistration } from "@/lib/supabase-helpers/event-applications";
+import { fetchUserInfoContactById } from "@/lib/supabase-helpers/users";
 import { useUser } from "@/context/UserContext";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
@@ -71,32 +78,22 @@ export default function ApplicationReviewPage() {
 
       try {
         // Fetch registration
-        const { data: registrationData, error: regError } = await supabase
-          .from("event_registrations")
-          .select("*")
-          .eq("id", registrationId)
-          .maybeSingle();
-
-        if (regError) {
-          throw new Error(`Failed to fetch registration: ${regError.message}`);
-        }
+        const registrationData = await fetchEventRegistrationById(
+          supabase,
+          registrationId
+        );
 
         if (!registrationData) {
           throw new Error("Registration not found");
         }
 
-        setRegistration(registrationData as Registration);
+        setRegistration(registrationData as unknown as Registration);
 
         // Fetch user info
-        const { data: userData, error: userError } = await supabase
-          .from("user_info")
-          .select("id, name, email")
-          .eq("id", registrationData.user_id)
-          .maybeSingle();
-
-        if (userError) {
-          throw new Error(`Failed to fetch user info: ${userError.message}`);
-        }
+        const userData = await fetchUserInfoContactById(
+          supabase,
+          registrationData.user_id
+        );
 
         if (!userData) {
           throw new Error("User not found");
@@ -105,15 +102,10 @@ export default function ApplicationReviewPage() {
         setUserInfo(userData);
 
         // Fetch event
-        const { data: eventData, error: eventError } = await supabase
-          .from("events")
-          .select("*")
-          .eq("id", registrationData.event_id)
-          .maybeSingle();
-
-        if (eventError) {
-          throw new Error(`Failed to fetch event: ${eventError.message}`);
-        }
+        const eventData = await fetchEventById(
+          supabase,
+          registrationData.event_id
+        );
 
         if (!eventData) {
           throw new Error("Event not found");
@@ -122,30 +114,12 @@ export default function ApplicationReviewPage() {
         setEvent(eventData);
 
         // Fetch responses with joined questions
-        const { data: responsesData, error: responsesError } = await supabase
-          .from("event_application_responses")
-          .select(
-            `
-            *,
-            event_application_questions (
-              id,
-              question,
-              response_type,
-              max_char_limit,
-              response_options
-            )
-          `
-          )
-          .eq("event_registration_id", registrationId)
-          .order("created_at", { ascending: true });
+        const responsesData = await fetchApplicationResponsesForRegistration(
+          supabase,
+          registrationId
+        );
 
-        if (responsesError) {
-          throw new Error(
-            `Failed to fetch responses: ${responsesError.message}`
-          );
-        }
-
-        setResponses((responsesData || []) as ResponseWithQuestion[]);
+        setResponses(responsesData as unknown as ResponseWithQuestion[]);
       } catch (err) {
         console.error("Error fetching data:", err);
         setError(
@@ -166,17 +140,10 @@ export default function ApplicationReviewPage() {
     setError(null);
 
     try {
-      const { error: updateError } = await supabase
-        .from("event_registrations")
-        .update({
-          status: newStatus,
-          reviewer_id: user.id,
-        })
-        .eq("id", registrationId);
-
-      if (updateError) {
-        throw new Error(`Failed to update status: ${updateError.message}`);
-      }
+      await updateEventRegistration(supabase, registrationId, {
+        status: newStatus,
+        reviewer_id: user.id,
+      });
 
       // Update local state
       setRegistration({ ...registration, status: newStatus });

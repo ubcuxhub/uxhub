@@ -2,6 +2,9 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { fetchEventById } from "@/lib/supabase-helpers/events";
+import { fetchApplicationQuestions } from "@/lib/supabase-helpers/event-applications";
+import { fetchUserRegistrationId } from "@/lib/supabase-helpers/event-registrations";
 import {
   ResponseType,
   type EventRow,
@@ -40,17 +43,7 @@ export function useEventDetail(
 
       try {
         // Fetch event
-        const { data: eventData, error: eventError } = await supabase
-          .from("events")
-          .select("*")
-          .eq("id", eventId)
-          .maybeSingle();
-
-        if (eventError) {
-          setError(eventError.message);
-          setLoading(false);
-          return;
-        }
+        const eventData = await fetchEventById(supabase, eventId);
 
         if (!eventData) {
           setError("Event not found");
@@ -61,43 +54,43 @@ export function useEventDetail(
         setEvent(eventData);
 
         // Fetch application questions
-        const { data: questionsData, error: questionsError } = await supabase
-          .from("event_application_questions")
-          .select("*")
-          .eq("event_id", eventId)
-          .order("created_at", { ascending: true });
-
-        if (questionsError) {
+        try {
+          const questionsData = await fetchApplicationQuestions(
+            supabase,
+            eventId
+          );
+          if (questionsData.length > 0) {
+            const formattedQuestions: ApplicationQuestionTemplate[] =
+              questionsData.map((q) => ({
+                question: q.question ?? "",
+                response:
+                  (q.response_type as ResponseType) ?? ResponseType.text,
+                max_char_limit: q.max_char_limit ?? 0,
+                response_options: q.response_options ?? [],
+              }));
+            setQuestions(formattedQuestions);
+          } else {
+            setQuestions([]);
+          }
+        } catch (questionsError) {
           console.error("Error fetching questions:", questionsError);
-          setQuestions([]);
-        } else if (questionsData && questionsData.length > 0) {
-          const formattedQuestions: ApplicationQuestionTemplate[] =
-            questionsData.map((q) => ({
-              question: q.question ?? "",
-              response: (q.response_type as ResponseType) ?? ResponseType.text,
-              max_char_limit: q.max_char_limit ?? 0,
-              response_options: q.response_options ?? [],
-            }));
-          setQuestions(formattedQuestions);
-        } else {
           setQuestions([]);
         }
 
         // Check if user has already applied
         if (user?.auth_user_id) {
-          const { data: registrationData, error: registrationError } =
-            await supabase
-              .from("event_registrations")
-              .select("id")
-              .eq("event_id", eventId)
-              .eq("user_id", user.auth_user_id)
-              .maybeSingle();
-
-          if (registrationError) {
+          try {
+            const existingRegistrationId = await fetchUserRegistrationId(
+              supabase,
+              eventId,
+              user.auth_user_id
+            );
+            if (existingRegistrationId) {
+              setHasApplied(true);
+              setRegistrationId(existingRegistrationId);
+            }
+          } catch (registrationError) {
             console.error("Error checking registration:", registrationError);
-          } else if (registrationData) {
-            setHasApplied(true);
-            setRegistrationId(registrationData.id);
           }
         }
 

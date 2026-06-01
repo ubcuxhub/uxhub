@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { fetchMembershipTypeById } from "@/lib/supabase-helpers/memberships";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { PaymentForm } from "@/features/memberships";
@@ -21,13 +22,9 @@ async function page({
   const { membership } = await params;
   const supabase = await createClient();
 
-  const { data: membershipTier, error } = await supabase
-    .from("membership_types")
-    .select("*")
-    .eq("id", membership)
-    .single();
+  const membershipTier = await fetchMembershipTypeById(supabase, membership);
 
-  if (error || !membershipTier) {
+  if (!membershipTier) {
     notFound();
   }
 

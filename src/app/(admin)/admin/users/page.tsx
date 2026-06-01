@@ -10,6 +10,12 @@ import {
   type UserRecord,
 } from "@/features/admin";
 import { createClient } from "@/lib/supabase/client";
+import {
+  fetchAdminUserRecords,
+  updateUserInfoByEmail,
+} from "@/lib/supabase-helpers/users";
+import { fetchMembershipTypeOptions } from "@/lib/supabase-helpers/memberships";
+import type { UserInfoUpdate } from "@/types/models";
 
 const AdminUsersManager = () => {
   const [users, setUsers] = useState<UserRecord[]>([]);
@@ -33,43 +39,30 @@ const AdminUsersManager = () => {
       setError(null);
 
       try {
-        const { data, error: fetchError } = await supabase
-          .from("user_info")
-          .select(
-            `
-            *,
-            membership_types!membership_type_id(name)
-          `
-          )
-          .order("name", { ascending: true });
-
-        if (fetchError) {
-          setError(fetchError.message);
-        } else {
-          const transformedData = (data ?? []).map(
-            (user: {
-              membership_types: { name: string } | { name: string }[] | null;
-              [key: string]: unknown;
-            }) => {
-              let membershipTypeName: string | null = null;
-              if (user.membership_types) {
-                if (Array.isArray(user.membership_types)) {
-                  membershipTypeName = user.membership_types[0]?.name || null;
-                } else {
-                  membershipTypeName = user.membership_types.name || null;
-                }
+        const data = await fetchAdminUserRecords(supabase);
+        const transformedData = data.map(
+          (user: {
+            membership_types: { name: string } | { name: string }[] | null;
+            [key: string]: unknown;
+          }) => {
+            let membershipTypeName: string | null = null;
+            if (user.membership_types) {
+              if (Array.isArray(user.membership_types)) {
+                membershipTypeName = user.membership_types[0]?.name || null;
+              } else {
+                membershipTypeName = user.membership_types.name || null;
               }
-
-              return {
-                ...user,
-                membership_type_name: membershipTypeName,
-              };
             }
-          );
 
-          setUsers(transformedData as unknown as UserRecord[]);
-          setFilteredUsers(transformedData as unknown as UserRecord[]);
-        }
+            return {
+              ...user,
+              membership_type_name: membershipTypeName,
+            };
+          }
+        );
+
+        setUsers(transformedData as unknown as UserRecord[]);
+        setFilteredUsers(transformedData as unknown as UserRecord[]);
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
@@ -79,16 +72,8 @@ const AdminUsersManager = () => {
 
     const fetchMembershipTypes = async () => {
       try {
-        const { data, error: fetchError } = await supabase
-          .from("membership_types")
-          .select("id, name")
-          .order("name", { ascending: true });
-
-        if (fetchError) {
-          console.error("Error fetching membership types:", fetchError);
-        } else {
-          setMembershipTypes((data || []) as MembershipTypeOption[]);
-        }
+        const data = await fetchMembershipTypeOptions(supabase);
+        setMembershipTypes(data as MembershipTypeOption[]);
       } catch (err) {
         console.error("Error fetching membership types:", err);
       }
@@ -174,12 +159,7 @@ const AdminUsersManager = () => {
         }
       }
 
-      const { error: updateError } = await supabase
-        .from("user_info")
-        .update(updateData)
-        .eq("email", selectedUser.email);
-
-      if (updateError) throw updateError;
+      await updateUserInfoByEmail(supabase, selectedUser.email, updateData as UserInfoUpdate);
 
       let updatedUser: UserRecord = { ...selectedUser, [field]: updateData[field] };
 
