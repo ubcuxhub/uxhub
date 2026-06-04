@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/context/UserContext";
 import { createClient } from "@/lib/supabase/client";
+import { fetchEvents } from "@/lib/supabase-helpers/events";
 import { LogoutButton } from "@/features/auth";
 import { EventCard, type EventRow } from "@/features/events";
 import { Button } from "@/components/ui/button";
@@ -58,23 +59,20 @@ export default function Events() {
   useEffect(() => {
     const supabase = createClient();
 
-    async function fetchEvents() {
+    async function loadEvents() {
       setLoadingEvents(true);
-      const { data, error } = await supabase
-        .from("events")
-        .select("*")
-        .order("start_date", { ascending: true });
-
-      if (error) {
+      try {
+        const data = await fetchEvents(supabase, { orderBy: "start_date" });
+        setEvents(data);
+      } catch (error) {
         console.error("Error fetching events:", error);
         setEvents([]);
-      } else {
-        setEvents(data ?? []);
+      } finally {
+        setLoadingEvents(false);
       }
-      setLoadingEvents(false);
     }
 
-    if (user) fetchEvents();
+    if (user) loadEvents();
   }, [user]);
 
   // Get first name from email or user name

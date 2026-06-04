@@ -4,14 +4,22 @@ import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import {
   CheckInTable,
-  fetchAttendingRegistrations,
-  fetchCheckInSessions,
-  fetchCheckInStatuses,
   type AttendingRegistration,
   type CheckInSession,
 } from "@/features/admin";
 import { type EventRow } from "@/features/events";
 import { createClient } from "@/lib/supabase/client";
+import { fetchEventById } from "@/lib/supabase-helpers/events";
+import {
+  fetchAttendingRegistrations,
+  fetchCheckInSessions,
+  fetchCheckInStatuses,
+  fetchCheckInId,
+  insertCheckIn,
+  updateCheckInTimestamp,
+} from "@/lib/supabase-helpers/check-ins";
+import { fetchRegistrationsForEvent } from "@/lib/supabase-helpers/event-registrations";
+import { TABLES } from "@/lib/supabase-helpers/tables";
 import type { EventRegistrationRow } from "@/types/models";
 import {
   Card,
@@ -88,17 +96,7 @@ export default function CheckInPage() {
 
       try {
         // Fetch event
-        const { data: eventData, error: eventError } = await supabase
-          .from("events")
-          .select("*")
-          .eq("id", eventId)
-          .maybeSingle();
-
-        if (eventError) {
-          setError(eventError.message);
-          setLoading(false);
-          return;
-        }
+        const eventData = await fetchEventById(supabase, eventId);
 
         if (!eventData) {
           setError("Event not found");
@@ -109,18 +107,8 @@ export default function CheckInPage() {
         setEvent(eventData);
 
         // Fetch all registrations for statistics
-        const { data: allRegsData, error: allRegsError } = await supabase
-          .from("event_registrations")
-          .select("*")
-          .eq("event_id", eventId);
-
-        if (allRegsError) {
-          throw new Error(
-            `Failed to fetch registrations: ${allRegsError.message}`
-          );
-        }
-
-        setAllRegistrations(allRegsData || []);
+        const allRegsData = await fetchRegistrationsForEvent(supabase, eventId);
+        setAllRegistrations(allRegsData);
 
         // Fetch check-in sessions
         const sessions = await fetchCheckInSessions(supabase, eventId);
@@ -156,7 +144,7 @@ export default function CheckInPage() {
         {
           event: "*",
           schema: "public",
-          table: "check_ins",
+          table: TABLES.checkIns,
         },
         async () => {
           try {
@@ -173,17 +161,17 @@ export default function CheckInPage() {
         {
           event: "*",
           schema: "public",
-          table: "event_registrations",
+          table: TABLES.eventRegistrations,
           filter: `event_id=eq.${eventId}`,
         },
         async () => {
           try {
             // Refetch registrations when event_registrations change
-            const { data: allRegsData } = await supabase
-              .from("event_registrations")
-              .select("*")
-              .eq("event_id", eventId);
-            setAllRegistrations(allRegsData || []);
+            const allRegsData = await fetchRegistrationsForEvent(
+              supabase,
+              eventId
+            );
+            setAllRegistrations(allRegsData);
 
             const registrations = await fetchAttendingRegistrations(
               supabase,
@@ -200,7 +188,7 @@ export default function CheckInPage() {
         {
           event: "*",
           schema: "public",
-          table: "check_in_sessions",
+          table: TABLES.checkInSessions,
           filter: `event_id=eq.${eventId}`,
         },
         async () => {
@@ -248,27 +236,16 @@ export default function CheckInPage() {
 
     try {
       // Check if entry exists
-      const { data: existingCheckIn, error: fetchError } = await supabase
-        .from("check_ins")
-        .select("id")
-        .eq("event_registration_id", registrationId)
-        .eq("check_in_session_id", sessionId)
-        .maybeSingle();
-
-      if (fetchError && fetchError.code !== "PGRST116") {
-        // PGRST116 is "not found" which is fine
-        throw fetchError;
-      }
+      const existingCheckInId = await fetchCheckInId(
+        supabase,
+        registrationId,
+        sessionId
+      );
 
       if (currentlyChecked) {
         // Unchecking - set checked_in_at to null
-        if (existingCheckIn) {
-          const { error: updateError } = await supabase
-            .from("check_ins")
-            .update({ checked_in_at: null })
-            .eq("id", existingCheckIn.id);
-
-          if (updateError) throw updateError;
+        if (existingCheckInId) {
+          await updateCheckInTimestamp(supabase, existingCheckInId, null);
 
           // Update local state
           setCheckInStatuses((prev) => {
@@ -281,25 +258,16 @@ export default function CheckInPage() {
         // Checking - set checked_in_at to current time
         const now = new Date().toISOString();
 
-        if (existingCheckIn) {
+        if (existingCheckInId) {
           // Update existing entry
-          const { error: updateError } = await supabase
-            .from("check_ins")
-            .update({ checked_in_at: now })
-            .eq("id", existingCheckIn.id);
-
-          if (updateError) throw updateError;
+          await updateCheckInTimestamp(supabase, existingCheckInId, now);
         } else {
           // Insert new entry
-          const { error: insertError } = await supabase
-            .from("check_ins")
-            .insert({
-              event_registration_id: registrationId,
-              check_in_session_id: sessionId,
-              checked_in_at: now,
-            });
-
-          if (insertError) throw insertError;
+          await insertCheckIn(supabase, {
+            event_registration_id: registrationId,
+            check_in_session_id: sessionId,
+            checked_in_at: now,
+          });
         }
 
         // Update local state

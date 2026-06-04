@@ -16,6 +16,7 @@ import {
 import { useState, useEffect } from "react";
 import { Pencil } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { updateUserInfoById } from "@/lib/supabase-helpers/users";
 import { cn } from "@/lib/utils";
 import type { UniversityYear, UserType } from "@/types/models";
 
@@ -80,25 +81,20 @@ const Profile = () => {
     setLoading(true);
 
     try {
-      const { error } = await supabase
-        .from("user_info")
-        .update({
-          name: formData.name,
-          phone: formData.phone,
-          student_number: formData.student_number
-            ? parseInt(formData.student_number)
-            : null,
-          faculty: formData.faculty || null,
-          major: formData.major || null,
-          year: formData.year || null,
-          dietary_restrictions: formData.dietary_restrictions || null,
-          preferred_pronouns: formData.preferred_pronouns || null,
-          newsletter: formData.newsletter,
-          user_type: formData.user_type,
-        })
-        .eq("id", user.id);
-
-      if (error) throw error;
+      await updateUserInfoById(supabase, user.id, {
+        name: formData.name,
+        phone: formData.phone,
+        student_number: formData.student_number
+          ? parseInt(formData.student_number)
+          : null,
+        faculty: formData.faculty || null,
+        major: formData.major || null,
+        year: formData.year || null,
+        dietary_restrictions: formData.dietary_restrictions || null,
+        preferred_pronouns: formData.preferred_pronouns || null,
+        newsletter: formData.newsletter,
+        user_type: formData.user_type,
+      });
 
       await refreshUser();
       setIsEditing(false);

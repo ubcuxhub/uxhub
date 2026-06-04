@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import type { UserInfoRow } from "@/features/auth";
 import { createClient } from "@/lib/supabase/server";
+import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";
 
 export async function requireAuth(): Promise<UserInfoRow> {
   const supabase = await createClient();
@@ -15,13 +16,11 @@ export async function requireAuth(): Promise<UserInfoRow> {
     redirect("/auth/login");
   }
 
-  const { data: userInfo, error: userInfoError } = await supabase
-    .from("user_info")
-    .select("*")
-    .eq("auth_user_id", authUser.id)
-    .single();
+  const userInfo = await fetchUserInfoByAuthId(supabase, authUser.id).catch(
+    () => null
+  );
 
-  if (userInfoError || !userInfo) {
+  if (!userInfo) {
     redirect("/auth/login");
   }
 

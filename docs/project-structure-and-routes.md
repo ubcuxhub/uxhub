@@ -96,6 +96,16 @@ uxhub/
 │   │   ├── admin.ts                       # Service role — server-only
 │   │   ├── proxy.ts                       # Session refresh helper
 │   │   └── database.types.ts              # Generated via `supabase gen types`
+│   ├── supabase-helpers/                  # Single data-access boundary
+│   │   ├── types.ts                       # Shared DbClient type
+│   │   ├── tables.ts                      # TABLES name map (also for realtime)
+│   │   ├── events.ts                      # Per-domain query/mutation helpers
+│   │   ├── event-registrations.ts
+│   │   ├── event-applications.ts
+│   │   ├── check-ins.ts
+│   │   ├── users.ts
+│   │   ├── memberships.ts
+│   │   └── admin-server.ts                # Service-role helpers — server-only
 │   ├── square/
 │   │   └── client.ts                      # Square SDK client — server-only
 │   ├── auth/
@@ -111,7 +121,9 @@ uxhub/
 └── ...
 ```
 
-**Server actions for your own mutations; `/api` only for third parties.** Square webhooks, OAuth callbacks, anything an external system calls — those need `/api/.../route.ts`. Your own forms (purchase a ticket, create an event) should use server actions colocated in `features/<domain>/actions.ts`. Less boilerplate, type-safe end to end.
+**All table access goes through `src/lib/supabase-helpers/`.** This is the single data-access boundary. Pages, hooks, components, server actions, and route handlers call typed domain helpers (e.g. `fetchEventById`, `updateEventRegistration`) instead of writing `supabase.from("...")` inline. Each helper takes an injected `DbClient` (`src/lib/supabase-helpers/types.ts`), so the same function works on the browser client, the server client, and in tests. Raw table names — including realtime `postgres_changes` table strings — come from the `TABLES` map (`src/lib/supabase-helpers/tables.ts`). Service-role (RLS-bypassing) access lives in `admin-server.ts` and uses the shared server-only client at `src/lib/supabase/admin.ts`. See [`supabase/README.md`](../supabase/README.md) for the schema-change runbook and a table → helper map.
+
+**Server actions for your own mutations; `/api` only for third parties.** Square webhooks, OAuth callbacks, anything an external system calls — those need `/api/.../route.ts`. Your own forms (purchase a ticket, create an event) should use server actions colocated in `features/<domain>/actions.ts`, delegating to the `supabase-helpers` layer for the actual queries. Less boilerplate, type-safe end to end.
 
 **Proxy does session refresh, not gatekeeping.** Next's `proxy.ts` should call Supabase's session-refresh helper on matched requests (otherwise tokens expire mid-session). Put the actual "is this user allowed here" checks in route group layouts, where you have full server context and can redirect cleanly.
 

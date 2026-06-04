@@ -11,11 +11,6 @@ export { UserDirectoryPanel } from "./components/UserDirectoryPanel";
 export { UserDetailsPanel } from "./components/UserDetailsPanel";
 export { EditableUserField } from "./components/EditableUserField";
 export { MembershipTypeField } from "./components/MembershipTypeField";
-export {
-  fetchCheckInSessions,
-  fetchAttendingRegistrations,
-  fetchCheckInStatuses,
-} from "./queries/checkIn";
 export type {
   CheckInSession,
   CheckInSessionDraft,

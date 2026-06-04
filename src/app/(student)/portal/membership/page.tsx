@@ -11,6 +11,7 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
+import { fetchMembershipTypes } from "@/lib/supabase-helpers/memberships";
 import { useEffect, useState } from "react";
 import { useUser } from "@/context/UserContext";
 import { cn } from "@/lib/utils";
@@ -28,13 +29,8 @@ export default function MembershipsPage() {
     const fetchMembershipTiers = async () => {
       const supabase = createClient();
       try {
-        const { data, error } = await supabase
-          .from("membership_types")
-          .select("*")
-          .order("price", { ascending: true });
-
-        if (error) throw error;
-        setMembershipTiers(data || []);
+        const data = await fetchMembershipTypes(supabase, { orderBy: "price" });
+        setMembershipTiers(data);
       } catch (error) {
         console.error("Error fetching membership tiers:", error);
       } finally {
