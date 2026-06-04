@@ -17,12 +17,9 @@ const EventCard: React.FC<EventCardProps> = ({
     return (
         <div className="flex-1 rounded-2xl border border-[#C1C7CD] p-3">
             <div className="overflow-hidden rounded-lg">
-                <Image
+                <img
                     src={imageSrc}
                     alt={imageAlt}
-                    width={0}
-                    height={0}
-                    sizes="100vw"
                     className="w-full object-contain"
                 />
             </div>
