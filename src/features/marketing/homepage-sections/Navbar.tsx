@@ -49,7 +49,7 @@ export default function Navbar() {
               Contact Us
             </Link>
 
-            <Button variant="primary" withArrow={false} shorterHeight={true} onClick={() => {}}>
+            <Button variant="primary" withArrow={false} shorterHeight={true} onClick={() => { window.location.href = "/portal/profile"; }}>
               BECOME A MEMBER
             </Button>
           </div>
