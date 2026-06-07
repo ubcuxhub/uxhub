@@ -14,6 +14,8 @@ export const TABLES = {
   checkInSessions: "check_in_sessions",
   checkIns: "check_ins",
   membershipTypes: "membership_types",
+  purchases: "purchases",
+  squareWebhookEvents: "square_webhook_events",
 } as const;
 
 export type TableName = (typeof TABLES)[keyof typeof TABLES];

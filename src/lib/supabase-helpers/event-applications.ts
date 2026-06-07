@@ -51,6 +51,26 @@ export async function fetchApplicationQuestionIds(
   return data ?? [];
 }
 
+export async function fetchEventIdsWithApplications(
+  supabase: DbClient
+): Promise<string[]> {
+  const { data, error } = await supabase
+    .from(TABLES.eventApplicationQuestions)
+    .select("event_id");
+
+  if (error) throw error;
+
+  return Array.from(
+    new Set(
+      (data ?? []).map(
+        (
+          row: Pick<EventApplicationQuestionRow, "event_id">
+        ) => row.event_id
+      )
+    )
+  );
+}
+
 export async function insertApplicationQuestions(
   supabase: DbClient,
   questions: EventApplicationQuestionInsert[]

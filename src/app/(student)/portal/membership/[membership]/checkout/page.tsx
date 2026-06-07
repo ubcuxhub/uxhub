@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { CheckoutSummaryCard } from "@/components/shared/CheckoutSummaryCard";
+import { requireAuth } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchMembershipTypeBySlug } from "@/lib/supabase-helpers/memberships";
 
@@ -27,6 +28,7 @@ export default async function MembershipCheckoutPage({
   params,
 }: MembershipCheckoutPageProps) {
   const { membership: plan } = await params;
+  const user = await requireAuth();
   const supabase = await createClient();
   const membershipType = await fetchMembershipTypeBySlug(supabase, plan);
 
@@ -35,6 +37,13 @@ export default async function MembershipCheckoutPage({
   }
 
   const formattedPrice = formatCurrency(membershipType.price);
+  const amountCents = Math.round(membershipType.price * 100);
+  const hasMembership = Boolean(
+    user.membership_type_id || user.membership_pre_ordered_type_id
+  );
+  const disabledMessage = hasMembership
+    ? "Your account already has an active or pending membership."
+    : null;
 
   return (
     <div className="container mx-auto max-w-6xl px-4 py-10">
@@ -82,8 +91,16 @@ export default async function MembershipCheckoutPage({
         <div className="lg:sticky lg:top-6 lg:self-start">
           <CheckoutSummaryCard
             amount={formattedPrice}
+            amountCents={amountCents}
             description={`Review your ${membershipType.name} membership purchase.`}
-            buttonLabel="Checkout Coming Soon"
+            buttonLabel="Purchase Membership"
+            disabled={hasMembership}
+            disabledMessage={disabledMessage}
+            initialEmail={user.email}
+            initialName={user.name}
+            initialPhone={user.phone}
+            kind="membership"
+            slug={membershipType.slug}
           />
         </div>
       </div>

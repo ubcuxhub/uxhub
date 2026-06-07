@@ -29,7 +29,7 @@
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-icons": "^5.5.0",
-    "square": "^43.2.0",
+    "square": "^43.2.1",
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {

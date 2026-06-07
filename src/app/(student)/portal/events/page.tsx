@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@/context/UserContext";
 import { createClient } from "@/lib/supabase/client";
+import { fetchEventIdsWithApplications } from "@/lib/supabase-helpers/event-applications";
 import { fetchEvents } from "@/lib/supabase-helpers/events";
 import { LogoutButton } from "@/features/auth";
 import { EventCard, type EventRow } from "@/features/events";
@@ -54,6 +55,7 @@ export default function Events() {
   const router = useRouter();
 
   const [events, setEvents] = useState<EventRow[]>([]);
+  const [applicationEventIds, setApplicationEventIds] = useState<string[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
 
   useEffect(() => {
@@ -62,11 +64,16 @@ export default function Events() {
     async function loadEvents() {
       setLoadingEvents(true);
       try {
-        const data = await fetchEvents(supabase, { orderBy: "start_date" });
+        const [data, appliedEventIds] = await Promise.all([
+          fetchEvents(supabase, { orderBy: "start_date" }),
+          fetchEventIdsWithApplications(supabase),
+        ]);
         setEvents(data);
+        setApplicationEventIds(appliedEventIds);
       } catch (error) {
         console.error("Error fetching events:", error);
         setEvents([]);
+        setApplicationEventIds([]);
       } finally {
         setLoadingEvents(false);
       }
@@ -149,7 +156,11 @@ export default function Events() {
                       event={event}
                       variant="default"
                       onClick={() =>
-                        router.push(`/portal/events/${event.slug}/checkout`)
+                        router.push(
+                          applicationEventIds.includes(event.id)
+                            ? `/portal/events/${event.slug}`
+                            : `/portal/events/${event.slug}/checkout`
+                        )
                       }
                     />
                   </div>

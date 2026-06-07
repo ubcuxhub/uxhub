@@ -1,30 +1,48 @@
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { SquareCheckoutForm } from "@/features/payments";
+import type { PurchaseKind } from "@/features/payments";
 
 interface CheckoutSummaryCardProps {
   amount: string;
+  amountCents: number;
   description: string;
   buttonLabel?: string;
+  disabled?: boolean;
+  disabledMessage?: string | null;
+  initialEmail: string;
+  initialName: string;
+  initialPhone?: string | null;
+  kind: PurchaseKind;
+  slug: string;
+  successHref?: string;
 }
 
 export function CheckoutSummaryCard({
   amount,
+  amountCents,
   description,
   buttonLabel = "Secure Checkout",
+  disabled = false,
+  disabledMessage = null,
+  initialEmail,
+  initialName,
+  initialPhone,
+  kind,
+  slug,
+  successHref,
 }: CheckoutSummaryCardProps) {
   return (
     <Card>
       <CardHeader>
         <CardTitle>Secure Checkout</CardTitle>
-        <CardDescription>{description}</CardDescription>
+        <p className="text-sm text-muted-foreground">{description}</p>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex items-center justify-between text-sm">
@@ -32,15 +50,23 @@ export function CheckoutSummaryCard({
           <span className="font-semibold">{amount}</span>
         </div>
         <Separator />
-        <p className="text-sm text-muted-foreground">
-          Payments are not enabled on this page yet. This screen is currently a
-          preview of the checkout flow.
-        </p>
+        <SquareCheckoutForm
+          amountCents={amountCents}
+          amountLabel={amount}
+          buttonLabel={buttonLabel}
+          disabled={disabled}
+          disabledMessage={disabledMessage}
+          initialEmail={initialEmail}
+          initialName={initialName}
+          initialPhone={initialPhone}
+          kind={kind}
+          slug={slug}
+          successHref={successHref}
+        />
       </CardContent>
-      <CardFooter>
-        <Button className="w-full" disabled>
-          {buttonLabel}
-        </Button>
+      <CardFooter className="pt-0 text-xs text-muted-foreground">
+        Square secures the payment details while UX Hub controls pricing,
+        membership eligibility, and ticket fulfillment on the server.
       </CardFooter>
     </Card>
   );

@@ -57,6 +57,36 @@ export async function fetchUserRegistrationId(
   return data?.id ?? null;
 }
 
+export async function fetchUserRegistration(
+  supabase: DbClient,
+  eventId: string,
+  userId: string
+): Promise<EventRegistrationRow | null> {
+  const { data, error } = await supabase
+    .from(TABLES.eventRegistrations)
+    .select("*")
+    .eq("event_id", eventId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchEventRegistrationByPurchaseId(
+  supabase: DbClient,
+  purchaseId: string
+): Promise<EventRegistrationRow | null> {
+  const { data, error } = await supabase
+    .from(TABLES.eventRegistrations)
+    .select("*")
+    .eq("purchase_id", purchaseId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function createEventRegistration(
   supabase: DbClient,
   payload: { event_id: string; user_id: string; status?: ApplicationStatus }
