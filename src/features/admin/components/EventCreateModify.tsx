@@ -144,14 +144,7 @@ export const EventCreateModify = ({
   ]);
   const [applicationTemplate, setApplicationTemplate] = useState<
     ApplicationQuestionTemplate[]
-  >([
-    {
-      question: "",
-      response: ResponseType.text,
-      max_char_limit: 0,
-      response_options: [],
-    },
-  ]);
+  >([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingEvent, setLoadingEvent] = useState(!!eventId);
   const [error, setError] = useState<string | null>(null);
@@ -192,14 +185,7 @@ export const EventCreateModify = ({
               ]
             );
             setApplicationTemplate(
-              parsed.applicationTemplate || [
-                {
-                  question: "",
-                  response: ResponseType.text,
-                  max_char_limit: 0,
-                  response_options: [],
-                },
-              ]
+              parsed.applicationTemplate || []
             );
           }, 0);
         }
@@ -324,25 +310,11 @@ export const EventCreateModify = ({
             }))
           );
         } else {
-          setApplicationTemplate([
-            {
-              question: "",
-              response: ResponseType.text,
-              max_char_limit: 0,
-              response_options: [],
-            },
-          ]);
+          setApplicationTemplate([]);
         }
       } catch (questionsError) {
         console.error("Error fetching application questions:", questionsError);
-        setApplicationTemplate([
-          {
-            question: "",
-            response: ResponseType.text,
-            max_char_limit: 0,
-            response_options: [],
-          },
-        ]);
+        setApplicationTemplate([]);
       }
 
       setLoadingEvent(false);
@@ -544,11 +516,6 @@ export const EventCreateModify = ({
 
   const validateForm = () => {
     if (!formState.name.trim()) return "Event name is required.";
-    if (!formState.start_date) return "Event start date is required.";
-    if (!formState.start_time) return "Event start time is required.";
-    // location_building and location_room are now optional
-    if (!formState.location_address_url.trim())
-      return "Location address URL is required.";
     if (!formState.description.trim()) return "Description is required.";
     if (!formState.regular_price.trim()) return "Regular price is required.";
     if (Number.isNaN(Number(formState.regular_price)))
@@ -862,14 +829,7 @@ export const EventCreateModify = ({
       }
       setFormState(defaultFormState);
       setCheckInEvents([{ name: "", start_time: "", end_time: "" }]);
-      setApplicationTemplate([
-        {
-          question: "",
-          response: ResponseType.text,
-          max_char_limit: 0,
-          response_options: [],
-        },
-      ]);
+      setApplicationTemplate([]);
     }
 
     if (onSuccess) {
