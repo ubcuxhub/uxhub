@@ -38,14 +38,9 @@ To receive Square webhook notifications during local development, you need to ex
    - `SQUARE_WEBHOOK_SIGNATURE_KEY`: Your webhook signature key from the Square Developer Console.
    - `SQUARE_WEBHOOK_NOTIFICATION_URL`: `https://your-subdomain.ngrok-free.dev/api/square/webhook`
 
-### Testing Payments (Square Sandbox)
+## Testing Payments (Square Sandbox)
 
-When testing checkout flows in the local development environment, use the following Square Sandbox test card details:
-
-- **Card Number:** `4111 1111 1111 1111`
-- **Expiration:** `12/30`
-- **CVV:** `111`
-- **ZIP/Postal Code:** `94103`
+https://www.notion.so/Square-Sandbox-Test-Card-37b2f9f09f1880d4b6ddd31242de3b9b?source=copy_link
 
 ## Commands
 
