@@ -22,7 +22,7 @@ import { BackButton } from "@/components/shared/BackButton";
 export default function EventDetailPage() {
   const params = useParams();
   const { user, loading: userLoading, refreshUser } = useUser();
-  const eventId = params?.event as string;
+  const eventSlug = params?.event as string;
 
   const {
     event,
@@ -31,7 +31,7 @@ export default function EventDetailPage() {
     error,
     hasApplied,
     registrationId,
-  } = useEventDetail(eventId, user, userLoading);
+  } = useEventDetail(eventSlug, user, userLoading);
 
   const {
     isSubmitting,
@@ -47,7 +47,7 @@ export default function EventDetailPage() {
       return;
     }
 
-    await submitApplication(eventId, responses, user, registrationId);
+    await submitApplication(event.id, responses, user, registrationId);
   };
 
   if (loading) {
@@ -100,7 +100,7 @@ export default function EventDetailPage() {
         {questions.length > 0 ? (
           <div className="space-y-4">
             <EventApplicationForm
-              eventId={eventId}
+              eventId={event.id}
               questions={questions}
               onSubmit={handleSubmitApplication}
               isSubmitting={isSubmitting}

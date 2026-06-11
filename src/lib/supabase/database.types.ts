@@ -186,6 +186,7 @@ export type Database = {
           created_at: string | null
           event_id: string
           id: string
+          purchase_id: string | null
           reviewer_id: string | null
           status: Database["public"]["Enums"]["application_status"] | null
           updated_at: string | null
@@ -196,6 +197,7 @@ export type Database = {
           created_at?: string | null
           event_id: string
           id?: string
+          purchase_id?: string | null
           reviewer_id?: string | null
           status?: Database["public"]["Enums"]["application_status"] | null
           updated_at?: string | null
@@ -206,6 +208,7 @@ export type Database = {
           created_at?: string | null
           event_id?: string
           id?: string
+          purchase_id?: string | null
           reviewer_id?: string | null
           status?: Database["public"]["Enums"]["application_status"] | null
           updated_at?: string | null
@@ -217,6 +220,13 @@ export type Database = {
             columns: ["event_id"]
             isOneToOne: false
             referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_registrations_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchases"
             referencedColumns: ["id"]
           },
           {
@@ -334,6 +344,106 @@ export type Database = {
         }
         Relationships: []
       }
+      purchases: {
+        Row: {
+          amount_cents: number
+          created_at: string | null
+          currency: string
+          event_id: string | null
+          failure_reason: string | null
+          fulfilled_at: string | null
+          id: string
+          idempotency_key: string
+          kind: string
+          membership_type_id: string | null
+          square_customer_id: string | null
+          square_payment_id: string | null
+          status: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          amount_cents: number
+          created_at?: string | null
+          currency: string
+          event_id?: string | null
+          failure_reason?: string | null
+          fulfilled_at?: string | null
+          id?: string
+          idempotency_key: string
+          kind: string
+          membership_type_id?: string | null
+          square_customer_id?: string | null
+          square_payment_id?: string | null
+          status: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string | null
+          currency?: string
+          event_id?: string | null
+          failure_reason?: string | null
+          fulfilled_at?: string | null
+          id?: string
+          idempotency_key?: string
+          kind?: string
+          membership_type_id?: string | null
+          square_customer_id?: string | null
+          square_payment_id?: string | null
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchases_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchases_membership_type_id_fkey"
+            columns: ["membership_type_id"]
+            isOneToOne: false
+            referencedRelation: "membership_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "purchases_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_info"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      square_webhook_events: {
+        Row: {
+          created_at: string | null
+          event_id: string
+          event_type: string
+          payload: Json
+          processed_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          event_id: string
+          event_type: string
+          payload: Json
+          processed_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          event_id?: string
+          event_type?: string
+          payload?: Json
+          processed_at?: string | null
+        }
+        Relationships: []
+      }
       user_info: {
         Row: {
           auth_user_id: string | null
@@ -352,6 +462,7 @@ export type Database = {
           phone: string | null
           preferred_pronouns: string | null
           role_access: Database["public"]["Enums"]["role_access_enum"]
+          square_customer_id: string | null
           student_number: number | null
           updated_at: string | null
           user_type: Database["public"]["Enums"]["user_type"]
@@ -374,6 +485,7 @@ export type Database = {
           phone?: string | null
           preferred_pronouns?: string | null
           role_access: Database["public"]["Enums"]["role_access_enum"]
+          square_customer_id?: string | null
           student_number?: number | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"]
@@ -396,6 +508,7 @@ export type Database = {
           phone?: string | null
           preferred_pronouns?: string | null
           role_access?: Database["public"]["Enums"]["role_access_enum"]
+          square_customer_id?: string | null
           student_number?: number | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"]
@@ -426,6 +539,17 @@ export type Database = {
       get_user_info_id: { Args: never; Returns: string }
       is_admin: { Args: never; Returns: boolean }
       is_authenticated: { Args: never; Returns: boolean }
+      release_paid_event_ticket_reservation: {
+        Args: { p_purchase_id: string }
+        Returns: undefined
+      }
+      reserve_paid_event_ticket: {
+        Args: { p_event_id: string; p_purchase_id: string; p_user_id: string }
+        Returns: {
+          failure_reason: string
+          registration_id: string
+        }[]
+      }
     }
     Enums: {
       application_status: "pending" | "declined" | "accepted"
