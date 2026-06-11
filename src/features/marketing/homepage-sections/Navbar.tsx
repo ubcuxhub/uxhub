@@ -24,7 +24,7 @@ export default function Navbar() {
     <div className="fixed inset-x-0 top-0 z-50 bg-white py-1">
       <nav className="flex h-20 items-center md:px-[5%] px-[5%]">
         {/* Logo */}
-        <Link href="#home" className="block" onClick={close}>
+        <Link href="/" className="block" onClick={close}>
           <div className="w-[48px] h-[48px]">
             <Image
               src="/logo.png"
@@ -39,23 +39,17 @@ export default function Navbar() {
 
         <div className="ml-auto hidden md:flex items-center">
           <div className="flex items-center gap-8">
-            <Link href="#home" className={navLink}>
+            <Link href="/" className={navLink}>
               Home
             </Link>
-            <Link href="#about-us" className={navLink}>
-              About Us
-            </Link>
-            <Link href="#events" className={navLink}>
+            <Link href="/events" className={navLink}>
               Events
-            </Link>
-            <Link href="#team" className={navLink}>
-              Meet the Team
             </Link>
             <Link href="mailto:ubcuxhub@gmail.com" className={navLink}>
               Contact Us
             </Link>
 
-            <Button variant="primary" withArrow={false} shorterHeight={true}  onClick={() => {window.location.href = "https://linktr.ee/ubcuxhub?fbclid=PAZXh0bgNhZW0CMTEAAaf0yjegrtGiSXfSFyHbl76u5TnYyGoUSImwqeW6vbKvy74Cz_NmVY6_HVuUdw_aem_gG2KbQMNO5Yidm2tSQOltA"}}>
+            <Button variant="primary" withArrow={false} shorterHeight={true} onClick={() => { window.location.href = "/portal/profile"; }}>
               BECOME A MEMBER
             </Button>
           </div>
@@ -86,17 +80,11 @@ export default function Navbar() {
             role="menu"
           >
             <div className="flex flex-col p-3">
-              <Link href="#home" className={`${navLink} px-3 py-2`} onClick={close}>
+              <Link href="/" className={`${navLink} px-3 py-2`} onClick={close}>
                 Home
               </Link>
-              <Link href="#about-us" className={`${navLink} px-3 py-2`} onClick={close}>
-                About Us
-              </Link>
-              <Link href="#events" className={`${navLink} px-3 py-2`} onClick={close}>
+              <Link href="/events" className={`${navLink} px-3 py-2`} onClick={close}>
                 Events
-              </Link>
-              <Link href="#team" className={`${navLink} px-3 py-2`} onClick={close}>
-                Meet the Team
               </Link>
               <Link
                 href="mailto:ubcuxhub@gmail.com"

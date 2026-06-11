@@ -45,7 +45,7 @@ export default function FooterCallout() {
           </p>
 
           <div className="flex flex-col items-center justify-center gap-3 sm:flex-row pt-4">
-            <Button variant="primary" onClick={() => {window.location.href = "https://linktr.ee/ubcuxhub?fbclid=PAZXh0bgNhZW0CMTEAAaf0yjegrtGiSXfSFyHbl76u5TnYyGoUSImwqeW6vbKvy74Cz_NmVY6_HVuUdw_aem_gG2KbQMNO5Yidm2tSQOltA"}}>
+            <Button variant="primary" onClick={() => { window.location.href = "/portal/profile"; }}>
               BECOME A MEMBER
             </Button>
 
