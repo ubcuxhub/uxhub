@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useUser } from "@/context/UserContext";
 import { createClient } from "@/lib/supabase/client";
 import { fetchEvents } from "@/lib/supabase-helpers/events";
-import { fetchPurchasesForUser } from "@/lib/supabase-helpers/purchases";
+import { fetchRegistrationsForUser } from "@/lib/supabase-helpers/event-registrations";
 import { LogoutButton } from "@/features/auth";
 import { EventCard, type EventRow } from "@/features/events";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import {
   ArrowRight,
   CalendarDays,
   History,
+  Radio,
   Sparkles,
   User,
 } from "lucide-react";
@@ -38,21 +39,6 @@ function EventCardSkeleton() {
           <Skeleton className="h-4 w-20" />
         </div>
       </div>
-    </div>
-  );
-}
-
-function RegisteredEmptyState() {
-  return (
-    <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-      <div className="rounded-full bg-muted p-4 mb-4">
-        <CalendarDays className="h-8 w-8 text-muted-foreground" />
-      </div>
-      <h3 className="text-lg font-semibold mb-1">No registered events yet</h3>
-      <p className="text-muted-foreground text-sm max-w-sm">
-        You haven&apos;t registered for any events yet. Browse all events to
-        find something that interests you.
-      </p>
     </div>
   );
 }
@@ -114,8 +100,9 @@ export default function PortalHome() {
   const { user } = useUser();
   const router = useRouter();
 
-  const [registeredEvents, setRegisteredEvents] = useState<EventRow[]>([]);
-  const [pastEvents, setPastEvents] = useState<EventRow[]>([]);
+  const [ongoingEvents, setOngoingEvents] = useState<EventRow[]>([]);
+  const [upcomingEvents, setUpcomingEvents] = useState<EventRow[]>([]);
+  const [attendedEvents, setAttendedEvents] = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -124,49 +111,52 @@ export default function PortalHome() {
     async function loadEvents(userId: string) {
       setLoading(true);
       try {
-        const [events, purchases] = await Promise.all([
+        const [events, registrations] = await Promise.all([
           fetchEvents(supabase, { orderBy: "start_date" }),
-          fetchPurchasesForUser(supabase, userId),
+          fetchRegistrationsForUser(supabase, userId),
         ]);
 
-        const purchasedEventIds = new Set(
-          purchases
-            .filter(
-              (p) =>
-                p.kind === "event_ticket" &&
-                p.status === "completed" &&
-                p.event_id,
-            )
-            .map((p) => p.event_id as string),
+        const registeredEventIds = new Set(
+          registrations
+            .filter((r) => r.status === "accepted")
+            .map((r) => r.event_id),
         );
 
         const now = Date.now();
-        const purchased = events.filter((e) => purchasedEventIds.has(e.id));
+        const registered = events.filter((e) => registeredEventIds.has(e.id));
 
-        const registered = purchased
-          .filter(
-            (e) => !e.start_date || new Date(e.start_date).getTime() >= now,
-          )
-          .sort(
-            (a, b) =>
-              new Date(a.start_date ?? 0).getTime() -
-              new Date(b.start_date ?? 0).getTime(),
-          );
+        const ongoing: EventRow[] = [];
+        const upcoming: EventRow[] = [];
+        const attended: EventRow[] = [];
 
-        const past = purchased
-          .filter((e) => e.start_date && new Date(e.start_date).getTime() < now)
-          .sort(
-            (a, b) =>
-              new Date(b.start_date ?? 0).getTime() -
-              new Date(a.start_date ?? 0).getTime(),
-          );
+        for (const e of registered) {
+          const start = e.start_date ? new Date(e.start_date).getTime() : null;
+          const end = e.end_date ? new Date(e.end_date).getTime() : null;
 
-        setRegisteredEvents(registered);
-        setPastEvents(past);
+          if (start !== null && end !== null && start <= now && now <= end) {
+            ongoing.push(e);
+          } else if (start === null || start >= now) {
+            upcoming.push(e);
+          } else {
+            attended.push(e);
+          }
+        }
+
+        const startAsc = (a: EventRow, b: EventRow) =>
+          new Date(a.start_date ?? 0).getTime() -
+          new Date(b.start_date ?? 0).getTime();
+        const startDesc = (a: EventRow, b: EventRow) =>
+          new Date(b.start_date ?? 0).getTime() -
+          new Date(a.start_date ?? 0).getTime();
+
+        setOngoingEvents(ongoing.sort(startAsc));
+        setUpcomingEvents(upcoming.sort(startAsc));
+        setAttendedEvents(attended.sort(startDesc));
       } catch (error) {
         console.error("Error fetching events:", error);
-        setRegisteredEvents([]);
-        setPastEvents([]);
+        setOngoingEvents([]);
+        setUpcomingEvents([]);
+        setAttendedEvents([]);
       } finally {
         setLoading(false);
       }
@@ -183,8 +173,7 @@ export default function PortalHome() {
     (!user?.membership_expires_at ||
       new Date(user.membership_expires_at) > new Date());
 
-  const openEvent = (event: EventRow) =>
-    router.push(`/events/${event.slug}`);
+  const openEvent = (event: EventRow) => router.push(`/events/${event.slug}`);
 
   return (
     <div className="min-h-screen bg-linear-to-b from-background to-muted/20">
@@ -219,7 +208,8 @@ export default function PortalHome() {
             Hey, {firstName}!
           </h1>
           <p className="text-muted-foreground">
-            Here&apos;s what you&apos;re signed up for.
+            Welcome to the UBC UX Hub portal. Here you can view your registered
+            events.
           </p>
         </div>
 
@@ -233,42 +223,48 @@ export default function PortalHome() {
           </Button>
         </section>
 
-        {/* Registered Events */}
-        <section className="mb-12">
-          <div className="flex items-center gap-2 mb-6">
-            <CalendarDays className="h-5 w-5 text-muted-foreground" />
-            <h2 className="text-xl font-semibold">Registered Events</h2>
-            {!loading && registeredEvents.length > 0 && (
-              <span className="text-sm text-muted-foreground ml-1">
-                ({registeredEvents.length})
-              </span>
-            )}
-          </div>
-
-          {loading ? (
+        {loading ? (
+          <section className="mb-12">
             <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
               {[...Array(3)].map((_, i) => (
                 <EventCardSkeleton key={i} />
               ))}
             </div>
-          ) : registeredEvents.length === 0 ? (
-            <RegisteredEmptyState />
-          ) : (
-            <EventGrid events={registeredEvents} onSelect={openEvent} />
-          )}
-        </section>
+          </section>
+        ) : (
+          <>
+            {/* Ongoing Events */}
+            {ongoingEvents.length > 0 && (
+              <section className="mb-12">
+                <div className="flex items-center gap-2 mb-6">
+                  <Radio className="h-5 w-5 text-muted-foreground" />
+                  <h2 className="text-xl font-semibold">Ongoing Events</h2>
+                </div>
+                <EventGrid events={ongoingEvents} onSelect={openEvent} />
+              </section>
+            )}
 
-        {/* Past Events */}
-        {!loading && pastEvents.length > 0 && (
+            {/* Upcoming Events */}
+            {upcomingEvents.length > 0 && (
+              <section className="mb-12">
+                <div className="flex items-center gap-2 mb-6">
+                  <CalendarDays className="h-5 w-5 text-muted-foreground" />
+                  <h2 className="text-xl font-semibold">Upcoming Events</h2>
+                </div>
+                <EventGrid events={upcomingEvents} onSelect={openEvent} />
+              </section>
+            )}
+          </>
+        )}
+
+        {/* Attended Events */}
+        {!loading && attendedEvents.length > 0 && (
           <section className="mb-12">
             <div className="flex items-center gap-2 mb-6">
               <History className="h-5 w-5 text-muted-foreground" />
-              <h2 className="text-xl font-semibold">Past Events</h2>
-              <span className="text-sm text-muted-foreground ml-1">
-                ({pastEvents.length})
-              </span>
+              <h2 className="text-xl font-semibold">Attended Events</h2>
             </div>
-            <EventGrid events={pastEvents} onSelect={openEvent} />
+            <EventGrid events={attendedEvents} onSelect={openEvent} />
           </section>
         )}
       </main>
