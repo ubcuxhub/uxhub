@@ -76,7 +76,7 @@ export default async function EventCheckoutPage({
     <div className="container mx-auto max-w-6xl px-4 py-10">
       <div className="mb-6">
         <Button variant="outline" asChild>
-          <Link href="/portal/events">Back to Events</Link>
+          <Link href="/portal">Back to portal homepage</Link>
         </Button>
       </div>
 

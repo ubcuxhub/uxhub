@@ -70,8 +70,8 @@ export default function EventDetailPage() {
           <CardContent>
             <p className="text-destructive">{error}</p>
             <BackButton
-              link="/portal/events"
-              label="Back to Events"
+              link="/portal"
+              label="Back to portal homepage"
               className="mt-4"
             />
           </CardContent>
@@ -86,7 +86,7 @@ export default function EventDetailPage() {
 
   return (
     <div className="container mx-auto max-w-7xl space-y-6 py-10">
-      <BackButton link="/portal/events" label="Back to Events" />
+      <BackButton link="/portal" label="Back to portal homepage" />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <div className="space-y-6">

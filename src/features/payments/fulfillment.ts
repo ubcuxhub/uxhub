@@ -224,7 +224,7 @@ async function revalidatePurchasePaths(purchaseId: string) {
   if (purchase.kind === "event_ticket" && purchase.event_id) {
     const event = await fetchEventById(adminDb, purchase.event_id);
 
-    revalidatePath("/portal/events");
+    revalidatePath("/portal");
 
     if (event?.slug) {
       revalidatePath(`/portal/events/${event.slug}`);

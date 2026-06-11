@@ -232,7 +232,7 @@ export function useEventApplication(
 
       // Redirect after a short delay
       setTimeout(() => {
-        router.push("/portal/events");
+        router.push("/portal");
       }, 2000);
     } catch (err) {
       console.error("Error submitting application:", err);

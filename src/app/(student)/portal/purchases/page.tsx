@@ -44,7 +44,7 @@ export default async function PurchasesPage() {
           </p>
         </div>
         <Button asChild variant="outline">
-          <Link href="/portal/events">Back to Portal</Link>
+          <Link href="/portal">Back to Portal</Link>
         </Button>
       </div>
 
