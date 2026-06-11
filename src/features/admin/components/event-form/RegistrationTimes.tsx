@@ -5,7 +5,12 @@ import { CalendarIcon } from "lucide-react";
 
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   Popover,
@@ -51,6 +56,9 @@ const dateStringToDate = (value: string) => {
   return new Date(year, month - 1, day);
 };
 
+const isSameDate = (left: string, right: string) =>
+  Boolean(left && right && left === right);
+
 const dateToDateString = (date: Date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -65,15 +73,25 @@ const combineDateTimeLocal = (date: string, time: string) => {
   return `${date}T${time}`;
 };
 
+const isDateTimeRangeInvalid = (start: string, end: string) => {
+  if (!start || !end) return false;
+
+  return new Date(start) >= new Date(end);
+};
+
 const RegistrationDateTimeField = ({
   id,
   label,
   value,
+  minDate,
+  minTime,
   onChange,
 }: {
   id: keyof RegistrationTimesState;
   label: string;
   value: string;
+  minDate?: Date;
+  minTime?: string;
   onChange: (value: string) => void;
 }) => {
   const [open, setOpen] = useState(false);
@@ -103,6 +121,7 @@ const RegistrationDateTimeField = ({
             <Calendar
               mode="single"
               selected={selectedDate}
+              disabled={minDate ? { before: minDate } : undefined}
               onSelect={(newDate) => {
                 if (!newDate) return;
 
@@ -116,6 +135,7 @@ const RegistrationDateTimeField = ({
           id={`${id}_time`}
           type="time"
           value={time}
+          min={minTime}
           onChange={(event) =>
             onChange(combineDateTimeLocal(date, event.target.value))
           }
@@ -132,6 +152,19 @@ export const RegistrationTimes = ({
   registration_end_time,
   onFieldChange,
 }: RegistrationTimesProps) => {
+  const { date: startDateString } = splitDateTimeLocal(
+    registration_start_time
+  );
+  const { date: endDateString } = splitDateTimeLocal(registration_end_time);
+  const startDate = dateStringToDate(startDateString);
+  const minEndTime = isSameDate(startDateString, endDateString)
+    ? splitDateTimeLocal(registration_start_time).time
+    : undefined;
+  const hasInvalidRange = isDateTimeRangeInvalid(
+    registration_start_time,
+    registration_end_time
+  );
+
   return (
     <FieldGroup className="grid gap-4 md:grid-cols-2">
       <RegistrationDateTimeField
@@ -144,8 +177,15 @@ export const RegistrationTimes = ({
         id="registration_end_time"
         label="Registration End Time"
         value={registration_end_time}
+        minDate={startDate}
+        minTime={minEndTime}
         onChange={(value) => onFieldChange("registration_end_time", value)}
       />
+      {hasInvalidRange && (
+        <FieldError className="md:col-span-2">
+          Registration end time must be after the start time.
+        </FieldError>
+      )}
     </FieldGroup>
   );
 };

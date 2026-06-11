@@ -8,6 +8,7 @@ import { Calendar } from "@/components/ui/calendar";
 import {
   Field,
   FieldDescription,
+  FieldError,
   FieldGroup,
   FieldLabel,
   FieldLegend,
@@ -56,6 +57,9 @@ const dateStringToDate = (value: string) => {
   return new Date(year, month - 1, day);
 };
 
+const isSameDate = (left: string, right: string) =>
+  Boolean(left && right && left === right);
+
 const dateToDateString = (date: Date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -70,15 +74,25 @@ const combineDateTimeLocal = (date: string, time: string) => {
   return `${date}T${time}`;
 };
 
+const isDateTimeRangeInvalid = (start: string, end: string) => {
+  if (!start || !end) return false;
+
+  return new Date(start) >= new Date(end);
+};
+
 const CheckInDateTimeField = ({
   id,
   label,
   value,
+  minDate,
+  minTime,
   onChange,
 }: {
   id: string;
   label: string;
   value: string;
+  minDate?: Date;
+  minTime?: string;
   onChange: (value: string) => void;
 }) => {
   const [open, setOpen] = useState(false);
@@ -110,6 +124,7 @@ const CheckInDateTimeField = ({
             <Calendar
               mode="single"
               selected={selectedDate}
+              disabled={minDate ? { before: minDate } : undefined}
               onSelect={(newDate) => {
                 if (!newDate) return;
 
@@ -123,6 +138,7 @@ const CheckInDateTimeField = ({
           id={`${id}_time`}
           type="time"
           value={time}
+          min={minTime}
           onChange={(event) =>
             onChange(combineDateTimeLocal(date, event.target.value))
           }
@@ -161,49 +177,66 @@ export const CheckInEventsSection = ({
         </Button>
       </div>
       <FieldGroup className="gap-4">
-        {checkInEvents.map((item, index) => (
-          <FieldGroup
-            key={`check-in-${index}`}
-            className="grid gap-3 rounded-lg border p-4"
-          >
-            <Field>
-              <FieldLabel htmlFor={`check_name_${index}`}>
-                Name <span className="text-red-500">*</span>
-              </FieldLabel>
-              <Input
-                id={`check_name_${index}`}
-                value={item.name}
-                onChange={(e) => onUpdate(index, "name", e.target.value)}
-                required
-              />
-            </Field>
-            <div className="grid gap-3 md:grid-cols-2">
-              <CheckInDateTimeField
-                id={`check_start_time_${index}`}
-                label="Start Time"
-                value={item.start_time}
-                onChange={(value) => onUpdate(index, "start_time", value)}
-              />
-              <CheckInDateTimeField
-                id={`check_end_time_${index}`}
-                label="End Time"
-                value={item.end_time}
-                onChange={(value) => onUpdate(index, "end_time", value)}
-              />
-            </div>
-            <div className="flex justify-end">
-              <Button
-                type="button"
-                variant="ghost"
-                className="text-red-500 hover:text-red-600"
-                onClick={() => onRemove(index)}
-                disabled={checkInEvents.length === 1}
-              >
-                Remove
-              </Button>
-            </div>
-          </FieldGroup>
-        ))}
+        {checkInEvents.map((item, index) => {
+          const { date: startDateString, time: startTime } =
+            splitDateTimeLocal(item.start_time);
+          const { date: endDateString } = splitDateTimeLocal(item.end_time);
+          const startDate = dateStringToDate(startDateString);
+          const minEndTime = isSameDate(startDateString, endDateString)
+            ? startTime
+            : undefined;
+
+          return (
+            <FieldGroup
+              key={`check-in-${index}`}
+              className="grid gap-3 rounded-lg border p-4"
+            >
+              <Field>
+                <FieldLabel htmlFor={`check_name_${index}`}>
+                  Name <span className="text-red-500">*</span>
+                </FieldLabel>
+                <Input
+                  id={`check_name_${index}`}
+                  value={item.name}
+                  onChange={(e) => onUpdate(index, "name", e.target.value)}
+                  required
+                />
+              </Field>
+              <div className="grid gap-3 md:grid-cols-2">
+                <CheckInDateTimeField
+                  id={`check_start_time_${index}`}
+                  label="Start Time"
+                  value={item.start_time}
+                  onChange={(value) => onUpdate(index, "start_time", value)}
+                />
+                <CheckInDateTimeField
+                  id={`check_end_time_${index}`}
+                  label="End Time"
+                  value={item.end_time}
+                  minDate={startDate}
+                  minTime={minEndTime}
+                  onChange={(value) => onUpdate(index, "end_time", value)}
+                />
+              </div>
+              {isDateTimeRangeInvalid(item.start_time, item.end_time) && (
+                <FieldError>
+                  Check-in end time must be after the start time.
+                </FieldError>
+              )}
+              <div className="flex justify-end">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="text-red-500 hover:text-red-600"
+                  onClick={() => onRemove(index)}
+                  disabled={checkInEvents.length === 1}
+                >
+                  Remove
+                </Button>
+              </div>
+            </FieldGroup>
+          );
+        })}
       </FieldGroup>
     </FieldSet>
   );

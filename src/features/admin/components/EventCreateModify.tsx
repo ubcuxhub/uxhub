@@ -105,6 +105,44 @@ const defaultFormState: EventFormState = {
   created_at: "",
 };
 
+const PACIFIC_TIME_ZONE = "America/Los_Angeles";
+
+const getPacificStartDefaults = (): Pick<
+  EventFormState,
+  "start_date" | "start_time"
+> => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: PACIFIC_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date());
+
+  const valueFor = (type: string) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+
+  return {
+    start_date: `${valueFor("year")}-${valueFor("month")}-${valueFor("day")}`,
+    start_time: `${valueFor("hour")}:${valueFor("minute")}`,
+  };
+};
+
+const withPacificStartDefaults = (formState: EventFormState): EventFormState => {
+  const defaults = getPacificStartDefaults();
+
+  return {
+    ...formState,
+    start_date: formState.start_date || defaults.start_date,
+    start_time: formState.start_time || defaults.start_time,
+  };
+};
+
+const getInitialFormState = (): EventFormState =>
+  withPacificStartDefaults(defaultFormState);
+
 // Helper function to convert timestamptz to datetime-local format
 // Converts UTC timestamptz to local datetime-local string
 const timestamptzToDatetimeLocal = (timestamptz: string | null): string => {
@@ -129,6 +167,23 @@ const datetimeLocalToTimestamptz = (datetimeLocal: string): string | null => {
   return date.toISOString();
 };
 
+const isDateTimeRangeInvalid = (start: string, end: string) => {
+  if (!start || !end) return false;
+
+  return new Date(start) >= new Date(end);
+};
+
+const isEventScheduleRangeInvalid = (formState: EventFormState) => {
+  const { start_date, start_time, end_date, end_time } = formState;
+
+  if (!start_date || !start_time || !end_date || !end_time) return false;
+
+  return isDateTimeRangeInvalid(
+    `${start_date}T${start_time}`,
+    `${end_date}T${end_time}`
+  );
+};
+
 // Add a storage key constant after the defaultFormState
 const STORAGE_KEY = "event_create_form_draft";
 
@@ -143,7 +198,8 @@ export const EventCreateModify = ({
   const isInitialMount = useRef(true);
   const hasRestoredState = useRef(false);
 
-  const [formState, setFormState] = useState<EventFormState>(defaultFormState);
+  const [formState, setFormState] =
+    useState<EventFormState>(getInitialFormState);
   const [checkInEvents, setCheckInEvents] = useState<CheckInSessionDraft[]>([
     { name: "", start_time: "", end_time: "" },
   ]);
@@ -183,7 +239,14 @@ export const EventCreateModify = ({
           const parsed = JSON.parse(saved);
           // Defer state updates to avoid cascading renders
           setTimeout(() => {
-            setFormState(parsed.formState || defaultFormState);
+            setFormState(
+              parsed.formState
+                ? withPacificStartDefaults({
+                    ...defaultFormState,
+                    ...parsed.formState,
+                  })
+                : getInitialFormState()
+            );
             setCheckInEvents(
               parsed.checkInEvents || [
                 { name: "", start_time: "", end_time: "" },
@@ -529,12 +592,27 @@ export const EventCreateModify = ({
     if (Number.isNaN(Number(formState.member_price)))
       return "Member price must be a valid number.";
     if (!formState.max_capacity) return "Max capacity is required.";
+    if (isEventScheduleRangeInvalid(formState))
+      return "Event end time must be after the start time.";
+    if (
+      isDateTimeRangeInvalid(
+        formState.registration_start_time,
+        formState.registration_end_time
+      )
+    )
+      return "Registration end time must be after the start time.";
     if (
       !checkInEvents.every(
         (item) => item.name && item.start_time && item.end_time
       )
     )
       return "All check-in sessions require name, start time, and end time.";
+    if (
+      checkInEvents.some((item) =>
+        isDateTimeRangeInvalid(item.start_time, item.end_time)
+      )
+    )
+      return "Check-in end time must be after the start time.";
 
     // Validate application questions and track errors per question
     const newQuestionErrors: Record<number, string> = {};
