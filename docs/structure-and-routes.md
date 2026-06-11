@@ -176,10 +176,11 @@ uxhub/
 ```text
 /
 /events
+/events/[slug]
 /under-construction
 ```
 
-There are currently no separate public `/about`, `/team`, `/contact`, `/membership`, or public event-detail routes.
+`/events/[slug]` is a stub public event-detail page (event title + "under construction") that homepage and portal event cards link to. There are currently no separate public `/about`, `/team`, `/contact`, or `/membership` routes.
 
 ### Auth - `(auth)`
 
@@ -197,7 +198,6 @@ There are currently no separate public `/about`, `/team`, `/contact`, `/membersh
 
 ```text
 /portal
-/portal/events/[event]
 /portal/events/[event]/checkout
 /portal/membership
 /portal/membership/[membership]
@@ -209,8 +209,8 @@ There are currently no separate public `/about`, `/team`, `/contact`, `/membersh
 
 Notes:
 
-- `/portal` is the personalized student dashboard: registered events (purchased, upcoming), past events, a link to the public `/events` page, and a "become a member" banner for non-members.
-- `[event]` is treated as an event slug in student-facing routes.
+- `/portal` is the personalized student dashboard: registered events (purchased, upcoming), past events, a link to the public `/events` page, and a "become a member" banner for non-members. Event cards link to the public `/events/[slug]` detail page.
+- `[event]` is treated as an event slug in student-facing routes. The portal keeps only the `/portal/events/[event]/checkout` route; there is no portal event-detail page.
 - `/portal/membership/[membership]` is a legacy ID route that looks up the membership type by ID and redirects to `/portal/membership/[slug]/checkout`.
 - There is no checkout confirmation route at the moment.
 

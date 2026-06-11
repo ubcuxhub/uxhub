@@ -184,7 +184,7 @@ export default function PortalHome() {
       new Date(user.membership_expires_at) > new Date());
 
   const openEvent = (event: EventRow) =>
-    router.push(`/portal/events/${event.slug}`);
+    router.push(`/events/${event.slug}`);
 
   return (
     <div className="min-h-screen bg-linear-to-b from-background to-muted/20">

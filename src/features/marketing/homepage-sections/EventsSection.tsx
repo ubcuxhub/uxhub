@@ -92,6 +92,7 @@ const EventsSection: React.FC = () => {
                 imageAlt={event.name || "Event Image"}
                 buttonText={index % 2 === 0 ? "office tour" : "competition"}
                 buttonIcon={index % 2 === 0 ? triangleIcon : starIcon}
+                href={`/events/${event.slug}`}
               />
               {index < events.length - 1 && (
                 <div className="md:w-[5%] h-8" aria-hidden="true"></div>

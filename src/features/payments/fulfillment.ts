@@ -227,7 +227,7 @@ async function revalidatePurchasePaths(purchaseId: string) {
     revalidatePath("/portal");
 
     if (event?.slug) {
-      revalidatePath(`/portal/events/${event.slug}`);
+      revalidatePath(`/events/${event.slug}`);
       revalidatePath(`/portal/events/${event.slug}/checkout`);
     }
   }

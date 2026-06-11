@@ -63,6 +63,7 @@ pnpm start
 ```text
 /
 /events
+/events/[slug]
 /under-construction
 
 /auth/login
@@ -74,7 +75,6 @@ pnpm start
 /auth/confirm
 
 /portal
-/portal/events/[event]
 /portal/events/[event]/checkout
 /portal/membership
 /portal/membership/[membership]
