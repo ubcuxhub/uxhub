@@ -43,6 +43,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+} from "@/components/ui/field";
 import { BasicEventInfo } from "./event-form/BasicEventInfo";
 import { EventPricing } from "./event-form/EventPricing";
 import { EventLocation } from "./event-form/EventLocation";
@@ -1147,9 +1152,17 @@ export const EventCreateModify = ({
               onResponseTypeChange={handleResponseTypeChange}
             />
 
-            {error && <p className="text-sm text-red-500">{error}</p>}
+            {error && (
+              <Field data-invalid>
+                <FieldError>{error}</FieldError>
+              </Field>
+            )}
             {successMessage && (
-              <p className="text-sm text-green-600">{successMessage}</p>
+              <Field>
+                <FieldDescription className="text-green-600">
+                  {successMessage}
+                </FieldDescription>
+              </Field>
             )}
 
             <CardFooter className="px-0 flex gap-2">

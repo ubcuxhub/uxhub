@@ -1,5 +1,5 @@
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 
 interface EventPricingProps {
   regular_price: string;
@@ -21,11 +21,11 @@ export const EventPricing = ({
   onFieldChange,
 }: EventPricingProps) => {
   return (
-    <section className="grid gap-4 md:grid-cols-2">
-      <div className="grid gap-2">
-        <Label htmlFor="regular_price">
+    <FieldGroup className="grid gap-4 md:grid-cols-2">
+      <Field>
+        <FieldLabel htmlFor="regular_price">
           Regular Price <span className="text-red-500">*</span>
-        </Label>
+        </FieldLabel>
         <Input
           id="regular_price"
           type="number"
@@ -35,11 +35,11 @@ export const EventPricing = ({
           onChange={(e) => onFieldChange("regular_price", e.target.value)}
           required
         />
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor="member_price">
+      </Field>
+      <Field>
+        <FieldLabel htmlFor="member_price">
           Member Price <span className="text-red-500">*</span>
-        </Label>
+        </FieldLabel>
         <Input
           id="member_price"
           type="number"
@@ -49,8 +49,8 @@ export const EventPricing = ({
           onChange={(e) => onFieldChange("member_price", e.target.value)}
           required
         />
-      </div>
-    </section>
+      </Field>
+    </FieldGroup>
   );
 };
 

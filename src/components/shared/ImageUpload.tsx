@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useRef, useEffect, DragEvent, ChangeEvent } from "react";
-import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { Spinner } from "@/components/ui/spinner";
 import Image from "next/image";
 interface ImageUploadProps {
   value?: string;
@@ -132,8 +133,8 @@ export const ImageUpload = ({
   };
 
   return (
-    <div className="grid gap-2">
-      <Label htmlFor="image_upload">Image Cover for the Event</Label>
+    <Field data-invalid={!!error}>
+      <FieldLabel htmlFor="image_upload">Image Cover for the Event</FieldLabel>
       <div
         className={`relative border-2 border-dashed rounded-lg p-6 transition-colors ${
           isDragging
@@ -157,7 +158,7 @@ export const ImageUpload = ({
 
         {isUploading ? (
           <div className="flex flex-col items-center justify-center gap-2">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <Spinner size="lg" />
             <p className="text-sm text-muted-foreground">Uploading...</p>
           </div>
         ) : preview ? (
@@ -213,8 +214,8 @@ export const ImageUpload = ({
           </div>
         )}
       </div>
-      {error && <p className="text-sm text-red-500">{error}</p>}
-    </div>
+      <FieldError>{error}</FieldError>
+    </Field>
   );
 };
 

@@ -1,5 +1,18 @@
-import { Label } from "@/components/ui/label";
+"use client";
+
+import { useState } from "react";
+import { CalendarIcon } from "lucide-react";
+
+import { Calendar } from "@/components/ui/calendar";
+import { Button } from "@/components/ui/button";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 interface EventScheduleProps {
   start_date: string;
@@ -19,6 +32,74 @@ export interface EventScheduleState {
   end_time: string;
 }
 
+const dateFormatter = new Intl.DateTimeFormat("en-US", {
+  dateStyle: "medium",
+});
+
+const dateStringToDate = (value: string) => {
+  if (!value) return undefined;
+
+  const [year, month, day] = value.split("-").map(Number);
+
+  if (!year || !month || !day) return undefined;
+
+  return new Date(year, month - 1, day);
+};
+
+const dateToDateString = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+};
+
+const DatePickerButton = ({
+  id,
+  value,
+  placeholder,
+  onChange,
+}: {
+  id: string;
+  value: string;
+  placeholder: string;
+  onChange: (value: string) => void;
+}) => {
+  const [open, setOpen] = useState(false);
+  const selectedDate = dateStringToDate(value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          id={id}
+          type="button"
+          variant="outline"
+          className={cn(
+            "w-full justify-start text-left font-normal",
+            !selectedDate && "text-muted-foreground"
+          )}
+        >
+          <CalendarIcon data-icon="inline-start" />
+          {selectedDate ? dateFormatter.format(selectedDate) : placeholder}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="single"
+          selected={selectedDate}
+          onSelect={(date) => {
+            if (!date) return;
+
+            onChange(dateToDateString(date));
+            setOpen(false);
+          }}
+        />
+      </PopoverContent>
+    </Popover>
+  );
+};
+
 export const EventSchedule = ({
   start_date,
   start_time,
@@ -27,44 +108,44 @@ export const EventSchedule = ({
   onFieldChange,
 }: EventScheduleProps) => {
   return (
-    <section className="grid gap-4 md:grid-cols-2">
-      <div className="grid gap-2">
-        <Label htmlFor="start_date">Start Date</Label>
-        <Input
+    <FieldGroup className="grid gap-4 md:grid-cols-2">
+      <Field>
+        <FieldLabel htmlFor="start_date">Start Date</FieldLabel>
+        <DatePickerButton
           id="start_date"
-          type="date"
           value={start_date}
-          onChange={(e) => onFieldChange("start_date", e.target.value)}
+          placeholder="Pick a start date"
+          onChange={(value) => onFieldChange("start_date", value)}
         />
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor="start_time">Start Time</Label>
+      </Field>
+      <Field>
+        <FieldLabel htmlFor="start_time">Start Time</FieldLabel>
         <Input
           id="start_time"
           type="time"
           value={start_time}
           onChange={(e) => onFieldChange("start_time", e.target.value)}
         />
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor="end_date">End Date</Label>
-        <Input
+      </Field>
+      <Field>
+        <FieldLabel htmlFor="end_date">End Date</FieldLabel>
+        <DatePickerButton
           id="end_date"
-          type="date"
           value={end_date}
-          onChange={(e) => onFieldChange("end_date", e.target.value)}
+          placeholder="Pick an end date"
+          onChange={(value) => onFieldChange("end_date", value)}
         />
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor="end_time">End Time</Label>
+      </Field>
+      <Field>
+        <FieldLabel htmlFor="end_time">End Time</FieldLabel>
         <Input
           id="end_time"
           type="time"
           value={end_time}
           onChange={(e) => onFieldChange("end_time", e.target.value)}
         />
-      </div>
-    </section>
+      </Field>
+    </FieldGroup>
   );
 };
 
