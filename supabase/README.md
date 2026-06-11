@@ -58,17 +58,17 @@ Do these steps in order:
 Start here when a schema edit breaks something — find the table, open the
 helper file, and fix it in one place.
 
-| Table                          | Helper file                                          |
-| ------------------------------ | ---------------------------------------------------- |
-| `events`                       | `src/lib/supabase-helpers/events.ts`                 |
-| `event_registrations`          | `src/lib/supabase-helpers/event-registrations.ts`    |
-| `event_application_questions`  | `src/lib/supabase-helpers/event-applications.ts`     |
-| `event_application_responses`  | `src/lib/supabase-helpers/event-applications.ts`     |
-| `check_in_sessions`            | `src/lib/supabase-helpers/check-ins.ts`              |
-| `check_ins`                    | `src/lib/supabase-helpers/check-ins.ts`              |
-| `user_info`                    | `src/lib/supabase-helpers/users.ts`                  |
-| `membership_types`             | `src/lib/supabase-helpers/memberships.ts`            |
-| `user_info` (service-role)     | `src/lib/supabase-helpers/admin-server.ts`           |
+| Table                         | Helper file                                       |
+| ----------------------------- | ------------------------------------------------- |
+| `events`                      | `src/lib/supabase-helpers/events.ts`              |
+| `event_registrations`         | `src/lib/supabase-helpers/event-registrations.ts` |
+| `event_application_questions` | `src/lib/supabase-helpers/event-applications.ts`  |
+| `event_application_responses` | `src/lib/supabase-helpers/event-applications.ts`  |
+| `check_in_sessions`           | `src/lib/supabase-helpers/check-ins.ts`           |
+| `check_ins`                   | `src/lib/supabase-helpers/check-ins.ts`           |
+| `user_info`                   | `src/lib/supabase-helpers/users.ts`               |
+| `membership_types`            | `src/lib/supabase-helpers/memberships.ts`         |
+| `user_info` (service-role)    | `src/lib/supabase-helpers/admin-server.ts`        |
 
 Supporting files:
 
@@ -121,3 +121,5 @@ strings the compiler cannot validate. A rename here breaks silently at runtime:
   backfill, update helpers, then drop the old column in a later migration. This
   reduces branch conflicts and deployment risk.
 - Don't mix `supabase db pull` and `supabase db push` in the same workflow.
+
+test
