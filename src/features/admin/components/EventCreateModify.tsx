@@ -480,7 +480,7 @@ export const EventCreateModify = ({
           loadedApplicationTemplate = questionsData.map((q) => ({
             question: q.question ?? "",
             response: (q.response_type as ResponseType) ?? ResponseType.text,
-            max_char_limit: q.max_char_limit ?? 0,
+            max_char_limit: q.max_char_limit ?? "",
             response_options: q.response_options ?? [],
           }));
         }
@@ -582,7 +582,9 @@ export const EventCreateModify = ({
               ...question,
               [field]:
                 field === "max_char_limit"
-                  ? Number(value)
+                  ? value === ""
+                    ? ""
+                    : Number(value)
                   : field === "response_options"
                   ? (value as string[])
                   : (value as string | ResponseType),
@@ -649,7 +651,7 @@ export const EventCreateModify = ({
       {
         question: "",
         response: ResponseType.text,
-        max_char_limit: 0,
+        max_char_limit: "",
         response_options: [],
       },
     ]);
@@ -684,8 +686,8 @@ export const EventCreateModify = ({
                     response_options: q.response_options || [],
                   }
                 : {}),
-              ...(newResponseType === ResponseType.text && q.max_char_limit <= 0
-                ? { max_char_limit: 100 }
+              ...(newResponseType === ResponseType.text && !q.max_char_limit
+                ? { max_char_limit: "" }
                 : {}),
             }
           : q
@@ -734,7 +736,10 @@ export const EventCreateModify = ({
           newQuestionErrors[i] = "Question is required.";
         } else {
           if (item.response === ResponseType.text) {
-            if (item.max_char_limit <= 0) {
+            if (
+              item.max_char_limit !== "" &&
+              item.max_char_limit <= 0
+            ) {
               newQuestionErrors[i] =
                 "Text response questions require a maximum character limit greater than 0.";
             }
@@ -987,7 +992,8 @@ export const EventCreateModify = ({
           };
 
           if (q.response === ResponseType.text) {
-            questionData.max_char_limit = q.max_char_limit;
+            questionData.max_char_limit =
+              q.max_char_limit === "" ? 5000 : q.max_char_limit;
           } else if (
             q.response === ResponseType.multi_select ||
             q.response === ResponseType.single_select

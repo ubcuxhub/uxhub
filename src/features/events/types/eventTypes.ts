@@ -24,6 +24,6 @@ export interface ApplicationQuestionResponse {
 export interface ApplicationQuestionTemplate {
   question: string;
   response: ResponseTypeValue;
-  max_char_limit: number;
+  max_char_limit: number | "";
   response_options?: string[];
 }

@@ -125,22 +125,21 @@ export const ApplicationQuestionsSection = ({
                   <FieldGroup className="grid gap-2 md:grid-cols-3">
                     <Field>
                       <FieldLabel htmlFor={`max_char_limit_${index}`}>
-                        Max Character Limit{" "}
-                        <span className="text-red-500">*</span>
+                        Max Character Limit
                       </FieldLabel>
                       <Input
                         id={`max_char_limit_${index}`}
                         type="number"
                         min="1"
+                        placeholder="5000"
                         value={question.max_char_limit}
                         onChange={(e) =>
                           onUpdate(
                             index,
                             "max_char_limit",
-                            Number(e.target.value)
+                            e.target.value === "" ? "" : Number(e.target.value)
                           )
                         }
-                        required
                         className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                       />
                     </Field>
