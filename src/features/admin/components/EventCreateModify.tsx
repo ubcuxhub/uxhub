@@ -86,6 +86,12 @@ interface EventFormState {
   created_at: string;
 }
 
+interface EventFormSnapshot {
+  formState: EventFormState;
+  checkInEvents: CheckInSessionDraft[];
+  applicationTemplate: ApplicationQuestionTemplate[];
+}
+
 const defaultFormState: EventFormState = {
   name: "",
   description: "",
@@ -184,6 +190,20 @@ const isEventScheduleRangeInvalid = (formState: EventFormState) => {
   );
 };
 
+const createFormSnapshot = (
+  formState: EventFormState,
+  checkInEvents: CheckInSessionDraft[],
+  applicationTemplate: ApplicationQuestionTemplate[]
+) =>
+  JSON.stringify({
+    formState,
+    checkInEvents,
+    applicationTemplate,
+  } satisfies EventFormSnapshot);
+
+const UNSAVED_CHANGES_MESSAGE =
+  "Changes may not be saved. Are you sure you want to leave?";
+
 // Add a storage key constant after the defaultFormState
 const STORAGE_KEY = "event_create_form_draft";
 
@@ -197,9 +217,18 @@ export const EventCreateModify = ({
   const router = useRouter();
   const isInitialMount = useRef(true);
   const hasRestoredState = useRef(false);
+  const initialFormState = useMemo(() => getInitialFormState(), []);
+  const cleanSnapshot = useRef(
+    createFormSnapshot(
+      initialFormState,
+      [{ name: "", start_time: "", end_time: "" }],
+      []
+    )
+  );
+  const bypassUnsavedChangesWarning = useRef(false);
 
   const [formState, setFormState] =
-    useState<EventFormState>(getInitialFormState);
+    useState<EventFormState>(initialFormState);
   const [checkInEvents, setCheckInEvents] = useState<CheckInSessionDraft[]>([
     { name: "", start_time: "", end_time: "" },
   ]);
@@ -215,6 +244,7 @@ export const EventCreateModify = ({
   );
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Restore state from sessionStorage on mount (only for new events)
   useEffect(() => {
@@ -284,6 +314,82 @@ export const EventCreateModify = ({
   }, [formState, checkInEvents, applicationTemplate, eventId]);
 
   useEffect(() => {
+    if (loadingEvent) return;
+
+    const currentSnapshot = createFormSnapshot(
+      formState,
+      checkInEvents,
+      applicationTemplate
+    );
+    setHasUnsavedChanges(currentSnapshot !== cleanSnapshot.current);
+  }, [formState, checkInEvents, applicationTemplate, loadingEvent]);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (bypassUnsavedChangesWarning.current) return;
+
+      event.preventDefault();
+      event.returnValue = UNSAVED_CHANGES_MESSAGE;
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [hasUnsavedChanges]);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+
+    const handleDocumentClick = (event: MouseEvent) => {
+      if (bypassUnsavedChangesWarning.current) return;
+      if (event.defaultPrevented || event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return;
+      }
+
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      const anchor = target.closest<HTMLAnchorElement>("a[href]");
+      if (
+        !anchor ||
+        anchor.target === "_blank" ||
+        anchor.hasAttribute("download")
+      ) {
+        return;
+      }
+
+      const href = anchor.getAttribute("href");
+      if (!href) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (!window.confirm(UNSAVED_CHANGES_MESSAGE)) return;
+
+      bypassUnsavedChangesWarning.current = true;
+
+      if (anchor.origin === window.location.origin) {
+        router.push(`${anchor.pathname}${anchor.search}${anchor.hash}`);
+      } else {
+        window.location.assign(anchor.href);
+      }
+    };
+
+    document.addEventListener("click", handleDocumentClick, { capture: true });
+
+    return () => {
+      document.removeEventListener("click", handleDocumentClick, {
+        capture: true,
+      });
+    };
+  }, [hasUnsavedChanges, router]);
+
+  useEffect(() => {
     const fetchExistingEvent = async () => {
       if (!eventId) return;
 
@@ -305,7 +411,7 @@ export const EventCreateModify = ({
         return;
       }
 
-      setFormState({
+      const loadedFormState: EventFormState = {
         name: data.name ?? "",
         description: data.description ?? "",
         regular_price:
@@ -335,25 +441,26 @@ export const EventCreateModify = ({
           data.registration_end_time
         ),
         created_at: data.created_at ?? "",
-      });
+      };
+      setFormState(loadedFormState);
 
       // Fetch check-in sessions from check_in_sessions table
+      let loadedCheckInEvents: CheckInSessionDraft[] = [
+        { name: "", start_time: "", end_time: "" },
+      ];
       try {
         const checkInSessionsData = await fetchCheckInSessions(
           supabase,
           eventId
         );
         if (checkInSessionsData.length > 0) {
-          setCheckInEvents(
-            checkInSessionsData.map((session) => ({
-              name: session.name ?? "",
-              start_time: timestamptzToDatetimeLocal(session.start_time),
-              end_time: timestamptzToDatetimeLocal(session.end_time),
-            }))
-          );
-        } else {
-          setCheckInEvents([{ name: "", start_time: "", end_time: "" }]);
+          loadedCheckInEvents = checkInSessionsData.map((session) => ({
+            name: session.name ?? "",
+            start_time: timestamptzToDatetimeLocal(session.start_time),
+            end_time: timestamptzToDatetimeLocal(session.end_time),
+          }));
         }
+        setCheckInEvents(loadedCheckInEvents);
       } catch (checkInSessionsError) {
         console.error(
           "Error fetching check-in sessions:",
@@ -363,28 +470,32 @@ export const EventCreateModify = ({
       }
 
       // Fetch application questions from event_application_questions table
+      let loadedApplicationTemplate: ApplicationQuestionTemplate[] = [];
       try {
         const questionsData = await fetchApplicationQuestions(
           supabase,
           eventId
         );
         if (questionsData.length > 0) {
-          setApplicationTemplate(
-            questionsData.map((q) => ({
-              question: q.question ?? "",
-              response: (q.response_type as ResponseType) ?? ResponseType.text,
-              max_char_limit: q.max_char_limit ?? 0,
-              response_options: q.response_options ?? [],
-            }))
-          );
-        } else {
-          setApplicationTemplate([]);
+          loadedApplicationTemplate = questionsData.map((q) => ({
+            question: q.question ?? "",
+            response: (q.response_type as ResponseType) ?? ResponseType.text,
+            max_char_limit: q.max_char_limit ?? 0,
+            response_options: q.response_options ?? [],
+          }));
         }
+        setApplicationTemplate(loadedApplicationTemplate);
       } catch (questionsError) {
         console.error("Error fetching application questions:", questionsError);
         setApplicationTemplate([]);
       }
 
+      cleanSnapshot.current = createFormSnapshot(
+        loadedFormState,
+        loadedCheckInEvents,
+        loadedApplicationTemplate
+      );
+      setHasUnsavedChanges(false);
       setLoadingEvent(false);
     };
 
@@ -901,6 +1012,12 @@ export const EventCreateModify = ({
       }
     }
 
+    cleanSnapshot.current = createFormSnapshot(
+      formState,
+      checkInEvents,
+      applicationTemplate
+    );
+    setHasUnsavedChanges(false);
     setSuccessMessage(
       eventId ? "Event updated successfully." : "Event created successfully."
     );
@@ -910,12 +1027,20 @@ export const EventCreateModify = ({
       if (typeof window !== "undefined") {
         sessionStorage.removeItem(STORAGE_KEY);
       }
-      setFormState(defaultFormState);
-      setCheckInEvents([{ name: "", start_time: "", end_time: "" }]);
+      const resetFormState = getInitialFormState();
+      const resetCheckInEvents = [{ name: "", start_time: "", end_time: "" }];
+      setFormState(resetFormState);
+      setCheckInEvents(resetCheckInEvents);
       setApplicationTemplate([]);
+      cleanSnapshot.current = createFormSnapshot(
+        resetFormState,
+        resetCheckInEvents,
+        []
+      );
     }
 
     if (onSuccess) {
+      bypassUnsavedChangesWarning.current = true;
       onSuccess(finalEventId);
     } else {
       router.refresh();
@@ -983,6 +1108,7 @@ export const EventCreateModify = ({
 
       // Success - redirect to events page
       setShowDeleteModal(false);
+      bypassUnsavedChangesWarning.current = true;
       router.push("/admin/events");
     } catch {
       setError("An unexpected error occurred while deleting the event.");
