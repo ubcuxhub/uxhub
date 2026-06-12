@@ -155,3 +155,38 @@ export async function fetchEventRegistrationsGroupedByUser(
 
   return Array.from(groupedMap.values());
 }
+
+export interface PurchaseHistoryItem {
+  id: string;
+  status: ApplicationStatus | null;
+  created_at: string | null;
+  event: {
+    name: string;
+    slug: string;
+    regular_price: number;
+    member_price: number;
+    start_date: string | null;
+    image_url: string | null;
+  } | null;
+}
+
+/**
+ * A user's event registrations with the related event details, newest first.
+ * Powers the "my purchase history" section on the profile page.
+ */
+export async function fetchPurchaseHistoryForUser(
+  supabase: DbClient,
+  userId: string
+): Promise<PurchaseHistoryItem[]> {
+  const { data, error } = await supabase
+    .from(TABLES.eventRegistrations)
+    .select(
+      `id, status, created_at,
+       event:events!event_id(name, slug, regular_price, member_price, start_date, image_url)`
+    )
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []) as unknown as PurchaseHistoryItem[];
+}
