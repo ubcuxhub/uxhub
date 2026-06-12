@@ -147,16 +147,32 @@ export async function ensureUserInfo(
       membership_type: "NonUbc",
       role_access: "basic",
     })
-    .select("auth_user_id")
+    .select("id")
     .single();
 
   if (createError) {
     // Unique constraint violation - record already exists, reuse session id
     if (createError.code === "23505") {
+      const { data: existingAfterConflict, error: refetchError } = await supabase
+        .from(TABLES.userInfo)
+        .select("id")
+        .eq("auth_user_id", sessionUserId)
+        .maybeSingle();
+
+      if (refetchError) {
+        throw new Error(
+          `Failed to reload your profile after a duplicate record was detected: ${refetchError.message}`
+        );
+      }
+
+      if (existingAfterConflict?.id) {
+        return existingAfterConflict.id;
+      }
+
       return sessionUserId;
     }
     throw new Error(`Failed to set up your profile: ${createError.message}`);
   }
 
-  return newUserInfo?.auth_user_id || sessionUserId;
+  return newUserInfo?.id || sessionUserId;
 }

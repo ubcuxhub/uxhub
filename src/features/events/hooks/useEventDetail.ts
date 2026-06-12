@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { fetchEventById } from "@/lib/supabase-helpers/events";
+import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
 import { fetchApplicationQuestions } from "@/lib/supabase-helpers/event-applications";
 import { fetchUserRegistrationId } from "@/lib/supabase-helpers/event-registrations";
 import {
@@ -22,7 +22,7 @@ interface UseEventDetailResult {
 }
 
 export function useEventDetail(
-  eventId: string | undefined,
+  eventSlug: string | undefined,
   user: UserInfoRow | null,
   userLoading: boolean
 ): UseEventDetailResult {
@@ -35,7 +35,7 @@ export function useEventDetail(
   const [registrationId, setRegistrationId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!eventId || userLoading) return;
+    if (!eventSlug || userLoading) return;
 
     const fetchEventData = async () => {
       setLoading(true);
@@ -43,7 +43,7 @@ export function useEventDetail(
 
       try {
         // Fetch event
-        const eventData = await fetchEventById(supabase, eventId);
+        const eventData = await fetchEventBySlug(supabase, eventSlug);
 
         if (!eventData) {
           setError("Event not found");
@@ -57,7 +57,7 @@ export function useEventDetail(
         try {
           const questionsData = await fetchApplicationQuestions(
             supabase,
-            eventId
+            eventData.id
           );
           if (questionsData.length > 0) {
             const formattedQuestions: ApplicationQuestionTemplate[] =
@@ -78,12 +78,12 @@ export function useEventDetail(
         }
 
         // Check if user has already applied
-        if (user?.auth_user_id) {
+        if (user?.id) {
           try {
             const existingRegistrationId = await fetchUserRegistrationId(
               supabase,
-              eventId,
-              user.auth_user_id
+              eventData.id,
+              user.id
             );
             if (existingRegistrationId) {
               setHasApplied(true);
@@ -103,7 +103,7 @@ export function useEventDetail(
     };
 
     fetchEventData();
-  }, [eventId, user?.auth_user_id, userLoading, supabase]);
+  }, [eventSlug, user?.id, userLoading, supabase]);
 
   return {
     event,

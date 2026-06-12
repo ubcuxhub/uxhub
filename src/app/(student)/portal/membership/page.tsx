@@ -45,10 +45,18 @@ export default function MembershipsPage() {
     return <div>Loading memberships...</div>;
   }
 
+  const membershipExpiryLabel = user.membership_expires_at
+    ? new Date(user.membership_expires_at).toLocaleDateString("en-CA", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    : null;
+
   // Determine if a user can purchase a specific tier
   const canPurchase = (tierName: string): boolean => {
     // If user already has a membership, they cannot purchase any
-    if (user.membership_type_id) {
+    if (user.membership_type_id || user.membership_pre_ordered_type_id) {
       return false;
     }
 
@@ -132,7 +140,9 @@ export default function MembershipsPage() {
                       }}
                     >
                     {isCurrent
-                      ? "Expires at..."
+                      ? membershipExpiryLabel
+                        ? `Active until ${membershipExpiryLabel}`
+                        : "Current Plan"
                       : isPurchasable
                       ? "Purchase"
                       : "Not Available"}
