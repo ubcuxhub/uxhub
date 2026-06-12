@@ -40,6 +40,20 @@ export async function fetchRegistrationsForEvent(
   return data ?? [];
 }
 
+/** Returns all event registrations for a given user. */
+export async function fetchRegistrationsForUser(
+  supabase: DbClient,
+  userId: string
+): Promise<EventRegistrationRow[]> {
+  const { data, error } = await supabase
+    .from(TABLES.eventRegistrations)
+    .select("*")
+    .eq("user_id", userId);
+
+  if (error) throw error;
+  return data ?? [];
+}
+
 /** Returns the registration id for a user/event pair, or null if none. */
 export async function fetchUserRegistrationId(
   supabase: DbClient,

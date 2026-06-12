@@ -63,7 +63,7 @@ export function SignUpForm({
         email: normalizedEmail,
         password: formData.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/portal/events`,
+          emailRedirectTo: `${window.location.origin}/portal`,
           data: {
             full_name: formData.name,
           },

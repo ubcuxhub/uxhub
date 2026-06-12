@@ -2,15 +2,17 @@
 
 This file provides guidance to Claude Code when working in this repository.
 
+If you make a major edit, always make sure this file is up to date. Also make sure @docs/structure-and-routes.md is up to date.
+
 ## Project Overview
 
-UX Hub is a single Next.js application at the repository root. It contains:
+UX Hub is a single Next.js application using the App Router under `src/app`. It contains:
 
-- Public marketing homepage at `/`
+- Public marketing routes at `/`, `/events`, and `/under-construction`
 - Student portal under `/portal/*`
 - Admin portal under `/admin/*`
 - Auth pages under `/auth/*`
-- API routes under `/api/*`
+- API routes for callbacks, integrations, user linking, and uploads under `/api/*`
 
 The app uses Next.js 16, React 19, TypeScript, Tailwind CSS 4, Supabase, Square, and the Babel React Compiler.
 
@@ -29,28 +31,73 @@ pnpm start
 - `src/app` - Next.js App Router routes
   - `(marketing)` - public marketing routes
   - `(student)/portal` - authenticated student portal routes
-  - `admin` - admin routes
-  - `auth` - auth routes
-  - `api` - server API routes and callbacks
+  - `(admin)/admin` - admin-gated routes
+  - `(auth)/auth` - auth routes
+  - `api` - server route handlers and callbacks
 - `src/features` - domain logic and feature UI
   - `marketing` - ported homepage components, sections, data, and types
   - `events` - event browsing, details, applications, and event UI
   - `memberships` - membership checkout and related types
   - `auth` - auth components and user types
-  - `admin` - admin UI, queries, and types
+  - `admin` - admin UI and types
+  - `payments` - Square checkout actions, schemas, fulfillment, and checkout UI
 - `src/components/ui` - shared shadcn-style primitives
 - `src/components/shared` - shared app composites
-- `src/lib` - Supabase clients, queries, constants, and utilities
+- `src/context` - current user context
+- `src/lib` - Supabase clients, typed helper boundary, auth guards, Square client, constants, and utilities
 - `public` - public marketing and portal assets
 - `supabase` - migrations and Supabase project files
 
 ## Important Patterns
 
-- Middleware refreshes Supabase sessions for `/portal/*`, `/admin/*`, and `/api/*`.
-- Route/page components handle authorization through the existing `ProtectedRoute` pattern.
+- `src/proxy.ts` refreshes Supabase sessions for `/portal/*`, `/admin/*`, and `/api/*`.
+- Route group layouts and server code handle authorization with `requireAuth()` and `requireAdmin()` from `src/lib/auth/guards.ts`.
+- Data access should go through typed helpers in `src/lib/supabase-helpers/`. Avoid scattering raw `supabase.from("...")` calls through pages and components.
+- Service-role access belongs in `src/lib/supabase/admin.ts` and `src/lib/supabase-helpers/admin-server.ts`.
 - Marketing styles are scoped through the `marketing-home` wrapper in `src/app/globals.css` so homepage fonts/colors do not leak into portal/admin UI.
 - Use the `@/*` path alias for imports from `src/*`.
-- Keep `/api` for callback/integration endpoints; prefer colocated feature functions for app-owned behavior.
+- Prefer server actions for app-owned mutations. Keep `/api` for callbacks/integrations and route-handler-specific needs such as Supabase email confirmation, Square webhooks, auth user linking, and event image upload.
+
+## Current Routes
+
+```text
+/
+/events
+/events/[slug]
+/under-construction
+
+/auth/login
+/auth/sign-up
+/auth/sign-up-success
+/auth/forgot-password
+/auth/update-password
+/auth/error
+/auth/confirm
+
+/portal
+/portal/events/[event]/checkout
+/portal/membership
+/portal/membership/[membership]
+/portal/membership/[membership]/checkout
+/portal/purchases
+/portal/purchases/[purchaseId]
+/portal/profile
+
+/admin
+/admin/events
+/admin/events/create-new
+/admin/events/[event]
+/admin/events/[event]/check-in
+/admin/events/[event]/review-applications
+/admin/events/[event]/review-applications/[registrationId]
+/admin/users
+
+/api/link-auth-user
+/api/upload-event-image
+/api/square/webhook
+```
+
+Student event routes use event slugs. Admin event routes currently use event IDs.
 
 ## Environment
 
