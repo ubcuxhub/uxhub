@@ -1,5 +1,5 @@
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
 
 interface EventLocationProps {
   location_building: string;
@@ -24,33 +24,35 @@ export const EventLocation = ({
   onFieldChange,
 }: EventLocationProps) => {
   return (
-    <section className="grid gap-4 md:grid-cols-2">
-      <div className="grid gap-2">
-        <Label htmlFor="location_building">Location Building</Label>
+    <FieldGroup className="grid gap-4 md:grid-cols-2">
+      <Field>
+        <FieldLabel htmlFor="location_building">Location Building</FieldLabel>
         <Input
           id="location_building"
           value={location_building}
           onChange={(e) => onFieldChange("location_building", e.target.value)}
         />
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor="location_room">Location Room</Label>
+      </Field>
+      <Field>
+        <FieldLabel htmlFor="location_room">Location Room</FieldLabel>
         <Input
           id="location_room"
           value={location_room}
           onChange={(e) => onFieldChange("location_room", e.target.value)}
         />
-      </div>
-      <div className="grid gap-2 md:col-span-2">
-        <Label htmlFor="location_address_url">Location Address URL</Label>
+      </Field>
+      <Field className="md:col-span-2">
+        <FieldLabel htmlFor="location_address_url">
+          Location Address URL
+        </FieldLabel>
         <Input
           id="location_address_url"
           type="url"
           value={location_address_url}
           onChange={(e) => onFieldChange("location_address_url", e.target.value)}
         />
-      </div>
-    </section>
+      </Field>
+    </FieldGroup>
   );
 };
 

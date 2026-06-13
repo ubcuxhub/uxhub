@@ -43,6 +43,11 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+} from "@/components/ui/field";
 import { BasicEventInfo } from "./event-form/BasicEventInfo";
 import { EventPricing } from "./event-form/EventPricing";
 import { EventLocation } from "./event-form/EventLocation";
@@ -81,6 +86,12 @@ interface EventFormState {
   created_at: string;
 }
 
+interface EventFormSnapshot {
+  formState: EventFormState;
+  checkInEvents: CheckInSessionDraft[];
+  applicationTemplate: ApplicationQuestionTemplate[];
+}
+
 const defaultFormState: EventFormState = {
   name: "",
   description: "",
@@ -99,6 +110,44 @@ const defaultFormState: EventFormState = {
   registration_end_time: "",
   created_at: "",
 };
+
+const PACIFIC_TIME_ZONE = "America/Los_Angeles";
+
+const getPacificStartDefaults = (): Pick<
+  EventFormState,
+  "start_date" | "start_time"
+> => {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: PACIFIC_TIME_ZONE,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date());
+
+  const valueFor = (type: string) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+
+  return {
+    start_date: `${valueFor("year")}-${valueFor("month")}-${valueFor("day")}`,
+    start_time: `${valueFor("hour")}:${valueFor("minute")}`,
+  };
+};
+
+const withPacificStartDefaults = (formState: EventFormState): EventFormState => {
+  const defaults = getPacificStartDefaults();
+
+  return {
+    ...formState,
+    start_date: formState.start_date || defaults.start_date,
+    start_time: formState.start_time || defaults.start_time,
+  };
+};
+
+const getInitialFormState = (): EventFormState =>
+  withPacificStartDefaults(defaultFormState);
 
 // Helper function to convert timestamptz to datetime-local format
 // Converts UTC timestamptz to local datetime-local string
@@ -124,6 +173,37 @@ const datetimeLocalToTimestamptz = (datetimeLocal: string): string | null => {
   return date.toISOString();
 };
 
+const isDateTimeRangeInvalid = (start: string, end: string) => {
+  if (!start || !end) return false;
+
+  return new Date(start) >= new Date(end);
+};
+
+const isEventScheduleRangeInvalid = (formState: EventFormState) => {
+  const { start_date, start_time, end_date, end_time } = formState;
+
+  if (!start_date || !start_time || !end_date || !end_time) return false;
+
+  return isDateTimeRangeInvalid(
+    `${start_date}T${start_time}`,
+    `${end_date}T${end_time}`
+  );
+};
+
+const createFormSnapshot = (
+  formState: EventFormState,
+  checkInEvents: CheckInSessionDraft[],
+  applicationTemplate: ApplicationQuestionTemplate[]
+) =>
+  JSON.stringify({
+    formState,
+    checkInEvents,
+    applicationTemplate,
+  } satisfies EventFormSnapshot);
+
+const UNSAVED_CHANGES_MESSAGE =
+  "Changes may not be saved. Are you sure you want to leave?";
+
 // Add a storage key constant after the defaultFormState
 const STORAGE_KEY = "event_create_form_draft";
 
@@ -137,21 +217,24 @@ export const EventCreateModify = ({
   const router = useRouter();
   const isInitialMount = useRef(true);
   const hasRestoredState = useRef(false);
+  const initialFormState = useMemo(() => getInitialFormState(), []);
+  const cleanSnapshot = useRef(
+    createFormSnapshot(
+      initialFormState,
+      [{ name: "", start_time: "", end_time: "" }],
+      []
+    )
+  );
+  const bypassUnsavedChangesWarning = useRef(false);
 
-  const [formState, setFormState] = useState<EventFormState>(defaultFormState);
+  const [formState, setFormState] =
+    useState<EventFormState>(initialFormState);
   const [checkInEvents, setCheckInEvents] = useState<CheckInSessionDraft[]>([
     { name: "", start_time: "", end_time: "" },
   ]);
   const [applicationTemplate, setApplicationTemplate] = useState<
     ApplicationQuestionTemplate[]
-  >([
-    {
-      question: "",
-      response: ResponseType.text,
-      max_char_limit: 0,
-      response_options: [],
-    },
-  ]);
+  >([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingEvent, setLoadingEvent] = useState(!!eventId);
   const [error, setError] = useState<string | null>(null);
@@ -161,6 +244,7 @@ export const EventCreateModify = ({
   );
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
   // Restore state from sessionStorage on mount (only for new events)
   useEffect(() => {
@@ -185,21 +269,21 @@ export const EventCreateModify = ({
           const parsed = JSON.parse(saved);
           // Defer state updates to avoid cascading renders
           setTimeout(() => {
-            setFormState(parsed.formState || defaultFormState);
+            setFormState(
+              parsed.formState
+                ? withPacificStartDefaults({
+                    ...defaultFormState,
+                    ...parsed.formState,
+                  })
+                : getInitialFormState()
+            );
             setCheckInEvents(
               parsed.checkInEvents || [
                 { name: "", start_time: "", end_time: "" },
               ]
             );
             setApplicationTemplate(
-              parsed.applicationTemplate || [
-                {
-                  question: "",
-                  response: ResponseType.text,
-                  max_char_limit: 0,
-                  response_options: [],
-                },
-              ]
+              parsed.applicationTemplate || []
             );
           }, 0);
         }
@@ -230,6 +314,82 @@ export const EventCreateModify = ({
   }, [formState, checkInEvents, applicationTemplate, eventId]);
 
   useEffect(() => {
+    if (loadingEvent) return;
+
+    const currentSnapshot = createFormSnapshot(
+      formState,
+      checkInEvents,
+      applicationTemplate
+    );
+    setHasUnsavedChanges(currentSnapshot !== cleanSnapshot.current);
+  }, [formState, checkInEvents, applicationTemplate, loadingEvent]);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (bypassUnsavedChangesWarning.current) return;
+
+      event.preventDefault();
+      event.returnValue = UNSAVED_CHANGES_MESSAGE;
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [hasUnsavedChanges]);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return;
+
+    const handleDocumentClick = (event: MouseEvent) => {
+      if (bypassUnsavedChangesWarning.current) return;
+      if (event.defaultPrevented || event.button !== 0) return;
+      if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+        return;
+      }
+
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+
+      const anchor = target.closest<HTMLAnchorElement>("a[href]");
+      if (
+        !anchor ||
+        anchor.target === "_blank" ||
+        anchor.hasAttribute("download")
+      ) {
+        return;
+      }
+
+      const href = anchor.getAttribute("href");
+      if (!href) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      if (!window.confirm(UNSAVED_CHANGES_MESSAGE)) return;
+
+      bypassUnsavedChangesWarning.current = true;
+
+      if (anchor.origin === window.location.origin) {
+        router.push(`${anchor.pathname}${anchor.search}${anchor.hash}`);
+      } else {
+        window.location.assign(anchor.href);
+      }
+    };
+
+    document.addEventListener("click", handleDocumentClick, { capture: true });
+
+    return () => {
+      document.removeEventListener("click", handleDocumentClick, {
+        capture: true,
+      });
+    };
+  }, [hasUnsavedChanges, router]);
+
+  useEffect(() => {
     const fetchExistingEvent = async () => {
       if (!eventId) return;
 
@@ -251,7 +411,7 @@ export const EventCreateModify = ({
         return;
       }
 
-      setFormState({
+      const loadedFormState: EventFormState = {
         name: data.name ?? "",
         description: data.description ?? "",
         regular_price:
@@ -281,25 +441,26 @@ export const EventCreateModify = ({
           data.registration_end_time
         ),
         created_at: data.created_at ?? "",
-      });
+      };
+      setFormState(loadedFormState);
 
       // Fetch check-in sessions from check_in_sessions table
+      let loadedCheckInEvents: CheckInSessionDraft[] = [
+        { name: "", start_time: "", end_time: "" },
+      ];
       try {
         const checkInSessionsData = await fetchCheckInSessions(
           supabase,
           eventId
         );
         if (checkInSessionsData.length > 0) {
-          setCheckInEvents(
-            checkInSessionsData.map((session) => ({
-              name: session.name ?? "",
-              start_time: timestamptzToDatetimeLocal(session.start_time),
-              end_time: timestamptzToDatetimeLocal(session.end_time),
-            }))
-          );
-        } else {
-          setCheckInEvents([{ name: "", start_time: "", end_time: "" }]);
+          loadedCheckInEvents = checkInSessionsData.map((session) => ({
+            name: session.name ?? "",
+            start_time: timestamptzToDatetimeLocal(session.start_time),
+            end_time: timestamptzToDatetimeLocal(session.end_time),
+          }));
         }
+        setCheckInEvents(loadedCheckInEvents);
       } catch (checkInSessionsError) {
         console.error(
           "Error fetching check-in sessions:",
@@ -309,42 +470,32 @@ export const EventCreateModify = ({
       }
 
       // Fetch application questions from event_application_questions table
+      let loadedApplicationTemplate: ApplicationQuestionTemplate[] = [];
       try {
         const questionsData = await fetchApplicationQuestions(
           supabase,
           eventId
         );
         if (questionsData.length > 0) {
-          setApplicationTemplate(
-            questionsData.map((q) => ({
-              question: q.question ?? "",
-              response: (q.response_type as ResponseType) ?? ResponseType.text,
-              max_char_limit: q.max_char_limit ?? 0,
-              response_options: q.response_options ?? [],
-            }))
-          );
-        } else {
-          setApplicationTemplate([
-            {
-              question: "",
-              response: ResponseType.text,
-              max_char_limit: 0,
-              response_options: [],
-            },
-          ]);
+          loadedApplicationTemplate = questionsData.map((q) => ({
+            question: q.question ?? "",
+            response: (q.response_type as ResponseType) ?? ResponseType.text,
+            max_char_limit: q.max_char_limit ?? "",
+            response_options: q.response_options ?? [],
+          }));
         }
+        setApplicationTemplate(loadedApplicationTemplate);
       } catch (questionsError) {
         console.error("Error fetching application questions:", questionsError);
-        setApplicationTemplate([
-          {
-            question: "",
-            response: ResponseType.text,
-            max_char_limit: 0,
-            response_options: [],
-          },
-        ]);
+        setApplicationTemplate([]);
       }
 
+      cleanSnapshot.current = createFormSnapshot(
+        loadedFormState,
+        loadedCheckInEvents,
+        loadedApplicationTemplate
+      );
+      setHasUnsavedChanges(false);
       setLoadingEvent(false);
     };
 
@@ -431,7 +582,9 @@ export const EventCreateModify = ({
               ...question,
               [field]:
                 field === "max_char_limit"
-                  ? Number(value)
+                  ? value === ""
+                    ? ""
+                    : Number(value)
                   : field === "response_options"
                   ? (value as string[])
                   : (value as string | ResponseType),
@@ -498,7 +651,7 @@ export const EventCreateModify = ({
       {
         question: "",
         response: ResponseType.text,
-        max_char_limit: 0,
+        max_char_limit: "",
         response_options: [],
       },
     ]);
@@ -533,8 +686,8 @@ export const EventCreateModify = ({
                     response_options: q.response_options || [],
                   }
                 : {}),
-              ...(newResponseType === ResponseType.text && q.max_char_limit <= 0
-                ? { max_char_limit: 100 }
+              ...(newResponseType === ResponseType.text && !q.max_char_limit
+                ? { max_char_limit: "" }
                 : {}),
             }
           : q
@@ -544,11 +697,6 @@ export const EventCreateModify = ({
 
   const validateForm = () => {
     if (!formState.name.trim()) return "Event name is required.";
-    if (!formState.start_date) return "Event start date is required.";
-    if (!formState.start_time) return "Event start time is required.";
-    // location_building and location_room are now optional
-    if (!formState.location_address_url.trim())
-      return "Location address URL is required.";
     if (!formState.description.trim()) return "Description is required.";
     if (!formState.regular_price.trim()) return "Regular price is required.";
     if (Number.isNaN(Number(formState.regular_price)))
@@ -557,12 +705,27 @@ export const EventCreateModify = ({
     if (Number.isNaN(Number(formState.member_price)))
       return "Member price must be a valid number.";
     if (!formState.max_capacity) return "Max capacity is required.";
+    if (isEventScheduleRangeInvalid(formState))
+      return "Event end time must be after the start time.";
+    if (
+      isDateTimeRangeInvalid(
+        formState.registration_start_time,
+        formState.registration_end_time
+      )
+    )
+      return "Registration end time must be after the start time.";
     if (
       !checkInEvents.every(
         (item) => item.name && item.start_time && item.end_time
       )
     )
       return "All check-in sessions require name, start time, and end time.";
+    if (
+      checkInEvents.some((item) =>
+        isDateTimeRangeInvalid(item.start_time, item.end_time)
+      )
+    )
+      return "Check-in end time must be after the start time.";
 
     // Validate application questions and track errors per question
     const newQuestionErrors: Record<number, string> = {};
@@ -573,7 +736,10 @@ export const EventCreateModify = ({
           newQuestionErrors[i] = "Question is required.";
         } else {
           if (item.response === ResponseType.text) {
-            if (item.max_char_limit <= 0) {
+            if (
+              item.max_char_limit !== "" &&
+              item.max_char_limit <= 0
+            ) {
               newQuestionErrors[i] =
                 "Text response questions require a maximum character limit greater than 0.";
             }
@@ -826,7 +992,8 @@ export const EventCreateModify = ({
           };
 
           if (q.response === ResponseType.text) {
-            questionData.max_char_limit = q.max_char_limit;
+            questionData.max_char_limit =
+              q.max_char_limit === "" ? 5000 : q.max_char_limit;
           } else if (
             q.response === ResponseType.multi_select ||
             q.response === ResponseType.single_select
@@ -851,6 +1018,12 @@ export const EventCreateModify = ({
       }
     }
 
+    cleanSnapshot.current = createFormSnapshot(
+      formState,
+      checkInEvents,
+      applicationTemplate
+    );
+    setHasUnsavedChanges(false);
     setSuccessMessage(
       eventId ? "Event updated successfully." : "Event created successfully."
     );
@@ -860,19 +1033,20 @@ export const EventCreateModify = ({
       if (typeof window !== "undefined") {
         sessionStorage.removeItem(STORAGE_KEY);
       }
-      setFormState(defaultFormState);
-      setCheckInEvents([{ name: "", start_time: "", end_time: "" }]);
-      setApplicationTemplate([
-        {
-          question: "",
-          response: ResponseType.text,
-          max_char_limit: 0,
-          response_options: [],
-        },
-      ]);
+      const resetFormState = getInitialFormState();
+      const resetCheckInEvents = [{ name: "", start_time: "", end_time: "" }];
+      setFormState(resetFormState);
+      setCheckInEvents(resetCheckInEvents);
+      setApplicationTemplate([]);
+      cleanSnapshot.current = createFormSnapshot(
+        resetFormState,
+        resetCheckInEvents,
+        []
+      );
     }
 
     if (onSuccess) {
+      bypassUnsavedChangesWarning.current = true;
       onSuccess(finalEventId);
     } else {
       router.refresh();
@@ -940,6 +1114,7 @@ export const EventCreateModify = ({
 
       // Success - redirect to events page
       setShowDeleteModal(false);
+      bypassUnsavedChangesWarning.current = true;
       router.push("/admin/events");
     } catch {
       setError("An unexpected error occurred while deleting the event.");
@@ -1187,9 +1362,17 @@ export const EventCreateModify = ({
               onResponseTypeChange={handleResponseTypeChange}
             />
 
-            {error && <p className="text-sm text-red-500">{error}</p>}
+            {error && (
+              <Field data-invalid>
+                <FieldError>{error}</FieldError>
+              </Field>
+            )}
             {successMessage && (
-              <p className="text-sm text-green-600">{successMessage}</p>
+              <Field>
+                <FieldDescription className="text-green-600">
+                  {successMessage}
+                </FieldDescription>
+              </Field>
             )}
 
             <CardFooter className="px-0 flex gap-2">
