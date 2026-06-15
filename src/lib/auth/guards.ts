@@ -27,7 +27,7 @@ export async function requireAuth(): Promise<UserInfoRow> {
   return userInfo;
 }
 
-export async function redirectIfAuthenticated(redirectTo = "/portal/events") {
+export async function redirectIfAuthenticated(redirectTo = "/portal") {
   const supabase = await createClient();
 
   const {

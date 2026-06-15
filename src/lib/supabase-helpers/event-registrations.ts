@@ -40,6 +40,20 @@ export async function fetchRegistrationsForEvent(
   return data ?? [];
 }
 
+/** Returns all event registrations for a given user. */
+export async function fetchRegistrationsForUser(
+  supabase: DbClient,
+  userId: string
+): Promise<EventRegistrationRow[]> {
+  const { data, error } = await supabase
+    .from(TABLES.eventRegistrations)
+    .select("*")
+    .eq("user_id", userId);
+
+  if (error) throw error;
+  return data ?? [];
+}
+
 /** Returns the registration id for a user/event pair, or null if none. */
 export async function fetchUserRegistrationId(
   supabase: DbClient,
@@ -55,6 +69,36 @@ export async function fetchUserRegistrationId(
 
   if (error) throw error;
   return data?.id ?? null;
+}
+
+export async function fetchUserRegistration(
+  supabase: DbClient,
+  eventId: string,
+  userId: string
+): Promise<EventRegistrationRow | null> {
+  const { data, error } = await supabase
+    .from(TABLES.eventRegistrations)
+    .select("*")
+    .eq("event_id", eventId)
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchEventRegistrationByPurchaseId(
+  supabase: DbClient,
+  purchaseId: string
+): Promise<EventRegistrationRow | null> {
+  const { data, error } = await supabase
+    .from(TABLES.eventRegistrations)
+    .select("*")
+    .eq("purchase_id", purchaseId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
 }
 
 export async function createEventRegistration(

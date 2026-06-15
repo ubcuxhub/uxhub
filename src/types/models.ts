@@ -17,6 +17,14 @@ export type MembershipTypeRow = Tables<"membership_types">;
 export type MembershipTypeInsert = TablesInsert<"membership_types">;
 export type MembershipTypeUpdate = TablesUpdate<"membership_types">;
 
+export type PurchaseRow = Tables<"purchases">;
+export type PurchaseInsert = TablesInsert<"purchases">;
+export type PurchaseUpdate = TablesUpdate<"purchases">;
+
+export type SquareWebhookEventRow = Tables<"square_webhook_events">;
+export type SquareWebhookEventInsert = TablesInsert<"square_webhook_events">;
+export type SquareWebhookEventUpdate = TablesUpdate<"square_webhook_events">;
+
 export type EventRegistrationRow = Tables<"event_registrations">;
 export type EventRegistrationInsert = TablesInsert<"event_registrations">;
 export type EventRegistrationUpdate = TablesUpdate<"event_registrations">;

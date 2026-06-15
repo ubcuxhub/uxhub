@@ -11,7 +11,9 @@ import {
 import { CheckoutSummaryCard } from "@/components/shared/CheckoutSummaryCard";
 import { requireAuth } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
+import { fetchApplicationQuestions } from "@/lib/supabase-helpers/event-applications";
 import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
+import { fetchUserRegistration } from "@/lib/supabase-helpers/event-registrations";
 
 function formatCurrency(amount: number) {
   return new Intl.NumberFormat("en-CA", {
@@ -51,15 +53,30 @@ export default async function EventCheckoutPage({
   const isMember = Boolean(user.membership_type_id);
   const price = isMember ? event.member_price : event.regular_price;
   const formattedPrice = formatCurrency(price);
+  const amountCents = Math.round(price * 100);
   const formattedMemberPrice = formatCurrency(event.member_price);
   const formattedRegularPrice = formatCurrency(event.regular_price);
   const formattedDate = formatDate(event.start_date);
+  const [applicationQuestions, existingRegistration] = await Promise.all([
+    fetchApplicationQuestions(supabase, event.id),
+    fetchUserRegistration(supabase, event.id, user.id),
+  ]);
+  const isDirectPurchaseEvent = applicationQuestions.length === 0;
+
+  let disabledMessage: string | null = null;
+
+  if (!isDirectPurchaseEvent) {
+    disabledMessage =
+      "This event uses an application flow and cannot be purchased directly.";
+  } else if (existingRegistration) {
+    disabledMessage = "You already have a registration for this event.";
+  }
 
   return (
     <div className="container mx-auto max-w-6xl px-4 py-10">
       <div className="mb-6">
         <Button variant="outline" asChild>
-          <Link href="/portal/events">Back to Events</Link>
+          <Link href="/portal">Back to portal homepage</Link>
         </Button>
       </div>
 
@@ -110,8 +127,16 @@ export default async function EventCheckoutPage({
         <div className="lg:sticky lg:top-6 lg:self-start">
           <CheckoutSummaryCard
             amount={formattedPrice}
+            amountCents={amountCents}
             description={`Review your ticket for ${event.name}.`}
-            buttonLabel="Checkout Coming Soon"
+            buttonLabel="Purchase Ticket"
+            disabled={!isDirectPurchaseEvent || Boolean(existingRegistration)}
+            disabledMessage={disabledMessage}
+            initialEmail={user.email}
+            initialName={user.name}
+            initialPhone={user.phone}
+            kind="event_ticket"
+            slug={event.slug}
           />
         </div>
       </div>
