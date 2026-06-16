@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import Navbar from "@/features/marketing/homepage-sections/Navbar";
 import Footer from "@/features/marketing/homepage-sections/Footer";
 import { createClient } from "@/lib/supabase/client";
@@ -50,8 +51,14 @@ export default function EventsPage() {
                                 })
                                 : null;
 
+                            const eventHref = `/events/${event.slug || event.id}`;
+
                             return (
-                                <div key={event.id} className="border border-gray-300 rounded-xl overflow-hidden shadow-sm bg-white">
+                                <Link
+                                    key={event.id}
+                                    href={eventHref}
+                                    className="border border-gray-300 rounded-xl overflow-hidden shadow-sm bg-white block hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
+                                >
                                     {event.image_url ? (
                                         <img src={event.image_url} alt={event.name} className="w-full h-48 object-cover" />
                                     ) : (
@@ -73,7 +80,7 @@ export default function EventsPage() {
                                         <h3 className="text-lg font-bold text-black mb-1">{event.name}</h3>
                                         <p className="text-gray-600 text-sm line-clamp-3">{event.description}</p>
                                     </div>
-                                </div>
+                                </Link>
                             );
                         })}
                     </div>
@@ -86,3 +93,4 @@ export default function EventsPage() {
         </main>
     );
 }
+
