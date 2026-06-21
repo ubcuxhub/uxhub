@@ -5,6 +5,8 @@ import Link from "next/link";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faChevronLeft } from "@fortawesome/free-solid-svg-icons";
 import { createClient } from "@/lib/supabase/client";
+import { fetchEvents } from "@/lib/supabase-helpers/events";
+import { TABLES } from "@/lib/supabase-helpers/tables";
 import type { EventRow } from "@/features/events/types/eventTypes";
 import { cn } from "@/lib/utils";
 import { Spinner } from "@/components/ui/spinner";
@@ -23,16 +25,11 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
   useEffect(() => {
     const supabase = createClient();
 
-    const fetchEvents = async () => {
+    const loadEvents = async () => {
       try {
         setIsLoadingEvents(true);
-        const { data, error } = await supabase
-          .from("events")
-          .select("*")
-          .order("start_date", { ascending: true });
-
-        if (error) throw error;
-        setEvents(data ?? []);
+        const data = await fetchEvents(supabase, { orderBy: "start_date" });
+        setEvents(data);
       } catch (err) {
         console.error("Error fetching events:", err);
       } finally {
@@ -41,7 +38,7 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
     };
 
     // Fetch on mount
-    fetchEvents();
+    loadEvents();
 
     // Set up realtime subscription
     const channel = supabase
@@ -51,11 +48,11 @@ export function AdminSidebar({ className }: AdminSidebarProps) {
         {
           event: "*", // Listen to all changes (INSERT, UPDATE, DELETE)
           schema: "public",
-          table: "events",
+          table: TABLES.events,
         },
         () => {
           // Refetch events when any change occurs
-          fetchEvents();
+          loadEvents();
         }
       )
       .subscribe();

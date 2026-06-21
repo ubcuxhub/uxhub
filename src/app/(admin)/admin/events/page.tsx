@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { EventCard, type EventRow } from "@/features/events";
 import { createClient } from "@/lib/supabase/client";
+import { fetchEvents } from "@/lib/supabase-helpers/events";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -15,27 +16,24 @@ const AdminEventsManager = () => {
 
   useEffect(() => {
     const supabase = createClient();
-    const fetchEvents = async () => {
+    const loadEvents = async () => {
       setIsLoading(true);
       setError(null);
 
-      const { data, error } = await supabase
-        .from("events")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      console.log(data);
-
-      if (error) {
-        setError(error.message);
-      } else {
-        setEvents(data ?? []);
+      try {
+        const data = await fetchEvents(supabase, {
+          orderBy: "created_at",
+          ascending: false,
+        });
+        setEvents(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Failed to load events");
+      } finally {
+        setIsLoading(false);
       }
-
-      setIsLoading(false);
     };
 
-    fetchEvents();
+    loadEvents();
   }, []);
 
   return (

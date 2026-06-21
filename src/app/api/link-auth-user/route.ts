@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SECRET_KEY!
-);
+import { supabaseAdmin } from "@/lib/supabase/admin";
+import {
+  adminFindUserInfoIdByEmail,
+  adminInsertUserInfo,
+  adminUpdateUserInfoByEmail,
+} from "@/lib/supabase-helpers/admin-server";
 
 export async function POST(req: Request) {
   const body = await req.json();
@@ -31,7 +31,7 @@ export async function POST(req: Request) {
     // 1. Verify the user actually exists in Supabase Auth
     // This handles cases where Supabase returns a fake user object for enumeration protection
     const { data: authUser, error: authError } =
-      await supabase.auth.admin.getUserById(authUserId);
+      await supabaseAdmin.auth.admin.getUserById(authUserId);
 
     if (authError || !authUser.user) {
       console.error(
@@ -48,42 +48,33 @@ export async function POST(req: Request) {
     }
 
     // 2. Check if user_info already exists for this email
-    const { data: existingUser } = await supabase
-      .from("user_info")
-      .select("id")
-      .eq("email", email.trim().toLowerCase())
-      .single();
+    const normalizedEmail = email.trim().toLowerCase();
+    const existingUser = await adminFindUserInfoIdByEmail(normalizedEmail);
 
     if (existingUser) {
       // Update existing record instead of inserting
-      const { data, error } = await supabase
-        .from("user_info")
-        .update({
-          auth_user_id: authUserId,
-          name: name,
-          phone: phone || null,
-          student_number: studentNumber ? parseInt(studentNumber) : null,
-          faculty: faculty || null,
-          major: major || null,
-          year: year || null,
-          newsletter: newsletter ? "true" : "false",
-          // Don't overwrite role_access or order_date if they might exist?
-          // For now, let's keep basic logic but ensure we link.
-          // role_access: "basic",
-        })
-        .eq("email", email.trim().toLowerCase())
-        .select();
+      const data = await adminUpdateUserInfoByEmail(normalizedEmail, {
+        auth_user_id: authUserId,
+        name: name,
+        phone: phone || null,
+        student_number: studentNumber ? parseInt(studentNumber) : null,
+        faculty: faculty || null,
+        major: major || null,
+        year: year || null,
+        newsletter: newsletter ? "true" : "false",
+        // Don't overwrite role_access or order_date if they might exist?
+        // For now, let's keep basic logic but ensure we link.
+        // role_access: "basic",
+      });
 
-      if (error) throw error;
       return NextResponse.json({ data });
     }
 
     // 3. Insert new record
-    const { data, error } = await supabase
-      .from("user_info")
-      .insert({
+    try {
+      const data = await adminInsertUserInfo({
         auth_user_id: authUserId,
-        email: email.trim().toLowerCase(),
+        email: normalizedEmail,
         name: name,
         phone: phone || null,
         student_number: studentNumber ? parseInt(studentNumber) : null,
@@ -94,15 +85,15 @@ export async function POST(req: Request) {
         role_access: "basic",
         order_date: new Date().toISOString(),
         membership_type: null,
-      })
-      .select();
+      });
 
-    if (error) {
-      console.error("Insert error:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ data });
+    } catch (insertErr) {
+      console.error("Insert error:", insertErr);
+      const message =
+        insertErr instanceof Error ? insertErr.message : "Insert failed";
+      return NextResponse.json({ error: message }, { status: 500 });
     }
-
-    return NextResponse.json({ data });
   } catch (err) {
     console.error("Server error in link-auth-user:", err);
     return NextResponse.json(

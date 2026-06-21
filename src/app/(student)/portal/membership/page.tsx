@@ -11,6 +11,7 @@ import {
   CardFooter,
 } from "@/components/ui/card";
 import { createClient } from "@/lib/supabase/client";
+import { fetchMembershipTypes } from "@/lib/supabase-helpers/memberships";
 import { useEffect, useState } from "react";
 import { useUser } from "@/context/UserContext";
 import { cn } from "@/lib/utils";
@@ -28,13 +29,8 @@ export default function MembershipsPage() {
     const fetchMembershipTiers = async () => {
       const supabase = createClient();
       try {
-        const { data, error } = await supabase
-          .from("membership_types")
-          .select("*")
-          .order("price", { ascending: true });
-
-        if (error) throw error;
-        setMembershipTiers(data || []);
+        const data = await fetchMembershipTypes(supabase, { orderBy: "price" });
+        setMembershipTiers(data);
       } catch (error) {
         console.error("Error fetching membership tiers:", error);
       } finally {
@@ -49,10 +45,18 @@ export default function MembershipsPage() {
     return <div>Loading memberships...</div>;
   }
 
+  const membershipExpiryLabel = user.membership_expires_at
+    ? new Date(user.membership_expires_at).toLocaleDateString("en-CA", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      })
+    : null;
+
   // Determine if a user can purchase a specific tier
   const canPurchase = (tierName: string): boolean => {
     // If user already has a membership, they cannot purchase any
-    if (user.membership_type_id) {
+    if (user.membership_type_id || user.membership_pre_ordered_type_id) {
       return false;
     }
 
@@ -128,15 +132,17 @@ export default function MembershipsPage() {
                   <Button
                     className="w-full"
                     variant={isCurrent ? "outline" : "default"}
-                    disabled={!isPurchasable}
-                    onClick={() => {
-                      if (!isCurrent) {
-                        router.push(`/portal/membership/${tier.id}`);
-                      }
-                    }}
-                  >
+                      disabled={!isPurchasable}
+                      onClick={() => {
+                        if (!isCurrent) {
+                          router.push(`/portal/membership/${tier.slug}/checkout`);
+                        }
+                      }}
+                    >
                     {isCurrent
-                      ? "Expires at..."
+                      ? membershipExpiryLabel
+                        ? `Active until ${membershipExpiryLabel}`
+                        : "Current Plan"
                       : isPurchasable
                       ? "Purchase"
                       : "Not Available"}

@@ -1,5 +1,6 @@
-import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Textarea } from "@/components/ui/textarea";
 import { ImageUpload } from "@/components/shared/ImageUpload";
 
 interface BasicEventInfoProps {
@@ -30,22 +31,22 @@ export const BasicEventInfo = ({
   onFieldChange,
 }: BasicEventInfoProps) => {
   return (
-    <section className="grid gap-4 md:grid-cols-2">
-      <div className="grid gap-2">
-        <Label htmlFor="name">
+    <FieldGroup className="grid gap-4 md:grid-cols-2">
+      <Field>
+        <FieldLabel htmlFor="name">
           Event Name <span className="text-red-500">*</span>
-        </Label>
+        </FieldLabel>
         <Input
           id="name"
           value={name}
           onChange={(e) => onFieldChange("name", e.target.value)}
           required
         />
-      </div>
-      <div className="grid gap-2">
-        <Label htmlFor="max_capacity">
+      </Field>
+      <Field>
+        <FieldLabel htmlFor="max_capacity">
           Max Capacity <span className="text-red-500">*</span>
-        </Label>
+        </FieldLabel>
         <Input
           id="max_capacity"
           type="number"
@@ -54,27 +55,27 @@ export const BasicEventInfo = ({
           onChange={(e) => onFieldChange("max_capacity", e.target.value)}
           required
         />
-      </div>
-      <div className="grid gap-2 md:col-span-2">
+      </Field>
+      <Field className="md:col-span-2">
         <ImageUpload
           value={image_url}
           onChange={(path) => onFieldChange("image_url", path)}
           eventName={name || "event"}
           disabled={isSubmitting}
         />
-      </div>
-      <div className="grid gap-2 md:col-span-2">
-        <Label htmlFor="description">
+      </Field>
+      <Field className="md:col-span-2">
+        <FieldLabel htmlFor="description">
           Description <span className="text-red-500">*</span>
-        </Label>
-        <textarea
+        </FieldLabel>
+        <Textarea
           id="description"
-          className="min-h-[120px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+          className="min-h-[120px]"
           value={description}
           onChange={(e) => onFieldChange("description", e.target.value)}
           required
         />
-      </div>
-    </section>
+      </Field>
+    </FieldGroup>
   );
 };

@@ -2,7 +2,6 @@
 import { FACULTIES, YEAR_LEVELS } from "@/lib/constants";
 import { useUser } from "@/context/UserContext";
 import { Button } from "@/components/ui/button";
-import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -14,9 +13,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useState, useEffect } from "react";
-import { Pencil } from "lucide-react";
+import { Pencil, Star } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { updateUserInfoById } from "@/lib/supabase-helpers/users";
+import {
+  fetchMembershipTypeById,
+  fetchMembershipTypes,
+} from "@/lib/supabase-helpers/memberships";
+import {
+  fetchPurchaseHistoryForUser,
+  type PurchaseHistoryItem,
+} from "@/lib/supabase-helpers/event-registrations";
+import { MembershipWizard } from "@/features/memberships";
 import { cn } from "@/lib/utils";
+import type { MembershipTypeRow } from "@/features/memberships";
 import type { UniversityYear, UserType } from "@/types/models";
 
 const supabase = createClient();
@@ -36,13 +46,34 @@ type ProfileFormData = {
   year: UniversityYear | "";
   dietary_restrictions: string;
   preferred_pronouns: string;
-  newsletter: boolean;
   user_type: UserType;
 };
 
+// Perks shown in the "Member benefits" card to non-members. Edit this list to
+// change the copy (placeholder content — replace with final wording).
+const MEMBER_BENEFITS = [
+  "Discounted tickets to UX Hub events and workshops",
+  "Priority access to UXathon, design sprints, and office tours",
+  "Members-only socials and networking nights",
+  "Access to the member resource library and Figma kits",
+];
+
+const formatPrice = (value: number) =>
+  new Intl.NumberFormat("en-CA", {
+    style: "currency",
+    currency: "CAD",
+  }).format(value);
+
+const formatDate = (value: string | null) =>
+  value
+    ? new Date(value).toLocaleDateString("en-CA", {
+        month: "short",
+        day: "numeric",
+      })
+    : "";
+
 const Profile = () => {
   const { user, refreshUser } = useUser();
-  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState<ProfileFormData>({
     name: "",
@@ -53,10 +84,34 @@ const Profile = () => {
     year: "",
     dietary_restrictions: "",
     preferred_pronouns: "",
-    newsletter: false,
     user_type: "ubcStudent",
   });
   const [loading, setLoading] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
+  const [purchases, setPurchases] = useState<PurchaseHistoryItem[]>([]);
+  const [membershipTiers, setMembershipTiers] = useState<MembershipTypeRow[]>(
+    []
+  );
+  const [currentMembership, setCurrentMembership] =
+    useState<MembershipTypeRow | null>(null);
+  const [newsletterSaving, setNewsletterSaving] = useState(false);
+  const [avatarVersion, setAvatarVersion] = useState(0);
+  const [avatarBroken, setAvatarBroken] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
+  const isMember = Boolean(user?.membership_type_id);
+
+  // Public URL for the user's avatar by convention (avatars/<user id>). The
+  // version query param busts the browser cache after a re-upload. If no file
+  // exists (or the bucket isn't set up yet) the <img> errors and we fall back
+  // to the logo placeholder.
+  const AVATAR_BUCKET = "avatars";
+  const avatarSrc = user
+    ? `${
+        supabase.storage.from(AVATAR_BUCKET).getPublicUrl(user.id).data
+          .publicUrl
+      }?v=${avatarVersion}`
+    : "";
 
   useEffect(() => {
     if (user) {
@@ -69,37 +124,53 @@ const Profile = () => {
         year: user.year || "",
         dietary_restrictions: user.dietary_restrictions || "",
         preferred_pronouns: user.preferred_pronouns || "",
-        newsletter: user.newsletter || false,
         user_type: user.user_type || "ubcStudent",
       });
     }
   }, [user]);
 
+  // Purchase history (event registrations + event details).
+  useEffect(() => {
+    if (!user) return;
+    fetchPurchaseHistoryForUser(supabase, user.id)
+      .then(setPurchases)
+      .catch((e) => console.error("Error loading purchase history:", e));
+  }, [user]);
+
+  // Membership tiers (for member-benefits/types) + the user's current tier.
+  useEffect(() => {
+    fetchMembershipTypes(supabase, { orderBy: "price" })
+      .then(setMembershipTiers)
+      .catch((e) => console.error("Error loading membership tiers:", e));
+  }, []);
+
+  useEffect(() => {
+    if (!user?.membership_type_id) {
+      setCurrentMembership(null);
+      return;
+    }
+    fetchMembershipTypeById(supabase, user.membership_type_id)
+      .then(setCurrentMembership)
+      .catch((e) => console.error("Error loading current membership:", e));
+  }, [user?.membership_type_id]);
+
   const handleSave = async () => {
     if (!user) return;
     setLoading(true);
-
     try {
-      const { error } = await supabase
-        .from("user_info")
-        .update({
-          name: formData.name,
-          phone: formData.phone,
-          student_number: formData.student_number
-            ? parseInt(formData.student_number)
-            : null,
-          faculty: formData.faculty || null,
-          major: formData.major || null,
-          year: formData.year || null,
-          dietary_restrictions: formData.dietary_restrictions || null,
-          preferred_pronouns: formData.preferred_pronouns || null,
-          newsletter: formData.newsletter,
-          user_type: formData.user_type,
-        })
-        .eq("id", user.id);
-
-      if (error) throw error;
-
+      await updateUserInfoById(supabase, user.id, {
+        name: formData.name,
+        phone: formData.phone,
+        student_number: formData.student_number
+          ? parseInt(formData.student_number)
+          : null,
+        faculty: formData.faculty || null,
+        major: formData.major || null,
+        year: formData.year || null,
+        dietary_restrictions: formData.dietary_restrictions || null,
+        preferred_pronouns: formData.preferred_pronouns || null,
+        user_type: formData.user_type,
+      });
       await refreshUser();
       setIsEditing(false);
     } catch (error) {
@@ -110,324 +181,454 @@ const Profile = () => {
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      handleSave();
+  const handleNewsletterToggle = async () => {
+    if (!user || newsletterSaving) return;
+    setNewsletterSaving(true);
+    try {
+      await updateUserInfoById(supabase, user.id, { newsletter: !user.newsletter });
+      await refreshUser();
+    } catch (error) {
+      console.error("Error updating newsletter preference:", error);
+    } finally {
+      setNewsletterSaving(false);
     }
+  };
+
+  const handleAvatarUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    setUploadingAvatar(true);
+    try {
+      const { error } = await supabase.storage
+        .from(AVATAR_BUCKET)
+        .upload(user.id, file, { upsert: true, contentType: file.type });
+      if (error) throw error;
+      setAvatarBroken(false);
+      setAvatarVersion((v) => v + 1); // cache-bust the public URL
+    } catch (error) {
+      console.error("Avatar upload failed:", error);
+      alert(
+        'Could not upload photo. Make sure the "avatars" storage bucket exists.'
+      );
+    } finally {
+      setUploadingAvatar(false);
+      e.target.value = ""; // allow re-selecting the same file
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter") handleSave();
   };
 
   if (!user) return null;
 
   return (
-    <div className="container mx-auto max-w-2xl py-10 space-y-6">
-        <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-bold">My Profile</h1>
-        </div>
+    <div className="container mx-auto max-w-6xl py-10">
+      <h1 className="text-3xl font-bold mb-6">My Profile</h1>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle>Membership</CardTitle>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => router.push("/portal/membership")}
-            >
-              Manage
-            </Button>
-          </CardHeader>
-          <CardContent className="grid gap-4 pt-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <Label className="text-muted-foreground">Type</Label>
-                <div className="font-medium capitalize">
-                  {user.membership_type_id ? "Active" : "None"}
-                </div>
-              </div>
-              {user.role_access === "admin" && (
-                <div className="space-y-1">
-                  <Label className="text-muted-foreground">Role Access</Label>
-                  <div className="font-medium capitalize">
-                    {user.role_access}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
+        {/* ---------- LEFT: membership status + purchase history ---------- */}
+        <div className="lg:col-span-2 space-y-6">
+          {/* Membership status */}
+          <Card>
+            <CardContent className="flex items-center justify-between gap-4 py-6">
+              {isMember ? (
+                <>
+                  <div>
+                    <p className="text-2xl font-bold leading-tight">
+                      you&apos;re a registered member!
+                    </p>
                   </div>
+                  <Star className="h-10 w-10 flex-shrink-0 fill-primary text-primary" />
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-2xl font-bold leading-tight">
+                    you&apos;re not a member yet
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Join UX Hub to unlock member perks and event discounts.
+                  </p>
+                  <Button onClick={() => setWizardOpen(true)}>Join now</Button>
                 </div>
               )}
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle>Profile Information</CardTitle>
-            {!isEditing ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsEditing(true)}
-                className="flex items-center gap-2"
-              >
-                <Pencil className="h-4 w-4" />
-                Edit
-              </Button>
-            ) : (
-              <div className="flex gap-2">
+          {/* Purchase history */}
+          <Card>
+            <CardHeader>
+              <CardTitle>my purchase history</CardTitle>
+            </CardHeader>
+          </Card>
+
+          {purchases.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                No purchases yet — your event tickets will show up here.
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-4">
+              {purchases.map((item) => (
+                <Card key={item.id} className="overflow-hidden">
+                  <CardContent className="p-4">
+                    <div className="aspect-video w-full rounded-md bg-muted overflow-hidden mb-3">
+                      {item.event?.image_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={item.event.image_url}
+                          alt={item.event?.name ?? "Event"}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="h-full w-full grid place-items-center text-muted-foreground/40 text-xs">
+                          No image
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-end justify-between">
+                      <div>
+                        <p className="font-semibold">
+                          {item.event?.name ?? "Event"}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
+                          {item.event ? formatPrice(item.event.regular_price) : ""}
+                        </p>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        {formatDate(item.event?.start_date ?? item.created_at)}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {/* Member benefits + types (non-members only) */}
+          {!isMember && (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Member benefits</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
+                    {MEMBER_BENEFITS.map((b, i) => (
+                      <li key={i}>{b}</li>
+                    ))}
+                  </ol>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Member types</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
+                    {membershipTiers.map((t) => (
+                      <li key={t.id} className="capitalize">
+                        {t.name} — {formatPrice(t.price)}
+                      </li>
+                    ))}
+                  </ol>
+                </CardContent>
+              </Card>
+            </>
+          )}
+        </div>
+
+        {/* ---------- RIGHT: profile info + newsletter ---------- */}
+        <div className="lg:col-span-3 space-y-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle>Profile Information</CardTitle>
+              {!isEditing ? (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => setIsEditing(false)}
-                  disabled={loading}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  variant="default"
-                  size="sm"
-                  onClick={handleSave}
-                  disabled={loading}
+                  onClick={() => setIsEditing(true)}
                   className="flex items-center gap-2"
                 >
-                  Save
+                  <Pencil className="h-4 w-4" />
+                  Edit
                 </Button>
-              </div>
-            )}
-          </CardHeader>
-          <CardContent className="grid gap-6 pt-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label className="text-muted-foreground">Name</Label>
-                {isEditing ? (
-                  <Input
-                    value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                    onKeyDown={handleKeyDown}
-                  />
-                ) : (
-                  <div className="font-medium min-h-10 flex items-center">
-                    {user.name}
-                  </div>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label className="text-muted-foreground">Email</Label>
-                <div
-                  className={cn(
-                    "font-medium min-h-10 flex items-center",
-                    isEditing && "text-muted-foreground/80"
+              ) : (
+                <div className="flex gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsEditing(false)}
+                    disabled={loading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={handleSave}
+                    disabled={loading}
+                  >
+                    Save
+                  </Button>
+                </div>
+              )}
+            </CardHeader>
+            <CardContent className="pt-4">
+              <div className="flex flex-col sm:flex-row gap-6">
+                {/* Avatar — click to upload; logo shown at 50% opacity when
+                    no photo has been uploaded yet */}
+                <label className="group relative h-32 w-32 flex-shrink-0 cursor-pointer overflow-hidden rounded-lg bg-muted grid place-items-center">
+                  {!avatarBroken ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={avatarSrc}
+                      alt="Profile photo"
+                      onError={() => setAvatarBroken(true)}
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                  ) : (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src="/logo.png"
+                      alt=""
+                      aria-hidden
+                      className="h-16 w-16 object-contain opacity-50"
+                    />
                   )}
-                >
-                  {user.email}
+                  <div className="absolute inset-0 hidden items-center justify-center bg-black/40 text-xs font-medium text-white group-hover:flex">
+                    {uploadingAvatar ? "Uploading…" : "Change photo"}
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleAvatarUpload}
+                    disabled={uploadingAvatar}
+                  />
+                </label>
+
+                <div className="flex-1 space-y-4">
+                  <Field label="name">
+                    {isEditing ? (
+                      <Input
+                        value={formData.name}
+                        onChange={(e) =>
+                          setFormData({ ...formData, name: e.target.value })
+                        }
+                        onKeyDown={handleKeyDown}
+                      />
+                    ) : (
+                      user.name
+                    )}
+                  </Field>
+
+                  <Field label="pronouns">
+                    {isEditing ? (
+                      <Input
+                        value={formData.preferred_pronouns}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            preferred_pronouns: e.target.value,
+                          })
+                        }
+                        onKeyDown={handleKeyDown}
+                        placeholder="e.g. she/her"
+                      />
+                    ) : (
+                      user.preferred_pronouns || "—"
+                    )}
+                  </Field>
+
+                  <Field label="email">{user.email}</Field>
+
+                  <Field label="student #">
+                    {isEditing ? (
+                      <Input
+                        type="number"
+                        value={formData.student_number}
+                        onChange={(e) =>
+                          setFormData({
+                            ...formData,
+                            student_number: e.target.value,
+                          })
+                        }
+                        onKeyDown={handleKeyDown}
+                      />
+                    ) : (
+                      user.student_number || "—"
+                    )}
+                  </Field>
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label className="text-muted-foreground">Phone</Label>
-                {isEditing ? (
-                  <Input
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) =>
-                      setFormData({ ...formData, phone: e.target.value })
-                    }
-                    onKeyDown={handleKeyDown}
-                  />
-                ) : (
-                  <div className="font-medium min-h-10 flex items-center">
-                    {user.phone}
+
+              {/* Additional editable fields (shown in edit mode so nothing is lost) */}
+              {isEditing && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-6 pt-6 border-t">
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">User Type</Label>
+                    <Select
+                      value={formData.user_type}
+                      onValueChange={(value: UserType) =>
+                        setFormData({ ...formData, user_type: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select user type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {USER_TYPES.map((type) => (
+                          <SelectItem key={type.value} value={type.value}>
+                            {type.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label className="text-muted-foreground">
-                  Preferred Pronouns
-                </Label>
-                {isEditing ? (
-                  <Input
-                    value={formData.preferred_pronouns}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        preferred_pronouns: e.target.value,
-                      })
-                    }
-                    onKeyDown={handleKeyDown}
-                    placeholder="e.g. she/her"
-                  />
-                ) : (
-                  <div className="font-medium min-h-10 flex items-center">
-                    {user.preferred_pronouns || "-"}
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">Phone</Label>
+                    <Input
+                      type="tel"
+                      value={formData.phone}
+                      onChange={(e) =>
+                        setFormData({ ...formData, phone: e.target.value })
+                      }
+                      onKeyDown={handleKeyDown}
+                    />
                   </div>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label className="text-muted-foreground">User Type</Label>
-                {isEditing ? (
-                  <Select
-                    value={formData.user_type}
-                    onValueChange={(value: UserType) =>
-                      setFormData({ ...formData, user_type: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select user type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {USER_TYPES.map((type) => (
-                        <SelectItem key={type.value} value={type.value}>
-                          {type.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <div className="font-medium min-h-10 flex items-center">
-                    {USER_TYPES.find((t) => t.value === user.user_type)
-                      ?.label || user.user_type}
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">Faculty</Label>
+                    <Select
+                      value={formData.faculty}
+                      onValueChange={(value: string) =>
+                        setFormData({ ...formData, faculty: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a faculty" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {FACULTIES.map((faculty) => (
+                          <SelectItem key={faculty} value={faculty}>
+                            {faculty}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label className="text-muted-foreground">Student Number</Label>
-                {isEditing ? (
-                  <Input
-                    type="number"
-                    value={formData.student_number}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        student_number: e.target.value,
-                      })
-                    }
-                    onKeyDown={handleKeyDown}
-                  />
-                ) : (
-                  <div className="font-medium min-h-10 flex items-center">
-                    {user.student_number || "-"}
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">Major</Label>
+                    <Input
+                      value={formData.major}
+                      onChange={(e) =>
+                        setFormData({ ...formData, major: e.target.value })
+                      }
+                      onKeyDown={handleKeyDown}
+                    />
                   </div>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label className="text-muted-foreground">Faculty</Label>
-                {isEditing ? (
-                  <Select
-                    value={formData.faculty}
-                    onValueChange={(value: string) =>
-                      setFormData({ ...formData, faculty: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a faculty" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {FACULTIES.map((faculty) => (
-                        <SelectItem key={faculty} value={faculty}>
-                          {faculty}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <div className="font-medium min-h-10 flex items-center">
-                    {user.faculty || "-"}
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">Year</Label>
+                    <Select
+                      value={formData.year}
+                      onValueChange={(value: UniversityYear) =>
+                        setFormData({ ...formData, year: value })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select year" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {YEAR_LEVELS.map((year) => (
+                          <SelectItem key={year} value={year}>
+                            {year}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label className="text-muted-foreground">Major</Label>
-                {isEditing ? (
-                  <Input
-                    value={formData.major}
-                    onChange={(e) =>
-                      setFormData({ ...formData, major: e.target.value })
-                    }
-                    onKeyDown={handleKeyDown}
-                  />
-                ) : (
-                  <div className="font-medium min-h-10 flex items-center">
-                    {user.major || "-"}
+                  <div className="space-y-2">
+                    <Label className="text-muted-foreground">
+                      Dietary Restrictions
+                    </Label>
+                    <Input
+                      value={formData.dietary_restrictions}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          dietary_restrictions: e.target.value,
+                        })
+                      }
+                      onKeyDown={handleKeyDown}
+                      placeholder="e.g. Vegetarian"
+                    />
                   </div>
+                </div>
+              )}
+
+              {/* Fields with no data model yet (mid-fi placeholders) */}
+              {!isEditing && (
+                <div className="mt-6 pt-6 border-t space-y-4">
+                  <Field label="why ux?">
+                    <span className="text-muted-foreground/60">—</span>
+                  </Field>
+                  <Field label="fun fact about me">
+                    <span className="text-muted-foreground/60">—</span>
+                  </Field>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Newsletter toggle */}
+          <Card>
+            <CardContent className="flex items-center justify-between py-6">
+              <span className="text-lg font-medium">
+                Subscribe to the newsletter
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={user.newsletter}
+                disabled={newsletterSaving}
+                onClick={handleNewsletterToggle}
+                className={cn(
+                  "relative inline-flex h-7 w-12 flex-shrink-0 items-center rounded-full transition-colors disabled:opacity-50",
+                  user.newsletter ? "bg-primary" : "bg-muted-foreground/30"
                 )}
-              </div>
-              <div className="space-y-2">
-                <Label className="text-muted-foreground">Year</Label>
-                {isEditing ? (
-                  <Select
-                    value={formData.year}
-                    onValueChange={(value: UniversityYear) =>
-                      setFormData({ ...formData, year: value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select year" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {YEAR_LEVELS.map((year) => (
-                        <SelectItem key={year} value={year}>
-                          {year}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <div className="font-medium min-h-10 flex items-center">
-                    {user.year || "-"}
-                  </div>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label className="text-muted-foreground">
-                  Dietary Restrictions
-                </Label>
-                {isEditing ? (
-                  <Input
-                    value={formData.dietary_restrictions}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        dietary_restrictions: e.target.value,
-                      })
-                    }
-                    onKeyDown={handleKeyDown}
-                    placeholder="e.g. Vegetarian, Gluten-free"
-                  />
-                ) : (
-                  <div className="font-medium min-h-10 flex items-center">
-                    {user.dietary_restrictions || "None"}
-                  </div>
-                )}
-              </div>
-              <div className="space-y-2">
-                <Label className="text-muted-foreground">
-                  Subscribe me to thenewsletter!
-                </Label>
-                {isEditing ? (
-                  <Select
-                    value={formData.newsletter ? "true" : "false"}
-                    onValueChange={(value: string) =>
-                      setFormData({
-                        ...formData,
-                        newsletter: value === "true",
-                      })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="true">Yes</SelectItem>
-                      <SelectItem value="false">No</SelectItem>
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <div className="font-medium min-h-10 flex items-center">
-                    {user.newsletter ? "Yes" : "No"}
-                  </div>
-                )}
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+              >
+                <span
+                  className={cn(
+                    "inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform",
+                    user.newsletter ? "translate-x-6" : "translate-x-1"
+                  )}
+                />
+              </button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      <MembershipWizard open={wizardOpen} onOpenChange={setWizardOpen} />
     </div>
   );
 };
+
+// Small label/value row used by the profile card.
+const Field = ({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) => (
+  <div className="space-y-1">
+    <Label className="text-muted-foreground">{label}</Label>
+    <div className="font-medium min-h-9 flex items-center">{children}</div>
+  </div>
+);
 
 export default Profile;

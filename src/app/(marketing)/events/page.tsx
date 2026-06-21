@@ -5,6 +5,7 @@ import Link from "next/link";
 import Navbar from "@/features/marketing/homepage-sections/Navbar";
 import Footer from "@/features/marketing/homepage-sections/Footer";
 import { createClient } from "@/lib/supabase/client";
+import { fetchEvents } from "@/lib/supabase-helpers/events";
 import type { EventRow } from "@/types/models";
 
 export default function EventsPage() {
@@ -13,12 +14,17 @@ export default function EventsPage() {
 
     useEffect(() => {
         const supabase = createClient();
-        async function fetchEvents() {
-            const { data, error } = await supabase.from("events").select("*").order("start_date", { ascending: true });
-            if (!error && data) setEvents(data);
-            setLoading(false);
+        async function loadEvents() {
+            try {
+                const data = await fetchEvents(supabase, { orderBy: "start_date" });
+                setEvents(data);
+            } catch (error) {
+                console.error("Error fetching events:", error);
+            } finally {
+                setLoading(false);
+            }
         }
-        fetchEvents();
+        loadEvents();
     }, []);
 
     return (

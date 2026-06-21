@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";
 import type { UserInfoRow } from "@/features/auth";
 
 const supabase = createClient();
@@ -54,14 +55,15 @@ export function UserProvider({
       return;
     }
 
-    const { data: member, error } = await supabase
-      .from("user_info")
-      .select("*")
-      .eq("auth_user_id", authUser.id)
-      .single();
+    let member: UserInfoRow | null = null;
+    try {
+      member = await fetchUserInfoByAuthId(supabase, authUser.id);
+    } catch {
+      member = null;
+    }
 
     setTimeout(() => {
-      if (error) {
+      if (!member) {
         setUser(null);
         hasUser.current = false;
       } else {
