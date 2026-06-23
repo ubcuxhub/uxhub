@@ -57,11 +57,13 @@ export default function EventsPage() {
                                 })
                                 : null;
 
+                            const eventHref = `/events/${event.slug || event.id}`;
+
                             return (
                                 <Link
                                     key={event.id}
-                                    href={`/events/${event.slug}`}
-                                    className="block border border-gray-300 rounded-xl overflow-hidden shadow-sm bg-white transition-shadow hover:shadow-md"
+                                    href={eventHref}
+                                    className="border border-gray-300 rounded-xl overflow-hidden shadow-sm bg-white block hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
                                 >
                                     {event.image_url ? (
                                         <img src={event.image_url} alt={event.name} className="w-full h-48 object-cover" />
@@ -97,3 +99,4 @@ export default function EventsPage() {
         </main>
     );
 }
+

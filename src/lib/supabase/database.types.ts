@@ -247,8 +247,10 @@ export type Database = {
       }
       events: {
         Row: {
+          agenda: Json | null
           created_at: string | null
           description: string
+          description_images: string[] | null
           end_date: string | null
           end_time: string | null
           id: string
@@ -258,18 +260,22 @@ export type Database = {
           location_room: string | null
           max_capacity: number
           member_price: number
+          mentors: Json | null
           name: string
           registration_end_time: string | null
           registration_start_time: string | null
           regular_price: number
-          slug: string
+          slug: string | null
+          sponsor_logos: string[] | null
           start_date: string | null
           start_time: string | null
           updated_at: string | null
         }
         Insert: {
+          agenda?: Json | null
           created_at?: string | null
           description: string
+          description_images?: string[] | null
           end_date?: string | null
           end_time?: string | null
           id?: string
@@ -279,18 +285,22 @@ export type Database = {
           location_room?: string | null
           max_capacity: number
           member_price?: number
+          mentors?: Json | null
           name: string
           registration_end_time?: string | null
           registration_start_time?: string | null
           regular_price: number
-          slug: string
+          slug?: string | null
+          sponsor_logos?: string[] | null
           start_date?: string | null
           start_time?: string | null
           updated_at?: string | null
         }
         Update: {
+          agenda?: Json | null
           created_at?: string | null
           description?: string
+          description_images?: string[] | null
           end_date?: string | null
           end_time?: string | null
           id?: string
@@ -300,11 +310,13 @@ export type Database = {
           location_room?: string | null
           max_capacity?: number
           member_price?: number
+          mentors?: Json | null
           name?: string
           registration_end_time?: string | null
           registration_start_time?: string | null
           regular_price?: number
-          slug?: string
+          slug?: string | null
+          sponsor_logos?: string[] | null
           start_date?: string | null
           start_time?: string | null
           updated_at?: string | null

@@ -65,6 +65,7 @@ create table events (
     end_date date,
     end_time time,
     max_capacity int not null check (max_capacity > 0),
+    slug text,
     image_url text,
     registration_start_time timestamp with time zone default now(),
     registration_end_time timestamp with time zone default now() + interval '7 days',
