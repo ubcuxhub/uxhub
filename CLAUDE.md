@@ -30,8 +30,9 @@ pnpm start
 
 - `src/app` - Next.js App Router routes
   - `(marketing)` - public marketing routes
-  - `(student)/portal` - authenticated student portal routes
-  - `(admin)/admin` - admin-gated routes
+  - `(app)` - shared authenticated shell (single sidebar) wrapping both portals
+    - `(app)/portal` - authenticated student portal routes
+    - `(app)/admin` - admin-gated routes
   - `(auth)/auth` - auth routes
   - `api` - server route handlers and callbacks
 - `src/features` - domain logic and feature UI
@@ -51,7 +52,7 @@ pnpm start
 ## Important Patterns
 
 - `src/proxy.ts` refreshes Supabase sessions for `/portal/*`, `/admin/*`, and `/api/*`.
-- Route group layouts and server code handle authorization with `requireAuth()` and `requireAdmin()` from `src/lib/auth/guards.ts`.
+- Route group layouts and server code handle authorization with `requireAuth()` and `requireAdmin()` from `src/lib/auth/guards.ts`. The shared `(app)/layout.tsx` calls `requireAuth()` and renders the unified `AppSidebar` (`src/components/shared/AppSidebar.tsx`); the nested `(app)/admin/layout.tsx` adds `requireAdmin()` as a guard only. The sidebar shows admin tabs when `user.role_access === "admin"`.
 - Data access should go through typed helpers in `src/lib/supabase-helpers/`. Avoid scattering raw `supabase.from("...")` calls through pages and components.
 - Service-role access belongs in `src/lib/supabase/admin.ts` and `src/lib/supabase-helpers/admin-server.ts`.
 - Marketing styles are scoped through the `marketing-home` wrapper in `src/app/globals.css` so homepage fonts/colors do not leak into portal/admin UI.
@@ -75,6 +76,7 @@ pnpm start
 /auth/confirm
 
 /portal
+/portal/events
 /portal/events/[event]/checkout
 /portal/membership
 /portal/membership/[membership]
