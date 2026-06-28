@@ -133,7 +133,8 @@ export default function PortalEvents() {
     if (user) loadEvents(user.id);
   }, [user]);
 
-  const openEvent = (event: EventRow) => router.push(`/events/${event.slug}`);
+  const openEvent = (event: EventRow) =>
+    router.push(`/portal/events/${event.slug}`);
 
   return (
     <main className="container mx-auto max-w-6xl px-4 py-8">

@@ -42,7 +42,9 @@ uxhub/
 │   │   │   │   ├── page.tsx              # Welcome / dashboard landing
 │   │   │   │   ├── events/
 │   │   │   │   │   ├── page.tsx          # Your registered events (ongoing/upcoming/attended)
-│   │   │   │   │   └── [event]/checkout/page.tsx # Event checkout by event slug
+│   │   │   │   │   └── [event]/
+│   │   │   │   │       ├── page.tsx      # Simple event detail by event slug
+│   │   │   │   │       └── checkout/page.tsx # Event checkout by event slug
 │   │   │   │   ├── membership/
 │   │   │   │   │   ├── page.tsx          # Membership tier list
 │   │   │   │   │   └── [membership]/
@@ -179,7 +181,7 @@ uxhub/
 /under-construction
 ```
 
-`/events/[slug]` is a stub public event-detail page (event title + "under construction") that homepage and portal event cards link to. There are currently no separate public `/about`, `/team`, `/contact`, or `/membership` routes.
+`/events/[slug]` is a stub public event-detail page (event title + "under construction") that homepage event cards link to. There are currently no separate public `/about`, `/team`, `/contact`, or `/membership` routes.
 
 ### Auth - `(auth)`
 
@@ -198,6 +200,7 @@ uxhub/
 ```text
 /portal
 /portal/events
+/portal/events/[event]
 /portal/events/[event]/checkout
 /portal/membership
 /portal/membership/[membership]
@@ -210,8 +213,8 @@ uxhub/
 Notes:
 
 - `/portal` is a simple welcome landing (greeting + a "become a member" banner for non-members).
-- `/portal/events` is the personalized registered-events view (ongoing/upcoming/attended) plus a link to the public `/events` page. Event cards link to the public `/events/[slug]` detail page.
-- `[event]` is treated as an event slug in student-facing routes. The portal keeps only the `/portal/events/[event]/checkout` route under `[event]`; there is no portal event-detail page.
+- `/portal/events` is the personalized registered-events view (ongoing/upcoming/attended) plus a link to the public `/events` page. Event cards link to the portal `/portal/events/[slug]` detail page.
+- `[event]` is treated as an event slug in student-facing routes. `/portal/events/[event]` is a simple portal event-detail page (name, date/time, location, and a button linking to the public `/events/[slug]` page); `/portal/events/[event]/checkout` handles checkout.
 - `/portal/membership/[membership]` is a legacy ID route that looks up the membership type by ID and redirects to `/portal/membership/[slug]/checkout`.
 - There is no checkout confirmation route at the moment.
 
