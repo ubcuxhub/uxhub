@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code when working in this repository.
 
-If you make a major edit, always make sure this file is up to date. Also make sure @docs/structure-and-routes.md is up to date.
+If you make a significant edit, always make sure this file is up to date. Also make sure @docs/structure-and-routes.md is up to date.
 
 ## Project Overview
 
@@ -77,6 +77,7 @@ pnpm start
 
 /portal
 /portal/events
+/portal/events/[event]
 /portal/events/[event]/checkout
 /portal/membership
 /portal/membership/[membership]
@@ -108,3 +109,7 @@ Local env values live in `.env.local` and are git-ignored. Required variables in
 ## Quality
 
 Run `pnpm lint` and `pnpm build` after route, dependency, config, or shared styling changes.
+
+## UI
+
+Use components in src/components whenever possible. Use shadcn components whenever possible.
