@@ -4,6 +4,9 @@ import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import { useUser } from "@/context/UserContext";
+import { fetchUserRegistration } from "@/lib/supabase-helpers/event-registrations";
 import type { EventRow } from "@/types/models";
 import Navbar from "@/features/marketing/homepage-sections/Navbar";
 import Footer from "@/features/marketing/homepage-sections/Footer";
@@ -96,8 +99,10 @@ export default function EventDetailPage() {
   const slug = params?.slug as string;
 
   const supabase = useMemo(() => createClient(), []);
+  const { user } = useUser();
   const [event, setEvent] = useState<EventRow | null>(null);
   const [registrationCount, setRegistrationCount] = useState<number>(0);
+  const [alreadyRegistered, setAlreadyRegistered] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hoveredMentor, setHoveredMentor] = useState<number | null>(null);
@@ -154,6 +159,35 @@ export default function EventDetailPage() {
     fetchEvent();
   }, [slug, supabase]);
 
+  /* ── Check if the current user already registered ── */
+  useEffect(() => {
+    let active = true;
+
+    async function checkRegistration() {
+      if (!event || !user) {
+        if (active) setAlreadyRegistered(false);
+        return;
+      }
+
+      try {
+        const registration = await fetchUserRegistration(
+          supabase,
+          event.id,
+          user.id,
+        );
+        if (active) setAlreadyRegistered(Boolean(registration));
+      } catch {
+        if (active) setAlreadyRegistered(false);
+      }
+    }
+
+    checkRegistration();
+
+    return () => {
+      active = false;
+    };
+  }, [event, user, supabase]);
+
   /* ── Loading ── */
   if (loading) {
     return (
@@ -191,6 +225,15 @@ export default function EventDetailPage() {
   /* ── Derived data ── */
   const regStatus = getRegistrationStatus(event);
   const spotsLeft = event.max_capacity - registrationCount;
+  const canRegister =
+    !alreadyRegistered && regStatus === "open" && spotsLeft > 0;
+  const registerLabel = alreadyRegistered
+    ? "Already Registered"
+    : regStatus === "upcoming"
+      ? "Registration Opens Soon"
+      : spotsLeft <= 0
+        ? "Event Full"
+        : "Registration Closed";
   const isFree = Number(event.regular_price) === 0;
   const hasMemberPrice =
     event.member_price !== null &&
@@ -310,27 +353,14 @@ export default function EventDetailPage() {
             </div>
 
             {/* Register Button */}
-            {regStatus === "open" && spotsLeft > 0 ? (
-              <Link
-                href={`/portal/events/${event.id}`}
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-black text-white font-bold text-sm px-8 py-3 hover:bg-gray-800 transition-all duration-200 w-fit mt-2"
-              >
-                Register Now
-              </Link>
-            ) : regStatus === "upcoming" ? (
-              <button
-                disabled
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-200 text-gray-400 font-bold text-sm px-8 py-3 cursor-not-allowed w-fit mt-2"
-              >
-                Registration Opens Soon
-              </button>
+            {canRegister ? (
+              <Button asChild className="self-start">
+                <Link href={`/portal/events/${event.slug}/checkout`}>
+                  Register Now
+                </Link>
+              </Button>
             ) : (
-              <button
-                disabled
-                className="inline-flex items-center justify-center gap-2 rounded-lg bg-gray-200 text-gray-400 font-bold text-sm px-8 py-3 cursor-not-allowed w-fit mt-2"
-              >
-                {spotsLeft <= 0 ? "Event Full" : "Registration Closed"}
-              </button>
+              <Button disabled className="self-start">{registerLabel}</Button>
             )}
           </div>
         </div>
@@ -503,7 +533,7 @@ export default function EventDetailPage() {
               {event.location_address_url ? (
                 <iframe
                   src={`https://maps.google.com/maps?q=${encodeURIComponent(
-                    locationDisplay || ""
+                    locationDisplay || "",
                   )}&output=embed`}
                   className="w-full h-full border-0"
                   loading="lazy"
