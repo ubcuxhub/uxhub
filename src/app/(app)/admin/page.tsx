@@ -1,6 +1,8 @@
+import { PageContainer } from "@/components/shared/PageContainer";
+
 export default function AdminDashboard() {
   return (
-    <main className="container mx-auto max-w-6xl px-4 py-8">
+    <PageContainer>
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight mb-2">
           Admin Dashboard
@@ -9,6 +11,6 @@ export default function AdminDashboard() {
           Manage events and users from the sidebar.
         </p>
       </div>
-    </main>
+    </PageContainer>
   );
 }

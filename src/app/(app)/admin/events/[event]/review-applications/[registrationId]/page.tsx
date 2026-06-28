@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
 import {
   ApplicantInfoCard,
   ApplicationResponseCard,
@@ -18,10 +17,9 @@ import {
 import { fetchApplicationResponsesForRegistration } from "@/lib/supabase-helpers/event-applications";
 import { fetchUserInfoContactById } from "@/lib/supabase-helpers/users";
 import { useUser } from "@/context/UserContext";
-import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Card, CardContent } from "@/components/ui/card";
-import { BackButton } from "@/components/shared/BackButton";
+import { PageContainer } from "@/components/shared/PageContainer";
 import { SuccessOverlay } from "@/components/shared/SuccessOverlay";
 
 interface Registration {
@@ -185,18 +183,15 @@ export default function ApplicationReviewPage() {
 
   if (error && !registration) {
     return (
-      <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 py-8 px-8">
+      <PageContainer
+        backHref={`/admin/events/${eventId}/review-applications`}
+        backLabel="Back to Applications"
+        className="flex flex-col gap-8"
+      >
         <div className="rounded-lg border border-destructive/50 p-10 text-center text-sm text-destructive">
           {error}
         </div>
-        <Button asChild variant="outline">
-          <Link
-            href={`/admin/events/${eventId}/review-applications?filter=pending`}
-          >
-            Back to Applications
-          </Link>
-        </Button>
-      </div>
+      </PageContainer>
     );
   }
 
@@ -206,20 +201,17 @@ export default function ApplicationReviewPage() {
 
   return (
     <>
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-8 py-8 px-8">
-            {/* Header with Back Button */}
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-semibold">Application Review</h1>
-                <p className="text-sm text-muted-foreground mt-1">
-                  {event.name}
-                </p>
-              </div>
-              <BackButton
-                link={`/admin/events/${eventId}/review-applications?filter=pending`}
-                label="Back to Applications"
-                className="w-fit"
-              />
+      <PageContainer
+        backHref={`/admin/events/${eventId}/review-applications`}
+        backLabel="Back to Applications"
+        className="flex flex-col gap-8"
+      >
+            {/* Header */}
+            <div>
+              <h1 className="text-2xl font-semibold">Application Review</h1>
+              <p className="text-sm text-muted-foreground mt-1">
+                {event.name}
+              </p>
             </div>
 
             {/* Applicant Information */}
@@ -273,7 +265,7 @@ export default function ApplicationReviewPage() {
               onStatusUpdate={handleStatusUpdate}
               error={error}
             />
-      </div>
+      </PageContainer>
 
       {/* Success Overlay */}
       {successMessage && (

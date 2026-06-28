@@ -1,13 +1,12 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { PageContainer } from "@/components/shared/PageContainer";
 import { requireAuth } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchEventRegistrationByPurchaseId } from "@/lib/supabase-helpers/event-registrations";
@@ -56,17 +55,11 @@ export default async function PurchaseDetailPage({
       : purchase.events?.name || "Event ticket";
 
   return (
-    <div className="container mx-auto max-w-4xl px-4 py-10">
-      <div className="mb-6 flex items-center justify-between gap-4">
-        <Button asChild variant="outline">
-          <Link href="/portal/purchases">Back to Purchases</Link>
-        </Button>
-        <Badge variant="secondary">{purchase.status}</Badge>
-      </div>
-
+    <PageContainer backHref="/portal/purchases" backLabel="Back to Purchases">
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
           <CardTitle className="text-3xl">{title}</CardTitle>
+          <Badge variant="secondary">{purchase.status}</Badge>
         </CardHeader>
         <CardContent className="space-y-4 text-sm">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -128,6 +121,6 @@ export default async function PurchaseDetailPage({
           )}
         </CardContent>
       </Card>
-    </div>
+    </PageContainer>
   );
 }

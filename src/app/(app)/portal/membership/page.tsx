@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/client";
 import { fetchMembershipTypes } from "@/lib/supabase-helpers/memberships";
 import { useEffect, useState } from "react";
 import { useUser } from "@/context/UserContext";
+import { PageContainer } from "@/components/shared/PageContainer";
 import { cn } from "@/lib/utils";
 import { Check } from "lucide-react";
 
@@ -78,7 +79,7 @@ export default function MembershipsPage() {
   };
 
   return (
-    <div className="container mx-auto py-10 max-w-5xl">
+    <PageContainer>
         <h1 className="text-3xl font-bold mb-8 text-center">
           Choose Your Membership
         </h1>
@@ -152,6 +153,6 @@ export default function MembershipsPage() {
             );
           })}
         </div>
-    </div>
+    </PageContainer>
   );
 }

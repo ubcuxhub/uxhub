@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { fetchEvents } from "@/lib/supabase-helpers/events";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { PageContainer } from "@/components/shared/PageContainer";
 
 const AdminEventsManager = () => {
   const [events, setEvents] = useState<EventRow[]>([]);
@@ -37,7 +38,7 @@ const AdminEventsManager = () => {
   }, []);
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 py-8 px-8">
+    <PageContainer className="flex flex-col gap-8">
             <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <h1 className="text-3xl font-bold tracking-tight mb-2">
@@ -89,7 +90,7 @@ const AdminEventsManager = () => {
                 ))}
               </div>
             )}
-    </div>
+    </PageContainer>
   );
 };
 

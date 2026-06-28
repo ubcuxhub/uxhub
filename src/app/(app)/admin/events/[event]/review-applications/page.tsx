@@ -12,7 +12,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-import { BackButton } from "@/components/shared/BackButton";
+import { PageContainer } from "@/components/shared/PageContainer";
 import { fetchEventById } from "@/lib/supabase-helpers/events";
 import { fetchEventRegistrationsGroupedByUser } from "@/lib/supabase-helpers/event-registrations";
 
@@ -119,13 +119,12 @@ export default function ReviewApplicationsPage() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 py-8 px-8">
+    <PageContainer
+      backHref={`/admin/events/${eventId}`}
+      backLabel="Back to Event"
+      className="flex flex-col gap-8"
+    >
             <header className="flex flex-col gap-4">
-              <BackButton
-                link="/admin/events"
-                label="Back to Events"
-                className="w-fit"
-              />
               <div>
                 <h1 className="text-2xl font-semibold">Review Applications</h1>
                 <p className="text-sm text-muted-foreground">
@@ -233,6 +232,6 @@ export default function ReviewApplicationsPage() {
                 )}
               </>
             )}
-    </div>
+    </PageContainer>
   );
 }

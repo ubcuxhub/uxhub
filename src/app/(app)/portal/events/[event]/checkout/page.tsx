@@ -1,7 +1,5 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -9,6 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { CheckoutSummaryCard } from "@/components/shared/CheckoutSummaryCard";
+import { PageContainer } from "@/components/shared/PageContainer";
 import { requireAuth } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchApplicationQuestions } from "@/lib/supabase-helpers/event-applications";
@@ -73,13 +72,7 @@ export default async function EventCheckoutPage({
   }
 
   return (
-    <div className="container mx-auto max-w-6xl px-4 py-10">
-      <div className="mb-6">
-        <Button variant="outline" asChild>
-          <Link href="/portal">Back to portal homepage</Link>
-        </Button>
-      </div>
-
+    <PageContainer backHref={`/portal/events/${event.slug ?? slug}`} backLabel="Back to Event">
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_360px]">
         <div className="space-y-6">
           <Card>
@@ -140,6 +133,6 @@ export default async function EventCheckoutPage({
           />
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 }

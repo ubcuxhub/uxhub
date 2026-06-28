@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
 import { BackButton } from "@/components/shared/BackButton";
+import { PageContainer } from "@/components/shared/PageContainer";
 
 // Stat card component
 function StatCard({
@@ -311,15 +312,14 @@ export default function CheckInPage() {
   }, [allRegistrations, checkInStatuses]);
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 py-8 px-8">
+    <PageContainer
+      backHref={`/admin/events/${eventId}`}
+      backLabel="Back to Event"
+      className="flex flex-col gap-6"
+    >
             {/* Header */}
             <div className="flex items-center justify-between">
               <div>
-                <BackButton
-                  link="/admin/events"
-                  label="Back to Events"
-                  className="mb-4"
-                />
                 <h1 className="text-2xl font-semibold">Check-In Management</h1>
                 <p className="text-sm text-muted-foreground">
                   Manage attendee check-ins for this event
@@ -339,8 +339,8 @@ export default function CheckInPage() {
                 <CardContent>
                   <p className="text-destructive">{error}</p>
                   <BackButton
-                    link="/admin/events"
-                    label="Back to Events"
+                    link={`/admin/events/${eventId}`}
+                    label="Back to Event"
                     className="mt-4"
                   />
                 </CardContent>
@@ -459,6 +459,6 @@ export default function CheckInPage() {
                 </Card>
               </>
             ) : null}
-    </div>
+    </PageContainer>
   );
 }
