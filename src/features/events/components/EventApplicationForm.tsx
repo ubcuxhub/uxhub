@@ -125,11 +125,9 @@ export const EventApplicationForm = ({
 
       if (question.response === ResponseType.text) {
         const textResponse = response as string;
-        if (
-          question.max_char_limit > 0 &&
-          textResponse.length > question.max_char_limit
-        ) {
-          newErrors[questionId] = `Response must be ${question.max_char_limit} characters or less`;
+        const maxCharLimit = Number(question.max_char_limit) || 0;
+        if (maxCharLimit > 0 && textResponse.length > maxCharLimit) {
+          newErrors[questionId] = `Response must be ${maxCharLimit} characters or less`;
         }
       } else if (question.response === ResponseType.multi_select) {
         const multiResponse = response as string[];
@@ -211,7 +209,7 @@ export const EventApplicationForm = ({
                       }`}
                       required
                     />
-                    {question.max_char_limit > 0 && (
+                    {Number(question.max_char_limit) > 0 && (
                       <p className="text-xs text-muted-foreground">
                         {(response as string)?.length || 0} /{" "}
                         {question.max_char_limit} characters

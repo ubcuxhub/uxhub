@@ -136,7 +136,7 @@ export default async function EventCheckoutPage({
             initialName={user.name}
             initialPhone={user.phone}
             kind="event_ticket"
-            slug={event.slug}
+            slug={event.slug ?? slug}
           />
         </div>
       </div>

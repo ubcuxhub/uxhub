@@ -40,8 +40,10 @@ const AdminEventsManager = () => {
     <div className="mx-auto flex w-full max-w-6xl flex-col gap-8 py-8 px-8">
             <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
-                <h1 className="text-2xl font-semibold">Events Dashboard</h1>
-                <p className="text-sm text-muted-foreground">
+                <h1 className="text-3xl font-bold tracking-tight mb-2">
+                  Events Dashboard
+                </h1>
+                <p className="text-muted-foreground">
                   Review, create, and manage upcoming events.
                 </p>
               </div>

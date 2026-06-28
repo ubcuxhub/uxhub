@@ -36,36 +36,35 @@ uxhub/
 │   │   │   ├── error/page.tsx
 │   │   │   └── confirm/route.ts          # Supabase email confirmation callback
 │   │   │
-│   │   ├── (student)/portal/             # Auth-gated routes
-│   │   │   ├── layout.tsx                # requireAuth
-│   │   │   ├── events/
-│   │   │   │   ├── page.tsx              # Browse portal events
-│   │   │   │   └── [event]/
-│   │   │   │       ├── page.tsx          # Event detail/application by event slug
-│   │   │   │       └── checkout/page.tsx # Event checkout by event slug
-│   │   │   ├── membership/
-│   │   │   │   ├── page.tsx              # Membership tier list
-│   │   │   │   └── [membership]/
-│   │   │   │       ├── page.tsx          # Legacy ID route; redirects to slug checkout
-│   │   │   │       └── checkout/page.tsx # Membership checkout by membership slug
-│   │   │   ├── purchases/
-│   │   │   │   ├── page.tsx              # User purchase history
-│   │   │   │   └── [purchaseId]/page.tsx # User purchase detail/receipt
-│   │   │   └── profile/page.tsx
-│   │   │
-│   │   ├── (admin)/admin/                # Admin-gated routes
-│   │   │   ├── layout.tsx                # requireAdmin, AdminSidebar
-│   │   │   ├── page.tsx                  # Admin dashboard
-│   │   │   ├── events/
-│   │   │   │   ├── page.tsx              # Event list
-│   │   │   │   ├── create-new/page.tsx   # Create event
-│   │   │   │   └── [event]/
-│   │   │   │       ├── page.tsx          # Edit/manage event by event ID
-│   │   │   │       ├── check-in/page.tsx
-│   │   │   │       └── review-applications/
-│   │   │   │           ├── page.tsx
-│   │   │   │           └── [registrationId]/page.tsx
-│   │   │   └── users/page.tsx            # User directory and profile editing
+│   │   ├── (app)/                        # Shared authenticated shell (single sidebar)
+│   │   │   ├── layout.tsx                # requireAuth, UserProvider, SidebarProvider + AppSidebar
+│   │   │   ├── portal/                   # Auth-gated student routes
+│   │   │   │   ├── page.tsx              # Welcome / dashboard landing
+│   │   │   │   ├── events/
+│   │   │   │   │   ├── page.tsx          # Your registered events (ongoing/upcoming/attended)
+│   │   │   │   │   └── [event]/checkout/page.tsx # Event checkout by event slug
+│   │   │   │   ├── membership/
+│   │   │   │   │   ├── page.tsx          # Membership tier list
+│   │   │   │   │   └── [membership]/
+│   │   │   │   │       ├── page.tsx      # Legacy ID route; redirects to slug checkout
+│   │   │   │   │       └── checkout/page.tsx # Membership checkout by membership slug
+│   │   │   │   ├── purchases/
+│   │   │   │   │   ├── page.tsx          # User purchase history
+│   │   │   │   │   └── [purchaseId]/page.tsx # User purchase detail/receipt
+│   │   │   │   └── profile/page.tsx
+│   │   │   └── admin/                    # Admin-gated routes
+│   │   │       ├── layout.tsx            # requireAdmin guard only (sidebar comes from (app))
+│   │   │       ├── page.tsx              # Admin dashboard
+│   │   │       ├── events/
+│   │   │       │   ├── page.tsx          # Event list
+│   │   │       │   ├── create-new/page.tsx   # Create event
+│   │   │       │   └── [event]/
+│   │   │       │       ├── page.tsx      # Edit/manage event by event ID
+│   │   │       │       ├── check-in/page.tsx
+│   │   │       │       └── review-applications/
+│   │   │       │           ├── page.tsx
+│   │   │       │           └── [registrationId]/page.tsx
+│   │   │       └── users/page.tsx        # User directory and profile editing
 │   │   │
 │   │   └── api/
 │   │       ├── link-auth-user/route.ts   # Links Supabase Auth user to user_info
@@ -167,7 +166,7 @@ uxhub/
 
 **Use server actions for first-party mutations when possible.** The checkout flow currently uses `src/features/payments/actions.ts`, which delegates to `src/features/payments/fulfillment.ts`. Route handlers are still used where a normal form/action boundary is not enough: Supabase email confirmation, Square webhooks, Auth-to-`user_info` linking, and event image upload.
 
-**Layouts handle access control.** `src/proxy.ts` refreshes Supabase sessions for `/admin`, `/portal`, and `/api` requests. It does not decide authorization. `src/app/(student)/portal/layout.tsx` calls `requireAuth()`, and `src/app/(admin)/admin/layout.tsx` calls `requireAdmin()`.
+**Layouts handle access control.** `src/proxy.ts` refreshes Supabase sessions for `/admin`, `/portal`, and `/api` requests. It does not decide authorization. The shared `src/app/(app)/layout.tsx` calls `requireAuth()`, wraps everything in `UserProvider`, and renders the unified `AppSidebar` (`src/components/shared/AppSidebar.tsx`) inside a `SidebarProvider`. The nested `src/app/(app)/admin/layout.tsx` adds `requireAdmin()` as a guard only. Because both portals share the `(app)` parent layout, the sidebar persists when navigating between student and admin pages; admin tabs render only when `user.role_access === "admin"`.
 
 ## URL Conventions
 
@@ -194,10 +193,11 @@ uxhub/
 /auth/confirm
 ```
 
-### Student Portal - `(student)`
+### Student Portal - `(app)/portal`
 
 ```text
 /portal
+/portal/events
 /portal/events/[event]/checkout
 /portal/membership
 /portal/membership/[membership]
@@ -209,12 +209,13 @@ uxhub/
 
 Notes:
 
-- `/portal` is the personalized student dashboard: registered events (purchased, upcoming), past events, a link to the public `/events` page, and a "become a member" banner for non-members. Event cards link to the public `/events/[slug]` detail page.
-- `[event]` is treated as an event slug in student-facing routes. The portal keeps only the `/portal/events/[event]/checkout` route; there is no portal event-detail page.
+- `/portal` is a simple welcome landing (greeting + a "become a member" banner for non-members).
+- `/portal/events` is the personalized registered-events view (ongoing/upcoming/attended) plus a link to the public `/events` page. Event cards link to the public `/events/[slug]` detail page.
+- `[event]` is treated as an event slug in student-facing routes. The portal keeps only the `/portal/events/[event]/checkout` route under `[event]`; there is no portal event-detail page.
 - `/portal/membership/[membership]` is a legacy ID route that looks up the membership type by ID and redirects to `/portal/membership/[slug]/checkout`.
 - There is no checkout confirmation route at the moment.
 
-### Admin - `(admin)`
+### Admin - `(app)/admin`
 
 ```text
 /admin

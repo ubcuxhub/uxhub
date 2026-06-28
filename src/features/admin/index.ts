@@ -1,4 +1,3 @@
-export { AdminSidebar } from "./components/AdminSidebar";
 export { AdminPageSkeleton } from "./components/AdminPageSkeleton";
 export { EventCreateModify } from "./components/EventCreateModify";
 export { DeleteEventModal } from "./components/DeleteEventModal";

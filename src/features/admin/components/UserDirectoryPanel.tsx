@@ -41,8 +41,10 @@ export function UserDirectoryPanel({
     <div className="w-1/2 border-r overflow-y-auto p-6">
       <div className="space-y-4">
         <div>
-          <h1 className="text-2xl font-semibold mb-2">User Directory</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-3xl font-bold tracking-tight mb-2">
+            User Directory
+          </h1>
+          <p className="text-muted-foreground">
             Search and manage all users
           </p>
         </div>
