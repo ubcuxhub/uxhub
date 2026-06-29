@@ -36,12 +36,9 @@ export async function redirectIfAuthenticated(redirectTo = "/portal") {
 
   if (!authUser) return;
 
-  // Only redirect away from auth pages when the user is *fully* authenticated,
-  // i.e. they also have a user_info profile row. This mirrors requireAuth() so
-  // an "orphaned" session (auth user with no profile, e.g. a failed sign-up)
-  // can't bounce between the portal guard and the auth pages forever
-  // (ERR_TOO_MANY_REDIRECTS). Without a profile, the user stays on the auth
-  // page and can sign in with a complete account.
+  // Auth pages should send signed-in users either to the portal (profile row
+  // exists) or to the profile-completion step (auth user exists, profile row
+  // does not). 
   const userInfo = await fetchUserInfoByAuthId(supabase, authUser.id).catch(
     () => null
   );
@@ -49,6 +46,8 @@ export async function redirectIfAuthenticated(redirectTo = "/portal") {
   if (userInfo) {
     redirect(redirectTo);
   }
+
+  redirect("/auth/complete-profile");
 }
 
 export async function requireAdmin(): Promise<UserInfoRow> {

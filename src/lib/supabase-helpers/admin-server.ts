@@ -14,6 +14,12 @@ import { TABLES } from "./tables";
 
 type UserInfoWritePayload = Record<string, unknown>;
 
+export interface AdminUserInfoLookup {
+  id: string;
+  auth_user_id: string | null;
+  email: string;
+}
+
 export async function adminFindUserInfoIdByEmail(
   email: string
 ): Promise<{ id: string } | null> {
@@ -24,6 +30,33 @@ export async function adminFindUserInfoIdByEmail(
     .maybeSingle();
 
   return (data as { id: string } | null) ?? null;
+}
+
+export async function adminFindUserInfoByEmail(
+  email: string
+): Promise<AdminUserInfoLookup | null> {
+  const { data, error } = await supabaseAdmin
+    .from(TABLES.userInfo)
+    .select("id, auth_user_id, email")
+    .eq("email", email)
+    .maybeSingle();
+
+  if (error) throw error;
+  return (data as AdminUserInfoLookup | null) ?? null;
+}
+
+export async function adminUpdateUserInfoById(
+  id: string,
+  payload: UserInfoWritePayload
+) {
+  const { data, error } = await supabaseAdmin
+    .from(TABLES.userInfo)
+    .update(payload)
+    .eq("id", id)
+    .select();
+
+  if (error) throw error;
+  return data;
 }
 
 export async function adminUpdateUserInfoByEmail(
