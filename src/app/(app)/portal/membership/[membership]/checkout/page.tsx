@@ -1,7 +1,5 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -9,6 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { CheckoutSummaryCard } from "@/components/shared/CheckoutSummaryCard";
+import { PageContainer } from "@/components/shared/PageContainer";
 import { requireAuth } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchMembershipTypeBySlug } from "@/lib/supabase-helpers/memberships";
@@ -46,13 +45,7 @@ export default async function MembershipCheckoutPage({
     : null;
 
   return (
-    <div className="container mx-auto max-w-6xl px-4 py-10">
-      <div className="mb-6">
-        <Button variant="outline" asChild>
-          <Link href="/portal/membership">Back to Memberships</Link>
-        </Button>
-      </div>
-
+    <PageContainer backHref="/portal/membership" backLabel="Back to Memberships">
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_360px]">
         <div className="space-y-6">
           <Card>
@@ -104,6 +97,6 @@ export default async function MembershipCheckoutPage({
           />
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 }

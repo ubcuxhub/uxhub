@@ -10,6 +10,7 @@ import { fetchRegistrationsForUser } from "@/lib/supabase-helpers/event-registra
 import { EventCard, type EventRow } from "@/features/events";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageContainer } from "@/components/shared/PageContainer";
 import { ArrowRight, CalendarDays, History, Radio } from "lucide-react";
 
 function EventCardSkeleton() {
@@ -137,7 +138,7 @@ export default function PortalEvents() {
     router.push(`/portal/events/${event.slug}`);
 
   return (
-    <main className="container mx-auto max-w-6xl px-4 py-8">
+    <PageContainer>
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold tracking-tight mb-2">Your Events</h1>
@@ -200,6 +201,6 @@ export default function PortalEvents() {
           <EventGrid events={attendedEvents} onSelect={openEvent} />
         </section>
       )}
-    </main>
+    </PageContainer>
   );
 }

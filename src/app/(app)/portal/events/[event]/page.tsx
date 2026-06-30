@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { PageContainer } from "@/components/shared/PageContainer";
 import { requireAuth } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
@@ -49,7 +50,7 @@ export default async function PortalEventPage({
     .join(", ");
 
   return (
-    <div className="container mx-auto max-w-3xl space-y-4 px-4 py-10">
+    <PageContainer backHref="/portal/events" backLabel="Back to Events" className="space-y-4">
       <h1 className="text-3xl font-semibold">{event.name}</h1>
 
       <div className="flex items-start gap-3 text-sm">
@@ -78,6 +79,6 @@ export default async function PortalEventPage({
       <Button asChild>
         <Link href={`/events/${event.slug}`}>View full event details</Link>
       </Button>
-    </div>
+    </PageContainer>
   );
 }

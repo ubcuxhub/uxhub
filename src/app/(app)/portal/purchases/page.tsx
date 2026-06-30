@@ -7,6 +7,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { PageContainer } from "@/components/shared/PageContainer";
 import { requireAuth } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchPurchasesForUser } from "@/lib/supabase-helpers/purchases";
@@ -35,17 +36,12 @@ export default async function PurchasesPage() {
   const purchases = await fetchPurchasesForUser(supabase, user.id);
 
   return (
-    <div className="container mx-auto max-w-5xl px-4 py-10">
-      <div className="mb-8 flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Purchases</h1>
-          <p className="text-sm text-muted-foreground">
-            View your completed memberships and event tickets.
-          </p>
-        </div>
-        <Button asChild variant="outline">
-          <Link href="/portal">Back to Portal</Link>
-        </Button>
+    <PageContainer>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold">Purchases</h1>
+        <p className="text-sm text-muted-foreground">
+          View your completed memberships and event tickets.
+        </p>
       </div>
 
       {purchases.length === 0 ? (
@@ -98,6 +94,6 @@ export default async function PurchasesPage() {
           })}
         </div>
       )}
-    </div>
+    </PageContainer>
   );
 }

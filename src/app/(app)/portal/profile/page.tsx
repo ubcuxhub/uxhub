@@ -25,6 +25,7 @@ import {
   type PurchaseHistoryItem,
 } from "@/lib/supabase-helpers/event-registrations";
 import { MembershipWizard } from "@/features/memberships";
+import { PageContainer } from "@/components/shared/PageContainer";
 import { cn } from "@/lib/utils";
 import type { MembershipTypeRow } from "@/features/memberships";
 import type { UniversityYear, UserType } from "@/types/models";
@@ -225,7 +226,7 @@ const Profile = () => {
   if (!user) return null;
 
   return (
-    <div className="container mx-auto max-w-6xl py-10">
+    <PageContainer>
       <h1 className="text-3xl font-bold mb-6">My Profile</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
@@ -613,7 +614,7 @@ const Profile = () => {
       </div>
 
       <MembershipWizard open={wizardOpen} onOpenChange={setWizardOpen} />
-    </div>
+    </PageContainer>
   );
 };
 
