@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useUser } from "@/context/UserContext";
 import { Button } from "@/components/ui/button";
+import { PageContainer } from "@/components/shared/PageContainer";
 import { ArrowRight, CalendarDays, Sparkles } from "lucide-react";
 
 function BecomeMemberBanner() {
@@ -41,7 +42,7 @@ export default function PortalHome() {
       new Date(user.membership_expires_at) > new Date());
 
   return (
-    <main className="container mx-auto max-w-6xl px-4 py-8">
+    <PageContainer>
       {user && !isMember && <BecomeMemberBanner />}
 
       <div className="mb-8">
@@ -59,6 +60,6 @@ export default function PortalHome() {
           <CalendarDays className="h-4 w-4" />
         </Link>
       </Button>
-    </main>
+    </PageContainer>
   );
 }

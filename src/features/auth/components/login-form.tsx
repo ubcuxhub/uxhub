@@ -16,6 +16,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { GoogleOAuthButton } from "./google-oauth-button";
+
 export function LoginForm({
   className,
   ...props
@@ -58,8 +60,9 @@ export function LoginForm({
           </CardDescription>
         </CardHeader>
         <CardContent>
+          <GoogleOAuthButton />
           <form onSubmit={handleLogin}>
-            <div className="flex flex-col gap-6">
+            <div className="mt-6 flex flex-col gap-6">
               <div className="grid gap-2">
                 <Label htmlFor="email">Email</Label>
                 <Input

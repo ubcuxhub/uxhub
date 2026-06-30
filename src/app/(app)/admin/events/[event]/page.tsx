@@ -1,4 +1,5 @@
 import { EventCreateModify } from "@/features/admin";
+import { PageContainer } from "@/components/shared/PageContainer";
 import React from "react";
 
 interface EventViewProps {
@@ -12,9 +13,9 @@ const Page: React.FC<EventViewProps> = async ({ params }) => {
   const eventId = slug.event;
 
   return (
-    <div className="flex w-full justify-center py-10 gap-4">
+    <PageContainer backHref="/admin/events" backLabel="Back to Events">
       <EventCreateModify eventId={eventId} />
-    </div>
+    </PageContainer>
   );
 };
 
