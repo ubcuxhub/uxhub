@@ -1,12 +1,10 @@
--- Add slug column to events table for public URL-friendly event detail pages.
--- Slugs are auto-generated from the event name on insert if not supplied.
 
 alter table events add column if not exists slug text;
 
--- Create a unique index on slug (allows null but unique when set)
+
 create unique index if not exists idx_events_slug on events (slug) where slug is not null;
 
--- Backfill existing events with a slug derived from their name
+
 update events
 set slug = lower(
   regexp_replace(
@@ -16,7 +14,7 @@ set slug = lower(
 )
 where slug is null;
 
--- Create a function to auto-generate slugs on insert
+
 create or replace function generate_event_slug()
 returns trigger as $$
 begin
