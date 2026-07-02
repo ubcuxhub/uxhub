@@ -74,7 +74,7 @@ const EventsSection: React.FC = () => {
         </h2>
       </div>
 
-      {/* event cards */}
+
       <div className="flex flex-col md:flex-row">
         {loading ? (
           <div className="flex w-full justify-center py-20">
@@ -102,7 +102,7 @@ const EventsSection: React.FC = () => {
         )}
       </div>
 
-      {/* CTA */}
+
       <div className="text-center flex justify-center pt-16">
         <Button
           variant="primary"
