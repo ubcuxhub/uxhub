@@ -499,19 +499,19 @@ export default function EventDetailPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
             {/* Map embed or static image */}
-            <div className="aspect-[4/3] rounded-xl overflow-hidden bg-gray-100">
+            <div className="aspect-[4/3] rounded-xl overflow-hidden bg-gray-100 relative pointer-events-none">
               {event.location_address_url ? (
                 <iframe
                   src={`https://maps.google.com/maps?q=${encodeURIComponent(
                     locationDisplay || ""
                   )}&output=embed`}
-                  className="w-full h-full border-0"
+                  className="absolute border-0 w-[150%] h-[150%] -top-[25%] -left-[25%]"
                   loading="lazy"
                   title="Event location map"
                   allowFullScreen
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-300">
+                <div className="w-full h-full flex items-center justify-center text-gray-300 absolute inset-0">
                   <MapPin size={48} />
                 </div>
               )}
