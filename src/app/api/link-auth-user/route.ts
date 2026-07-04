@@ -83,8 +83,6 @@ export async function POST(req: Request) {
         year: year || null,
         newsletter: newsletter ? "true" : "false",
         role_access: "basic",
-        order_date: new Date().toISOString(),
-        membership_type: null,
       });
 
       return NextResponse.json({ data });
