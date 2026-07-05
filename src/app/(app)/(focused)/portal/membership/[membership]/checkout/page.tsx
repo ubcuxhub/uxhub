@@ -7,7 +7,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { CheckoutSummaryCard } from "@/components/shared/CheckoutSummaryCard";
-import { PageContainer } from "@/components/shared/PageContainer";
 import { requireAuth } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchMembershipTypeBySlug } from "@/lib/supabase-helpers/memberships";
@@ -45,7 +44,7 @@ export default async function MembershipCheckoutPage({
     : null;
 
   return (
-    <PageContainer backHref="/portal/membership" backLabel="Back to Memberships">
+    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_360px]">
         <div className="space-y-6">
           <Card>
@@ -97,6 +96,6 @@ export default async function MembershipCheckoutPage({
           />
         </div>
       </div>
-    </PageContainer>
+    </div>
   );
 }

@@ -21,7 +21,7 @@ function BecomeMemberBanner() {
         </div>
       </div>
       <Button asChild className="shrink-0">
-        <Link href="/portal/membership">
+        <Link href="/portal/membership/join">
           Become a member
           <ArrowRight className="h-4 w-4" />
         </Link>

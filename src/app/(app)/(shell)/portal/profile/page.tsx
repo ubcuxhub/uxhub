@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { FACULTIES, YEAR_LEVELS } from "@/lib/constants";
 import { useUser } from "@/context/UserContext";
 import { Button } from "@/components/ui/button";
@@ -24,7 +25,6 @@ import {
   fetchPurchaseHistoryForUser,
   type PurchaseHistoryItem,
 } from "@/lib/supabase-helpers/event-registrations";
-import { MembershipWizard } from "@/features/memberships";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { cn } from "@/lib/utils";
 import type { MembershipTypeRow } from "@/features/memberships";
@@ -88,7 +88,6 @@ const Profile = () => {
     user_type: "ubcStudent",
   });
   const [loading, setLoading] = useState(false);
-  const [wizardOpen, setWizardOpen] = useState(false);
   const [purchases, setPurchases] = useState<PurchaseHistoryItem[]>([]);
   const [membershipTiers, setMembershipTiers] = useState<MembershipTypeRow[]>(
     []
@@ -252,7 +251,9 @@ const Profile = () => {
                   <p className="text-sm text-muted-foreground">
                     Join UX Hub to unlock member perks and event discounts.
                   </p>
-                  <Button onClick={() => setWizardOpen(true)}>Join now</Button>
+                  <Button asChild>
+                    <Link href="/portal/membership/join">Join now</Link>
+                  </Button>
                 </div>
               )}
             </CardContent>
@@ -612,8 +613,6 @@ const Profile = () => {
           </Card>
         </div>
       </div>
-
-      <MembershipWizard open={wizardOpen} onOpenChange={setWizardOpen} />
     </PageContainer>
   );
 };

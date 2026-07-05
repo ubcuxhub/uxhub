@@ -4,7 +4,6 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   CalendarDays,
-  CreditCard,
   Home,
   LayoutDashboard,
   LogOut,
@@ -31,7 +30,6 @@ import {
 const studentItems = [
   { title: "Home", href: "/portal", icon: Home, exact: true },
   { title: "Events", href: "/portal/events", icon: CalendarDays },
-  { title: "Membership", href: "/portal/membership", icon: CreditCard },
   { title: "Purchases", href: "/portal/purchases", icon: Receipt },
 ];
 
