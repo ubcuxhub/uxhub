@@ -241,7 +241,7 @@ const Profile = () => {
                       you&apos;re a registered member!
                     </p>
                   </div>
-                  <Star className="h-10 w-10 flex-shrink-0 fill-primary text-primary" />
+                  <Star className="flex-shrink-0 fill-primary text-primary" />
                 </>
               ) : (
                 <div className="space-y-3">
@@ -355,7 +355,7 @@ const Profile = () => {
                   onClick={() => setIsEditing(true)}
                   className="flex items-center gap-2"
                 >
-                  <Pencil className="h-4 w-4" />
+                  <Pencil />
                   Edit
                 </Button>
               ) : (

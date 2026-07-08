@@ -211,7 +211,7 @@ export default function EventDetailPage() {
             href="/events"
             className="flex items-center gap-2 text-black font-medium hover:underline"
           >
-            <ArrowLeft size={18} />
+            <ArrowLeft />
             Back to Events
           </Link>
         </div>
@@ -263,7 +263,7 @@ export default function EventDetailPage() {
           href="/events"
           className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-black transition-colors mb-6"
         >
-          <ArrowLeft size={16} />
+          <ArrowLeft />
           All Events
         </Link>
 
@@ -279,7 +279,7 @@ export default function EventDetailPage() {
               />
             ) : (
               <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-100 flex items-center justify-center">
-                <Calendar size={64} className="text-gray-300" />
+                <Calendar className="text-gray-300" />
               </div>
             )}
           </div>
@@ -297,7 +297,7 @@ export default function EventDetailPage() {
             {/* Price badge */}
             <div className="flex items-center gap-3">
               <div className="inline-flex items-center gap-2 bg-gray-100 rounded-lg px-4 py-2">
-                <DollarSign size={16} className="text-gray-500" />
+                <DollarSign className="text-gray-500" />
                 <span className="font-semibold text-black">
                   {isFree
                     ? "Free"
@@ -319,7 +319,7 @@ export default function EventDetailPage() {
             {/* Date & Time */}
             <div className="flex items-center gap-3 text-sm text-gray-700">
               <div className="flex items-center justify-center w-8 h-8 rounded-md bg-gray-100">
-                <Calendar size={16} className="text-gray-500" />
+                <Calendar className="text-gray-500" />
               </div>
               <div>
                 <p className="font-medium">{startDateFormatted || "TBD"}</p>
@@ -335,7 +335,7 @@ export default function EventDetailPage() {
             {/* Location */}
             <div className="flex items-center gap-3 text-sm text-gray-700">
               <div className="flex items-center justify-center w-8 h-8 rounded-md bg-gray-100">
-                <MapPin size={16} className="text-gray-500" />
+                <MapPin className="text-gray-500" />
               </div>
               <div>
                 <p className="font-medium">{locationDisplay || "TBD"}</p>
@@ -447,7 +447,7 @@ export default function EventDetailPage() {
                           rel="noopener noreferrer"
                           className="text-blue-600 hover:text-blue-800 flex-shrink-0"
                         >
-                          <Linkedin size={16} />
+                          <Linkedin />
                         </a>
                       )}
                     </div>
@@ -542,7 +542,7 @@ export default function EventDetailPage() {
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-300 absolute inset-0">
-                  <MapPin size={48} />
+                  <MapPin />
                 </div>
               )}
             </div>
@@ -573,7 +573,7 @@ export default function EventDetailPage() {
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 rounded-lg bg-black text-white font-bold text-sm px-6 py-2.5 hover:bg-gray-800 transition-all duration-200"
                 >
-                  <ExternalLink size={14} />
+                  <ExternalLink />
                   Directions
                 </a>
               )}

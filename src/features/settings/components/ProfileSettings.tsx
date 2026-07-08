@@ -153,22 +153,15 @@ export function ProfileSettings() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
-          Your personal details and preferences.
-        </p>
+      <div className="flex items-center justify-end">
         {!isEditing ? (
           <Button variant="outline" onClick={() => setIsEditing(true)}>
-            <Pencil className="h-4 w-4" />
+            <Pencil />
             Edit
           </Button>
         ) : (
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={handleCancel}
-              disabled={saving}
-            >
+            <Button variant="outline" onClick={handleCancel} disabled={saving}>
               Cancel
             </Button>
             <Button onClick={handleSave} disabled={saving}>
@@ -310,13 +303,13 @@ export function ProfileSettings() {
               onClick={() => patch({ newsletter: !formData.newsletter })}
               className={cn(
                 "relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors",
-                formData.newsletter ? "bg-primary" : "bg-muted-foreground/30"
+                formData.newsletter ? "bg-primary" : "bg-muted-foreground/30",
               )}
             >
               <span
                 className={cn(
                   "inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform",
-                  formData.newsletter ? "translate-x-6" : "translate-x-1"
+                  formData.newsletter ? "translate-x-6" : "translate-x-1",
                 )}
               />
             </button>
@@ -330,9 +323,6 @@ export function ProfileSettings() {
 
       {/* Read-only account details */}
       <div className="space-y-4 border-t pt-6">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-          Account
-        </p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Row label="Email">
             <ReadValue>{user.email}</ReadValue>
@@ -388,7 +378,9 @@ function ReadValue({
     children === "" ||
     (typeof children === "string" && children.trim() === "");
   return (
-    <div className={cn("min-h-9 flex items-center text-sm font-medium", className)}>
+    <div
+      className={cn("min-h-9 flex items-center text-sm font-medium", className)}
+    >
       {isEmpty ? <span className="text-muted-foreground/60">—</span> : children}
     </div>
   );

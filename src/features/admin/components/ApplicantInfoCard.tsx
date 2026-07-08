@@ -36,11 +36,11 @@ function formatDate(dateString: string) {
 function getStatusIcon(status: ApplicationStatus) {
   switch (status) {
     case "pending":
-      return <Clock className="h-4 w-4 text-yellow-500" />;
+      return <Clock className="text-yellow-500" />;
     case "declined":
-      return <X className="h-4 w-4 text-red-500" />;
+      return <X className="text-red-500" />;
     case "accepted":
-      return <Check className="h-4 w-4 text-green-500" />;
+      return <Check className="text-green-500" />;
   }
 }
 
@@ -60,11 +60,11 @@ export function ApplicantInfoCard({
         <div className="flex items-start justify-between">
           <div className="flex-1 space-y-1">
             <CardTitle className="text-lg flex items-center gap-2">
-              <User className="h-5 w-5 text-muted-foreground" />
+              <User className="text-muted-foreground" />
               {name}
             </CardTitle>
             <CardDescription className="flex items-center gap-2">
-              <Mail className="h-4 w-4" />
+              <Mail />
               {email}
             </CardDescription>
           </div>
@@ -78,7 +78,7 @@ export function ApplicantInfoCard({
       </CardHeader>
       <CardContent>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Calendar className="h-4 w-4" />
+          <Calendar />
           <span>Applied: {formatDate(applicationDate)}</span>
         </div>
       </CardContent>

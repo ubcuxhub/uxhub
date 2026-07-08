@@ -47,7 +47,7 @@ export function StatusUpdateSection({
                 </>
               ) : (
                 <>
-                  <X className="mr-2 h-4 w-4" />
+                  <X className="mr-2" />
                   Decline
                 </>
               )}
@@ -65,7 +65,7 @@ export function StatusUpdateSection({
                 </>
               ) : (
                 <>
-                  <Check className="mr-2 h-4 w-4" />
+                  <Check className="mr-2" />
                   Accept
                 </>
               )}

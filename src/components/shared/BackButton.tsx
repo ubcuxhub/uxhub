@@ -12,7 +12,7 @@ export function BackButton({ link, label = "Back", className }: BackButtonProps)
   return (
     <Button asChild variant="outline" className={className}>
       <Link href={link}>
-        <ArrowLeft className="mr-2 h-4 w-4" />
+        <ArrowLeft className="mr-2" />
         {label}
       </Link>
     </Button>

@@ -82,7 +82,7 @@ export function SettingsDialog() {
       window.history.replaceState(
         null,
         "",
-        window.location.pathname + window.location.search
+        window.location.pathname + window.location.search,
       );
     }
   };
@@ -96,7 +96,7 @@ export function SettingsDialog() {
         </DialogDescription>
         <SidebarProvider className="min-h-0">
           <Sidebar collapsible="none" className="flex w-48 bg-transparent">
-            <SidebarHeader className="shrink-0 flex-row items-center p-3">
+            <SidebarHeader className="shrink-0 flex-row items-center">
               <DialogClose asChild>
                 <Button variant="ghost" size="icon" aria-label="Close">
                   <X />
@@ -125,12 +125,12 @@ export function SettingsDialog() {
           </Sidebar>
 
           <main className="flex h-[80vh] max-h-[760px] flex-1 flex-col overflow-hidden">
-            <header className="flex h-[3.75rem] shrink-0 items-center px-6">
+            <header className="flex shrink-0 items-center px-6 py-6">
               <h2 className="text-base font-semibold">
                 {TABS.find((t) => t.id === tab)?.label ?? "Settings"}
               </h2>
             </header>
-            <div className="flex-1 overflow-y-auto p-6">
+            <div className="flex-1 overflow-y-auto p-6 pt-0">
               {tab === "general" && <GeneralSettings />}
               {tab === "profile" && <ProfileSettings />}
               {tab === "purchases" && <PurchaseHistorySettings />}

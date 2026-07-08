@@ -24,7 +24,7 @@ export function GeneralSettings() {
             Sign out of your UX Hub account on this device.
           </p>
         </div>
-        <Button variant="destructive" onClick={handleLogout}>
+        <Button variant="secondary" onClick={handleLogout}>
           <LogOut />
           Logout
         </Button>
