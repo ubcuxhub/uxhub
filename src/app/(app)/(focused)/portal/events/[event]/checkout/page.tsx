@@ -7,6 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { CheckoutSummaryCard } from "@/components/shared/CheckoutSummaryCard";
+import { PageContainer } from "@/components/shared/PageContainer";
 import { requireAuth } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchApplicationQuestions } from "@/lib/supabase-helpers/event-applications";
@@ -71,7 +72,10 @@ export default async function EventCheckoutPage({
   }
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+    <PageContainer
+      backHref={`/events/${event.slug ?? slug}`}
+      backLabel="Back to event"
+    >
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_360px]">
         <div className="space-y-6">
           <Card>
@@ -132,6 +136,6 @@ export default async function EventCheckoutPage({
           />
         </div>
       </div>
-    </div>
+    </PageContainer>
   );
 }
