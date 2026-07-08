@@ -352,7 +352,6 @@ const Profile = () => {
               {!isEditing ? (
                 <Button
                   variant="outline"
-                  size="sm"
                   onClick={() => setIsEditing(true)}
                   className="flex items-center gap-2"
                 >
@@ -363,14 +362,12 @@ const Profile = () => {
                 <div className="flex gap-2">
                   <Button
                     variant="outline"
-                    size="sm"
                     onClick={() => setIsEditing(false)}
                     disabled={loading}
                   >
                     Cancel
                   </Button>
                   <Button
-                    size="sm"
                     onClick={handleSave}
                     disabled={loading}
                   >

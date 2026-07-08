@@ -55,13 +55,12 @@ export function MembershipTypeField({
             </SelectContent>
           </Select>
           <Button
-            size="sm"
             onClick={() => onEditSave("membership_type_id")}
             disabled={isSaving}
           >
             Save
           </Button>
-          <Button size="sm" variant="outline" onClick={onEditCancel} disabled={isSaving}>
+          <Button variant="outline" onClick={onEditCancel} disabled={isSaving}>
             Cancel
           </Button>
         </div>
@@ -69,7 +68,6 @@ export function MembershipTypeField({
         <div className="flex items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm">
           <span className={!value ? "text-muted-foreground" : ""}>{value || "None"}</span>
           <Button
-            size="sm"
             variant="ghost"
             onClick={() => onEditStart("membership_type_id", selectedMembershipTypeId ?? null)}
             className="h-6 px-2 text-xs"

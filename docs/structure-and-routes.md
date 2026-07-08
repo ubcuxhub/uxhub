@@ -45,9 +45,6 @@ uxhub/
 │   │   │   │   │   ├── events/
 │   │   │   │   │   │   ├── page.tsx      # Your registered events (ongoing/upcoming/attended)
 │   │   │   │   │   │   └── [event]/page.tsx # Simple event detail by event slug
-│   │   │   │   │   ├── purchases/
-│   │   │   │   │   │   ├── page.tsx      # User purchase history
-│   │   │   │   │   │   └── [purchaseId]/page.tsx # User purchase detail/receipt
 │   │   │   │   │   └── profile/page.tsx
 │   │   │   │   └── admin/                # Admin-gated routes
 │   │   │   │       ├── layout.tsx        # requireAdmin guard only (sidebar comes from (shell))
@@ -108,13 +105,16 @@ uxhub/
 │   │   ├── memberships/
 │   │   │   ├── types/
 │   │   │   └── index.ts
-│   │   └── payments/
-│   │       ├── actions.ts                # Checkout server action
-│   │       ├── fulfillment.ts            # Checkout/webhook fulfillment logic
-│   │       ├── schemas.ts
-│   │       ├── types.ts
-│   │       ├── components/
-│   │       └── index.ts
+│   │   ├── payments/
+│   │   │   ├── actions.ts                # Checkout server action
+│   │   │   ├── fulfillment.ts            # Checkout/webhook fulfillment logic
+│   │   │   ├── schemas.ts
+│   │   │   ├── types.ts
+│   │   │   ├── components/
+│   │   │   └── index.ts
+│   │   └── settings/                     # Hash-driven settings dialog (#settings/<tab>)
+│   │       ├── components/               # SettingsDialog + General/Profile/PurchaseHistory panels
+│   │       └── index.ts                  # SettingsDialog, openSettings
 │   │
 │   ├── lib/
 │   │   ├── auth/
@@ -175,6 +175,8 @@ uxhub/
 
 **Layouts handle access control.** `src/proxy.ts` refreshes Supabase sessions for `/admin`, `/portal`, and `/api` requests. It does not decide authorization. The shared `src/app/(app)/layout.tsx` calls `requireAuth()` and wraps everything in `UserProvider` (no sidebar of its own). It then splits into two layout-only route groups that leave every URL unchanged: `src/app/(app)/(shell)/layout.tsx` renders the unified `AppSidebar` (`src/components/shared/AppSidebar.tsx`) inside a `SidebarProvider` around the student browsing routes and admin, while `src/app/(app)/(focused)/layout.tsx` is a full-height, sidebar-less container for the membership list, join wizard, and checkout pages. The nested `src/app/(app)/(shell)/admin/layout.tsx` adds `requireAdmin()` as a guard only. Because the shell routes share the `(shell)` parent layout, the sidebar persists when navigating between student and admin pages; admin tabs render only when `user.role_access === "admin"`. The `(focused)` group is how a URL-child (e.g. `/portal/events/[event]/checkout`) opts out of the sidebar its URL-parent (`/portal/events/[event]`) still shows — route groups decouple layout inheritance from the URL hierarchy.
 
+**Settings live in a hash-driven dialog.** `AppSidebar`'s footer "Profile & settings" button opens `SettingsDialog` (`src/features/settings`) instead of navigating. The dialog is a shadcn `Dialog` containing an in-dialog shadcn `Sidebar` with General / Profile / Purchase history tabs, and is controlled entirely by the URL hash `#settings/<tab>` (so `/portal#settings/profile` deep-links straight to the Profile tab). Call `openSettings(tab)` to open it from anywhere. The Profile tab edits `user_info` via the same `updateUserInfoById` + `refreshUser` pattern used by `/portal/profile`. The Purchase history tab lists the user's purchases via `fetchPurchasesForUser` — there is no standalone `/portal/purchases` route; the checkout success flow redirects to `/portal#settings/purchases`.
+
 ## URL Conventions
 
 ### Public - `(marketing)`
@@ -211,8 +213,6 @@ uxhub/
 /portal/membership/join                    # (focused) — no sidebar
 /portal/membership/[membership]            # (focused) — no sidebar
 /portal/membership/[membership]/checkout   # (focused) — no sidebar
-/portal/purchases                          # (shell) — sidebar
-/portal/purchases/[purchaseId]             # (shell) — sidebar
 /portal/profile                            # (shell) — sidebar
 ```
 
