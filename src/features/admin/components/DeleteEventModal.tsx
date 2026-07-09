@@ -60,13 +60,16 @@ export function DeleteEventModal({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div
-            className="text-sm text-muted-foreground"
-            dangerouslySetInnerHTML={{
-              __html:
-                "Are you sure you want to delete this event? This action cannot be undone.<br />Type in the event name to delete this event forever.",
-            }}
-          />
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>
+              Are you sure you want to delete this event? This action cannot be
+              undone.
+            </p>
+            <p>
+              Type in the event name <strong>{eventName}</strong> to delete
+              this event forever.
+            </p>
+          </div>
           <div className="space-y-2">
             <Input
               type="text"
