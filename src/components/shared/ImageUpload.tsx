@@ -5,6 +5,25 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
 import Image from "next/image";
+
+const getImageDimensions = (file: File) =>
+  new Promise<{ width: number; height: number }>((resolve, reject) => {
+    const imageUrl = URL.createObjectURL(file);
+    const image = document.createElement("img");
+
+    image.onload = () => {
+      URL.revokeObjectURL(imageUrl);
+      resolve({ width: image.naturalWidth, height: image.naturalHeight });
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(imageUrl);
+      reject(new Error("Unable to read image dimensions"));
+    };
+
+    image.src = imageUrl;
+  });
+
 interface ImageUploadProps {
   value?: string;
   onChange: (path: string) => void;
@@ -85,6 +104,17 @@ export const ImageUpload = ({
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
       setError("Image size must be less than 5MB");
+      return;
+    }
+
+    const dimensions = await getImageDimensions(file).catch(() => null);
+    if (!dimensions) {
+      setError("Unable to read image dimensions");
+      return;
+    }
+
+    if (dimensions.width !== dimensions.height) {
+      setError("Event thumbnails must be square (same width and height)");
       return;
     }
 
@@ -178,7 +208,7 @@ export const ImageUpload = ({
                 type="button"
                 variant="destructive"
                 size="sm"
-                className="absolute top-2 right-2"
+                className="absolute top-2 right-2 bg-red-600 text-white hover:bg-red-700"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleRemove();
@@ -208,7 +238,7 @@ export const ImageUpload = ({
                 Drag and drop an image here, or click to select
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                JPG or PNG (max 5MB)
+                Square JPG or PNG (max 5MB)
               </p>
             </div>
           </div>
