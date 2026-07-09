@@ -3,13 +3,7 @@ import { CalendarDays, Eye, List, MapPin, Pencil } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import {
   Popover,
   PopoverContent,
@@ -71,24 +65,21 @@ export function UpcomingEventPanel({
 }: UpcomingEventPanelProps) {
   if (!event) {
     return (
-      <Card className="h-full">
-        <CardHeader>
-          <CardTitle>Upcoming Event</CardTitle>
-          <CardDescription>
-            Your next scheduled event will appear here.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex min-h-48 flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
-            <p className="text-sm text-muted-foreground">
-              No upcoming events are scheduled yet.
-            </p>
-            <Button asChild size="sm">
-              <Link href="/admin/events/create-new">Create Event</Link>
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <section className="flex h-full flex-col gap-3">
+        <h2 className="text-2xl font-bold">Upcoming Event</h2>
+        <Card className="h-full">
+          <CardContent>
+            <div className="flex min-h-48 flex-col items-center justify-center gap-3 rounded-lg border border-dashed p-8 text-center">
+              <p className="text-sm text-muted-foreground">
+                No upcoming events are scheduled yet.
+              </p>
+              <Button asChild size="sm">
+                <Link href="/admin/events/create-new">Create Event</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
     );
   }
 
@@ -100,110 +91,110 @@ export function UpcomingEventPanel({
   const rsvpLabel = `${rsvpCount} RSVP${rsvpCount === 1 ? "" : "s"}`;
 
   return (
-    <Popover>
-      <Card className="h-full">
-        <CardHeader>
-          <CardTitle>Upcoming Event</CardTitle>
-          <CardDescription>
-            The next event on the admin calendar.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              className="w-full rounded-lg text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring hover:cursor-pointer"
-              aria-label={`Open actions for ${event.name}`}
-            >
-              <div className="grid gap-6 p-2 lg:grid-cols-[minmax(180px,0.9fr)_minmax(0,1fr)] lg:items-center">
-                {event.image_url ? (
-                  <div className="overflow-hidden rounded-lg bg-muted">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={event.image_url}
-                      alt={event.name}
-                      className="aspect-video h-full w-full object-cover lg:aspect-square"
-                    />
-                  </div>
-                ) : (
-                  <div className="flex aspect-video items-center justify-center rounded-lg bg-muted text-sm text-muted-foreground lg:aspect-square">
-                    Event image
-                  </div>
-                )}
+    <section className="flex h-full flex-col gap-3">
+      <h2 className="text-2xl font-bold">Upcoming Event</h2>
+      <Popover>
+        <Card className="h-full">
+          <CardContent>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className="w-full rounded-lg text-left transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring hover:cursor-pointer"
+                aria-label={`Open actions for ${event.name}`}
+              >
+                <div className="grid gap-6 p-2 lg:grid-cols-[minmax(180px,0.9fr)_minmax(0,1fr)] lg:items-center">
+                  {event.image_url ? (
+                    <div className="overflow-hidden rounded-lg bg-muted">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={event.image_url}
+                        alt={event.name}
+                        className="aspect-video h-full w-full object-cover lg:aspect-square"
+                      />
+                    </div>
+                  ) : (
+                    <div className="flex aspect-video items-center justify-center rounded-lg bg-muted text-sm text-muted-foreground lg:aspect-square">
+                      Event image
+                    </div>
+                  )}
 
-                <div className="flex flex-col gap-4">
-                  <div className="flex flex-col gap-3">
-                    <Badge variant="outline" className="w-fit">
-                      {rsvpLabel}
-                    </Badge>
-                    <div className="flex flex-col gap-2">
-                      <h2 className="text-2xl font-semibold tracking-tight">
-                        {event.name}
-                      </h2>
-                      <p className="line-clamp-3 text-sm text-muted-foreground">
-                        {event.description}
-                      </p>
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-3">
+                      <Badge
+                        variant="outline"
+                        className="w-fit text-sm font-normal"
+                      >
+                        {rsvpLabel}
+                      </Badge>
+                      <div className="flex flex-col gap-2">
+                        <h3 className="text-xl font-semibold tracking-tight">
+                          {event.name}
+                        </h3>
+                        <p className="line-clamp-3 text-sm text-muted-foreground">
+                          {event.description}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-2 text-sm text-muted-foreground [&_svg]:size-4 [&_svg]:shrink-0">
+                      {(eventDate || eventTime) && (
+                        <div className="flex items-center gap-2">
+                          <CalendarDays />
+                          <span>
+                            {eventDate && eventTime
+                              ? `${eventDate} at ${eventTime}`
+                              : eventDate || eventTime}
+                          </span>
+                        </div>
+                      )}
+                      {location && (
+                        <div className="flex items-center gap-2">
+                          <MapPin />
+                          <span>{location}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
-
-                  <div className="flex flex-col gap-2 text-sm text-muted-foreground [&_svg]:size-4 [&_svg]:shrink-0">
-                    {(eventDate || eventTime) && (
-                      <div className="flex items-center gap-2">
-                        <CalendarDays />
-                        <span>
-                          {eventDate && eventTime
-                            ? `${eventDate} at ${eventTime}`
-                            : eventDate || eventTime}
-                        </span>
-                      </div>
-                    )}
-                    {location && (
-                      <div className="flex items-center gap-2">
-                        <MapPin />
-                        <span>{location}</span>
-                      </div>
-                    )}
-                  </div>
                 </div>
-              </div>
-            </button>
-          </PopoverTrigger>
-        </CardContent>
-      </Card>
-      <PopoverContent side="right" align="center" className="w-48 p-2">
-        <div className="flex flex-col gap-1">
-          <Button
-            asChild
-            variant="ghost"
-            className="justify-start text-muted-foreground hover:text-muted-foreground"
-          >
-            <Link href={event.slug ? `/events/${event.slug}` : "/events"}>
-              <Eye data-icon="inline-start" />
-              View
-            </Link>
-          </Button>
-          <Button
-            asChild
-            variant="ghost"
-            className="justify-start text-muted-foreground hover:text-muted-foreground"
-          >
-            <Link href={`/admin/events/${event.id}`}>
-              <Pencil data-icon="inline-start" />
-              Edit
-            </Link>
-          </Button>
-          <Button
-            asChild
-            variant="ghost"
-            className="justify-start text-muted-foreground hover:text-muted-foreground"
-          >
-            <Link href="/admin/events">
-              <List data-icon="inline-start" />
-              See All Events
-            </Link>
-          </Button>
-        </div>
-      </PopoverContent>
-    </Popover>
+              </button>
+            </PopoverTrigger>
+          </CardContent>
+        </Card>
+        <PopoverContent side="right" align="center" className="w-48 p-2">
+          <div className="flex flex-col gap-1">
+            <Button
+              asChild
+              variant="ghost"
+              className="justify-start text-sm text-muted-foreground hover:text-muted-foreground"
+            >
+              <Link href={event.slug ? `/events/${event.slug}` : "/events"}>
+                <Eye data-icon="inline-start" />
+                View
+              </Link>
+            </Button>
+            <Button
+              asChild
+              variant="ghost"
+              className="justify-start text-sm text-muted-foreground hover:text-muted-foreground"
+            >
+              <Link href={`/admin/events/${event.id}`}>
+                <Pencil data-icon="inline-start" />
+                Edit
+              </Link>
+            </Button>
+            <Button
+              asChild
+              variant="ghost"
+              className="justify-start text-sm text-muted-foreground hover:text-muted-foreground"
+            >
+              <Link href="/admin/events">
+                <List data-icon="inline-start" />
+                See All Events
+              </Link>
+            </Button>
+          </div>
+        </PopoverContent>
+      </Popover>
+    </section>
   );
 }
