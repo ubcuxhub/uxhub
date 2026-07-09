@@ -56,6 +56,7 @@ pnpm start
 - Data access should go through typed helpers in `src/lib/supabase-helpers/`. Avoid scattering raw `supabase.from("...")` calls through pages and components.
 - Service-role access belongs in `src/lib/supabase/admin.ts` and `src/lib/supabase-helpers/admin-server.ts`.
 - Pages rendered inside the `(app)` shell (sidebar visible) wrap their content in `PageContainer` (`src/components/shared/PageContainer.tsx`) for a consistent max-width and edge padding. Layered (non-sidebar) routes pass `backHref`/`backLabel` to render a top-left back button to their parent route. `/admin/users` is intentionally exempt (full-height split-pane).
+- Admin dashboard sections should live as modular panel components under `src/features/admin/components/dashboard/` so the `/admin` layout can be rearranged without rewriting panel internals.
 - Marketing styles are scoped through the `marketing-home` wrapper in `src/app/globals.css` so homepage fonts/colors do not leak into portal/admin UI.
 - Use the `@/*` path alias for imports from `src/*`.
 - Prefer server actions for app-owned mutations. Keep `/api` for callbacks/integrations and route-handler-specific needs such as Supabase email confirmation, Square webhooks, auth user linking, and event image upload.

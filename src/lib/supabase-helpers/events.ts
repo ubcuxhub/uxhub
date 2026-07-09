@@ -25,6 +25,22 @@ export async function fetchEvents(
   return data ?? [];
 }
 
+export async function fetchUpcomingEvent(
+  supabase: DbClient,
+  fromDate = new Date().toISOString().slice(0, 10)
+): Promise<EventRow | null> {
+  const { data, error } = await supabase
+    .from(TABLES.events)
+    .select("*")
+    .gte("start_date", fromDate)
+    .order("start_date", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function fetchEventById(
   supabase: DbClient,
   id: string

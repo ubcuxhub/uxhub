@@ -10,6 +10,7 @@ export { UserDirectoryPanel } from "./components/UserDirectoryPanel";
 export { UserDetailsPanel } from "./components/UserDetailsPanel";
 export { EditableUserField } from "./components/EditableUserField";
 export { MembershipTypeField } from "./components/MembershipTypeField";
+export { UpcomingEventPanel } from "./components/dashboard/UpcomingEventPanel";
 export type {
   CheckInSession,
   CheckInSessionDraft,

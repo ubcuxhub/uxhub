@@ -56,7 +56,7 @@ uxhub/
 │   │   │   │   └── profile/page.tsx
 │   │   │   └── admin/                    # Admin-gated routes
 │   │   │       ├── layout.tsx            # requireAdmin guard only (sidebar comes from (app))
-│   │   │       ├── page.tsx              # Admin dashboard
+│   │   │       ├── page.tsx              # Admin dashboard with modular panels
 │   │   │       ├── events/
 │   │   │       │   ├── page.tsx          # Event list
 │   │   │       │   ├── create-new/page.tsx   # Create event

@@ -40,6 +40,26 @@ export async function fetchRegistrationsForEvent(
   return data ?? [];
 }
 
+export async function countRegistrationsForEvent(
+  supabase: DbClient,
+  eventId: string,
+  statuses?: ApplicationStatus[]
+): Promise<number> {
+  let query = supabase
+    .from(TABLES.eventRegistrations)
+    .select("id", { count: "exact", head: true })
+    .eq("event_id", eventId);
+
+  if (statuses?.length) {
+    query = query.in("status", statuses);
+  }
+
+  const { count, error } = await query;
+
+  if (error) throw error;
+  return count ?? 0;
+}
+
 /** Returns all event registrations for a given user. */
 export async function fetchRegistrationsForUser(
   supabase: DbClient,
