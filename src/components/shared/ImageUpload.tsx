@@ -27,14 +27,14 @@ const getImageDimensions = (file: File) =>
 interface ImageUploadProps {
   value?: string;
   onChange: (path: string) => void;
-  eventName: string;
+  onFileChange?: (file: File | null) => void;
   disabled?: boolean;
 }
 
 export const ImageUpload = ({
   value,
   onChange,
-  eventName,
+  onFileChange,
   disabled = false,
 }: ImageUploadProps) => {
   const [isDragging, setIsDragging] = useState(false);
@@ -119,7 +119,6 @@ export const ImageUpload = ({
     }
 
     setError(null);
-    setIsUploading(true);
 
     try {
       // Create preview
@@ -128,27 +127,11 @@ export const ImageUpload = ({
         setPreview(reader.result as string);
       };
       reader.readAsDataURL(file);
-
-      // Upload file
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("eventName", eventName);
-
-      const response = await fetch("/api/upload-event-image", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to upload image");
-      }
-
-      onChange(data.path);
+      onFileChange?.(file);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to upload image");
+      setError(err instanceof Error ? err.message : "Failed to read image");
       setPreview(null);
+      onFileChange?.(null);
     } finally {
       setIsUploading(false);
     }
@@ -156,6 +139,7 @@ export const ImageUpload = ({
 
   const handleRemove = () => {
     setPreview(null);
+    onFileChange?.(null);
     onChange("");
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
