@@ -45,7 +45,7 @@ export default async function MembershipCheckoutPage({
     : null;
 
   return (
-    <PageContainer backHref="/portal/membership" backLabel="Back to Memberships">
+    <PageContainer backHref="/portal/membership" backLabel="Back to memberships">
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_360px]">
         <div className="space-y-6">
           <Card>

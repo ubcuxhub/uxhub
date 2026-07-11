@@ -115,15 +115,15 @@ export function EventCard({
             </div>
           </div>
           <div className="flex gap-2 w-full">
-            <Button asChild variant="outline" size="sm">
+            <Button asChild variant="outline">
               <Link href={adminLinks?.editHref || `/admin/events/${event.id}`}>Modify</Link>
             </Button>
-            <Button asChild variant="outline" size="sm" className="flex-1">
+            <Button asChild variant="outline" className="flex-1">
               <Link href={adminLinks?.checkInHref || `/admin/events/${event.id}/check-in`}>
                 Check-In
               </Link>
             </Button>
-            <Button asChild variant="outline" size="sm" className="flex-1">
+            <Button asChild variant="outline" className="flex-1">
               <Link
                 href={
                   adminLinks?.applicationsHref ||
