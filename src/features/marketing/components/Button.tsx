@@ -30,7 +30,7 @@ const Button: React.FC<ButtonProps> = ({
     noBorder: "bg-white hover:bg-black text-black hover:text-white"
   };
 
-  const arrowIcon = <ArrowUpRight size={24} className={
+  const arrowIcon = <ArrowUpRight className={
     `transition-all duration-300 ease-in-out group-hover:rotate-45
     ${variant == "primary" ? "group-hover:text-black" : "group-hover:text-white"}`
   } />

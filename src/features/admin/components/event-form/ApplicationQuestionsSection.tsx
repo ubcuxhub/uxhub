@@ -163,7 +163,6 @@ export const ApplicationQuestionsSection = ({
                       <Button
                         type="button"
                         variant="outline"
-                        size="sm"
                         onClick={() => onAddResponseOption(index)}
                       >
                         Add Option
@@ -199,7 +198,6 @@ export const ApplicationQuestionsSection = ({
                             <Button
                               type="button"
                               variant="ghost"
-                              size="sm"
                               className="text-red-500 hover:text-red-600 shrink-0"
                               onClick={() =>
                                 onRemoveResponseOption(index, optionIndex)
