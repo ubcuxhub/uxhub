@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Button from "@/features/marketing/components/Button";
-import EventCard from "@/features/marketing/components/EventCard";
+import { EventCard } from "@/components/shared/EventCard";
 import { createClient } from "@/lib/supabase/client";
 import type { EventRow } from "@/types/models";
 
@@ -87,13 +87,13 @@ const EventsSection: React.FC = () => {
         ) : (
           events.map((event, index) => (
             <React.Fragment key={event.id}>
-              <EventCard
-                imageSrc={event.image_url || "/events/event1.png"}
-                imageAlt={event.name || "Event Image"}
-                buttonText={index % 2 === 0 ? "office tour" : "competition"}
-                buttonIcon={index % 2 === 0 ? triangleIcon : starIcon}
-                href={`/events/${event.slug || event.id}`}
-              />
+              <div className="flex-1 w-full md:w-1/2">
+                <EventCard
+                  event={event}
+                  href={`/events/${event.slug || event.id}`}
+                  buttonText={index % 2 === 0 ? "office tour" : "competition"}
+                />
+              </div>
               {index < events.length - 1 && (
                 <div className="md:w-[5%] h-8" aria-hidden="true"></div>
               )}

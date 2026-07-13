@@ -1,5 +1,4 @@
-export { EventCard } from "./components/EventCard";
-export { EventDetailsCard } from "./components/EventDetailsCard";
+
 export { EventStatusCard } from "./components/EventStatusCard";
 export { EventApplicationForm } from "./components/EventApplicationForm";
 export { useEventDetail } from "./hooks/useEventDetail";

@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-import { EventCard, type EventRow } from "@/features/events";
+import { type EventRow } from "@/features/events";
+import { EventCard } from "@/components/shared/EventCard";
 import { createClient } from "@/lib/supabase/client";
 import { fetchEvents } from "@/lib/supabase-helpers/events";
 import { Button } from "@/components/ui/button";
