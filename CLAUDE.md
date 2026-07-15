@@ -30,9 +30,9 @@ pnpm start
 
 - `src/app` - Next.js App Router routes
   - `(marketing)` - public marketing routes
-  - `(app)` - shared authenticated shell (single sidebar) wrapping both portals
-    - `(app)/portal` - authenticated student portal routes
-    - `(app)/admin` - admin-gated routes
+  - `(app)` - shared authenticated boundary (`requireAuth` + `UserProvider`), split into two layout groups
+    - `(app)/(shell)` - sidebar shell: student portal browsing (`portal/*`) and admin (`admin/*`)
+    - `(app)/(focused)` - chrome-free flows (no sidebar): membership list, join wizard, and checkout pages
   - `(auth)/auth` - auth routes
   - `api` - server route handlers and callbacks
 - `src/features` - domain logic and feature UI
@@ -42,6 +42,7 @@ pnpm start
   - `auth` - auth components and user types
   - `admin` - admin UI and types
   - `payments` - Square checkout actions, schemas, fulfillment, and checkout UI
+  - `settings` - project-level settings dialog (General / Profile / Purchase history tabs) launched from the sidebar footer
 - `src/components/ui` - shared shadcn-style primitives
 - `src/components/shared` - shared app composites
 - `src/context` - current user context
@@ -52,10 +53,11 @@ pnpm start
 ## Important Patterns
 
 - `src/proxy.ts` refreshes Supabase sessions for `/portal/*`, `/admin/*`, and `/api/*`.
-- Route group layouts and server code handle authorization with `requireAuth()` and `requireAdmin()` from `src/lib/auth/guards.ts`. The shared `(app)/layout.tsx` calls `requireAuth()` and renders the unified `AppSidebar` (`src/components/shared/AppSidebar.tsx`); the nested `(app)/admin/layout.tsx` adds `requireAdmin()` as a guard only. The sidebar shows admin tabs when `user.role_access === "admin"`.
+- Route group layouts and server code handle authorization with `requireAuth()` and `requireAdmin()` from `src/lib/auth/guards.ts`. The shared `(app)/layout.tsx` calls `requireAuth()` and wraps children in `UserProvider` (no sidebar). It splits into two layout-only route groups that keep every URL unchanged: `(app)/(shell)/layout.tsx` renders the unified `AppSidebar` (`src/components/shared/AppSidebar.tsx`) around portal-browsing and admin routes, while `(app)/(focused)/layout.tsx` is a chrome-free, sidebar-less container for the membership list, join wizard, and checkout flows. The nested `(app)/(shell)/admin/layout.tsx` adds `requireAdmin()` as a guard only. The sidebar shows admin tabs when `user.role_access === "admin"`.
 - Data access should go through typed helpers in `src/lib/supabase-helpers/`. Avoid scattering raw `supabase.from("...")` calls through pages and components.
 - Service-role access belongs in `src/lib/supabase/admin.ts` and `src/lib/supabase-helpers/admin-server.ts`.
-- Pages rendered inside the `(app)` shell (sidebar visible) wrap their content in `PageContainer` (`src/components/shared/PageContainer.tsx`) for a consistent max-width and edge padding. Layered (non-sidebar) routes pass `backHref`/`backLabel` to render a top-left back button to their parent route. `/admin/users` is intentionally exempt (full-height split-pane).
+- The sidebar footer's "Profile & settings" button opens `SettingsDialog` (`src/features/settings`), a shadcn `Dialog` with an in-dialog shadcn `Sidebar` and three tabs (General / Profile / Purchase history). It is driven entirely by the URL hash (`#settings/<tab>`) so it deep-links and survives reloads; use `openSettings(tab)` to open it. The Profile tab reuses the `updateUserInfoById` + `refreshUser` edit/save pattern from `/portal/profile`; the Purchase history tab lists the user's purchases via `fetchPurchasesForUser` (there is no standalone `/portal/purchases` route). The checkout success flow redirects to `/portal#settings/purchases`.
+- Pages rendered inside the `(app)/(shell)` sidebar group wrap their content in `PageContainer` (`src/components/shared/PageContainer.tsx`) for a consistent max-width and edge padding. Sidebar-less routes in `(app)/(focused)` also use `PageContainer` and pass `backHref`/`backLabel` to render a top-left back button to their parent route. `/admin/users` is intentionally exempt (full-height split-pane).
 - Marketing styles are scoped through the `marketing-home` wrapper in `src/app/globals.css` so homepage fonts/colors do not leak into portal/admin UI.
 - Use the `@/*` path alias for imports from `src/*`.
 - Prefer server actions for app-owned mutations. Keep `/api` for callbacks/integrations and route-handler-specific needs such as Supabase email confirmation, Square webhooks, auth user linking, and event image upload.
@@ -81,10 +83,9 @@ pnpm start
 /portal/events/[event]
 /portal/events/[event]/checkout
 /portal/membership
+/portal/membership/join
 /portal/membership/[membership]
 /portal/membership/[membership]/checkout
-/portal/purchases
-/portal/purchases/[purchaseId]
 /portal/profile
 
 /admin

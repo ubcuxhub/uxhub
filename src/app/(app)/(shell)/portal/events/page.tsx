@@ -152,7 +152,7 @@ export default function PortalEvents() {
         <Button asChild variant="outline">
           <Link href="/events">
             Browse all events
-            <ArrowRight className="h-4 w-4" />
+            <ArrowRight />
           </Link>
         </Button>
       </section>
@@ -171,7 +171,7 @@ export default function PortalEvents() {
           {ongoingEvents.length > 0 && (
             <section className="mb-12">
               <div className="flex items-center gap-2 mb-6">
-                <Radio className="h-5 w-5 text-muted-foreground" />
+                <Radio className="text-muted-foreground" />
                 <h2 className="text-xl font-semibold">Ongoing Events</h2>
               </div>
               <EventGrid events={ongoingEvents} onSelect={openEvent} />
@@ -182,7 +182,7 @@ export default function PortalEvents() {
           {upcomingEvents.length > 0 && (
             <section className="mb-12">
               <div className="flex items-center gap-2 mb-6">
-                <CalendarDays className="h-5 w-5 text-muted-foreground" />
+                <CalendarDays className="text-muted-foreground" />
                 <h2 className="text-xl font-semibold">Upcoming Events</h2>
               </div>
               <EventGrid events={upcomingEvents} onSelect={openEvent} />
@@ -195,7 +195,7 @@ export default function PortalEvents() {
       {!loading && attendedEvents.length > 0 && (
         <section className="mb-12">
           <div className="flex items-center gap-2 mb-6">
-            <History className="h-5 w-5 text-muted-foreground" />
+            <History className="text-muted-foreground" />
             <h2 className="text-xl font-semibold">Attended Events</h2>
           </div>
           <EventGrid events={attendedEvents} onSelect={openEvent} />

@@ -40,11 +40,11 @@ export function ApplicationListCard({
   const getStatusIcon = () => {
     switch (status) {
       case "pending":
-        return <Clock className="h-5 w-5 text-yellow-500" />;
+        return <Clock className="text-yellow-500" />;
       case "declined":
-        return <X className="h-5 w-5 text-red-500" />;
+        return <X className="text-red-500" />;
       case "accepted":
-        return <Check className="h-5 w-5 text-green-500" />;
+        return <Check className="text-green-500" />;
     }
   };
 

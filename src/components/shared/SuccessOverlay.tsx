@@ -22,7 +22,7 @@ export function SuccessOverlay({ message, onClose }: SuccessOverlayProps) {
       <Card className="mx-4 max-w-md w-full">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-green-600">
-            <Check className="h-5 w-5" />
+            <Check />
             Success
           </CardTitle>
         </CardHeader>

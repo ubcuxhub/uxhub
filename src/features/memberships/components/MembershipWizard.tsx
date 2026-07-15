@@ -1,15 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useReducer } from "react";
 import { useRouter } from "next/navigation";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -31,7 +23,7 @@ import {
   validateStudentNumber,
 } from "../lib/validation";
 
-const supabase = createClient();
+type WizardStep = 1 | 2;
 
 const OPTIONS: Array<{
   value: UserType;
@@ -55,45 +47,68 @@ const OPTIONS: Array<{
   },
 ];
 
-interface MembershipWizardProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+// Format-validators keyed by user type; types with no identifier (e.g. nonUbc)
+// have no entry and are treated as always valid.
+const VALIDATORS: Partial<Record<UserType, (value: string) => string | null>> = {
+  ubcStudent: validateStudentNumber,
+  faculty: validateFacultyEmail,
+};
+
+interface WizardState {
+  step: WizardStep;
+  selection: UserType | null;
+  identifier: string;
+  faculty: string;
+  error: string | null;
+  saving: boolean;
 }
 
-export default function MembershipWizard({
-  open,
-  onOpenChange,
-}: MembershipWizardProps) {
+const initialState: WizardState = {
+  step: 1,
+  selection: null,
+  identifier: "",
+  faculty: "",
+  error: null,
+  saving: false,
+};
+
+type WizardAction =
+  | { type: "reset" }
+  | { type: "select"; value: UserType }
+  | { type: "goToStep"; step: WizardStep }
+  | { type: "setIdentifier"; value: string }
+  | { type: "setFaculty"; value: string }
+  | { type: "setError"; value: string | null }
+  | { type: "setSaving"; value: boolean };
+
+function wizardReducer(state: WizardState, action: WizardAction): WizardState {
+  switch (action.type) {
+    case "reset":
+      return initialState;
+    case "select":
+      return { ...state, selection: action.value, error: null };
+    case "goToStep":
+      return { ...state, step: action.step, error: null };
+    case "setIdentifier":
+      return { ...state, identifier: action.value, error: null };
+    case "setFaculty":
+      return { ...state, faculty: action.value };
+    case "setError":
+      return { ...state, error: action.value };
+    case "setSaving":
+      return { ...state, saving: action.value };
+  }
+}
+
+export default function MembershipWizard() {
   const { user, refreshUser } = useUser();
   const router = useRouter();
-
-  const [step, setStep] = useState<1 | 2>(1);
-  const [selection, setSelection] = useState<UserType | null>(null);
-  const [identifier, setIdentifier] = useState("");
-  const [faculty, setFaculty] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
-
-  // Reset to a clean state every time the wizard opens.
-  useEffect(() => {
-    if (open) {
-      setStep(1);
-      setSelection(null);
-      setIdentifier("");
-      setFaculty("");
-      setError(null);
-      setSaving(false);
-    }
-  }, [open]);
-
-  const handleSelect = (value: UserType) => {
-    setSelection(value);
-    setError(null);
-  };
+  const [state, dispatch] = useReducer(wizardReducer, initialState);
+  const { step, selection, identifier, faculty, error, saving } = state;
 
   const handleContinue = () => {
     if (!selection) {
-      setError("Please choose an option to continue.");
+      dispatch({ type: "setError", value: "Please choose an option to continue." });
       return;
     }
     // Non-UBC needs no identifier, so finish straight away.
@@ -101,29 +116,19 @@ export default function MembershipWizard({
       void handleFinish();
       return;
     }
-    setError(null);
-    setStep(2);
+    dispatch({ type: "goToStep", step: 2 });
   };
 
   const handleFinish = async () => {
     if (!user || !selection) return;
 
-    if (selection === "ubcStudent") {
-      const validationError = validateStudentNumber(identifier);
-      if (validationError) {
-        setError(validationError);
-        return;
-      }
-    } else if (selection === "faculty") {
-      const validationError = validateFacultyEmail(identifier);
-      if (validationError) {
-        setError(validationError);
-        return;
-      }
+    const validationError = VALIDATORS[selection]?.(identifier) ?? null;
+    if (validationError) {
+      dispatch({ type: "setError", value: validationError });
+      return;
     }
 
-    setError(null);
-    setSaving(true);
+    dispatch({ type: "setSaving", value: true });
     try {
       const payload: UserInfoUpdate = {
         user_type: selection,
@@ -132,134 +137,198 @@ export default function MembershipWizard({
         faculty: selection === "faculty" ? faculty || null : null,
       };
 
+      const supabase = createClient();
       await updateUserInfoById(supabase, user.id, payload);
       await refreshUser();
-      onOpenChange(false);
       router.push("/portal/membership");
     } catch (err) {
       console.error("Error saving membership details:", err);
-      setError("Something went wrong saving your details. Please try again.");
+      dispatch({
+        type: "setError",
+        value: "Something went wrong saving your details. Please try again.",
+      });
     } finally {
-      setSaving(false);
+      dispatch({ type: "setSaving", value: false });
     }
   };
 
   const isFaculty = selection === "faculty";
 
+  return step === 1 ? (
+    <UserTypeStep
+      selection={selection}
+      error={error}
+      saving={saving}
+      onSelect={(value) => dispatch({ type: "select", value })}
+      onContinue={handleContinue}
+    />
+  ) : (
+    <VerifyIdentifierStep
+      isFaculty={isFaculty}
+      identifier={identifier}
+      faculty={faculty}
+      error={error}
+      saving={saving}
+      onIdentifierChange={(value) => dispatch({ type: "setIdentifier", value })}
+      onFacultyChange={(value) => dispatch({ type: "setFaculty", value })}
+      onBack={() => dispatch({ type: "goToStep", step: 1 })}
+      onFinish={handleFinish}
+    />
+  );
+}
+
+function OptionCard({
+  title,
+  description,
+  selected,
+  onClick,
+}: {
+  title: string;
+  description: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        {step === 1 ? (
-          <>
-            <DialogHeader>
-              <DialogTitle>What best describes you?</DialogTitle>
-              <DialogDescription>
-                This helps us show you the right membership options.
-              </DialogDescription>
-            </DialogHeader>
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "rounded-lg border p-4 text-left transition-colors hover:bg-accent",
+        selected && "border-primary ring-1 ring-primary bg-primary/5",
+      )}
+    >
+      <div className="font-medium">{title}</div>
+      <div className="text-sm text-muted-foreground">{description}</div>
+    </button>
+  );
+}
 
-            <div className="grid gap-3 py-2">
-              {OPTIONS.map((option) => {
-                const isSelected = selection === option.value;
-                return (
-                  <button
-                    key={option.value}
-                    type="button"
-                    onClick={() => handleSelect(option.value)}
-                    className={cn(
-                      "rounded-lg border p-4 text-left transition-colors hover:bg-accent",
-                      isSelected &&
-                        "border-primary ring-1 ring-primary bg-primary/5",
-                    )}
-                  >
-                    <div className="font-medium">{option.title}</div>
-                    <div className="text-sm text-muted-foreground">
-                      {option.description}
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+function UserTypeStep({
+  selection,
+  error,
+  saving,
+  onSelect,
+  onContinue,
+}: {
+  selection: UserType | null;
+  error: string | null;
+  saving: boolean;
+  onSelect: (value: UserType) => void;
+  onContinue: () => void;
+}) {
+  return (
+    <div className="grid gap-4">
+      <div className="flex flex-col space-y-1.5">
+        <h1 className="text-lg font-semibold leading-none tracking-tight">
+          What best describes you?
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          This helps us show you the right membership options.
+        </p>
+      </div>
 
-            {error && <p className="text-sm text-destructive">{error}</p>}
+      <div className="grid gap-3 py-2">
+        {OPTIONS.map((option) => (
+          <OptionCard
+            key={option.value}
+            title={option.title}
+            description={option.description}
+            selected={selection === option.value}
+            onClick={() => onSelect(option.value)}
+          />
+        ))}
+      </div>
 
-            <DialogFooter>
-              <Button onClick={handleContinue} disabled={saving}>
-                {selection === "nonUbc" ? "Finish" : "Next"}
-              </Button>
-            </DialogFooter>
-          </>
-        ) : (
-          <>
-            <DialogHeader>
-              <DialogTitle>
-                {isFaculty ? "Verify your faculty email" : "Verify your student number"}
-              </DialogTitle>
-              <DialogDescription>
-                {isFaculty
-                  ? "Enter your UBC faculty email to confirm your identity."
-                  : "Enter your 8-digit UBC student number to confirm your identity."}
-              </DialogDescription>
-            </DialogHeader>
+      {error && <p className="text-sm text-destructive">{error}</p>}
 
-            <div className="grid gap-4 py-2">
-              <div className="space-y-2">
-                <Label htmlFor="membership-identifier">
-                  {isFaculty ? "UBC faculty email" : "UBC student number"}
-                </Label>
-                <Input
-                  id="membership-identifier"
-                  type={isFaculty ? "email" : "text"}
-                  inputMode={isFaculty ? "email" : "numeric"}
-                  value={identifier}
-                  onChange={(e) => {
-                    setIdentifier(e.target.value);
-                    setError(null);
-                  }}
-                  placeholder={isFaculty ? "name@ubc.ca" : "12345678"}
-                  autoFocus
-                />
-              </div>
+      <div className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2">
+        <Button onClick={onContinue} disabled={saving}>
+          {selection === "nonUbc" ? "Finish" : "Next"}
+        </Button>
+      </div>
+    </div>
+  );
+}
 
-              {isFaculty && (
-                <div className="space-y-2">
-                  <Label>Faculty (optional)</Label>
-                  <Select value={faculty} onValueChange={setFaculty}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a faculty" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {FACULTIES.map((item) => (
-                        <SelectItem key={item} value={item}>
-                          {item}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+function VerifyIdentifierStep({
+  isFaculty,
+  identifier,
+  faculty,
+  error,
+  saving,
+  onIdentifierChange,
+  onFacultyChange,
+  onBack,
+  onFinish,
+}: {
+  isFaculty: boolean;
+  identifier: string;
+  faculty: string;
+  error: string | null;
+  saving: boolean;
+  onIdentifierChange: (value: string) => void;
+  onFacultyChange: (value: string) => void;
+  onBack: () => void;
+  onFinish: () => void;
+}) {
+  return (
+    <div className="grid gap-4">
+      <div className="flex flex-col space-y-1.5">
+        <h1 className="text-lg font-semibold leading-none tracking-tight">
+          {isFaculty ? "Verify your faculty email" : "Verify your student number"}
+        </h1>
+        <p className="text-sm text-muted-foreground">
+          {isFaculty
+            ? "Enter your UBC faculty email to confirm your identity."
+            : "Enter your 8-digit UBC student number to confirm your identity."}
+        </p>
+      </div>
 
-              {error && <p className="text-sm text-destructive">{error}</p>}
-            </div>
+      <div className="grid gap-4 py-2">
+        <div className="space-y-2">
+          <Label htmlFor="membership-identifier">
+            {isFaculty ? "UBC faculty email" : "UBC student number"}
+          </Label>
+          <Input
+            id="membership-identifier"
+            type={isFaculty ? "email" : "text"}
+            inputMode={isFaculty ? "email" : "numeric"}
+            value={identifier}
+            onChange={(e) => onIdentifierChange(e.target.value)}
+            placeholder={isFaculty ? "name@ubc.ca" : "12345678"}
+            autoFocus
+          />
+        </div>
 
-            <DialogFooter className="sm:justify-between">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setError(null);
-                  setStep(1);
-                }}
-                disabled={saving}
-              >
-                Back
-              </Button>
-              <Button onClick={handleFinish} disabled={saving}>
-                {saving ? "Saving..." : "Finish"}
-              </Button>
-            </DialogFooter>
-          </>
+        {isFaculty && (
+          <div className="space-y-2">
+            <Label>Faculty (optional)</Label>
+            <Select value={faculty} onValueChange={onFacultyChange}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a faculty" />
+              </SelectTrigger>
+              <SelectContent>
+                {FACULTIES.map((item) => (
+                  <SelectItem key={item} value={item}>
+                    {item}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         )}
-      </DialogContent>
-    </Dialog>
+
+        {error && <p className="text-sm text-destructive">{error}</p>}
+      </div>
+
+      <div className="flex flex-col-reverse sm:flex-row sm:justify-between sm:space-x-2">
+        <Button variant="outline" onClick={onBack} disabled={saving}>
+          Back
+        </Button>
+        <Button onClick={onFinish} disabled={saving}>
+          {saving ? "Saving..." : "Finish"}
+        </Button>
+      </div>
+    </div>
   );
 }

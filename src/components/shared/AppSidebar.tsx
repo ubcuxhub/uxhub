@@ -1,20 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import {
   CalendarDays,
-  CreditCard,
   Home,
   LayoutDashboard,
-  LogOut,
-  Receipt,
-  User,
+  Settings,
   Users,
 } from "lucide-react";
 
 import { useUser } from "@/context/UserContext";
-import { createClient } from "@/lib/supabase/client";
+import { SettingsDialog, openSettings } from "@/features/settings";
 import {
   Sidebar,
   SidebarContent,
@@ -31,8 +28,6 @@ import {
 const studentItems = [
   { title: "Home", href: "/portal", icon: Home, exact: true },
   { title: "Events", href: "/portal/events", icon: CalendarDays },
-  { title: "Membership", href: "/portal/membership", icon: CreditCard },
-  { title: "Purchases", href: "/portal/purchases", icon: Receipt },
 ];
 
 function useIsActive() {
@@ -47,14 +42,7 @@ function useIsActive() {
 export function AppSidebar() {
   const { user } = useUser();
   const isActive = useIsActive();
-  const router = useRouter();
   const isAdmin = user?.role_access === "admin";
-
-  const handleLogout = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    router.push("/auth/login");
-  };
 
   return (
     <Sidebar>
@@ -139,24 +127,17 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
-              asChild
-              isActive={isActive("/portal/profile")}
+              onClick={() => openSettings("general")}
               className="h-9"
             >
-              <Link href="/portal/profile">
-                <User />
-                <span>Profile</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-          <SidebarMenuItem>
-            <SidebarMenuButton onClick={handleLogout} className="h-9">
-              <LogOut />
-              <span>Logout</span>
+              <Settings />
+              <span>Profile &amp; settings</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
+
+      <SettingsDialog />
     </Sidebar>
   );
 }

@@ -42,10 +42,10 @@ export function EditableUserField({
             className="flex-1"
             autoFocus
           />
-          <Button size="sm" onClick={() => onEditSave(field)} disabled={isSaving}>
+          <Button onClick={() => onEditSave(field)} disabled={isSaving}>
             Save
           </Button>
-          <Button size="sm" variant="outline" onClick={onEditCancel} disabled={isSaving}>
+          <Button variant="outline" onClick={onEditCancel} disabled={isSaving}>
             Cancel
           </Button>
         </div>
@@ -53,7 +53,6 @@ export function EditableUserField({
         <div className="flex items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm">
           <span className={!value ? "text-muted-foreground" : ""}>{displayValue}</span>
           <Button
-            size="sm"
             variant="ghost"
             onClick={() => onEditStart(field, value ?? null)}
             className="h-6 px-2 text-xs"
