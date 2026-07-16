@@ -24,6 +24,10 @@ import {
 } from "@/lib/supabase-helpers/event-applications";
 import { deleteRegistrationsForEvent } from "@/lib/supabase-helpers/event-registrations";
 import {
+  deleteFailedPurchasesForEvent,
+  ensureEventPurchasesAreDeletable,
+} from "@/lib/supabase-helpers/purchases";
+import {
   ResponseType,
   type ApplicationQuestionTemplate,
 } from "@/features/events/types/eventTypes";
@@ -1123,6 +1127,19 @@ export const EventCreateModify = ({
     setError(null);
 
     try {
+      // Purchases restrict event deletion. Fail before removing other event data.
+      try {
+        await ensureEventPurchasesAreDeletable(supabase, eventId);
+      } catch (checkPurchasesError) {
+        const message =
+          checkPurchasesError instanceof Error
+            ? checkPurchasesError.message
+            : "Unknown error";
+        setError(message);
+        setIsDeleting(false);
+        return;
+      }
+
       // Delete related check-in sessions first
       try {
         await deleteCheckInSessionsForEvent(supabase, eventId);
@@ -1158,6 +1175,19 @@ export const EventCreateModify = ({
             ? deleteRegistrationsError.message
             : "Unknown error";
         setError(`Failed to delete event registrations: ${message}`);
+        setIsDeleting(false);
+        return;
+      }
+
+      // Delete failed purchases that would otherwise block event deletion
+      try {
+        await deleteFailedPurchasesForEvent(supabase, eventId);
+      } catch (deletePurchasesError) {
+        const message =
+          deletePurchasesError instanceof Error
+            ? deletePurchasesError.message
+            : "Unknown error";
+        setError(`Failed to delete event purchases: ${message}`);
         setIsDeleting(false);
         return;
       }
