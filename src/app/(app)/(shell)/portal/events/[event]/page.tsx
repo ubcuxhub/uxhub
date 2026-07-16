@@ -54,7 +54,7 @@ export default async function PortalEventPage({
       <h1 className="text-3xl font-semibold">{event.name}</h1>
 
       <div className="flex items-start gap-3 text-sm">
-        <Calendar className="mt-0.5 h-5 w-5 text-muted-foreground" />
+        <Calendar className="mt-0.5 text-muted-foreground" />
         <div>
           <p className="font-medium">
             {formatDate(event.start_date)}
@@ -72,7 +72,7 @@ export default async function PortalEventPage({
       </div>
 
       <div className="flex items-start gap-3 text-sm">
-        <MapPin className="mt-0.5 h-5 w-5 text-muted-foreground" />
+        <MapPin className="mt-0.5 text-muted-foreground" />
         <p className="font-medium">{location || "TBD"}</p>
       </div>
 

@@ -177,7 +177,6 @@ export const ImageUpload = ({
               <Button
                 type="button"
                 variant="destructive"
-                size="sm"
                 className="absolute top-2 right-2"
                 onClick={(e) => {
                   e.stopPropagation();

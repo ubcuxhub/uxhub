@@ -203,9 +203,8 @@ async function revalidatePurchasePaths(purchaseId: string) {
     return;
   }
 
-  revalidatePath("/portal/purchases");
-  revalidatePath(`/portal/purchases/${purchase.id}`);
-
+  // Purchase history now lives in the client-fetched settings dialog
+  // (#settings/purchases), so there is no server route to revalidate for it.
   if (purchase.kind === "membership" && purchase.membership_type_id) {
     const membershipType = await fetchMembershipTypeById(
       adminDb,
@@ -343,8 +342,10 @@ async function applyPaymentStateToPurchase(purchaseId: string, payment: Payment)
   return updatedPurchase;
 }
 
-function getPurchaseRedirectPath(purchaseId: string) {
-  return `/portal/purchases/${purchaseId}`;
+function getPurchaseRedirectPath() {
+  // Land the buyer on their purchase history, which opens from the URL hash
+  // when /portal mounts after checkout.
+  return "/portal#settings/purchases";
 }
 
 async function handleExistingCheckoutAttempt(
@@ -373,7 +374,7 @@ async function handleExistingCheckoutAttempt(
     return {
       ok: true,
       purchaseId: existingPurchase.id,
-      redirectTo: getPurchaseRedirectPath(existingPurchase.id),
+      redirectTo: getPurchaseRedirectPath(),
     };
   }
 
@@ -622,7 +623,7 @@ export async function executeCheckoutForUser(
   return {
     ok: true,
     purchaseId: result.purchaseId,
-    redirectTo: getPurchaseRedirectPath(result.purchaseId),
+    redirectTo: getPurchaseRedirectPath(),
   };
 }
 

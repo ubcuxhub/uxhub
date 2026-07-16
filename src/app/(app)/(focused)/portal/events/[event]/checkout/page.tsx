@@ -72,7 +72,10 @@ export default async function EventCheckoutPage({
   }
 
   return (
-    <PageContainer backHref={`/portal/events/${event.slug ?? slug}`} backLabel="Back to Event">
+    <PageContainer
+      backHref={`/events/${event.slug ?? slug}`}
+      backLabel="Back to event"
+    >
       <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_360px]">
         <div className="space-y-6">
           <Card>

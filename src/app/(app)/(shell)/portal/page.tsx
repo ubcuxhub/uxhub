@@ -11,7 +11,7 @@ function BecomeMemberBanner() {
     <div className="mb-8 flex flex-col gap-3 rounded-lg border bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-start gap-3">
         <div className="rounded-full bg-primary/10 p-2">
-          <Sparkles className="h-5 w-5 text-primary" />
+          <Sparkles className="text-primary" />
         </div>
         <div>
           <h3 className="font-semibold">Become a UX Hub member</h3>
@@ -21,9 +21,9 @@ function BecomeMemberBanner() {
         </div>
       </div>
       <Button asChild className="shrink-0">
-        <Link href="/portal/membership">
+        <Link href="/portal/membership/join">
           Become a member
-          <ArrowRight className="h-4 w-4" />
+          <ArrowRight />
         </Link>
       </Button>
     </div>
@@ -57,7 +57,7 @@ export default function PortalHome() {
       <Button asChild variant="outline">
         <Link href="/portal/events">
           View your events
-          <CalendarDays className="h-4 w-4" />
+          <CalendarDays />
         </Link>
       </Button>
     </PageContainer>

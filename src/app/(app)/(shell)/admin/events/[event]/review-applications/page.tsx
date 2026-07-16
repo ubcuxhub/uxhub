@@ -163,7 +163,6 @@ export default function ReviewApplicationsPage() {
                       variant={
                         statusFilters.has("pending") ? "default" : "outline"
                       }
-                      size="sm"
                       onClick={() => toggleStatusFilter("pending")}
                     >
                       Pending
@@ -173,7 +172,6 @@ export default function ReviewApplicationsPage() {
                       variant={
                         statusFilters.has("declined") ? "default" : "outline"
                       }
-                      size="sm"
                       onClick={() => toggleStatusFilter("declined")}
                     >
                       Declined
@@ -183,7 +181,6 @@ export default function ReviewApplicationsPage() {
                       variant={
                         statusFilters.has("accepted") ? "default" : "outline"
                       }
-                      size="sm"
                       onClick={() => toggleStatusFilter("accepted")}
                     >
                       Accepted
@@ -192,7 +189,6 @@ export default function ReviewApplicationsPage() {
                       <Button
                         type="button"
                         variant="outline"
-                        size="sm"
                         onClick={clearFilters}
                       >
                         Clear Filters
