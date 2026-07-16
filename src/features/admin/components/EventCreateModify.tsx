@@ -82,6 +82,11 @@ interface EventFormSnapshot {
   formState: EventFormState;
   checkInEvents: CheckInSessionDraft[];
   applicationTemplate: ApplicationQuestionTemplate[];
+  pendingImageFile: {
+    name: string;
+    size: number;
+    lastModified: number;
+  } | null;
 }
 
 const defaultFormState: EventFormState = {
@@ -185,12 +190,20 @@ const isEventScheduleRangeInvalid = (formState: EventFormState) => {
 const createFormSnapshot = (
   formState: EventFormState,
   checkInEvents: CheckInSessionDraft[],
-  applicationTemplate: ApplicationQuestionTemplate[]
+  applicationTemplate: ApplicationQuestionTemplate[],
+  pendingImageFile: File | null = null
 ) =>
   JSON.stringify({
     formState,
     checkInEvents,
     applicationTemplate,
+    pendingImageFile: pendingImageFile
+      ? {
+          name: pendingImageFile.name,
+          size: pendingImageFile.size,
+          lastModified: pendingImageFile.lastModified,
+        }
+      : null,
   } satisfies EventFormSnapshot);
 
 const UNSAVED_CHANGES_MESSAGE =
@@ -237,6 +250,7 @@ export const EventCreateModify = ({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
 
   // Restore state from sessionStorage on mount (only for new events)
   useEffect(() => {
@@ -311,10 +325,17 @@ export const EventCreateModify = ({
     const currentSnapshot = createFormSnapshot(
       formState,
       checkInEvents,
-      applicationTemplate
+      applicationTemplate,
+      pendingImageFile
     );
     setHasUnsavedChanges(currentSnapshot !== cleanSnapshot.current);
-  }, [formState, checkInEvents, applicationTemplate, loadingEvent]);
+  }, [
+    formState,
+    checkInEvents,
+    applicationTemplate,
+    pendingImageFile,
+    loadingEvent,
+  ]);
 
   useEffect(() => {
     if (!hasUnsavedChanges) return;
@@ -435,6 +456,7 @@ export const EventCreateModify = ({
         created_at: data.created_at ?? "",
       };
       setFormState(loadedFormState);
+      setPendingImageFile(null);
 
       // Fetch check-in sessions from check_in_sessions table
       let loadedCheckInEvents: CheckInSessionDraft[] = [
@@ -514,6 +536,11 @@ export const EventCreateModify = ({
       ...prev,
       [field]: value,
     }));
+  };
+
+  const handleImageFileChange = (file: File | null) => {
+    resetSuccessMessage();
+    setPendingImageFile(file);
   };
 
   const updateCheckInEvent = (
@@ -687,6 +714,24 @@ export const EventCreateModify = ({
     );
   };
 
+  const uploadPendingEventImage = async (file: File, eventName: string) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    formData.append("eventName", eventName);
+
+    const response = await fetch("/api/upload-event-image", {
+      method: "POST",
+      body: formData,
+    });
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to upload image");
+    }
+
+    return data.path as string;
+  };
+
   const validateForm = () => {
     if (!formState.name.trim()) return "Event name is required.";
     if (!formState.description.trim()) return "Description is required.";
@@ -805,6 +850,24 @@ export const EventCreateModify = ({
       eventSlug = createUniqueSlug(formState.name, existingSlugs, "event");
     }
 
+    let committedImageUrl = formState.image_url;
+    if (pendingImageFile) {
+      try {
+        committedImageUrl = await uploadPendingEventImage(
+          pendingImageFile,
+          formState.name
+        );
+      } catch (imageUploadError) {
+        setError(
+          imageUploadError instanceof Error
+            ? imageUploadError.message
+            : "Failed to upload image"
+        );
+        setIsSubmitting(false);
+        return;
+      }
+    }
+
     // Prepare payload
     const payload: {
       name: string;
@@ -859,8 +922,8 @@ export const EventCreateModify = ({
     if (formState.end_time) {
       payload.end_time = formState.end_time;
     }
-    if (formState.image_url) {
-      payload.image_url = formState.image_url;
+    if (committedImageUrl) {
+      payload.image_url = committedImageUrl;
     } else {
       payload.image_url = null;
     }
@@ -1010,10 +1073,17 @@ export const EventCreateModify = ({
       }
     }
 
+    const savedFormState = {
+      ...formState,
+      image_url: committedImageUrl,
+    };
+    setFormState(savedFormState);
+    setPendingImageFile(null);
     cleanSnapshot.current = createFormSnapshot(
-      formState,
+      savedFormState,
       checkInEvents,
-      applicationTemplate
+      applicationTemplate,
+      null
     );
     setHasUnsavedChanges(false);
     setSuccessMessage(
@@ -1028,6 +1098,7 @@ export const EventCreateModify = ({
       const resetFormState = getInitialFormState();
       const resetCheckInEvents = [{ name: "", start_time: "", end_time: "" }];
       setFormState(resetFormState);
+      setPendingImageFile(null);
       setCheckInEvents(resetCheckInEvents);
       setApplicationTemplate([]);
       cleanSnapshot.current = createFormSnapshot(
@@ -1303,6 +1374,7 @@ export const EventCreateModify = ({
               max_capacity={formState.max_capacity}
               image_url={formState.image_url}
               isSubmitting={isSubmitting}
+              onImageFileChange={handleImageFileChange}
               onFieldChange={handleFieldChange}
             />
 
