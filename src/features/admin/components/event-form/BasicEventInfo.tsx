@@ -36,7 +36,7 @@ export const BasicEventInfo = ({
     <FieldGroup className="grid gap-4 md:grid-cols-2">
       <Field>
         <FieldLabel htmlFor="name">
-          Event Name <span className="text-red-500">*</span>
+          Event Name <span className="text-destructive">*</span>
         </FieldLabel>
         <Input
           id="name"
@@ -47,7 +47,7 @@ export const BasicEventInfo = ({
       </Field>
       <Field>
         <FieldLabel htmlFor="max_capacity">
-          Max Capacity <span className="text-red-500">*</span>
+          Max Capacity <span className="text-destructive">*</span>
         </FieldLabel>
         <Input
           id="max_capacity"
@@ -68,7 +68,7 @@ export const BasicEventInfo = ({
       </Field>
       <Field className="md:col-span-2">
         <FieldLabel htmlFor="description">
-          Description <span className="text-red-500">*</span>
+          Description <span className="text-destructive">*</span>
         </FieldLabel>
         <Textarea
           id="description"

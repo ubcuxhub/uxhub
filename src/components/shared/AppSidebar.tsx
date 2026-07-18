@@ -47,7 +47,7 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader className="p-3">
-        <Link href="/portal" className="px-2 py-1 text-lg font-semibold">
+        <Link href="/portal" className="px-2 py-1 text-h3">
           UBC UX Hub
         </Link>
       </SidebarHeader>

@@ -24,7 +24,7 @@ export const EventPricing = ({
     <FieldGroup className="grid gap-4 md:grid-cols-2">
       <Field>
         <FieldLabel htmlFor="regular_price">
-          Regular Price <span className="text-red-500">*</span>
+          Regular Price <span className="text-destructive">*</span>
         </FieldLabel>
         <Input
           id="regular_price"
@@ -38,7 +38,7 @@ export const EventPricing = ({
       </Field>
       <Field>
         <FieldLabel htmlFor="member_price">
-          Member Price <span className="text-red-500">*</span>
+          Member Price <span className="text-destructive">*</span>
         </FieldLabel>
         <Input
           id="member_price"

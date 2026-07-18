@@ -19,7 +19,7 @@ export default async function AdminEventsPage() {
     <PageContainer className="flex flex-col gap-8">
       <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="mb-2 text-3xl font-bold tracking-tight">
+          <h1 className="mb-2 text-h1 tracking-tight">
             Events Dashboard
           </h1>
           <p className="text-muted-foreground">

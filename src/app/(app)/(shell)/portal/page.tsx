@@ -14,8 +14,8 @@ function BecomeMemberBanner() {
           <Sparkles className="text-primary" />
         </div>
         <div>
-          <h3 className="font-semibold">Become a UX Hub member</h3>
-          <p className="text-sm text-muted-foreground">
+          <h3 className="text-subheading">Become a UX Hub member</h3>
+          <p className="text-small text-muted-foreground">
             Unlock member pricing on events and exclusive perks.
           </p>
         </div>
@@ -46,7 +46,7 @@ export default function PortalHome() {
       {user && !isMember && <BecomeMemberBanner />}
 
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight mb-2">
+        <h1 className="mb-2 text-h1 tracking-tight">
           Hey, {firstName}!
         </h1>
         <p className="text-muted-foreground">

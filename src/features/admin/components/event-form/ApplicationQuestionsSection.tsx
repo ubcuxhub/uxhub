@@ -85,7 +85,7 @@ export const ApplicationQuestionsSection = ({
                 data-invalid={questionError ? true : undefined}
               >
                 <FieldLabel htmlFor={`question_${index}`}>
-                  Question <span className="text-red-500">*</span>
+                  Question <span className="text-destructive">*</span>
                 </FieldLabel>
                 <Input
                   id={`question_${index}`}
@@ -147,7 +147,7 @@ export const ApplicationQuestionsSection = ({
                       <Button
                         type="button"
                         variant="ghost"
-                        className="text-red-500 hover:text-red-600"
+                        className="text-destructive hover:text-destructive/80"
                         onClick={() => onRemove(index)}
                       >
                         Remove
@@ -198,7 +198,7 @@ export const ApplicationQuestionsSection = ({
                             <Button
                               type="button"
                               variant="ghost"
-                              className="text-red-500 hover:text-red-600 shrink-0"
+                              className="text-destructive hover:text-destructive/80 shrink-0"
                               onClick={() =>
                                 onRemoveResponseOption(index, optionIndex)
                               }
@@ -223,7 +223,7 @@ export const ApplicationQuestionsSection = ({
                       <Button
                         type="button"
                         variant="ghost"
-                        className="text-red-500 hover:text-red-600"
+                        className="text-destructive hover:text-destructive/80"
                         onClick={() => onRemove(index)}
                       >
                         Remove Question

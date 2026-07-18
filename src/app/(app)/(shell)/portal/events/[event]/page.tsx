@@ -51,9 +51,9 @@ export default async function PortalEventPage({
 
   return (
     <PageContainer backHref="/portal/events" backLabel="Back to Events" className="space-y-4">
-      <h1 className="text-3xl font-semibold">{event.name}</h1>
+      <h1 className="text-h1">{event.name}</h1>
 
-      <div className="flex items-start gap-3 text-sm">
+      <div className="flex items-start gap-3 text-small">
         <Calendar className="mt-0.5 text-muted-foreground" />
         <div>
           <p className="font-medium">
@@ -71,7 +71,7 @@ export default async function PortalEventPage({
         </div>
       </div>
 
-      <div className="flex items-start gap-3 text-sm">
+      <div className="flex items-start gap-3 text-small">
         <MapPin className="mt-0.5 text-muted-foreground" />
         <p className="font-medium">{location || "TBD"}</p>
       </div>

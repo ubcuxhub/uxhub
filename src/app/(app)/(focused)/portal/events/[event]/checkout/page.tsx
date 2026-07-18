@@ -92,12 +92,12 @@ export default async function EventCheckoutPage({
                 ) : null}
               </div>
               <div className="space-y-2">
-                <CardTitle className="text-3xl">{event.name}</CardTitle>
-                <p className="text-2xl font-semibold text-primary">
+                <CardTitle className="text-h1">{event.name}</CardTitle>
+                <p className="text-h2 text-primary">
                   {formattedPrice}
                 </p>
                 {event.member_price !== event.regular_price ? (
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-small text-muted-foreground">
                     Regular: {formattedRegularPrice} | Member:{" "}
                     {formattedMemberPrice}
                   </p>
@@ -105,7 +105,7 @@ export default async function EventCheckoutPage({
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+              <p className="whitespace-pre-wrap text-small text-muted-foreground">
                 {event.description}
               </p>
               {event.image_url ? (

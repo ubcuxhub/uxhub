@@ -322,7 +322,7 @@ export function ProfileSettings() {
             >
               <span
                 className={cn(
-                  "inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform",
+                  "inline-block h-4 w-4 transform rounded-full bg-background shadow transition-transform",
                   formData.newsletter ? "translate-x-6" : "translate-x-1",
                 )}
               />
@@ -393,7 +393,7 @@ function ReadValue({
     (typeof children === "string" && children.trim() === "");
   return (
     <div
-      className={cn("min-h-9 flex items-center text-sm font-medium", className)}
+      className={cn("min-h-9 flex items-center text-table", className)}
     >
       {isEmpty ? <span className="text-muted-foreground/60">—</span> : children}
     </div>

@@ -7,8 +7,8 @@ interface MessageCardProps {
 
 export function MessageCard({ type, message }: MessageCardProps) {
   const isError = type === "error";
-  const borderColor = isError ? "border-destructive" : "border-green-500";
-  const textColor = isError ? "text-destructive" : "text-green-600";
+  const borderColor = isError ? "border-destructive" : "border-success";
+  const textColor = isError ? "text-destructive" : "text-success";
   const icon = isError ? "⚠️" : "✓";
 
   return (
@@ -16,10 +16,9 @@ export function MessageCard({ type, message }: MessageCardProps) {
       <CardContent className="pt-6">
         <div className="flex items-start gap-2">
           <span className={textColor}>{icon}</span>
-          <p className={`text-sm ${textColor}`}>{message}</p>
+          <p className={`text-small ${textColor}`}>{message}</p>
         </div>
       </CardContent>
     </Card>
   );
 }
-

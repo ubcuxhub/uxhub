@@ -41,7 +41,7 @@ export function UserDirectoryPanel({
     <div className="w-1/2 border-r overflow-y-auto p-6">
       <div className="space-y-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight mb-2">
+          <h1 className="mb-2 text-h1 tracking-tight">
             User Directory
           </h1>
           <p className="text-muted-foreground">
@@ -60,7 +60,7 @@ export function UserDirectoryPanel({
             <select
               value={searchOption}
               onChange={(e) => onSearchOptionChange(e.target.value as SearchOption)}
-              className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+              className="rounded-md border border-input bg-background px-3 py-2 text-small"
             >
               <option value="name">Name</option>
               <option value="email">Email</option>
@@ -69,11 +69,11 @@ export function UserDirectoryPanel({
         </div>
 
         <div className="flex items-center gap-2">
-          <Label className="text-sm">Sort by:</Label>
+          <Label>Sort by:</Label>
           <select
             value={sortOption}
             onChange={(e) => onSortOptionChange(e.target.value as SortOption)}
-            className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+            className="rounded-md border border-input bg-background px-3 py-2 text-small"
           >
             <option value="name">Name</option>
             <option value="email">Email</option>
@@ -85,9 +85,9 @@ export function UserDirectoryPanel({
             <Spinner size="lg" />
           </div>
         ) : error ? (
-          <div className="text-center text-sm text-destructive py-8">{error}</div>
+          <div className="text-center text-small text-destructive py-8">{error}</div>
         ) : users.length === 0 ? (
-          <div className="text-center text-sm text-muted-foreground py-8">
+          <div className="text-center text-small text-muted-foreground py-8">
             No users found
           </div>
         ) : (
@@ -104,9 +104,9 @@ export function UserDirectoryPanel({
               >
                 <CardContent className="p-4">
                   <div className="font-semibold">{user.name}</div>
-                  <div className="text-sm text-muted-foreground">{user.email}</div>
+                  <div className="text-small text-muted-foreground">{user.email}</div>
                   {user.phone && (
-                    <div className="text-sm text-muted-foreground">{user.phone}</div>
+                    <div className="text-small text-muted-foreground">{user.phone}</div>
                   )}
                 </CardContent>
               </Card>

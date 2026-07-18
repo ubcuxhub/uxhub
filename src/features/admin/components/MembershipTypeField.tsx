@@ -38,7 +38,7 @@ export function MembershipTypeField({
 }: MembershipTypeFieldProps) {
   return (
     <div className="space-y-2">
-      <Label className="text-sm font-medium">Membership Type</Label>
+      <Label>Membership Type</Label>
       {isEditing ? (
         <div className="flex gap-2">
           <Select value={editValue} onValueChange={onValueChange}>
@@ -65,12 +65,12 @@ export function MembershipTypeField({
           </Button>
         </div>
       ) : (
-        <div className="flex items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm">
+        <div className="flex items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-small">
           <span className={!value ? "text-muted-foreground" : ""}>{value || "None"}</span>
           <Button
             variant="ghost"
             onClick={() => onEditStart("membership_type_id", selectedMembershipTypeId ?? null)}
-            className="h-6 px-2 text-xs"
+            className="h-6 px-2"
           >
             Edit
           </Button>
