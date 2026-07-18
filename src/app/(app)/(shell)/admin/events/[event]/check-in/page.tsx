@@ -47,16 +47,16 @@ function StatCard({
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
+        <CardTitle className="text-table text-muted-foreground">
           {title}
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className={`text-2xl font-bold ${valueClassName || ""}`}>
+        <div className={`text-h2 font-bold ${valueClassName || ""}`}>
           {value}
         </div>
         {subtitle && (
-          <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+          <p className="text-small text-muted-foreground mt-1">{subtitle}</p>
         )}
       </CardContent>
     </Card>
@@ -320,8 +320,8 @@ export default function CheckInPage() {
             {/* Header */}
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-semibold">Check-In Management</h1>
-                <p className="text-sm text-muted-foreground">
+                <h1 className="text-h2">Check-In Management</h1>
+                <p className="text-small text-muted-foreground">
                   Manage attendee check-ins for this event
                 </p>
               </div>
@@ -356,10 +356,10 @@ export default function CheckInPage() {
                   <CardContent>
                     <div className="grid gap-4 md:grid-cols-4">
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">
+                        <p className="text-table text-muted-foreground">
                           Date & Time
                         </p>
-                        <p className="text-base">
+                        <p>
                           {event.start_date && event.start_time
                             ? `${new Date(event.start_date).toLocaleDateString(
                                 "en-US",
@@ -382,28 +382,28 @@ export default function CheckInPage() {
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">
+                        <p className="text-table text-muted-foreground">
                           Location
                         </p>
-                        <p className="text-base">
+                        <p>
                           {event.location_building && event.location_room
                             ? `${event.location_building} ${event.location_room}`
                             : "TBD"}
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">
+                        <p className="text-table text-muted-foreground">
                           Max Capacity
                         </p>
-                        <p className="text-base">
+                        <p>
                           {event.max_capacity} attendees
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">
+                        <p className="text-table text-muted-foreground">
                           Price
                         </p>
-                        <p className="text-base">
+                        <p>
                           ${Number(event.regular_price ?? 0).toFixed(2)}
                           {event.member_price !== event.regular_price && (
                             <span className="text-muted-foreground ml-1">
@@ -432,7 +432,7 @@ export default function CheckInPage() {
                           )}%`
                         : "0%"
                     }
-                    valueClassName="text-green-600"
+                    valueClassName="text-success"
                   />
                 </div>
 

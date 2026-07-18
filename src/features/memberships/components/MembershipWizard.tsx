@@ -198,7 +198,7 @@ function OptionCard({
       )}
     >
       <div className="font-medium">{title}</div>
-      <div className="text-sm text-muted-foreground">{description}</div>
+      <div className="text-small text-muted-foreground">{description}</div>
     </button>
   );
 }
@@ -219,10 +219,10 @@ function UserTypeStep({
   return (
     <div className="grid gap-4">
       <div className="flex flex-col space-y-1.5">
-        <h1 className="text-lg font-semibold leading-none tracking-tight">
+        <h1 className="text-subheading tracking-tight">
           What best describes you?
         </h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-small text-muted-foreground">
           This helps us show you the right membership options.
         </p>
       </div>
@@ -239,7 +239,7 @@ function UserTypeStep({
         ))}
       </div>
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
+      {error && <p className="text-small text-destructive">{error}</p>}
 
       <div className="flex flex-col-reverse sm:flex-row sm:justify-end sm:space-x-2">
         <Button onClick={onContinue} disabled={saving}>
@@ -274,10 +274,10 @@ function VerifyIdentifierStep({
   return (
     <div className="grid gap-4">
       <div className="flex flex-col space-y-1.5">
-        <h1 className="text-lg font-semibold leading-none tracking-tight">
+        <h1 className="text-subheading tracking-tight">
           {isFaculty ? "Verify your faculty email" : "Verify your student number"}
         </h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-small text-muted-foreground">
           {isFaculty
             ? "Enter your UBC faculty email to confirm your identity."
             : "Enter your 8-digit UBC student number to confirm your identity."}
@@ -318,7 +318,7 @@ function VerifyIdentifierStep({
           </div>
         )}
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="text-small text-destructive">{error}</p>}
       </div>
 
       <div className="flex flex-col-reverse sm:flex-row sm:justify-between sm:space-x-2">

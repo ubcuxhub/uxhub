@@ -257,7 +257,7 @@ export function SquareCheckoutForm({
         </div>
       </div>
 
-      <div className="rounded-md border bg-background p-3 text-sm">
+      <div className="rounded-md border bg-background p-3 text-small">
         <div className="flex items-center justify-between">
           <span className="text-muted-foreground">Charge amount</span>
           <span className="font-medium">{amountLabel}</span>
@@ -270,9 +270,9 @@ export function SquareCheckoutForm({
       />
 
       {message ? (
-        <p className="text-sm text-destructive">{message}</p>
+        <p className="text-small text-destructive">{message}</p>
       ) : (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-small text-muted-foreground">
           Your card details are tokenized by Square. Prices and eligibility are
           confirmed on the server before we complete the purchase.
         </p>

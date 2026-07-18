@@ -25,18 +25,18 @@ export function EventDetailsCard({ event }: EventDetailsCardProps) {
             />
           </div>
         )}
-        <CardTitle className="text-3xl">{event.name}</CardTitle>
-        <CardDescription className="text-base">
+        <CardTitle className="text-h1">{event.name}</CardTitle>
+        <CardDescription className="text-body">
           {event.description}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid gap-4">
           <div>
-            <p className="text-sm font-medium text-muted-foreground">
+            <p className="text-table text-muted-foreground">
               Date & Time
             </p>
-            <p className="text-base">
+            <p>
               {event.start_date && event.start_time
                 ? `${new Date(event.start_date).toLocaleDateString("en-US", {
                     year: "numeric",
@@ -53,10 +53,10 @@ export function EventDetailsCard({ event }: EventDetailsCardProps) {
             </p>
           </div>
           <div>
-            <p className="text-sm font-medium text-muted-foreground">
+            <p className="text-table text-muted-foreground">
               Location
             </p>
-            <p className="text-base">
+            <p>
               {event.location_building && event.location_room
                 ? `${event.location_building} ${event.location_room}`
                 : "TBD"}
@@ -66,15 +66,15 @@ export function EventDetailsCard({ event }: EventDetailsCardProps) {
                 href={event.location_address_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm text-primary hover:underline"
+                className="text-small text-primary hover:underline"
               >
                 View on map
               </a>
             )}
           </div>
           <div>
-            <p className="text-sm font-medium text-muted-foreground">Price</p>
-            <p className="text-base">
+            <p className="text-table text-muted-foreground">Price</p>
+            <p>
               ${Number(event.regular_price ?? 0).toFixed(2)}
               {event.member_price !== event.regular_price && (
                 <span className="text-muted-foreground ml-1">
@@ -84,10 +84,10 @@ export function EventDetailsCard({ event }: EventDetailsCardProps) {
             </p>
           </div>
           <div>
-            <p className="text-sm font-medium text-muted-foreground">
+            <p className="text-table text-muted-foreground">
               Max Capacity
             </p>
-            <p className="text-base">{event.max_capacity} attendees</p>
+            <p>{event.max_capacity} attendees</p>
           </div>
         </div>
       </CardContent>

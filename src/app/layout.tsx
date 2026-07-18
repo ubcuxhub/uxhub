@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
-import { DM_Sans, Geist, Geist_Mono, Lora } from "next/font/google";
+import { DM_Sans, Inter, Lora } from "next/font/google";
 import { UserProvider } from "@/context/UserContext";
+import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -10,13 +11,8 @@ const dmSans = DM_Sans({
   variable: "--font-dm-sans",
 });
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
 });
 
@@ -52,10 +48,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body
-        className={`${dmSans.variable} ${lora.variable} ${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${inter.variable} ${dmSans.variable} ${lora.variable} text-body antialiased`}
       >
+        <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         <UserProvider>{children}</UserProvider>
         <Analytics />
       </body>

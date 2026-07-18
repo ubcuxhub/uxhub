@@ -60,7 +60,7 @@ export function DeleteEventModal({
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-2 text-sm text-muted-foreground">
+          <div className="space-y-2 text-small text-muted-foreground">
             <p>
               Are you sure you want to delete this event? This action cannot be
               undone.
@@ -80,12 +80,12 @@ export function DeleteEventModal({
               className={!isValid && confirmText ? "border-destructive" : ""}
             />
             {!isValid && confirmText && (
-              <p className="text-xs text-destructive">
+              <p className="text-small text-destructive">
                 The event name does not match.
               </p>
             )}
             {error && (
-              <p className="text-xs text-destructive">{error}</p>
+              <p className="text-small text-destructive">{error}</p>
             )}
           </div>
           <div className="flex gap-2 justify-end">
@@ -109,4 +109,3 @@ export function DeleteEventModal({
     </div>
   );
 }
-

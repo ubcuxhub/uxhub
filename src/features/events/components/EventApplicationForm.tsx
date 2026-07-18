@@ -190,7 +190,7 @@ export const EventApplicationForm = ({
               <div key={questionId} className="space-y-2">
                 <Label htmlFor={questionId}>
                   {question.question}
-                  <span className="text-red-500 ml-1">*</span>
+                  <span className="text-destructive ml-1">*</span>
                 </Label>
 
                 {question.response === ResponseType.text && (
@@ -202,20 +202,20 @@ export const EventApplicationForm = ({
                         handleTextChange(questionId, e.target.value)
                       }
                       maxLength={question.max_char_limit || undefined}
-                      className={`min-h-[100px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 ${
+                      className={`min-h-[100px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-small shadow-sm transition-colors placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 ${
                         error
-                          ? "border-red-500 focus-visible:ring-red-500"
+                          ? "border-destructive focus-visible:ring-destructive"
                           : ""
                       }`}
                       required
                     />
                     {Number(question.max_char_limit) > 0 && (
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-small text-muted-foreground">
                         {(response as string)?.length || 0} /{" "}
                         {question.max_char_limit} characters
                       </p>
                     )}
-                    {error && <p className="text-sm text-red-500">{error}</p>}
+                    {error && <p className="text-small text-destructive">{error}</p>}
                   </div>
                 )}
 
@@ -229,7 +229,7 @@ export const EventApplicationForm = ({
                       required
                     >
                       <SelectTrigger
-                        className={error ? "border-red-500" : ""}
+                        className={error ? "border-destructive" : ""}
                       >
                         <SelectValue placeholder="Select an option" />
                       </SelectTrigger>
@@ -241,7 +241,7 @@ export const EventApplicationForm = ({
                         ))}
                       </SelectContent>
                     </Select>
-                    {error && <p className="text-sm text-red-500">{error}</p>}
+                    {error && <p className="text-small text-destructive">{error}</p>}
                   </div>
                 )}
 
@@ -278,7 +278,7 @@ export const EventApplicationForm = ({
                         );
                       })}
                     </div>
-                    {error && <p className="text-sm text-red-500">{error}</p>}
+                    {error && <p className="text-small text-destructive">{error}</p>}
                   </div>
                 )}
               </div>

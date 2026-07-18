@@ -41,7 +41,7 @@ const AdminEventsManager = () => {
     <PageContainer className="flex flex-col gap-8">
             <header className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
-                <h1 className="text-3xl font-bold tracking-tight mb-2">
+                <h1 className="mb-2 text-h1 tracking-tight">
                   Events Dashboard
                 </h1>
                 <p className="text-muted-foreground">
@@ -58,13 +58,13 @@ const AdminEventsManager = () => {
                 <Spinner size="lg" />
               </div>
             ) : error ? (
-              <div className="rounded-lg border border-destructive/50 p-10 text-center text-sm text-destructive">
+              <div className="rounded-lg border border-destructive/50 p-10 text-center text-small text-destructive">
                 {error}
               </div>
             ) : events.length === 0 ? (
               <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed p-12 text-center">
-                <div className="text-2xl font-semibold">No events yet</div>
-                <p className="max-w-md text-sm text-muted-foreground">
+                <div className="text-h2">No events yet</div>
+                <p className="max-w-md text-small text-muted-foreground">
                   You haven&apos;t created any events. Use the create button to
                   add your first event and it will show up here.
                 </p>

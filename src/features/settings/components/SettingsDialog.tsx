@@ -126,7 +126,7 @@ export function SettingsDialog() {
 
           <main className="flex h-[80vh] max-h-[760px] flex-1 flex-col overflow-hidden">
             <header className="flex shrink-0 items-center px-6 py-6">
-              <h2 className="text-base font-semibold">
+              <h2 className="text-subheading">
                 {TABS.find((t) => t.id === tab)?.label ?? "Settings"}
               </h2>
             </header>

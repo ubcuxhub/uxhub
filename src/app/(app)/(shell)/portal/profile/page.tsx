@@ -226,7 +226,7 @@ const Profile = () => {
 
   return (
     <PageContainer>
-      <h1 className="text-3xl font-bold mb-6">My Profile</h1>
+      <h1 className="mb-6 text-h1">My Profile</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
         {/* ---------- LEFT: membership status + purchase history ---------- */}
@@ -237,7 +237,7 @@ const Profile = () => {
               {isMember ? (
                 <>
                   <div>
-                    <p className="text-2xl font-bold leading-tight">
+                    <p className="text-h2 font-bold">
                       you&apos;re a registered member!
                     </p>
                   </div>
@@ -245,10 +245,10 @@ const Profile = () => {
                 </>
               ) : (
                 <div className="space-y-3">
-                  <p className="text-2xl font-bold leading-tight">
+                  <p className="text-h2 font-bold">
                     you&apos;re not a member yet
                   </p>
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-small text-muted-foreground">
                     Join UX Hub to unlock member perks and event discounts.
                   </p>
                   <Button asChild>
@@ -268,7 +268,7 @@ const Profile = () => {
 
           {purchases.length === 0 ? (
             <Card>
-              <CardContent className="py-8 text-center text-sm text-muted-foreground">
+              <CardContent className="py-8 text-center text-small text-muted-foreground">
                 No purchases yet — your event tickets will show up here.
               </CardContent>
             </Card>
@@ -286,7 +286,7 @@ const Profile = () => {
                           className="h-full w-full object-cover"
                         />
                       ) : (
-                        <div className="h-full w-full grid place-items-center text-muted-foreground/40 text-xs">
+                        <div className="h-full w-full grid place-items-center text-muted-foreground/40 text-small">
                           No image
                         </div>
                       )}
@@ -296,11 +296,11 @@ const Profile = () => {
                         <p className="font-semibold">
                           {item.event?.name ?? "Event"}
                         </p>
-                        <p className="text-sm text-muted-foreground">
+                        <p className="text-small text-muted-foreground">
                           {item.event ? formatPrice(item.event.regular_price) : ""}
                         </p>
                       </div>
-                      <p className="text-xs text-muted-foreground">
+                      <p className="text-small text-muted-foreground">
                         {formatDate(item.event?.start_date ?? item.created_at)}
                       </p>
                     </div>
@@ -315,10 +315,10 @@ const Profile = () => {
             <>
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Member benefits</CardTitle>
+                  <CardTitle className="text-subheading">Member benefits</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
+                  <ol className="list-decimal list-inside space-y-1 text-small text-muted-foreground">
                     {MEMBER_BENEFITS.map((b, i) => (
                       <li key={i}>{b}</li>
                     ))}
@@ -328,10 +328,10 @@ const Profile = () => {
 
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Member types</CardTitle>
+                  <CardTitle className="text-subheading">Member types</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <ol className="list-decimal list-inside space-y-1 text-sm text-muted-foreground">
+                  <ol className="list-decimal list-inside space-y-1 text-small text-muted-foreground">
                     {membershipTiers.map((t) => (
                       <li key={t.id} className="capitalize">
                         {t.name} — {formatPrice(t.price)}
@@ -398,7 +398,7 @@ const Profile = () => {
                       className="h-16 w-16 object-contain opacity-50"
                     />
                   )}
-                  <div className="absolute inset-0 hidden items-center justify-center bg-black/40 text-xs font-medium text-white group-hover:flex">
+                  <div className="absolute inset-0 hidden items-center justify-center bg-black/50 text-table text-white group-hover:flex">
                     {uploadingAvatar ? "Uploading…" : "Change photo"}
                   </div>
                   <input
@@ -585,7 +585,7 @@ const Profile = () => {
           {/* Newsletter toggle */}
           <Card>
             <CardContent className="flex items-center justify-between py-6">
-              <span className="text-lg font-medium">
+              <span className="text-subheading">
                 Subscribe to the newsletter
               </span>
               <button
@@ -601,7 +601,7 @@ const Profile = () => {
               >
                 <span
                   className={cn(
-                    "inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform",
+                    "inline-block h-5 w-5 transform rounded-full bg-background shadow transition-transform",
                     user.newsletter ? "translate-x-6" : "translate-x-1"
                   )}
                 />

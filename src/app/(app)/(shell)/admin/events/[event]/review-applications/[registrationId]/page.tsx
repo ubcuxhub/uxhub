@@ -188,7 +188,7 @@ export default function ApplicationReviewPage() {
         backLabel="Back to Applications"
         className="flex flex-col gap-8"
       >
-        <div className="rounded-lg border border-destructive/50 p-10 text-center text-sm text-destructive">
+        <div className="rounded-lg border border-destructive/50 p-10 text-center text-small text-destructive">
           {error}
         </div>
       </PageContainer>
@@ -208,8 +208,8 @@ export default function ApplicationReviewPage() {
       >
             {/* Header */}
             <div>
-              <h1 className="text-2xl font-semibold">Application Review</h1>
-              <p className="text-sm text-muted-foreground mt-1">
+              <h1 className="text-h2">Application Review</h1>
+              <p className="text-small text-muted-foreground mt-1">
                 {event.name}
               </p>
             </div>
@@ -225,8 +225,8 @@ export default function ApplicationReviewPage() {
             {/* Application Responses */}
             <div className="space-y-4">
               <div>
-                <h2 className="text-xl font-semibold">Application Responses</h2>
-                <p className="text-sm text-muted-foreground mt-1">
+                <h2 className="text-h3">Application Responses</h2>
+                <p className="text-small text-muted-foreground mt-1">
                   Review the applicant&apos;s responses to the application
                   questions
                 </p>
@@ -235,7 +235,7 @@ export default function ApplicationReviewPage() {
               {responses.length === 0 ? (
                 <Card>
                   <CardContent className="py-12 text-center">
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-small text-muted-foreground">
                       No application responses found.
                     </p>
                   </CardContent>

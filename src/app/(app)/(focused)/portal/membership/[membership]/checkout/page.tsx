@@ -52,24 +52,24 @@ export default async function MembershipCheckoutPage({
             <CardHeader className="space-y-4">
               <Badge variant="secondary">Annual Membership</Badge>
               <div className="space-y-2">
-                <CardTitle className="text-3xl">{membershipType.name}</CardTitle>
-                <p className="text-2xl font-semibold text-primary">
+                <CardTitle className="text-h1">{membershipType.name}</CardTitle>
+                <p className="text-h2 text-primary">
                   {formattedPrice}
                 </p>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm leading-6 text-muted-foreground">
+              <p className="text-small text-muted-foreground">
                 {membershipType.description}
               </p>
               {membershipType.features && membershipType.features.length > 0 ? (
                 <div className="space-y-3">
-                  <h2 className="font-medium">Included</h2>
+                  <h2 className="text-subheading">Included</h2>
                   <ul className="space-y-2">
                     {membershipType.features.map((feature) => (
                       <li
                         key={feature}
-                        className="rounded-md border px-3 py-2 text-sm text-muted-foreground"
+                        className="rounded-md border px-3 py-2 text-small text-muted-foreground"
                       >
                         {feature}
                       </li>

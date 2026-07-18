@@ -85,7 +85,7 @@ export function CompleteProfileForm({
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">Complete your profile</CardTitle>
+          <CardTitle className="text-h2">Complete your profile</CardTitle>
           <CardDescription>
             Finish setting up your account before entering the portal.
           </CardDescription>
@@ -98,7 +98,7 @@ export function CompleteProfileForm({
               onChange={handleChange}
             />
 
-            {error ? <p className="text-sm text-red-500">{error}</p> : null}
+            {error ? <p className="text-small text-destructive">{error}</p> : null}
 
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Saving profile..." : "Continue to portal"}

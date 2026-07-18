@@ -1219,10 +1219,10 @@ export const EventCreateModify = ({
     <div className="flex w-full flex-col gap-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
         <div className="flex-1">
-          <h2 className="text-lg font-semibold leading-none">
+          <h2 className="text-subheading">
             {title ?? (eventId ? "Modify Event" : "Create Event")}
           </h2>
-          <p className="text-muted-foreground text-sm">
+          <p className="text-muted-foreground text-small">
             {description ??
               (eventId
                 ? "Update the details for this event."
@@ -1461,7 +1461,7 @@ export const EventCreateModify = ({
             )}
             {successMessage && (
               <Field>
-                <FieldDescription className="text-green-600">
+                <FieldDescription className="text-success">
                   {successMessage}
                 </FieldDescription>
               </Field>

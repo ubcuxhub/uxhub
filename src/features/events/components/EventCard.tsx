@@ -78,13 +78,13 @@ export function EventCard({
           />
         </div>
       ) : (
-        <div className="flex h-40 w-full items-center justify-center bg-muted text-sm text-muted-foreground">
+        <div className="flex h-40 w-full items-center justify-center bg-muted text-small text-muted-foreground">
           No image available
         </div>
       )}
       <CardHeader>
         <CardTitle className="line-clamp-1">{event.name}</CardTitle>
-        <CardDescription className="flex flex-col gap-1 text-xs">
+        <CardDescription className="flex flex-col gap-1 text-small">
           {(startDate || startTime) && (
             <span>
               {startDate && startTime
@@ -98,14 +98,14 @@ export function EventCard({
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <p className="line-clamp-3 text-sm text-muted-foreground">
+        <p className="line-clamp-3 text-small text-muted-foreground">
           {event.description}
         </p>
       </CardContent>
       {variant === "admin" ? (
         <CardFooter className="flex flex-col gap-2">
           <div className="flex items-center justify-between w-full">
-            <div className="text-sm font-medium">
+            <div className="text-table">
               ${Number(event.regular_price ?? 0).toFixed(2)}
               {event.member_price !== event.regular_price && (
                 <span className="text-muted-foreground ml-1">
@@ -138,7 +138,7 @@ export function EventCard({
       ) : (
         <CardFooter>
           <div className="flex items-center justify-between w-full">
-            <div className="text-sm font-medium">
+            <div className="text-table">
               ${Number(event.regular_price ?? 0).toFixed(2)}
               {event.member_price !== event.regular_price && (
                 <span className="text-muted-foreground ml-1">

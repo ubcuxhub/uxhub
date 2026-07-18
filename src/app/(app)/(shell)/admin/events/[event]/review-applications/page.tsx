@@ -126,8 +126,8 @@ export default function ReviewApplicationsPage() {
     >
             <header className="flex flex-col gap-4">
               <div>
-                <h1 className="text-2xl font-semibold">Review Applications</h1>
-                <p className="text-sm text-muted-foreground">
+                <h1 className="text-h2">Review Applications</h1>
+                <p className="text-small text-muted-foreground">
                   {event?.name || "Loading event..."}
                 </p>
               </div>
@@ -138,7 +138,7 @@ export default function ReviewApplicationsPage() {
                 <Spinner size="lg" />
               </div>
             ) : error ? (
-              <div className="rounded-lg border border-destructive/50 p-10 text-center text-sm text-destructive">
+              <div className="rounded-lg border border-destructive/50 p-10 text-center text-small text-destructive">
                 {error}
               </div>
             ) : (
@@ -157,7 +157,7 @@ export default function ReviewApplicationsPage() {
                 {/* Filter Section */}
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium">Filter:</span>
+                    <span className="text-table">Filter:</span>
                     <Button
                       type="button"
                       variant={
@@ -200,12 +200,12 @@ export default function ReviewApplicationsPage() {
                 {/* Applications List */}
                 {filteredRegistrations.length === 0 ? (
                   <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed p-12 text-center">
-                    <div className="text-2xl font-semibold">
+                    <div className="text-h2">
                       {registrations.length === 0
                         ? "No applications yet"
                         : "No applications match your filters"}
                     </div>
-                    <p className="max-w-md text-sm text-muted-foreground">
+                    <p className="max-w-md text-small text-muted-foreground">
                       {registrations.length === 0
                         ? "Applications will appear here once users submit them."
                         : "Try adjusting your search or filter criteria."}

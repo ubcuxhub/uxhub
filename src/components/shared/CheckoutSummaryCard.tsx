@@ -42,10 +42,10 @@ export function CheckoutSummaryCard({
     <Card>
       <CardHeader>
         <CardTitle>Secure Checkout</CardTitle>
-        <p className="text-sm text-muted-foreground">{description}</p>
+        <p className="text-small text-muted-foreground">{description}</p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center justify-between text-small">
           <span className="text-muted-foreground">Total Amount</span>
           <span className="font-semibold">{amount}</span>
         </div>
@@ -64,7 +64,7 @@ export function CheckoutSummaryCard({
           successHref={successHref}
         />
       </CardContent>
-      <CardFooter className="pt-0 text-xs text-muted-foreground">
+      <CardFooter className="pt-0 text-small text-muted-foreground">
         Square secures the payment details while UX Hub controls pricing,
         membership eligibility, and ticket fulfillment on the server.
       </CardFooter>

@@ -141,7 +141,7 @@ export default function PortalEvents() {
     <PageContainer>
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight mb-2">Your Events</h1>
+        <h1 className="mb-2 text-h1 tracking-tight">Your Events</h1>
         <p className="text-muted-foreground">
           View the events you&apos;re registered for.
         </p>
@@ -172,7 +172,7 @@ export default function PortalEvents() {
             <section className="mb-12">
               <div className="flex items-center gap-2 mb-6">
                 <Radio className="text-muted-foreground" />
-                <h2 className="text-xl font-semibold">Ongoing Events</h2>
+                <h2 className="text-h3">Ongoing Events</h2>
               </div>
               <EventGrid events={ongoingEvents} onSelect={openEvent} />
             </section>
@@ -183,7 +183,7 @@ export default function PortalEvents() {
             <section className="mb-12">
               <div className="flex items-center gap-2 mb-6">
                 <CalendarDays className="text-muted-foreground" />
-                <h2 className="text-xl font-semibold">Upcoming Events</h2>
+                <h2 className="text-h3">Upcoming Events</h2>
               </div>
               <EventGrid events={upcomingEvents} onSelect={openEvent} />
             </section>
@@ -196,7 +196,7 @@ export default function PortalEvents() {
         <section className="mb-12">
           <div className="flex items-center gap-2 mb-6">
             <History className="text-muted-foreground" />
-            <h2 className="text-xl font-semibold">Attended Events</h2>
+            <h2 className="text-h3">Attended Events</h2>
           </div>
           <EventGrid events={attendedEvents} onSelect={openEvent} />
         </section>

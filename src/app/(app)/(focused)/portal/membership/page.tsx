@@ -80,7 +80,7 @@ export default function MembershipsPage() {
 
   return (
     <PageContainer>
-        <h1 className="text-3xl font-bold mb-8 text-center">
+        <h1 className="mb-8 text-center text-h1">
           Choose Your Membership
         </h1>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -101,18 +101,18 @@ export default function MembershipsPage() {
                 )}
               >
                 {isCurrent && (
-                  <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-xs px-3 py-1 rounded-bl-lg font-medium">
+                  <div className="absolute top-0 right-0 bg-primary text-primary-foreground text-badge px-3 py-1 rounded-bl-lg">
                     Current Plan
                   </div>
                 )}
                 <CardHeader>
-                  <CardTitle className="text-xl">{tier.name}</CardTitle>
-                  <CardDescription className="text-2xl font-bold text-primary mt-2">
+                  <CardTitle>{tier.name}</CardTitle>
+                  <CardDescription className="text-h2 font-bold text-primary mt-2">
                     {formattedPrice}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="flex-grow">
-                  <p className="text-muted-foreground text-sm mb-6">
+                  <p className="text-muted-foreground text-small mb-6">
                     {tier.description}
                   </p>
                   {tier.features && tier.features.length > 0 && (
@@ -120,7 +120,7 @@ export default function MembershipsPage() {
                       {tier.features.map((feature, idx) => (
                         <li
                           key={idx}
-                          className="flex items-start gap-2 text-sm text-muted-foreground"
+                          className="flex items-start gap-2 text-small text-muted-foreground"
                         >
                           <Check className="text-primary mt-0.5 flex-shrink-0" />
                           <span>{feature}</span>
