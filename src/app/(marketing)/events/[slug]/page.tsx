@@ -3,8 +3,12 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Card } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Spinner } from "@/components/ui/spinner";
 import { useUser } from "@/context/UserContext";
 import { fetchUserRegistration } from "@/lib/supabase-helpers/event-registrations";
 import type { EventRow } from "@/types/models";
@@ -191,10 +195,10 @@ export default function EventDetailPage() {
   /* ── Loading ── */
   if (loading) {
     return (
-      <main className="bg-white min-h-screen">
+      <main className="min-h-screen">
         <Navbar />
-        <div className="flex items-center justify-center min-h-[60vh]">
-          <div className="animate-spin rounded-full h-10 w-10 border-2 border-black border-t-transparent" />
+        <div className="flex min-h-[60vh] items-center justify-center bg-background font-sans text-body text-foreground">
+          <Spinner size="lg" />
         </div>
       </main>
     );
@@ -203,17 +207,16 @@ export default function EventDetailPage() {
   /* ── Error / Not found ── */
   if (error || !event) {
     return (
-      <main className="bg-white min-h-screen">
+      <main className="min-h-screen">
         <Navbar />
-        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-          <p className="text-gray-500 text-lg">{error || "Event not found"}</p>
-          <Link
-            href="/events"
-            className="flex items-center gap-2 text-black font-medium hover:underline"
-          >
-            <ArrowLeft />
-            Back to Events
-          </Link>
+        <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 bg-background font-sans text-body text-foreground">
+          <p className="text-subheading text-muted-foreground">{error || "Event not found"}</p>
+          <Button asChild variant="link">
+            <Link href="/events">
+              <ArrowLeft />
+              Back to Events
+            </Link>
+          </Button>
         </div>
         <div className="pt-16">
           <Footer />
@@ -253,23 +256,23 @@ export default function EventDetailPage() {
   const sponsorLogos = event.sponsor_logos ?? [];
 
   return (
-    <main className="bg-white min-h-screen">
+    <main className="min-h-screen">
       <Navbar />
 
-      {/* ────────────────────── HERO SECTION ────────────────────── */}
-      <section className="mt-[80px] px-[5%] md:px-[10%] lg:px-[15%] pt-8 pb-12">
+      <div className="bg-background font-sans text-body text-foreground">
+        {/* ────────────────────── HERO SECTION ────────────────────── */}
+        <section className="mt-[80px] px-[5%] pb-12 pt-8 md:px-[10%] lg:px-[15%]">
         {/* Back link */}
-        <Link
-          href="/events"
-          className="inline-flex items-center gap-2 text-sm text-gray-500 hover:text-black transition-colors mb-6"
-        >
-          <ArrowLeft />
-          All Events
-        </Link>
+        <Button asChild variant="link" className="mb-6 px-0">
+          <Link href="/events">
+            <ArrowLeft />
+            All Events
+          </Link>
+        </Button>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
           {/* Left: Hero Image */}
-          <div className="w-full aspect-[4/3] rounded-2xl overflow-hidden bg-gray-100">
+          <div className="aspect-[4/3] w-full overflow-hidden rounded-2xl bg-muted">
             {event.image_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -278,36 +281,34 @@ export default function EventDetailPage() {
                 className="w-full h-full object-cover"
               />
             ) : (
-              <div className="w-full h-full bg-gradient-to-br from-gray-200 to-gray-100 flex items-center justify-center">
-                <Calendar className="text-gray-300" />
+              <div className="flex h-full w-full items-center justify-center bg-muted">
+                <Calendar className="text-muted-foreground" />
               </div>
             )}
           </div>
 
           {/* Right: Event Info */}
           <div className="flex flex-col gap-5">
-            <h1 className="text-3xl md:text-4xl font-bold text-black leading-tight">
-              {event.name}
-            </h1>
+            <h1 className="text-h1">{event.name}</h1>
 
-            <p className="text-gray-600 text-[15px] leading-relaxed line-clamp-4">
+            <p className="line-clamp-4 text-muted-foreground">
               {event.description}
             </p>
 
             {/* Price badge */}
             <div className="flex items-center gap-3">
-              <div className="inline-flex items-center gap-2 bg-gray-100 rounded-lg px-4 py-2">
-                <DollarSign className="text-gray-500" />
-                <span className="font-semibold text-black">
+              <Badge variant="secondary" className="gap-2 px-4 py-2">
+                <DollarSign className="text-muted-foreground" />
+                <span>
                   {isFree
                     ? "Free"
                     : `$${Number(event.regular_price).toFixed(2)}`}
                 </span>
-              </div>
+              </Badge>
               {hasMemberPrice && (
-                <span className="text-sm text-gray-500">
+                <span className="text-small text-muted-foreground">
                   Members:{" "}
-                  <span className="font-semibold text-green-700">
+                  <span className="text-success">
                     {Number(event.member_price) === 0
                       ? "Free"
                       : `$${Number(event.member_price).toFixed(2)}`}
@@ -317,14 +318,14 @@ export default function EventDetailPage() {
             </div>
 
             {/* Date & Time */}
-            <div className="flex items-center gap-3 text-sm text-gray-700">
-              <div className="flex items-center justify-center w-8 h-8 rounded-md bg-gray-100">
-                <Calendar className="text-gray-500" />
+            <div className="flex items-center gap-3 text-table">
+              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted">
+                <Calendar className="text-muted-foreground" />
               </div>
               <div>
-                <p className="font-medium">{startDateFormatted || "TBD"}</p>
+                <p>{startDateFormatted || "TBD"}</p>
                 {startTimeFormatted && (
-                  <p className="text-gray-500 text-xs">
+                  <p className="text-small text-muted-foreground">
                     {startTimeFormatted}
                     {endTimeFormatted && ` – ${endTimeFormatted}`}
                   </p>
@@ -333,18 +334,18 @@ export default function EventDetailPage() {
             </div>
 
             {/* Location */}
-            <div className="flex items-center gap-3 text-sm text-gray-700">
-              <div className="flex items-center justify-center w-8 h-8 rounded-md bg-gray-100">
-                <MapPin className="text-gray-500" />
+            <div className="flex items-center gap-3 text-table">
+              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted">
+                <MapPin className="text-muted-foreground" />
               </div>
               <div>
-                <p className="font-medium">{locationDisplay || "TBD"}</p>
+                <p>{locationDisplay || "TBD"}</p>
                 {event.location_address_url && (
                   <a
                     href={event.location_address_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline text-xs"
+                    className="text-small text-primary hover:underline"
                   >
                     View on map
                   </a>
@@ -364,14 +365,13 @@ export default function EventDetailPage() {
             )}
           </div>
         </div>
-      </section>
+        </section>
 
-      {/* ────────────────────── EVENT DESCRIPTION ────────────────────── */}
-      <section className="px-[5%] md:px-[10%] lg:px-[15%] py-12 border-t border-gray-100">
-        <h2 className="text-2xl font-bold text-black mb-6">
-          Event Description
-        </h2>
-        <p className="text-gray-600 text-[15px] leading-relaxed whitespace-pre-wrap mb-8 max-w-3xl">
+        {/* ────────────────────── EVENT DESCRIPTION ────────────────────── */}
+        <Separator />
+        <section className="px-[5%] py-12 md:px-[10%] lg:px-[15%]">
+        <h2 className="mb-6 text-h2">Event Description</h2>
+        <p className="mb-8 max-w-3xl whitespace-pre-wrap text-muted-foreground">
           {event.description}
         </p>
 
@@ -381,7 +381,7 @@ export default function EventDetailPage() {
             {descriptionImages.map((img, i) => (
               <div
                 key={i}
-                className="aspect-[4/3] rounded-xl overflow-hidden bg-gray-100"
+                className="aspect-[4/3] overflow-hidden rounded-xl bg-muted"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -393,12 +393,14 @@ export default function EventDetailPage() {
             ))}
           </div>
         )}
-      </section>
+        </section>
 
       {/* ────────────────────── MENTORS ────────────────────── */}
       {mentors.length > 0 && (
-        <section className="px-[5%] md:px-[10%] lg:px-[15%] py-12 border-t border-gray-100">
-          <h2 className="text-2xl font-bold text-black mb-8">Mentors</h2>
+        <>
+          <Separator />
+          <section className="px-[5%] py-12 md:px-[10%] lg:px-[15%]">
+          <h2 className="mb-8 text-h2">Mentors</h2>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 max-w-2xl">
             {mentors.map((mentor, i) => (
@@ -409,7 +411,7 @@ export default function EventDetailPage() {
                 onMouseLeave={() => setHoveredMentor(null)}
               >
                 {/* Mentor photo */}
-                <div className="aspect-square rounded-xl overflow-hidden bg-gray-100 cursor-pointer">
+                <div className="aspect-square cursor-pointer overflow-hidden rounded-xl bg-muted">
                   {mentor.image_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
@@ -418,7 +420,7 @@ export default function EventDetailPage() {
                       className="w-full h-full object-cover"
                     />
                   ) : (
-                    <div className="w-full h-full bg-gray-200 flex items-center justify-center text-gray-400 text-3xl font-bold">
+                    <div className="flex h-full w-full items-center justify-center bg-muted text-h1 text-muted-foreground">
                       {mentor.name.charAt(0)}
                     </div>
                   )}
@@ -426,14 +428,14 @@ export default function EventDetailPage() {
 
                 {/* Hover card */}
                 {hoveredMentor === i && (
-                  <div className="absolute z-20 bottom-0 left-0 right-0 bg-white rounded-xl shadow-lg border border-gray-200 p-4 transform translate-y-2 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                  <Card className="absolute bottom-0 left-0 right-0 z-20 translate-y-2 gap-0 p-4 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200">
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <div>
-                        <p className="font-bold text-sm text-black">
+                        <p className="text-table">
                           {mentor.name}
                         </p>
                         {(mentor.role || mentor.company) && (
-                          <p className="text-xs text-gray-500">
+                          <p className="text-small text-muted-foreground">
                             {mentor.role}
                             {mentor.role && mentor.company && " at "}
                             {mentor.company}
@@ -445,70 +447,76 @@ export default function EventDetailPage() {
                           href={mentor.linkedin_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-blue-600 hover:text-blue-800 flex-shrink-0"
+                          className="flex-shrink-0 text-primary hover:text-action-hover"
                         >
                           <Linkedin />
                         </a>
                       )}
                     </div>
                     {mentor.bio && (
-                      <p className="text-xs text-gray-500 line-clamp-3">
+                      <p className="line-clamp-3 text-small text-muted-foreground">
                         {mentor.bio}
                       </p>
                     )}
-                  </div>
+                  </Card>
                 )}
               </div>
             ))}
           </div>
-        </section>
+          </section>
+        </>
       )}
 
       {/* ────────────────────── AGENDA ────────────────────── */}
       {agenda.length > 0 && (
-        <section className="px-[5%] md:px-[10%] lg:px-[15%] py-12 border-t border-gray-100">
-          <h2 className="text-2xl font-bold text-black mb-8">Agenda</h2>
+        <>
+          <Separator />
+          <section className="px-[5%] py-12 md:px-[10%] lg:px-[15%]">
+          <h2 className="mb-8 text-h2">Agenda</h2>
 
-          <div className="rounded-xl border border-gray-200 overflow-hidden">
+          <Card className="gap-0 overflow-hidden py-0">
             {agenda.map((item, i) => (
               <div
                 key={i}
                 className={`flex items-start gap-6 px-5 py-4 ${
-                  i % 2 === 0 ? "bg-white" : "bg-gray-50"
-                } ${i < agenda.length - 1 ? "border-b border-gray-100" : ""}`}
+                  i % 2 === 0 ? "bg-card" : "bg-muted/50"
+                } ${i < agenda.length - 1 ? "border-b" : ""}`}
               >
-                <span className="text-sm font-semibold text-black whitespace-nowrap min-w-[80px]">
+                <span className="min-w-[80px] whitespace-nowrap text-table">
                   {item.time}
                 </span>
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-gray-700">{item.title}</p>
+                  <p className="text-table">{item.title}</p>
                   {item.description && (
-                    <p className="text-xs text-gray-400 mt-0.5">
+                    <p className="mt-0.5 text-small text-muted-foreground">
                       {item.description}
                     </p>
                   )}
                 </div>
                 {item.room && (
-                  <span className="text-xs text-gray-400 whitespace-nowrap">
+                  <span className="whitespace-nowrap text-small text-muted-foreground">
                     {item.room}
                   </span>
                 )}
               </div>
             ))}
-          </div>
-        </section>
+          </Card>
+          </section>
+        </>
       )}
 
       {/* ────────────────────── SPONSORS ────────────────────── */}
       {sponsorLogos.length > 0 && (
-        <section className="px-[5%] md:px-[10%] lg:px-[15%] py-12 border-t border-gray-100">
-          <h2 className="text-2xl font-bold text-black mb-8">Sponsors</h2>
+        <>
+          <Separator />
+          <section className="px-[5%] py-12 md:px-[10%] lg:px-[15%]">
+          <h2 className="mb-8 text-h2">Sponsors</h2>
 
           <div className="flex flex-wrap items-center gap-6">
             {sponsorLogos.map((logo, i) => (
               <div
                 key={i}
-                className="w-24 h-24 rounded-xl overflow-hidden bg-gray-100 flex items-center justify-center p-2"
+                className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-xl bg-muted p-2"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -519,17 +527,20 @@ export default function EventDetailPage() {
               </div>
             ))}
           </div>
-        </section>
+          </section>
+        </>
       )}
 
       {/* ────────────────────── LOCATION ────────────────────── */}
       {(locationDisplay || event.location_address_url) && (
-        <section className="px-[5%] md:px-[10%] lg:px-[15%] py-12 border-t border-gray-100">
-          <h2 className="text-2xl font-bold text-black mb-8">Location</h2>
+        <>
+          <Separator />
+          <section className="px-[5%] py-12 md:px-[10%] lg:px-[15%]">
+          <h2 className="mb-8 text-h2">Location</h2>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
             {/* Map embed or static image */}
-            <div className="aspect-[4/3] rounded-xl overflow-hidden bg-gray-100 relative pointer-events-none">
+            <div className="pointer-events-none relative aspect-[4/3] overflow-hidden rounded-xl bg-muted">
               {event.location_address_url ? (
                 <iframe
                   src={`https://maps.google.com/maps?q=${encodeURIComponent(
@@ -541,7 +552,7 @@ export default function EventDetailPage() {
                   allowFullScreen
                 />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-300 absolute inset-0">
+                <div className="absolute inset-0 flex h-full w-full items-center justify-center text-muted-foreground">
                   <MapPin />
                 </div>
               )}
@@ -549,9 +560,9 @@ export default function EventDetailPage() {
 
             {/* Address info */}
             <div className="space-y-4">
-              <h3 className="text-xl font-bold text-black">Address</h3>
+              <h3 className="text-h3">Address</h3>
               {locationDisplay && (
-                <p className="text-gray-600 text-[15px] leading-relaxed">
+                <p className="text-muted-foreground">
                   {event.location_building && (
                     <>
                       {event.location_building}
@@ -567,20 +578,23 @@ export default function EventDetailPage() {
                 </p>
               )}
               {event.location_address_url && (
-                <a
-                  href={event.location_address_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-2 rounded-lg bg-black text-white font-bold text-sm px-6 py-2.5 hover:bg-gray-800 transition-all duration-200"
-                >
-                  <ExternalLink />
-                  Directions
-                </a>
+                <Button asChild>
+                  <a
+                    href={event.location_address_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <ExternalLink />
+                    Directions
+                  </a>
+                </Button>
               )}
             </div>
           </div>
-        </section>
+          </section>
+        </>
       )}
+      </div>
 
       {/* ────────────────────── FOOTER ────────────────────── */}
       <div className="pt-16">
