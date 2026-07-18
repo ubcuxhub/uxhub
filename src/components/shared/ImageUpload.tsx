@@ -5,17 +5,36 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
 import Image from "next/image";
+
+const getImageDimensions = (file: File) =>
+  new Promise<{ width: number; height: number }>((resolve, reject) => {
+    const imageUrl = URL.createObjectURL(file);
+    const image = document.createElement("img");
+
+    image.onload = () => {
+      URL.revokeObjectURL(imageUrl);
+      resolve({ width: image.naturalWidth, height: image.naturalHeight });
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(imageUrl);
+      reject(new Error("Unable to read image dimensions"));
+    };
+
+    image.src = imageUrl;
+  });
+
 interface ImageUploadProps {
   value?: string;
   onChange: (path: string) => void;
-  eventName: string;
+  onFileChange?: (file: File | null) => void;
   disabled?: boolean;
 }
 
 export const ImageUpload = ({
   value,
   onChange,
-  eventName,
+  onFileChange,
   disabled = false,
 }: ImageUploadProps) => {
   const [isDragging, setIsDragging] = useState(false);
@@ -88,8 +107,18 @@ export const ImageUpload = ({
       return;
     }
 
+    const dimensions = await getImageDimensions(file).catch(() => null);
+    if (!dimensions) {
+      setError("Unable to read image dimensions");
+      return;
+    }
+
+    if (dimensions.width !== dimensions.height) {
+      setError("Event thumbnails must be square (same width and height)");
+      return;
+    }
+
     setError(null);
-    setIsUploading(true);
 
     try {
       // Create preview
@@ -98,27 +127,11 @@ export const ImageUpload = ({
         setPreview(reader.result as string);
       };
       reader.readAsDataURL(file);
-
-      // Upload file
-      const formData = new FormData();
-      formData.append("file", file);
-      formData.append("eventName", eventName);
-
-      const response = await fetch("/api/upload-event-image", {
-        method: "POST",
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to upload image");
-      }
-
-      onChange(data.path);
+      onFileChange?.(file);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to upload image");
+      setError(err instanceof Error ? err.message : "Failed to read image");
       setPreview(null);
+      onFileChange?.(null);
     } finally {
       setIsUploading(false);
     }
@@ -126,6 +139,7 @@ export const ImageUpload = ({
 
   const handleRemove = () => {
     setPreview(null);
+    onFileChange?.(null);
     onChange("");
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -177,7 +191,7 @@ export const ImageUpload = ({
               <Button
                 type="button"
                 variant="destructive"
-                className="absolute top-2 right-2"
+                className="absolute top-2 right-2 bg-red-600 text-white hover:bg-red-700"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleRemove();
@@ -207,7 +221,7 @@ export const ImageUpload = ({
                 Drag and drop an image here, or click to select
               </p>
               <p className="text-xs text-muted-foreground mt-1">
-                JPG or PNG (max 5MB)
+                Square JPG or PNG (max 5MB)
               </p>
             </div>
           </div>

@@ -9,6 +9,7 @@ interface BasicEventInfoProps {
   max_capacity: string;
   image_url: string;
   isSubmitting: boolean;
+  onImageFileChange?: (file: File | null) => void;
   onFieldChange: <K extends keyof BasicEventInfoState>(
     field: K,
     value: BasicEventInfoState[K]
@@ -28,6 +29,7 @@ export const BasicEventInfo = ({
   max_capacity,
   image_url,
   isSubmitting,
+  onImageFileChange,
   onFieldChange,
 }: BasicEventInfoProps) => {
   return (
@@ -60,7 +62,7 @@ export const BasicEventInfo = ({
         <ImageUpload
           value={image_url}
           onChange={(path) => onFieldChange("image_url", path)}
-          eventName={name || "event"}
+          onFileChange={onImageFileChange}
           disabled={isSubmitting}
         />
       </Field>

@@ -14,6 +14,13 @@ export interface PurchaseWithDetails extends PurchaseRow {
   membership_types: Pick<MembershipTypeRow, "id" | "name" | "slug"> | null;
 }
 
+type EventPurchaseSummary = Pick<PurchaseRow, "id" | "status">;
+
+const SUCCESSFUL_EVENT_PURCHASE_DELETE_WARNING =
+  "Unable to delete the event, there exists successful user purchases relating to the event. Please contact the development team for assistance.";
+
+const SUCCESSFUL_PURCHASE_STATUSES = new Set(["authorized", "completed"]);
+
 export async function createPurchase(
   supabase: DbClient,
   payload: PurchaseInsert
@@ -84,6 +91,65 @@ export async function updatePurchase(
 
   if (error) throw error;
   return data;
+}
+
+async function fetchEventPurchaseSummaries(
+  supabase: DbClient,
+  eventId: string
+): Promise<EventPurchaseSummary[]> {
+  const { data, error } = await supabase
+    .from(TABLES.purchases)
+    .select("id, status")
+    .eq("event_id", eventId);
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+function assertOnlyFailedPurchases(purchases: EventPurchaseSummary[]): void {
+  const hasSuccessfulPurchase = purchases.some((purchase) =>
+    SUCCESSFUL_PURCHASE_STATUSES.has(purchase.status)
+  );
+
+  if (hasSuccessfulPurchase) {
+    throw new Error(SUCCESSFUL_EVENT_PURCHASE_DELETE_WARNING);
+  }
+
+  const hasBlockingPurchase = purchases.some(
+    (purchase) => purchase.status !== "failed"
+  );
+
+  if (hasBlockingPurchase) {
+    throw new Error(
+      "This event has purchases that are not failed, so it cannot be deleted."
+    );
+  }
+}
+
+export async function ensureEventPurchasesAreDeletable(
+  supabase: DbClient,
+  eventId: string
+): Promise<void> {
+  const purchases = await fetchEventPurchaseSummaries(supabase, eventId);
+  assertOnlyFailedPurchases(purchases);
+}
+
+export async function deleteFailedPurchasesForEvent(
+  supabase: DbClient,
+  eventId: string
+): Promise<void> {
+  const purchases = await fetchEventPurchaseSummaries(supabase, eventId);
+  if (purchases.length === 0) return;
+
+  assertOnlyFailedPurchases(purchases);
+
+  const purchaseIds = purchases.map((purchase) => purchase.id);
+  const { error: deleteError } = await supabase
+    .from(TABLES.purchases)
+    .delete()
+    .in("id", purchaseIds);
+
+  if (deleteError) throw deleteError;
 }
 
 export async function fetchPurchasesForUser(
