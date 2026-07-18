@@ -44,6 +44,8 @@
   --text-badge--line-height: 1;
   --text-badge--font-weight: 600;
 
+  --background-image-ux-hub: var(--gradient-ux-hub);
+
   /* ── shadcn semantic tokens ─────────────────────────────────────── */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -143,6 +145,13 @@
   --brand-purple-500: #c983c7;
   --brand-purple-600: #865a85;
   --brand-purple-700: #5e3f5d;
+
+  /* UX Hub brand gradient — Figma: #3A5FC4 → #B67FC6 at 90% opacity */
+  --gradient-ux-hub: linear-gradient(
+    to bottom,
+    rgb(58 95 196 / 90%),
+    rgb(182 127 198 / 90%)
+  );
 
   /* ── Light mode semantic tokens ──────────────────────────────────── */
 
