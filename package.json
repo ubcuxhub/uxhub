@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "node --experimental-default-type=module --test src/lib/utils.test.mjs",
     "types:supabase": "supabase gen types typescript --project-id otsvpvnoqwlenghobdal --schema public > src/lib/supabase/database.types.ts"
   },
   "dependencies": {
