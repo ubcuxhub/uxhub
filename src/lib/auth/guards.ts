@@ -3,8 +3,9 @@ import { redirect } from "next/navigation";
 import type { UserInfoRow } from "@/features/auth";
 import { createClient } from "@/lib/supabase/server";
 import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";
+import { getSafeInternalPath } from "@/lib/auth/paths";
 
-export async function requireAuth(): Promise<UserInfoRow> {
+export async function requireAuth(nextPath?: string): Promise<UserInfoRow> {
   const supabase = await createClient();
 
   const {
@@ -13,7 +14,8 @@ export async function requireAuth(): Promise<UserInfoRow> {
   } = await supabase.auth.getUser();
 
   if (authError || !authUser) {
-    redirect("/auth/login");
+    const safeNextPath = getSafeInternalPath(nextPath);
+    redirect(`/auth/login?next=${encodeURIComponent(safeNextPath)}`);
   }
 
   const userInfo = await fetchUserInfoByAuthId(supabase, authUser.id).catch(
@@ -21,7 +23,8 @@ export async function requireAuth(): Promise<UserInfoRow> {
   );
 
   if (!userInfo) {
-    redirect("/auth/login");
+    const safeNextPath = getSafeInternalPath(nextPath);
+    redirect(`/auth/login?next=${encodeURIComponent(safeNextPath)}`);
   }
 
   return userInfo;

@@ -44,8 +44,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({
   children,
+  flow,
 }: Readonly<{
   children: React.ReactNode;
+  flow: React.ReactNode;
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
@@ -53,7 +55,10 @@ export default function RootLayout({
         className={`${inter.variable} ${dmSans.variable} ${lora.variable} text-body antialiased`}
       >
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
-        <UserProvider>{children}</UserProvider>
+        <UserProvider>
+          {children}
+          {flow}
+        </UserProvider>
         <Analytics />
       </body>
     </html>

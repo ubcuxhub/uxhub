@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { FlowLink } from "@/components/shared/FlowLink";
 import { useUser } from "@/context/UserContext";
 import { Button } from "@/components/ui/button";
 import { PageContainer } from "@/components/shared/PageContainer";
@@ -21,10 +22,10 @@ function BecomeMemberBanner() {
         </div>
       </div>
       <Button asChild className="shrink-0">
-        <Link href="/portal/membership/join">
+        <FlowLink href="/portal/membership/join">
           Become a member
           <ArrowRight />
-        </Link>
+        </FlowLink>
       </Button>
     </div>
   );

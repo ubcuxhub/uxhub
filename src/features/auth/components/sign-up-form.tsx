@@ -29,8 +29,9 @@ type SignUpFormData = AuthProfileFormData & {
 
 export function SignUpForm({
   className,
+  nextPath = "/portal",
   ...props
-}: React.ComponentPropsWithoutRef<"div">) {
+}: React.ComponentPropsWithoutRef<"div"> & { nextPath?: string }) {
   const [formData, setFormData] = useState<SignUpFormData>({
     email: "",
     password: "",
@@ -65,7 +66,7 @@ export function SignUpForm({
         email: normalizedEmail,
         password: formData.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=/portal`,
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
           data: {
             full_name: formData.name,
           },
@@ -103,7 +104,9 @@ export function SignUpForm({
         }
       }
 
-      router.push("/auth/sign-up-success");
+      router.push(
+        `/auth/sign-up-success?next=${encodeURIComponent(nextPath)}`,
+      );
     } catch (error: unknown) {
       console.error("Sign up error:", error);
       setError(error instanceof Error ? error.message : "An error occurred");
@@ -124,7 +127,7 @@ export function SignUpForm({
           <CardDescription>Create a new account</CardDescription>
         </CardHeader>
         <CardContent>
-          <GoogleOAuthButton />
+          <GoogleOAuthButton nextPath={nextPath} />
           <form onSubmit={handleSignUp} className="space-y-6">
             <div className="space-y-4 pt-6">
               <AuthProfileFields formData={formData} onChange={handleChange} />
@@ -163,7 +166,10 @@ export function SignUpForm({
 
             <div className="text-center text-small">
               Already have an account?{" "}
-              <Link href="/auth/login" className="underline underline-offset-4">
+              <Link
+                href={`/auth/login?next=${encodeURIComponent(nextPath)}`}
+                className="underline underline-offset-4"
+              >
                 Login
               </Link>
             </div>

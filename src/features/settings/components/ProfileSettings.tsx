@@ -10,6 +10,7 @@ import { updateUserInfoById } from "@/lib/supabase-helpers/users";
 import { fetchMembershipTypeById } from "@/lib/supabase-helpers/memberships";
 import { updateEligibilityProfileAction } from "@/features/memberships/actions";
 import { Button } from "@/components/ui/button";
+import { FlowLink } from "@/components/shared/FlowLink";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -20,7 +21,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import type { UniversityYear, UserType } from "@/types/models";
+import type {
+  StudentStatus,
+  UniversityYear,
+  UserType,
+} from "@/types/models";
+import { canEditMembershipClassification } from "@/features/memberships/lib/policy";
 
 const supabase = createClient();
 
@@ -37,7 +43,10 @@ type ProfileFormData = {
   student_number: string;
   user_type: UserType;
   faculty: string;
+  faculty_email: string;
   major: string;
+  school_institution: string;
+  student_status: StudentStatus | "";
   year: UniversityYear | "";
   dietary_restrictions: string;
   newsletter: boolean;
@@ -50,7 +59,10 @@ const emptyForm: ProfileFormData = {
   student_number: "",
   user_type: "ubcStudent",
   faculty: "",
+  faculty_email: "",
   major: "",
+  school_institution: "",
+  student_status: "",
   year: "",
   dietary_restrictions: "",
   newsletter: false,
@@ -81,7 +93,10 @@ export function ProfileSettings() {
       student_number: user.student_number?.toString() || "",
       user_type: user.user_type || "ubcStudent",
       faculty: user.faculty || "",
+      faculty_email: user.faculty_email || "",
       major: user.major || "",
+      school_institution: user.school_institution || "",
+      student_status: user.student_status || "",
       year: user.year || "",
       dietary_restrictions: user.dietary_restrictions || "",
       newsletter: user.newsletter ?? false,
@@ -111,7 +126,10 @@ export function ProfileSettings() {
       student_number: user.student_number?.toString() || "",
       user_type: user.user_type || "ubcStudent",
       faculty: user.faculty || "",
+      faculty_email: user.faculty_email || "",
       major: user.major || "",
+      school_institution: user.school_institution || "",
+      student_status: user.student_status || "",
       year: user.year || "",
       dietary_restrictions: user.dietary_restrictions || "",
       newsletter: user.newsletter ?? false,
@@ -164,6 +182,7 @@ export function ProfileSettings() {
       ? `${membershipName} member`
       : "Member"
     : "Not a member";
+  const canChangeClassification = canEditMembershipClassification(user);
 
   return (
     <div className="space-y-6">
@@ -210,91 +229,90 @@ export function ProfileSettings() {
           editing={isEditing}
           onChange={(v) => patch({ phone: v })}
         />
-        <TextField
-          label="Student number"
-          type="number"
-          value={formData.student_number}
-          display={user.student_number?.toString() ?? null}
-          editing={isEditing}
-          onChange={(v) => patch({ student_number: v })}
-        />
+        {user.user_type === "ubcStudent" ? (
+          <TextField
+            label="Student number"
+            type="number"
+            value={formData.student_number}
+            display={user.student_number?.toString() ?? null}
+            editing={isEditing}
+            onChange={(v) => patch({ student_number: v })}
+          />
+        ) : null}
 
         <Row label="User type">
-          {isEditing ? (
-            <Select
-              value={formData.user_type}
-              onValueChange={(v: UserType) => patch({ user_type: v })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select user type" />
-              </SelectTrigger>
-              <SelectContent>
-                {USER_TYPES.map((t) => (
-                  <SelectItem key={t.value} value={t.value}>
-                    {t.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
+          <div className="flex min-h-9 items-center justify-between gap-3">
             <ReadValue>
               {USER_TYPES.find((t) => t.value === user.user_type)?.label ??
                 user.user_type}
             </ReadValue>
-          )}
+            {canChangeClassification ? (
+              <Button asChild size="default" variant="outline">
+                <FlowLink href="/portal/membership/join">Change</FlowLink>
+              </Button>
+            ) : null}
+          </div>
         </Row>
 
-        <Row label="Faculty">
-          {isEditing ? (
-            <Select
+        {user.user_type === "ubcStudent" ? (
+          <>
+            <FacultySetting
+              editing={isEditing}
               value={formData.faculty}
-              onValueChange={(v: string) => patch({ faculty: v })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a faculty" />
-              </SelectTrigger>
-              <SelectContent>
-                {FACULTIES.map((f) => (
-                  <SelectItem key={f} value={f}>
-                    {f}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <ReadValue>{user.faculty}</ReadValue>
-          )}
-        </Row>
-
-        <TextField
-          label="Major"
-          value={formData.major}
-          display={user.major}
-          editing={isEditing}
-          onChange={(v) => patch({ major: v })}
-        />
-
-        <Row label="Year">
-          {isEditing ? (
-            <Select
+              display={user.faculty}
+              onChange={(value) => patch({ faculty: value })}
+            />
+            <TextField
+              label="Major"
+              value={formData.major}
+              display={user.major}
+              editing={isEditing}
+              onChange={(v) => patch({ major: v })}
+            />
+            <YearSetting
+              editing={isEditing}
               value={formData.year}
-              onValueChange={(v: UniversityYear) => patch({ year: v })}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select year" />
-              </SelectTrigger>
-              <SelectContent>
-                {YEAR_LEVELS.map((y) => (
-                  <SelectItem key={y} value={y}>
-                    {y}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : (
-            <ReadValue>{user.year}</ReadValue>
-          )}
-        </Row>
+              display={user.year}
+              onChange={(value) => patch({ year: value })}
+            />
+          </>
+        ) : user.user_type === "faculty" ? (
+          <>
+            <TextField
+              label="Faculty email"
+              type="email"
+              value={formData.faculty_email}
+              display={user.faculty_email}
+              editing={false}
+              onChange={(value) => patch({ faculty_email: value })}
+            />
+            <FacultySetting
+              editing={isEditing}
+              value={formData.faculty}
+              display={user.faculty}
+              onChange={(value) => patch({ faculty: value })}
+            />
+          </>
+        ) : (
+          <>
+            <TextField
+              label="School/institution"
+              value={formData.school_institution}
+              display={user.school_institution}
+              editing={false}
+              onChange={(value) => patch({ school_institution: value })}
+            />
+            <Row label="Student status">
+              <ReadValue className="capitalize">{user.student_status}</ReadValue>
+            </Row>
+            <YearSetting
+              editing={isEditing}
+              value={formData.year}
+              display={user.year}
+              onChange={(value) => patch({ year: value })}
+            />
+          </>
+        )}
 
         <div className="sm:col-span-2">
           <TextField
@@ -397,6 +415,72 @@ function ReadValue({
     >
       {isEmpty ? <span className="text-muted-foreground/60">—</span> : children}
     </div>
+  );
+}
+
+function FacultySetting({
+  display,
+  editing,
+  onChange,
+  value,
+}: {
+  display: string | null;
+  editing: boolean;
+  onChange: (value: string) => void;
+  value: string;
+}) {
+  return (
+    <Row label="Faculty">
+      {editing ? (
+        <Select value={value} onValueChange={onChange}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select a faculty" />
+          </SelectTrigger>
+          <SelectContent>
+            {FACULTIES.map((faculty) => (
+              <SelectItem key={faculty} value={faculty}>
+                {faculty}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : (
+        <ReadValue>{display}</ReadValue>
+      )}
+    </Row>
+  );
+}
+
+function YearSetting({
+  display,
+  editing,
+  onChange,
+  value,
+}: {
+  display: UniversityYear | null;
+  editing: boolean;
+  onChange: (value: UniversityYear) => void;
+  value: UniversityYear | "";
+}) {
+  return (
+    <Row label="Year">
+      {editing ? (
+        <Select value={value} onValueChange={onChange}>
+          <SelectTrigger>
+            <SelectValue placeholder="Select year" />
+          </SelectTrigger>
+          <SelectContent>
+            {YEAR_LEVELS.map((year) => (
+              <SelectItem key={year} value={year}>
+                {year}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : (
+        <ReadValue>{display}</ReadValue>
+      )}
+    </Row>
   );
 }
 
