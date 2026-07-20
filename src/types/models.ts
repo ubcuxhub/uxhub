@@ -55,6 +55,7 @@ export type ApplicationStatus = Enums<"application_status">;
 export type ResponseType = Enums<"response_type">;
 export type UserType = Enums<"user_type">;
 export type RoleAccess = Enums<"role_access_enum">;
+export type StudentStatus = Enums<"student_status">;
 export type UniversityYear = Enums<"uni_year">;
 
 export const ResponseType = {

@@ -463,6 +463,7 @@ export type Database = {
           dietary_restrictions: string | null
           email: string
           faculty: string | null
+          faculty_email: string | null
           id: string
           major: string | null
           membership_expires_at: string | null
@@ -474,7 +475,9 @@ export type Database = {
           phone: string | null
           preferred_pronouns: string | null
           role_access: Database["public"]["Enums"]["role_access_enum"]
+          school_institution: string | null
           square_customer_id: string | null
+          student_status: Database["public"]["Enums"]["student_status"] | null
           student_number: number | null
           updated_at: string | null
           user_type: Database["public"]["Enums"]["user_type"]
@@ -486,6 +489,7 @@ export type Database = {
           dietary_restrictions?: string | null
           email: string
           faculty?: string | null
+          faculty_email?: string | null
           id?: string
           major?: string | null
           membership_expires_at?: string | null
@@ -497,7 +501,9 @@ export type Database = {
           phone?: string | null
           preferred_pronouns?: string | null
           role_access: Database["public"]["Enums"]["role_access_enum"]
+          school_institution?: string | null
           square_customer_id?: string | null
+          student_status?: Database["public"]["Enums"]["student_status"] | null
           student_number?: number | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"]
@@ -509,6 +515,7 @@ export type Database = {
           dietary_restrictions?: string | null
           email?: string
           faculty?: string | null
+          faculty_email?: string | null
           id?: string
           major?: string | null
           membership_expires_at?: string | null
@@ -520,7 +527,9 @@ export type Database = {
           phone?: string | null
           preferred_pronouns?: string | null
           role_access?: Database["public"]["Enums"]["role_access_enum"]
+          school_institution?: string | null
           square_customer_id?: string | null
+          student_status?: Database["public"]["Enums"]["student_status"] | null
           student_number?: number | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"]
@@ -567,6 +576,7 @@ export type Database = {
       application_status: "pending" | "declined" | "accepted"
       response_type: "text" | "single_select" | "multi_select"
       role_access_enum: "basic" | "admin"
+      student_status: "undergraduate" | "graduate" | "other"
       uni_year: "1" | "2" | "3" | "4" | "5+"
       user_type: "ubcStudent" | "faculty" | "nonUbc"
     }
@@ -699,6 +709,7 @@ export const Constants = {
       application_status: ["pending", "declined", "accepted"],
       response_type: ["text", "single_select", "multi_select"],
       role_access_enum: ["basic", "admin"],
+      student_status: ["undergraduate", "graduate", "other"],
       uni_year: ["1", "2", "3", "4", "5+"],
       user_type: ["ubcStudent", "faculty", "nonUbc"],
     },

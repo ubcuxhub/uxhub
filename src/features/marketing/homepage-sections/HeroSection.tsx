@@ -164,7 +164,7 @@ export default function Hero() {
             </p>
 
             <div className="mt-10 flex gap-4 sm:mt-12 md:mt-14">
-              <Button variant="primary" onClick={() => { window.location.href = "/portal/membership/join"; }}>
+              <Button variant="primary" href="/portal/membership/join">
                 BECOME A MEMBER
               </Button>
             </div>

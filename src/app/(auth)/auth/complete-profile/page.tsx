@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { CompleteProfileForm } from "@/features/auth";
 import { createClient } from "@/lib/supabase/server";
 import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";
+import { getSafeInternalPath } from "@/lib/auth/paths";
 
 function getInitialNameFromMetadata(metadata: Record<string, unknown>) {
   const candidateKeys = ["full_name", "name", "given_name"];
@@ -17,7 +18,12 @@ function getInitialNameFromMetadata(metadata: Record<string, unknown>) {
   return "";
 }
 
-export default async function Page() {
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const nextPath = getSafeInternalPath((await searchParams).next);
   const supabase = await createClient();
   const {
     data: { user: authUser },
@@ -31,7 +37,7 @@ export default async function Page() {
     .catch(() => null);
 
   if (existingProfile) {
-    redirect("/portal");
+    redirect(nextPath);
   }
 
   const initialName = getInitialNameFromMetadata(authUser.user_metadata ?? {});
@@ -40,6 +46,7 @@ export default async function Page() {
     <CompleteProfileForm
       initialEmail={authUser.email.trim().toLowerCase()}
       initialName={initialName}
+      nextPath={nextPath}
     />
   );
 }

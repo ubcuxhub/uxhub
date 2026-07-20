@@ -35,6 +35,7 @@ import {
   squareClient,
   SQUARE_CURRENCY,
 } from "@/lib/square/client";
+import { isEligibleForMembership } from "@/features/memberships/lib/policy";
 
 const adminDb = supabaseAdmin as unknown as SupabaseClient<Database>;
 
@@ -74,31 +75,6 @@ function getSquareErrorMessage(
   }
 
   return fallback;
-}
-
-function isMembershipPurchasableForUser(
-  user: UserInfoRow,
-  membershipName: string
-) {
-  if (user.membership_type_id || user.membership_pre_ordered_type_id) {
-    return false;
-  }
-
-  const lowerName = membershipName.toLowerCase();
-
-  if (user.user_type === "ubcStudent" && user.student_number) {
-    return lowerName.includes("explorer") || lowerName.includes("innovator");
-  }
-
-  if (user.user_type === "faculty") {
-    return lowerName.includes("faculty");
-  }
-
-  if (user.user_type === "nonUbc") {
-    return lowerName.includes("non");
-  }
-
-  return false;
 }
 
 function getMembershipExpiryIsoString() {
@@ -407,7 +383,7 @@ async function createSquarePaymentForMembership(
     return { error: "Membership plan not found." } as const;
   }
 
-  if (!isMembershipPurchasableForUser(user, membershipType.name)) {
+  if (!isEligibleForMembership(user, membershipType)) {
     return {
       error: "This membership tier is not available for your account.",
     } as const;

@@ -1,12 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Receipt, SlidersHorizontal, User, X } from "lucide-react";
+import { Receipt, SlidersHorizontal, User } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import {
   Dialog,
-  DialogClose,
   DialogContent,
   DialogDescription,
   DialogTitle,
@@ -16,7 +14,6 @@ import {
   SidebarContent,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -89,21 +86,14 @@ export function SettingsDialog() {
 
   return (
     <Dialog open={tab !== null} onOpenChange={handleOpenChange}>
-      <DialogContent className="overflow-hidden p-0 sm:max-w-[1000px] [&>button]:hidden">
+      <DialogContent size="large" className="flex overflow-hidden p-0">
         <DialogTitle className="sr-only">Profile & settings</DialogTitle>
         <DialogDescription className="sr-only">
           Manage your profile and account settings.
         </DialogDescription>
-        <SidebarProvider className="min-h-0">
+        <SidebarProvider className="h-full min-h-0">
           <Sidebar collapsible="none" className="flex w-48 bg-transparent">
-            <SidebarHeader className="shrink-0 flex-row items-center">
-              <DialogClose asChild>
-                <Button variant="ghost" size="icon" aria-label="Close">
-                  <X />
-                </Button>
-              </DialogClose>
-            </SidebarHeader>
-            <SidebarContent>
+            <SidebarContent className="pt-8">
               <SidebarGroup>
                 <SidebarGroupContent>
                   <SidebarMenu>
@@ -124,8 +114,8 @@ export function SettingsDialog() {
             </SidebarContent>
           </Sidebar>
 
-          <main className="flex h-[80vh] max-h-[760px] flex-1 flex-col overflow-hidden">
-            <header className="flex shrink-0 items-center px-6 py-6">
+          <main className="flex h-full flex-1 flex-col overflow-hidden">
+            <header className="flex shrink-0 items-center py-6 pl-6 pr-16">
               <h2 className="text-subheading">
                 {TABS.find((t) => t.id === tab)?.label ?? "Settings"}
               </h2>

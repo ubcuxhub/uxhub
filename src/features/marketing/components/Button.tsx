@@ -1,6 +1,8 @@
+"use client";
 
 import React from "react";
 import {ArrowUpRight} from "lucide-react";
+import { FlowLink } from "@/components/shared/FlowLink";
 
 interface ButtonProps {
   variant?: "primary" | "secondary" | "noBorder";
@@ -9,6 +11,7 @@ interface ButtonProps {
   withArrow?: boolean;
   shorterHeight?: boolean;
   className?: string;
+  href?: string;
 }
 
 const Button: React.FC<ButtonProps> = ({
@@ -18,6 +21,7 @@ const Button: React.FC<ButtonProps> = ({
   withArrow = true,
   shorterHeight = false,
   className = "",
+  href,
 }) => {
   const baseStyles =
     "flex items-center justify-center gap-3 rounded-full px-6 transition-all duration-300 ease-in-out cursor-pointer";
@@ -35,13 +39,22 @@ const Button: React.FC<ButtonProps> = ({
     ${variant == "primary" ? "group-hover:text-black" : "group-hover:text-white"}`
   } />
 
-  return (
-    <button
-      onClick={onClick}
-      className={`${baseStyles} ${height} ${variants[variant]} ${className} group`}
-    >
+  const content = (
+    <>
       <b>{children}</b>
       {withArrow ? arrowIcon : null}
+    </>
+  );
+
+  const styles = `${baseStyles} ${height} ${variants[variant]} ${className} group`;
+
+  return href ? (
+    <FlowLink href={href} className={styles}>
+      {content}
+    </FlowLink>
+  ) : (
+    <button type="button" onClick={onClick} className={styles}>
+      {content}
     </button>
   );
 };

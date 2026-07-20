@@ -1,5 +1,5 @@
 "use client";
-import Link from "next/link";
+import { FlowLink } from "@/components/shared/FlowLink";
 import { FACULTIES, YEAR_LEVELS } from "@/lib/constants";
 import { useUser } from "@/context/UserContext";
 import { Button } from "@/components/ui/button";
@@ -169,7 +169,9 @@ const Profile = () => {
         year: formData.year || null,
         dietary_restrictions: formData.dietary_restrictions || null,
         preferred_pronouns: formData.preferred_pronouns || null,
-        user_type: formData.user_type,
+        // Membership classification changes go through the validated purchase
+        // flow so eligibility and audience-specific fields stay consistent.
+        user_type: user.user_type,
       });
       await refreshUser();
       setIsEditing(false);
@@ -252,7 +254,7 @@ const Profile = () => {
                     Join UX Hub to unlock member perks and event discounts.
                   </p>
                   <Button asChild>
-                    <Link href="/portal/membership/join">Join now</Link>
+                    <FlowLink href="/portal/membership/join">Join now</FlowLink>
                   </Button>
                 </div>
               )}
@@ -471,6 +473,7 @@ const Profile = () => {
                   <div className="space-y-2">
                     <Label className="text-muted-foreground">User Type</Label>
                     <Select
+                      disabled
                       value={formData.user_type}
                       onValueChange={(value: UserType) =>
                         setFormData({ ...formData, user_type: value })

@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
+import { FlowLink } from "@/components/shared/FlowLink";
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -356,9 +357,9 @@ export default function EventDetailPage() {
             {/* Register Button */}
             {canRegister ? (
               <Button asChild className="self-start">
-                <Link href={`/portal/events/${event.slug}/checkout`}>
+                <FlowLink href={`/portal/events/${event.slug}/checkout`}>
                   Register Now
-                </Link>
+                </FlowLink>
               </Button>
             ) : (
               <Button disabled className="self-start">{registerLabel}</Button>

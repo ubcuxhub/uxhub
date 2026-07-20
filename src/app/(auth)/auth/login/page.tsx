@@ -1,10 +1,17 @@
 import { LoginForm } from "@/features/auth";
 import { redirectIfAuthenticated } from "@/lib/auth/guards";
 
-export default async function Page() {
-  await redirectIfAuthenticated();
+import { getSafeInternalPath } from "@/lib/auth/paths";
+
+export default async function Page({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>;
+}) {
+  const nextPath = getSafeInternalPath((await searchParams).next);
+  await redirectIfAuthenticated(nextPath);
 
   return (
-    <LoginForm />
+    <LoginForm nextPath={nextPath} />
   );
 }

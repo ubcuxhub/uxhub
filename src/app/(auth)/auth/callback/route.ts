@@ -92,5 +92,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL(nextPath, request.url));
   }
 
-  return NextResponse.redirect(new URL("/auth/complete-profile", request.url));
+  const completeProfileUrl = new URL("/auth/complete-profile", request.url);
+  completeProfileUrl.searchParams.set("next", nextPath);
+  return NextResponse.redirect(completeProfileUrl);
 }

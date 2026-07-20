@@ -22,12 +22,14 @@ interface CompleteProfileFormProps
   extends React.ComponentPropsWithoutRef<"div"> {
   initialEmail: string;
   initialName: string;
+  nextPath?: string;
 }
 
 export function CompleteProfileForm({
   className,
   initialEmail,
   initialName,
+  nextPath = "/portal",
   ...props
 }: CompleteProfileFormProps) {
   const [formData, setFormData] = useState<AuthProfileFormData>({
@@ -72,7 +74,7 @@ export function CompleteProfileForm({
         throw new Error(result.error || "Failed to complete profile");
       }
 
-      router.replace("/portal");
+      router.replace(nextPath);
       router.refresh();
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
