@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 
 import { type EventRow } from "@/features/events";
-import { EventCard } from "@/components/shared/EventCard";
 import { createClient } from "@/lib/supabase/client";
 import { fetchEvents } from "@/lib/supabase-helpers/events";
 import { Button } from "@/components/ui/button";
@@ -37,6 +36,19 @@ const AdminEventsManager = () => {
 
     loadEvents();
   }, []);
+
+  const formatDate = (date: string | null) => {
+    if (!date) return "—";
+    try {
+      return new Date(date).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "short",
+        day: "numeric",
+      });
+    } catch {
+      return date;
+    }
+  };
 
   return (
     <PageContainer className="flex flex-col gap-8">
@@ -76,19 +88,58 @@ const AdminEventsManager = () => {
                 </Button>
               </div>
             ) : (
-              <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-                {events.map((event) => (
-                  <EventCard
-                    key={event.id}
-                    event={event}
-                    variant="admin"
-                    adminLinks={{
-                      editHref: `/admin/events/${event.id}`,
-                      checkInHref: `/admin/events/${event.id}/check-in`,
-                      applicationsHref: `/admin/events/${event.id}/review-applications`,
-                    }}
-                  />
-                ))}
+              <div className="rounded-lg border">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="px-4 py-3 text-left font-medium">Event</th>
+                      <th className="px-4 py-3 text-left font-medium hidden sm:table-cell">Date</th>
+                      <th className="px-4 py-3 text-left font-medium hidden md:table-cell">Price</th>
+                      <th className="px-4 py-3 text-right font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {events.map((event) => (
+                      <tr key={event.id} className="border-b last:border-b-0 hover:bg-muted/30 transition-colors">
+                        <td className="px-4 py-3">
+                          <Link
+                            href={`/admin/events/${event.id}`}
+                            className="font-medium hover:underline"
+                          >
+                            {event.name}
+                          </Link>
+                          <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5 sm:hidden">
+                            {formatDate(event.start_date)}
+                          </p>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">
+                          {formatDate(event.start_date)}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
+                          ${Number(event.regular_price ?? 0).toFixed(2)}
+                          {event.member_price !== event.regular_price && (
+                            <span className="ml-1 text-xs">
+                              / ${Number(event.member_price ?? 0).toFixed(2)} member
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button asChild variant="outline" size="default">
+                              <Link href={`/admin/events/${event.id}`}>Edit</Link>
+                            </Button>
+                            <Button asChild variant="outline" size="default">
+                              <Link href={`/admin/events/${event.id}/check-in`}>Check-In</Link>
+                            </Button>
+                            <Button asChild variant="outline" size="default">
+                              <Link href={`/admin/events/${event.id}/review-applications`}>Apps</Link>
+                            </Button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
     </PageContainer>

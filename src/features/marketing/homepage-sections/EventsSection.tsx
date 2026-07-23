@@ -91,7 +91,6 @@ const EventsSection: React.FC = () => {
                 <EventCard
                   event={event}
                   href={`/events/${event.slug || event.id}`}
-                  buttonText={index % 2 === 0 ? "office tour" : "competition"}
                 />
               </div>
               {index < events.length - 1 && (

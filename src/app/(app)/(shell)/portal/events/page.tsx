@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useUser } from "@/context/UserContext";
 import { createClient } from "@/lib/supabase/client";
 import { fetchEvents } from "@/lib/supabase-helpers/events";
@@ -37,13 +36,7 @@ function EventCardSkeleton() {
   );
 }
 
-function EventGrid({
-  events,
-  onSelect,
-}: {
-  events: EventRow[];
-  onSelect: (event: EventRow) => void;
-}) {
+function EventGrid({ events }: { events: EventRow[] }) {
   return (
     <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
       {events.map((event, index) => (
@@ -57,8 +50,7 @@ function EventGrid({
         >
           <EventCard
             event={event}
-            variant="default"
-            onClick={() => onSelect(event)}
+            href={`/portal/events/${event.slug}`}
           />
         </div>
       ))}
@@ -68,7 +60,6 @@ function EventGrid({
 
 export default function PortalEvents() {
   const { user } = useUser();
-  const router = useRouter();
 
   const [ongoingEvents, setOngoingEvents] = useState<EventRow[]>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<EventRow[]>([]);
@@ -135,8 +126,7 @@ export default function PortalEvents() {
     if (user) loadEvents(user.id);
   }, [user]);
 
-  const openEvent = (event: EventRow) =>
-    router.push(`/portal/events/${event.slug}`);
+
 
   return (
     <PageContainer>
@@ -175,7 +165,7 @@ export default function PortalEvents() {
                 <Radio className="text-muted-foreground" />
                 <h2 className="text-xl font-semibold">Ongoing Events</h2>
               </div>
-              <EventGrid events={ongoingEvents} onSelect={openEvent} />
+              <EventGrid events={ongoingEvents} />
             </section>
           )}
 
@@ -186,7 +176,7 @@ export default function PortalEvents() {
                 <CalendarDays className="text-muted-foreground" />
                 <h2 className="text-xl font-semibold">Upcoming Events</h2>
               </div>
-              <EventGrid events={upcomingEvents} onSelect={openEvent} />
+              <EventGrid events={upcomingEvents} />
             </section>
           )}
         </>
@@ -199,7 +189,7 @@ export default function PortalEvents() {
             <History className="text-muted-foreground" />
             <h2 className="text-xl font-semibold">Attended Events</h2>
           </div>
-          <EventGrid events={attendedEvents} onSelect={openEvent} />
+          <EventGrid events={attendedEvents} />
         </section>
       )}
     </PageContainer>

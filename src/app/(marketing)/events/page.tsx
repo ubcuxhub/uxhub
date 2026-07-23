@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import Navbar from "@/features/marketing/homepage-sections/Navbar";
 import Footer from "@/features/marketing/homepage-sections/Footer";
+import { EventCard } from "@/components/shared/EventCard";
 import { createClient } from "@/lib/supabase/client";
 import { fetchEvents } from "@/lib/supabase-helpers/events";
 import type { EventRow } from "@/types/models";
@@ -48,47 +48,13 @@ export default function EventsPage() {
                     </div>
                 ) : (
                     <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-                        {events.map((event) => {
-                            const startDate = event.start_date
-                                ? new Date(event.start_date).toLocaleDateString("en-US", {
-                                    month: "long",
-                                    day: "numeric",
-                                    year: "numeric",
-                                })
-                                : null;
-
-                            const eventHref = `/events/${event.slug || event.id}`;
-
-                            return (
-                                <Link
-                                    key={event.id}
-                                    href={eventHref}
-                                    className="border border-gray-300 rounded-xl overflow-hidden shadow-sm bg-white block hover:shadow-md hover:-translate-y-0.5 transition-all duration-200"
-                                >
-                                    {event.image_url ? (
-                                        <img src={event.image_url} alt={event.name} className="w-full h-48 object-cover" />
-                                    ) : (
-                                        <div className="h-48 w-full bg-gray-100 flex items-center justify-center text-gray-400">No Image</div>
-                                    )}
-
-                                    <div className="p-4">
-                                        <div className="flex gap-2 mb-2">
-                                            {startDate && (
-                                                <span className="text-xs px-2 py-0.5 bg-gray-100 rounded-md text-gray-700">{startDate}</span>
-                                            )}
-                                            {event.regular_price !== undefined && (
-                                                <span className="text-xs px-2 py-0.5 bg-green-100 rounded-md text-green-700">
-                                                    {Number(event.regular_price) === 0 ? "Free" : `$${Number(event.regular_price)}`}
-                                                </span>
-                                            )}
-                                        </div>
-
-                                        <h3 className="text-lg font-bold text-black mb-1">{event.name}</h3>
-                                        <p className="text-gray-600 text-sm line-clamp-3">{event.description}</p>
-                                    </div>
-                                </Link>
-                            );
-                        })}
+                        {events.map((event) => (
+                            <EventCard
+                                key={event.id}
+                                event={event}
+                                href={`/events/${event.slug || event.id}`}
+                            />
+                        ))}
                     </div>
                 )}
             </div>
