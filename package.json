@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "seed": "node --env-file=.env.local scripts/seed/index.ts",
     "types:supabase": "supabase gen types typescript --project-id otsvpvnoqwlenghobdal --schema public > src/lib/supabase/database.types.ts"
   },
   "dependencies": {
