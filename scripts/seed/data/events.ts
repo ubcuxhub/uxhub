@@ -357,7 +357,7 @@ export const seedEvents: SeedEvent[] = [
       end_time: "19:30:00",
       max_capacity: 120,
       image_url:
-        "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&q=80&w=800",
+        "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&q=80&w=800&h=800",
       registration_start_time: "2025-08-22T00:00:00-07:00",
       registration_end_time: "2025-09-28T23:59:00-07:00",
     },
@@ -387,7 +387,7 @@ export const seedEvents: SeedEvent[] = [
       end_time: "17:00:00",
       max_capacity: 60,
       image_url:
-        "https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&q=80&w=800",
+        "https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&q=80&w=800&h=800",
       registration_start_time: "2025-09-13T00:00:00-07:00",
       registration_end_time: "2025-10-20T23:59:00-07:00",
       mentors: designSprintMentors,
@@ -432,7 +432,7 @@ export const seedEvents: SeedEvent[] = [
       end_time: "20:00:00",
       max_capacity: 100,
       image_url:
-        "https://images.unsplash.com/photo-1475721027785-f74eccf877e2?auto=format&fit=crop&q=80&w=800",
+        "https://images.unsplash.com/photo-1475721027785-f74eccf877e2?auto=format&fit=crop&q=80&w=800&h=800",
       registration_start_time: "2025-10-02T00:00:00-07:00",
       registration_end_time: "2025-11-08T23:59:00-08:00",
       mentors: panelMentors,
@@ -464,7 +464,7 @@ export const seedEvents: SeedEvent[] = [
       end_time: "17:00:00",
       max_capacity: 80,
       image_url:
-        "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?auto=format&fit=crop&q=80&w=800",
+        "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?auto=format&fit=crop&q=80&w=800&h=800",
       registration_start_time: "2025-12-12T00:00:00-08:00",
       registration_end_time: "2026-01-19T23:59:00-08:00",
       mentors: uxathonMentors,
@@ -515,7 +515,7 @@ export const seedEvents: SeedEvent[] = [
       end_time: "16:00:00",
       max_capacity: 25,
       image_url:
-        "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=800",
+        "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=800&h=800",
       registration_start_time: "2025-12-31T00:00:00-08:00",
       registration_end_time: "2026-02-06T23:59:00-08:00",
     },
@@ -550,7 +550,7 @@ export const seedEvents: SeedEvent[] = [
       end_time: "19:30:00",
       max_capacity: 80,
       image_url:
-        "https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&q=80&w=800",
+        "https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&q=80&w=800&h=800",
       registration_start_time: "2026-01-27T00:00:00-08:00",
       registration_end_time: "2026-03-05T23:59:00-08:00",
     },
@@ -582,7 +582,7 @@ export const seedEvents: SeedEvent[] = [
       end_time: "19:30:00",
       max_capacity: 120,
       image_url:
-        "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&q=80&w=800",
+        "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&q=80&w=800&h=800",
       registration_start_time: "2026-08-21T00:00:00-07:00",
       registration_end_time: "2026-09-27T23:59:00-07:00",
     },
@@ -612,7 +612,7 @@ export const seedEvents: SeedEvent[] = [
       end_time: "17:00:00",
       max_capacity: 60,
       image_url:
-        "https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&q=80&w=800",
+        "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?auto=format&fit=crop&q=80&w=800&h=800",
       registration_start_time: "2026-09-12T00:00:00-07:00",
       registration_end_time: "2026-10-19T23:59:00-07:00",
       mentors: designSprintMentors,
@@ -657,7 +657,7 @@ export const seedEvents: SeedEvent[] = [
       end_time: "20:00:00",
       max_capacity: 100,
       image_url:
-        "https://images.unsplash.com/photo-1475721027785-f74eccf877e2?auto=format&fit=crop&q=80&w=800",
+        "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=800&h=800",
       registration_start_time: "2026-10-01T00:00:00-07:00",
       registration_end_time: "2026-11-07T23:59:00-08:00",
       mentors: panelMentors,
@@ -689,7 +689,7 @@ export const seedEvents: SeedEvent[] = [
       end_time: "18:00:00",
       max_capacity: 40,
       image_url:
-        "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&q=80&w=800",
+        "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=800&h=800",
       registration_start_time: "2026-10-14T00:00:00-07:00",
       registration_end_time: "2026-11-20T23:59:00-08:00",
     },
@@ -719,7 +719,7 @@ export const seedEvents: SeedEvent[] = [
       end_time: "17:00:00",
       max_capacity: 80,
       image_url:
-        "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?auto=format&fit=crop&q=80&w=800",
+        "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=800&h=800",
       registration_start_time: "2026-12-11T00:00:00-08:00",
       registration_end_time: "2027-01-18T23:59:00-08:00",
       mentors: uxathonMentors,
@@ -770,7 +770,7 @@ export const seedEvents: SeedEvent[] = [
       end_time: "16:00:00",
       max_capacity: 25,
       image_url:
-        "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=800",
+        "https://images.unsplash.com/photo-1611162616475-46b635cb6868?auto=format&fit=crop&q=80&w=800&h=800",
       registration_start_time: "2026-12-30T00:00:00-08:00",
       registration_end_time: "2027-02-05T23:59:00-08:00",
     },
