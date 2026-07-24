@@ -150,6 +150,12 @@ uxhub/
 │   ├── icons/
 │   └── people/
 │
+├── scripts/
+│   └── seed/                             # Idempotent local seed script (`pnpm seed`)
+│       ├── index.ts                      # CLI, guardrails, orchestration, summary
+│       ├── lib/reconcile.ts              # upsertBySlug + reconcileChildren
+│       └── data/                         # events.ts, membership-types.ts
+│
 ├── supabase/
 │   ├── migrations/                       # Versioned SQL migrations
 │   └── README.md                         # Schema-change and helper runbook
@@ -174,6 +180,17 @@ uxhub/
 **Use server actions for first-party mutations when possible.** The checkout flow currently uses `src/features/payments/actions.ts`, which delegates to `src/features/payments/fulfillment.ts`. Route handlers are still used where a normal form/action boundary is not enough: Supabase email confirmation, Square webhooks, Auth-to-`user_info` linking, and event image upload.
 
 **Layouts handle access control.** `src/proxy.ts` refreshes Supabase sessions for `/admin`, `/portal`, and `/api` requests. It does not decide authorization. The shared `src/app/(app)/layout.tsx` calls `requireAuth()` and wraps everything in `UserProvider` (no sidebar of its own). It then splits into two layout-only route groups that leave every URL unchanged: `src/app/(app)/(shell)/layout.tsx` renders the unified `AppSidebar` (`src/components/shared/AppSidebar.tsx`) inside a `SidebarProvider` around the student browsing routes and admin, while `src/app/(app)/(focused)/layout.tsx` is a full-height, sidebar-less container for the membership list, join wizard, and checkout pages. The nested `src/app/(app)/(shell)/admin/layout.tsx` adds `requireAdmin()` as a guard only. Because the shell routes share the `(shell)` parent layout, the sidebar persists when navigating between student and admin pages; admin tabs render only when `user.role_access === "admin"`. The `(focused)` group is how a URL-child (e.g. `/portal/events/[event]/checkout`) opts out of the sidebar its URL-parent (`/portal/events/[event]`) still shows — route groups decouple layout inheritance from the URL hierarchy.
+
+**Local sample data comes from `pnpm seed`, not from migrations.** No migration inserts rows, so
+`supabase db reset` leaves an empty database and `/portal/membership`, `/admin/events`, and the
+public `/events` page render nothing. `scripts/seed/` fills it with four membership tiers and two
+seasons of events (2025-26 past, 2026-27 upcoming) plus their check-in sessions and application
+questions. It is safe to re-run: parents are upserted on their `slug` unique constraint, children
+are reconciled by natural key, and deletes require `--prune` because `event_registrations`,
+`check_ins`, and `event_application_responses` cascade off those tables. The script refuses to
+run against a non-local Supabase unless passed `--allow-remote`, since it authenticates with the
+RLS-bypassing service-role key. Data lives in `scripts/seed/data/*.ts`, typed against
+`src/lib/supabase/database.types.ts` so column and enum typos fail `pnpm build`.
 
 **Settings live in a hash-driven dialog.** `AppSidebar`'s footer "Profile & settings" button opens `SettingsDialog` (`src/features/settings`) instead of navigating. The dialog is a shadcn `Dialog` containing an in-dialog shadcn `Sidebar` with General / Profile / Purchase history tabs, and is controlled entirely by the URL hash `#settings/<tab>` (so `/portal#settings/profile` deep-links straight to the Profile tab). Call `openSettings(tab)` to open it from anywhere. The Profile tab edits `user_info` via the same `updateUserInfoById` + `refreshUser` pattern used by `/portal/profile`. The Purchase history tab lists the user's purchases via `fetchPurchasesForUser` — there is no standalone `/portal/purchases` route; the checkout success flow redirects to `/portal#settings/purchases`.
 

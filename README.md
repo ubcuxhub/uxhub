@@ -49,8 +49,26 @@ pnpm dev      # Start the Next.js dev server
 pnpm build    # Build for production
 pnpm start    # Start the production server
 pnpm lint     # Run ESLint
+pnpm seed     # Fill the local database with sample data (safe to re-run)
 pnpm types:supabase # Regenerate Supabase TypeScript types
 ```
+
+### Seeding local data
+
+`supabase db reset` leaves an empty database — no migration inserts rows — so run `pnpm seed`
+after a reset to get four membership tiers and two seasons of events with their check-in
+sessions and application questions. The script is idempotent: it matches rows on their natural
+key, so editing `scripts/seed/data/*.ts` and re-running syncs your change rather than
+duplicating it.
+
+```bash
+pnpm seed -- --dry-run            # Show what would change, write nothing
+pnpm seed -- --only=memberships   # memberships | events
+pnpm seed -- --prune              # Also delete rows no longer in the data files
+```
+
+It refuses to touch a non-local Supabase (it uses the service-role key, which bypasses RLS);
+pass `--allow-remote` if you genuinely mean to.
 
 ## Supabase Migrations
 

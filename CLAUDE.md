@@ -24,7 +24,12 @@ pnpm dev
 pnpm build
 pnpm lint
 pnpm start
+pnpm seed          # populate a local database with sample data
 ```
+
+`pnpm seed` is idempotent — run it as often as you like. Flags:
+`--only=memberships|events`, `--dry-run`, `--prune`, `--allow-remote`.
+Pass them after `--`, e.g. `pnpm seed -- --dry-run`.
 
 ## Architecture
 
@@ -49,6 +54,7 @@ pnpm start
 - `src/lib` - Supabase clients, typed helper boundary, auth guards, Square client, constants, and utilities
 - `public` - public marketing and portal assets
 - `supabase` - migrations and Supabase project files
+- `scripts/seed` - idempotent local-database seed script (`pnpm seed`)
 
 ## Important Patterns
 
@@ -60,6 +66,12 @@ pnpm start
 - Pages rendered inside the `(app)/(shell)` sidebar group wrap their content in `PageContainer` (`src/components/shared/PageContainer.tsx`) for a consistent max-width and edge padding. Sidebar-less routes in `(app)/(focused)` also use `PageContainer` and pass `backHref`/`backLabel` to render a top-left back button to their parent route. `/admin/users` is intentionally exempt (full-height split-pane).
 - Marketing styles are scoped through the `marketing-home` wrapper in `src/app/globals.css` so homepage fonts/colors do not leak into portal/admin UI.
 - Use the `@/*` path alias for imports from `src/*`.
+- Local sample data lives in `scripts/seed/data/*.ts` and is applied by `pnpm seed`. No
+  migration inserts rows, so a fresh `supabase db reset` leaves the database empty. Rows are
+  matched on their natural key (`slug` for events and membership tiers; `name`/`question` for
+  their children), so editing the data files and re-running syncs the change instead of
+  duplicating. Membership tier **names** are load-bearing — `canPurchase` and
+  `src/features/payments/fulfillment.ts` match them by substring.
 - Prefer server actions for app-owned mutations. Keep `/api` for callbacks/integrations and route-handler-specific needs such as Supabase email confirmation, Square webhooks, auth user linking, and event image upload.
 
 ## Current Routes
