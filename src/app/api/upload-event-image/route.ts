@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
+import { requireAdmin } from "@/lib/auth/guards";
 
 type ImageDimensions = {
   width: number;
@@ -86,6 +87,8 @@ function getImageDimensions(buffer: Buffer, fileType: string): ImageDimensions |
 }
 
 export async function POST(req: NextRequest) {
+  await requireAdmin();
+
   try {
     const formData = await req.formData();
     const file = formData.get("file") as File;

@@ -8,6 +8,7 @@ import { useUser } from "@/context/UserContext";
 import { createClient } from "@/lib/supabase/client";
 import { updateUserInfoById } from "@/lib/supabase-helpers/users";
 import { fetchMembershipTypeById } from "@/lib/supabase-helpers/memberships";
+import { updateEligibilityProfileAction } from "@/features/memberships/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -121,14 +122,27 @@ export function ProfileSettings() {
   const handleSave = async () => {
     setSaving(true);
     try {
+      const studentNumber = formData.student_number
+        ? parseInt(formData.student_number)
+        : null;
+      const eligibilityChanged =
+        formData.user_type !== user.user_type ||
+        studentNumber !== user.student_number;
+
+      if (eligibilityChanged) {
+        await updateEligibilityProfileAction({
+          userType: formData.user_type,
+          studentNumber: formData.student_number || null,
+          faculty: formData.faculty || null,
+          facultyEmail:
+            formData.user_type === "faculty" ? user.email : null,
+        });
+      }
+
       await updateUserInfoById(supabase, user.id, {
         name: formData.name,
         preferred_pronouns: formData.preferred_pronouns || null,
         phone: formData.phone || null,
-        student_number: formData.student_number
-          ? parseInt(formData.student_number)
-          : null,
-        user_type: formData.user_type,
         faculty: formData.faculty || null,
         major: formData.major || null,
         year: formData.year || null,

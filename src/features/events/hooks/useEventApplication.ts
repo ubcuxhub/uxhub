@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { ensureUserInfo } from "@/lib/supabase-helpers/users";
 import {
   createEventRegistration,
   fetchUserRegistrationId,
@@ -67,17 +66,11 @@ export function useEventApplication(
     setIsSubmitting(true);
 
     try {
-      // Get auth session
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-
-      if (!session?.user) {
+      if (!user) {
         throw new Error("You must be logged in to apply for events.");
       }
 
-      // Ensure user_info exists and get userId
-      const userId = await ensureUserInfo(supabase, session.user.id, user);
+      const userId = user.id;
 
       // Check if user already has a registration
       const existingRegId = await fetchUserRegistrationId(

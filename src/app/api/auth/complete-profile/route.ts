@@ -59,14 +59,21 @@ export async function POST(req: Request) {
   }
 
   const normalizedEmail = authUser.email.trim().toLowerCase();
+  const studentNumber = body.studentNumber?.trim() ?? "";
+
+  if (studentNumber && !/^\d{8}$/.test(studentNumber)) {
+    return NextResponse.json(
+      { error: "Student number must be 8 digits." },
+      { status: 400 }
+    );
+  }
+
   const payload = {
     auth_user_id: authUser.id,
     email: normalizedEmail,
     name,
     phone: normalizeText(body.phone),
-    student_number: body.studentNumber?.trim()
-      ? parseInt(body.studentNumber, 10)
-      : null,
+    student_number: studentNumber ? parseInt(studentNumber, 10) : null,
     faculty: normalizeText(body.faculty),
     major: normalizeText(body.major),
     year: normalizeText(body.year),

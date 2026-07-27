@@ -55,27 +55,16 @@ export default function MembershipsPage() {
     : null;
 
   // Determine if a user can purchase a specific tier
-  const canPurchase = (tierName: string): boolean => {
+  const canPurchase = (tier: MembershipTypeRow): boolean => {
     // If user already has a membership, they cannot purchase any
     if (user.membership_type_id || user.membership_pre_ordered_type_id) {
       return false;
     }
 
-    const lowerName = tierName.toLowerCase();
-
-    if (user.user_type === "ubcStudent" && user.student_number) {
-      return lowerName.includes("explorer") || lowerName.includes("innovator");
-    }
-
-    if (user.user_type === "faculty") {
-      return lowerName.includes("faculty");
-    }
-
-    if (user.user_type === "nonUbc") {
-      return lowerName.includes("non"); // matches "Non-UBC"
-    }
-
-    return false;
+    return (
+      tier.eligible_user_types.includes(user.user_type) &&
+      (user.user_type !== "ubcStudent" || Boolean(user.student_number))
+    );
   };
 
   return (
@@ -86,7 +75,7 @@ export default function MembershipsPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {membershipTiers.map((tier) => {
             const isCurrent = user.membership_type_id === tier.id;
-            const isPurchasable = canPurchase(tier.name);
+            const isPurchasable = canPurchase(tier);
             const formattedPrice = new Intl.NumberFormat("en-CA", {
               style: "currency",
               currency: "CAD",
