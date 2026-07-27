@@ -4,9 +4,9 @@ import { useState, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { ApplicationListCard } from "@/features/admin";
 import {
-  type ApplicationStatus,
   type GroupedRegistration,
 } from "@/features/events";
+import type { ApplicationStatus } from "@/types/models";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageContainer } from "@/components/shared/PageContainer";

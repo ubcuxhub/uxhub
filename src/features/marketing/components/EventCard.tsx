@@ -4,8 +4,6 @@ import Link from "next/link";
 interface EventCardProps {
     imageSrc: string;
     imageAlt: string;
-    buttonText: string;
-    buttonIcon: React.ReactNode;
     href?: string;
 }
 

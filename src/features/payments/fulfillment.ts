@@ -1,26 +1,18 @@
 import "server-only";
 
-import { revalidatePath } from "next/cache";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { SquareError, type Payment, type PaymentUpdatedEvent } from "square";
-import type { UserInfoRow } from "@/features/auth";
+import type { Payment, PaymentUpdatedEvent } from "square";
+import type { UserInfoRow } from "@/types/models";
 import type { CheckoutActionResult, CheckoutRequestInput } from "./types";
 import type { Database, Json } from "@/lib/supabase/database.types";
-import type { MembershipTypeRow } from "@/types/models";
-import {
-  fetchEventById,
-  fetchEventBySlug,
-} from "@/lib/supabase-helpers/events";
+import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
 import { fetchApplicationQuestions } from "@/lib/supabase-helpers/event-applications";
 import {
   fetchEventRegistrationByPurchaseId,
   fetchUserRegistration,
   updateEventRegistration,
 } from "@/lib/supabase-helpers/event-registrations";
-import {
-  fetchMembershipTypeById,
-  fetchMembershipTypeBySlug,
-} from "@/lib/supabase-helpers/memberships";
+import { fetchMembershipTypeBySlug } from "@/lib/supabase-helpers/memberships";
 import {
   createPurchase,
   fetchPurchaseById,
@@ -36,67 +28,23 @@ import {
   squareClient,
   SQUARE_CURRENCY,
 } from "@/lib/square/client";
+import {
+  formatReservationFailure,
+  getSquareErrorMessage,
+  getPurchaseRedirectPath,
+  normalizeSquareStatus,
+} from "./fulfillment-rules";
+import { isMembershipPurchasableForUser } from "@/features/memberships/lib/eligibility";
+import { ensureSquareCustomerId } from "./customer";
+import { revalidatePurchasePaths } from "./revalidation";
 
 const adminDb = supabaseAdmin as unknown as SupabaseClient<Database>;
-
-function splitBuyerName(fullName: string) {
-  const parts = fullName.trim().split(/\s+/);
-  const givenName = parts[0] || undefined;
-  const familyName = parts.slice(1).join(" ") || undefined;
-
-  return { givenName, familyName };
-}
-
-function normalizeSquareStatus(status: string | undefined) {
-  switch (status) {
-    case "APPROVED":
-      return "authorized" as const;
-    case "COMPLETED":
-      return "completed" as const;
-    case "CANCELED":
-      return "canceled" as const;
-    case "FAILED":
-      return "failed" as const;
-    default:
-      return "pending" as const;
-  }
-}
-
-function getSquareErrorMessage(
-  error: unknown,
-  fallback = "Payment processing failed."
-) {
-  if (error instanceof SquareError) {
-    return error.errors[0]?.detail || error.message || fallback;
-  }
-
-  if (error instanceof Error && error.message) {
-    return error.message;
-  }
-
-  return fallback;
-}
-
-function isMembershipPurchasableForUser(
-  user: UserInfoRow,
-  membership: MembershipTypeRow
-) {
-  if (user.membership_type_id || user.membership_pre_ordered_type_id) {
-    return false;
-  }
-
-  return (
-    membership.eligible_user_types.includes(user.user_type) &&
-    (user.user_type !== "ubcStudent" || Boolean(user.student_number))
-  );
-}
 
 function getMembershipExpiryIsoString() {
   const expiry = new Date();
   expiry.setFullYear(expiry.getFullYear() + 1);
   return expiry.toISOString();
 }
-
 async function cancelSquarePaymentIfPossible(paymentId: string) {
   try {
     await squareClient.payments.cancel({ paymentId });
@@ -104,41 +52,6 @@ async function cancelSquarePaymentIfPossible(paymentId: string) {
     // Best effort only. Webhooks and purchase status reconciliation handle the rest.
   }
 }
-
-async function ensureSquareCustomerId(
-  user: UserInfoRow,
-  buyer: Pick<
-    CheckoutRequestInput,
-    "buyerEmail" | "buyerName" | "buyerPhone" | "idempotencyKey"
-  >
-) {
-  if (user.square_customer_id) {
-    return user.square_customer_id;
-  }
-
-  const { givenName, familyName } = splitBuyerName(buyer.buyerName);
-  const response = await squareClient.customers.create({
-    idempotencyKey: `customer:${user.id}`,
-    givenName,
-    familyName,
-    emailAddress: buyer.buyerEmail,
-    phoneNumber: buyer.buyerPhone ?? undefined,
-    referenceId: user.id,
-  });
-
-  const customerId = response.customer?.id;
-
-  if (!customerId) {
-    throw new Error("Square did not return a customer ID.");
-  }
-
-  await updateUserInfoById(adminDb, user.id, {
-    square_customer_id: customerId,
-  });
-
-  return customerId;
-}
-
 async function reserveEventTicketSeat(
   eventId: string,
   userId: string,
@@ -164,61 +77,6 @@ async function releaseEventTicketSeatReservation(purchaseId: string) {
 
   if (error) {
     throw error;
-  }
-}
-
-function formatReservationFailure(reason: string | null | undefined) {
-  switch (reason) {
-    case "APPLICATION_REQUIRED":
-      return "This event uses an application flow and cannot be purchased directly.";
-    case "REGISTRATION_NOT_OPEN":
-      return "Registration for this event is not open yet.";
-    case "REGISTRATION_CLOSED":
-      return "Registration for this event has closed.";
-    case "ALREADY_REGISTERED":
-      return "You already have a registration for this event.";
-    case "SOLD_OUT":
-      return "This event is sold out.";
-    case "EVENT_NOT_FOUND":
-      return "This event could not be found.";
-    default:
-      return "We could not reserve a ticket for this event.";
-  }
-}
-
-async function revalidatePurchasePaths(purchaseId: string) {
-  const purchase = await fetchPurchaseById(adminDb, purchaseId);
-
-  if (!purchase) {
-    return;
-  }
-
-  // Purchase history now lives in the client-fetched settings dialog
-  // (#settings/purchases), so there is no server route to revalidate for it.
-  if (purchase.kind === "membership" && purchase.membership_type_id) {
-    const membershipType = await fetchMembershipTypeById(
-      adminDb,
-      purchase.membership_type_id
-    );
-
-    revalidatePath("/portal/membership");
-    revalidatePath("/portal/profile");
-
-    if (membershipType?.slug) {
-      revalidatePath(`/portal/membership/${membershipType.slug}`);
-      revalidatePath(`/portal/membership/${membershipType.slug}/checkout`);
-    }
-  }
-
-  if (purchase.kind === "event_ticket" && purchase.event_id) {
-    const event = await fetchEventById(adminDb, purchase.event_id);
-
-    revalidatePath("/portal");
-
-    if (event?.slug) {
-      revalidatePath(`/events/${event.slug}`);
-      revalidatePath(`/portal/events/${event.slug}/checkout`);
-    }
   }
 }
 
@@ -248,7 +106,7 @@ async function fulfillMembershipPurchase(purchaseId: string) {
     square_customer_id: purchase.square_customer_id,
   });
 
-  await revalidatePurchasePaths(purchase.id);
+  await revalidatePurchasePaths(adminDb, purchase.id);
   return updatedPurchase;
 }
 
@@ -299,7 +157,7 @@ async function fulfillEventTicketPurchase(purchaseId: string) {
     fulfilled_at: new Date().toISOString(),
   });
 
-  await revalidatePurchasePaths(purchase.id);
+  await revalidatePurchasePaths(adminDb, purchase.id);
   return updatedPurchase;
 }
 
@@ -330,12 +188,6 @@ async function applyPaymentStateToPurchase(purchaseId: string, payment: Payment)
   }
 
   return updatedPurchase;
-}
-
-function getPurchaseRedirectPath() {
-  // Land the buyer on their purchase history, which opens from the URL hash
-  // when /portal mounts after checkout.
-  return "/portal#settings/purchases";
 }
 
 async function handleExistingCheckoutAttempt(

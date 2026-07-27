@@ -10,6 +10,7 @@ import {
 } from "@/lib/supabase-helpers/purchases";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatTimestamp } from "@/lib/date";
 
 const supabase = createClient();
 
@@ -18,14 +19,6 @@ function formatCurrency(amountCents: number, currency: string) {
     style: "currency",
     currency,
   }).format(amountCents / 100);
-}
-
-function formatTimestamp(value: string | null) {
-  if (!value) return "Unknown date";
-  return new Date(value).toLocaleString("en-CA", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
 }
 
 export function PurchaseHistorySettings() {
@@ -81,7 +74,7 @@ export function PurchaseHistorySettings() {
               <p className="truncate text-table">{title}</p>
               <p className="text-small text-muted-foreground">{type}</p>
               <p className="text-small text-muted-foreground">
-                {formatTimestamp(purchase.created_at)}
+                {formatTimestamp(purchase.created_at) ?? "Unknown date"}
               </p>
             </div>
             <div className="flex flex-col items-end gap-2">

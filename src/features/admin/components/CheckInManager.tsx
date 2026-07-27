@@ -6,7 +6,7 @@ import {
   type AttendingRegistration,
   type CheckInSession,
 } from "@/features/admin";
-import { type EventRow } from "@/features/events";
+import type { EventRow } from "@/types/models";
 import { createClient } from "@/lib/supabase/client";
 import { TABLES } from "@/lib/supabase-helpers/tables";
 import type { EventRegistrationRow } from "@/types/models";
@@ -22,6 +22,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { PageContainer } from "@/components/shared/PageContainer";
+import { formatEventDate, formatEventTime } from "@/lib/date";
 
 // Stat card component
 function StatCard({
@@ -256,24 +257,16 @@ export function CheckInManager({
                           Date & Time
                         </p>
                         <p className="text-base">
-                          {event.start_date && event.start_time
-                            ? `${new Date(event.start_date).toLocaleDateString(
-                                "en-US",
-                                {
-                                  year: "numeric",
-                                  month: "short",
-                                  day: "numeric",
-                                }
-                              )} at ${event.start_time}`
-                            : event.start_date
-                            ? new Date(event.start_date).toLocaleDateString(
-                                "en-US",
-                                {
-                                  year: "numeric",
-                                  month: "short",
-                                  day: "numeric",
-                                }
-                              )
+                          {formatEventDate(event.start_date, {
+                            month: "short",
+                          })
+                            ? `${formatEventDate(event.start_date, {
+                                month: "short",
+                              })}${
+                                event.start_time
+                                  ? ` at ${formatEventTime(event.start_time)}`
+                                  : ""
+                              }`
                             : "TBD"}
                         </p>
                       </div>

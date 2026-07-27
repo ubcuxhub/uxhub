@@ -1,4 +1,3 @@
-export { submitCheckoutAction } from "./actions";
 export { SquareCheckoutForm } from "./components/SquareCheckoutForm";
 export type {
   CheckoutActionResult,

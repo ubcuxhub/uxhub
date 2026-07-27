@@ -2,55 +2,19 @@
 
 import { useEffect, useState } from "react";
 import { Pencil } from "lucide-react";
-
-import { FACULTIES, YEAR_LEVELS } from "@/lib/constants";
 import { useUser } from "@/context/UserContext";
 import { createClient } from "@/lib/supabase/client";
 import { updateUserInfoById } from "@/lib/supabase-helpers/users";
 import { fetchMembershipTypeById } from "@/lib/supabase-helpers/memberships";
 import { updateEligibilityProfileAction } from "@/features/memberships/actions";
-import { Button } from "@/components/ui/button";
-import { FlowLink } from "@/components/shared/FlowLink";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { cn } from "@/lib/utils";
-import type {
-  StudentStatus,
-  UniversityYear,
-  UserType,
-} from "@/types/models";
 import { canEditMembershipClassification } from "@/features/memberships/lib/policy";
+import { Button } from "@/components/ui/button";
+import {
+  ProfileFields,
+  type ProfileFormData,
+} from "./ProfileFields";
 
 const supabase = createClient();
-
-const USER_TYPES: Array<{ value: UserType; label: string }> = [
-  { value: "ubcStudent", label: "UBC Student" },
-  { value: "faculty", label: "Faculty" },
-  { value: "nonUbc", label: "Non-UBC" },
-];
-
-type ProfileFormData = {
-  name: string;
-  preferred_pronouns: string;
-  phone: string;
-  student_number: string;
-  user_type: UserType;
-  faculty: string;
-  faculty_email: string;
-  major: string;
-  school_institution: string;
-  student_status: StudentStatus | "";
-  year: UniversityYear | "";
-  dietary_restrictions: string;
-  newsletter: boolean;
-};
 
 const emptyForm: ProfileFormData = {
   name: "",
@@ -68,15 +32,6 @@ const emptyForm: ProfileFormData = {
   newsletter: false,
 };
 
-const formatDate = (value: string | null) =>
-  value
-    ? new Date(value).toLocaleDateString("en-CA", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      })
-    : "—";
-
 export function ProfileSettings() {
   const { user, refreshUser } = useUser();
   const [isEditing, setIsEditing] = useState(false);
@@ -84,14 +39,14 @@ export function ProfileSettings() {
   const [formData, setFormData] = useState<ProfileFormData>(emptyForm);
   const [membershipName, setMembershipName] = useState<string | null>(null);
 
-  useEffect(() => {
+  const resetForm = () => {
     if (!user) return;
     setFormData({
       name: user.name || "",
       preferred_pronouns: user.preferred_pronouns || "",
       phone: user.phone || "",
       student_number: user.student_number?.toString() || "",
-      user_type: user.user_type || "ubcStudent",
+      user_type: user.user_type,
       faculty: user.faculty || "",
       faculty_email: user.faculty_email || "",
       major: user.major || "",
@@ -99,43 +54,30 @@ export function ProfileSettings() {
       student_status: user.student_status || "",
       year: user.year || "",
       dietary_restrictions: user.dietary_restrictions || "",
-      newsletter: user.newsletter ?? false,
+      newsletter: user.newsletter,
     });
+  };
+
+  useEffect(() => {
+    if (user) queueMicrotask(resetForm);
+    // Reset only when the context's user record changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   useEffect(() => {
     if (!user?.membership_type_id) {
-      setMembershipName(null);
+      queueMicrotask(() => setMembershipName(null));
       return;
     }
     fetchMembershipTypeById(supabase, user.membership_type_id)
-      .then((m) => setMembershipName(m?.name ?? null))
-      .catch((e) => console.error("Error loading membership:", e));
+      .then((membership) => setMembershipName(membership?.name ?? null))
+      .catch(() => setMembershipName(null));
   }, [user?.membership_type_id]);
 
   if (!user) return null;
 
   const patch = (values: Partial<ProfileFormData>) =>
-    setFormData((prev) => ({ ...prev, ...values }));
-
-  const handleCancel = () => {
-    setFormData({
-      name: user.name || "",
-      preferred_pronouns: user.preferred_pronouns || "",
-      phone: user.phone || "",
-      student_number: user.student_number?.toString() || "",
-      user_type: user.user_type || "ubcStudent",
-      faculty: user.faculty || "",
-      faculty_email: user.faculty_email || "",
-      major: user.major || "",
-      school_institution: user.school_institution || "",
-      student_status: user.student_status || "",
-      year: user.year || "",
-      dietary_restrictions: user.dietary_restrictions || "",
-      newsletter: user.newsletter ?? false,
-    });
-    setIsEditing(false);
-  };
+    setFormData((current) => ({ ...current, ...values }));
 
   const handleSave = async () => {
     setSaving(true);
@@ -143,11 +85,10 @@ export function ProfileSettings() {
       const studentNumber = formData.student_number
         ? parseInt(formData.student_number)
         : null;
-      const eligibilityChanged =
+      if (
         formData.user_type !== user.user_type ||
-        studentNumber !== user.student_number;
-
-      if (eligibilityChanged) {
+        studentNumber !== user.student_number
+      ) {
         await updateEligibilityProfileAction({
           userType: formData.user_type,
           studentNumber: formData.student_number || null,
@@ -156,7 +97,6 @@ export function ProfileSettings() {
             formData.user_type === "faculty" ? user.email : null,
         });
       }
-
       await updateUserInfoById(supabase, user.id, {
         name: formData.name,
         preferred_pronouns: formData.preferred_pronouns || null,
@@ -169,8 +109,7 @@ export function ProfileSettings() {
       });
       await refreshUser();
       setIsEditing(false);
-    } catch (error) {
-      console.error("Error updating profile:", error);
+    } catch {
       alert("Failed to update profile");
     } finally {
       setSaving(false);
@@ -194,7 +133,14 @@ export function ProfileSettings() {
           </Button>
         ) : (
           <div className="flex gap-2">
-            <Button variant="outline" onClick={handleCancel} disabled={saving}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                resetForm();
+                setIsEditing(false);
+              }}
+              disabled={saving}
+            >
               Cancel
             </Button>
             <Button onClick={handleSave} disabled={saving}>
@@ -203,317 +149,14 @@ export function ProfileSettings() {
           </div>
         )}
       </div>
-
-      {/* Editable fields */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <TextField
-          label="Name"
-          value={formData.name}
-          display={user.name}
-          editing={isEditing}
-          onChange={(v) => patch({ name: v })}
-        />
-        <TextField
-          label="Pronouns"
-          value={formData.preferred_pronouns}
-          display={user.preferred_pronouns}
-          editing={isEditing}
-          onChange={(v) => patch({ preferred_pronouns: v })}
-          placeholder="e.g. she/her"
-        />
-        <TextField
-          label="Phone"
-          type="tel"
-          value={formData.phone}
-          display={user.phone}
-          editing={isEditing}
-          onChange={(v) => patch({ phone: v })}
-        />
-        {user.user_type === "ubcStudent" ? (
-          <TextField
-            label="Student number"
-            type="number"
-            value={formData.student_number}
-            display={user.student_number?.toString() ?? null}
-            editing={isEditing}
-            onChange={(v) => patch({ student_number: v })}
-          />
-        ) : null}
-
-        <Row label="User type">
-          <div className="flex min-h-9 items-center justify-between gap-3">
-            <ReadValue>
-              {USER_TYPES.find((t) => t.value === user.user_type)?.label ??
-                user.user_type}
-            </ReadValue>
-            {canChangeClassification ? (
-              <Button asChild size="default" variant="outline">
-                <FlowLink href="/portal/membership/join">Change</FlowLink>
-              </Button>
-            ) : null}
-          </div>
-        </Row>
-
-        {user.user_type === "ubcStudent" ? (
-          <>
-            <FacultySetting
-              editing={isEditing}
-              value={formData.faculty}
-              display={user.faculty}
-              onChange={(value) => patch({ faculty: value })}
-            />
-            <TextField
-              label="Major"
-              value={formData.major}
-              display={user.major}
-              editing={isEditing}
-              onChange={(v) => patch({ major: v })}
-            />
-            <YearSetting
-              editing={isEditing}
-              value={formData.year}
-              display={user.year}
-              onChange={(value) => patch({ year: value })}
-            />
-          </>
-        ) : user.user_type === "faculty" ? (
-          <>
-            <TextField
-              label="Faculty email"
-              type="email"
-              value={formData.faculty_email}
-              display={user.faculty_email}
-              editing={false}
-              onChange={(value) => patch({ faculty_email: value })}
-            />
-            <FacultySetting
-              editing={isEditing}
-              value={formData.faculty}
-              display={user.faculty}
-              onChange={(value) => patch({ faculty: value })}
-            />
-          </>
-        ) : (
-          <>
-            <TextField
-              label="School/institution"
-              value={formData.school_institution}
-              display={user.school_institution}
-              editing={false}
-              onChange={(value) => patch({ school_institution: value })}
-            />
-            <Row label="Student status">
-              <ReadValue className="capitalize">{user.student_status}</ReadValue>
-            </Row>
-            <YearSetting
-              editing={isEditing}
-              value={formData.year}
-              display={user.year}
-              onChange={(value) => patch({ year: value })}
-            />
-          </>
-        )}
-
-        <div className="sm:col-span-2">
-          <TextField
-            label="Dietary restrictions"
-            value={formData.dietary_restrictions}
-            display={user.dietary_restrictions}
-            editing={isEditing}
-            onChange={(v) => patch({ dietary_restrictions: v })}
-            placeholder="e.g. Vegetarian"
-          />
-        </div>
-
-        {/* Newsletter preference */}
-        <Row label="Newsletter">
-          {isEditing ? (
-            <button
-              type="button"
-              role="switch"
-              aria-checked={formData.newsletter}
-              onClick={() => patch({ newsletter: !formData.newsletter })}
-              className={cn(
-                "relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors",
-                formData.newsletter ? "bg-primary" : "bg-muted-foreground/30",
-              )}
-            >
-              <span
-                className={cn(
-                  "inline-block h-4 w-4 transform rounded-full bg-background shadow transition-transform",
-                  formData.newsletter ? "translate-x-6" : "translate-x-1",
-                )}
-              />
-            </button>
-          ) : (
-            <ReadValue>
-              {user.newsletter ? "Subscribed" : "Not subscribed"}
-            </ReadValue>
-          )}
-        </Row>
-      </div>
-
-      {/* Read-only account details */}
-      <div className="space-y-4 border-t pt-6">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Row label="Email">
-            <ReadValue>{user.email}</ReadValue>
-          </Row>
-          <Row label="Membership">
-            <ReadValue>{membershipStatus}</ReadValue>
-          </Row>
-          <Row label="Membership expires">
-            <ReadValue>
-              {user.membership_expires_at
-                ? formatDate(user.membership_expires_at)
-                : "—"}
-            </ReadValue>
-          </Row>
-          <Row label="Role">
-            <ReadValue className="capitalize">{user.role_access}</ReadValue>
-          </Row>
-          <Row label="Joined">
-            <ReadValue>{formatDate(user.created_at)}</ReadValue>
-          </Row>
-        </div>
-      </div>
+      <ProfileFields
+        user={user}
+        formData={formData}
+        editing={isEditing}
+        membershipStatus={membershipStatus}
+        canChangeClassification={canChangeClassification}
+        patch={patch}
+      />
     </div>
-  );
-}
-
-/** Label + control/value row. */
-function Row({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="space-y-1.5">
-      <Label className="text-muted-foreground">{label}</Label>
-      {children}
-    </div>
-  );
-}
-
-function ReadValue({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  const isEmpty =
-    children === null ||
-    children === undefined ||
-    children === "" ||
-    (typeof children === "string" && children.trim() === "");
-  return (
-    <div
-      className={cn("min-h-9 flex items-center text-table", className)}
-    >
-      {isEmpty ? <span className="text-muted-foreground/60">—</span> : children}
-    </div>
-  );
-}
-
-function FacultySetting({
-  display,
-  editing,
-  onChange,
-  value,
-}: {
-  display: string | null;
-  editing: boolean;
-  onChange: (value: string) => void;
-  value: string;
-}) {
-  return (
-    <Row label="Faculty">
-      {editing ? (
-        <Select value={value} onValueChange={onChange}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select a faculty" />
-          </SelectTrigger>
-          <SelectContent>
-            {FACULTIES.map((faculty) => (
-              <SelectItem key={faculty} value={faculty}>
-                {faculty}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      ) : (
-        <ReadValue>{display}</ReadValue>
-      )}
-    </Row>
-  );
-}
-
-function YearSetting({
-  display,
-  editing,
-  onChange,
-  value,
-}: {
-  display: UniversityYear | null;
-  editing: boolean;
-  onChange: (value: UniversityYear) => void;
-  value: UniversityYear | "";
-}) {
-  return (
-    <Row label="Year">
-      {editing ? (
-        <Select value={value} onValueChange={onChange}>
-          <SelectTrigger>
-            <SelectValue placeholder="Select year" />
-          </SelectTrigger>
-          <SelectContent>
-            {YEAR_LEVELS.map((year) => (
-              <SelectItem key={year} value={year}>
-                {year}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      ) : (
-        <ReadValue>{display}</ReadValue>
-      )}
-    </Row>
-  );
-}
-
-/** A text field that swaps between an Input (editing) and a read-only value. */
-function TextField({
-  label,
-  value,
-  display,
-  editing,
-  onChange,
-  type = "text",
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  display: string | null | undefined;
-  editing: boolean;
-  onChange: (value: string) => void;
-  type?: string;
-  placeholder?: string;
-}) {
-  return (
-    <Row label={label}>
-      {editing ? (
-        <Input
-          type={type}
-          value={value}
-          placeholder={placeholder}
-          onChange={(e) => onChange(e.target.value)}
-        />
-      ) : (
-        <ReadValue>{display}</ReadValue>
-      )}
-    </Row>
   );
 }

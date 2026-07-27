@@ -23,7 +23,9 @@ uxhub/
 │   │   ├── (marketing)/                  # Public routes
 │   │   │   ├── layout.tsx
 │   │   │   ├── page.tsx                  # Homepage
-│   │   │   ├── events/page.tsx           # Public events listing
+│   │   │   ├── events/
+│   │   │   │   ├── page.tsx              # Public events listing
+│   │   │   │   └── [slug]/page.tsx       # Public event detail
 │   │   │   └── under-construction/page.tsx
 │   │   │
 │   │   ├── (auth)/auth/                  # Auth routes
@@ -34,6 +36,7 @@ uxhub/
 │   │   │   ├── forgot-password/page.tsx
 │   │   │   ├── update-password/page.tsx
 │   │   │   ├── error/page.tsx
+│   │   │   ├── callback/route.ts         # OAuth callback
 │   │   │   └── confirm/route.ts          # Supabase email confirmation callback
 │   │   │
 │   │   ├── (app)/                        # Shared authenticated boundary (requireAuth + UserProvider)
@@ -45,7 +48,6 @@ uxhub/
 │   │   │   │   │   ├── events/
 │   │   │   │   │   │   ├── page.tsx      # Your registered events (ongoing/upcoming/attended)
 │   │   │   │   │   │   └── [event]/page.tsx # Simple event detail by event slug
-│   │   │   │   │   └── profile/page.tsx
 │   │   │   │   └── admin/                # Admin-gated routes
 │   │   │   │       ├── layout.tsx        # requireAdmin guard only (sidebar comes from (shell))
 │   │   │   │       ├── page.tsx          # Admin dashboard
@@ -192,7 +194,7 @@ run against a non-local Supabase unless passed `--allow-remote`, since it authen
 RLS-bypassing service-role key. Data lives in `scripts/seed/data/*.ts`, typed against
 `src/lib/supabase/database.types.ts` so column and enum typos fail `pnpm build`.
 
-**Settings live in a hash-driven dialog.** `AppSidebar`'s footer "Profile & settings" button opens `SettingsDialog` (`src/features/settings`) instead of navigating. The dialog is a shadcn `Dialog` containing an in-dialog shadcn `Sidebar` with General / Profile / Purchase history tabs, and is controlled entirely by the URL hash `#settings/<tab>` (so `/portal#settings/profile` deep-links straight to the Profile tab). Call `openSettings(tab)` to open it from anywhere. The Profile tab edits `user_info` via the same `updateUserInfoById` + `refreshUser` pattern used by `/portal/profile`. The Purchase history tab lists the user's purchases via `fetchPurchasesForUser` — there is no standalone `/portal/purchases` route; the checkout success flow redirects to `/portal#settings/purchases`.
+**Settings live in a hash-driven dialog.** `AppSidebar`'s footer "Profile & settings" button opens `SettingsDialog` (`src/features/settings`) instead of navigating. The dialog is a shadcn `Dialog` containing an in-dialog shadcn `Sidebar` with General / Profile / Purchase history tabs, and is controlled entirely by the URL hash `#settings/<tab>` (so `/portal#settings/profile` deep-links straight to the Profile tab). Call `openSettings(tab)` to open it from anywhere. The Profile tab edits `user_info` via `updateUserInfoById` + `refreshUser`. The Purchase history tab lists the user's purchases via `fetchPurchasesForUser` — there is no standalone `/portal/purchases` route; the checkout success flow redirects to `/portal#settings/purchases`.
 
 ## URL Conventions
 
@@ -205,7 +207,7 @@ RLS-bypassing service-role key. Data lives in `scripts/seed/data/*.ts`, typed ag
 /under-construction
 ```
 
-`/events/[slug]` is a stub public event-detail page (event title + "under construction") that homepage event cards link to. There are currently no separate public `/about`, `/team`, `/contact`, or `/membership` routes.
+`/events/[slug]` is the full public event-detail page that homepage and calendar cards link to. There are currently no separate public `/about`, `/team`, `/contact`, or `/membership` routes.
 
 ### Auth - `(auth)`
 
@@ -216,6 +218,7 @@ RLS-bypassing service-role key. Data lives in `scripts/seed/data/*.ts`, typed ag
 /auth/forgot-password
 /auth/update-password
 /auth/error
+/auth/callback
 /auth/confirm
 ```
 
@@ -230,7 +233,6 @@ RLS-bypassing service-role key. Data lives in `scripts/seed/data/*.ts`, typed ag
 /portal/membership/join                    # (focused) — no sidebar
 /portal/membership/[membership]            # (focused) — no sidebar
 /portal/membership/[membership]/checkout   # (focused) — no sidebar
-/portal/profile                            # (shell) — sidebar
 ```
 
 Notes:

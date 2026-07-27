@@ -6,26 +6,7 @@ import { requireAuth } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
 import { Calendar, MapPin } from "lucide-react";
-
-function formatDate(date: string | null) {
-  if (!date) return "TBD";
-  return new Date(date).toLocaleDateString("en-CA", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}
-
-function formatTime(time: string | null) {
-  if (!time) return null;
-  const value = time.includes("T") ? time : `1970-01-01T${time}`;
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return time;
-  return parsed.toLocaleTimeString("en-CA", {
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
+import { formatEventDate, formatEventTime } from "@/lib/date";
 
 interface PortalEventPageProps {
   params: Promise<{ event: string }>;
@@ -43,8 +24,8 @@ export default async function PortalEventPage({
     notFound();
   }
 
-  const startTime = formatTime(event.start_time);
-  const endTime = formatTime(event.end_time);
+  const startTime = formatEventTime(event.start_time);
+  const endTime = formatEventTime(event.end_time);
   const location = [event.location_building, event.location_room]
     .filter(Boolean)
     .join(", ");
@@ -57,9 +38,9 @@ export default async function PortalEventPage({
         <Calendar className="mt-0.5 text-muted-foreground" />
         <div>
           <p className="font-medium">
-            {formatDate(event.start_date)}
+            {formatEventDate(event.start_date) ?? "TBD"}
             {event.end_date && event.end_date !== event.start_date
-              ? ` – ${formatDate(event.end_date)}`
+              ? ` – ${formatEventDate(event.end_date)}`
               : ""}
           </p>
           {startTime && (

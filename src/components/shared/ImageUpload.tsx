@@ -231,5 +231,3 @@ export const ImageUpload = ({
     </Field>
   );
 };
-
-export default ImageUpload;

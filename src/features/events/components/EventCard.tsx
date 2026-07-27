@@ -1,7 +1,5 @@
-"use client";
-
 import Link from "next/link";
-import type { EventRow } from "../types/eventTypes";
+import type { EventRow } from "@/types/models";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,11 +9,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { formatEventDate, formatEventTime } from "@/lib/date";
 
 interface EventCardProps {
   event: EventRow;
   variant?: "default" | "admin";
-  onClick?: () => void;
   adminLinks?: {
     editHref: string;
     checkInHref: string;
@@ -26,42 +24,10 @@ interface EventCardProps {
 export function EventCard({
   event,
   variant = "default",
-  onClick,
   adminLinks,
 }: EventCardProps) {
-  // Format date and time for display
-  const formatDate = (date: string | null | undefined) => {
-    if (!date) return null;
-    try {
-      return new Date(date).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      });
-    } catch {
-      return date;
-    }
-  };
-
-  const formatTime = (time: string | null | undefined) => {
-    if (!time) return null;
-    try {
-      // If it's a full timestamp, extract time
-      if (time.includes("T")) {
-        return new Date(time).toLocaleTimeString("en-US", {
-          hour: "numeric",
-          minute: "2-digit",
-        });
-      }
-      // If it's just time, format it
-      return time;
-    } catch {
-      return time;
-    }
-  };
-
-  const startDate = formatDate(event.start_date);
-  const startTime = formatTime(event.start_time);
+  const startDate = formatEventDate(event.start_date, { month: "short" });
+  const startTime = formatEventTime(event.start_time);
   const locationDisplay = [event.location_building, event.location_room]
     .filter(Boolean)
     .join(" ");
@@ -152,16 +118,15 @@ export function EventCard({
     </>
   );
 
-  if (variant === "default" && onClick) {
-    return (
-      <Card
-        className="overflow-hidden cursor-pointer hover:bg-muted/50 transition-colors"
-        onClick={onClick}
-      >
-        {cardContent}
-      </Card>
-    );
-  }
-
-  return <Card className="overflow-hidden">{cardContent}</Card>;
+  return (
+    <Card
+      className={
+        variant === "default"
+          ? "overflow-hidden transition-colors hover:bg-muted/50"
+          : "overflow-hidden"
+      }
+    >
+      {cardContent}
+    </Card>
+  );
 }
