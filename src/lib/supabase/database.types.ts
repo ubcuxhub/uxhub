@@ -327,6 +327,7 @@ export type Database = {
         Row: {
           created_at: string | null
           description: string
+          eligible_user_types: Database["public"]["Enums"]["user_type"][]
           features: string[] | null
           id: string
           name: string
@@ -337,6 +338,7 @@ export type Database = {
         Insert: {
           created_at?: string | null
           description: string
+          eligible_user_types?: Database["public"]["Enums"]["user_type"][]
           features?: string[] | null
           id?: string
           name: string
@@ -347,6 +349,7 @@ export type Database = {
         Update: {
           created_at?: string | null
           description?: string
+          eligible_user_types?: Database["public"]["Enums"]["user_type"][]
           features?: string[] | null
           id?: string
           name?: string
@@ -548,6 +551,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      current_user_info_id: { Args: never; Returns: string }
+      delete_event_atomically: {
+        Args: { target_event_id: string }
+        Returns: undefined
+      }
       get_user_info_id: { Args: never; Returns: string }
       is_admin: { Args: never; Returns: boolean }
       is_authenticated: { Args: never; Returns: boolean }

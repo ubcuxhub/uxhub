@@ -20,18 +20,6 @@ export interface AdminUserInfoLookup {
   email: string;
 }
 
-export async function adminFindUserInfoIdByEmail(
-  email: string
-): Promise<{ id: string } | null> {
-  const { data } = await supabaseAdmin
-    .from(TABLES.userInfo)
-    .select("id")
-    .eq("email", email)
-    .maybeSingle();
-
-  return (data as { id: string } | null) ?? null;
-}
-
 export async function adminFindUserInfoByEmail(
   email: string
 ): Promise<AdminUserInfoLookup | null> {
@@ -59,20 +47,6 @@ export async function adminUpdateUserInfoById(
   return data;
 }
 
-export async function adminUpdateUserInfoByEmail(
-  email: string,
-  payload: UserInfoWritePayload
-) {
-  const { data, error } = await supabaseAdmin
-    .from(TABLES.userInfo)
-    .update(payload)
-    .eq("email", email)
-    .select();
-
-  if (error) throw error;
-  return data;
-}
-
 export async function adminInsertUserInfo(payload: UserInfoWritePayload) {
   const { data, error } = await supabaseAdmin
     .from(TABLES.userInfo)
@@ -81,16 +55,4 @@ export async function adminInsertUserInfo(payload: UserInfoWritePayload) {
 
   if (error) throw error;
   return data;
-}
-
-export async function adminUpdateMembershipByEmail(
-  email: string,
-  payload: UserInfoWritePayload
-): Promise<{ error: { message: string } | null }> {
-  const { error } = await supabaseAdmin
-    .from(TABLES.userInfo)
-    .update(payload)
-    .eq("email", email);
-
-  return { error };
 }

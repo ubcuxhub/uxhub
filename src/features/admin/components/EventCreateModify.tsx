@@ -4,37 +4,18 @@ import { useEffect, useMemo, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-import { createClient } from "@/lib/supabase/client";
 import {
-  deleteEvent,
-  fetchEventById,
-  fetchEventSlugsByPrefix,
-  insertEvent,
-  updateEvent,
-} from "@/lib/supabase-helpers/events";
-import {
-  deleteCheckInSessionsForEvent,
-  fetchCheckInSessions,
-  insertCheckInSessions,
-} from "@/lib/supabase-helpers/check-ins";
-import {
-  deleteApplicationQuestionsForEvent,
-  fetchApplicationQuestions,
-  insertApplicationQuestions,
-} from "@/lib/supabase-helpers/event-applications";
-import { deleteRegistrationsForEvent } from "@/lib/supabase-helpers/event-registrations";
-import {
-  deleteFailedPurchasesForEvent,
-  ensureEventPurchasesAreDeletable,
-} from "@/lib/supabase-helpers/purchases";
+  deleteAdminEventAction,
+  saveAdminEventAction,
+} from "@/features/admin/actions";
 import {
   ResponseType,
   type ApplicationQuestionTemplate,
 } from "@/features/events/types/eventTypes";
 import type {
-  CheckInSessionInsert,
-  EventApplicationQuestionInsert,
-  EventInsert,
+  CheckInSessionRow,
+  EventApplicationQuestionRow,
+  EventRow,
   EventUpdate,
 } from "@/types/models";
 import type { CheckInSessionDraft } from "../types/checkInTypes";
@@ -54,10 +35,12 @@ import { ApplicationQuestionsSection } from "./event-form/ApplicationQuestionsSe
 import { Skeleton } from "@/components/ui/skeleton";
 import { BackButton } from "@/components/shared/BackButton";
 import { DeleteEventModal } from "./DeleteEventModal";
-import { createUniqueSlug, slugify } from "@/lib/slug";
 
 interface EventCreateModifyProps {
   eventId?: string;
+  initialEvent?: EventRow | null;
+  initialCheckInSessions?: CheckInSessionRow[];
+  initialApplicationQuestions?: EventApplicationQuestionRow[];
   onSuccess?: (id: string) => void;
   title?: string;
   description?: string;
@@ -218,11 +201,13 @@ const STORAGE_KEY = "event_create_form_draft";
 
 export const EventCreateModify = ({
   eventId,
+  initialEvent = null,
+  initialCheckInSessions = [],
+  initialApplicationQuestions = [],
   onSuccess,
   title,
   description,
 }: EventCreateModifyProps) => {
-  const supabase = useMemo(() => createClient(), []);
   const router = useRouter();
   const isInitialMount = useRef(true);
   const hasRestoredState = useRef(false);
@@ -407,20 +392,13 @@ export const EventCreateModify = ({
   }, [hasUnsavedChanges, router]);
 
   useEffect(() => {
-    const fetchExistingEvent = async () => {
+    const loadExistingEvent = () => {
       if (!eventId) return;
 
       setLoadingEvent(true);
       setError(null);
 
-      let data;
-      try {
-        data = await fetchEventById(supabase, eventId);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load event.");
-        setLoadingEvent(false);
-        return;
-      }
+      const data = initialEvent;
 
       if (!data) {
         setError("Event not found.");
@@ -462,51 +440,26 @@ export const EventCreateModify = ({
       setFormState(loadedFormState);
       setPendingImageFile(null);
 
-      // Fetch check-in sessions from check_in_sessions table
       let loadedCheckInEvents: CheckInSessionDraft[] = [
         { name: "", start_time: "", end_time: "" },
       ];
-      try {
-        const checkInSessionsData = await fetchCheckInSessions(
-          supabase,
-          eventId
-        );
-        if (checkInSessionsData.length > 0) {
-          loadedCheckInEvents = checkInSessionsData.map((session) => ({
-            name: session.name ?? "",
-            start_time: timestamptzToDatetimeLocal(session.start_time),
-            end_time: timestamptzToDatetimeLocal(session.end_time),
-          }));
-        }
-        setCheckInEvents(loadedCheckInEvents);
-      } catch (checkInSessionsError) {
-        console.error(
-          "Error fetching check-in sessions:",
-          checkInSessionsError
-        );
-        setCheckInEvents([{ name: "", start_time: "", end_time: "" }]);
+      if (initialCheckInSessions.length > 0) {
+        loadedCheckInEvents = initialCheckInSessions.map((session) => ({
+          name: session.name ?? "",
+          start_time: timestamptzToDatetimeLocal(session.start_time),
+          end_time: timestamptzToDatetimeLocal(session.end_time),
+        }));
       }
+      setCheckInEvents(loadedCheckInEvents);
 
-      // Fetch application questions from event_application_questions table
-      let loadedApplicationTemplate: ApplicationQuestionTemplate[] = [];
-      try {
-        const questionsData = await fetchApplicationQuestions(
-          supabase,
-          eventId
-        );
-        if (questionsData.length > 0) {
-          loadedApplicationTemplate = questionsData.map((q) => ({
+      const loadedApplicationTemplate: ApplicationQuestionTemplate[] =
+        initialApplicationQuestions.map((q) => ({
             question: q.question ?? "",
             response: (q.response_type as ResponseType) ?? ResponseType.text,
             max_char_limit: q.max_char_limit ?? "",
             response_options: q.response_options ?? [],
           }));
-        }
-        setApplicationTemplate(loadedApplicationTemplate);
-      } catch (questionsError) {
-        console.error("Error fetching application questions:", questionsError);
-        setApplicationTemplate([]);
-      }
+      setApplicationTemplate(loadedApplicationTemplate);
 
       cleanSnapshot.current = createFormSnapshot(
         loadedFormState,
@@ -517,8 +470,13 @@ export const EventCreateModify = ({
       setLoadingEvent(false);
     };
 
-    fetchExistingEvent();
-  }, [eventId, supabase]);
+    loadExistingEvent();
+  }, [
+    eventId,
+    initialApplicationQuestions,
+    initialCheckInSessions,
+    initialEvent,
+  ]);
 
   const resetSuccessMessage = () => {
     if (successMessage) {
@@ -831,29 +789,6 @@ export const EventCreateModify = ({
 
     setIsSubmitting(true);
 
-    let eventSlug: string | undefined;
-
-    if (!eventId) {
-      const normalizedBaseSlug = slugify(formState.name);
-      const baseSlug =
-        normalizedBaseSlug === "item" ? "event" : normalizedBaseSlug;
-
-      let existingSlugs: string[];
-      try {
-        existingSlugs = await fetchEventSlugsByPrefix(supabase, baseSlug);
-      } catch (slugFetchError) {
-        const message =
-          slugFetchError instanceof Error
-            ? slugFetchError.message
-            : "Unknown error";
-        setError(`Failed to prepare event slug: ${message}`);
-        setIsSubmitting(false);
-        return;
-      }
-
-      eventSlug = createUniqueSlug(formState.name, existingSlugs, "event");
-    }
-
     let committedImageUrl = formState.image_url;
     if (pendingImageFile) {
       try {
@@ -875,7 +810,6 @@ export const EventCreateModify = ({
     // Prepare payload
     const payload: {
       name: string;
-      slug?: string;
       description: string;
       regular_price: number;
       member_price: number;
@@ -899,10 +833,6 @@ export const EventCreateModify = ({
       max_capacity: Number(formState.max_capacity),
       created_at: formState.created_at || new Date().toISOString(),
     };
-
-    if (eventSlug) {
-      payload.slug = eventSlug;
-    }
 
     // Add optional fields only if they have values
     if (formState.location_building) {
@@ -942,139 +872,61 @@ export const EventCreateModify = ({
       );
     }
 
-    // First, insert or update the event
-    let finalEventId: string;
-    try {
-      const result = eventId
-        ? await updateEvent(supabase, eventId, payload as EventUpdate)
-        : await insertEvent(supabase, {
-            ...payload,
-            slug: eventSlug ?? "event",
-          } as EventInsert);
-      finalEventId = result.id;
-    } catch (upsertError) {
-      setError(
-        upsertError instanceof Error
-          ? upsertError.message
-          : "No event id returned from Supabase."
-      );
-      setIsSubmitting(false);
-      return;
-    }
-
-    // If updating, delete existing check-in sessions and application questions
-    if (eventId) {
-      try {
-        await deleteCheckInSessionsForEvent(supabase, eventId);
-      } catch (deleteCheckInError) {
-        const message =
-          deleteCheckInError instanceof Error
-            ? deleteCheckInError.message
-            : "Unknown error";
-        setError(`Failed to delete existing check-in sessions: ${message}`);
-        setIsSubmitting(false);
-        return;
-      }
-
-      try {
-        await deleteApplicationQuestionsForEvent(supabase, eventId);
-      } catch (deleteError) {
-        const message =
-          deleteError instanceof Error ? deleteError.message : "Unknown error";
-        setError(`Failed to delete existing questions: ${message}`);
-        setIsSubmitting(false);
-        return;
-      }
-    }
-
-    // Insert check-in sessions if there are any
-    if (checkInEvents.length > 0) {
-      // Filter out empty sessions (where name, start_time, or end_time is empty)
-      const validSessions = checkInEvents.filter(
+    const sessionsToInsert = checkInEvents
+      .filter(
         (session) =>
           session.name.trim() &&
           session.start_time.trim() &&
           session.end_time.trim()
-      );
-
-      if (validSessions.length > 0) {
-        const sessionsToInsert = validSessions
-          .map((session) => {
-            const startTime = datetimeLocalToTimestamptz(session.start_time);
-            const endTime = datetimeLocalToTimestamptz(session.end_time);
-            // Only include if both times are valid
-            if (startTime && endTime) {
-              return {
-                event_id: finalEventId,
-                name: session.name,
-                start_time: startTime,
-                end_time: endTime,
-              };
+      )
+      .map((session) => {
+        const startTime = datetimeLocalToTimestamptz(session.start_time);
+        const endTime = datetimeLocalToTimestamptz(session.end_time);
+        return startTime && endTime
+          ? {
+              name: session.name,
+              start_time: startTime,
+              end_time: endTime,
             }
-            return null;
-          })
-          .filter(
-            (session): session is NonNullable<typeof session> =>
-              session !== null
-          );
-
-        try {
-          await insertCheckInSessions(
-            supabase,
-            sessionsToInsert as CheckInSessionInsert[]
-          );
-        } catch (checkInSessionsError) {
-          const message =
-            checkInSessionsError instanceof Error
-              ? checkInSessionsError.message
-              : "Unknown error";
-          setError(`Failed to save check-in sessions: ${message}`);
-          setIsSubmitting(false);
-          return;
-        }
-      }
-    }
-
-    // Insert application questions if there are any
-    if (applicationTemplate.length > 0) {
-      // Filter out empty questions (where question is empty)
-      const validQuestions = applicationTemplate.filter((q) =>
-        q.question.trim()
+          : null;
+      })
+      .filter(
+        (session): session is NonNullable<typeof session> => session !== null
       );
 
-      if (validQuestions.length > 0) {
-        const questionsToInsert = validQuestions.map((q) => {
-          const questionData: EventApplicationQuestionInsert = {
-            event_id: finalEventId,
-            question: q.question,
-            response_type: q.response,
-          };
+    const questionsToInsert = applicationTemplate
+      .filter((question) => question.question.trim())
+      .map((question) => ({
+        question: question.question,
+        response_type: question.response,
+        max_char_limit:
+          question.response === ResponseType.text
+            ? question.max_char_limit === ""
+              ? 5000
+              : question.max_char_limit
+            : null,
+        response_options:
+          question.response === ResponseType.multi_select ||
+          question.response === ResponseType.single_select
+            ? question.response_options || []
+            : null,
+      }));
 
-          if (q.response === ResponseType.text) {
-            questionData.max_char_limit =
-              q.max_char_limit === "" ? 5000 : q.max_char_limit;
-          } else if (
-            q.response === ResponseType.multi_select ||
-            q.response === ResponseType.single_select
-          ) {
-            questionData.response_options = q.response_options || [];
-          }
-
-          return questionData;
-        });
-
-        try {
-          await insertApplicationQuestions(supabase, questionsToInsert);
-        } catch (questionsError) {
-          const message =
-            questionsError instanceof Error
-              ? questionsError.message
-              : "Unknown error";
-          setError(`Failed to save application questions: ${message}`);
-          setIsSubmitting(false);
-          return;
-        }
-      }
+    let finalEventId: string;
+    try {
+      const result = await saveAdminEventAction({
+        eventId,
+        event: payload as EventUpdate,
+        checkInSessions: sessionsToInsert,
+        applicationQuestions: questionsToInsert,
+      });
+      finalEventId = result.id;
+    } catch (saveError) {
+      setError(
+        saveError instanceof Error ? saveError.message : "Failed to save event."
+      );
+      setIsSubmitting(false);
+      return;
     }
 
     const savedFormState = {
@@ -1115,6 +967,9 @@ export const EventCreateModify = ({
     if (onSuccess) {
       bypassUnsavedChangesWarning.current = true;
       onSuccess(finalEventId);
+    } else if (!eventId) {
+      bypassUnsavedChangesWarning.current = true;
+      router.push("/admin/events");
     } else {
       router.refresh();
     }
@@ -1127,90 +982,17 @@ export const EventCreateModify = ({
     setError(null);
 
     try {
-      // Purchases restrict event deletion. Fail before removing other event data.
-      try {
-        await ensureEventPurchasesAreDeletable(supabase, eventId);
-      } catch (checkPurchasesError) {
-        const message =
-          checkPurchasesError instanceof Error
-            ? checkPurchasesError.message
-            : "Unknown error";
-        setError(message);
-        setIsDeleting(false);
-        return;
-      }
+      await deleteAdminEventAction(eventId);
 
-      // Delete related check-in sessions first
-      try {
-        await deleteCheckInSessionsForEvent(supabase, eventId);
-      } catch (deleteCheckInError) {
-        const message =
-          deleteCheckInError instanceof Error
-            ? deleteCheckInError.message
-            : "Unknown error";
-        setError(`Failed to delete check-in sessions: ${message}`);
-        setIsDeleting(false);
-        return;
-      }
-
-      // Delete related application questions
-      try {
-        await deleteApplicationQuestionsForEvent(supabase, eventId);
-      } catch (deleteQuestionsError) {
-        const message =
-          deleteQuestionsError instanceof Error
-            ? deleteQuestionsError.message
-            : "Unknown error";
-        setError(`Failed to delete application questions: ${message}`);
-        setIsDeleting(false);
-        return;
-      }
-
-      // Delete event registrations
-      try {
-        await deleteRegistrationsForEvent(supabase, eventId);
-      } catch (deleteRegistrationsError) {
-        const message =
-          deleteRegistrationsError instanceof Error
-            ? deleteRegistrationsError.message
-            : "Unknown error";
-        setError(`Failed to delete event registrations: ${message}`);
-        setIsDeleting(false);
-        return;
-      }
-
-      // Delete failed purchases that would otherwise block event deletion
-      try {
-        await deleteFailedPurchasesForEvent(supabase, eventId);
-      } catch (deletePurchasesError) {
-        const message =
-          deletePurchasesError instanceof Error
-            ? deletePurchasesError.message
-            : "Unknown error";
-        setError(`Failed to delete event purchases: ${message}`);
-        setIsDeleting(false);
-        return;
-      }
-
-      // Finally, delete the event itself
-      try {
-        await deleteEvent(supabase, eventId);
-      } catch (deleteEventError) {
-        const message =
-          deleteEventError instanceof Error
-            ? deleteEventError.message
-            : "Unknown error";
-        setError(`Failed to delete event: ${message}`);
-        setIsDeleting(false);
-        return;
-      }
-
-      // Success - redirect to events page
       setShowDeleteModal(false);
       bypassUnsavedChangesWarning.current = true;
       router.push("/admin/events");
-    } catch {
-      setError("An unexpected error occurred while deleting the event.");
+    } catch (deleteError) {
+      setError(
+        deleteError instanceof Error
+          ? deleteError.message
+          : "Failed to delete event."
+      );
       setIsDeleting(false);
     }
   };

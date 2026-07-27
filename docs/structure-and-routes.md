@@ -71,8 +71,8 @@ uxhub/
 │   │   │           └── events/[event]/checkout/page.tsx # Event checkout by event slug
 │   │   │
 │   │   └── api/
-│   │       ├── link-auth-user/route.ts   # Links Supabase Auth user to user_info
-│   │       ├── upload-event-image/route.ts # Local public/event_images upload
+│   │       ├── auth/complete-profile/route.ts # Authenticated profile creation
+│   │       ├── upload-event-image/route.ts # Admin-only local public/event_images upload
 │   │       └── square/webhook/route.ts   # Square payment webhook
 │   │
 │   ├── components/
@@ -265,7 +265,7 @@ Notes:
 ### API
 
 ```text
-/api/link-auth-user
+/api/auth/complete-profile
 /api/upload-event-image
 /api/square/webhook
 ```

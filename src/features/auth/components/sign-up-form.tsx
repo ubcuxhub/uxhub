@@ -65,7 +65,7 @@ export function SignUpForm({
         email: normalizedEmail,
         password: formData.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/portal`,
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=/portal`,
           data: {
             full_name: formData.name,
           },
@@ -77,27 +77,30 @@ export function SignUpForm({
       const user = authData.user;
       if (!user) throw new Error("User not returned from Supabase");
 
-      // Call the API route to create the user profile (bypasses RLS)
-      const res = await fetch("/api/link-auth-user", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          authUserId: user.id,
-          email: normalizedEmail,
-          name: formData.name,
-          phone: formData.phone,
-          studentNumber: formData.studentNumber,
-          faculty: formData.faculty,
-          major: formData.major,
-          year: formData.year,
-        }),
-      });
+      // When email confirmation is disabled, signUp returns a session and the
+      // authenticated route can create the profile immediately. Otherwise the
+      // confirmation callback establishes the session and sends the user to the
+      // existing profile-completion page.
+      if (authData.session) {
+        const res = await fetch("/api/auth/complete-profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: formData.name,
+            phone: formData.phone,
+            studentNumber: formData.studentNumber,
+            faculty: formData.faculty,
+            major: formData.major,
+            year: formData.year,
+          }),
+        });
 
-      const result = await res.json();
+        const result = await res.json();
 
-      if (!res.ok) {
-        console.error("Failed to create user profile:", result.error);
-        throw new Error(result.error || "Failed to create user profile");
+        if (!res.ok) {
+          console.error("Failed to create user profile:", result.error);
+          throw new Error(result.error || "Failed to create user profile");
+        }
       }
 
       router.push("/auth/sign-up-success");

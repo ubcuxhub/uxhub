@@ -13,11 +13,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
-import { updateUserInfoById } from "@/lib/supabase-helpers/users";
 import { useUser } from "@/context/UserContext";
 import { FACULTIES } from "@/lib/constants";
-import type { UserInfoUpdate, UserType } from "@/types/models";
+import type { UserType } from "@/types/models";
+import { updateEligibilityProfileAction } from "@/features/memberships/actions";
 import {
   validateFacultyEmail,
   validateStudentNumber,
@@ -130,15 +129,12 @@ export default function MembershipWizard() {
 
     dispatch({ type: "setSaving", value: true });
     try {
-      const payload: UserInfoUpdate = {
-        user_type: selection,
-        student_number:
-          selection === "ubcStudent" ? parseInt(identifier.trim(), 10) : null,
+      await updateEligibilityProfileAction({
+        userType: selection,
+        studentNumber: selection === "ubcStudent" ? identifier : null,
         faculty: selection === "faculty" ? faculty || null : null,
-      };
-
-      const supabase = createClient();
-      await updateUserInfoById(supabase, user.id, payload);
+        facultyEmail: selection === "faculty" ? identifier : null,
+      });
       await refreshUser();
       router.push("/portal/membership");
     } catch (err) {
