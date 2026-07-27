@@ -3,8 +3,6 @@ import { TABLES } from "./tables";
 import type {
   EventApplicationQuestionInsert,
   EventApplicationQuestionRow,
-  EventApplicationResponseRow,
-  EventApplicationResponseInsert,
 } from "@/types/models";
 
 export interface ApplicationResponseWithQuestion {
@@ -34,41 +32,6 @@ export async function fetchApplicationQuestions(
 
   if (error) throw error;
   return data ?? [];
-}
-
-/** Returns question ids for an event, ordered by creation time. */
-export async function fetchApplicationQuestionIds(
-  supabase: DbClient,
-  eventId: string
-): Promise<Pick<EventApplicationQuestionRow, "id">[]> {
-  const { data, error } = await supabase
-    .from(TABLES.eventApplicationQuestions)
-    .select("id")
-    .eq("event_id", eventId)
-    .order("created_at", { ascending: true });
-
-  if (error) throw error;
-  return data ?? [];
-}
-
-export async function fetchEventIdsWithApplications(
-  supabase: DbClient
-): Promise<string[]> {
-  const { data, error } = await supabase
-    .from(TABLES.eventApplicationQuestions)
-    .select("event_id");
-
-  if (error) throw error;
-
-  return Array.from(
-    new Set(
-      (data ?? []).map(
-        (
-          row: Pick<EventApplicationQuestionRow, "event_id">
-        ) => row.event_id
-      )
-    )
-  );
 }
 
 export async function insertApplicationQuestions(
@@ -122,53 +85,4 @@ export async function fetchApplicationResponsesForRegistration(
 
   if (error) throw error;
   return (data ?? []) as unknown as ApplicationResponseWithQuestion[];
-}
-
-/** Returns the question ids that already have a response for a registration. */
-export async function fetchAnsweredQuestionIds(
-  supabase: DbClient,
-  registrationId: string
-): Promise<string[]> {
-  const { data, error } = await supabase
-    .from(TABLES.eventApplicationResponses)
-    .select("event_application_question_id")
-    .eq("event_registration_id", registrationId);
-
-  // PGRST116 means no rows, which is fine for a registration without responses.
-  if (error && error.code !== "PGRST116") {
-    throw error;
-  }
-
-  return (data ?? []).map(
-    (row: Pick<EventApplicationResponseRow, "event_application_question_id">) =>
-      row.event_application_question_id
-  );
-}
-
-export async function updateApplicationResponse(
-  supabase: DbClient,
-  registrationId: string,
-  questionId: string,
-  response: string
-): Promise<void> {
-  const { error } = await supabase
-    .from(TABLES.eventApplicationResponses)
-    .update({ response })
-    .eq("event_registration_id", registrationId)
-    .eq("event_application_question_id", questionId);
-
-  if (error) throw error;
-}
-
-export async function insertApplicationResponses(
-  supabase: DbClient,
-  responses: EventApplicationResponseInsert[]
-): Promise<number> {
-  const { data, error } = await supabase
-    .from(TABLES.eventApplicationResponses)
-    .insert(responses)
-    .select("id, event_registration_id, event_application_question_id");
-
-  if (error) throw error;
-  return data?.length ?? 0;
 }

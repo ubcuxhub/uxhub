@@ -1,18 +1,18 @@
-"use client";
-
-import { useEffect, useState, useMemo } from "react";
-import { useParams } from "next/navigation";
+import { notFound } from "next/navigation";
 import Link from "next/link";
-import { FlowLink } from "@/components/shared/FlowLink";
 import { Badge } from "@/components/ui/badge";
-import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Spinner } from "@/components/ui/spinner";
-import { useUser } from "@/context/UserContext";
-import { fetchUserRegistration } from "@/lib/supabase-helpers/event-registrations";
+import { createPublicClient } from "@/lib/supabase/public";
+import {
+  fetchEventBySlug,
+  fetchEvents,
+} from "@/lib/supabase-helpers/events";
+import { fetchEventRegistrationCount } from "@/lib/supabase-helpers/event-registrations";
 import type { EventRow } from "@/types/models";
+import { formatEventDate, formatEventTime } from "@/lib/date";
+import { EventRegistrationAction } from "@/features/events/components/EventRegistrationAction";
 import Navbar from "@/features/marketing/homepage-sections/Navbar";
 import Footer from "@/features/marketing/homepage-sections/Footer";
 import {
@@ -45,35 +45,6 @@ interface AgendaItem {
 
 /* ─── helpers ─── */
 
-function formatDate(date: string | null | undefined) {
-  if (!date) return null;
-  return new Date(date).toLocaleDateString("en-US", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}
-
-function formatTime(time: string | null | undefined) {
-  if (!time) return null;
-  try {
-    if (time.includes("T")) {
-      return new Date(time).toLocaleTimeString("en-US", {
-        hour: "numeric",
-        minute: "2-digit",
-      });
-    }
-    const [h, m] = time.split(":");
-    const hour = parseInt(h, 10);
-    const suffix = hour >= 12 ? "PM" : "AM";
-    const display = hour > 12 ? hour - 12 : hour === 0 ? 12 : hour;
-    return `${display}:${m} ${suffix}`;
-  } catch {
-    return time;
-  }
-}
-
 function getRegistrationStatus(event: EventRow) {
   const now = new Date();
   const regStart = event.registration_start_time
@@ -97,143 +68,36 @@ function parseAgenda(raw: Json | null): AgendaItem[] {
   return raw as unknown as AgendaItem[];
 }
 
-/* ─── page component ─── */
+export const revalidate = 300;
 
-export default function EventDetailPage() {
-  const params = useParams();
-  const slug = params?.slug as string;
+export async function generateStaticParams() {
+  const events = await fetchEvents(createPublicClient());
+  return events
+    .filter((event) => event.slug)
+    .map((event) => ({ slug: event.slug! }));
+}
 
-  const supabase = useMemo(() => createClient(), []);
-  const { user } = useUser();
-  const [event, setEvent] = useState<EventRow | null>(null);
-  const [registrationCount, setRegistrationCount] = useState<number>(0);
-  const [alreadyRegistered, setAlreadyRegistered] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [hoveredMentor, setHoveredMentor] = useState<number | null>(null);
+interface EventDetailPageProps {
+  params: Promise<{ slug: string }>;
+}
 
-  useEffect(() => {
-    if (!slug) return;
-
-    async function fetchEvent() {
-      setLoading(true);
-      setError(null);
-
-      // Try slug first, then fallback to id
-      const slugResult = await supabase
-        .from("events")
-        .select("*")
-        .eq("slug", slug)
-        .maybeSingle();
-
-      let data = slugResult.data;
-      let fetchError = slugResult.error;
-
-      if (!data && !fetchError) {
-        const idResult = await supabase
-          .from("events")
-          .select("*")
-          .eq("id", slug)
-          .maybeSingle();
-        data = idResult.data;
-        fetchError = idResult.error;
-      }
-
-      if (fetchError) {
-        setError(fetchError.message);
-        setLoading(false);
-        return;
-      }
-      if (!data) {
-        setError("Event not found");
-        setLoading(false);
-        return;
-      }
-
-      setEvent(data);
-
-      const { count } = await supabase
-        .from("event_registrations")
-        .select("*", { count: "exact", head: true })
-        .eq("event_id", data.id);
-
-      setRegistrationCount(count ?? 0);
-      setLoading(false);
-    }
-
-    fetchEvent();
-  }, [slug, supabase]);
-
-  /* ── Check if the current user already registered ── */
-  useEffect(() => {
-    let active = true;
-
-    async function checkRegistration() {
-      if (!event || !user) {
-        if (active) setAlreadyRegistered(false);
-        return;
-      }
-
-      try {
-        const registration = await fetchUserRegistration(
-          supabase,
-          event.id,
-          user.id,
-        );
-        if (active) setAlreadyRegistered(Boolean(registration));
-      } catch {
-        if (active) setAlreadyRegistered(false);
-      }
-    }
-
-    checkRegistration();
-
-    return () => {
-      active = false;
-    };
-  }, [event, user, supabase]);
-
-  /* ── Loading ── */
-  if (loading) {
-    return (
-      <main className="min-h-screen">
-        <Navbar />
-        <div className="flex min-h-[60vh] items-center justify-center bg-background font-sans text-body text-foreground">
-          <Spinner size="lg" />
-        </div>
-      </main>
-    );
-  }
-
-  /* ── Error / Not found ── */
-  if (error || !event) {
-    return (
-      <main className="min-h-screen">
-        <Navbar />
-        <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 bg-background font-sans text-body text-foreground">
-          <p className="text-subheading text-muted-foreground">{error || "Event not found"}</p>
-          <Button asChild variant="link">
-            <Link href="/events">
-              <ArrowLeft />
-              Back to Events
-            </Link>
-          </Button>
-        </div>
-        <div className="pt-16">
-          <Footer />
-        </div>
-      </main>
-    );
-  }
+export default async function EventDetailPage({
+  params,
+}: EventDetailPageProps) {
+  const { slug } = await params;
+  const supabase = createPublicClient();
+  const event = await fetchEventBySlug(supabase, slug);
+  if (!event) notFound();
+  const registrationCount = await fetchEventRegistrationCount(
+    supabase,
+    event.id
+  );
 
   /* ── Derived data ── */
   const regStatus = getRegistrationStatus(event);
   const spotsLeft = event.max_capacity - registrationCount;
-  const canRegister =
-    !alreadyRegistered && regStatus === "open" && spotsLeft > 0;
-  const registerLabel = alreadyRegistered
-    ? "Already Registered"
-    : regStatus === "upcoming"
+  const canRegister = regStatus === "open" && spotsLeft > 0;
+  const registerLabel = regStatus === "upcoming"
       ? "Registration Opens Soon"
       : spotsLeft <= 0
         ? "Event Full"
@@ -244,9 +108,11 @@ export default function EventDetailPage() {
     event.member_price !== undefined &&
     Number(event.member_price) !== Number(event.regular_price);
 
-  const startDateFormatted = formatDate(event.start_date);
-  const startTimeFormatted = formatTime(event.start_time);
-  const endTimeFormatted = formatTime(event.end_time);
+  const startDateFormatted = formatEventDate(event.start_date, {
+    weekday: "long",
+  });
+  const startTimeFormatted = formatEventTime(event.start_time);
+  const endTimeFormatted = formatEventTime(event.end_time);
   const locationDisplay = [event.location_building, event.location_room]
     .filter(Boolean)
     .join(", ");
@@ -355,15 +221,12 @@ export default function EventDetailPage() {
             </div>
 
             {/* Register Button */}
-            {canRegister ? (
-              <Button asChild className="self-start">
-                <FlowLink href={`/portal/events/${event.slug}/checkout`}>
-                  Register Now
-                </FlowLink>
-              </Button>
-            ) : (
-              <Button disabled className="self-start">{registerLabel}</Button>
-            )}
+            <EventRegistrationAction
+              eventId={event.id}
+              eventSlug={event.slug ?? slug}
+              registrationAvailable={canRegister}
+              unavailableLabel={registerLabel}
+            />
           </div>
         </div>
         </section>
@@ -405,12 +268,7 @@ export default function EventDetailPage() {
 
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 max-w-2xl">
             {mentors.map((mentor, i) => (
-              <div
-                key={i}
-                className="relative group"
-                onMouseEnter={() => setHoveredMentor(i)}
-                onMouseLeave={() => setHoveredMentor(null)}
-              >
+              <div key={i} className="relative group">
                 {/* Mentor photo */}
                 <div className="aspect-square cursor-pointer overflow-hidden rounded-xl bg-muted">
                   {mentor.image_url ? (
@@ -428,8 +286,7 @@ export default function EventDetailPage() {
                 </div>
 
                 {/* Hover card */}
-                {hoveredMentor === i && (
-                  <Card className="absolute bottom-0 left-0 right-0 z-20 translate-y-2 gap-0 p-4 shadow-lg animate-in fade-in slide-in-from-bottom-2 duration-200">
+                  <Card className="pointer-events-none absolute inset-x-0 bottom-0 z-20 translate-y-2 gap-0 p-4 opacity-0 shadow-lg transition-opacity duration-200 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <div>
                         <p className="text-table">
@@ -460,7 +317,6 @@ export default function EventDetailPage() {
                       </p>
                     )}
                   </Card>
-                )}
               </div>
             ))}
           </div>

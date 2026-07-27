@@ -100,11 +100,3 @@ export async function updateEvent(
   if (!data?.id) throw new Error("No event id returned from Supabase.");
   return data;
 }
-
-export async function deleteEvent(
-  supabase: DbClient,
-  id: string
-): Promise<void> {
-  const { error } = await supabase.from(TABLES.events).delete().eq("id", id);
-  if (error) throw error;
-}

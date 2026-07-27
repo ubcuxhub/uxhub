@@ -11,10 +11,3 @@ export interface TeamMember {
   image: string;
   roleEmoji: string;
 }
-
-export interface MarketingEventCard {
-  imageSrc: string;
-  imageAlt: string;
-  buttonText: string;
-  icon: "triangle" | "star";
-}

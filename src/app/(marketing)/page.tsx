@@ -1,5 +1,3 @@
-"use client";
-
 import DotGrid from "@/features/marketing/components/DotGrid";
 import EventsSection from "@/features/marketing/homepage-sections/EventsSection";
 import Footer from "@/features/marketing/homepage-sections/Footer";
@@ -9,8 +7,15 @@ import MailingList from "@/features/marketing/homepage-sections/MailingListSecti
 import Navbar from "@/features/marketing/homepage-sections/Navbar";
 import TeamSection from "@/features/marketing/homepage-sections/TeamSection";
 import WhoWeAreSection from "@/features/marketing/homepage-sections/WhoWeAreSection";
+import { createPublicClient } from "@/lib/supabase/public";
+import { fetchEvents } from "@/lib/supabase-helpers/events";
 
-export default function Home() {
+export const revalidate = 300;
+
+export default async function Home() {
+  const supabase = createPublicClient();
+  const events = (await fetchEvents(supabase)).slice(0, 2);
+
   return (
     <main className="bg-white">
       <Navbar />
@@ -31,7 +36,7 @@ export default function Home() {
         <MailingList />
         <WhoWeAreSection />
         <LogoCarousel />
-        <EventsSection />
+        <EventsSection events={events} />
         <TeamSection />
       </div>
 

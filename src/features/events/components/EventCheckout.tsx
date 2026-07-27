@@ -12,9 +12,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import type { UserInfoRow } from "@/features/auth";
-import type { EventRow } from "@/features/events";
 import { cn } from "@/lib/utils";
+import type { EventRow, UserInfoRow } from "@/types/models";
 
 interface EventCheckoutProps {
   disabledMessage: string | null;

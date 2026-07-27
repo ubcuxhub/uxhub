@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { ApplicationStatus } from "@/features/events/types/applicationTypes";
+import type { ApplicationStatus } from "@/types/models";
 import { Clock, X, Check } from "lucide-react";
+import { formatTimestamp } from "@/lib/date";
 
 interface ApplicationListCardProps {
   registrationId: string;
@@ -22,21 +23,6 @@ export function ApplicationListCard({
   status,
   eventId,
 }: ApplicationListCardProps) {
-  const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-      });
-    } catch {
-      return dateString;
-    }
-  };
-
   const getStatusIcon = () => {
     switch (status) {
       case "pending":
@@ -76,7 +62,7 @@ export function ApplicationListCard({
         <CardContent>
           <div className="flex items-center justify-between text-small">
             <span className="text-muted-foreground">
-              Applied: {formatDate(applicationDate)}
+              Applied: {formatTimestamp(applicationDate)}
             </span>
             <span className="text-muted-foreground capitalize">
               {getStatusText()}

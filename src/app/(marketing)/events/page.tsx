@@ -1,6 +1,3 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -10,31 +7,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Spinner } from "@/components/ui/spinner";
 import Navbar from "@/features/marketing/homepage-sections/Navbar";
 import Footer from "@/features/marketing/homepage-sections/Footer";
-import { createClient } from "@/lib/supabase/client";
+import { createPublicClient } from "@/lib/supabase/public";
 import { fetchEvents } from "@/lib/supabase-helpers/events";
-import type { EventRow } from "@/types/models";
+import { formatEventDate } from "@/lib/date";
 
-export default function EventsPage() {
-  const [events, setEvents] = useState<EventRow[]>([]);
-  const [loading, setLoading] = useState(true);
+export const revalidate = 300;
 
-  useEffect(() => {
-    const supabase = createClient();
-    async function loadEvents() {
-      try {
-        const data = await fetchEvents(supabase, { orderBy: "start_date" });
-        setEvents(data);
-      } catch (error) {
-        console.error("Error fetching events:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadEvents();
-  }, []);
+export default async function EventsPage() {
+  const supabase = createPublicClient();
+  const events = await fetchEvents(supabase, { orderBy: "start_date" });
 
   return (
     <main className="min-h-screen">
@@ -52,25 +35,14 @@ export default function EventsPage() {
             </p>
           </div>
 
-          {loading ? (
-            <div className="flex justify-center py-20">
-              <Spinner size="lg" />
-            </div>
-          ) : events.length === 0 ? (
+          {events.length === 0 ? (
             <Card className="border-dashed py-20 text-center shadow-none">
               <CardTitle>No events scheduled yet</CardTitle>
             </Card>
           ) : (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {events.map((event) => {
-                const startDate = event.start_date
-                  ? new Date(event.start_date).toLocaleDateString("en-US", {
-                      month: "long",
-                      day: "numeric",
-                      year: "numeric",
-                    })
-                  : null;
-
+                const startDate = formatEventDate(event.start_date);
                 const eventHref = `/events/${event.slug || event.id}`;
 
                 return (
