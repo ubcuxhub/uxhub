@@ -50,3 +50,5 @@ next-env.d.ts
 # Testing
 coverage/
 .nyc_output/
+.vercel
+.env*
