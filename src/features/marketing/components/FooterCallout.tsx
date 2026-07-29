@@ -1,3 +1,5 @@
+"use client";
+
 import React from "react";
 import Image from "next/image";
 import Button from "./Button";
@@ -45,7 +47,7 @@ export default function FooterCallout() {
           </p>
 
           <div className="flex flex-col items-center justify-center gap-3 sm:flex-row pt-4">
-            <Button variant="primary" onClick={() => { window.location.href = "/portal/membership/join"; }}>
+            <Button variant="primary" href="/portal/membership/join">
               BECOME A MEMBER
             </Button>
 

@@ -10,6 +10,7 @@ import {
 } from "@/lib/supabase-helpers/purchases";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatTimestamp } from "@/lib/date";
 
 const supabase = createClient();
 
@@ -18,14 +19,6 @@ function formatCurrency(amountCents: number, currency: string) {
     style: "currency",
     currency,
   }).format(amountCents / 100);
-}
-
-function formatTimestamp(value: string | null) {
-  if (!value) return "Unknown date";
-  return new Date(value).toLocaleString("en-CA", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  });
 }
 
 export function PurchaseHistorySettings() {
@@ -54,8 +47,8 @@ export function PurchaseHistorySettings() {
   if (purchases.length === 0) {
     return (
       <div className="grid place-items-center rounded-lg border border-dashed py-16 text-center">
-        <p className="text-sm font-medium">No purchases yet</p>
-        <p className="text-sm text-muted-foreground">
+        <p className="text-table">No purchases yet</p>
+        <p className="text-small text-muted-foreground">
           Your memberships and event tickets will appear here.
         </p>
       </div>
@@ -78,14 +71,14 @@ export function PurchaseHistorySettings() {
             className="flex items-start justify-between gap-4 rounded-lg border p-4"
           >
             <div className="min-w-0 space-y-1">
-              <p className="truncate text-sm font-medium">{title}</p>
-              <p className="text-sm text-muted-foreground">{type}</p>
-              <p className="text-xs text-muted-foreground">
-                {formatTimestamp(purchase.created_at)}
+              <p className="truncate text-table">{title}</p>
+              <p className="text-small text-muted-foreground">{type}</p>
+              <p className="text-small text-muted-foreground">
+                {formatTimestamp(purchase.created_at) ?? "Unknown date"}
               </p>
             </div>
             <div className="flex flex-col items-end gap-2">
-              <p className="text-sm font-medium">
+              <p className="text-table">
                 {formatCurrency(purchase.amount_cents, purchase.currency)}
               </p>
               <Badge variant="secondary" className="capitalize">

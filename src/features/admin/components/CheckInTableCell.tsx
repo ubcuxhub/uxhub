@@ -19,7 +19,7 @@ export function CheckInTableCell({
   isUpdating,
 }: CheckInTableCellProps) {
   return (
-    <td className="px-4 py-3 text-center">
+    <td className="px-4 py-3 text-center text-table">
       <div className="flex items-center justify-center">
         {isUpdating ? (
           <Spinner size="sm" />
@@ -35,4 +35,3 @@ export function CheckInTableCell({
     </td>
   );
 }
-

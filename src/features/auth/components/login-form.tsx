@@ -20,8 +20,9 @@ import { GoogleOAuthButton } from "./google-oauth-button";
 
 export function LoginForm({
   className,
+  nextPath = "/portal",
   ...props
-}: React.ComponentPropsWithoutRef<"div">) {
+}: React.ComponentPropsWithoutRef<"div"> & { nextPath?: string }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +43,7 @@ export function LoginForm({
       });
       if (error) throw error;
       // Update this route to redirect to an authenticated route. The user already has an active session.
-      router.replace("/portal");
+      router.replace(nextPath);
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
     } finally {
@@ -54,13 +55,13 @@ export function LoginForm({
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">Login</CardTitle>
+          <CardTitle className="text-h2">Login</CardTitle>
           <CardDescription>
             Enter your email below to login to your account
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <GoogleOAuthButton />
+          <GoogleOAuthButton nextPath={nextPath} />
           <form onSubmit={handleLogin}>
             <div className="mt-6 flex flex-col gap-6">
               <div className="grid gap-2">
@@ -79,7 +80,7 @@ export function LoginForm({
                   <Label htmlFor="password">Password</Label>
                   <Link
                     href="/auth/forgot-password"
-                    className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
+                    className="ml-auto inline-block text-small underline-offset-4 hover:underline"
                   >
                     Forgot your password?
                   </Link>
@@ -92,15 +93,15 @@ export function LoginForm({
                   onChange={(e) => setPassword(e.target.value)}
                 />
               </div>
-              {error && <p className="text-sm text-red-500">{error}</p>}
+              {error && <p className="text-small text-destructive">{error}</p>}
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? "Logging in..." : "Login"}
               </Button>
             </div>
-            <div className="mt-4 text-center text-sm">
+            <div className="mt-4 text-center text-small">
               Don&apos;t have an account?{" "}
               <Link
-                href="/auth/sign-up"
+                href={`/auth/sign-up?next=${encodeURIComponent(nextPath)}`}
                 className="underline underline-offset-4"
               >
                 Sign up

@@ -51,12 +51,12 @@ export function GoogleOAuthButton({
         <FcGoogle className="size-5" />
         {isLoading ? "Redirecting..." : "Continue with Google"}
       </Button>
-      {error ? <p className="text-sm text-red-500">{error}</p> : null}
+      {error ? <p className="text-small text-destructive">{error}</p> : null}
       <div className="relative">
         <div className="absolute inset-0 flex items-center">
           <span className="w-full border-t" />
         </div>
-        <div className="relative flex justify-center text-xs uppercase">
+        <div className="relative flex justify-center text-small uppercase">
           <span className="bg-card px-2 text-muted-foreground">
             or continue with email
           </span>

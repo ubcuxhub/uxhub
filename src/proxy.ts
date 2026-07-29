@@ -2,7 +2,12 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function proxy(req: NextRequest) {
-  const res = NextResponse.next();
+  const requestHeaders = new Headers(req.headers);
+  requestHeaders.set(
+    "x-uxhub-path",
+    `${req.nextUrl.pathname}${req.nextUrl.search}`,
+  );
+  const res = NextResponse.next({ request: { headers: requestHeaders } });
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,

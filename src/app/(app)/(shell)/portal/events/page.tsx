@@ -1,40 +1,13 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useUser } from "@/context/UserContext";
-import { createClient } from "@/lib/supabase/client";
+import { requireAuth } from "@/lib/auth/guards";
+import { createClient } from "@/lib/supabase/server";
 import { fetchEvents } from "@/lib/supabase-helpers/events";
 import { fetchRegistrationsForUser } from "@/lib/supabase-helpers/event-registrations";
-import { type EventRow } from "@/features/events";
 import { EventCard } from "@/components/shared/EventCard";
+import type { EventRow } from "@/types/models";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { ArrowRight, CalendarDays, History, Radio } from "lucide-react";
-
-function EventCardSkeleton() {
-  return (
-    <div className="overflow-hidden rounded-lg border bg-card">
-      <Skeleton className="h-40 w-full rounded-none" />
-      <div className="p-4 space-y-3">
-        <Skeleton className="h-5 w-3/4" />
-        <div className="space-y-1.5">
-          <Skeleton className="h-3 w-1/2" />
-          <Skeleton className="h-3 w-1/3" />
-        </div>
-        <div className="space-y-1.5 pt-1">
-          <Skeleton className="h-3 w-full" />
-          <Skeleton className="h-3 w-full" />
-          <Skeleton className="h-3 w-2/3" />
-        </div>
-        <div className="pt-2">
-          <Skeleton className="h-4 w-20" />
-        </div>
-      </div>
-    </div>
-  );
-}
 
 function EventGrid({ events }: { events: EventRow[] }) {
   return (
@@ -58,87 +31,51 @@ function EventGrid({ events }: { events: EventRow[] }) {
   );
 }
 
-export default function PortalEvents() {
-  const { user } = useUser();
+export default async function PortalEvents() {
+  const user = await requireAuth();
+  const supabase = await createClient();
+  const [events, registrations] = await Promise.all([
+    fetchEvents(supabase, { orderBy: "start_date" }),
+    fetchRegistrationsForUser(supabase, user.id),
+  ]);
+  const registeredEventIds = new Set(
+    registrations
+      .filter((registration) => registration.status === "accepted")
+      .map((registration) => registration.event_id)
+  );
+  // Server-rendered categorization needs the request's current wall-clock time.
+  // eslint-disable-next-line react-hooks/purity
+  const now = Date.now();
+  const ongoingEvents: EventRow[] = [];
+  const upcomingEvents: EventRow[] = [];
+  const attendedEvents: EventRow[] = [];
 
-  const [ongoingEvents, setOngoingEvents] = useState<EventRow[]>([]);
-  const [upcomingEvents, setUpcomingEvents] = useState<EventRow[]>([]);
-  const [attendedEvents, setAttendedEvents] = useState<EventRow[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const supabase = createClient();
-
-    async function loadEvents(userId: string) {
-      setLoading(true);
-      try {
-        const [events, registrations] = await Promise.all([
-          fetchEvents(supabase, { orderBy: "start_date" }),
-          fetchRegistrationsForUser(supabase, userId),
-        ]);
-
-        const registeredEventIds = new Set(
-          registrations
-            .filter((r) => r.status === "accepted")
-            .map((r) => r.event_id),
-        );
-
-        const now = Date.now();
-        const registered = events.filter((e) => registeredEventIds.has(e.id));
-
-        const ongoing: EventRow[] = [];
-        const upcoming: EventRow[] = [];
-        const attended: EventRow[] = [];
-
-        for (const e of registered) {
-          const start = e.start_date ? new Date(e.start_date).getTime() : null;
-          const end = e.end_date ? new Date(e.end_date).getTime() : null;
-
-          if (start !== null && end !== null && start <= now && now <= end) {
-            ongoing.push(e);
-          } else if (start === null || start >= now) {
-            upcoming.push(e);
-          } else {
-            attended.push(e);
-          }
-        }
-
-        const startAsc = (a: EventRow, b: EventRow) =>
-          new Date(a.start_date ?? 0).getTime() -
-          new Date(b.start_date ?? 0).getTime();
-        const startDesc = (a: EventRow, b: EventRow) =>
-          new Date(b.start_date ?? 0).getTime() -
-          new Date(a.start_date ?? 0).getTime();
-
-        setOngoingEvents(ongoing.sort(startAsc));
-        setUpcomingEvents(upcoming.sort(startAsc));
-        setAttendedEvents(attended.sort(startDesc));
-      } catch (error) {
-        console.error("Error fetching events:", error);
-        setOngoingEvents([]);
-        setUpcomingEvents([]);
-        setAttendedEvents([]);
-      } finally {
-        setLoading(false);
-      }
+  for (const event of events.filter((item) => registeredEventIds.has(item.id))) {
+    const start = event.start_date ? new Date(event.start_date).getTime() : null;
+    const end = event.end_date ? new Date(event.end_date).getTime() : null;
+    if (start !== null && end !== null && start <= now && now <= end) {
+      ongoingEvents.push(event);
+    } else if (start === null || start >= now) {
+      upcomingEvents.push(event);
+    } else {
+      attendedEvents.push(event);
     }
+  }
 
-    if (user) loadEvents(user.id);
-  }, [user]);
-
-
+  const startTime = (event: EventRow) =>
+    new Date(event.start_date ?? 0).getTime();
+  ongoingEvents.sort((a, b) => startTime(a) - startTime(b));
+  upcomingEvents.sort((a, b) => startTime(a) - startTime(b));
+  attendedEvents.sort((a, b) => startTime(b) - startTime(a));
 
   return (
     <PageContainer>
-      {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight mb-2">Your Events</h1>
+        <h1 className="mb-2 text-h1 tracking-tight">Your Events</h1>
         <p className="text-muted-foreground">
           View the events you&apos;re registered for.
         </p>
       </div>
-
-      {/* Link to marketing events page */}
       <section className="mb-12">
         <Button asChild variant="outline">
           <Link href="/events">
@@ -147,47 +84,29 @@ export default function PortalEvents() {
           </Link>
         </Button>
       </section>
-
-      {loading ? (
+      {ongoingEvents.length > 0 && (
         <section className="mb-12">
-          <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
-            {[...Array(3)].map((_, i) => (
-              <EventCardSkeleton key={i} />
-            ))}
+          <div className="mb-6 flex items-center gap-2">
+            <Radio className="text-muted-foreground" />
+            <h2 className="text-xl font-semibold">Ongoing Events</h2>
           </div>
+          <EventGrid events={ongoingEvents} />
         </section>
-      ) : (
-        <>
-          {/* Ongoing Events */}
-          {ongoingEvents.length > 0 && (
-            <section className="mb-12">
-              <div className="flex items-center gap-2 mb-6">
-                <Radio className="text-muted-foreground" />
-                <h2 className="text-xl font-semibold">Ongoing Events</h2>
-              </div>
-              <EventGrid events={ongoingEvents} />
-            </section>
-          )}
-
-          {/* Upcoming Events */}
-          {upcomingEvents.length > 0 && (
-            <section className="mb-12">
-              <div className="flex items-center gap-2 mb-6">
-                <CalendarDays className="text-muted-foreground" />
-                <h2 className="text-xl font-semibold">Upcoming Events</h2>
-              </div>
-              <EventGrid events={upcomingEvents} />
-            </section>
-          )}
-        </>
       )}
-
-      {/* Attended Events */}
-      {!loading && attendedEvents.length > 0 && (
+      {upcomingEvents.length > 0 && (
         <section className="mb-12">
-          <div className="flex items-center gap-2 mb-6">
+          <div className="mb-6 flex items-center gap-2">
+            <CalendarDays className="text-muted-foreground" />
+            <h2 className="text-h3">Upcoming Events</h2>
+          </div>
+          <EventGrid events={upcomingEvents} />
+        </section>
+      )}
+      {attendedEvents.length > 0 && (
+        <section className="mb-12">
+          <div className="mb-6 flex items-center gap-2">
             <History className="text-muted-foreground" />
-            <h2 className="text-xl font-semibold">Attended Events</h2>
+            <h2 className="text-h3">Attended Events</h2>
           </div>
           <EventGrid events={attendedEvents} />
         </section>

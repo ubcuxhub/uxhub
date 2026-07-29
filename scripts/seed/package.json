@@ -1,0 +1,4 @@
+{
+  "//": "Scopes the seed script to ESM without making the whole app `\"type\": \"module\"`. Without this, Node reparses each file and warns about MODULE_TYPELESS_PACKAGE_JSON.",
+  "type": "module"
+}

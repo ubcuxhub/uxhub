@@ -23,7 +23,9 @@ uxhub/
 │   │   ├── (marketing)/                  # Public routes
 │   │   │   ├── layout.tsx
 │   │   │   ├── page.tsx                  # Homepage
-│   │   │   ├── events/page.tsx           # Public events listing
+│   │   │   ├── events/
+│   │   │   │   ├── page.tsx              # Public events listing
+│   │   │   │   └── [slug]/page.tsx       # Public event detail
 │   │   │   └── under-construction/page.tsx
 │   │   │
 │   │   ├── (auth)/auth/                  # Auth routes
@@ -34,6 +36,7 @@ uxhub/
 │   │   │   ├── forgot-password/page.tsx
 │   │   │   ├── update-password/page.tsx
 │   │   │   ├── error/page.tsx
+│   │   │   ├── callback/route.ts         # OAuth callback
 │   │   │   └── confirm/route.ts          # Supabase email confirmation callback
 │   │   │
 │   │   ├── (app)/                        # Shared authenticated boundary (requireAuth + UserProvider)
@@ -45,7 +48,6 @@ uxhub/
 │   │   │   │   │   ├── events/
 │   │   │   │   │   │   ├── page.tsx      # Your registered events (ongoing/upcoming/attended)
 │   │   │   │   │   │   └── [event]/page.tsx # Simple event detail by event slug
-│   │   │   │   │   └── profile/page.tsx
 │   │   │   │   └── admin/                # Admin-gated routes
 │   │   │   │       ├── layout.tsx        # requireAdmin guard only (sidebar comes from (shell))
 │   │   │   │       ├── page.tsx          # Admin dashboard
@@ -71,8 +73,8 @@ uxhub/
 │   │   │           └── events/[event]/checkout/page.tsx # Event checkout by event slug
 │   │   │
 │   │   └── api/
-│   │       ├── link-auth-user/route.ts   # Links Supabase Auth user to user_info
-│   │       ├── upload-event-image/route.ts # Local public/event_images upload
+│   │       ├── auth/complete-profile/route.ts # Authenticated profile creation
+│   │       ├── upload-event-image/route.ts # Admin-only local public/event_images upload
 │   │       └── square/webhook/route.ts   # Square payment webhook
 │   │
 │   ├── components/
@@ -150,6 +152,12 @@ uxhub/
 │   ├── icons/
 │   └── people/
 │
+├── scripts/
+│   └── seed/                             # Idempotent local seed script (`pnpm seed`)
+│       ├── index.ts                      # CLI, guardrails, orchestration, summary
+│       ├── lib/reconcile.ts              # upsertBySlug + reconcileChildren
+│       └── data/                         # events.ts, membership-types.ts
+│
 ├── supabase/
 │   ├── migrations/                       # Versioned SQL migrations
 │   └── README.md                         # Schema-change and helper runbook
@@ -175,7 +183,18 @@ uxhub/
 
 **Layouts handle access control.** `src/proxy.ts` refreshes Supabase sessions for `/admin`, `/portal`, and `/api` requests. It does not decide authorization. The shared `src/app/(app)/layout.tsx` calls `requireAuth()` and wraps everything in `UserProvider` (no sidebar of its own). It then splits into two layout-only route groups that leave every URL unchanged: `src/app/(app)/(shell)/layout.tsx` renders the unified `AppSidebar` (`src/components/shared/AppSidebar.tsx`) inside a `SidebarProvider` around the student browsing routes and admin, while `src/app/(app)/(focused)/layout.tsx` is a full-height, sidebar-less container for the membership list, join wizard, and checkout pages. The nested `src/app/(app)/(shell)/admin/layout.tsx` adds `requireAdmin()` as a guard only. Because the shell routes share the `(shell)` parent layout, the sidebar persists when navigating between student and admin pages; admin tabs render only when `user.role_access === "admin"`. The `(focused)` group is how a URL-child (e.g. `/portal/events/[event]/checkout`) opts out of the sidebar its URL-parent (`/portal/events/[event]`) still shows — route groups decouple layout inheritance from the URL hierarchy.
 
-**Settings live in a hash-driven dialog.** `AppSidebar`'s footer "Profile & settings" button opens `SettingsDialog` (`src/features/settings`) instead of navigating. The dialog is a shadcn `Dialog` containing an in-dialog shadcn `Sidebar` with General / Profile / Purchase history tabs, and is controlled entirely by the URL hash `#settings/<tab>` (so `/portal#settings/profile` deep-links straight to the Profile tab). Call `openSettings(tab)` to open it from anywhere. The Profile tab edits `user_info` via the same `updateUserInfoById` + `refreshUser` pattern used by `/portal/profile`. The Purchase history tab lists the user's purchases via `fetchPurchasesForUser` — there is no standalone `/portal/purchases` route; the checkout success flow redirects to `/portal#settings/purchases`.
+**Local sample data comes from `pnpm seed`, not from migrations.** No migration inserts rows, so
+`supabase db reset` leaves an empty database and `/portal/membership`, `/admin/events`, and the
+public `/events` page render nothing. `scripts/seed/` fills it with four membership tiers and two
+seasons of events (2025-26 past, 2026-27 upcoming) plus their check-in sessions and application
+questions. It is safe to re-run: parents are upserted on their `slug` unique constraint, children
+are reconciled by natural key, and deletes require `--prune` because `event_registrations`,
+`check_ins`, and `event_application_responses` cascade off those tables. The script refuses to
+run against a non-local Supabase unless passed `--allow-remote`, since it authenticates with the
+RLS-bypassing service-role key. Data lives in `scripts/seed/data/*.ts`, typed against
+`src/lib/supabase/database.types.ts` so column and enum typos fail `pnpm build`.
+
+**Settings live in a hash-driven dialog.** `AppSidebar`'s footer "Profile & settings" button opens `SettingsDialog` (`src/features/settings`) instead of navigating. The dialog is a shadcn `Dialog` containing an in-dialog shadcn `Sidebar` with General / Profile / Purchase history tabs, and is controlled entirely by the URL hash `#settings/<tab>` (so `/portal#settings/profile` deep-links straight to the Profile tab). Call `openSettings(tab)` to open it from anywhere. The Profile tab edits `user_info` via `updateUserInfoById` + `refreshUser`. The Purchase history tab lists the user's purchases via `fetchPurchasesForUser` — there is no standalone `/portal/purchases` route; the checkout success flow redirects to `/portal#settings/purchases`.
 
 ## URL Conventions
 
@@ -188,7 +207,7 @@ uxhub/
 /under-construction
 ```
 
-`/events/[slug]` is a stub public event-detail page (event title + "under construction") that homepage event cards link to. There are currently no separate public `/about`, `/team`, `/contact`, or `/membership` routes.
+`/events/[slug]` is the full public event-detail page that homepage and calendar cards link to. There are currently no separate public `/about`, `/team`, `/contact`, or `/membership` routes.
 
 ### Auth - `(auth)`
 
@@ -199,6 +218,7 @@ uxhub/
 /auth/forgot-password
 /auth/update-password
 /auth/error
+/auth/callback
 /auth/confirm
 ```
 
@@ -213,7 +233,6 @@ uxhub/
 /portal/membership/join                    # (focused) — no sidebar
 /portal/membership/[membership]            # (focused) — no sidebar
 /portal/membership/[membership]/checkout   # (focused) — no sidebar
-/portal/profile                            # (shell) — sidebar
 ```
 
 Notes:
@@ -248,7 +267,7 @@ Notes:
 ### API
 
 ```text
-/api/link-auth-user
+/api/auth/complete-profile
 /api/upload-event-image
 /api/square/webhook
 ```

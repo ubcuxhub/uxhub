@@ -29,8 +29,9 @@ type SignUpFormData = AuthProfileFormData & {
 
 export function SignUpForm({
   className,
+  nextPath = "/portal",
   ...props
-}: React.ComponentPropsWithoutRef<"div">) {
+}: React.ComponentPropsWithoutRef<"div"> & { nextPath?: string }) {
   const [formData, setFormData] = useState<SignUpFormData>({
     email: "",
     password: "",
@@ -65,7 +66,7 @@ export function SignUpForm({
         email: normalizedEmail,
         password: formData.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/portal`,
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
           data: {
             full_name: formData.name,
           },
@@ -77,30 +78,35 @@ export function SignUpForm({
       const user = authData.user;
       if (!user) throw new Error("User not returned from Supabase");
 
-      // Call the API route to create the user profile (bypasses RLS)
-      const res = await fetch("/api/link-auth-user", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          authUserId: user.id,
-          email: normalizedEmail,
-          name: formData.name,
-          phone: formData.phone,
-          studentNumber: formData.studentNumber,
-          faculty: formData.faculty,
-          major: formData.major,
-          year: formData.year,
-        }),
-      });
+      // When email confirmation is disabled, signUp returns a session and the
+      // authenticated route can create the profile immediately. Otherwise the
+      // confirmation callback establishes the session and sends the user to the
+      // existing profile-completion page.
+      if (authData.session) {
+        const res = await fetch("/api/auth/complete-profile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: formData.name,
+            phone: formData.phone,
+            studentNumber: formData.studentNumber,
+            faculty: formData.faculty,
+            major: formData.major,
+            year: formData.year,
+          }),
+        });
 
-      const result = await res.json();
+        const result = await res.json();
 
-      if (!res.ok) {
-        console.error("Failed to create user profile:", result.error);
-        throw new Error(result.error || "Failed to create user profile");
+        if (!res.ok) {
+          console.error("Failed to create user profile:", result.error);
+          throw new Error(result.error || "Failed to create user profile");
+        }
       }
 
-      router.push("/auth/sign-up-success");
+      router.push(
+        `/auth/sign-up-success?next=${encodeURIComponent(nextPath)}`,
+      );
     } catch (error: unknown) {
       console.error("Sign up error:", error);
       setError(error instanceof Error ? error.message : "An error occurred");
@@ -117,11 +123,11 @@ export function SignUpForm({
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">Sign up</CardTitle>
+          <CardTitle className="text-h2">Sign up</CardTitle>
           <CardDescription>Create a new account</CardDescription>
         </CardHeader>
         <CardContent>
-          <GoogleOAuthButton />
+          <GoogleOAuthButton nextPath={nextPath} />
           <form onSubmit={handleSignUp} className="space-y-6">
             <div className="space-y-4 pt-6">
               <AuthProfileFields formData={formData} onChange={handleChange} />
@@ -152,15 +158,18 @@ export function SignUpForm({
               </div>
             </div>
 
-            {error && <p className="text-sm text-red-500">{error}</p>}
+            {error && <p className="text-small text-destructive">{error}</p>}
 
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Creating account..." : "Sign up"}
             </Button>
 
-            <div className="text-center text-sm">
+            <div className="text-center text-small">
               Already have an account?{" "}
-              <Link href="/auth/login" className="underline underline-offset-4">
+              <Link
+                href={`/auth/login?next=${encodeURIComponent(nextPath)}`}
+                className="underline underline-offset-4"
+              >
                 Login
               </Link>
             </div>

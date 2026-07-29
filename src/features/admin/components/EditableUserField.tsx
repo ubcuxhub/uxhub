@@ -33,7 +33,7 @@ export function EditableUserField({
 
   return (
     <div className="space-y-2">
-      <Label className="text-sm font-medium">{label}</Label>
+      <Label>{label}</Label>
       {isEditing ? (
         <div className="flex gap-2">
           <Input
@@ -50,12 +50,12 @@ export function EditableUserField({
           </Button>
         </div>
       ) : (
-        <div className="flex items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm">
+        <div className="flex items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-small">
           <span className={!value ? "text-muted-foreground" : ""}>{displayValue}</span>
           <Button
             variant="ghost"
             onClick={() => onEditStart(field, value ?? null)}
-            className="h-6 px-2 text-xs"
+            className="h-6 px-2"
           >
             Edit
           </Button>

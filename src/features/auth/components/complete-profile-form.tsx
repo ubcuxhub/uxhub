@@ -22,12 +22,14 @@ interface CompleteProfileFormProps
   extends React.ComponentPropsWithoutRef<"div"> {
   initialEmail: string;
   initialName: string;
+  nextPath?: string;
 }
 
 export function CompleteProfileForm({
   className,
   initialEmail,
   initialName,
+  nextPath = "/portal",
   ...props
 }: CompleteProfileFormProps) {
   const [formData, setFormData] = useState<AuthProfileFormData>({
@@ -72,7 +74,7 @@ export function CompleteProfileForm({
         throw new Error(result.error || "Failed to complete profile");
       }
 
-      router.replace("/portal");
+      router.replace(nextPath);
       router.refresh();
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
@@ -85,7 +87,7 @@ export function CompleteProfileForm({
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">Complete your profile</CardTitle>
+          <CardTitle className="text-h2">Complete your profile</CardTitle>
           <CardDescription>
             Finish setting up your account before entering the portal.
           </CardDescription>
@@ -98,7 +100,7 @@ export function CompleteProfileForm({
               onChange={handleChange}
             />
 
-            {error ? <p className="text-sm text-red-500">{error}</p> : null}
+            {error ? <p className="text-small text-destructive">{error}</p> : null}
 
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? "Saving profile..." : "Continue to portal"}

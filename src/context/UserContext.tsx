@@ -1,9 +1,9 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, useRef } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";
-import type { UserInfoRow } from "@/features/auth";
+import type { UserInfoRow } from "@/types/models";
 
 const supabase = createClient();
 
@@ -32,81 +32,58 @@ export function UserProvider({
 }: UserProviderProps) {
   const [user, setUser] = useState<UserInfoRow | null>(initialUser);
   const [loading, setLoading] = useState(!initialUser);
-  const hasUser = useRef(Boolean(initialUser));
 
-  const loadUser = async (silent = false) => {
-    // Only set loading if this is not a silent refresh and we don't have a user yet
-    if (!silent && !hasUser.current) {
-      setLoading(true);
+  const loadUser = useCallback(async (authUserId?: string) => {
+    setLoading(true);
+    let userId = authUserId;
+
+    if (!userId) {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      userId = session?.user.id;
     }
 
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    const authUser = session?.user;
-    if (!authUser) {
-      // async defer to avoid hook mismatch
-      setTimeout(() => {
-        setUser(null);
-        hasUser.current = false;
-        setLoading(false);
-      }, 0);
+    if (!userId) {
+      setUser(null);
+      setLoading(false);
       return;
     }
 
-    let member: UserInfoRow | null = null;
     try {
-      member = await fetchUserInfoByAuthId(supabase, authUser.id);
+      setUser(await fetchUserInfoByAuthId(supabase, userId));
     } catch {
-      member = null;
-    }
-
-    setTimeout(() => {
-      if (!member) {
-        setUser(null);
-        hasUser.current = false;
-      } else {
-        setUser(member);
-        hasUser.current = true;
-      }
+      setUser(null);
+    } finally {
       setLoading(false);
-    }, 0);
-  };
+    }
+  }, []);
 
   useEffect(() => {
-    // Defer initial load to avoid synchronous setState warnings
-    setTimeout(() => loadUser(false), 0);
+    if (!initialUser) {
+      void loadUser();
+    }
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      // Ignore TOKEN_REFRESHED events - they don't require a full reload
-      // and are common when tab regains focus
-      if (event === "TOKEN_REFRESHED" && hasUser.current) {
-        return;
-      }
+      if (event === "TOKEN_REFRESHED") return;
 
       if (!session?.user) {
-        setTimeout(() => {
-          setUser(null);
-          hasUser.current = false;
-          setLoading(false);
-        }, 0);
+        setUser(null);
+        setLoading(false);
         return;
       }
 
-      // Use silent refresh if we already have a user (prevents loading flicker)
-      const shouldBeSilent = hasUser.current && event === "TOKEN_REFRESHED";
-      setTimeout(() => loadUser(shouldBeSilent), 0);
+      void loadUser(session.user.id);
     });
 
     return () => subscription.unsubscribe();
-  }, []);
+  }, [initialUser, loadUser]);
 
   return (
     <UserContext.Provider
-      value={{ user, loading, refreshUser: () => loadUser(false) }}
+      value={{ user, loading, refreshUser: () => loadUser() }}
     >
       {children}
     </UserContext.Provider>

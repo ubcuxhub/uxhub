@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
-import type { ApplicationStatus } from "@/features/events/types/applicationTypes";
+import type { ApplicationStatus } from "@/types/models";
 import { X, Check } from "lucide-react";
 
 interface StatusUpdateSectionProps {
@@ -56,7 +56,7 @@ export function StatusUpdateSection({
               variant="default"
               onClick={() => onStatusUpdate("accepted")}
               disabled={isUpdating}
-              className="flex-1 bg-green-600 hover:bg-green-700"
+              className="flex-1 bg-success hover:bg-success/90"
             >
               {isUpdating ? (
                 <>
@@ -89,7 +89,7 @@ export function StatusUpdateSection({
           </Button>
         )}
 
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="text-small text-destructive">{error}</p>}
       </CardContent>
     </Card>
   );

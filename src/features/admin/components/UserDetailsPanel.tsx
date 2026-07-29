@@ -37,8 +37,8 @@ export function UserDetailsPanel({
       <div className="w-1/2 overflow-y-auto p-6">
         <div className="flex items-center justify-center h-full">
           <div className="text-center text-muted-foreground">
-            <p className="text-lg font-medium mb-2">No user selected</p>
-            <p className="text-sm">
+            <p className="text-subheading mb-2">No user selected</p>
+            <p className="text-small">
               Select a user from the directory to view and edit their information
             </p>
           </div>
@@ -51,8 +51,8 @@ export function UserDetailsPanel({
     <div className="w-1/2 overflow-y-auto p-6">
       <div className="space-y-6">
         <div>
-          <h2 className="text-2xl font-semibold mb-2">User Details</h2>
-          <p className="text-sm text-muted-foreground">
+          <h2 className="mb-2 text-h2">User Details</h2>
+          <p className="text-small text-muted-foreground">
             View and edit user information
           </p>
         </div>
@@ -219,8 +219,8 @@ export function UserDetailsPanel({
               onValueChange={onValueChange}
             />
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Auth User ID</Label>
-              <div className="rounded-md border border-input bg-muted px-3 py-2 text-sm text-muted-foreground">
+              <Label>Auth User ID</Label>
+              <div className="rounded-md border border-input bg-muted px-3 py-2 text-small text-muted-foreground">
                 {selectedUser.auth_user_id}
               </div>
             </div>

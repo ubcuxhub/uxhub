@@ -6,6 +6,7 @@ import {
   CalendarDays,
   Home,
   LayoutDashboard,
+  PanelLeft,
   Settings,
   Users,
 } from "lucide-react";
@@ -23,6 +24,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 
 const studentItems = [
@@ -41,19 +43,20 @@ function useIsActive() {
 
 export function AppSidebar() {
   const { user } = useUser();
+  const { state, toggleSidebar } = useSidebar();
   const isActive = useIsActive();
   const isAdmin = user?.role_access === "admin";
 
   return (
-    <Sidebar>
-      <SidebarHeader className="p-3">
-        <Link href="/portal" className="px-2 py-1 text-lg font-semibold">
+    <Sidebar collapsible="icon">
+      <SidebarHeader className="p-3 group-data-[collapsible=icon]:hidden">
+        <Link href="/portal" className="px-2 py-1 text-h3">
           UBC UX Hub
         </Link>
       </SidebarHeader>
 
-      <SidebarContent>
-        <SidebarGroup className="p-3">
+      <SidebarContent className="group-data-[collapsible=icon]:invisible">
+        <SidebarGroup className="p-3 group-data-[collapsible=icon]:p-2">
           <SidebarGroupContent>
             <SidebarMenu>
               {studentItems.map((item) => (
@@ -61,6 +64,7 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     asChild
                     isActive={isActive(item.href, item.exact)}
+                    tooltip={item.title}
                     className="h-9"
                   >
                     <Link href={item.href}>
@@ -75,7 +79,7 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {isAdmin && (
-          <SidebarGroup className="p-3">
+          <SidebarGroup className="p-3 group-data-[collapsible=icon]:p-2">
             <SidebarGroupLabel>Admin</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
@@ -83,6 +87,7 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     asChild
                     isActive={isActive("/admin", true)}
+                    tooltip="Dashboard"
                     className="h-9"
                   >
                     <Link href="/admin">
@@ -96,6 +101,7 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     asChild
                     isActive={isActive("/admin/events")}
+                    tooltip="Manage Events"
                     className="h-9"
                   >
                     <Link href="/admin/events">
@@ -109,6 +115,7 @@ export function AppSidebar() {
                   <SidebarMenuButton
                     asChild
                     isActive={isActive("/admin/users")}
+                    tooltip="Manage Users"
                     className="h-9"
                   >
                     <Link href="/admin/users">
@@ -128,10 +135,22 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={() => openSettings("general")}
-              className="h-9"
+              tooltip="Settings"
+              className="h-9 group-data-[collapsible=icon]:size-9!"
             >
               <Settings />
-              <span>Profile &amp; settings</span>
+              <span>Settings</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              onClick={toggleSidebar}
+              tooltip={state === "collapsed" ? "Expand sidebar" : "Collapse sidebar"}
+              aria-label={state === "collapsed" ? "Expand sidebar" : "Collapse sidebar"}
+              className="h-9 group-data-[collapsible=icon]:size-9!"
+            >
+              <PanelLeft />
+              <span>Collapse sidebar</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

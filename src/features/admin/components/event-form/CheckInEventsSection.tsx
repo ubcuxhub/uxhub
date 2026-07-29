@@ -102,7 +102,7 @@ const CheckInDateTimeField = ({
   return (
     <Field>
       <FieldLabel htmlFor={`${id}_date`}>
-        {label} <span className="text-red-500">*</span>
+        {label} <span className="text-destructive">*</span>
       </FieldLabel>
       <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
         <Popover open={open} onOpenChange={setOpen}>
@@ -193,7 +193,7 @@ export const CheckInEventsSection = ({
             >
               <Field>
                 <FieldLabel htmlFor={`check_name_${index}`}>
-                  Name <span className="text-red-500">*</span>
+                  Name <span className="text-destructive">*</span>
                 </FieldLabel>
                 <Input
                   id={`check_name_${index}`}
@@ -227,7 +227,7 @@ export const CheckInEventsSection = ({
                 <Button
                   type="button"
                   variant="ghost"
-                  className="text-red-500 hover:text-red-600"
+                  className="text-destructive hover:text-destructive/80"
                   onClick={() => onRemove(index)}
                   disabled={checkInEvents.length === 1}
                 >

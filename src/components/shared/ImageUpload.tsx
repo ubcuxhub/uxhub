@@ -173,7 +173,7 @@ export const ImageUpload = ({
         {isUploading ? (
           <div className="flex flex-col items-center justify-center gap-2">
             <Spinner size="lg" />
-            <p className="text-sm text-muted-foreground">Uploading...</p>
+            <p className="text-small text-muted-foreground">Uploading...</p>
           </div>
         ) : preview ? (
           <div className="relative">
@@ -191,7 +191,7 @@ export const ImageUpload = ({
               <Button
                 type="button"
                 variant="destructive"
-                className="absolute top-2 right-2 bg-red-600 text-white hover:bg-red-700"
+                className="absolute top-2 right-2 bg-destructive text-destructive-foreground hover:bg-destructive/90"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleRemove();
@@ -216,11 +216,11 @@ export const ImageUpload = ({
                 d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
               />
             </svg>
-            <div className="text-sm">
+            <div className="text-small">
               <p className="text-muted-foreground">
                 Drag and drop an image here, or click to select
               </p>
-              <p className="text-xs text-muted-foreground mt-1">
+              <p className="text-small text-muted-foreground mt-1">
                 Square JPG or PNG (max 5MB)
               </p>
             </div>
@@ -231,5 +231,3 @@ export const ImageUpload = ({
     </Field>
   );
 };
-
-export default ImageUpload;

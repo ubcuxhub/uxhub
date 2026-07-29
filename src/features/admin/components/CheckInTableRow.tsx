@@ -23,7 +23,7 @@ export function CheckInTableRow({
 }: CheckInTableRowProps) {
   return (
     <tr className="border-b hover:bg-muted/50">
-      <td className="px-4 py-3 font-medium">{registration.user_name}</td>
+      <td className="px-4 py-3 text-table">{registration.user_name}</td>
       {sessions.map((session) => {
         const key = `${registration.id}_${session.id}`;
         const checkedInAt = checkInStatuses.get(key);

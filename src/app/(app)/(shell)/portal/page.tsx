@@ -1,9 +1,8 @@
-"use client";
-
 import Link from "next/link";
-import { useUser } from "@/context/UserContext";
+import { FlowLink } from "@/components/shared/FlowLink";
 import { Button } from "@/components/ui/button";
 import { PageContainer } from "@/components/shared/PageContainer";
+import { requireAuth } from "@/lib/auth/guards";
 import { ArrowRight, CalendarDays, Sparkles } from "lucide-react";
 
 function BecomeMemberBanner() {
@@ -14,46 +13,41 @@ function BecomeMemberBanner() {
           <Sparkles className="text-primary" />
         </div>
         <div>
-          <h3 className="font-semibold">Become a UX Hub member</h3>
-          <p className="text-sm text-muted-foreground">
+          <h3 className="text-subheading">Become a UX Hub member</h3>
+          <p className="text-small text-muted-foreground">
             Unlock member pricing on events and exclusive perks.
           </p>
         </div>
       </div>
       <Button asChild className="shrink-0">
-        <Link href="/portal/membership/join">
+        <FlowLink href="/portal/membership/join">
           Become a member
           <ArrowRight />
-        </Link>
+        </FlowLink>
       </Button>
     </div>
   );
 }
 
-export default function PortalHome() {
-  const { user } = useUser();
-
-  const firstName =
-    user?.name?.split(" ")[0] || user?.email?.split("@")[0] || "there";
-
+export default async function PortalHome() {
+  const user = await requireAuth();
+  const firstName = user.name?.split(" ")[0] || user.email.split("@")[0] || "there";
   const isMember =
-    Boolean(user?.membership_type_id) &&
-    (!user?.membership_expires_at ||
+    Boolean(user.membership_type_id) &&
+    (!user.membership_expires_at ||
       new Date(user.membership_expires_at) > new Date());
 
   return (
     <PageContainer>
-      {user && !isMember && <BecomeMemberBanner />}
-
+      {!isMember && <BecomeMemberBanner />}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold tracking-tight mb-2">
+        <h1 className="mb-2 text-h1 tracking-tight">
           Hey, {firstName}!
         </h1>
         <p className="text-muted-foreground">
           Welcome to the UBC UX Hub portal.
         </p>
       </div>
-
       <Button asChild variant="outline">
         <Link href="/portal/events">
           View your events

@@ -1,14 +1,11 @@
-export const PURCHASE_KINDS = ["event_ticket", "membership"] as const;
-export type PurchaseKind = (typeof PURCHASE_KINDS)[number];
+export type PurchaseKind = "event_ticket" | "membership";
 
-export const PURCHASE_STATUSES = [
-  "pending",
-  "authorized",
-  "completed",
-  "canceled",
-  "failed",
-] as const;
-export type PurchaseStatus = (typeof PURCHASE_STATUSES)[number];
+export type PurchaseStatus =
+  | "pending"
+  | "authorized"
+  | "completed"
+  | "canceled"
+  | "failed";
 
 export interface CheckoutRequestInput {
   kind: PurchaseKind;

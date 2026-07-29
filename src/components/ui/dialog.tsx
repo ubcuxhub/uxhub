@@ -1,9 +1,10 @@
 "use client";
 
 import * as React from "react";
-import * as DialogPrimitive from "@radix-ui/react-dialog";
+import { Dialog as DialogPrimitive } from "radix-ui";
 import { X } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const Dialog = DialogPrimitive.Root;
@@ -26,24 +27,41 @@ const DialogOverlay = React.forwardRef<
 ));
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
+interface DialogContentProps
+  extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
+  closeDisabled?: boolean;
+  closeLabel?: string;
+  size?: "default" | "large";
+}
+
 const DialogContent = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+  DialogContentProps
+>(({ className, children, closeDisabled = false, closeLabel = "Close", size = "default", ...props }, ref) => (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
         "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg",
+        size === "large" &&
+          "h-[calc(100svh-1rem)] w-[calc(100vw-1rem)] max-w-[1000px] sm:h-[80vh] sm:max-h-[760px]",
         className,
       )}
       {...props}
     >
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none">
-        <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
+      <DialogPrimitive.Close asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={closeLabel}
+          disabled={closeDisabled}
+          className="absolute right-4 top-4 z-10"
+        >
+          <X />
+        </Button>
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
   </DialogPortal>
@@ -85,7 +103,7 @@ const DialogTitle = React.forwardRef<
   <DialogPrimitive.Title
     ref={ref}
     className={cn(
-      "text-lg font-semibold leading-none tracking-tight",
+      "text-subheading tracking-tight",
       className,
     )}
     {...props}
@@ -99,7 +117,7 @@ const DialogDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
-    className={cn("text-sm text-muted-foreground", className)}
+    className={cn("text-small text-muted-foreground", className)}
     {...props}
   />
 ));

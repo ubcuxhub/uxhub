@@ -19,14 +19,13 @@ export function ApplicationResponseCard({
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base font-medium">{question}</CardTitle>
+        <CardTitle className="text-subheading">{question}</CardTitle>
       </CardHeader>
       <CardContent>
-        <p className="text-sm whitespace-pre-wrap text-muted-foreground">
+        <p className="text-small whitespace-pre-wrap text-muted-foreground">
           {response || "No response provided"}
         </p>
       </CardContent>
     </Card>
   );
 }
-

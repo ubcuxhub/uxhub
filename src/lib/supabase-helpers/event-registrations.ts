@@ -8,10 +8,8 @@ import type {
   EventRegistrationRow,
   EventRegistrationUpdate,
 } from "@/types/models";
-import type {
-  ApplicationStatus,
-  GroupedRegistration,
-} from "@/features/events/types/applicationTypes";
+import type { GroupedRegistration } from "@/features/events/types/applicationTypes";
+import type { ApplicationStatus } from "@/types/models";
 
 export async function fetchEventRegistrationById(
   supabase: DbClient,
@@ -40,6 +38,19 @@ export async function fetchRegistrationsForEvent(
   return data ?? [];
 }
 
+export async function fetchEventRegistrationCount(
+  supabase: DbClient,
+  eventId: string
+): Promise<number> {
+  const { count, error } = await supabase
+    .from(TABLES.eventRegistrations)
+    .select("id", { count: "exact", head: true })
+    .eq("event_id", eventId);
+
+  if (error) throw error;
+  return count ?? 0;
+}
+
 /** Returns all event registrations for a given user. */
 export async function fetchRegistrationsForUser(
   supabase: DbClient,
@@ -52,23 +63,6 @@ export async function fetchRegistrationsForUser(
 
   if (error) throw error;
   return data ?? [];
-}
-
-/** Returns the registration id for a user/event pair, or null if none. */
-export async function fetchUserRegistrationId(
-  supabase: DbClient,
-  eventId: string,
-  userId: string
-): Promise<string | null> {
-  const { data, error } = await supabase
-    .from(TABLES.eventRegistrations)
-    .select("id")
-    .eq("event_id", eventId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (error) throw error;
-  return data?.id ?? null;
 }
 
 export async function fetchUserRegistration(
@@ -101,30 +95,6 @@ export async function fetchEventRegistrationByPurchaseId(
   return data;
 }
 
-export async function createEventRegistration(
-  supabase: DbClient,
-  payload: { event_id: string; user_id: string; status?: ApplicationStatus }
-): Promise<string> {
-  const { data, error } = await supabase
-    .from(TABLES.eventRegistrations)
-    .insert({
-      event_id: payload.event_id,
-      user_id: payload.user_id,
-      status: payload.status ?? "pending",
-    })
-    .select("id")
-    .single();
-
-  if (error) {
-    // Surface the postgres error so callers can branch on unique violations.
-    throw error;
-  }
-  if (!data?.id) {
-    throw new Error("No registration id returned from Supabase.");
-  }
-  return data.id;
-}
-
 export async function updateEventRegistration(
   supabase: DbClient,
   registrationId: string,
@@ -134,18 +104,6 @@ export async function updateEventRegistration(
     .from(TABLES.eventRegistrations)
     .update(payload)
     .eq("id", registrationId);
-
-  if (error) throw error;
-}
-
-export async function deleteRegistrationsForEvent(
-  supabase: DbClient,
-  eventId: string
-): Promise<void> {
-  const { error } = await supabase
-    .from(TABLES.eventRegistrations)
-    .delete()
-    .eq("event_id", eventId);
 
   if (error) throw error;
 }
@@ -198,39 +156,4 @@ export async function fetchEventRegistrationsGroupedByUser(
   }
 
   return Array.from(groupedMap.values());
-}
-
-export interface PurchaseHistoryItem {
-  id: string;
-  status: ApplicationStatus | null;
-  created_at: string | null;
-  event: {
-    name: string;
-    slug: string;
-    regular_price: number;
-    member_price: number;
-    start_date: string | null;
-    image_url: string | null;
-  } | null;
-}
-
-/**
- * A user's event registrations with the related event details, newest first.
- * Powers the "my purchase history" section on the profile page.
- */
-export async function fetchPurchaseHistoryForUser(
-  supabase: DbClient,
-  userId: string
-): Promise<PurchaseHistoryItem[]> {
-  const { data, error } = await supabase
-    .from(TABLES.eventRegistrations)
-    .select(
-      `id, status, created_at,
-       event:events!event_id(name, slug, regular_price, member_price, start_date, image_url)`
-    )
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
-
-  if (error) throw error;
-  return (data ?? []) as unknown as PurchaseHistoryItem[];
 }

@@ -8,8 +8,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { ApplicationStatus } from "@/features/events/types/applicationTypes";
+import type { ApplicationStatus } from "@/types/models";
 import { Clock, X, Check, User, Mail, Calendar } from "lucide-react";
+import { formatTimestamp } from "@/lib/date";
 
 interface ApplicantInfoCardProps {
   name: string;
@@ -18,29 +19,14 @@ interface ApplicantInfoCardProps {
   status: ApplicationStatus;
 }
 
-function formatDate(dateString: string) {
-  try {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  } catch {
-    return dateString;
-  }
-}
-
 function getStatusIcon(status: ApplicationStatus) {
   switch (status) {
     case "pending":
-      return <Clock className="text-yellow-500" />;
+      return <Clock className="text-warning" />;
     case "declined":
-      return <X className="text-red-500" />;
+      return <X className="text-destructive" />;
     case "accepted":
-      return <Check className="text-green-500" />;
+      return <Check className="text-success" />;
   }
 }
 
@@ -59,7 +45,7 @@ export function ApplicantInfoCard({
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="flex-1 space-y-1">
-            <CardTitle className="text-lg flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-subheading">
               <User className="text-muted-foreground" />
               {name}
             </CardTitle>
@@ -77,9 +63,9 @@ export function ApplicantInfoCard({
         </div>
       </CardHeader>
       <CardContent>
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className="flex items-center gap-2 text-small text-muted-foreground">
           <Calendar />
-          <span>Applied: {formatDate(applicationDate)}</span>
+          <span>Applied: {formatTimestamp(applicationDate)}</span>
         </div>
       </CardContent>
     </Card>

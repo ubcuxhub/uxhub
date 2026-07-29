@@ -1,5 +1,3 @@
-export type { ApplicationStatus } from "@/types/models";
-
 import type { ApplicationStatus } from "@/types/models";
 
 export interface GroupedRegistration {

@@ -1,13 +1,25 @@
 "use client";
 
 import { payments } from "@square/web-sdk";
-import { useId, useState, useEffect, startTransition } from "react";
+import {
+  startTransition,
+  useEffect,
+  useId,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { useRouter } from "next/navigation";
 import { submitCheckoutAction } from "@/features/payments/actions";
 import type { PurchaseKind } from "@/features/payments/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  getThemeServerSnapshot,
+  getThemeSnapshot,
+  subscribeTheme,
+  type Theme,
+} from "@/lib/theme";
 
 interface CardTokenizerResult {
   errors?: { message?: string }[];
@@ -17,6 +29,7 @@ interface CardTokenizerResult {
 
 interface CardInstance {
   attach(target: string): Promise<void>;
+  configure(options: { style: SquareCardStyle }): Promise<void>;
   destroy?(): Promise<boolean> | Promise<void> | void;
   tokenize(verificationDetails?: {
     amount: string;
@@ -35,18 +48,24 @@ interface CardInstance {
   }): Promise<CardTokenizerResult>;
 }
 
+type SquareCardStyle = Record<string, Record<string, string>>;
+
 interface SquareCheckoutFormProps {
   amountCents: number;
   amountLabel: string;
   buttonLabel: string;
+  collectBuyerDetails?: boolean;
   kind: PurchaseKind;
   slug: string;
-  successHref?: string;
+  successHref?: string | ((purchaseId: string) => string);
   initialEmail: string;
   initialName: string;
   initialPhone?: string | null;
   disabled?: boolean;
   disabledMessage?: string | null;
+  onSubmittingChange?: (submitting: boolean) => void;
+  showAmount?: boolean;
+  showSecurityMessage?: boolean;
 }
 
 function splitFullName(fullName: string) {
@@ -63,10 +82,67 @@ function getSquareScriptUrl(applicationId: string) {
     : "https://web.squarecdn.com/v1/square.js";
 }
 
+function getSquareCardStyle(theme: Theme): SquareCardStyle {
+  const colors =
+    theme === "dark"
+      ? {
+          background: "#1c2029",
+          border: "#2a2f3a",
+          error: "#f87171",
+          focus: "#89a4e4",
+          muted: "#8b9097",
+          text: "#f1f2f5",
+        }
+      : {
+          background: "#ffffff",
+          border: "#d9dce3",
+          error: "#b42318",
+          focus: "#5f81d1",
+          muted: "#8b9097",
+          text: "#111111",
+        };
+
+  return {
+    input: {
+      backgroundColor: colors.background,
+      color: colors.text,
+    },
+    "input::placeholder": {
+      color: colors.muted,
+    },
+    "input.is-error": {
+      color: colors.error,
+    },
+    ".input-container": {
+      borderColor: colors.border,
+      borderRadius: "6px",
+    },
+    ".input-container.is-focus": {
+      borderColor: colors.focus,
+    },
+    ".input-container.is-error": {
+      borderColor: colors.error,
+    },
+    ".message-text": {
+      color: colors.muted,
+    },
+    ".message-icon": {
+      color: colors.muted,
+    },
+    ".message-text.is-error": {
+      color: colors.error,
+    },
+    ".message-icon.is-error": {
+      color: colors.error,
+    },
+  };
+}
+
 export function SquareCheckoutForm({
   amountCents,
   amountLabel,
   buttonLabel,
+  collectBuyerDetails = true,
   kind,
   slug,
   successHref,
@@ -75,8 +151,16 @@ export function SquareCheckoutForm({
   initialPhone,
   disabled = false,
   disabledMessage = null,
+  onSubmittingChange,
+  showAmount = true,
+  showSecurityMessage = true,
 }: SquareCheckoutFormProps) {
   const router = useRouter();
+  const theme = useSyncExternalStore(
+    subscribeTheme,
+    getThemeSnapshot,
+    getThemeServerSnapshot,
+  );
   const containerId = useId().replace(/:/g, "");
   const [buyerName, setBuyerName] = useState(initialName);
   const [buyerEmail, setBuyerEmail] = useState(initialEmail);
@@ -116,7 +200,15 @@ export function SquareCheckoutForm({
           return;
         }
 
-        nextCard = (await squarePayments.card()) as unknown as CardInstance;
+        try {
+          nextCard = (await squarePayments.card({
+            style: getSquareCardStyle(getThemeSnapshot()),
+          })) as unknown as CardInstance;
+        } catch (error) {
+          console.error("Square theme setup failed:", error);
+          nextCard = (await squarePayments.card()) as unknown as CardInstance;
+        }
+
         await nextCard.attach(`#${containerId}`);
 
         if (!mounted) {
@@ -144,6 +236,16 @@ export function SquareCheckoutForm({
     };
   }, [containerId, disabled]);
 
+  useEffect(() => {
+    if (!card) {
+      return;
+    }
+
+    void card.configure({ style: getSquareCardStyle(theme) }).catch((error) => {
+      console.error("Square theme update failed:", error);
+    });
+  }, [card, theme]);
+
   const handleCheckout = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
@@ -152,6 +254,7 @@ export function SquareCheckoutForm({
     }
 
     setSubmitting(true);
+    onSubmittingChange?.(true);
     setMessage("");
 
     try {
@@ -198,85 +301,96 @@ export function SquareCheckoutForm({
       }
 
       startTransition(() => {
-        router.push(successHref || result.redirectTo);
+        const destination =
+          typeof successHref === "function"
+            ? successHref(result.purchaseId)
+            : successHref || result.redirectTo;
+        router.replace(destination);
       });
     } catch (error) {
       console.error("Checkout failed:", error);
       setMessage("Payment failed. Please try again.");
     } finally {
       setSubmitting(false);
+      onSubmittingChange?.(false);
     }
   };
 
   return (
     <form onSubmit={handleCheckout} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor={`${containerId}-name`}>Full name</Label>
-        <Input
-          id={`${containerId}-name`}
-          autoComplete="name"
-          onChange={(event) => setBuyerName(event.target.value)}
-          required
-          value={buyerName}
-        />
-      </div>
+      {collectBuyerDetails ? (
+        <>
+          <div className="space-y-2">
+            <Label htmlFor={`${containerId}-name`}>Full name</Label>
+            <Input
+              id={`${containerId}-name`}
+              autoComplete="name"
+              onChange={(event) => setBuyerName(event.target.value)}
+              required
+              value={buyerName}
+            />
+          </div>
 
-      <div className="space-y-2">
-        <Label htmlFor={`${containerId}-email`}>Email</Label>
-        <Input
-          id={`${containerId}-email`}
-          autoComplete="email"
-          onChange={(event) => setBuyerEmail(event.target.value)}
-          required
-          type="email"
-          value={buyerEmail}
-        />
-      </div>
+          <div className="space-y-2">
+            <Label htmlFor={`${containerId}-email`}>Email</Label>
+            <Input
+              id={`${containerId}-email`}
+              autoComplete="email"
+              onChange={(event) => setBuyerEmail(event.target.value)}
+              required
+              type="email"
+              value={buyerEmail}
+            />
+          </div>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="space-y-2">
-          <Label htmlFor={`${containerId}-phone`}>Phone</Label>
-          <Input
-            id={`${containerId}-phone`}
-            autoComplete="tel"
-            onChange={(event) => setBuyerPhone(event.target.value)}
-            placeholder="+1 604 555 1234"
-            value={buyerPhone}
-          />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor={`${containerId}-phone`}>Phone</Label>
+              <Input
+                id={`${containerId}-phone`}
+                autoComplete="tel"
+                onChange={(event) => setBuyerPhone(event.target.value)}
+                placeholder="+1 604 555 1234"
+                value={buyerPhone}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor={`${containerId}-postal`}>Postal code</Label>
+              <Input
+                id={`${containerId}-postal`}
+                autoComplete="postal-code"
+                onChange={(event) => setBillingPostalCode(event.target.value)}
+                placeholder="V6T 1Z4"
+                value={billingPostalCode}
+              />
+            </div>
+          </div>
+        </>
+      ) : null}
+
+      {showAmount ? (
+        <div className="rounded-md border bg-background p-3 text-small">
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">Charge amount</span>
+            <span className="font-medium">{amountLabel}</span>
+          </div>
         </div>
-
-        <div className="space-y-2">
-          <Label htmlFor={`${containerId}-postal`}>Postal code</Label>
-          <Input
-            id={`${containerId}-postal`}
-            autoComplete="postal-code"
-            onChange={(event) => setBillingPostalCode(event.target.value)}
-            placeholder="V6T 1Z4"
-            value={billingPostalCode}
-          />
-        </div>
-      </div>
-
-      <div className="rounded-md border bg-background p-3 text-sm">
-        <div className="flex items-center justify-between">
-          <span className="text-muted-foreground">Charge amount</span>
-          <span className="font-medium">{amountLabel}</span>
-        </div>
-      </div>
+      ) : null}
 
       <div
         id={containerId}
-        className="min-h-24 rounded-md border bg-background p-3"
+        className="min-h-24"
       />
 
       {message ? (
-        <p className="text-sm text-destructive">{message}</p>
-      ) : (
-        <p className="text-xs text-muted-foreground">
+        <p className="text-small text-destructive">{message}</p>
+      ) : showSecurityMessage ? (
+        <p className="text-small text-muted-foreground">
           Your card details are tokenized by Square. Prices and eligibility are
           confirmed on the server before we complete the purchase.
         </p>
-      )}
+      ) : null}
 
       <Button
         className="w-full"

@@ -1,0 +1,181 @@
+"use client";
+
+import { useState, useMemo } from "react";
+import { useSearchParams } from "next/navigation";
+import { ApplicationListCard } from "@/features/admin";
+import {
+  type GroupedRegistration,
+} from "@/features/events";
+import type { ApplicationStatus } from "@/types/models";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { PageContainer } from "@/components/shared/PageContainer";
+
+interface ReviewApplicationsClientProps {
+  eventId: string;
+  eventName: string;
+  registrations: GroupedRegistration[];
+}
+
+export function ReviewApplicationsClient({
+  eventId,
+  eventName,
+  registrations,
+}: ReviewApplicationsClientProps) {
+  const searchParams = useSearchParams();
+
+  // Initialize status filters from URL query param
+  const initialFilter = searchParams?.get("filter");
+  const initialStatusFilters = useMemo(() => {
+    const filters = new Set<ApplicationStatus>();
+    if (initialFilter === "pending") {
+      filters.add("pending");
+    }
+    return filters;
+  }, [initialFilter]);
+
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilters, setStatusFilters] =
+    useState<Set<ApplicationStatus>>(initialStatusFilters);
+
+  const filteredRegistrations = useMemo(() => {
+    let filtered = [...registrations];
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (reg) =>
+          reg.name.toLowerCase().includes(query) ||
+          reg.email.toLowerCase().includes(query)
+      );
+    }
+
+    // Apply status filters
+    if (statusFilters.size > 0) {
+      filtered = filtered.filter((reg) => statusFilters.has(reg.status));
+    }
+
+    return filtered;
+  }, [registrations, searchQuery, statusFilters]);
+
+  const toggleStatusFilter = (status: ApplicationStatus) => {
+    setStatusFilters((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(status)) {
+        newSet.delete(status);
+      } else {
+        newSet.add(status);
+      }
+      return newSet;
+    });
+  };
+
+  const clearFilters = () => {
+    setStatusFilters(new Set());
+    setSearchQuery("");
+  };
+
+  return (
+    <PageContainer
+      backHref={`/admin/events/${eventId}`}
+      backLabel="Back to Event"
+      className="flex flex-col gap-8"
+    >
+            <header className="flex flex-col gap-4">
+              <div>
+                <h1 className="text-2xl font-semibold">Review Applications</h1>
+                <p className="text-sm text-muted-foreground">
+                  {eventName}
+                </p>
+              </div>
+            </header>
+
+              <>
+                {/* Search Bar */}
+                <div className="w-full">
+                  <Input
+                    type="text"
+                    placeholder="Search by name or email..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+
+                {/* Filter Section */}
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">Filter:</span>
+                    <Button
+                      type="button"
+                      variant={
+                        statusFilters.has("pending") ? "default" : "outline"
+                      }
+                      onClick={() => toggleStatusFilter("pending")}
+                    >
+                      Pending
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={
+                        statusFilters.has("declined") ? "default" : "outline"
+                      }
+                      onClick={() => toggleStatusFilter("declined")}
+                    >
+                      Declined
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={
+                        statusFilters.has("accepted") ? "default" : "outline"
+                      }
+                      onClick={() => toggleStatusFilter("accepted")}
+                    >
+                      Accepted
+                    </Button>
+                    {(statusFilters.size > 0 || searchQuery.trim()) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={clearFilters}
+                      >
+                        Clear Filters
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Applications List */}
+                {filteredRegistrations.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed p-12 text-center">
+                    <div className="text-2xl font-semibold">
+                      {registrations.length === 0
+                        ? "No applications yet"
+                        : "No applications match your filters"}
+                    </div>
+                    <p className="max-w-md text-sm text-muted-foreground">
+                      {registrations.length === 0
+                        ? "Applications will appear here once users submit them."
+                        : "Try adjusting your search or filter criteria."}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="grid gap-4">
+                    {filteredRegistrations.map((registration) => (
+                      <ApplicationListCard
+                        key={registration.user_id}
+                        registrationId={registration.registrationId}
+                        name={registration.name}
+                        email={registration.email}
+                        applicationDate={registration.applicationDate}
+                        status={registration.status}
+                        eventId={eventId}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
+    </PageContainer>
+  );
+}
