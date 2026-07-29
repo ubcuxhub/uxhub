@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import type { UserInfoRow } from "@/features/auth";
+import type { UserInfoRow } from "@/types/models";
 import { createClient } from "@/lib/supabase/server";
 import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";
 import { getSafeInternalPath } from "@/lib/auth/paths";

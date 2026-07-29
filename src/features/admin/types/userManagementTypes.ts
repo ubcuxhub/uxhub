@@ -1,4 +1,4 @@
-import type { UserInfoRow } from "@/features/auth/types/userTypes";
+import type { UserInfoRow } from "@/types/models";
 
 export type UserRecord = UserInfoRow & {
   id?: string;

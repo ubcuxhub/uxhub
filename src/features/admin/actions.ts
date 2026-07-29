@@ -34,7 +34,7 @@ import type {
   EventUpdate,
   UserInfoUpdate,
 } from "@/types/models";
-import type { ApplicationStatus } from "@/features/events";
+import type { ApplicationStatus } from "@/types/models";
 
 const ADMIN_USER_FIELDS = new Set([
   "name",

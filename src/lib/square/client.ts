@@ -2,7 +2,6 @@ import "server-only";
 
 import { SquareClient, SquareEnvironment } from "square";
 
-export const SQUARE_API_VERSION = "2025-10-16" as const;
 export const SQUARE_CURRENCY = "CAD" as const;
 
 function requiredEnv(name: string): string {
@@ -36,5 +35,5 @@ function getSquareEnvironment() {
 export const squareClient = new SquareClient({
   token: requiredEnv("SQUARE_ACCESS_TOKEN"),
   environment: getSquareEnvironment(),
-  version: SQUARE_API_VERSION,
+  version: "2025-10-16",
 });
