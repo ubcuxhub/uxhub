@@ -5,12 +5,14 @@ import Link from "next/link";
 import Image from "next/image";
 import { Menu } from "lucide-react";
 import Button from "@/features/marketing/components/Button";
+import { useUser } from "@/context/UserContext";
 
 const navLink =
   "text-black no-underline font-sans font-medium leading-normal whitespace-nowrap decoration-transparent transition-all duration-200 hover:text-gray-600";
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
+  const { user, loading } = useUser();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
@@ -19,6 +21,8 @@ export default function Navbar() {
   }, []);
 
   const close = () => setOpen(false);
+
+  const isMember = Boolean(user?.membership_type_id) && (!user?.membership_expires_at || new Date(user.membership_expires_at) > new Date());
 
   return (
     <div className="fixed inset-x-0 top-0 z-50 bg-white py-1">
@@ -49,9 +53,26 @@ export default function Navbar() {
               Contact Us
             </Link>
 
-            <Button variant="primary" withArrow={false} shorterHeight={true} href="/portal/membership/join">
-              BECOME A MEMBER
-            </Button>
+            <div className="flex items-center gap-4">
+              {!loading ? (
+                <>
+                  {user && (
+                    <Button variant={isMember ? "primary" : "secondary"} withArrow={false} shorterHeight={true} href="/portal">
+                      GO TO PORTAL
+                    </Button>
+                  )}
+                  {!isMember && (
+                    <Button variant="primary" withArrow={false} shorterHeight={true} href="/portal/membership/join">
+                      BECOME A MEMBER
+                    </Button>
+                  )}
+                </>
+              ) : (
+                <Button variant="primary" withArrow={false} shorterHeight={true} href="/portal/membership/join">
+                  BECOME A MEMBER
+                </Button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -79,7 +100,7 @@ export default function Navbar() {
             className="absolute right-[5%] top-full w-[70%] rounded-xl bg-white shadow-lg backdrop-blur-md md:hidden"
             role="menu"
           >
-            <div className="flex flex-col p-3">
+            <div className="flex flex-col p-3 gap-2">
               <Link href="/" className={`${navLink} px-3 py-2`} onClick={close}>
                 Home
               </Link>
@@ -93,6 +114,26 @@ export default function Navbar() {
               >
                 Contact Us
               </Link>
+              <div className="mt-2 flex flex-col gap-2 px-3">
+                {!loading ? (
+                  <>
+                    {user && (
+                      <Button variant={isMember ? "primary" : "secondary"} withArrow={false} shorterHeight={true} href="/portal">
+                        GO TO PORTAL
+                      </Button>
+                    )}
+                    {!isMember && (
+                      <Button variant="primary" withArrow={false} shorterHeight={true} href="/portal/membership/join">
+                        BECOME A MEMBER
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  <Button variant="primary" withArrow={false} shorterHeight={true} href="/portal/membership/join">
+                    BECOME A MEMBER
+                  </Button>
+                )}
+              </div>
             </div>
           </div>
         )}
