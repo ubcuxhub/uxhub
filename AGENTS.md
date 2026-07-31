@@ -23,6 +23,8 @@ pnpm install
 pnpm dev
 pnpm lint
 pnpm exec tsc --noEmit
+pnpm test
+pnpm test:watch
 pnpm build
 pnpm start
 pnpm seed
@@ -118,8 +120,13 @@ key to client components.
 - Run `pnpm lint` and `pnpm exec tsc --noEmit` after code changes.
 - Also run `pnpm build` after route, dependency, configuration, schema, or
   shared-style changes.
-- There is no general automated test script. Supabase RLS checks live in
-  `supabase/tests/rls.sql`.
+- Run `pnpm test` (Vitest) when changing logic it covers. Tests are colocated
+  as `*.test.ts` next to the code they exercise, and `vitest.config.ts` maps
+  the `@/*` alias. Coverage is pure-logic only — schemas, validation,
+  fulfillment rules, slugs, and class merging. There is no component,
+  integration, or end-to-end suite, so verify UI changes by running the app.
+- Supabase RLS checks live in `supabase/tests/rls.sql` and are not part of
+  `pnpm test`.
 
 ## UI
 
