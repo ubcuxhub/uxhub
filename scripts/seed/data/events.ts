@@ -1,21 +1,23 @@
 /**
- * Two full seasons of events: 2025-26 (past) and 2026-27 (upcoming).
+ * A relative event timeline with past, ongoing, and upcoming fixtures.
  *
  * Conventions:
- * - Recurring events are slugged with the calendar year they happen in, so one
- *   academic year spans two suffixes (design-sprint-2026 + uxathon-2027).
+ * - Slugs are stable seed identities. Visible names and years move relative to
+ *   the seed run so existing database rows update instead of duplicating.
  * - `start_time` / `end_time` are `time` columns: naive local wall-clock, no offset.
- * - `registration_*_time` are `timestamptz`: explicit America/Vancouver offsets,
- *   -07:00 during PDT and -08:00 during PST (DST ends the first Sunday of November).
- * - Registration opens ~6 weeks before an event and closes ~5 days before, which
- *   also keeps `registration_end_time >= registration_start_time` (events_check1).
- * - Check-in session times are absolute ISO timestamps rather than offsets from the
- *   event start. The previous script derived them with
- *   `start.setHours(start.getHours() + offsetHours)`, which truncates fractional
- *   hours to zero and silently placed sessions at the wrong time.
+ * - `registration_*_time` and check-in sessions are generated as absolute UTC
+ *   timestamps. Event `time` columns remain naive local wall-clock values.
  */
 
 import type { TablesInsert } from "../../../src/lib/supabase/database.types.ts";
+import {
+  addDays,
+  addMonths,
+  dateString,
+  eventYear,
+  startOfUtcDay,
+  timestamp,
+} from "../lib/relative-dates.ts";
 
 /**
  * Shapes of the `mentors` and `agenda` JSONB columns.
@@ -338,11 +340,40 @@ const applicationQuestions = {
   ],
 };
 
-export const seedEvents: SeedEvent[] = [
-  /* ── 2025-26 season ─────────────────────────────────────────────────── */
+export function buildSeedEvents(now: Date): SeedEvent[] {
+  const today = startOfUtcDay(now);
+  const schedule = {
+    getToKnowPast: addMonths(today, -12),
+    designSprintPast: addMonths(today, -10),
+    uxathonPast: addMonths(today, -8),
+    thinkboxPast: addMonths(today, -4),
+    industryTalkPast: addMonths(today, -2),
+    mentorshipStart: addMonths(today, -1),
+    mentorshipEnd: addMonths(today, 18),
+    openStudioStart: addMonths(today, -6),
+    openStudioEnd: addMonths(today, 24),
+    coffeeSeriesStart: addMonths(today, -3),
+    coffeeSeriesEnd: addMonths(today, 9),
+    studentPanelFuture: addMonths(today, 12),
+    designSprintFuture: addMonths(today, 24),
+    uxathonFuture: addMonths(today, 18),
+    thinkboxFuture: addMonths(today, 22),
+  } as const;
+
+  const historicalRegistration = (eventDate: Date) => ({
+    start: timestamp(addMonths(eventDate, -2)),
+    end: timestamp(addDays(eventDate, -5), 23, 59),
+  });
+  const openFutureRegistration = (eventDate: Date) => ({
+    start: timestamp(addMonths(today, -1)),
+    end: timestamp(addDays(eventDate, -5), 23, 59),
+  });
+
+  return [
+  /* ── Past events ────────────────────────────────────────────────────── */
   {
     event: {
-      name: "Get to Know UX Hub 2025",
+      name: `Get to Know UX Hub ${eventYear(schedule.getToKnowPast)}`,
       slug: "get-to-know-ux-hub-2025",
       description:
         "Our first event of the year and the easiest way to meet everyone. Short intro to what UX Hub runs across the year, a design-themed icebreaker, and plenty of time to talk to the exec team. No experience needed and nothing to prepare — come find out whether this is your kind of club.",
@@ -351,28 +382,28 @@ export const seedEvents: SeedEvent[] = [
       location_building: "AMS Nest",
       location_room: "Room 2314",
       location_address_url: "https://maps.app.goo.gl/9x8k2Qm4Zt6bXQ5s7",
-      start_date: "2025-10-03",
+      start_date: dateString(schedule.getToKnowPast),
       start_time: "17:30:00",
-      end_date: "2025-10-03",
+      end_date: dateString(schedule.getToKnowPast),
       end_time: "19:30:00",
       max_capacity: 120,
       image_url:
         "https://images.unsplash.com/photo-1511578314322-379afb476865?auto=format&fit=crop&q=80&w=800&h=800",
-      registration_start_time: "2025-08-22T00:00:00-07:00",
-      registration_end_time: "2025-09-28T23:59:00-07:00",
+      registration_start_time: historicalRegistration(schedule.getToKnowPast).start,
+      registration_end_time: historicalRegistration(schedule.getToKnowPast).end,
     },
     checkInSessions: [
       {
         name: "Door Check-in",
-        start_time: "2025-10-03T17:15:00-07:00",
-        end_time: "2025-10-03T18:30:00-07:00",
+        start_time: timestamp(schedule.getToKnowPast, 17, 15),
+        end_time: timestamp(schedule.getToKnowPast, 18, 30),
       },
     ],
     applicationQuestions: [],
   },
   {
     event: {
-      name: "Design Sprint 2025",
+      name: `Design Sprint ${eventYear(schedule.designSprintPast)}`,
       slug: "design-sprint-2025",
       description:
         "One day, one brief, one clickable prototype. Teams of four run a compressed design sprint from problem framing through guerrilla research to a final critique in front of working designers. Our biggest first-term event and the fastest way to get something real into your portfolio.",
@@ -381,15 +412,15 @@ export const seedEvents: SeedEvent[] = [
       location_building: "Neville Scarfe Building",
       location_room: "Room 100",
       location_address_url: "https://maps.app.goo.gl/vNq7CkS3Wm2hZr4A9",
-      start_date: "2025-10-25",
+      start_date: dateString(schedule.designSprintPast),
       start_time: "10:00:00",
-      end_date: "2025-10-25",
+      end_date: dateString(schedule.designSprintPast),
       end_time: "17:00:00",
       max_capacity: 60,
       image_url:
         "https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&q=80&w=800&h=800",
-      registration_start_time: "2025-09-13T00:00:00-07:00",
-      registration_end_time: "2025-10-20T23:59:00-07:00",
+      registration_start_time: historicalRegistration(schedule.designSprintPast).start,
+      registration_end_time: historicalRegistration(schedule.designSprintPast).end,
       mentors: designSprintMentors,
       agenda: designSprintAgenda,
       sponsor_logos: [
@@ -404,52 +435,52 @@ export const seedEvents: SeedEvent[] = [
     checkInSessions: [
       {
         name: "Morning Check-in",
-        start_time: "2025-10-25T09:45:00-07:00",
-        end_time: "2025-10-25T10:45:00-07:00",
+        start_time: timestamp(schedule.designSprintPast, 9, 45),
+        end_time: timestamp(schedule.designSprintPast, 10, 45),
       },
       {
         name: "Post-Lunch Check-in",
-        start_time: "2025-10-25T13:45:00-07:00",
-        end_time: "2025-10-25T14:30:00-07:00",
+        start_time: timestamp(schedule.designSprintPast, 13, 45),
+        end_time: timestamp(schedule.designSprintPast, 14, 30),
       },
     ],
     applicationQuestions: applicationQuestions.designSprint,
   },
   {
     event: {
-      name: "Student Panel 2025",
+      name: `Student Design Mentorship Program ${eventYear(schedule.mentorshipStart)}–${eventYear(schedule.mentorshipEnd)} [ongoing]`,
       slug: "student-panel-2025",
       description:
-        "Four students and recent grads talk through how they actually got into UX — the switched majors, the rejected portfolios, the co-op that changed everything. Honest answers rather than a polished career-fair pitch, followed by open Q&A and networking.",
-      regular_price: 0,
-      member_price: 0,
+        "A long-running mentorship program pairing students with peer and industry mentors. Members join monthly critiques, portfolio working sessions, and career conversations throughout the program.",
+      regular_price: 20,
+      member_price: 10,
       location_building: "Life Sciences Centre",
       location_room: "Atrium",
       location_address_url: "https://maps.app.goo.gl/T4wR8bLp1Vz6Yn3H8",
-      start_date: "2025-11-13",
+      start_date: dateString(schedule.mentorshipStart),
       start_time: "18:00:00",
-      end_date: "2025-11-13",
+      end_date: dateString(schedule.mentorshipEnd),
       end_time: "20:00:00",
       max_capacity: 100,
       image_url:
         "https://images.unsplash.com/photo-1475721027785-f74eccf877e2?auto=format&fit=crop&q=80&w=800&h=800",
-      registration_start_time: "2025-10-02T00:00:00-07:00",
-      registration_end_time: "2025-11-08T23:59:00-08:00",
+      registration_start_time: timestamp(addMonths(schedule.mentorshipStart, -3)),
+      registration_end_time: timestamp(schedule.mentorshipEnd, 23, 59),
       mentors: panelMentors,
       agenda: panelAgenda,
     },
     checkInSessions: [
       {
         name: "Door Check-in",
-        start_time: "2025-11-13T17:45:00-08:00",
-        end_time: "2025-11-13T19:00:00-08:00",
+        start_time: timestamp(schedule.mentorshipStart, 17, 45),
+        end_time: timestamp(schedule.mentorshipEnd, 19),
       },
     ],
     applicationQuestions: [],
   },
   {
     event: {
-      name: "UXathon 2026",
+      name: `UXathon ${eventYear(schedule.uxathonPast)}`,
       slug: "uxathon-2026",
       description:
         "Our flagship event: 32 hours, one open-ended brief, and a room full of teams turning it into something defensible. Mentors from across the Vancouver design scene rotate through all weekend, and the final round is judged on how well you argue for your decisions — not just how good the screens look. Food, snacks, and swag included.",
@@ -458,15 +489,15 @@ export const seedEvents: SeedEvent[] = [
       location_building: "ICICS/CS X-wing",
       location_room: "Room 100",
       location_address_url: "https://maps.app.goo.gl/6dK2sYqR8fV1nB7t5",
-      start_date: "2026-01-24",
+      start_date: dateString(schedule.uxathonPast),
       start_time: "09:00:00",
-      end_date: "2026-01-25",
+      end_date: dateString(addDays(schedule.uxathonPast, 1)),
       end_time: "17:00:00",
       max_capacity: 80,
       image_url:
         "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?auto=format&fit=crop&q=80&w=800&h=800",
-      registration_start_time: "2025-12-12T00:00:00-08:00",
-      registration_end_time: "2026-01-19T23:59:00-08:00",
+      registration_start_time: historicalRegistration(schedule.uxathonPast).start,
+      registration_end_time: historicalRegistration(schedule.uxathonPast).end,
       mentors: uxathonMentors,
       agenda: [...uxathonAgendaDayOne, ...uxathonAgendaDayTwo],
       sponsor_logos: [
@@ -482,25 +513,25 @@ export const seedEvents: SeedEvent[] = [
     checkInSessions: [
       {
         name: "Opening Ceremony Check-in",
-        start_time: "2026-01-24T08:45:00-08:00",
-        end_time: "2026-01-24T10:30:00-08:00",
+        start_time: timestamp(schedule.uxathonPast, 8, 45),
+        end_time: timestamp(schedule.uxathonPast, 10, 30),
       },
       {
         name: "Evening Headcount",
-        start_time: "2026-01-24T19:00:00-08:00",
-        end_time: "2026-01-24T20:00:00-08:00",
+        start_time: timestamp(schedule.uxathonPast, 19),
+        end_time: timestamp(schedule.uxathonPast, 20),
       },
       {
         name: "Final Presentations Check-in",
-        start_time: "2026-01-25T12:30:00-08:00",
-        end_time: "2026-01-25T13:30:00-08:00",
+        start_time: timestamp(addDays(schedule.uxathonPast, 1), 12, 30),
+        end_time: timestamp(addDays(schedule.uxathonPast, 1), 13, 30),
       },
     ],
     applicationQuestions: applicationQuestions.uxathon,
   },
   {
     event: {
-      name: "Thinkbox Office Tour 2026",
+      name: `Thinkbox Office Tour ${eventYear(schedule.thinkboxPast)}`,
       slug: "thinkbox-office-tour-2026",
       description:
         "A small-group visit to Thinkbox's Vancouver studio. Walk the space, see how their design team actually works day to day, and stay for an informal Q&A with two of their product designers. Capacity is tight because they are hosting us in one room — sign up early.",
@@ -509,33 +540,33 @@ export const seedEvents: SeedEvent[] = [
       location_building: "Thinkbox Studio",
       location_room: "Main Lobby",
       location_address_url: "https://maps.app.goo.gl/PLACEHOLDER-thinkbox",
-      start_date: "2026-02-11",
+      start_date: dateString(schedule.thinkboxPast),
       start_time: "14:00:00",
-      end_date: "2026-02-11",
+      end_date: dateString(schedule.thinkboxPast),
       end_time: "16:00:00",
       max_capacity: 25,
       image_url:
         "https://images.unsplash.com/photo-1497366216548-37526070297c?auto=format&fit=crop&q=80&w=800&h=800",
-      registration_start_time: "2025-12-31T00:00:00-08:00",
-      registration_end_time: "2026-02-06T23:59:00-08:00",
+      registration_start_time: historicalRegistration(schedule.thinkboxPast).start,
+      registration_end_time: historicalRegistration(schedule.thinkboxPast).end,
     },
     checkInSessions: [
       {
         name: "Campus Departure",
-        start_time: "2026-02-11T13:00:00-08:00",
-        end_time: "2026-02-11T13:20:00-08:00",
+        start_time: timestamp(schedule.thinkboxPast, 13),
+        end_time: timestamp(schedule.thinkboxPast, 13, 20),
       },
       {
         name: "Lobby Check-in",
-        start_time: "2026-02-11T13:50:00-08:00",
-        end_time: "2026-02-11T14:20:00-08:00",
+        start_time: timestamp(schedule.thinkboxPast, 13, 50),
+        end_time: timestamp(schedule.thinkboxPast, 14, 20),
       },
     ],
     applicationQuestions: [],
   },
   {
     event: {
-      name: "Industry Talk: AI and UX 2026",
+      name: `Industry Talk: AI and UX ${eventYear(schedule.industryTalkPast)}`,
       slug: "industry-talk-ai-and-ux-2026",
       description:
         "A working designer walks through what actually changed in their process once AI tooling landed in it — what they use, what they abandoned, and which parts of the job turned out to be stubbornly human. Talk, then a long Q&A.",
@@ -544,60 +575,60 @@ export const seedEvents: SeedEvent[] = [
       location_building: "Henry Angus Building",
       location_room: "Room 241",
       location_address_url: "https://maps.app.goo.gl/Mn5vJ2Xa7Rq9Ld3W6",
-      start_date: "2026-03-10",
+      start_date: dateString(schedule.industryTalkPast),
       start_time: "18:00:00",
-      end_date: "2026-03-10",
+      end_date: dateString(schedule.industryTalkPast),
       end_time: "19:30:00",
       max_capacity: 80,
       image_url:
         "https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&q=80&w=800&h=800",
-      registration_start_time: "2026-01-27T00:00:00-08:00",
-      registration_end_time: "2026-03-05T23:59:00-08:00",
+      registration_start_time: historicalRegistration(schedule.industryTalkPast).start,
+      registration_end_time: historicalRegistration(schedule.industryTalkPast).end,
     },
     checkInSessions: [
       {
         name: "Door Check-in",
-        start_time: "2026-03-10T17:45:00-07:00",
-        end_time: "2026-03-10T18:45:00-07:00",
+        start_time: timestamp(schedule.industryTalkPast, 17, 45),
+        end_time: timestamp(schedule.industryTalkPast, 18, 45),
       },
     ],
     applicationQuestions: [],
   },
 
-  /* ── 2026-27 season ─────────────────────────────────────────────────── */
+  /* ── Ongoing and upcoming events ────────────────────────────────────── */
   {
     event: {
-      name: "Get to Know UX Hub 2026",
+      name: `UX Hub Open Studio ${eventYear(schedule.openStudioStart)}–${eventYear(schedule.openStudioEnd)} [ongoing]`,
       slug: "get-to-know-ux-hub-2026",
       description:
-        "New year, same idea: come meet the club before committing to anything. Quick tour of what we run across both terms, a design-themed icebreaker, and time to ask the exec team whatever you want. Free, no experience needed, and the single best entry point if you are new to UX.",
+        "An always-on home base for the UX Hub community. Drop into recurring critique circles, co-working sessions, and open office hours throughout the program window.",
       regular_price: 0,
       member_price: 0,
       location_building: "AMS Nest",
       location_room: "Room 2314",
       location_address_url: "https://maps.app.goo.gl/9x8k2Qm4Zt6bXQ5s7",
-      start_date: "2026-10-02",
+      start_date: dateString(schedule.openStudioStart),
       start_time: "17:30:00",
-      end_date: "2026-10-02",
+      end_date: dateString(schedule.openStudioEnd),
       end_time: "19:30:00",
       max_capacity: 120,
       image_url:
         "https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&q=80&w=800&h=800",
-      registration_start_time: "2026-08-21T00:00:00-07:00",
-      registration_end_time: "2026-09-27T23:59:00-07:00",
+      registration_start_time: timestamp(addMonths(schedule.openStudioStart, -2)),
+      registration_end_time: timestamp(schedule.openStudioEnd, 23, 59),
     },
     checkInSessions: [
       {
         name: "Door Check-in",
-        start_time: "2026-10-02T17:15:00-07:00",
-        end_time: "2026-10-02T18:30:00-07:00",
+        start_time: timestamp(schedule.openStudioStart, 17, 15),
+        end_time: timestamp(schedule.openStudioEnd, 18, 30),
       },
     ],
     applicationQuestions: [],
   },
   {
     event: {
-      name: "Design Sprint 2026",
+      name: `Design Sprint ${eventYear(schedule.designSprintFuture)} [registration open]`,
       slug: "design-sprint-2026",
       description:
         "One day, one brief, one clickable prototype. Teams of four run a compressed design sprint from problem framing through guerrilla research to a final critique in front of working designers. Our biggest first-term event and the fastest way to get something real into your portfolio.",
@@ -606,15 +637,15 @@ export const seedEvents: SeedEvent[] = [
       location_building: "Neville Scarfe Building",
       location_room: "Room 100",
       location_address_url: "https://maps.app.goo.gl/vNq7CkS3Wm2hZr4A9",
-      start_date: "2026-10-24",
+      start_date: dateString(schedule.designSprintFuture),
       start_time: "10:00:00",
-      end_date: "2026-10-24",
+      end_date: dateString(schedule.designSprintFuture),
       end_time: "17:00:00",
       max_capacity: 60,
       image_url:
         "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?auto=format&fit=crop&q=80&w=800&h=800",
-      registration_start_time: "2026-09-12T00:00:00-07:00",
-      registration_end_time: "2026-10-19T23:59:00-07:00",
+      registration_start_time: openFutureRegistration(schedule.designSprintFuture).start,
+      registration_end_time: openFutureRegistration(schedule.designSprintFuture).end,
       mentors: designSprintMentors,
       agenda: designSprintAgenda,
       sponsor_logos: [
@@ -629,20 +660,20 @@ export const seedEvents: SeedEvent[] = [
     checkInSessions: [
       {
         name: "Morning Check-in",
-        start_time: "2026-10-24T09:45:00-07:00",
-        end_time: "2026-10-24T10:45:00-07:00",
+        start_time: timestamp(schedule.designSprintFuture, 9, 45),
+        end_time: timestamp(schedule.designSprintFuture, 10, 45),
       },
       {
         name: "Post-Lunch Check-in",
-        start_time: "2026-10-24T13:45:00-07:00",
-        end_time: "2026-10-24T14:30:00-07:00",
+        start_time: timestamp(schedule.designSprintFuture, 13, 45),
+        end_time: timestamp(schedule.designSprintFuture, 14, 30),
       },
     ],
     applicationQuestions: applicationQuestions.designSprint,
   },
   {
     event: {
-      name: "Student Panel 2026",
+      name: `Student Panel ${eventYear(schedule.studentPanelFuture)}`,
       slug: "student-panel-2026",
       description:
         "Four students and recent grads talk through how they actually got into UX — the switched majors, the rejected portfolios, the co-op that changed everything. Honest answers rather than a polished career-fair pitch, followed by open Q&A and networking.",
@@ -651,60 +682,60 @@ export const seedEvents: SeedEvent[] = [
       location_building: "Life Sciences Centre",
       location_room: "Atrium",
       location_address_url: "https://maps.app.goo.gl/T4wR8bLp1Vz6Yn3H8",
-      start_date: "2026-11-12",
+      start_date: dateString(schedule.studentPanelFuture),
       start_time: "18:00:00",
-      end_date: "2026-11-12",
+      end_date: dateString(schedule.studentPanelFuture),
       end_time: "20:00:00",
       max_capacity: 100,
       image_url:
         "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=800&h=800",
-      registration_start_time: "2026-10-01T00:00:00-07:00",
-      registration_end_time: "2026-11-07T23:59:00-08:00",
+      registration_start_time: timestamp(addMonths(today, 6)),
+      registration_end_time: timestamp(addDays(schedule.studentPanelFuture, -5), 23, 59),
       mentors: panelMentors,
       agenda: panelAgenda,
     },
     checkInSessions: [
       {
         name: "Door Check-in",
-        start_time: "2026-11-12T17:45:00-08:00",
-        end_time: "2026-11-12T19:00:00-08:00",
+        start_time: timestamp(schedule.studentPanelFuture, 17, 45),
+        end_time: timestamp(schedule.studentPanelFuture, 19),
       },
     ],
     applicationQuestions: [],
   },
   {
     event: {
-      name: "Coffee Chat Social 2026",
+      name: `Coffee Chat Community Series ${eventYear(schedule.coffeeSeriesStart)}–${eventYear(schedule.coffeeSeriesEnd)} [ongoing]`,
       slug: "coffee-chat-social-2026",
       description:
-        "A low-key end-of-term social. Coffee, pastries, and rotating small-group chats so you actually talk to people instead of standing near them. Bring a work-in-progress if you want feedback, or bring nothing at all.",
+        "A recurring low-key social series with coffee, pastries, rotating small-group chats, and optional feedback on work in progress.",
       regular_price: 0,
       member_price: 0,
       location_building: "AMS Nest",
       location_room: "Room 2306",
       location_address_url: "https://maps.app.goo.gl/9x8k2Qm4Zt6bXQ5s7",
-      start_date: "2026-11-25",
+      start_date: dateString(schedule.coffeeSeriesStart),
       start_time: "16:00:00",
-      end_date: "2026-11-25",
+      end_date: dateString(schedule.coffeeSeriesEnd),
       end_time: "18:00:00",
       max_capacity: 40,
       image_url:
         "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=800&h=800",
-      registration_start_time: "2026-10-14T00:00:00-07:00",
-      registration_end_time: "2026-11-20T23:59:00-08:00",
+      registration_start_time: timestamp(addMonths(schedule.coffeeSeriesStart, -2)),
+      registration_end_time: timestamp(schedule.coffeeSeriesEnd, 23, 59),
     },
     checkInSessions: [
       {
         name: "Door Check-in",
-        start_time: "2026-11-25T15:50:00-08:00",
-        end_time: "2026-11-25T17:00:00-08:00",
+        start_time: timestamp(schedule.coffeeSeriesStart, 15, 50),
+        end_time: timestamp(schedule.coffeeSeriesEnd, 17),
       },
     ],
     applicationQuestions: [],
   },
   {
     event: {
-      name: "UXathon 2027",
+      name: `UXathon ${eventYear(schedule.uxathonFuture)} [registration open]`,
       slug: "uxathon-2027",
       description:
         "Our flagship event: 32 hours, one open-ended brief, and a room full of teams turning it into something defensible. Mentors from across the Vancouver design scene rotate through all weekend, and the final round is judged on how well you argue for your decisions — not just how good the screens look. Food, snacks, and swag included.",
@@ -713,15 +744,15 @@ export const seedEvents: SeedEvent[] = [
       location_building: "ICICS/CS X-wing",
       location_room: "Room 100",
       location_address_url: "https://maps.app.goo.gl/6dK2sYqR8fV1nB7t5",
-      start_date: "2027-01-23",
+      start_date: dateString(schedule.uxathonFuture),
       start_time: "09:00:00",
-      end_date: "2027-01-24",
+      end_date: dateString(addDays(schedule.uxathonFuture, 1)),
       end_time: "17:00:00",
       max_capacity: 80,
       image_url:
         "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=800&h=800",
-      registration_start_time: "2026-12-11T00:00:00-08:00",
-      registration_end_time: "2027-01-18T23:59:00-08:00",
+      registration_start_time: openFutureRegistration(schedule.uxathonFuture).start,
+      registration_end_time: openFutureRegistration(schedule.uxathonFuture).end,
       mentors: uxathonMentors,
       agenda: [...uxathonAgendaDayOne, ...uxathonAgendaDayTwo],
       sponsor_logos: [
@@ -737,25 +768,25 @@ export const seedEvents: SeedEvent[] = [
     checkInSessions: [
       {
         name: "Opening Ceremony Check-in",
-        start_time: "2027-01-23T08:45:00-08:00",
-        end_time: "2027-01-23T10:30:00-08:00",
+        start_time: timestamp(schedule.uxathonFuture, 8, 45),
+        end_time: timestamp(schedule.uxathonFuture, 10, 30),
       },
       {
         name: "Evening Headcount",
-        start_time: "2027-01-23T19:00:00-08:00",
-        end_time: "2027-01-23T20:00:00-08:00",
+        start_time: timestamp(schedule.uxathonFuture, 19),
+        end_time: timestamp(schedule.uxathonFuture, 20),
       },
       {
         name: "Final Presentations Check-in",
-        start_time: "2027-01-24T12:30:00-08:00",
-        end_time: "2027-01-24T13:30:00-08:00",
+        start_time: timestamp(addDays(schedule.uxathonFuture, 1), 12, 30),
+        end_time: timestamp(addDays(schedule.uxathonFuture, 1), 13, 30),
       },
     ],
     applicationQuestions: applicationQuestions.uxathon,
   },
   {
     event: {
-      name: "Thinkbox Office Tour 2027",
+      name: `Thinkbox Office Tour ${eventYear(schedule.thinkboxFuture)} [registration open]`,
       slug: "thinkbox-office-tour-2027",
       description:
         "A small-group visit to Thinkbox's Vancouver studio. Walk the space, see how their design team actually works day to day, and stay for an informal Q&A with two of their product designers. Capacity is tight because they are hosting us in one room — sign up early.",
@@ -764,28 +795,31 @@ export const seedEvents: SeedEvent[] = [
       location_building: "Thinkbox Studio",
       location_room: "Main Lobby",
       location_address_url: "https://maps.app.goo.gl/PLACEHOLDER-thinkbox",
-      start_date: "2027-02-10",
+      start_date: dateString(schedule.thinkboxFuture),
       start_time: "14:00:00",
-      end_date: "2027-02-10",
+      end_date: dateString(schedule.thinkboxFuture),
       end_time: "16:00:00",
       max_capacity: 25,
       image_url:
         "https://images.unsplash.com/photo-1611162616475-46b635cb6868?auto=format&fit=crop&q=80&w=800&h=800",
-      registration_start_time: "2026-12-30T00:00:00-08:00",
-      registration_end_time: "2027-02-05T23:59:00-08:00",
+      registration_start_time: openFutureRegistration(schedule.thinkboxFuture).start,
+      registration_end_time: openFutureRegistration(schedule.thinkboxFuture).end,
     },
     checkInSessions: [
       {
         name: "Campus Departure",
-        start_time: "2027-02-10T13:00:00-08:00",
-        end_time: "2027-02-10T13:20:00-08:00",
+        start_time: timestamp(schedule.thinkboxFuture, 13),
+        end_time: timestamp(schedule.thinkboxFuture, 13, 20),
       },
       {
         name: "Lobby Check-in",
-        start_time: "2027-02-10T13:50:00-08:00",
-        end_time: "2027-02-10T14:20:00-08:00",
+        start_time: timestamp(schedule.thinkboxFuture, 13, 50),
+        end_time: timestamp(schedule.thinkboxFuture, 14, 20),
       },
     ],
     applicationQuestions: [],
   },
-];
+  ];
+}
+
+export const seedEvents = buildSeedEvents(new Date());
