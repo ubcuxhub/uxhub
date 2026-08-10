@@ -1,6 +1,6 @@
 import React from "react";
 import Link from "next/link";
-import EventCard from "@/features/marketing/components/EventCard";
+import { EventCard } from "@/components/shared/EventCard";
 import type { EventRow } from "@/types/models";
 
 const EventsSection = ({ events }: { events: EventRow[] }) => {
@@ -15,7 +15,6 @@ const EventsSection = ({ events }: { events: EventRow[] }) => {
         </h2>
       </div>
 
-
       <div className="flex flex-col md:flex-row">
         {events.length === 0 ? (
           <div className="text-center w-full py-20 border border-dashed border-gray-300 rounded-xl">
@@ -24,11 +23,12 @@ const EventsSection = ({ events }: { events: EventRow[] }) => {
         ) : (
           events.map((event, index) => (
             <React.Fragment key={event.id}>
-              <EventCard
-                imageSrc={event.image_url || "/events/event1.png"}
-                imageAlt={event.name || "Event Image"}
-                href={`/events/${event.slug || event.id}`}
-              />
+              <div className="flex-1 w-full md:w-1/2">
+                <EventCard
+                  event={event}
+                  href={`/events/${event.slug || event.id}`}
+                />
+              </div>
               {index < events.length - 1 && (
                 <div className="md:w-[5%] h-8" aria-hidden="true"></div>
               )}
@@ -36,7 +36,6 @@ const EventsSection = ({ events }: { events: EventRow[] }) => {
           ))
         )}
       </div>
-
 
       <div className="text-center flex justify-center pt-16">
         <Link

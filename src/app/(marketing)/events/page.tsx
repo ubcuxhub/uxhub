@@ -1,17 +1,9 @@
-import Link from "next/link";
-import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardTitle } from "@/components/ui/card";
 import Navbar from "@/features/marketing/homepage-sections/Navbar";
 import Footer from "@/features/marketing/homepage-sections/Footer";
+import { EventCard } from "@/components/shared/EventCard";
 import { createPublicClient } from "@/lib/supabase/public";
 import { fetchEvents } from "@/lib/supabase-helpers/events";
-import { formatEventDate } from "@/lib/date";
 
 export const revalidate = 300;
 
@@ -41,56 +33,13 @@ export default async function EventsPage() {
             </Card>
           ) : (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {events.map((event) => {
-                const startDate = formatEventDate(event.start_date);
-                const eventHref = `/events/${event.slug || event.id}`;
-
-                return (
-                  <Link
-                    key={event.id}
-                    href={eventHref}
-                    className="block rounded-xl transition-transform duration-200 hover:-translate-y-0.5"
-                  >
-                    <Card className="h-full gap-0 overflow-hidden py-0 transition-shadow duration-200 hover:shadow-md">
-                      {event.image_url ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={event.image_url}
-                          alt={event.name}
-                          className="h-48 w-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex h-48 w-full items-center justify-center bg-muted text-small text-muted-foreground">
-                          No Image
-                        </div>
-                      )}
-
-                      <CardHeader className="px-4 pt-4">
-                        <div className="mb-2 flex gap-2">
-                          {startDate && (
-                            <Badge variant="secondary">{startDate}</Badge>
-                          )}
-                          {event.regular_price !== undefined && (
-                            <Badge className="border-transparent bg-success-bg text-success hover:bg-success-bg">
-                              {Number(event.regular_price) === 0
-                                ? "Free"
-                                : `$${Number(event.regular_price)}`}
-                            </Badge>
-                          )}
-                        </div>
-                        <CardTitle className="line-clamp-1">
-                          {event.name}
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="px-4 pb-4">
-                        <CardDescription className="line-clamp-3">
-                          {event.description}
-                        </CardDescription>
-                      </CardContent>
-                    </Card>
-                  </Link>
-                );
-              })}
+              {events.map((event) => (
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  href={`/events/${event.slug || event.id}`}
+                />
+              ))}
             </div>
           )}
         </div>

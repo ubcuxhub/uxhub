@@ -1,4 +1,3 @@
-export { EventCard } from "./components/EventCard";
 export type {
   ApplicationQuestionTemplate,
 } from "./types/eventTypes";

@@ -3,7 +3,7 @@ import { requireAuth } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchEvents } from "@/lib/supabase-helpers/events";
 import { fetchRegistrationsForUser } from "@/lib/supabase-helpers/event-registrations";
-import { EventCard } from "@/features/events";
+import { EventCard } from "@/components/shared/EventCard";
 import type { EventRow } from "@/types/models";
 import { Button } from "@/components/ui/button";
 import { PageContainer } from "@/components/shared/PageContainer";
@@ -13,17 +13,19 @@ function EventGrid({ events }: { events: EventRow[] }) {
   return (
     <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-3">
       {events.map((event, index) => (
-        <Link
+        <div
           key={event.id}
-          href={`/portal/events/${event.slug}`}
           className="animate-in fade-in slide-in-from-bottom-4 duration-500"
           style={{
             animationDelay: `${index * 75}ms`,
             animationFillMode: "backwards",
           }}
         >
-          <EventCard event={event} variant="default" />
-        </Link>
+          <EventCard
+            event={event}
+            href={`/portal/events/${event.slug}`}
+          />
+        </div>
       ))}
     </div>
   );
