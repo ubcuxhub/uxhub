@@ -92,3 +92,5 @@ Guidelines:
 - Use descriptive migration names.
 - Avoid mixing `db pull` and `db push` in the same workflow.
 - **Regenerate types:** after any schema change, run `pnpm types:supabase`, then `pnpm exec tsc --noEmit`, and commit the updated `src/lib/supabase/database.types.ts`.
+
+test
