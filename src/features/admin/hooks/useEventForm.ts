@@ -10,6 +10,7 @@ import {
   ResponseType,
   type ApplicationQuestionTemplate,
 } from "@/features/events/types/eventTypes";
+import { EVENT_IMAGE_ERRORS } from "@/lib/event-image";
 import type {
   CheckInSessionRow,
   EventApplicationQuestionRow,
@@ -189,9 +190,24 @@ export function useEventForm({
       method: "POST",
       body,
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Failed to upload image");
-    return data.path as string;
+
+    // Not every failure is JSON: the platform rejects oversized bodies before
+    // the handler runs, and a non-admin gets an HTML redirect.
+    const data = await response
+      .json()
+      .catch(() => null as { error?: string; url?: string } | null);
+
+    if (!response.ok) {
+      throw new Error(
+        data?.error ||
+          (response.status === 413
+            ? EVENT_IMAGE_ERRORS.size
+            : "Failed to upload image.")
+      );
+    }
+
+    if (!data?.url) throw new Error("Failed to upload image.");
+    return data.url;
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
