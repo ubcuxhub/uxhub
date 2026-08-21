@@ -2,7 +2,7 @@
  * Seeds a local Supabase database with realistic UX Hub data.
  *
  *   pnpm seed                      # seed everything
- *   pnpm seed -- --only=events     # memberships | events | users (comma-separated)
+ *   pnpm seed -- --only=events     # storage | memberships | events | users (comma-separated)
  *   pnpm seed -- --dry-run         # print the plan, write nothing
  *   pnpm seed -- --prune           # delete seed-managed children no longer in the data
  *   pnpm seed -- --allow-remote    # required to target a non-local Supabase
@@ -11,12 +11,13 @@
  * events and membership tiers, name/question for children), so a re-run syncs
  * edits instead of duplicating or erroring. See scripts/seed/lib/reconcile.ts.
  *
- * Table names mirror TABLES in src/lib/supabase-helpers/tables.ts. That module
- * cannot be imported here — the helper tree imports through the `@/*` alias,
- * which Node does not resolve — so keep the two in sync by hand.
+ * Table names mirror TABLES in src/lib/supabase-helpers/tables.ts, and BUCKET
+ * mirrors BUCKETS in src/lib/supabase-helpers/buckets.ts. Those modules cannot
+ * be imported here — the helper tree imports through the `@/*` alias, which Node
+ * does not resolve — so keep them in sync by hand.
  */
 
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import {
   addCounts,
   emptyCounts,
@@ -30,6 +31,22 @@ import { buildSeedEvents } from "./data/events.ts";
 import { buildSeedUsers } from "./data/users.ts";
 import { reconcileUserFixtures } from "./lib/reconcile-users.ts";
 import { validateUserFixtures } from "./lib/user-fixtures.ts";
+
+/**
+ * Mirrors BUCKETS in src/lib/supabase-helpers/buckets.ts, and the migration at
+ * supabase/migrations/20260821120000_create_event_images_bucket.sql. Remote
+ * environments get this bucket from that migration; locally `supabase db push`
+ * is not available (there is no supabase/config.toml), so the seed provisions
+ * it instead.
+ */
+const BUCKET = {
+  eventImages: {
+    id: "event-images",
+    public: true,
+    fileSizeLimit: 4194304,
+    allowedMimeTypes: ["image/jpeg", "image/png"],
+  },
+} as const;
 
 const TABLE = {
   membershipTypes: "membership_types",
@@ -68,7 +85,7 @@ function parseArgs(argv: string[]): Options {
     }
   }
 
-  const known = new Set(["memberships", "events", "users"]);
+  const known = new Set(["storage", "memberships", "events", "users"]);
   for (const target of only) {
     if (!known.has(target)) {
       throw new Error(
@@ -125,6 +142,38 @@ function assertAllowedTarget(
   );
 }
 
+/**
+ * Creates the storage buckets the app expects, or updates their settings when
+ * they already exist. Idempotent, like the rest of the seed.
+ */
+async function reconcileBuckets(
+  supabase: SupabaseClient,
+  options: Options
+): Promise<string> {
+  const spec = BUCKET.eventImages;
+  const { data: existing } = await supabase.storage.getBucket(spec.id);
+
+  if (options.dryRun) {
+    return `Storage buckets: ${existing ? "0 created, 1 updated" : "1 created, 0 updated"}`;
+  }
+
+  const settings = {
+    public: spec.public,
+    fileSizeLimit: spec.fileSizeLimit,
+    allowedMimeTypes: [...spec.allowedMimeTypes],
+  };
+
+  if (existing) {
+    const { error } = await supabase.storage.updateBucket(spec.id, settings);
+    if (error) throw error;
+    return "Storage buckets: 0 created, 1 updated";
+  }
+
+  const { error } = await supabase.storage.createBucket(spec.id, settings);
+  if (error) throw error;
+  return "Storage buckets: 1 created, 0 updated";
+}
+
 function format(label: string, counts: Counts): string {
   const parts = [`${counts.created} created`, `${counts.updated} updated`];
   if (counts.pruned > 0) parts.push(`${counts.pruned} pruned`);
@@ -159,6 +208,10 @@ async function main(): Promise<void> {
   });
 
   const summary: string[] = [];
+
+  if (shouldRun(options, "storage")) {
+    summary.push(await reconcileBuckets(supabase, options));
+  }
 
   if (shouldRun(options, "memberships")) {
     const { counts } = await upsertBySlug(
