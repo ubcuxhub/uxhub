@@ -10,6 +10,7 @@ import {
   insertApplicationQuestions,
 } from "@/lib/supabase-helpers/event-applications";
 import {
+  fetchEventById,
   fetchEventSlugsByPrefix,
   insertEvent,
   updateEvent,
@@ -26,7 +27,10 @@ import {
 } from "@/lib/supabase-helpers/check-ins";
 import { updateEventRegistration } from "@/lib/supabase-helpers/event-registrations";
 import { fetchRegistrationsForEvent } from "@/lib/supabase-helpers/event-registrations";
-import { adminUpdateUserInfoById } from "@/lib/supabase-helpers/admin-server";
+import {
+  adminDeleteEventImageByUrl,
+  adminUpdateUserInfoById,
+} from "@/lib/supabase-helpers/admin-server";
 import type {
   CheckInSessionInsert,
   EventApplicationQuestionInsert,
@@ -103,6 +107,23 @@ export interface SaveAdminEventInput {
   applicationQuestions: Omit<EventApplicationQuestionInsert, "event_id">[];
 }
 
+/**
+ * Removes a cover image that is no longer referenced by any event.
+ *
+ * Best-effort on purpose: the database is the source of truth, so a leaked
+ * storage object is cheaper than failing a save or delete that already
+ * succeeded. No-ops for values that are not storage URLs.
+ */
+async function discardEventImage(imageUrl: string | null | undefined) {
+  if (!imageUrl) return;
+
+  try {
+    await adminDeleteEventImageByUrl(imageUrl);
+  } catch (error) {
+    console.error("Failed to delete event image:", error);
+  }
+}
+
 export async function saveAdminEventAction(
   input: SaveAdminEventInput
 ): Promise<{ id: string }> {
@@ -111,12 +132,18 @@ export async function saveAdminEventAction(
   let finalEventId: string;
 
   if (input.eventId) {
+    const previous = await fetchEventById(supabaseAdmin, input.eventId);
+
     const result = await updateEvent(
       supabaseAdmin,
       input.eventId,
       input.event
     );
     finalEventId = result.id;
+
+    if (previous?.image_url && previous.image_url !== input.event.image_url) {
+      await discardEventImage(previous.image_url);
+    }
 
     await deleteCheckInSessionsForEvent(supabaseAdmin, finalEventId);
     await deleteApplicationQuestionsForEvent(supabaseAdmin, finalEventId);
@@ -173,11 +200,16 @@ export async function saveAdminEventAction(
 export async function deleteAdminEventAction(eventId: string) {
   await requireAdmin();
 
+  const existing = await fetchEventById(supabaseAdmin, eventId);
+
   const { error } = await supabaseAdmin.rpc("delete_event_atomically", {
     target_event_id: eventId,
   });
 
   if (error) throw error;
+
+  await discardEventImage(existing?.image_url);
+
   revalidatePath("/admin/events");
 }
 
