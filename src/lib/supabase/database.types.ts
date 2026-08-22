@@ -265,10 +265,11 @@ export type Database = {
           registration_end_time: string | null
           registration_start_time: string | null
           regular_price: number
-          slug: string | null
+          slug: string
           sponsor_logos: string[] | null
           start_date: string | null
           start_time: string | null
+          status: Database["public"]["Enums"]["event_status"]
           updated_at: string | null
         }
         Insert: {
@@ -290,10 +291,11 @@ export type Database = {
           registration_end_time?: string | null
           registration_start_time?: string | null
           regular_price: number
-          slug?: string | null
+          slug: string
           sponsor_logos?: string[] | null
           start_date?: string | null
           start_time?: string | null
+          status?: Database["public"]["Enums"]["event_status"]
           updated_at?: string | null
         }
         Update: {
@@ -315,10 +317,11 @@ export type Database = {
           registration_end_time?: string | null
           registration_start_time?: string | null
           regular_price?: number
-          slug?: string | null
+          slug?: string
           sponsor_logos?: string[] | null
           start_date?: string | null
           start_time?: string | null
+          status?: Database["public"]["Enums"]["event_status"]
           updated_at?: string | null
         }
         Relationships: []
@@ -480,8 +483,8 @@ export type Database = {
           role_access: Database["public"]["Enums"]["role_access_enum"]
           school_institution: string | null
           square_customer_id: string | null
-          student_status: Database["public"]["Enums"]["student_status"] | null
           student_number: number | null
+          student_status: Database["public"]["Enums"]["student_status"] | null
           updated_at: string | null
           user_type: Database["public"]["Enums"]["user_type"]
           year: Database["public"]["Enums"]["uni_year"] | null
@@ -506,8 +509,8 @@ export type Database = {
           role_access: Database["public"]["Enums"]["role_access_enum"]
           school_institution?: string | null
           square_customer_id?: string | null
-          student_status?: Database["public"]["Enums"]["student_status"] | null
           student_number?: number | null
+          student_status?: Database["public"]["Enums"]["student_status"] | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"]
           year?: Database["public"]["Enums"]["uni_year"] | null
@@ -532,8 +535,8 @@ export type Database = {
           role_access?: Database["public"]["Enums"]["role_access_enum"]
           school_institution?: string | null
           square_customer_id?: string | null
-          student_status?: Database["public"]["Enums"]["student_status"] | null
           student_number?: number | null
+          student_status?: Database["public"]["Enums"]["student_status"] | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"]
           year?: Database["public"]["Enums"]["uni_year"] | null
@@ -582,6 +585,7 @@ export type Database = {
     }
     Enums: {
       application_status: "pending" | "declined" | "accepted"
+      event_status: "draft" | "active" | "archived"
       response_type: "text" | "single_select" | "multi_select"
       role_access_enum: "basic" | "admin"
       student_status: "undergraduate" | "graduate" | "other"
@@ -715,6 +719,7 @@ export const Constants = {
   public: {
     Enums: {
       application_status: ["pending", "declined", "accepted"],
+      event_status: ["draft", "active", "archived"],
       response_type: ["text", "single_select", "multi_select"],
       role_access_enum: ["basic", "admin"],
       student_status: ["undergraduate", "graduate", "other"],
