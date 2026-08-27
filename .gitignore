@@ -52,3 +52,7 @@ coverage/
 .nyc_output/
 .vercel
 .env*
+
+# Agent instructions
+AGENTS.md
+CLAUDE.md
