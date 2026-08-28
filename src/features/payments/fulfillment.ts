@@ -36,6 +36,7 @@ import {
 } from "./fulfillment-rules";
 import { isMembershipPurchasableForUser } from "@/features/memberships/lib/eligibility";
 import { ensureSquareCustomerId } from "./customer";
+import { sendPurchaseConfirmationEmail } from "./confirmation-email";
 import { revalidatePurchasePaths } from "./revalidation";
 
 const adminDb = supabaseAdmin as unknown as SupabaseClient<Database>;
@@ -107,6 +108,7 @@ async function fulfillMembershipPurchase(purchaseId: string) {
   });
 
   await revalidatePurchasePaths(adminDb, purchase.id);
+  await sendPurchaseConfirmationEmail(adminDb, purchase.id);
   return updatedPurchase;
 }
 
@@ -158,6 +160,7 @@ async function fulfillEventTicketPurchase(purchaseId: string) {
   });
 
   await revalidatePurchasePaths(adminDb, purchase.id);
+  await sendPurchaseConfirmationEmail(adminDb, purchase.id);
   return updatedPurchase;
 }
 
