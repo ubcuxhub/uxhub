@@ -11,9 +11,11 @@ import {
 } from "@/lib/supabase-helpers/event-applications";
 import {
   fetchEventById,
+  fetchEventIdByImageUrl,
   fetchEventSlugsByPrefix,
   insertEvent,
   updateEvent,
+  updateEventIfImageMatches,
 } from "@/lib/supabase-helpers/events";
 import {
   deleteCheckInSessionsForEvent,
@@ -102,10 +104,20 @@ export async function updateAdminUserAction(
 
 export interface SaveAdminEventInput {
   eventId?: string;
+  /**
+   * The cover image URL the form was loaded with, used as the precondition for
+   * an update. Ignored when creating.
+   */
+  expectedImageUrl: string | null;
   event: EventUpdate;
   checkInSessions: Omit<CheckInSessionInsert, "event_id">[];
   applicationQuestions: Omit<EventApplicationQuestionInsert, "event_id">[];
 }
+
+// Not exported: a "use server" module may only export async functions, and the
+// form surfaces this by displaying the thrown error's message.
+const SAVE_CONFLICT_ERROR =
+  "This event's cover image was changed somewhere else since this page loaded. Reload the page and apply your changes again.";
 
 /**
  * Removes a cover image that is no longer referenced by any event.
@@ -124,6 +136,22 @@ async function discardEventImage(imageUrl: string | null | undefined) {
   }
 }
 
+/**
+ * Removes a cover image that was uploaded for a save that then failed.
+ *
+ * Safe to expose to the client even though it takes a URL: it refuses to touch
+ * anything an event still references, so a save that actually landed can never
+ * lose its image, and `discardEventImage` ignores URLs outside our bucket.
+ */
+export async function discardUnusedEventImageAction(imageUrl: string) {
+  await requireAdmin();
+
+  if (!imageUrl) return;
+  if (await fetchEventIdByImageUrl(supabaseAdmin, imageUrl)) return;
+
+  await discardEventImage(imageUrl);
+}
+
 export async function saveAdminEventAction(
   input: SaveAdminEventInput
 ): Promise<{ id: string }> {
@@ -132,17 +160,32 @@ export async function saveAdminEventAction(
   let finalEventId: string;
 
   if (input.eventId) {
-    const previous = await fetchEventById(supabaseAdmin, input.eventId);
+    const expectedImageUrl = input.expectedImageUrl;
+    const nextImageUrl = input.event.image_url ?? null;
 
-    const result = await updateEvent(
-      supabaseAdmin,
-      input.eventId,
-      input.event
-    );
-    finalEventId = result.id;
+    if (nextImageUrl === expectedImageUrl) {
+      // This save leaves the cover alone, so leave the column alone too. Writing
+      // the loaded value back would revert a replacement made elsewhere to a URL
+      // whose object that replacement already deleted.
+      const payload: EventUpdate = { ...input.event };
+      delete payload.image_url;
 
-    if (previous?.image_url && previous.image_url !== input.event.image_url) {
-      await discardEventImage(previous.image_url);
+      const result = await updateEvent(supabaseAdmin, input.eventId, payload);
+      finalEventId = result.id;
+    } else {
+      // Changing the cover deletes the old object, so the write is conditional
+      // on the row still holding the image this form was loaded with.
+      const result = await updateEventIfImageMatches(
+        supabaseAdmin,
+        input.eventId,
+        input.event,
+        expectedImageUrl
+      );
+
+      if (!result) throw new Error(SAVE_CONFLICT_ERROR);
+      finalEventId = result.id;
+
+      await discardEventImage(expectedImageUrl);
     }
 
     await deleteCheckInSessionsForEvent(supabaseAdmin, finalEventId);
