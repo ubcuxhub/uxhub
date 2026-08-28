@@ -50,8 +50,8 @@ export default async function PortalHome() {
       </div>
       <Button asChild variant="outline">
         <Link href="/portal/events">
-          View your events
           <CalendarDays />
+          View your events
         </Link>
       </Button>
     </PageContainer>

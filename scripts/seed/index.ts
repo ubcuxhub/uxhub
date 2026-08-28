@@ -2,7 +2,7 @@
  * Seeds a local Supabase database with realistic UX Hub data.
  *
  *   pnpm seed                      # seed everything
- *   pnpm seed -- --only=events     # memberships | events (comma-separated)
+ *   pnpm seed -- --only=events     # memberships | events | users (comma-separated)
  *   pnpm seed -- --dry-run         # print the plan, write nothing
  *   pnpm seed -- --prune           # delete seed-managed children no longer in the data
  *   pnpm seed -- --allow-remote    # required to target a non-local Supabase
@@ -26,7 +26,10 @@ import {
   type ReconcileOptions,
 } from "./lib/reconcile.ts";
 import { membershipTypes } from "./data/membership-types.ts";
-import { seedEvents } from "./data/events.ts";
+import { buildSeedEvents } from "./data/events.ts";
+import { buildSeedUsers } from "./data/users.ts";
+import { reconcileUserFixtures } from "./lib/reconcile-users.ts";
+import { validateUserFixtures } from "./lib/user-fixtures.ts";
 
 const TABLE = {
   membershipTypes: "membership_types",
@@ -65,7 +68,7 @@ function parseArgs(argv: string[]): Options {
     }
   }
 
-  const known = new Set(["memberships", "events"]);
+  const known = new Set(["memberships", "events", "users"]);
   for (const target of only) {
     if (!known.has(target)) {
       throw new Error(
@@ -87,9 +90,26 @@ function shouldRun(options: Options, target: string): boolean {
  * bypasses RLS entirely, so pointing it at the deployed project by way of a
  * stale .env.local would let it rewrite production rows.
  */
-function assertLocalTarget(url: string, allowRemote: boolean): void {
+function isLocalTarget(url: string): boolean {
   const host = new URL(url).hostname;
-  const isLocal = host === "127.0.0.1" || host === "localhost" || host === "[::1]";
+  return host === "127.0.0.1" || host === "localhost" || host === "[::1]";
+}
+
+function assertAllowedTarget(
+  url: string,
+  allowRemote: boolean,
+  includesUsers: boolean
+): void {
+  const host = new URL(url).hostname;
+  const isLocal = isLocalTarget(url);
+
+  if (!isLocal && includesUsers) {
+    throw new Error(
+      `Refusing to seed known-password users into non-local Supabase at ${host}.\n` +
+        `  User fixtures are local-only. For remote reference data, use\n` +
+        `  --only=memberships,events --allow-remote.`
+    );
+  }
 
   if (isLocal || allowRemote) {
     if (!isLocal) {
@@ -113,6 +133,10 @@ function format(label: string, counts: Counts): string {
 
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
+  const seedNow = new Date();
+  const seedEvents = buildSeedEvents(seedNow);
+  const seedUsers = buildSeedUsers(seedEvents, seedNow);
+  validateUserFixtures(seedUsers, seedEvents, membershipTypes, seedNow);
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const secretKey = process.env.SUPABASE_SECRET_KEY;
@@ -124,7 +148,7 @@ async function main(): Promise<void> {
     );
   }
 
-  assertLocalTarget(url, options.allowRemote);
+  assertAllowedTarget(url, options.allowRemote, shouldRun(options, "users"));
 
   if (options.dryRun) {
     console.log("Dry run — no writes will be made.\n");
@@ -197,6 +221,22 @@ async function main(): Promise<void> {
 
     summary.push(format("Check-in sessions", sessionCounts));
     summary.push(format("Application questions", questionCounts));
+  }
+
+  if (shouldRun(options, "users")) {
+    const userSummary = await reconcileUserFixtures(supabase, seedUsers, {
+      allowPlannedDependencies:
+        options.dryRun &&
+        shouldRun(options, "memberships") &&
+        shouldRun(options, "events"),
+      dryRun: options.dryRun,
+    });
+    summary.push(format("Auth users", userSummary.authUsers));
+    summary.push(format("User profiles", userSummary.profiles));
+    summary.push(format("Purchases", userSummary.purchases));
+    summary.push(format("Event registrations", userSummary.registrations));
+    summary.push(format("Application responses", userSummary.responses));
+    summary.push(format("Check-ins", userSummary.checkIns));
   }
 
   console.log(summary.join("\n"));
