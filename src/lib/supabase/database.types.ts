@@ -365,6 +365,7 @@ export type Database = {
       purchases: {
         Row: {
           amount_cents: number
+          confirmation_email_sent_at: string | null
           created_at: string | null
           currency: string
           event_id: string | null
@@ -382,6 +383,7 @@ export type Database = {
         }
         Insert: {
           amount_cents: number
+          confirmation_email_sent_at?: string | null
           created_at?: string | null
           currency: string
           event_id?: string | null
@@ -399,6 +401,7 @@ export type Database = {
         }
         Update: {
           amount_cents?: number
+          confirmation_email_sent_at?: string | null
           created_at?: string | null
           currency?: string
           event_id?: string | null

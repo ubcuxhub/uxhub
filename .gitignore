@@ -57,5 +57,4 @@ coverage/
 supabase/.temp/
 
 # Agent instructions
-AGENTS.md
 CLAUDE.md
