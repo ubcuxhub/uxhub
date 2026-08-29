@@ -369,7 +369,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
     end: timestamp(addDays(eventDate, -5), 23, 59),
   });
 
-  return [
+  const seeded: SeedEvent[] = [
   /* ── Past events ────────────────────────────────────────────────────── */
   {
     event: {
@@ -820,6 +820,15 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
     applicationQuestions: [],
   },
   ];
+
+  // `status` defaults to 'draft' in the schema, and the public RLS policy on
+  // events only exposes 'active' rows, so draft fixtures are invisible on the
+  // marketing site and in the portal. Spread first so a fixture can still opt
+  // into its own status.
+  return seeded.map((seed) => ({
+    ...seed,
+    event: { status: "active" as const, ...seed.event },
+  }));
 }
 
 export const seedEvents = buildSeedEvents(new Date());
