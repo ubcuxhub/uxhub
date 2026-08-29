@@ -4,6 +4,13 @@ import { useState, useRef, useEffect, DragEvent, ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  EVENT_IMAGE_ERRORS,
+  EVENT_IMAGE_MAX_BYTES,
+  EVENT_IMAGE_MAX_MB,
+  isAllowedEventImageType,
+  resolveImagePreviewSrc,
+} from "@/lib/event-image";
 import Image from "next/image";
 
 const getImageDimensions = (file: File) =>
@@ -46,9 +53,7 @@ export const ImageUpload = ({
   // Update preview when value changes (for existing images)
   useEffect(() => {
     if (value) {
-      // If value is a relative path, prepend / to make it work with Next.js public folder
-      const imagePath = value.startsWith("/") ? value : `/${value}`;
-      setPreview(imagePath);
+      setPreview(resolveImagePreviewSrc(value));
     } else {
       setPreview(null);
     }
@@ -95,26 +100,25 @@ export const ImageUpload = ({
 
   const handleFile = async (file: File) => {
     // Validate file type
-    const allowedTypes = ["image/jpeg", "image/jpg", "image/png"];
-    if (!allowedTypes.includes(file.type)) {
-      setError("Only JPG and PNG images are allowed");
+    if (!isAllowedEventImageType(file.type)) {
+      setError(EVENT_IMAGE_ERRORS.type);
       return;
     }
 
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      setError("Image size must be less than 5MB");
+    // Mirrors the server-side limit in @/lib/event-image.
+    if (file.size > EVENT_IMAGE_MAX_BYTES) {
+      setError(EVENT_IMAGE_ERRORS.size);
       return;
     }
 
     const dimensions = await getImageDimensions(file).catch(() => null);
     if (!dimensions) {
-      setError("Unable to read image dimensions");
+      setError(EVENT_IMAGE_ERRORS.dimensions);
       return;
     }
 
     if (dimensions.width !== dimensions.height) {
-      setError("Event thumbnails must be square (same width and height)");
+      setError(EVENT_IMAGE_ERRORS.square);
       return;
     }
 
@@ -221,7 +225,7 @@ export const ImageUpload = ({
                 Drag and drop an image here, or click to select
               </p>
               <p className="text-small text-muted-foreground mt-1">
-                Square JPG or PNG (max 5MB)
+                Square JPG or PNG (max {EVENT_IMAGE_MAX_MB}MB)
               </p>
             </div>
           </div>

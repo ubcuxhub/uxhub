@@ -69,6 +69,7 @@ helper file, and fix it in one place.
 | `user_info`                   | `src/lib/supabase-helpers/users.ts`               |
 | `membership_types`            | `src/lib/supabase-helpers/memberships.ts`         |
 | `user_info` (service-role)    | `src/lib/supabase-helpers/admin-server.ts`        |
+| `event-images` (storage)      | `src/lib/supabase-helpers/admin-server.ts`        |
 
 Supporting files:
 
@@ -79,6 +80,35 @@ Supporting files:
 - `src/lib/supabase/admin.ts` — the service-role client. Server-only; bypasses
   Row Level Security. Only `admin-server.ts` and privileged route handlers
   import it.
+
+## Storage
+
+Event cover images live in the public `event-images` bucket. Bucket names are
+centralized in [`buckets.ts`](../src/lib/supabase-helpers/buckets.ts), the same
+way table names are in `tables.ts`.
+
+Uploads go through the service-role client, which bypasses RLS. Public reads are
+served by `/storage/v1/object/public/event-images/...` without an RLS check
+because the bucket is public. `storage.objects` ships default-deny for `anon` and
+`authenticated`, which is the posture we want, so there are deliberately **no
+`storage.objects` policies** — don't add them expecting to fix something.
+
+The bucket is provisioned in two places, and they are not redundant:
+
+| Environment          | Mechanism                                          |
+| -------------------- | -------------------------------------------------- |
+| Remote / production  | the migration, applied with `supabase db push`      |
+| Local                | `pnpm seed` (`--only=storage` to run just this)     |
+
+Local needs its own path because this repo has no `supabase/config.toml`, so
+`supabase db reset` and `supabase migration up` are unavailable — only the
+`--linked` commands work. Keep the bucket settings in
+`scripts/seed/index.ts` in sync with the migration by hand.
+
+Objects are keyed `covers/<slug>-<uuid>.<ext>`. The key is unique per upload
+rather than derived from the event name: public storage URLs are CDN-cached with
+a long `cache-control`, so reusing a key would serve a stale image after a cover
+is replaced.
 
 ## Type-safety gaps to watch (these do NOT fail `tsc`)
 

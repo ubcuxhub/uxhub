@@ -100,3 +100,47 @@ export async function updateEvent(
   if (!data?.id) throw new Error("No event id returned from Supabase.");
   return data;
 }
+
+/**
+ * Updates an event only while its stored cover image still matches
+ * `expectedImageUrl`.
+ *
+ * Returns `null` when no row matched, which the caller must treat as a
+ * conflict rather than retrying unconditionally: another writer replaced the
+ * cover (and deleted the object this payload still points at) since the form
+ * was loaded, so an unguarded write would leave the row referencing an image
+ * that no longer exists.
+ */
+export async function updateEventIfImageMatches(
+  supabase: DbClient,
+  id: string,
+  payload: EventUpdate,
+  expectedImageUrl: string | null
+): Promise<{ id: string } | null> {
+  const pending = supabase.from(TABLES.events).update(payload).eq("id", id);
+  const guarded =
+    expectedImageUrl === null
+      ? pending.is("image_url", null)
+      : pending.eq("image_url", expectedImageUrl);
+
+  const { data, error } = await guarded.select("id").maybeSingle();
+
+  if (error) throw error;
+  return data ?? null;
+}
+
+/** Finds an event still referencing `imageUrl`, if any. */
+export async function fetchEventIdByImageUrl(
+  supabase: DbClient,
+  imageUrl: string
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from(TABLES.events)
+    .select("id")
+    .eq("image_url", imageUrl)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data?.id ?? null;
+}
