@@ -1,12 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { ensureUserInfo } from "@/lib/auth/ensure-user-info";
 import { getRequestOrigin } from "@/lib/http/request-origin";
 import { createClient } from "@/lib/supabase/server";
-import {
-  adminFindUserInfoByEmail,
-  adminInsertUserInfo,
-} from "@/lib/supabase-helpers/admin-server";
-import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";
 
 const DEFAULT_NEXT_PATH = "/portal";
 
@@ -64,51 +60,11 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const existingByAuthId = await fetchUserInfoByAuthId(
-    supabase,
-    authUser.id
-  ).catch(() => null);
+  const result = await ensureUserInfo(authUser);
 
-  if (existingByAuthId) {
-    return NextResponse.redirect(new URL(nextPath, origin));
+  if (result.status === "conflict") {
+    return redirectToAuthError(origin, result.message);
   }
-
-  const normalizedEmail = authUser.email.trim().toLowerCase();
-
-  const name =
-    typeof authUser.user_metadata.full_name === "string" &&
-    authUser.user_metadata.full_name.trim()
-      ? authUser.user_metadata.full_name.trim()
-      : normalizedEmail.split("@")[0];
-
-  const payload = {
-    auth_user_id: authUser.id,
-    email: normalizedEmail,
-    name,
-  };
-
-  const existingByEmail = await adminFindUserInfoByEmail(normalizedEmail);
-
-  if (existingByEmail) {
-    if (existingByEmail.auth_user_id === authUser.id) {
-      return NextResponse.redirect(new URL(nextPath, origin));
-    }
-
-    const loginUrl = new URL("/auth/login", origin);
-    loginUrl.searchParams.set("next", nextPath);
-    loginUrl.searchParams.set(
-      "error",
-      "An account with this email already exists. Please log in instead."
-    );
-
-    return NextResponse.redirect(loginUrl);
-  }
-
-  await adminInsertUserInfo({
-    ...payload,
-    newsletter: false,
-    role_access: "basic",
-  });
 
   return NextResponse.redirect(new URL(nextPath, origin));
 }
