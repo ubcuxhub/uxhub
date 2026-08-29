@@ -1,4 +1,8 @@
+"use client";
+
+import { useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Check, CircleAlert, LoaderCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -11,10 +15,19 @@ export function EventConfirmation({
   purchase: PurchaseWithDetails;
   slug: string;
 }) {
+  const router = useRouter();
   const completed = purchase.status === "completed";
   const failed = purchase.status === "failed" || purchase.status === "canceled";
+  const pending = !completed && !failed;
   const eventName = purchase.events?.name ?? "the event";
   const eventHref = `/portal/events/${purchase.events?.slug ?? slug}`;
+
+  useEffect(() => {
+    if (!pending) return;
+
+    const refreshInterval = window.setInterval(() => router.refresh(), 3000);
+    return () => window.clearInterval(refreshInterval);
+  }, [pending, router]);
 
   return (
     <div className="text-center">
@@ -35,7 +48,9 @@ export function EventConfirmation({
         </h1>
         <p className="mt-3 text-muted-foreground">
           {completed
-            ? `You’re registered for ${eventName}. A confirmation email has been sent to your inbox.`
+            ? purchase.confirmation_email_sent_at
+              ? `You’re registered for ${eventName}. A confirmation email has been sent to your inbox.`
+              : `You’re registered for ${eventName}.`
             : failed
               ? purchase.failure_reason ?? "Your payment could not be completed."
               : "We’re still confirming your payment and event registration."}

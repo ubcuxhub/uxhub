@@ -1,5 +1,6 @@
 import "server-only";
 
+import { after } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Payment, PaymentUpdatedEvent } from "square";
 import type { UserInfoRow } from "@/types/models";
@@ -108,7 +109,7 @@ async function fulfillMembershipPurchase(purchaseId: string) {
   });
 
   await revalidatePurchasePaths(adminDb, purchase.id);
-  await sendPurchaseConfirmationEmail(adminDb, purchase.id);
+  after(() => sendPurchaseConfirmationEmail(adminDb, purchase.id));
   return updatedPurchase;
 }
 
@@ -160,7 +161,7 @@ async function fulfillEventTicketPurchase(purchaseId: string) {
   });
 
   await revalidatePurchasePaths(adminDb, purchase.id);
-  await sendPurchaseConfirmationEmail(adminDb, purchase.id);
+  after(() => sendPurchaseConfirmationEmail(adminDb, purchase.id));
   return updatedPurchase;
 }
 

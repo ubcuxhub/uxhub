@@ -8,8 +8,11 @@ vi.mock("@/lib/email/client", () => ({
 }));
 
 const fetchPurchaseById = vi.fn();
+const claimPurchaseConfirmationEmail = vi.fn();
 const updatePurchase = vi.fn();
 vi.mock("@/lib/supabase-helpers/purchases", () => ({
+  claimPurchaseConfirmationEmail: (...args: unknown[]) =>
+    claimPurchaseConfirmationEmail(...args),
   fetchPurchaseById: (...args: unknown[]) => fetchPurchaseById(...args),
   updatePurchase: (...args: unknown[]) => updatePurchase(...args),
 }));
@@ -36,8 +39,10 @@ const adminDb = {} as never;
 
 const completedMembershipPurchase = {
   amount_cents: 1500,
+  confirmation_email_attempted_at: null,
   confirmation_email_sent_at: null,
   created_at: "2026-08-01T00:00:00Z",
+  currency: "CAD",
   id: "purchase-1",
   kind: "membership",
   membership_type_id: "membership-1",
@@ -48,14 +53,20 @@ const completedMembershipPurchase = {
 describe("sendPurchaseConfirmationEmail", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sendEmail.mockResolvedValue(true);
+    claimPurchaseConfirmationEmail.mockResolvedValue(completedMembershipPurchase);
   });
 
-  it("sends once and stamps the purchase", async () => {
+  it("claims the purchase, sends once, and stamps it after Resend accepts", async () => {
     fetchPurchaseById.mockResolvedValue(completedMembershipPurchase);
 
     await sendPurchaseConfirmationEmail(adminDb, "purchase-1");
 
     expect(sendEmail).toHaveBeenCalledTimes(1);
+    expect(claimPurchaseConfirmationEmail).toHaveBeenCalledWith(
+      adminDb,
+      "purchase-1"
+    );
     expect(updatePurchase).toHaveBeenCalledWith(
       adminDb,
       "purchase-1",
@@ -74,6 +85,17 @@ describe("sendPurchaseConfirmationEmail", () => {
     await sendPurchaseConfirmationEmail(adminDb, "purchase-1");
 
     expect(sendEmail).not.toHaveBeenCalled();
+    expect(claimPurchaseConfirmationEmail).not.toHaveBeenCalled();
+    expect(updatePurchase).not.toHaveBeenCalled();
+  });
+
+  it("does not send when another request has already claimed the purchase", async () => {
+    fetchPurchaseById.mockResolvedValue(completedMembershipPurchase);
+    claimPurchaseConfirmationEmail.mockResolvedValue(null);
+
+    await sendPurchaseConfirmationEmail(adminDb, "purchase-1");
+
+    expect(sendEmail).not.toHaveBeenCalled();
     expect(updatePurchase).not.toHaveBeenCalled();
   });
 
@@ -86,6 +108,7 @@ describe("sendPurchaseConfirmationEmail", () => {
     await sendPurchaseConfirmationEmail(adminDb, "purchase-1");
 
     expect(sendEmail).not.toHaveBeenCalled();
+    expect(claimPurchaseConfirmationEmail).not.toHaveBeenCalled();
   });
 
   it("swallows sender failures so fulfillment is never broken", async () => {
@@ -102,5 +125,15 @@ describe("sendPurchaseConfirmationEmail", () => {
     expect(updatePurchase).not.toHaveBeenCalled();
     expect(consoleError).toHaveBeenCalled();
     consoleError.mockRestore();
+  });
+
+  it("does not mark the email sent when delivery is disabled", async () => {
+    fetchPurchaseById.mockResolvedValue(completedMembershipPurchase);
+    sendEmail.mockResolvedValue(false);
+
+    await sendPurchaseConfirmationEmail(adminDb, "purchase-1");
+
+    expect(claimPurchaseConfirmationEmail).toHaveBeenCalledTimes(1);
+    expect(updatePurchase).not.toHaveBeenCalled();
   });
 });

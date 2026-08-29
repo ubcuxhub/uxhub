@@ -25,7 +25,7 @@ export async function sendEmail({ html, subject, to }: SendEmailInput) {
   // so checkout still completes end to end.
   if (!client) {
     console.info(`[email] RESEND_API_KEY is unset; skipped "${subject}" to ${to}`);
-    return;
+    return false;
   }
 
   const { error } = await client.emails.send({
@@ -38,4 +38,6 @@ export async function sendEmail({ html, subject, to }: SendEmailInput) {
   if (error) {
     throw new Error(error.message);
   }
+
+  return true;
 }

@@ -6,13 +6,14 @@ function escapeHtml(value: string) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
-function formatAmount(amountCents: number) {
+function formatAmount(amountCents: number, currency: string) {
   return new Intl.NumberFormat("en-CA", {
     style: "currency",
-    currency: "CAD",
+    currency,
   }).format(amountCents / 100);
 }
 
@@ -56,12 +57,15 @@ export function renderMembershipConfirmationEmail({
   userName,
 }: {
   membershipType: Pick<MembershipTypeRow, "name">;
-  purchase: Pick<PurchaseRow, "amount_cents" | "created_at" | "id">;
+  purchase: Pick<
+    PurchaseRow,
+    "amount_cents" | "created_at" | "currency" | "id"
+  >;
   userName: string;
 }) {
   const details = [
     detailRow("Membership", membershipType.name),
-    detailRow("Amount paid", formatAmount(purchase.amount_cents)),
+    detailRow("Amount paid", formatAmount(purchase.amount_cents, purchase.currency)),
     detailRow("Purchased on", formatEventDate(purchase.created_at)),
     detailRow("Order ID", purchase.id),
   ].join("");
@@ -91,7 +95,10 @@ export function renderEventConfirmationEmail({
     | "start_date"
     | "start_time"
   >;
-  purchase: Pick<PurchaseRow, "amount_cents" | "created_at" | "id">;
+  purchase: Pick<
+    PurchaseRow,
+    "amount_cents" | "created_at" | "currency" | "id"
+  >;
   userName: string;
 }) {
   return {
@@ -118,7 +125,10 @@ function renderEventDetailRows(
     | "start_date"
     | "start_time"
   >,
-  purchase: Pick<PurchaseRow, "amount_cents" | "created_at" | "id">,
+  purchase: Pick<
+    PurchaseRow,
+    "amount_cents" | "created_at" | "currency" | "id"
+  >,
 ) {
   const timeRange = [
     formatEventTime(event.start_time),
@@ -135,7 +145,7 @@ function renderEventDetailRows(
     detailRow("Time", timeRange),
     detailRow("Location", location),
     detailRow("Address", event.location_address_url),
-    detailRow("Amount paid", formatAmount(purchase.amount_cents)),
+    detailRow("Amount paid", formatAmount(purchase.amount_cents, purchase.currency)),
     detailRow("Order ID", purchase.id),
   ].join("");
 }
