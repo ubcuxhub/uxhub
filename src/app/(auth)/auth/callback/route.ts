@@ -1,12 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { ensureUserInfo } from "@/lib/auth/ensure-user-info";
 import { getRequestOrigin } from "@/lib/http/request-origin";
 import { createClient } from "@/lib/supabase/server";
-import {
-  adminFindUserInfoByEmail,
-  adminUpdateUserInfoById,
-} from "@/lib/supabase-helpers/admin-server";
-import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";
 
 const DEFAULT_NEXT_PATH = "/portal";
 
@@ -64,39 +60,11 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const existingByAuthId = await fetchUserInfoByAuthId(
-    supabase,
-    authUser.id
-  ).catch(() => null);
+  const result = await ensureUserInfo(authUser);
 
-  if (existingByAuthId) {
-    return NextResponse.redirect(new URL(nextPath, origin));
+  if (result.status === "conflict") {
+    return redirectToAuthError(origin, result.message);
   }
 
-  const normalizedEmail = authUser.email.trim().toLowerCase();
-  const existingByEmail = await adminFindUserInfoByEmail(normalizedEmail);
-
-  if (existingByEmail) {
-    if (!existingByEmail.auth_user_id) {
-      await adminUpdateUserInfoById(existingByEmail.id, {
-        auth_user_id: authUser.id,
-        email: normalizedEmail,
-      });
-
-      return NextResponse.redirect(new URL(nextPath, origin));
-    }
-
-    if (existingByEmail.auth_user_id !== authUser.id) {
-      return redirectToAuthError(
-        origin,
-        "An account with this email is already linked to another sign-in method."
-      );
-    }
-
-    return NextResponse.redirect(new URL(nextPath, origin));
-  }
-
-  const completeProfileUrl = new URL("/auth/complete-profile", origin);
-  completeProfileUrl.searchParams.set("next", nextPath);
-  return NextResponse.redirect(completeProfileUrl);
+  return NextResponse.redirect(new URL(nextPath, origin));
 }

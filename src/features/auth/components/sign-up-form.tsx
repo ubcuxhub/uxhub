@@ -16,15 +16,13 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import {
-  AuthProfileFields,
-  type AuthProfileFormData,
-} from "./auth-profile-fields";
 import { GoogleOAuthButton } from "./google-oauth-button";
 
-type SignUpFormData = AuthProfileFormData & {
+type SignUpFormData = {
+  email: string;
   password: string;
   repeatPassword: string;
+  name: string;
 };
 
 export function SignUpForm({
@@ -37,11 +35,6 @@ export function SignUpForm({
     password: "",
     repeatPassword: "",
     name: "",
-    phone: "",
-    studentNumber: "",
-    faculty: "",
-    major: "",
-    year: "",
   });
 
   const [error, setError] = useState<string | null>(null);
@@ -80,20 +73,12 @@ export function SignUpForm({
 
       // When email confirmation is disabled, signUp returns a session and the
       // authenticated route can create the profile immediately. Otherwise the
-      // confirmation callback establishes the session and sends the user to the
-      // existing profile-completion page.
+      // confirmation callback creates it once the session exists.
       if (authData.session) {
         const res = await fetch("/api/auth/complete-profile", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: formData.name,
-            phone: formData.phone,
-            studentNumber: formData.studentNumber,
-            faculty: formData.faculty,
-            major: formData.major,
-            year: formData.year,
-          }),
+          body: JSON.stringify({ name: formData.name }),
         });
 
         const result = await res.json();
@@ -130,7 +115,30 @@ export function SignUpForm({
           <GoogleOAuthButton nextPath={nextPath} />
           <form onSubmit={handleSignUp} className="space-y-6">
             <div className="space-y-4 pt-6">
-              <AuthProfileFields formData={formData} onChange={handleChange} />
+              <div className="space-y-4">
+                <div className="grid gap-2">
+                  <Label htmlFor="name">Name *</Label>
+                  <Input
+                    id="name"
+                    placeholder="John Doe"
+                    required
+                    value={formData.name}
+                    onChange={(e) => handleChange("name", e.target.value)}
+                  />
+                </div>
+
+                <div className="grid gap-2">
+                  <Label htmlFor="email">Email *</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="m@example.com"
+                    required
+                    value={formData.email}
+                    onChange={(e) => handleChange("email", e.target.value)}
+                  />
+                </div>
+              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2">
