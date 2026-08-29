@@ -269,7 +269,6 @@ export type Database = {
           sponsor_logos: string[] | null
           start_date: string | null
           start_time: string | null
-          status: Database["public"]["Enums"]["event_status"]
           updated_at: string | null
         }
         Insert: {
@@ -295,7 +294,6 @@ export type Database = {
           sponsor_logos?: string[] | null
           start_date?: string | null
           start_time?: string | null
-          status?: Database["public"]["Enums"]["event_status"]
           updated_at?: string | null
         }
         Update: {
@@ -321,7 +319,6 @@ export type Database = {
           sponsor_logos?: string[] | null
           start_date?: string | null
           start_time?: string | null
-          status?: Database["public"]["Enums"]["event_status"]
           updated_at?: string | null
         }
         Relationships: []
@@ -365,6 +362,7 @@ export type Database = {
       purchases: {
         Row: {
           amount_cents: number
+          confirmation_email_attempted_at: string | null
           confirmation_email_sent_at: string | null
           created_at: string | null
           currency: string
@@ -383,6 +381,7 @@ export type Database = {
         }
         Insert: {
           amount_cents: number
+          confirmation_email_attempted_at?: string | null
           confirmation_email_sent_at?: string | null
           created_at?: string | null
           currency: string
@@ -401,6 +400,7 @@ export type Database = {
         }
         Update: {
           amount_cents?: number
+          confirmation_email_attempted_at?: string | null
           confirmation_email_sent_at?: string | null
           created_at?: string | null
           currency?: string
@@ -588,7 +588,6 @@ export type Database = {
     }
     Enums: {
       application_status: "pending" | "declined" | "accepted"
-      event_status: "draft" | "active" | "archived"
       response_type: "text" | "single_select" | "multi_select"
       role_access_enum: "basic" | "admin"
       student_status: "undergraduate" | "graduate" | "other"
@@ -722,7 +721,6 @@ export const Constants = {
   public: {
     Enums: {
       application_status: ["pending", "declined", "accepted"],
-      event_status: ["draft", "active", "archived"],
       response_type: ["text", "single_select", "multi_select"],
       role_access_enum: ["basic", "admin"],
       student_status: ["undergraduate", "graduate", "other"],

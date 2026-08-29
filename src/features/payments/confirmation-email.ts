@@ -5,6 +5,7 @@ import type { Database } from "@/lib/supabase/database.types";
 import { fetchEventById } from "@/lib/supabase-helpers/events";
 import { fetchMembershipTypeById } from "@/lib/supabase-helpers/memberships";
 import {
+  claimPurchaseConfirmationEmail,
   fetchPurchaseById,
   updatePurchase,
 } from "@/lib/supabase-helpers/purchases";
@@ -17,9 +18,9 @@ import {
 
 /**
  * Best-effort purchase confirmation email. Called from fulfillment, which runs
- * from both the synchronous checkout and the Square webhook, so the
- * confirmation_email_sent_at stamp is what keeps it to one send per purchase.
- * Never throws: the payment has already succeeded by this point.
+ * from both the synchronous checkout and the Square webhook. An atomic attempt
+ * claim keeps it to one send per purchase. Never throws: the payment has
+ * already succeeded by this point.
  */
 export async function sendPurchaseConfirmationEmail(
   adminDb: SupabaseClient<Database>,
@@ -31,7 +32,8 @@ export async function sendPurchaseConfirmationEmail(
     if (
       !purchase ||
       purchase.status !== "completed" ||
-      purchase.confirmation_email_sent_at
+      purchase.confirmation_email_sent_at ||
+      purchase.confirmation_email_attempted_at
     ) {
       return;
     }
@@ -73,13 +75,26 @@ export async function sendPurchaseConfirmationEmail(
       return;
     }
 
-    await sendEmail({
+    const claimedPurchase = await claimPurchaseConfirmationEmail(
+      adminDb,
+      purchase.id
+    );
+
+    if (!claimedPurchase) {
+      return;
+    }
+
+    const emailSent = await sendEmail({
       html: rendered.html,
       subject: rendered.subject,
       to: recipient.email,
     });
 
-    await updatePurchase(adminDb, purchase.id, {
+    if (!emailSent) {
+      return;
+    }
+
+    await updatePurchase(adminDb, claimedPurchase.id, {
       confirmation_email_sent_at: new Date().toISOString(),
     });
   } catch (error) {

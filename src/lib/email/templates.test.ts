@@ -7,6 +7,7 @@ import {
 const purchase = {
   amount_cents: 1500,
   created_at: "2026-08-01T00:00:00Z",
+  currency: "CAD",
   id: "purchase-1",
 };
 
@@ -64,6 +65,17 @@ describe("renderEventConfirmationEmail", () => {
     expect(html).not.toContain("<script>");
     expect(html).toContain("&lt;script&gt;");
   });
+
+  it("escapes apostrophes in event-supplied text", () => {
+    const { html } = renderEventConfirmationEmail({
+      event: { ...event, name: "Designers' Night" },
+      purchase,
+      userName: "O'Brien",
+    });
+
+    expect(html).toContain("Designers&#39; Night");
+    expect(html).toContain("O&#39;Brien");
+  });
 });
 
 describe("renderMembershipConfirmationEmail", () => {
@@ -77,5 +89,15 @@ describe("renderMembershipConfirmationEmail", () => {
     expect(subject).toContain("Innovator");
     expect(html).toContain("Innovator");
     expect(html).toContain("$15.00");
+  });
+
+  it("formats the amount using the purchase currency", () => {
+    const { html } = renderMembershipConfirmationEmail({
+      membershipType: { name: "Innovator" },
+      purchase: { ...purchase, currency: "USD" },
+      userName: "Ada",
+    });
+
+    expect(html).toContain("US$15.00");
   });
 });

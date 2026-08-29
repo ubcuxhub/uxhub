@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { EventConfirmation } from "./EventConfirmation";
 import { requireAuth } from "@/lib/auth/guards";
@@ -25,5 +25,10 @@ export async function EventConfirmationRoute({
   const purchase = await fetchPurchaseForUser(supabase, user.id, purchaseId);
 
   if (!purchase || purchase.kind !== "event_ticket") notFound();
+
+  if (purchase.events?.slug && purchase.events.slug !== slug) {
+    redirect(`/portal/events/${purchase.events.slug}/confirmation/${purchase.id}`);
+  }
+
   return <EventConfirmation purchase={purchase} slug={slug} />;
 }
