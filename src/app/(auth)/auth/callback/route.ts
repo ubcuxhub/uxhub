@@ -3,7 +3,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import {
   adminFindUserInfoByEmail,
-  adminUpdateUserInfoById,
+  adminInsertUserInfo,
 } from "@/lib/supabase-helpers/admin-server";
 import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";
 
@@ -70,29 +70,41 @@ export async function GET(request: NextRequest) {
   }
 
   const normalizedEmail = authUser.email.trim().toLowerCase();
+
+  const name =
+  typeof authUser.user_metadata.full_name === "string" &&
+  authUser.user_metadata.full_name.trim()
+    ? authUser.user_metadata.full_name.trim()
+    : normalizedEmail.split("@")[0];
+
+    const payload = {
+    auth_user_id: authUser.id,
+    email: normalizedEmail,
+    name,
+    };
+
   const existingByEmail = await adminFindUserInfoByEmail(normalizedEmail);
 
-  if (existingByEmail) {
-    if (!existingByEmail.auth_user_id) {
-      await adminUpdateUserInfoById(existingByEmail.id, {
-        auth_user_id: authUser.id,
-        email: normalizedEmail,
-      });
-
-      return NextResponse.redirect(new URL(nextPath, request.url));
+    if (existingByEmail) {
+    if (existingByEmail.auth_user_id === authUser.id) {
+        return NextResponse.redirect(new URL(nextPath, request.url));
     }
 
-    if (existingByEmail.auth_user_id !== authUser.id) {
-      return redirectToAuthError(
-        request,
-        "An account with this email is already linked to another sign-in method."
-      );
+    const loginUrl = new URL("/auth/login", request.url);
+    loginUrl.searchParams.set("next", nextPath);
+    loginUrl.searchParams.set(
+        "error",
+        "An account with this email already exists. Please log in instead."
+    );
+
+    return NextResponse.redirect(loginUrl);
     }
+
+    await adminInsertUserInfo({
+    ...payload,
+    newsletter: false,
+    role_access: "basic",
+    });
 
     return NextResponse.redirect(new URL(nextPath, request.url));
-  }
-
-  const completeProfileUrl = new URL("/auth/complete-profile", request.url);
-  completeProfileUrl.searchParams.set("next", nextPath);
-  return NextResponse.redirect(completeProfileUrl);
 }
