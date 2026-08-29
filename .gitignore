@@ -55,6 +55,3 @@ coverage/
 
 # Supabase CLI scratch state (version caches, local link)
 supabase/.temp/
-
-# Agent instructions
-CLAUDE.md
