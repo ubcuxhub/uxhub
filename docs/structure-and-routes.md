@@ -74,7 +74,7 @@ uxhub/
 │   │   │
 │   │   └── api/
 │   │       ├── auth/complete-profile/route.ts # Authenticated profile creation
-│   │       ├── upload-event-image/route.ts # Admin-only local public/event_images upload
+│   │       ├── upload-event-image/route.ts # Admin-only Supabase Storage cover upload
 │   │       └── square/webhook/route.ts   # Square payment webhook
 │   │
 │   ├── components/

@@ -1,11 +1,8 @@
 import { NextResponse, type NextRequest } from "next/server";
 
+import { ensureUserInfo } from "@/lib/auth/ensure-user-info";
+import { getRequestOrigin } from "@/lib/http/request-origin";
 import { createClient } from "@/lib/supabase/server";
-import {
-  adminFindUserInfoByEmail,
-  adminUpdateUserInfoById,
-} from "@/lib/supabase-helpers/admin-server";
-import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";
 
 const DEFAULT_NEXT_PATH = "/portal";
 
@@ -17,8 +14,8 @@ function getSafeNextPath(next: string | null) {
   return next;
 }
 
-function redirectToAuthError(request: NextRequest, message: string) {
-  const url = new URL("/auth/error", request.url);
+function redirectToAuthError(origin: string, message: string) {
+  const url = new URL("/auth/error", origin);
   url.searchParams.set("error", message);
   return NextResponse.redirect(url);
 }
@@ -26,17 +23,20 @@ function redirectToAuthError(request: NextRequest, message: string) {
 export async function GET(request: NextRequest) {
   const requestUrl = new URL(request.url);
   const { searchParams } = requestUrl;
+  // Redirects must stay on the origin the browser used, otherwise the session
+  // cookies set below are not sent with the follow-up request.
+  const origin = getRequestOrigin(request);
   const code = searchParams.get("code");
   const nextPath = getSafeNextPath(searchParams.get("next"));
   const providerError =
     searchParams.get("error_description") || searchParams.get("error");
 
   if (providerError) {
-    return redirectToAuthError(request, providerError);
+    return redirectToAuthError(origin, providerError);
   }
 
   if (!code) {
-    return redirectToAuthError(request, "Missing OAuth code");
+    return redirectToAuthError(origin, "Missing OAuth code");
   }
 
   const supabase = await createClient();
@@ -45,7 +45,7 @@ export async function GET(request: NextRequest) {
   );
 
   if (exchangeError) {
-    return redirectToAuthError(request, exchangeError.message);
+    return redirectToAuthError(origin, exchangeError.message);
   }
 
   const {
@@ -55,44 +55,16 @@ export async function GET(request: NextRequest) {
 
   if (authUserError || !authUser?.id || !authUser.email) {
     return redirectToAuthError(
-      request,
+      origin,
       authUserError?.message || "Unable to load authenticated user"
     );
   }
 
-  const existingByAuthId = await fetchUserInfoByAuthId(
-    supabase,
-    authUser.id
-  ).catch(() => null);
+  const result = await ensureUserInfo(authUser);
 
-  if (existingByAuthId) {
-    return NextResponse.redirect(new URL(nextPath, request.url));
+  if (result.status === "conflict") {
+    return redirectToAuthError(origin, result.message);
   }
 
-  const normalizedEmail = authUser.email.trim().toLowerCase();
-  const existingByEmail = await adminFindUserInfoByEmail(normalizedEmail);
-
-  if (existingByEmail) {
-    if (!existingByEmail.auth_user_id) {
-      await adminUpdateUserInfoById(existingByEmail.id, {
-        auth_user_id: authUser.id,
-        email: normalizedEmail,
-      });
-
-      return NextResponse.redirect(new URL(nextPath, request.url));
-    }
-
-    if (existingByEmail.auth_user_id !== authUser.id) {
-      return redirectToAuthError(
-        request,
-        "An account with this email is already linked to another sign-in method."
-      );
-    }
-
-    return NextResponse.redirect(new URL(nextPath, request.url));
-  }
-
-  const completeProfileUrl = new URL("/auth/complete-profile", request.url);
-  completeProfileUrl.searchParams.set("next", nextPath);
-  return NextResponse.redirect(completeProfileUrl);
+  return NextResponse.redirect(new URL(nextPath, origin));
 }

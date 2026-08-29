@@ -1,25 +1,11 @@
 import { NextResponse } from "next/server";
 
+import { ensureUserInfo } from "@/lib/auth/ensure-user-info";
 import { createClient } from "@/lib/supabase/server";
-import {
-  adminFindUserInfoByEmail,
-  adminInsertUserInfo,
-  adminUpdateUserInfoById,
-} from "@/lib/supabase-helpers/admin-server";
 import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";
 
 interface CompleteProfileBody {
-  faculty?: string;
-  major?: string;
   name?: string;
-  phone?: string;
-  studentNumber?: string;
-  year?: string;
-}
-
-function normalizeText(value: string | undefined) {
-  const trimmed = value?.trim();
-  return trimmed ? trimmed : null;
 }
 
 export async function POST(req: Request) {
@@ -58,53 +44,12 @@ export async function POST(req: Request) {
     );
   }
 
-  const normalizedEmail = authUser.email.trim().toLowerCase();
-  const studentNumber = body.studentNumber?.trim() ?? "";
-
-  if (studentNumber && !/^\d{8}$/.test(studentNumber)) {
-    return NextResponse.json(
-      { error: "Student number must be 8 digits." },
-      { status: 400 }
-    );
-  }
-
-  const payload = {
-    auth_user_id: authUser.id,
-    email: normalizedEmail,
-    name,
-    phone: normalizeText(body.phone),
-    student_number: studentNumber ? parseInt(studentNumber, 10) : null,
-    faculty: normalizeText(body.faculty),
-    major: normalizeText(body.major),
-    year: normalizeText(body.year),
-  };
-
   try {
-    const existingByEmail = await adminFindUserInfoByEmail(normalizedEmail);
+    const result = await ensureUserInfo(authUser, { name });
 
-    if (existingByEmail) {
-      if (
-        existingByEmail.auth_user_id &&
-        existingByEmail.auth_user_id !== authUser.id
-      ) {
-        return NextResponse.json(
-          {
-            error:
-              "An account with this email is already linked to another sign-in method.",
-          },
-          { status: 409 }
-        );
-      }
-
-      await adminUpdateUserInfoById(existingByEmail.id, payload);
-      return NextResponse.json({ success: true });
+    if (result.status === "conflict") {
+      return NextResponse.json({ error: result.message }, { status: 409 });
     }
-
-    await adminInsertUserInfo({
-      ...payload,
-      newsletter: false,
-      role_access: "basic",
-    });
 
     return NextResponse.json({ success: true });
   } catch (error) {

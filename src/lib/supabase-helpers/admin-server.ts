@@ -1,6 +1,8 @@
 import "server-only";
 
+import { parseEventImageObjectKey } from "@/lib/event-image";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { BUCKETS } from "./buckets";
 import { TABLES } from "./tables";
 
 /**
@@ -55,4 +57,46 @@ export async function adminInsertUserInfo(payload: UserInfoWritePayload) {
 
   if (error) throw error;
   return data;
+}
+
+/**
+ * Uploads an event cover image and returns its public URL.
+ *
+ * `upsert: false` keeps every upload on a fresh key, so the long `cacheControl`
+ * below never serves a stale image after a cover is replaced.
+ */
+export async function adminUploadEventImage(
+  objectKey: string,
+  body: Buffer,
+  contentType: string
+): Promise<string> {
+  const bucket = supabaseAdmin.storage.from(BUCKETS.eventImages);
+
+  const { error } = await bucket.upload(objectKey, body, {
+    contentType,
+    cacheControl: "31536000",
+    upsert: false,
+  });
+
+  if (error) throw error;
+
+  return bucket.getPublicUrl(objectKey).data.publicUrl;
+}
+
+/**
+ * Deletes an event cover image given its public URL.
+ *
+ * No-ops when the value is not a public URL for our bucket, so legacy
+ * `/event_images/...` paths and third-party URLs are left alone.
+ */
+export async function adminDeleteEventImageByUrl(url: string): Promise<void> {
+  const objectKey = parseEventImageObjectKey(url, BUCKETS.eventImages);
+
+  if (!objectKey) return;
+
+  const { error } = await supabaseAdmin.storage
+    .from(BUCKETS.eventImages)
+    .remove([objectKey]);
+
+  if (error) throw error;
 }

@@ -4,12 +4,14 @@ import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   deleteAdminEventAction,
+  discardUnusedEventImageAction,
   saveAdminEventAction,
 } from "@/features/admin/actions";
 import {
   ResponseType,
   type ApplicationQuestionTemplate,
 } from "@/features/events/types/eventTypes";
+import { EVENT_IMAGE_ERRORS } from "@/lib/event-image";
 import type {
   CheckInSessionRow,
   EventApplicationQuestionRow,
@@ -115,6 +117,11 @@ export function useEventForm({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [pendingImageFile, setPendingImageFile] = useState<File | null>(null);
+  // The cover image this form believes is stored, sent as the precondition for
+  // each save so a stale tab cannot revert someone else's replacement.
+  const persistedImageUrl = useRef<string | null>(
+    initialEvent?.image_url ?? null
+  );
   const bypassUnsavedChangesWarning = useRef(false);
   const cleanSnapshot = useRef(
     createFormSnapshot(startingFormState, startingCheckIns, startingQuestions)
@@ -189,9 +196,24 @@ export function useEventForm({
       method: "POST",
       body,
     });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error || "Failed to upload image");
-    return data.path as string;
+
+    // Not every failure is JSON: the platform rejects oversized bodies before
+    // the handler runs, and a non-admin gets an HTML redirect.
+    const data = await response
+      .json()
+      .catch(() => null as { error?: string; url?: string } | null);
+
+    if (!response.ok) {
+      throw new Error(
+        data?.error ||
+          (response.status === 413
+            ? EVENT_IMAGE_ERRORS.size
+            : "Failed to upload image.")
+      );
+    }
+
+    if (!data?.url) throw new Error("Failed to upload image.");
+    return data.url;
   };
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -211,8 +233,14 @@ export function useEventForm({
     setIsSubmitting(true);
 
     let imageUrl = formState.image_url;
+    // Tracked separately so a failure after the upload can take the orphaned
+    // object back out instead of leaking one per attempt.
+    let uploadedImageUrl: string | null = null;
     try {
-      if (pendingImageFile) imageUrl = await uploadImage(pendingImageFile);
+      if (pendingImageFile) {
+        imageUrl = await uploadImage(pendingImageFile);
+        uploadedImageUrl = imageUrl;
+      }
       const payload: EventUpdate = {
         name: formState.name,
         description: formState.description,
@@ -259,11 +287,13 @@ export function useEventForm({
       );
       const result = await saveAdminEventAction({
         eventId,
+        expectedImageUrl: persistedImageUrl.current,
         event: payload,
         checkInSessions,
         applicationQuestions,
       });
       const savedFormState = { ...formState, image_url: imageUrl };
+      persistedImageUrl.current = imageUrl || null;
       setFormState(savedFormState);
       setPendingImageFile(null);
       cleanSnapshot.current = createFormSnapshot(
@@ -279,6 +309,7 @@ export function useEventForm({
         clearDraft();
         const resetFormState = getInitialFormState();
         const resetCheckIns = [{ ...EMPTY_CHECK_IN_SESSION }];
+        persistedImageUrl.current = null;
         setFormState(resetFormState);
         setCheckInEvents(resetCheckIns);
         questions.setApplicationTemplate([]);
@@ -294,6 +325,15 @@ export function useEventForm({
         router.refresh();
       }
     } catch (saveError) {
+      // The upload landed but nothing references it, so clean it up. Best
+      // effort: the save error is what the admin needs to see.
+      if (uploadedImageUrl) {
+        try {
+          await discardUnusedEventImageAction(uploadedImageUrl);
+        } catch {
+          // Leaves an orphaned object; not worth masking the save error.
+        }
+      }
       setError(
         saveError instanceof Error ? saveError.message : "Failed to save event."
       );
