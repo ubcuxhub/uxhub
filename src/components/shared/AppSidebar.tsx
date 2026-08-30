@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -50,13 +51,29 @@ export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="p-3 group-data-[collapsible=icon]:hidden">
-        <Link href="/portal" className="px-2 py-1 text-h3">
-          UBC UX Hub
+        <Link href="/portal" aria-label="UBC UX Hub" className="px-2 py-1">
+          <Image
+            src="/icons/icon-dark.svg"
+            alt=""
+            width={32}
+            height={32}
+            className="size-8 dark:hidden"
+            priority
+          />
+          <Image
+            src="/icons/icon-light.svg"
+            alt=""
+            width={32}
+            height={32}
+            className="hidden size-8 dark:block"
+            priority
+          />
         </Link>
       </SidebarHeader>
 
       <SidebarContent className="group-data-[collapsible=icon]:invisible">
         <SidebarGroup className="p-3 group-data-[collapsible=icon]:p-2">
+          <SidebarGroupLabel className="uppercase">Browse</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {studentItems.map((item) => (
