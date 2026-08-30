@@ -10,6 +10,7 @@
     "lint": "eslint",
     "test": "vitest run",
     "test:watch": "vitest",
+    "email:templates": "node scripts/build-auth-templates.ts",
     "seed": "node --env-file=.env.local scripts/seed/index.ts",
     "types:supabase": "supabase gen types typescript --project-id otsvpvnoqwlenghobdal --schema public > src/lib/supabase/database.types.ts"
   },

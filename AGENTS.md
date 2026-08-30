@@ -28,6 +28,7 @@ pnpm build
 pnpm start
 pnpm seed
 pnpm types:supabase
+pnpm email:templates
 ```
 
 `pnpm test` runs the Vitest suite once (`pnpm test:watch` for watch mode). Tests are
@@ -84,6 +85,11 @@ targets unless explicitly passed `--allow-remote`.
   event IDs.
 - Settings are a hash-driven dialog (`#settings/<tab>`), not standalone portal
   pages. Use `openSettings(tab)` from `src/features/settings`.
+- Email markup lives in `src/lib/email`. `layout.ts` holds the shared chrome;
+  `templates.ts` renders purchase receipts at request time; `auth-templates.ts`
+  is the source for the Supabase auth emails. The auth templates are generated
+  into `supabase/templates/*.html` by `pnpm email:templates` — edit the module,
+  not the generated HTML. `pnpm test` fails when the two fall out of sync.
 - Marketing typography and colors are scoped by `.marketing-home` in
   `src/app/globals.css`; keep marketing-only styles inside that boundary.
 - Use the `@/*` alias for imports from `src/*`.

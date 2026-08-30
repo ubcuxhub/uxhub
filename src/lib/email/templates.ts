@@ -1,14 +1,7 @@
 import { formatEventDate, formatEventTime } from "@/lib/date";
 import type { EventRow, MembershipTypeRow, PurchaseRow } from "@/types/models";
 
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
+import { escapeHtml, renderEmailLayout } from "./layout";
 
 function formatAmount(amountCents: number, currency: string) {
   return new Intl.NumberFormat("en-CA", {
@@ -25,30 +18,6 @@ export function detailRow(label: string, value: string | null | undefined) {
     <td style="padding:6px 16px 6px 0;color:#6b7280;font-size:14px;">${escapeHtml(label)}</td>
     <td style="padding:6px 0;color:#111827;font-size:14px;font-weight:500;">${escapeHtml(value)}</td>
   </tr>`;
-}
-
-function renderEmailLayout({
-  body,
-  heading,
-  intro,
-}: {
-  body: string;
-  heading: string;
-  intro: string;
-}) {
-  return `<!doctype html>
-<html>
-  <body style="margin:0;padding:24px;background:#f4f5f7;font-family:Helvetica,Arial,sans-serif;">
-    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;padding:32px;">
-      <tr><td>
-        <h1 style="margin:0 0 12px;font-size:22px;color:#111827;">${escapeHtml(heading)}</h1>
-        <p style="margin:0 0 24px;font-size:15px;line-height:1.5;color:#4b5563;">${escapeHtml(intro)}</p>
-        ${body}
-        <p style="margin:28px 0 0;font-size:13px;color:#9ca3af;">UBC UX Hub</p>
-      </td></tr>
-    </table>
-  </body>
-</html>`;
 }
 
 export function renderMembershipConfirmationEmail({

@@ -210,15 +210,34 @@ otp_length = 6
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 
-# Use a production-ready SMTP server
+# Auth emails route through Resend so they share a sender with the purchase
+# confirmations sent from src/lib/email/client.ts.
+#
+# Left disabled locally on purpose: without it, local auth mail is caught by
+# Mailpit at http://127.0.0.1:54324 and nothing is actually delivered. Enabling
+# it sends real email from every local signup and spends Resend quota. Set the
+# same values in the hosted project under Authentication > Emails > SMTP
+# Settings, which is what governs production.
 # [auth.email.smtp]
 # enabled = true
-# host = "smtp.sendgrid.net"
+# host = "smtp.resend.com"
 # port = 587
-# user = "apikey"
-# pass = "env(SENDGRID_API_KEY)"
-# admin_email = "admin@email.com"
-# sender_name = "Admin"
+# user = "resend"
+# pass = "env(RESEND_API_KEY)"
+# admin_email = "noreply@ubcuxhub.ca"
+# sender_name = "UX Hub"
+
+# Branded templates for the two auth emails this app triggers: signup
+# confirmation (sign-up-form.tsx) and password recovery
+# (forgot-password-form.tsx). Upload the same HTML in the hosted project so
+# production matches.
+[auth.email.template.confirmation]
+subject = "Confirm your UX Hub account"
+content_path = "./supabase/templates/confirmation.html"
+
+[auth.email.template.recovery]
+subject = "Reset your UX Hub password"
+content_path = "./supabase/templates/recovery.html"
 
 # Uncomment to customize email template
 # [auth.email.template.invite]
