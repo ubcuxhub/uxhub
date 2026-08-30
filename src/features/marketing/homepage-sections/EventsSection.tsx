@@ -1,9 +1,6 @@
-import React from "react";
-import Link from "next/link";
-import { EventCard } from "@/components/shared/EventCard";
-import type { EventRow } from "@/types/models";
+import Button from "@/features/marketing/components/Button";
 
-const EventsSection = ({ events }: { events: EventRow[] }) => {
+const EventsSection = () => {
   return (
     <div id="events" className="px-[5%] md:px-[20%]">
       <div className="mb-8">
@@ -15,35 +12,19 @@ const EventsSection = ({ events }: { events: EventRow[] }) => {
         </h2>
       </div>
 
-      <div className="flex flex-col md:flex-row">
-        {events.length === 0 ? (
-          <div className="text-center w-full py-20 border border-dashed border-gray-300 rounded-xl">
-            <h3 className="text-lg font-semibold text-gray-700">No events scheduled yet</h3>
-          </div>
-        ) : (
-          events.map((event, index) => (
-            <React.Fragment key={event.id}>
-              <div className="flex-1 w-full md:w-1/2">
-                <EventCard
-                  event={event}
-                  href={`/events/${event.slug || event.id}`}
-                />
-              </div>
-              {index < events.length - 1 && (
-                <div className="md:w-[5%] h-8" aria-hidden="true"></div>
-              )}
-            </React.Fragment>
-          ))
-        )}
-      </div>
+      <div className="flex flex-col items-center gap-8 py-16 text-center">
+        <div className="flex flex-col gap-2">
+          <p className="text-gray text-xl font-semibold">
+            Events are coming soon.
+          </p>
+          <p className="text-gray">
+            Follow us for announcements about what we have planned.
+          </p>
+        </div>
 
-      <div className="text-center flex justify-center pt-16">
-        <Link
-          href="/events"
-          className="group flex h-13 items-center justify-center gap-3 rounded-full border-2 border-black bg-black px-6 font-bold text-white transition-all duration-300 hover:bg-white hover:text-black"
-        >
-          SEE MORE EVENTS
-        </Link>
+        <Button href="https://linktr.ee/ubcuxhub" external>
+          FOLLOW ON LINKTREE
+        </Button>
       </div>
     </div>
   );
