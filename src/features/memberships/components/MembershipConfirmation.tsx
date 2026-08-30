@@ -61,8 +61,16 @@ export function MembershipConfirmation({
               ? purchase.failure_reason ?? "Your payment could not be completed."
               : "We’re still confirming your payment and membership details."}
         </p>
+        {/*
+          A completed purchase makes /portal/membership a dead end: the plans
+          route sees the new membership and renders "You're already a member".
+          Those users go to the portal; a failed or pending one can still pick
+          a tier.
+        */}
         <Button asChild className="mt-8">
-          <Link href="/portal/membership">Back to membership</Link>
+          <Link href={completed ? "/portal" : "/portal/membership"}>
+            {completed ? "Go to portal" : "Back to membership"}
+          </Link>
         </Button>
       </div>
     </div>
