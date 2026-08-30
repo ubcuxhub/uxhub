@@ -35,7 +35,7 @@ import {
   getPurchaseRedirectPath,
   normalizeSquareStatus,
 } from "./fulfillment-rules";
-import { isMembershipPurchasableForUser } from "@/features/memberships/lib/eligibility";
+import { isEligibleForMembership } from "@/features/memberships/lib/policy";
 import { ensureSquareCustomerId } from "./customer";
 import { sendPurchaseConfirmationEmail } from "./confirmation-email";
 import { revalidatePurchasePaths } from "./revalidation";
@@ -253,7 +253,7 @@ async function createSquarePaymentForMembership(
     return { error: "Membership plan not found." } as const;
   }
 
-  if (!isMembershipPurchasableForUser(user, membershipType)) {
+  if (!isEligibleForMembership(user, membershipType)) {
     return {
       error: "This membership tier is not available for your account.",
     } as const;

@@ -24,12 +24,6 @@ const USER_TYPE_TO_AUDIENCE: Record<UserType, MembershipAudience> = {
   nonUbc: "non-ubc",
 };
 
-const ELIGIBLE_SLUGS: Record<UserType, readonly string[]> = {
-  ubcStudent: ["explorer", "innovator"],
-  faculty: ["faculty"],
-  nonUbc: ["non-ubc"],
-};
-
 export function isMembershipAudience(value: string): value is MembershipAudience {
   return MEMBERSHIP_AUDIENCES.includes(value as MembershipAudience);
 }
@@ -46,7 +40,34 @@ export function membershipDetailsPath(userType: UserType) {
   return `/portal/membership/join/${userTypeToAudience(userType)}`;
 }
 
-export function hasActiveOrPendingMembership(user: UserInfoRow) {
+/**
+ * The user columns membership eligibility reads. Narrower than `UserInfoRow` so
+ * server actions can pass a partial row and tests can build fixtures.
+ */
+export type MembershipEligibilityUser = Pick<
+  UserInfoRow,
+  | "faculty"
+  | "faculty_email"
+  | "major"
+  | "membership_pre_ordered_type_id"
+  | "membership_type_id"
+  | "student_number"
+  | "user_type"
+  | "year"
+>;
+
+/** The tier columns membership eligibility reads. */
+export type MembershipEligibilityType = Pick<
+  MembershipTypeRow,
+  "eligible_user_types"
+>;
+
+export function hasActiveOrPendingMembership(
+  user: Pick<
+    MembershipEligibilityUser,
+    "membership_pre_ordered_type_id" | "membership_type_id"
+  >,
+) {
   return Boolean(
     user.membership_type_id || user.membership_pre_ordered_type_id,
   );
@@ -56,7 +77,7 @@ export function canEditMembershipClassification(user: UserInfoRow) {
   return !hasActiveOrPendingMembership(user);
 }
 
-export function isMembershipProfileComplete(user: UserInfoRow) {
+export function isMembershipProfileComplete(user: MembershipEligibilityUser) {
   if (user.user_type === "ubcStudent") {
     return Boolean(
       user.student_number &&
@@ -74,22 +95,28 @@ export function isMembershipProfileComplete(user: UserInfoRow) {
   return true;
 }
 
-export function getEligibleMembershipTypes(
-  user: UserInfoRow,
-  membershipTypes: MembershipTypeRow[],
-) {
-  if (hasActiveOrPendingMembership(user)) return [];
-  const allowed = new Set(ELIGIBLE_SLUGS[user.user_type]);
-  return membershipTypes.filter((membership) => allowed.has(membership.slug));
-}
-
+/**
+ * The single membership eligibility rule, shared by the portal UI and the
+ * payment server action. `eligible_user_types` on the tier row is the source of
+ * truth for which audiences may buy it — do not reintroduce a slug list here,
+ * or the two checks drift and the UI offers purchases the server rejects.
+ */
 export function isEligibleForMembership(
-  user: UserInfoRow,
-  membership: MembershipTypeRow,
+  user: MembershipEligibilityUser,
+  membership: MembershipEligibilityType,
 ) {
   return (
     !hasActiveOrPendingMembership(user) &&
     isMembershipProfileComplete(user) &&
-    ELIGIBLE_SLUGS[user.user_type].includes(membership.slug)
+    membership.eligible_user_types.includes(user.user_type)
+  );
+}
+
+export function getEligibleMembershipTypes(
+  user: MembershipEligibilityUser,
+  membershipTypes: MembershipTypeRow[],
+) {
+  return membershipTypes.filter((membership) =>
+    isEligibleForMembership(user, membership),
   );
 }
