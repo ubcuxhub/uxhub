@@ -1,12 +1,22 @@
 import type { DbClient } from "./types";
 import { TABLES } from "./tables";
-import type { EventInsert, EventRow, EventUpdate } from "@/types/models";
+import type {
+  EventInsert,
+  EventRow,
+  EventStatus,
+  EventUpdate,
+} from "@/types/models";
 
 export type EventOrderBy = "start_date" | "created_at";
 
 interface FetchEventsOptions {
   orderBy?: EventOrderBy;
   ascending?: boolean;
+  status?: EventStatus;
+}
+
+interface FetchEventOptions {
+  status?: EventStatus;
 }
 
 /** Lists events, ordered by start date ascending by default. */
@@ -14,12 +24,18 @@ export async function fetchEvents(
   supabase: DbClient,
   options: FetchEventsOptions = {}
 ): Promise<EventRow[]> {
-  const { orderBy = "start_date", ascending = true } = options;
+  const { orderBy = "start_date", ascending = true, status } = options;
 
-  const { data, error } = await supabase
+  let query = supabase
     .from(TABLES.events)
     .select("*")
     .order(orderBy, { ascending });
+
+  if (status) {
+    query = query.eq("status", status);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
   return data ?? [];
@@ -41,13 +57,20 @@ export async function fetchEventById(
 
 export async function fetchEventBySlug(
   supabase: DbClient,
-  slug: string
+  slug: string,
+  options: FetchEventOptions = {}
 ): Promise<EventRow | null> {
-  const { data, error } = await supabase
+  const { status } = options;
+  let query = supabase
     .from(TABLES.events)
     .select("*")
-    .eq("slug", slug)
-    .maybeSingle();
+    .eq("slug", slug);
+
+  if (status) {
+    query = query.eq("status", status);
+  }
+
+  const { data, error } = await query.maybeSingle();
 
   if (error) throw error;
   return data;

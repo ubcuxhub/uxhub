@@ -8,6 +8,17 @@ import type {
 export type EventRow = Tables<"events">;
 export type EventInsert = TablesInsert<"events">;
 export type EventUpdate = TablesUpdate<"events">;
+export type EventStatus = Enums<"event_status">;
+export type EventType = Enums<"event_type">;
+
+export type MentorRow = Tables<"mentors">;
+export type MentorInsert = TablesInsert<"mentors">;
+export type MentorUpdate = TablesUpdate<"mentors">;
+export type SponsorRow = Tables<"sponsors">;
+export type SponsorInsert = TablesInsert<"sponsors">;
+export type SponsorUpdate = TablesUpdate<"sponsors">;
+export type EventMentorInsert = TablesInsert<"event_mentors">;
+export type EventSponsorInsert = TablesInsert<"event_sponsors">;
 
 export type UserInfoRow = Tables<"user_info">;
 export type UserInfoInsert = TablesInsert<"user_info">;
@@ -59,7 +70,10 @@ export type StudentStatus = Enums<"student_status">;
 export type UniversityYear = Enums<"uni_year">;
 
 export const ResponseType = {
-  text: "text",
-  single_select: "single_select",
-  multi_select: "multi_select",
+  short_text: "short_text",
+  long_text: "long_text",
+  checkbox: "checkbox",
+  multiple_choice: "multiple_choice",
+  dropdown: "dropdown",
+  file_upload: "file_upload",
 } as const satisfies Record<ResponseType, ResponseType>;

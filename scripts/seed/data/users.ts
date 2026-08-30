@@ -79,6 +79,7 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
   const industryTalkPast = requireEvent(events, "industry-talk-ai-and-ux-2026");
   const mentorshipOngoing = requireEvent(events, "student-panel-2025");
   const thinkboxFuture = requireEvent(events, "thinkbox-office-tour-2027");
+  const portfolioReviewFuture = requireEvent(events, "portfolio-review-night-2027");
   const industryCheckIn = industryTalkPast.checkInSessions[0]?.start_time;
   const designSprintCheckIns = designSprintPast.checkInSessions;
 
@@ -342,6 +343,94 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
             "I want to experience an end-to-end design process and leave with a project I can keep developing.",
           [designSprintQuestions.dietary]: "None",
         },
+      },
+    ],
+  },
+  {
+    email: "mock-member@example.com",
+    password: "ux-hub",
+    membershipSlug: "innovator",
+    profile: {
+      name: "Mock Member",
+      phone: "6045550103",
+      student_number: 10000003,
+      faculty: "Faculty of Applied Science",
+      major: "Integrated Engineering",
+      year: "4",
+      role_access: "basic",
+      user_type: "ubcStudent",
+      dietary_restrictions: "Gluten-free",
+      newsletter: true,
+      preferred_pronouns: "he/him",
+      square_customer_id: null,
+    },
+    purchases: [
+      {
+        amountCents: 1800,
+        createdAt: timestamp(addDays(today, -45), 16),
+        fulfilledAt: timestamp(addDays(today, -45), 16, 1),
+        idempotencyKey: "seed:membership:mock-member:innovator",
+        kind: "membership",
+        membershipSlug: "innovator",
+        squarePaymentId: "seed:payment:mock-member:innovator",
+        status: "completed",
+      },
+      {
+        amountCents: ticketPriceCents(industryTalkPast, true),
+        createdAt: historicalPurchaseTime(industryTalkPast),
+        eventSlug: industryTalkPast.event.slug,
+        fulfilledAt: afterTimestamp(historicalPurchaseTime(industryTalkPast), 1),
+        idempotencyKey: "seed:event:mock-member:industry-talk-ai-and-ux-2026",
+        kind: "event_ticket",
+        squarePaymentId:
+          "seed:payment:mock-member:industry-talk-ai-and-ux-2026",
+        status: "completed",
+      },
+      {
+        amountCents: ticketPriceCents(mentorshipOngoing, true),
+        createdAt: historicalPurchaseTime(mentorshipOngoing),
+        eventSlug: mentorshipOngoing.event.slug,
+        fulfilledAt: afterTimestamp(historicalPurchaseTime(mentorshipOngoing), 1),
+        idempotencyKey: "seed:event:mock-member:student-panel-2025",
+        kind: "event_ticket",
+        squarePaymentId: "seed:payment:mock-member:student-panel-2025",
+        status: "completed",
+      },
+      {
+        amountCents: ticketPriceCents(portfolioReviewFuture, true),
+        createdAt: futurePurchaseTime,
+        eventSlug: portfolioReviewFuture.event.slug,
+        fulfilledAt: afterTimestamp(futurePurchaseTime, 1),
+        idempotencyKey: "seed:event:mock-member:portfolio-review-night-2027",
+        kind: "event_ticket",
+        squarePaymentId:
+          "seed:payment:mock-member:portfolio-review-night-2027",
+        status: "completed",
+      },
+    ],
+    registrations: [
+      {
+        eventSlug: industryTalkPast.event.slug,
+        purchaseKey:
+          "seed:event:mock-member:industry-talk-ai-and-ux-2026",
+        status: "accepted",
+        attending: true,
+        checkIns: {
+          "Door Check-in": afterTimestamp(industryCheckIn, 12),
+        },
+      },
+      {
+        eventSlug: mentorshipOngoing.event.slug,
+        purchaseKey: "seed:event:mock-member:student-panel-2025",
+        status: "accepted",
+        attending: true,
+      },
+      {
+        eventSlug: portfolioReviewFuture.event.slug,
+        purchaseKey:
+          "seed:event:mock-member:portfolio-review-night-2027",
+        status: "accepted",
+        attending: true,
       },
     ],
   },

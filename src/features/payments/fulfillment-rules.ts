@@ -52,6 +52,8 @@ export function formatReservationFailure(reason: string | null | undefined) {
       return "This event is sold out.";
     case "EVENT_NOT_FOUND":
       return "This event could not be found.";
+    case "EVENT_NOT_ACTIVE":
+      return "This event is no longer open for registration.";
     default:
       return "We could not reserve a ticket for this event.";
   }

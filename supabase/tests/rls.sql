@@ -18,19 +18,33 @@ returning id \gset user_b_
 
 insert into public.events (
   name, description, regular_price, member_price, max_capacity, slug,
-  registration_start_time, registration_end_time
+  registration_start_time, registration_end_time, status
 )
 values (
   'RLS Event', 'RLS test event', 0, 0, 10, 'rls-event',
-  now() - interval '1 hour', now() + interval '1 hour'
+  now() - interval '1 hour', now() + interval '1 hour', 'active'
 )
 returning id \gset event_
 
 insert into public.event_application_questions (
   event_id, question, response_type
 )
-values (:'event_id', 'Why?', 'text')
+values (:'event_id', 'Why?', 'long_text')
 returning id \gset question_
+
+insert into public.mentors (full_name)
+values ('RLS Mentor')
+returning id \gset mentor_
+
+insert into public.event_mentors (event_id, mentor_id)
+values (:'event_id', :'mentor_id');
+
+insert into public.sponsors (name)
+values ('RLS Sponsor')
+returning id \gset sponsor_
+
+insert into public.event_sponsors (event_id, sponsor_id)
+values (:'event_id', :'sponsor_id');
 
 insert into public.check_in_sessions (event_id, name, start_time, end_time)
 values (:'event_id', 'RLS Session', now(), now() + interval '1 hour');
@@ -175,6 +189,16 @@ begin
   if visible_count <> 1 then
     raise exception 'registered user cannot read their check-in session';
   end if;
+
+  select count(*) into visible_count from public.mentors;
+  if visible_count <> 1 then
+    raise exception 'registered user cannot read active event mentor';
+  end if;
+
+  select count(*) into visible_count from public.sponsors;
+  if visible_count <> 1 then
+    raise exception 'registered user cannot read active event sponsor';
+  end if;
 end;
 $$;
 
@@ -228,6 +252,16 @@ begin
   from public.event_application_responses;
   if visible_count <> 2 then
     raise exception 'admin should see both responses, saw %', visible_count;
+  end if;
+
+  select count(*) into visible_count from public.mentors;
+  if visible_count <> 1 then
+    raise exception 'admin should see mentor catalog';
+  end if;
+
+  select count(*) into visible_count from public.sponsors;
+  if visible_count <> 1 then
+    raise exception 'admin should see sponsor catalog';
   end if;
 end;
 $$;

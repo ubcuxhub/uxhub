@@ -17,6 +17,8 @@ import type {
   EventApplicationQuestionRow,
   EventRow,
   EventUpdate,
+  MentorRow,
+  SponsorRow,
 } from "@/types/models";
 import type { CheckInSessionDraft } from "@/features/admin/types/checkInTypes";
 import {
@@ -25,6 +27,8 @@ import {
   getInitialFormState,
   validateEventForm,
   type EventFormState,
+  type MentorDraft,
+  type SponsorDraft,
 } from "../components/event-form/event-form-schema";
 import {
   datetimeLocalToTimestamptz,
@@ -39,13 +43,18 @@ interface UseEventFormOptions {
   initialEvent?: EventRow | null;
   initialCheckInSessions?: CheckInSessionRow[];
   initialApplicationQuestions?: EventApplicationQuestionRow[];
+  initialMentors?: MentorRow[];
+  initialSponsors?: SponsorRow[];
   onSuccess?: (id: string) => void;
 }
 
 function formStateFromEvent(event: EventRow): EventFormState {
   return {
     name: event.name ?? "",
+    short_description: event.short_description ?? "",
     description: event.description ?? "",
+    status: event.status,
+    event_type: event.event_type,
     regular_price: String(event.regular_price ?? ""),
     member_price: String(event.member_price ?? ""),
     location_building: event.location_building ?? "",
@@ -64,6 +73,9 @@ function formStateFromEvent(event: EventRow): EventFormState {
       event.registration_end_time
     ),
     created_at: event.created_at ?? "",
+    mentors_enabled: event.mentors_enabled,
+    sponsors_enabled: event.sponsors_enabled,
+    applications_enabled: event.applications_enabled,
   };
 }
 
@@ -72,9 +84,14 @@ function questionsFromRows(
 ): ApplicationQuestionTemplate[] {
   return questions.map((question) => ({
     question: question.question ?? "",
+    description: question.description ?? "",
     response: question.response_type,
+    is_required: question.is_required,
     max_char_limit: question.max_char_limit ?? "",
     response_options: question.response_options ?? [],
+    restrict_file_types: question.restrict_file_types,
+    allowed_file_types: question.allowed_file_types ?? [],
+    max_file_size_bytes: question.max_file_size_bytes ?? "",
   }));
 }
 
@@ -83,6 +100,8 @@ export function useEventForm({
   initialEvent = null,
   initialCheckInSessions = [],
   initialApplicationQuestions = [],
+  initialMentors = [],
+  initialSponsors = [],
   onSuccess,
 }: UseEventFormOptions) {
   const router = useRouter();
@@ -109,6 +128,23 @@ export function useEventForm({
     useState<EventFormState>(startingFormState);
   const [checkInEvents, setCheckInEvents] =
     useState<CheckInSessionDraft[]>(startingCheckIns);
+  const [mentors, setMentors] = useState<MentorDraft[]>(
+    initialMentors.map((mentor) => ({
+      id: mentor.id,
+      full_name: mentor.full_name,
+      position: mentor.position ?? "",
+      linkedin_url: mentor.linkedin_url ?? "",
+      description: mentor.description ?? "",
+      profile_image_path: mentor.profile_image_path ?? "",
+    }))
+  );
+  const [sponsors, setSponsors] = useState<SponsorDraft[]>(
+    initialSponsors.map((sponsor) => ({
+      id: sponsor.id,
+      name: sponsor.name,
+      brand_logo_path: sponsor.brand_logo_path ?? "",
+    }))
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(
     eventId && !initialEvent ? "Event not found." : null
@@ -124,7 +160,13 @@ export function useEventForm({
   );
   const bypassUnsavedChangesWarning = useRef(false);
   const cleanSnapshot = useRef(
-    createFormSnapshot(startingFormState, startingCheckIns, startingQuestions)
+    createFormSnapshot(
+      startingFormState,
+      startingCheckIns,
+      mentors,
+      sponsors,
+      startingQuestions
+    )
   );
   const resetSuccessMessage = () => setSuccessMessage(null);
   const questions = useApplicationQuestions(
@@ -135,15 +177,25 @@ export function useEventForm({
     eventId,
     formState,
     checkInEvents,
+    mentors,
+    sponsors,
     applicationTemplate: questions.applicationTemplate,
     setFormState,
     setCheckInEvents,
+    setMentors,
+    setSponsors,
     setApplicationTemplate: questions.setApplicationTemplate,
   });
+  const hasPendingPeopleCards =
+    mentors.some((mentor) => !mentor.id || mentor.isEditing) ||
+    sponsors.some((sponsor) => !sponsor.id || sponsor.isEditing);
   const hasUnsavedChanges =
+    hasPendingPeopleCards ||
     createFormSnapshot(
       formState,
       checkInEvents,
+      mentors,
+      sponsors,
       questions.applicationTemplate,
       pendingImageFile
     ) !== cleanSnapshot.current;
@@ -220,13 +272,42 @@ export function useEventForm({
     event.preventDefault();
     resetSuccessMessage();
     setError(null);
+    const hasUnsavedMentors = mentors.some(
+      (mentor) => !mentor.id || mentor.isEditing
+    );
+    const hasUnsavedSponsors = sponsors.some(
+      (sponsor) => !sponsor.id || sponsor.isEditing
+    );
+    if (hasUnsavedMentors || hasUnsavedSponsors) {
+      setFormState((current) => ({
+        ...current,
+        mentors_enabled: current.mentors_enabled || hasUnsavedMentors,
+        sponsors_enabled: current.sponsors_enabled || hasUnsavedSponsors,
+      }));
+      setError(
+        "Save or cancel every mentor and sponsor card before saving the event."
+      );
+      return;
+    }
     const validation = validateEventForm(
       formState,
       checkInEvents,
-      questions.applicationTemplate
+      questions.applicationTemplate,
+      mentors,
+      sponsors
     );
     questions.setQuestionErrors(validation.questionErrors);
     if (validation.error) {
+      setFormState((current) => ({
+        ...current,
+        mentors_enabled:
+          current.mentors_enabled || validation.invalidSections.mentors,
+        sponsors_enabled:
+          current.sponsors_enabled || validation.invalidSections.sponsors,
+        applications_enabled:
+          current.applications_enabled ||
+          validation.invalidSections.applications,
+      }));
       setError(validation.error);
       return;
     }
@@ -243,7 +324,13 @@ export function useEventForm({
       }
       const payload: EventUpdate = {
         name: formState.name,
+        short_description: formState.short_description || null,
         description: formState.description,
+        status: formState.status,
+        event_type: formState.event_type,
+        mentors_enabled: formState.mentors_enabled,
+        sponsors_enabled: formState.sponsors_enabled,
+        applications_enabled: formState.applications_enabled,
         regular_price: Number(formState.regular_price),
         member_price: Number(formState.member_price),
         max_capacity: Number(formState.max_capacity),
@@ -269,19 +356,38 @@ export function useEventForm({
         end_time: datetimeLocalToTimestamptz(session.end_time)!,
       }));
       const applicationQuestions = questions.applicationTemplate.map(
-        (question) => ({
+        (question, sortOrder) => ({
           question: question.question,
+          description: question.description || null,
           response_type: question.response,
+          is_required: question.is_required,
+          sort_order: sortOrder,
           max_char_limit:
-            question.response === ResponseType.text
+            question.response === ResponseType.short_text ||
+            question.response === ResponseType.long_text
               ? question.max_char_limit === ""
                 ? 5000
                 : question.max_char_limit
               : null,
           response_options:
-            question.response === ResponseType.multi_select ||
-            question.response === ResponseType.single_select
+            question.response === ResponseType.checkbox ||
+            question.response === ResponseType.multiple_choice ||
+            question.response === ResponseType.dropdown
               ? question.response_options || []
+              : null,
+          restrict_file_types:
+            question.response === ResponseType.file_upload
+              ? question.restrict_file_types
+              : false,
+          allowed_file_types:
+            question.response === ResponseType.file_upload &&
+            question.restrict_file_types
+              ? question.allowed_file_types
+              : null,
+          max_file_size_bytes:
+            question.response === ResponseType.file_upload &&
+            question.max_file_size_bytes !== ""
+              ? question.max_file_size_bytes
               : null,
         })
       );
@@ -290,6 +396,8 @@ export function useEventForm({
         expectedImageUrl: persistedImageUrl.current,
         event: payload,
         checkInSessions,
+        mentorIds: mentors.map((mentor) => mentor.id!),
+        sponsorIds: sponsors.map((sponsor) => sponsor.id!),
         applicationQuestions,
       });
       const savedFormState = { ...formState, image_url: imageUrl };
@@ -299,6 +407,8 @@ export function useEventForm({
       cleanSnapshot.current = createFormSnapshot(
         savedFormState,
         checkInEvents,
+        mentors,
+        sponsors,
         questions.applicationTemplate
       );
       setSuccessMessage(
@@ -312,8 +422,16 @@ export function useEventForm({
         persistedImageUrl.current = null;
         setFormState(resetFormState);
         setCheckInEvents(resetCheckIns);
+        setMentors([]);
+        setSponsors([]);
         questions.setApplicationTemplate([]);
-        cleanSnapshot.current = createFormSnapshot(resetFormState, resetCheckIns, []);
+        cleanSnapshot.current = createFormSnapshot(
+          resetFormState,
+          resetCheckIns,
+          [],
+          [],
+          []
+        );
       }
       if (onSuccess) {
         bypassUnsavedChangesWarning.current = true;
@@ -364,6 +482,10 @@ export function useEventForm({
   return {
     formState,
     checkInEvents,
+    mentors,
+    setMentors,
+    sponsors,
+    setSponsors,
     isSubmitting,
     loadingEvent: false,
     error,

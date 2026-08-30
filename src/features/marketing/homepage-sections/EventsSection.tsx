@@ -18,7 +18,9 @@ const EventsSection = ({ events }: { events: EventRow[] }) => {
       <div className="flex flex-col md:flex-row">
         {events.length === 0 ? (
           <div className="text-center w-full py-20 border border-dashed border-gray-300 rounded-xl">
-            <h3 className="text-lg font-semibold text-gray-700">No events scheduled yet</h3>
+            <h3 className="text-lg font-semibold text-gray-700">
+              No events scheduled yet
+            </h3>
           </div>
         ) : (
           events.map((event, index) => (

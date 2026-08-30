@@ -18,7 +18,7 @@ export default async function PortalEventPage({
   const { event: slug } = await params;
   await requireAuth();
   const supabase = await createClient();
-  const event = await fetchEventBySlug(supabase, slug);
+  const event = await fetchEventBySlug(supabase, slug, { status: "active" });
 
   if (!event) {
     notFound();

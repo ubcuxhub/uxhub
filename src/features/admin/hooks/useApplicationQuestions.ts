@@ -6,6 +6,25 @@ import {
   type ApplicationQuestionTemplate,
 } from "@/features/events/types/eventTypes";
 
+const isChoiceType = (response: ResponseType) =>
+  response === ResponseType.checkbox ||
+  response === ResponseType.multiple_choice ||
+  response === ResponseType.dropdown;
+
+const createQuestion = (
+  response: ResponseType
+): ApplicationQuestionTemplate => ({
+  question: "",
+  description: "",
+  response,
+  is_required: false,
+  max_char_limit: "",
+  response_options: isChoiceType(response) ? [""] : [],
+  restrict_file_types: false,
+  allowed_file_types: [],
+  max_file_size_bytes: response === ResponseType.file_upload ? 10_485_760 : "",
+});
+
 export function useApplicationQuestions(
   resetSuccessMessage: () => void,
   initial: ApplicationQuestionTemplate[] = []
@@ -26,13 +45,16 @@ export function useApplicationQuestions(
   const updateApplicationQuestion = (
     index: number,
     field: keyof ApplicationQuestionTemplate,
-    value: string | ResponseType | number | string[]
+    value: string | ResponseType | number | boolean | string[]
   ) => {
     resetSuccessMessage();
     if (
       field === "question" ||
+      field === "description" ||
       field === "max_char_limit" ||
-      field === "response_options"
+      field === "response_options" ||
+      field === "allowed_file_types" ||
+      field === "max_file_size_bytes"
     )
       clearError(index);
     setApplicationTemplate((current) =>
@@ -41,13 +63,14 @@ export function useApplicationQuestions(
           ? {
               ...question,
               [field]:
-                field === "max_char_limit"
+                field === "max_char_limit" || field === "max_file_size_bytes"
                   ? value === ""
                     ? ""
                     : Number(value)
-                  : field === "response_options"
+                  : field === "response_options" ||
+                      field === "allowed_file_types"
                     ? (value as string[])
-                    : (value as string | ResponseType),
+                    : value,
             }
           : question
       )
@@ -104,17 +127,9 @@ export function useApplicationQuestions(
     );
   };
 
-  const addApplicationQuestion = () => {
+  const addApplicationQuestion = (response: ResponseType) => {
     resetSuccessMessage();
-    setApplicationTemplate((current) => [
-      ...current,
-      {
-        question: "",
-        response: ResponseType.text,
-        max_char_limit: "",
-        response_options: [],
-      },
-    ]);
+    setApplicationTemplate((current) => [...current, createQuestion(response)]);
   };
 
   const removeApplicationQuestion = (index: number) => {
@@ -136,11 +151,12 @@ export function useApplicationQuestions(
           ? {
               ...question,
               response,
-              ...(response === ResponseType.multi_select ||
-              response === ResponseType.single_select
+              ...(isChoiceType(response)
                 ? { response_options: question.response_options || [] }
                 : {}),
-              ...(response === ResponseType.text && !question.max_char_limit
+              ...((response === ResponseType.short_text ||
+                response === ResponseType.long_text) &&
+              !question.max_char_limit
                 ? { max_char_limit: "" }
                 : {}),
             }

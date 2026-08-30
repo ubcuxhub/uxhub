@@ -10,6 +10,10 @@ import {
   fetchEvents,
 } from "@/lib/supabase-helpers/events";
 import { fetchEventRegistrationCount } from "@/lib/supabase-helpers/event-registrations";
+import {
+  fetchEventMentors,
+  fetchEventSponsors,
+} from "@/lib/supabase-helpers/event-people";
 import type { EventRow } from "@/types/models";
 import { formatEventDate, formatEventTime } from "@/lib/date";
 import { EventRegistrationAction } from "@/features/events/components/EventRegistrationAction";
@@ -26,15 +30,6 @@ import {
 import type { Json } from "@/lib/supabase/database.types";
 
 /* ─── types for JSONB fields ─── */
-
-interface Mentor {
-  name: string;
-  role?: string;
-  company?: string;
-  image_url?: string;
-  linkedin_url?: string;
-  bio?: string;
-}
 
 interface AgendaItem {
   time: string;
@@ -56,11 +51,6 @@ function getRegistrationStatus(event: EventRow) {
   if (regStart && now < regStart) return "upcoming";
   if (regEnd && now > regEnd) return "closed";
   return "open";
-}
-
-function parseMentors(raw: Json | null): Mentor[] {
-  if (!raw || !Array.isArray(raw)) return [];
-  return raw as unknown as Mentor[];
 }
 
 function parseAgenda(raw: Json | null): AgendaItem[] {
@@ -86,12 +76,13 @@ export default async function EventDetailPage({
 }: EventDetailPageProps) {
   const { slug } = await params;
   const supabase = createPublicClient();
-  const event = await fetchEventBySlug(supabase, slug);
+  const event = await fetchEventBySlug(supabase, slug, { status: "active" });
   if (!event) notFound();
-  const registrationCount = await fetchEventRegistrationCount(
-    supabase,
-    event.id
-  );
+  const [registrationCount, mentors, sponsors] = await Promise.all([
+    fetchEventRegistrationCount(supabase, event.id),
+    fetchEventMentors(supabase, event.id),
+    fetchEventSponsors(supabase, event.id),
+  ]);
 
   /* ── Derived data ── */
   const regStatus = getRegistrationStatus(event);
@@ -117,10 +108,8 @@ export default async function EventDetailPage({
     .filter(Boolean)
     .join(", ");
 
-  const mentors = parseMentors(event.mentors);
   const agenda = parseAgenda(event.agenda);
   const descriptionImages = event.description_images ?? [];
-  const sponsorLogos = event.sponsor_logos ?? [];
 
   return (
     <main className="min-h-screen">
@@ -128,7 +117,7 @@ export default async function EventDetailPage({
 
       <div className="bg-background font-sans text-body text-foreground">
         {/* ────────────────────── HERO SECTION ────────────────────── */}
-        <section className="mt-[80px] px-[5%] pb-12 pt-8 md:px-[10%] lg:px-[15%]">
+        <section className="mt-20 px-[5%] pb-12 pt-8 md:px-[10%] lg:px-[15%]">
         {/* Back link */}
         <Button asChild variant="link" className="mb-6 px-0">
           <Link href="/events">
@@ -139,7 +128,7 @@ export default async function EventDetailPage({
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
           {/* Left: Hero Image */}
-          <div className="aspect-[4/3] w-full overflow-hidden rounded-2xl bg-muted">
+          <div className="aspect-4/3 w-full overflow-hidden rounded-2xl bg-muted">
             {event.image_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
@@ -245,7 +234,7 @@ export default async function EventDetailPage({
             {descriptionImages.map((img, i) => (
               <div
                 key={i}
-                className="aspect-[4/3] overflow-hidden rounded-xl bg-muted"
+                className="aspect-4/3 overflow-hidden rounded-xl bg-muted"
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -260,7 +249,7 @@ export default async function EventDetailPage({
         </section>
 
       {/* ────────────────────── MENTORS ────────────────────── */}
-      {mentors.length > 0 && (
+      {event.mentors_enabled && mentors.length > 0 && (
         <>
           <Separator />
           <section className="px-[5%] py-12 md:px-[10%] lg:px-[15%]">
@@ -271,16 +260,16 @@ export default async function EventDetailPage({
               <div key={i} className="relative group">
                 {/* Mentor photo */}
                 <div className="aspect-square cursor-pointer overflow-hidden rounded-xl bg-muted">
-                  {mentor.image_url ? (
+                  {mentor.profile_image_path ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
-                      src={mentor.image_url}
-                      alt={mentor.name}
+                      src={mentor.profile_image_path}
+                      alt={mentor.full_name}
                       className="w-full h-full object-cover"
                     />
                   ) : (
                     <div className="flex h-full w-full items-center justify-center bg-muted text-h1 text-muted-foreground">
-                      {mentor.name.charAt(0)}
+                      {mentor.full_name.charAt(0)}
                     </div>
                   )}
                 </div>
@@ -290,13 +279,11 @@ export default async function EventDetailPage({
                     <div className="flex items-start justify-between gap-2 mb-2">
                       <div>
                         <p className="text-table">
-                          {mentor.name}
+                          {mentor.full_name}
                         </p>
-                        {(mentor.role || mentor.company) && (
+                        {mentor.position && (
                           <p className="text-small text-muted-foreground">
-                            {mentor.role}
-                            {mentor.role && mentor.company && " at "}
-                            {mentor.company}
+                            {mentor.position}
                           </p>
                         )}
                       </div>
@@ -305,15 +292,15 @@ export default async function EventDetailPage({
                           href={mentor.linkedin_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex-shrink-0 text-primary hover:text-action-hover"
+                            className="shrink-0 text-primary hover:text-action-hover"
                         >
                           <Linkedin />
                         </a>
                       )}
                     </div>
-                    {mentor.bio && (
+                    {mentor.description && (
                       <p className="line-clamp-3 text-small text-muted-foreground">
-                        {mentor.bio}
+                        {mentor.description}
                       </p>
                     )}
                   </Card>
@@ -339,7 +326,7 @@ export default async function EventDetailPage({
                   i % 2 === 0 ? "bg-card" : "bg-muted/50"
                 } ${i < agenda.length - 1 ? "border-b" : ""}`}
               >
-                <span className="min-w-[80px] whitespace-nowrap text-table">
+                <span className="min-w-20 whitespace-nowrap text-table">
                   {item.time}
                 </span>
                 <div className="flex-1 min-w-0">
@@ -363,24 +350,30 @@ export default async function EventDetailPage({
       )}
 
       {/* ────────────────────── SPONSORS ────────────────────── */}
-      {sponsorLogos.length > 0 && (
+      {event.sponsors_enabled && sponsors.length > 0 && (
         <>
           <Separator />
           <section className="px-[5%] py-12 md:px-[10%] lg:px-[15%]">
           <h2 className="mb-8 text-h2">Sponsors</h2>
 
           <div className="flex flex-wrap items-center gap-6">
-            {sponsorLogos.map((logo, i) => (
+            {sponsors.map((sponsor, i) => (
               <div
                 key={i}
                 className="flex h-24 w-24 items-center justify-center overflow-hidden rounded-xl bg-muted p-2"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={logo}
-                  alt={`Sponsor ${i + 1}`}
-                  className="w-full h-full object-contain"
-                />
+                {sponsor.brand_logo_path ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={sponsor.brand_logo_path}
+                    alt={sponsor.name}
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <span className="text-small text-muted-foreground">
+                    {sponsor.name}
+                  </span>
+                )}
               </div>
             ))}
           </div>
@@ -397,7 +390,7 @@ export default async function EventDetailPage({
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
             {/* Map embed or static image */}
-            <div className="pointer-events-none relative aspect-[4/3] overflow-hidden rounded-xl bg-muted">
+            <div className="pointer-events-none relative aspect-4/3 overflow-hidden rounded-xl bg-muted">
               {event.location_address_url ? (
                 <iframe
                   src={`https://maps.google.com/maps?q=${encodeURIComponent(
