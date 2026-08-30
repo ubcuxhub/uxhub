@@ -24,12 +24,19 @@ pnpm dev
 pnpm lint
 pnpm exec tsc --noEmit
 pnpm test
-pnpm test:watch
 pnpm build
 pnpm start
 pnpm seed
 pnpm types:supabase
+pnpm email:templates
 ```
+
+`pnpm test` runs the Vitest suite once (`pnpm test:watch` for watch mode). Tests are
+colocated with the code they cover (e.g. `src/lib/slug.test.ts`,
+`src/features/payments/schemas.test.ts`). Run a single file with
+`pnpm test src/lib/slug.test.ts`, or filter by name with
+`pnpm test -- -t "test name"`. CI (`.github/workflows/ci.yml`) runs `pnpm lint`,
+`pnpm exec tsc --noEmit`, and `pnpm test` on every push and pull request.
 
 `pnpm seed` is idempotent and supplies local sample memberships and events.
 Use `pnpm seed -- --dry-run` to preview it. It refuses non-local Supabase
@@ -78,6 +85,11 @@ targets unless explicitly passed `--allow-remote`.
   event IDs.
 - Settings are a hash-driven dialog (`#settings/<tab>`), not standalone portal
   pages. Use `openSettings(tab)` from `src/features/settings`.
+- Email markup lives in `src/lib/email`. `layout.ts` holds the shared chrome;
+  `templates.ts` renders purchase receipts at request time; `auth-templates.ts`
+  is the source for the Supabase auth emails. The auth templates are generated
+  into `supabase/templates/*.html` by `pnpm email:templates` — edit the module,
+  not the generated HTML. `pnpm test` fails when the two fall out of sync.
 - Marketing typography and colors are scoped by `.marketing-home` in
   `src/app/globals.css`; keep marketing-only styles inside that boundary.
 - Use the `@/*` alias for imports from `src/*`.
@@ -117,19 +129,15 @@ key to client components.
 
 ## Quality
 
-- Run `pnpm lint` and `pnpm exec tsc --noEmit` after code changes.
+- Run `pnpm lint`, `pnpm exec tsc --noEmit`, and `pnpm test` after code changes.
 - Also run `pnpm build` after route, dependency, configuration, schema, or
   shared-style changes.
-- Run `pnpm test` (Vitest) when changing logic it covers. Tests are colocated
-  as `*.test.ts` next to the code they exercise, and `vitest.config.ts` maps
-  the `@/*` alias. Coverage is pure-logic only — schemas, validation,
-  fulfillment rules, slugs, and class merging. There is no component,
-  integration, or end-to-end suite, so verify UI changes by running the app.
-- Supabase RLS checks live in `supabase/tests/rls.sql` and are not part of
-  `pnpm test`.
+- Supabase RLS checks live in `supabase/tests/rls.sql` (separate from the
+  Vitest suite).
 
 ## UI
 
 Reuse `src/components/ui` primitives and `src/components/shared` composites
 before adding new primitives. Follow the existing shadcn conventions and use
 design tokens from `src/app/globals.css` instead of duplicating one-off styles.
+

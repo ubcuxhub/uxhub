@@ -51,6 +51,7 @@ export async function EventCheckoutRoute({
       formattedDate={formatDate(event.start_date)}
       hasExistingRegistration={Boolean(existingRegistration)}
       isDirectPurchaseEvent={isDirectPurchaseEvent}
+      returnTo={returnTo}
       slug={event.slug ?? slug}
       user={user}
     />

@@ -12,6 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { withReturnTo } from "@/lib/auth/paths";
 import { cn } from "@/lib/utils";
 import type { EventRow, UserInfoRow } from "@/types/models";
 
@@ -21,6 +22,7 @@ interface EventCheckoutProps {
   formattedDate: string | null;
   hasExistingRegistration: boolean;
   isDirectPurchaseEvent: boolean;
+  returnTo?: string;
   slug: string;
   user: UserInfoRow;
 }
@@ -38,6 +40,7 @@ export function EventCheckout({
   formattedDate,
   hasExistingRegistration,
   isDirectPurchaseEvent,
+  returnTo,
   slug,
   user,
 }: EventCheckoutProps) {
@@ -51,6 +54,12 @@ export function EventCheckout({
     setProcessing(submitting);
     setBusy(submitting);
   };
+
+  const confirmationHref = (purchaseId: string) =>
+    withReturnTo(
+      `/portal/events/${slug}/confirmation/${purchaseId}`,
+      returnTo ?? "/portal",
+    );
 
   const eventDetails = [
     formattedDate,
@@ -97,6 +106,7 @@ export function EventCheckout({
             initialPhone={user.phone}
             kind="event_ticket"
             slug={slug}
+            successHref={confirmationHref}
             onSubmittingChange={handleSubmittingChange}
             showAmount={false}
             showSecurityMessage={false}

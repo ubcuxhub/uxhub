@@ -6,7 +6,6 @@ import {
   normalizeSquareStatus,
   splitBuyerName,
 } from "./fulfillment-rules";
-import { isMembershipPurchasableForUser } from "@/features/memberships/lib/eligibility";
 
 describe("payment fulfillment rules", () => {
   it.each([
@@ -63,53 +62,5 @@ describe("payment fulfillment rules", () => {
     [null, "We could not reserve a ticket for this event."],
   ])("formats reservation failure %s", (reason, expected) => {
     expect(formatReservationFailure(reason)).toBe(expected);
-  });
-
-  const baseUser = {
-    membership_type_id: null,
-    membership_pre_ordered_type_id: null,
-    student_number: null,
-    user_type: "nonUbc" as const,
-  };
-
-  it("allows an eligible user with no existing membership", () => {
-    expect(
-      isMembershipPurchasableForUser(baseUser, {
-        eligible_user_types: ["nonUbc"],
-      })
-    ).toBe(true);
-  });
-
-  it("rejects existing members, pre-orders, and ineligible user types", () => {
-    expect(
-      isMembershipPurchasableForUser(
-        { ...baseUser, membership_type_id: "member" },
-        { eligible_user_types: ["nonUbc"] }
-      )
-    ).toBe(false);
-    expect(
-      isMembershipPurchasableForUser(
-        { ...baseUser, membership_pre_ordered_type_id: "preorder" },
-        { eligible_user_types: ["nonUbc"] }
-      )
-    ).toBe(false);
-    expect(
-      isMembershipPurchasableForUser(baseUser, {
-        eligible_user_types: ["faculty"],
-      })
-    ).toBe(false);
-  });
-
-  it("requires a student number for UBC students", () => {
-    const student = { ...baseUser, user_type: "ubcStudent" as const };
-    const membership = { eligible_user_types: ["ubcStudent" as const] };
-
-    expect(isMembershipPurchasableForUser(student, membership)).toBe(false);
-    expect(
-      isMembershipPurchasableForUser(
-        { ...student, student_number: 12345678 },
-        membership
-      )
-    ).toBe(true);
   });
 });

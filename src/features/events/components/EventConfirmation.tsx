@@ -1,32 +1,26 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, CircleAlert, LoaderCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { PurchaseWithDetails } from "@/lib/supabase-helpers/purchases";
-import { useUser } from "@/context/UserContext";
 
-export function MembershipConfirmation({
+export function EventConfirmation({
   purchase,
+  slug,
 }: {
   purchase: PurchaseWithDetails;
+  slug: string;
 }) {
   const router = useRouter();
-  const { refreshUser } = useUser();
-  const refreshedUser = useRef(false);
   const completed = purchase.status === "completed";
   const failed = purchase.status === "failed" || purchase.status === "canceled";
   const pending = !completed && !failed;
-
-  useEffect(() => {
-    if (completed && !refreshedUser.current) {
-      refreshedUser.current = true;
-      void refreshUser();
-    }
-  }, [completed, refreshUser]);
+  const eventName = purchase.events?.name ?? "the event";
+  const eventHref = `/portal/events/${purchase.events?.slug ?? slug}`;
 
   useEffect(() => {
     if (!pending) return;
@@ -47,30 +41,22 @@ export function MembershipConfirmation({
         )}
         <h1 className="mt-6 text-h1">
           {completed
-            ? "Membership confirmed"
+            ? "Payment successful"
             : failed
               ? "Payment wasn’t completed"
-              : "Membership processing"}
+              : "Payment processing"}
         </h1>
         <p className="mt-3 text-muted-foreground">
           {completed
             ? purchase.confirmation_email_sent_at
-              ? `Your ${purchase.membership_types?.name ?? "UX Hub"} membership is now active. A confirmation email has been sent to your inbox.`
-              : `Your ${purchase.membership_types?.name ?? "UX Hub"} membership is now active.`
+              ? `You’re registered for ${eventName}. A confirmation email has been sent to your inbox.`
+              : `You’re registered for ${eventName}.`
             : failed
               ? purchase.failure_reason ?? "Your payment could not be completed."
-              : "We’re still confirming your payment and membership details."}
+              : "We’re still confirming your payment and event registration."}
         </p>
-        {/*
-          A completed purchase makes /portal/membership a dead end: the plans
-          route sees the new membership and renders "You're already a member".
-          Those users go to the portal; a failed or pending one can still pick
-          a tier.
-        */}
         <Button asChild className="mt-8">
-          <Link href={completed ? "/portal" : "/portal/membership"}>
-            {completed ? "Go to portal" : "Back to membership"}
-          </Link>
+          <Link href={eventHref}>Back to event</Link>
         </Button>
       </div>
     </div>

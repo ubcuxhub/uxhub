@@ -86,6 +86,29 @@ export async function updatePurchase(
   return data;
 }
 
+/**
+ * Atomically reserves the one allowed confirmation-email attempt for a
+ * completed purchase. A null result means another request already claimed or
+ * completed the send, or the purchase is no longer eligible.
+ */
+export async function claimPurchaseConfirmationEmail(
+  supabase: DbClient,
+  purchaseId: string
+): Promise<PurchaseRow | null> {
+  const { data, error } = await supabase
+    .from(TABLES.purchases)
+    .update({ confirmation_email_attempted_at: new Date().toISOString() })
+    .eq("id", purchaseId)
+    .eq("status", "completed")
+    .is("confirmation_email_attempted_at", null)
+    .is("confirmation_email_sent_at", null)
+    .select("*")
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function fetchPurchasesForUser(
   supabase: DbClient,
   userId: string
