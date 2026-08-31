@@ -22,12 +22,12 @@ describe("user seed fixtures", () => {
 
   it("reports the representative dataset totals", () => {
     expect(getUserFixtureTotals(seedUsers)).toEqual({
-      authUsers: 2,
-      profiles: 2,
-      purchases: 8,
-      registrations: 11,
+      authUsers: 3,
+      profiles: 3,
+      purchases: 12,
+      registrations: 14,
       responses: 22,
-      checkIns: 4,
+      checkIns: 5,
     });
   });
 

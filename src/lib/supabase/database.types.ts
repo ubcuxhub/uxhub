@@ -96,36 +96,51 @@ export type Database = {
       }
       event_application_questions: {
         Row: {
+          allowed_file_types: string[] | null
           created_at: string | null
+          description: string | null
           event_id: string
           id: string
           is_required: boolean
           max_char_limit: number | null
+          max_file_size_bytes: number | null
           question: string
+          restrict_file_types: boolean
           response_options: string[] | null
           response_type: Database["public"]["Enums"]["response_type"]
+          sort_order: number
           updated_at: string | null
         }
         Insert: {
+          allowed_file_types?: string[] | null
           created_at?: string | null
+          description?: string | null
           event_id: string
           id?: string
           is_required?: boolean
           max_char_limit?: number | null
+          max_file_size_bytes?: number | null
           question: string
+          restrict_file_types?: boolean
           response_options?: string[] | null
           response_type: Database["public"]["Enums"]["response_type"]
+          sort_order?: number
           updated_at?: string | null
         }
         Update: {
+          allowed_file_types?: string[] | null
           created_at?: string | null
+          description?: string | null
           event_id?: string
           id?: string
           is_required?: boolean
           max_char_limit?: number | null
+          max_file_size_bytes?: number | null
           question?: string
+          restrict_file_types?: boolean
           response_options?: string[] | null
           response_type?: Database["public"]["Enums"]["response_type"]
+          sort_order?: number
           updated_at?: string | null
         }
         Relationships: [
@@ -248,11 +263,13 @@ export type Database = {
       events: {
         Row: {
           agenda: Json | null
+          applications_enabled: boolean
           created_at: string | null
           description: string
           description_images: string[] | null
           end_date: string | null
           end_time: string | null
+          event_type: Database["public"]["Enums"]["event_type"]
           id: string
           image_url: string | null
           location_address_url: string | null
@@ -260,24 +277,28 @@ export type Database = {
           location_room: string | null
           max_capacity: number
           member_price: number
-          mentors: Json | null
+          mentors_enabled: boolean
           name: string
           registration_end_time: string | null
           registration_start_time: string | null
           regular_price: number
-          slug: string | null
-          sponsor_logos: string[] | null
+          short_description: string | null
+          slug: string
+          sponsors_enabled: boolean
           start_date: string | null
           start_time: string | null
+          status: Database["public"]["Enums"]["event_status"]
           updated_at: string | null
         }
         Insert: {
           agenda?: Json | null
+          applications_enabled?: boolean
           created_at?: string | null
           description: string
           description_images?: string[] | null
           end_date?: string | null
           end_time?: string | null
+          event_type?: Database["public"]["Enums"]["event_type"]
           id?: string
           image_url?: string | null
           location_address_url?: string | null
@@ -285,24 +306,28 @@ export type Database = {
           location_room?: string | null
           max_capacity: number
           member_price?: number
-          mentors?: Json | null
+          mentors_enabled?: boolean
           name: string
           registration_end_time?: string | null
           registration_start_time?: string | null
           regular_price: number
-          slug?: string | null
-          sponsor_logos?: string[] | null
+          short_description?: string | null
+          slug: string
+          sponsors_enabled?: boolean
           start_date?: string | null
           start_time?: string | null
+          status?: Database["public"]["Enums"]["event_status"]
           updated_at?: string | null
         }
         Update: {
           agenda?: Json | null
+          applications_enabled?: boolean
           created_at?: string | null
           description?: string
           description_images?: string[] | null
           end_date?: string | null
           end_time?: string | null
+          event_type?: Database["public"]["Enums"]["event_type"]
           id?: string
           image_url?: string | null
           location_address_url?: string | null
@@ -310,16 +335,117 @@ export type Database = {
           location_room?: string | null
           max_capacity?: number
           member_price?: number
-          mentors?: Json | null
+          mentors_enabled?: boolean
           name?: string
           registration_end_time?: string | null
           registration_start_time?: string | null
           regular_price?: number
-          slug?: string | null
-          sponsor_logos?: string[] | null
+          short_description?: string | null
+          slug?: string
+          sponsors_enabled?: boolean
           start_date?: string | null
           start_time?: string | null
+          status?: Database["public"]["Enums"]["event_status"]
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      event_mentors: {
+        Row: {
+          event_id: string
+          mentor_id: string
+          sort_order: number
+        }
+        Insert: {
+          event_id: string
+          mentor_id: string
+          sort_order?: number
+        }
+        Update: {
+          event_id?: string
+          mentor_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_mentors_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_mentors_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_sponsors: {
+        Row: {
+          event_id: string
+          sort_order: number
+          sponsor_id: string
+        }
+        Insert: {
+          event_id: string
+          sort_order?: number
+          sponsor_id: string
+        }
+        Update: {
+          event_id?: string
+          sort_order?: number
+          sponsor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_sponsors_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_sponsors_sponsor_id_fkey"
+            columns: ["sponsor_id"]
+            isOneToOne: false
+            referencedRelation: "sponsors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mentors: {
+        Row: {
+          created_at: string
+          description: string | null
+          full_name: string
+          id: string
+          linkedin_url: string | null
+          position: string | null
+          profile_image_path: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          full_name: string
+          id?: string
+          linkedin_url?: string | null
+          position?: string | null
+          profile_image_path?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          full_name?: string
+          id?: string
+          linkedin_url?: string | null
+          position?: string | null
+          profile_image_path?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -356,6 +482,30 @@ export type Database = {
           price?: number
           slug?: string
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      sponsors: {
+        Row: {
+          brand_logo_path: string | null
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          brand_logo_path?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          brand_logo_path?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -585,10 +735,31 @@ export type Database = {
           registration_id: string
         }[]
       }
+      save_admin_event_atomically: {
+        Args: {
+          p_application_questions: Json
+          p_check_in_sessions: Json
+          p_event: Json
+          p_event_id: string | null
+          p_expected_image_url: string | null
+          p_mentors: Json
+          p_slug: string | null
+          p_sponsors: Json
+        }
+        Returns: Json
+      }
     }
     Enums: {
       application_status: "pending" | "declined" | "accepted"
-      response_type: "text" | "single_select" | "multi_select"
+      event_status: "draft" | "active" | "archived"
+      event_type: "regular" | "flagship"
+      response_type:
+        | "short_text"
+        | "long_text"
+        | "checkbox"
+        | "multiple_choice"
+        | "dropdown"
+        | "file_upload"
       role_access_enum: "basic" | "admin"
       student_status: "undergraduate" | "graduate" | "other"
       uni_year: "1" | "2" | "3" | "4" | "5+"
@@ -721,7 +892,16 @@ export const Constants = {
   public: {
     Enums: {
       application_status: ["pending", "declined", "accepted"],
-      response_type: ["text", "single_select", "multi_select"],
+      event_status: ["draft", "active", "archived"],
+      event_type: ["regular", "flagship"],
+      response_type: [
+        "short_text",
+        "long_text",
+        "checkbox",
+        "multiple_choice",
+        "dropdown",
+        "file_upload",
+      ],
       role_access_enum: ["basic", "admin"],
       student_status: ["undergraduate", "graduate", "other"],
       uni_year: ["1", "2", "3", "4", "5+"],
