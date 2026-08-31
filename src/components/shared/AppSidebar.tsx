@@ -55,17 +55,17 @@ export function AppSidebar() {
           <Image
             src="/icons/icon-dark.svg"
             alt=""
-            width={32}
-            height={32}
-            className="size-8 dark:hidden"
+            width={40}
+            height={40}
+            className="size-14 dark:hidden"
             priority
           />
           <Image
             src="/icons/icon-light.svg"
             alt=""
-            width={32}
-            height={32}
-            className="hidden size-8 dark:block"
+            width={40}
+            height={40}
+            className="hidden size-14 dark:block"
             priority
           />
         </Link>
