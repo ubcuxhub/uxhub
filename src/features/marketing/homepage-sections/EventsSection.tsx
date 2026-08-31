@@ -23,7 +23,7 @@ const EventsSection = () => {
         </div>
 
         <Button href="https://linktr.ee/ubcuxhub" external>
-          FOLLOW ON LINKTREE
+          LINKTREE
         </Button>
       </div>
     </div>
