@@ -2,9 +2,14 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { PageContainer } from "@/components/shared/PageContainer";
+import {
+  AdminEventsTable,
+  type AdminEventTableRow,
+} from "@/features/admin/components/AdminEventsTable";
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchEvents } from "@/lib/supabase-helpers/events";
+import { fetchEventRegistrationCount } from "@/lib/supabase-helpers/event-registrations";
 
 export default async function AdminEventsPage() {
   await requireAdmin();
@@ -13,19 +18,28 @@ export default async function AdminEventsPage() {
     orderBy: "created_at",
     ascending: false,
   });
+  const now = new Date();
+  const rows: AdminEventTableRow[] = await Promise.all(
+    events.map(async (event) => {
+      const registrationStart = event.registration_start_time
+        ? new Date(event.registration_start_time)
+        : null;
+      const registrationEnd = event.registration_end_time
+        ? new Date(event.registration_end_time)
+        : null;
 
-  const formatDate = (date: string | null) => {
-    if (!date) return "—";
-    try {
-      return new Date(date).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      });
-    } catch {
-      return date;
-    }
-  };
+      return {
+        event,
+        registrationCount: await fetchEventRegistrationCount(
+          supabase,
+          event.id
+        ),
+        registrationOpen:
+          (!registrationStart || now >= registrationStart) &&
+          (!registrationEnd || now <= registrationEnd),
+      };
+    })
+  );
 
   return (
     <PageContainer className="flex flex-col gap-8">
@@ -57,59 +71,7 @@ export default async function AdminEventsPage() {
           </Button>
         </div>
       ) : (
-        <div className="rounded-lg border">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b bg-muted/50">
-                <th className="px-4 py-3 text-left font-medium">Event</th>
-                <th className="px-4 py-3 text-left font-medium hidden sm:table-cell">Date</th>
-                <th className="px-4 py-3 text-left font-medium hidden md:table-cell">Price</th>
-                <th className="px-4 py-3 text-right font-medium">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {events.map((event) => (
-                <tr key={event.id} className="border-b last:border-b-0 hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-3">
-                    <Link
-                      href={`/admin/events/${event.id}`}
-                      className="font-medium hover:underline"
-                    >
-                      {event.name}
-                    </Link>
-                    <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5 sm:hidden">
-                      {formatDate(event.start_date)}
-                    </p>
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground hidden sm:table-cell">
-                    {formatDate(event.start_date)}
-                  </td>
-                  <td className="px-4 py-3 text-muted-foreground hidden md:table-cell">
-                    ${Number(event.regular_price ?? 0).toFixed(2)}
-                    {event.member_price !== event.regular_price && (
-                      <span className="ml-1 text-xs">
-                        / ${Number(event.member_price ?? 0).toFixed(2)} member
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Button asChild variant="outline" size="default">
-                        <Link href={`/admin/events/${event.id}`}>Edit</Link>
-                      </Button>
-                      <Button asChild variant="outline" size="default">
-                        <Link href={`/admin/events/${event.id}/check-in`}>Check-In</Link>
-                      </Button>
-                      <Button asChild variant="outline" size="default">
-                        <Link href={`/admin/events/${event.id}/review-applications`}>Apps</Link>
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <AdminEventsTable rows={rows} />
       )}
     </PageContainer>
   );

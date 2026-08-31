@@ -11,7 +11,37 @@ describe("relative event seed timeline", () => {
     const counts = { past: 0, ongoing: 0, upcoming: 0 };
     for (const event of events) counts[classifySeedEvent(event, fixedNow)] += 1;
 
-    expect(counts).toEqual({ past: 5, ongoing: 3, upcoming: 4 });
+    expect(counts).toEqual({ past: 5, ongoing: 3, upcoming: 5 });
+  });
+
+  it("assigns lifecycle statuses to match the seeded timeline", () => {
+    const byPhase = {
+      past: events.filter(
+        (event) => classifySeedEvent(event, fixedNow) === "past"
+      ),
+      ongoing: events.filter(
+        (event) => classifySeedEvent(event, fixedNow) === "ongoing"
+      ),
+      upcoming: events.filter(
+        (event) => classifySeedEvent(event, fixedNow) === "upcoming"
+      ),
+    };
+
+    expect(byPhase.past.every((event) => event.event.status === "archived")).toBe(
+      true
+    );
+    expect(byPhase.ongoing.every((event) => event.event.status === "active")).toBe(
+      true
+    );
+    expect(
+      byPhase.upcoming
+        .filter((event) => event.event.status === "draft")
+        .map((event) => event.event.slug)
+        .sort()
+    ).toEqual(["design-sprint-2026", "student-panel-2026"]);
+    expect(
+      byPhase.upcoming.filter((event) => event.event.status === "active")
+    ).toHaveLength(3);
   });
 
   it("keeps long-running events active with registration open", () => {
@@ -21,7 +51,6 @@ describe("relative event seed timeline", () => {
 
     expect(ongoing).toHaveLength(3);
     for (const event of ongoing) {
-      expect(event.event.name).toContain("[ongoing]");
       expect(new Date(event.event.registration_start_time!).getTime()).toBeLessThan(
         fixedNow.getTime()
       );
@@ -38,13 +67,18 @@ describe("relative event seed timeline", () => {
     );
   });
 
-  it("marks exactly the far-future events whose registration is open", () => {
-    const marked = events.filter((event) =>
-      event.event.name.endsWith("[registration open]")
+  it("opens registration for exactly four far-future events", () => {
+    const openUpcoming = events.filter(
+      (event) =>
+        classifySeedEvent(event, fixedNow) === "upcoming" &&
+        new Date(event.event.registration_start_time!).getTime() <
+          fixedNow.getTime() &&
+        new Date(event.event.registration_end_time!).getTime() >
+          fixedNow.getTime()
     );
 
-    expect(marked).toHaveLength(3);
-    for (const event of marked) {
+    expect(openUpcoming).toHaveLength(4);
+    for (const event of openUpcoming) {
       expect(classifySeedEvent(event, fixedNow)).toBe("upcoming");
       expect(new Date(event.event.registration_start_time!).getTime()).toBeLessThan(
         fixedNow.getTime()
@@ -61,7 +95,9 @@ describe("relative event seed timeline", () => {
     expect(new Date(studentPanel!.event.registration_start_time!).getTime()).toBeGreaterThan(
       fixedNow.getTime()
     );
-    expect(studentPanel!.event.name).not.toContain("[registration open]");
+    expect(events.every((event) => !/\[(ongoing|registration open)\]/i.test(event.event.name))).toBe(
+      true
+    );
   });
 
   it("keeps historical registration windows closed and slugs stable", () => {
@@ -83,6 +119,7 @@ describe("relative event seed timeline", () => {
       "industry-talk-ai-and-ux-2026",
       "get-to-know-ux-hub-2026",
       "design-sprint-2026",
+      "portfolio-review-night-2027",
       "student-panel-2026",
       "coffee-chat-social-2026",
       "uxathon-2027",

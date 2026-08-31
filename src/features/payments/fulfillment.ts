@@ -315,13 +315,17 @@ async function createSquarePaymentForEventTicket(
   user: UserInfoRow,
   input: CheckoutRequestInput
 ) {
-  const event = await fetchEventBySlug(adminDb, input.slug);
+  const event = await fetchEventBySlug(adminDb, input.slug, {
+    status: "active",
+  });
 
   if (!event) {
     return { error: "Event not found." } as const;
   }
 
-  const applicationQuestions = await fetchApplicationQuestions(adminDb, event.id);
+  const applicationQuestions = event.applications_enabled
+    ? await fetchApplicationQuestions(adminDb, event.id)
+    : [];
 
   if (applicationQuestions.length > 0) {
     return {

@@ -9,7 +9,10 @@ export const revalidate = 300;
 
 export default async function EventsPage() {
   const supabase = createPublicClient();
-  const events = await fetchEvents(supabase, { orderBy: "start_date" });
+  const events = await fetchEvents(supabase, {
+    orderBy: "start_date",
+    status: "active",
+  });
 
   return (
     <main className="min-h-screen">
