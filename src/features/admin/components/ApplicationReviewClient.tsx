@@ -42,7 +42,6 @@ export interface AdminApplicationResponse {
 }
 
 interface ApplicationReviewClientProps {
-  eventId: string;
   registration: AdminApplicationRegistration;
   userInfo: AdminApplicationUser;
   event: EventRow;
@@ -50,7 +49,6 @@ interface ApplicationReviewClientProps {
 }
 
 export function ApplicationReviewClient({
-  eventId,
   registration: initialRegistration,
   userInfo,
   event,
@@ -105,8 +103,8 @@ export function ApplicationReviewClient({
   return (
     <>
       <PageContainer
-        backHref={`/admin/events/${eventId}/review-applications`}
-        backLabel="Back to Applications"
+        backHref="/admin/events"
+        backLabel="Back to Events"
         className="flex flex-col gap-8"
       >
             {/* Header */}

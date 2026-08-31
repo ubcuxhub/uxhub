@@ -6,38 +6,38 @@ import { requireAdmin } from "@/lib/auth/guards";
 import { createUniqueSlug, slugify } from "@/lib/slug";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
-  deleteApplicationQuestionsForEvent,
-  insertApplicationQuestions,
-} from "@/lib/supabase-helpers/event-applications";
+  adminDeleteEventImageByUrl,
+  adminUpdateUserInfoById,
+} from "@/lib/supabase-helpers/admin-server";
 import {
-  fetchEventById,
-  fetchEventIdByImageUrl,
-  fetchEventSlugsByPrefix,
-  insertEvent,
-  updateEvent,
-  updateEventIfImageMatches,
-} from "@/lib/supabase-helpers/events";
-import {
-  deleteCheckInSessionsForEvent,
   fetchAttendingRegistrations,
   fetchCheckInId,
   fetchCheckInSessions,
   fetchCheckInStatuses,
   insertCheckIn,
-  insertCheckInSessions,
   updateCheckInTimestamp,
 } from "@/lib/supabase-helpers/check-ins";
-import { updateEventRegistration } from "@/lib/supabase-helpers/event-registrations";
-import { fetchRegistrationsForEvent } from "@/lib/supabase-helpers/event-registrations";
 import {
-  adminDeleteEventImageByUrl,
-  adminUpdateUserInfoById,
-} from "@/lib/supabase-helpers/admin-server";
+  saveMentor,
+  saveSponsor,
+  type MentorInput,
+  type SponsorInput,
+} from "@/lib/supabase-helpers/event-people";
+import {
+  fetchRegistrationsForEvent,
+  updateEventRegistration,
+} from "@/lib/supabase-helpers/event-registrations";
+import {
+  fetchEventById,
+  fetchEventIdByImageUrl,
+  fetchEventSlugsByPrefix,
+} from "@/lib/supabase-helpers/events";
 import type {
   CheckInSessionInsert,
   EventApplicationQuestionInsert,
-  EventInsert,
   EventUpdate,
+  MentorRow,
+  SponsorRow,
   UserInfoUpdate,
 } from "@/types/models";
 import type { ApplicationStatus } from "@/types/models";
@@ -111,11 +111,16 @@ export interface SaveAdminEventInput {
   expectedImageUrl: string | null;
   event: EventUpdate;
   checkInSessions: Omit<CheckInSessionInsert, "event_id">[];
+  mentorIds: string[];
+  sponsorIds: string[];
   applicationQuestions: Omit<EventApplicationQuestionInsert, "event_id">[];
 }
 
 // Not exported: a "use server" module may only export async functions, and the
 // form surfaces this by displaying the thrown error's message.
+// Raised by save_admin_event_atomically when the cover-image precondition fails.
+const IMAGE_CONFLICT_SENTINEL = "EVENT_IMAGE_CONFLICT";
+
 const SAVE_CONFLICT_ERROR =
   "This event's cover image was changed somewhere else since this page loaded. Reload the page and apply your changes again.";
 
@@ -157,40 +162,9 @@ export async function saveAdminEventAction(
 ): Promise<{ id: string }> {
   await requireAdmin();
 
-  let finalEventId: string;
+  let slug: string | null = null;
 
-  if (input.eventId) {
-    const expectedImageUrl = input.expectedImageUrl;
-    const nextImageUrl = input.event.image_url ?? null;
-
-    if (nextImageUrl === expectedImageUrl) {
-      // This save leaves the cover alone, so leave the column alone too. Writing
-      // the loaded value back would revert a replacement made elsewhere to a URL
-      // whose object that replacement already deleted.
-      const payload: EventUpdate = { ...input.event };
-      delete payload.image_url;
-
-      const result = await updateEvent(supabaseAdmin, input.eventId, payload);
-      finalEventId = result.id;
-    } else {
-      // Changing the cover deletes the old object, so the write is conditional
-      // on the row still holding the image this form was loaded with.
-      const result = await updateEventIfImageMatches(
-        supabaseAdmin,
-        input.eventId,
-        input.event,
-        expectedImageUrl
-      );
-
-      if (!result) throw new Error(SAVE_CONFLICT_ERROR);
-      finalEventId = result.id;
-
-      await discardEventImage(expectedImageUrl);
-    }
-
-    await deleteCheckInSessionsForEvent(supabaseAdmin, finalEventId);
-    await deleteApplicationQuestionsForEvent(supabaseAdmin, finalEventId);
-  } else {
+  if (!input.eventId) {
     const normalizedBaseSlug = slugify(input.event.name ?? "");
     const baseSlug =
       normalizedBaseSlug === "item" ? "event" : normalizedBaseSlug;
@@ -198,46 +172,69 @@ export async function saveAdminEventAction(
       supabaseAdmin,
       baseSlug
     );
-    const slug = createUniqueSlug(
+    slug = createUniqueSlug(
       input.event.name ?? "event",
       existingSlugs,
       "event"
     );
-    const result = await insertEvent(supabaseAdmin, {
-      ...input.event,
-      name: input.event.name ?? "",
-      description: input.event.description ?? "",
-      regular_price: input.event.regular_price ?? 0,
-      member_price: input.event.member_price ?? 0,
-      max_capacity: input.event.max_capacity ?? 0,
-      slug,
-    } as EventInsert);
-    finalEventId = result.id;
   }
 
-  if (input.checkInSessions.length > 0) {
-    await insertCheckInSessions(
-      supabaseAdmin,
-      input.checkInSessions.map((session) => ({
-        ...session,
-        event_id: finalEventId,
-      }))
-    );
+  // The cover-image precondition is checked inside the same statement that
+  // writes the row, so a stale tab cannot overwrite a replacement made
+  // elsewhere between this form loading and saving.
+  const { data, error } = await supabaseAdmin.rpc(
+    "save_admin_event_atomically",
+    {
+      p_event_id: input.eventId ?? null,
+      p_event: input.event,
+      p_slug: slug,
+      p_expected_image_url: input.expectedImageUrl,
+      p_check_in_sessions: input.checkInSessions,
+      p_application_questions: input.applicationQuestions,
+      p_mentors: input.mentorIds,
+      p_sponsors: input.sponsorIds,
+    }
+  );
+  if (error) {
+    if (error.message.includes(IMAGE_CONFLICT_SENTINEL)) {
+      throw new Error(SAVE_CONFLICT_ERROR);
+    }
+    throw error;
   }
+  if (!data?.id) throw new Error("The event save returned no event id.");
 
-  if (input.applicationQuestions.length > 0) {
-    await insertApplicationQuestions(
-      supabaseAdmin,
-      input.applicationQuestions.map((question) => ({
-        ...question,
-        event_id: finalEventId,
-      }))
-    );
+  // The save landed, so the image it replaced is unreferenced.
+  if (input.eventId && (input.event.image_url ?? null) !== input.expectedImageUrl) {
+    await discardEventImage(input.expectedImageUrl);
   }
 
   revalidatePath("/admin/events");
-  revalidatePath(`/admin/events/${finalEventId}`);
-  return { id: finalEventId };
+  revalidatePath(`/admin/events/${data.id}`);
+  return { id: data.id };
+}
+
+export async function saveAdminMentorAction(
+  input: MentorInput
+): Promise<MentorRow> {
+  await requireAdmin();
+  if (!input.full_name.trim()) {
+    throw new Error("Mentor name is required.");
+  }
+  const mentor = await saveMentor(supabaseAdmin, input);
+  revalidatePath("/admin/events");
+  return mentor;
+}
+
+export async function saveAdminSponsorAction(
+  input: SponsorInput
+): Promise<SponsorRow> {
+  await requireAdmin();
+  if (!input.name.trim()) {
+    throw new Error("Sponsor name is required.");
+  }
+  const sponsor = await saveSponsor(supabaseAdmin, input);
+  revalidatePath("/admin/events");
+  return sponsor;
 }
 
 export async function deleteAdminEventAction(eventId: string) {

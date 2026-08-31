@@ -39,7 +39,6 @@ export default async function ApplicationReviewPage({
 
   return (
     <ApplicationReviewClient
-      eventId={eventId}
       registration={registration as AdminApplicationRegistration}
       userInfo={userInfo}
       event={event}

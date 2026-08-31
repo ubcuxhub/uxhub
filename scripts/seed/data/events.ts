@@ -45,6 +45,8 @@ type AgendaItem = {
 
 export interface SeedEvent {
   event: TablesInsert<"events"> & { slug: string };
+  mentors?: Mentor[];
+  sponsors?: string[];
   checkInSessions: Omit<TablesInsert<"check_in_sessions">, "event_id">[];
   applicationQuestions: Omit<
     TablesInsert<"event_application_questions">,
@@ -260,13 +262,13 @@ const applicationQuestions = {
   designSprint: [
     {
       question: "What year of study are you in?",
-      response_type: "single_select" as const,
+      response_type: "multiple_choice" as const,
       is_required: true,
       response_options: ["1", "2", "3", "4", "5+", "Not a student"],
     },
     {
       question: "How would you describe your experience with Figma?",
-      response_type: "single_select" as const,
+      response_type: "multiple_choice" as const,
       is_required: true,
       response_options: [
         "Never used it",
@@ -278,13 +280,13 @@ const applicationQuestions = {
     {
       question:
         "What do you want to walk away from the Design Sprint with? Two or three sentences is plenty.",
-      response_type: "text" as const,
+      response_type: "long_text" as const,
       is_required: true,
       max_char_limit: 500,
     },
     {
       question: "Any dietary restrictions we should know about for lunch?",
-      response_type: "multi_select" as const,
+      response_type: "checkbox" as const,
       is_required: false,
       response_options: [
         "None",
@@ -300,13 +302,13 @@ const applicationQuestions = {
   uxathon: [
     {
       question: "What year of study are you in?",
-      response_type: "single_select" as const,
+      response_type: "multiple_choice" as const,
       is_required: true,
       response_options: ["1", "2", "3", "4", "5+", "Not a student"],
     },
     {
       question: "Which area do you most want to contribute in?",
-      response_type: "multi_select" as const,
+      response_type: "checkbox" as const,
       is_required: true,
       response_options: [
         "User research",
@@ -319,21 +321,21 @@ const applicationQuestions = {
     },
     {
       question: "Have you participated in a hackathon or design sprint before?",
-      response_type: "single_select" as const,
+      response_type: "multiple_choice" as const,
       is_required: true,
       response_options: ["No, this is my first", "Once or twice", "Several times"],
     },
     {
       question:
         "Tell us about a design problem you have worked on recently. What was hard about it?",
-      response_type: "text" as const,
+      response_type: "long_text" as const,
       is_required: true,
       max_char_limit: 750,
     },
     {
       question:
         "Are you applying with teammates? List their names and we will keep you together.",
-      response_type: "text" as const,
+      response_type: "short_text" as const,
       is_required: false,
       max_char_limit: 200,
     },
@@ -354,6 +356,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
     openStudioEnd: addMonths(today, 24),
     coffeeSeriesStart: addMonths(today, -3),
     coffeeSeriesEnd: addMonths(today, 9),
+    portfolioReviewFuture: addMonths(today, 6),
     studentPanelFuture: addMonths(today, 12),
     designSprintFuture: addMonths(today, 24),
     uxathonFuture: addMonths(today, 18),
@@ -375,6 +378,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
     event: {
       name: `Get to Know UX Hub ${eventYear(schedule.getToKnowPast)}`,
       slug: "get-to-know-ux-hub-2025",
+      status: "archived",
       description:
         "Our first event of the year and the easiest way to meet everyone. Short intro to what UX Hub runs across the year, a design-themed icebreaker, and plenty of time to talk to the exec team. No experience needed and nothing to prepare — come find out whether this is your kind of club.",
       regular_price: 0,
@@ -405,6 +409,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
     event: {
       name: `Design Sprint ${eventYear(schedule.designSprintPast)}`,
       slug: "design-sprint-2025",
+      status: "archived",
       description:
         "One day, one brief, one clickable prototype. Teams of four run a compressed design sprint from problem framing through guerrilla research to a final critique in front of working designers. Our biggest first-term event and the fastest way to get something real into your portfolio.",
       regular_price: 15.0,
@@ -421,17 +426,17 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
         "https://images.unsplash.com/photo-1531403009284-440f080d1e12?auto=format&fit=crop&q=80&w=800&h=800",
       registration_start_time: historicalRegistration(schedule.designSprintPast).start,
       registration_end_time: historicalRegistration(schedule.designSprintPast).end,
-      mentors: designSprintMentors,
       agenda: designSprintAgenda,
-      sponsor_logos: [
-        "https://images.unsplash.com/photo-1611162616475-46b635cb6868?auto=format&fit=crop&q=80&w=300",
-        "https://images.unsplash.com/photo-1614680376593-902f74cf0d41?auto=format&fit=crop&q=80&w=300",
-      ],
       description_images: [
         "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=800",
         "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=800",
       ],
     },
+    mentors: designSprintMentors,
+    sponsors: [
+      "https://images.unsplash.com/photo-1611162616475-46b635cb6868?auto=format&fit=crop&q=80&w=300",
+      "https://images.unsplash.com/photo-1614680376593-902f74cf0d41?auto=format&fit=crop&q=80&w=300",
+    ],
     checkInSessions: [
       {
         name: "Morning Check-in",
@@ -448,8 +453,9 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
   },
   {
     event: {
-      name: `Student Design Mentorship Program ${eventYear(schedule.mentorshipStart)}–${eventYear(schedule.mentorshipEnd)} [ongoing]`,
+      name: `Student Design Mentorship Program ${eventYear(schedule.mentorshipStart)}–${eventYear(schedule.mentorshipEnd)}`,
       slug: "student-panel-2025",
+      status: "active",
       description:
         "A long-running mentorship program pairing students with peer and industry mentors. Members join monthly critiques, portfolio working sessions, and career conversations throughout the program.",
       regular_price: 20,
@@ -466,9 +472,9 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
         "https://images.unsplash.com/photo-1475721027785-f74eccf877e2?auto=format&fit=crop&q=80&w=800&h=800",
       registration_start_time: timestamp(addMonths(schedule.mentorshipStart, -3)),
       registration_end_time: timestamp(schedule.mentorshipEnd, 23, 59),
-      mentors: panelMentors,
       agenda: panelAgenda,
     },
+    mentors: panelMentors,
     checkInSessions: [
       {
         name: "Door Check-in",
@@ -482,6 +488,8 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
     event: {
       name: `UXathon ${eventYear(schedule.uxathonPast)}`,
       slug: "uxathon-2026",
+      status: "archived",
+      event_type: "flagship",
       description:
         "Our flagship event: 32 hours, one open-ended brief, and a room full of teams turning it into something defensible. Mentors from across the Vancouver design scene rotate through all weekend, and the final round is judged on how well you argue for your decisions — not just how good the screens look. Food, snacks, and swag included.",
       regular_price: 25.0,
@@ -498,18 +506,18 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
         "https://images.unsplash.com/photo-1542744173-8e7e53415bb0?auto=format&fit=crop&q=80&w=800&h=800",
       registration_start_time: historicalRegistration(schedule.uxathonPast).start,
       registration_end_time: historicalRegistration(schedule.uxathonPast).end,
-      mentors: uxathonMentors,
       agenda: [...uxathonAgendaDayOne, ...uxathonAgendaDayTwo],
-      sponsor_logos: [
-        "https://images.unsplash.com/photo-1611162616475-46b635cb6868?auto=format&fit=crop&q=80&w=300",
-        "https://images.unsplash.com/photo-1614680376593-902f74cf0d41?auto=format&fit=crop&q=80&w=300",
-        "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?auto=format&fit=crop&q=80&w=300",
-      ],
       description_images: [
         "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=800",
         "https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&q=80&w=800",
       ],
     },
+    mentors: uxathonMentors,
+    sponsors: [
+      "https://images.unsplash.com/photo-1611162616475-46b635cb6868?auto=format&fit=crop&q=80&w=300",
+      "https://images.unsplash.com/photo-1614680376593-902f74cf0d41?auto=format&fit=crop&q=80&w=300",
+      "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?auto=format&fit=crop&q=80&w=300",
+    ],
     checkInSessions: [
       {
         name: "Opening Ceremony Check-in",
@@ -533,6 +541,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
     event: {
       name: `Thinkbox Office Tour ${eventYear(schedule.thinkboxPast)}`,
       slug: "thinkbox-office-tour-2026",
+      status: "archived",
       description:
         "A small-group visit to Thinkbox's Vancouver studio. Walk the space, see how their design team actually works day to day, and stay for an informal Q&A with two of their product designers. Capacity is tight because they are hosting us in one room — sign up early.",
       regular_price: 10.0,
@@ -568,6 +577,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
     event: {
       name: `Industry Talk: AI and UX ${eventYear(schedule.industryTalkPast)}`,
       slug: "industry-talk-ai-and-ux-2026",
+      status: "archived",
       description:
         "A working designer walks through what actually changed in their process once AI tooling landed in it — what they use, what they abandoned, and which parts of the job turned out to be stubbornly human. Talk, then a long Q&A.",
       regular_price: 5.0,
@@ -598,8 +608,9 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
   /* ── Ongoing and upcoming events ────────────────────────────────────── */
   {
     event: {
-      name: `UX Hub Open Studio ${eventYear(schedule.openStudioStart)}–${eventYear(schedule.openStudioEnd)} [ongoing]`,
+      name: `UX Hub Open Studio ${eventYear(schedule.openStudioStart)}–${eventYear(schedule.openStudioEnd)}`,
       slug: "get-to-know-ux-hub-2026",
+      status: "active",
       description:
         "An always-on home base for the UX Hub community. Drop into recurring critique circles, co-working sessions, and open office hours throughout the program window.",
       regular_price: 0,
@@ -628,8 +639,9 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
   },
   {
     event: {
-      name: `Design Sprint ${eventYear(schedule.designSprintFuture)} [registration open]`,
+      name: `Design Sprint ${eventYear(schedule.designSprintFuture)}`,
       slug: "design-sprint-2026",
+      status: "draft",
       description:
         "One day, one brief, one clickable prototype. Teams of four run a compressed design sprint from problem framing through guerrilla research to a final critique in front of working designers. Our biggest first-term event and the fastest way to get something real into your portfolio.",
       regular_price: 15.0,
@@ -646,17 +658,17 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
         "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?auto=format&fit=crop&q=80&w=800&h=800",
       registration_start_time: openFutureRegistration(schedule.designSprintFuture).start,
       registration_end_time: openFutureRegistration(schedule.designSprintFuture).end,
-      mentors: designSprintMentors,
       agenda: designSprintAgenda,
-      sponsor_logos: [
-        "https://images.unsplash.com/photo-1611162616475-46b635cb6868?auto=format&fit=crop&q=80&w=300",
-        "https://images.unsplash.com/photo-1614680376593-902f74cf0d41?auto=format&fit=crop&q=80&w=300",
-      ],
       description_images: [
         "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=800",
         "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=800",
       ],
     },
+    mentors: designSprintMentors,
+    sponsors: [
+      "https://images.unsplash.com/photo-1611162616475-46b635cb6868?auto=format&fit=crop&q=80&w=300",
+      "https://images.unsplash.com/photo-1614680376593-902f74cf0d41?auto=format&fit=crop&q=80&w=300",
+    ],
     checkInSessions: [
       {
         name: "Morning Check-in",
@@ -673,8 +685,61 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
   },
   {
     event: {
+      name: `Portfolio Review Night ${eventYear(schedule.portfolioReviewFuture)}`,
+      slug: "portfolio-review-night-2027",
+      status: "active",
+      description:
+        "Bring one case study, a resume, or an early portfolio draft for focused feedback from working designers and UX Hub peers. Attendees rotate through short review tables and leave with a prioritized list of concrete improvements.",
+      regular_price: 8,
+      member_price: 0,
+      location_building: "AMS Nest",
+      location_room: "Room 2306",
+      location_address_url: "https://maps.app.goo.gl/9x8k2Qm4Zt6bXQ5s7",
+      start_date: dateString(schedule.portfolioReviewFuture),
+      start_time: "18:00:00",
+      end_date: dateString(schedule.portfolioReviewFuture),
+      end_time: "20:30:00",
+      max_capacity: 45,
+      image_url:
+        "https://images.unsplash.com/photo-1556761175-b413da4baf72?auto=format&fit=crop&q=80&w=800&h=800",
+      registration_start_time: openFutureRegistration(
+        schedule.portfolioReviewFuture
+      ).start,
+      registration_end_time: openFutureRegistration(
+        schedule.portfolioReviewFuture
+      ).end,
+      agenda: [
+        {
+          time: "6:00 PM",
+          title: "Check-in and reviewer matching",
+          description: "Choose a portfolio, resume, or case-study review track.",
+        },
+        {
+          time: "6:20 PM",
+          title: "Rapid review rounds",
+          description: "Three focused feedback conversations with rotating reviewers.",
+        },
+        {
+          time: "8:00 PM",
+          title: "Action planning and networking",
+          description: "Turn feedback into a short, prioritized improvement plan.",
+        },
+      ],
+    },
+    checkInSessions: [
+      {
+        name: "Door Check-in",
+        start_time: timestamp(schedule.portfolioReviewFuture, 17, 45),
+        end_time: timestamp(schedule.portfolioReviewFuture, 18, 45),
+      },
+    ],
+    applicationQuestions: [],
+  },
+  {
+    event: {
       name: `Student Panel ${eventYear(schedule.studentPanelFuture)}`,
       slug: "student-panel-2026",
+      status: "draft",
       description:
         "Four students and recent grads talk through how they actually got into UX — the switched majors, the rejected portfolios, the co-op that changed everything. Honest answers rather than a polished career-fair pitch, followed by open Q&A and networking.",
       regular_price: 0,
@@ -691,9 +756,9 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
         "https://images.unsplash.com/photo-1522071820081-009f0129c71c?auto=format&fit=crop&q=80&w=800&h=800",
       registration_start_time: timestamp(addMonths(today, 6)),
       registration_end_time: timestamp(addDays(schedule.studentPanelFuture, -5), 23, 59),
-      mentors: panelMentors,
       agenda: panelAgenda,
     },
+    mentors: panelMentors,
     checkInSessions: [
       {
         name: "Door Check-in",
@@ -705,8 +770,9 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
   },
   {
     event: {
-      name: `Coffee Chat Community Series ${eventYear(schedule.coffeeSeriesStart)}–${eventYear(schedule.coffeeSeriesEnd)} [ongoing]`,
+      name: `Coffee Chat Community Series ${eventYear(schedule.coffeeSeriesStart)}–${eventYear(schedule.coffeeSeriesEnd)}`,
       slug: "coffee-chat-social-2026",
+      status: "active",
       description:
         "A recurring low-key social series with coffee, pastries, rotating small-group chats, and optional feedback on work in progress.",
       regular_price: 0,
@@ -735,8 +801,10 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
   },
   {
     event: {
-      name: `UXathon ${eventYear(schedule.uxathonFuture)} [registration open]`,
+      name: `UXathon ${eventYear(schedule.uxathonFuture)}`,
       slug: "uxathon-2027",
+      status: "active",
+      event_type: "flagship",
       description:
         "Our flagship event: 32 hours, one open-ended brief, and a room full of teams turning it into something defensible. Mentors from across the Vancouver design scene rotate through all weekend, and the final round is judged on how well you argue for your decisions — not just how good the screens look. Food, snacks, and swag included.",
       regular_price: 25.0,
@@ -753,18 +821,18 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
         "https://images.unsplash.com/photo-1517245386807-bb43f82c33c4?auto=format&fit=crop&q=80&w=800&h=800",
       registration_start_time: openFutureRegistration(schedule.uxathonFuture).start,
       registration_end_time: openFutureRegistration(schedule.uxathonFuture).end,
-      mentors: uxathonMentors,
       agenda: [...uxathonAgendaDayOne, ...uxathonAgendaDayTwo],
-      sponsor_logos: [
-        "https://images.unsplash.com/photo-1611162616475-46b635cb6868?auto=format&fit=crop&q=80&w=300",
-        "https://images.unsplash.com/photo-1614680376593-902f74cf0d41?auto=format&fit=crop&q=80&w=300",
-        "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?auto=format&fit=crop&q=80&w=300",
-      ],
       description_images: [
         "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&q=80&w=800",
         "https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&q=80&w=800",
       ],
     },
+    mentors: uxathonMentors,
+    sponsors: [
+      "https://images.unsplash.com/photo-1611162616475-46b635cb6868?auto=format&fit=crop&q=80&w=300",
+      "https://images.unsplash.com/photo-1614680376593-902f74cf0d41?auto=format&fit=crop&q=80&w=300",
+      "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?auto=format&fit=crop&q=80&w=300",
+    ],
     checkInSessions: [
       {
         name: "Opening Ceremony Check-in",
@@ -786,8 +854,9 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
   },
   {
     event: {
-      name: `Thinkbox Office Tour ${eventYear(schedule.thinkboxFuture)} [registration open]`,
+      name: `Thinkbox Office Tour ${eventYear(schedule.thinkboxFuture)}`,
       slug: "thinkbox-office-tour-2027",
+      status: "active",
       description:
         "A small-group visit to Thinkbox's Vancouver studio. Walk the space, see how their design team actually works day to day, and stay for an informal Q&A with two of their product designers. Capacity is tight because they are hosting us in one room — sign up early.",
       regular_price: 10.0,

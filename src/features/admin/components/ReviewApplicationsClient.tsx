@@ -78,8 +78,8 @@ export function ReviewApplicationsClient({
 
   return (
     <PageContainer
-      backHref={`/admin/events/${eventId}`}
-      backLabel="Back to Event"
+      backHref="/admin/events"
+      backLabel="Back to Events"
       className="flex flex-col gap-8"
     >
             <header className="flex flex-col gap-4">

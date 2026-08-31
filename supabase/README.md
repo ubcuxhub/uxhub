@@ -10,6 +10,34 @@ helpers (e.g. `fetchEventById`) instead of writing `supabase.from("...")`
 directly. When the schema changes, you usually only need to edit the matching
 helper file plus the `TABLES` map — not every call site.
 
+## Rebuild the local database
+
+Docker must be running. The repository uses ports `15430`–`15437` because the
+default Supabase `5432x` range can be reserved by Docker Desktop on Windows.
+Set `.env.local` to the local values printed by `pnpm exec supabase status`;
+the API URL is `http://127.0.0.1:15431`.
+
+From the repository root, agents and developers can run:
+
+```bash
+./supabase/reset-local.sh
+```
+
+The script starts Supabase, destroys existing local database data, applies
+every migration in `supabase/migrations`, and runs the idempotent TypeScript
+seed reconciler. It never targets the linked remote database.
+
+The seed data lives under `scripts/seed/data/` and includes memberships, past,
+ongoing, and upcoming events, purchases, registrations, check-ins, and these
+local login fixtures (all use password `ux-hub`):
+
+- `admin-explorer@gmail.com` — administrator with an Explorer membership
+- `not-member@gmail.com` — basic user without a membership
+- `mock-member@example.com` — basic user with an Innovator membership
+
+To sync seed changes without destroying local data, run `pnpm seed`. Use
+`pnpm seed -- --dry-run` to preview the reconciliation.
+
 ## When you change the schema
 
 Do these steps in order:
@@ -66,6 +94,8 @@ helper file, and fix it in one place.
 | `event_application_responses` | `src/lib/supabase-helpers/event-applications.ts`  |
 | `check_in_sessions`           | `src/lib/supabase-helpers/check-ins.ts`           |
 | `check_ins`                   | `src/lib/supabase-helpers/check-ins.ts`           |
+| `mentors` / `event_mentors`   | `src/lib/supabase-helpers/event-people.ts`        |
+| `sponsors` / `event_sponsors` | `src/lib/supabase-helpers/event-people.ts`        |
 | `user_info`                   | `src/lib/supabase-helpers/users.ts`               |
 | `membership_types`            | `src/lib/supabase-helpers/memberships.ts`         |
 | `user_info` (service-role)    | `src/lib/supabase-helpers/admin-server.ts`        |

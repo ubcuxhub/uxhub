@@ -229,8 +229,8 @@ export function CheckInManager({
 
   return (
     <PageContainer
-      backHref={`/admin/events/${eventId}`}
-      backLabel="Back to Event"
+      backHref="/admin/events"
+      backLabel="Back to Events"
       className="flex flex-col gap-6"
     >
             {/* Header */}

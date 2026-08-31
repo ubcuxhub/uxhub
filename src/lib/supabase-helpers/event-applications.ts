@@ -14,6 +14,8 @@ export interface ApplicationResponseWithQuestion {
   event_application_questions: {
     id: string;
     question: string;
+    description: string | null;
+    is_required: boolean;
     response_type: string;
     max_char_limit: number | null;
     response_options: string[] | null;
@@ -28,7 +30,7 @@ export async function fetchApplicationQuestions(
     .from(TABLES.eventApplicationQuestions)
     .select("*")
     .eq("event_id", eventId)
-    .order("created_at", { ascending: true });
+    .order("sort_order", { ascending: true });
 
   if (error) throw error;
   return data ?? [];
@@ -74,6 +76,8 @@ export async function fetchApplicationResponsesForRegistration(
       event_application_questions (
         id,
         question,
+        description,
+        is_required,
         response_type,
         max_char_limit,
         response_options

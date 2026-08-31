@@ -177,6 +177,8 @@ uxhub/
 
 **Data access lives in `src/lib/supabase-helpers/`.** Pages, components, hooks, actions, and route handlers should call typed helpers instead of scattering raw `supabase.from("...")` calls. Helpers take an injected `DbClient` from `src/lib/supabase-helpers/types.ts`, so the same helper can run with the browser client, server client, service-role client, or tests. Raw table names, including realtime `postgres_changes` table names, should come from `TABLES` in `src/lib/supabase-helpers/tables.ts`.
 
+**Events use lifecycle status for visibility.** `events.status` is `draft`, `active`, or `archived`. Marketing routes, student portal event routes, and event checkout should only fetch `active` events. Admin event routes show all statuses so admins can draft, publish, and archive events.
+
 **Service-role access is isolated.** RLS-bypassing operations use `src/lib/supabase/admin.ts` and the server-only helpers in `src/lib/supabase-helpers/admin-server.ts`. See [`supabase/README.md`](../supabase/README.md) for the schema-change runbook and table-to-helper mapping.
 
 **Use server actions for first-party mutations when possible.** The checkout flow currently uses `src/features/payments/actions.ts`, which delegates to `src/features/payments/fulfillment.ts`. Route handlers are still used where a normal form/action boundary is not enough: Supabase email confirmation, Square webhooks, Auth-to-`user_info` linking, and event image upload.
@@ -239,8 +241,8 @@ Notes:
 
 - URLs are unchanged from before the `(shell)`/`(focused)` split; the group only decides whether the sidebar renders.
 - `/portal` is a simple welcome landing (greeting + a "become a member" banner for non-members).
-- `/portal/events` is the personalized registered-events view (ongoing/upcoming/attended) plus a link to the public `/events` page. Event cards link to the portal `/portal/events/[slug]` detail page.
-- `[event]` is treated as an event slug in student-facing routes. `/portal/events/[event]` is a simple portal event-detail page (name, date/time, location, and a button linking to the public `/events/[slug]` page); `/portal/events/[event]/checkout` handles checkout (sidebar-less).
+- `/portal/events` is the personalized registered-events view (ongoing/upcoming/attended) plus a link to the public `/events` page. Only active events are shown. Event cards link to the portal `/portal/events/[slug]` detail page.
+- `[event]` is treated as an event slug in student-facing routes. `/portal/events/[event]` is a simple portal event-detail page (name, date/time, location, and a button linking to the public `/events/[slug]` page); `/portal/events/[event]/checkout` is sidebar-less and handles checkout for active events only.
 - `/portal/membership/join` is the deep-linkable membership onboarding wizard (`MembershipWizard`) — it collects user type / identity, then redirects to `/portal/membership`. The profile page's "Join now" button links here.
 - `/portal/membership/[membership]` is a legacy ID route that looks up the membership type by ID and redirects to `/portal/membership/[slug]/checkout`.
 - There is no checkout confirmation route at the moment.
@@ -261,7 +263,7 @@ Notes:
 Notes:
 
 - `[event]` is treated as an event ID in admin routes.
-- Admin event editing happens at `/admin/events/[event]`; there is no separate `/edit` child route.
+- Admin event editing happens at `/admin/events/[event]`; there is no separate `/edit` child route. Admins can save drafts, publish active events, and archive events from the edit form.
 - There are currently no admin purchase-list, purchase-detail, or individual user-detail pages.
 
 ### API

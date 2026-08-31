@@ -53,6 +53,10 @@ const TABLE = {
   events: "events",
   checkInSessions: "check_in_sessions",
   eventApplicationQuestions: "event_application_questions",
+  mentors: "mentors",
+  sponsors: "sponsors",
+  eventMentors: "event_mentors",
+  eventSponsors: "event_sponsors",
 } as const;
 
 interface Options extends ReconcileOptions {
@@ -227,7 +231,16 @@ async function main(): Promise<void> {
     const { idsBySlug, counts: eventCounts } = await upsertBySlug(
       supabase,
       TABLE.events,
-      seedEvents.map((seed) => seed.event),
+      seedEvents.map((seed) => ({
+        ...seed.event,
+        event_type: seed.event.event_type ?? "regular",
+        short_description:
+          seed.event.short_description ??
+          seed.event.description.slice(0, 180),
+        mentors_enabled: Boolean(seed.mentors?.length),
+        sponsors_enabled: Boolean(seed.sponsors?.length),
+        applications_enabled: seed.applicationQuestions.length > 0,
+      })),
       options
     );
     summary.push(format("Events", eventCounts));
@@ -266,10 +279,108 @@ async function main(): Promise<void> {
           "event_id",
           eventId,
           "question",
-          seed.applicationQuestions,
+          seed.applicationQuestions.map((question, sortOrder) => ({
+            ...question,
+            description: null,
+            sort_order: sortOrder,
+          })),
           options
         )
       );
+
+      if (!options.dryRun) {
+        const mentorIds: string[] = [];
+        for (const mentor of seed.mentors ?? []) {
+          const { data: existingMentor, error: mentorReadError } = await supabase
+            .from(TABLE.mentors)
+            .select("id")
+            .eq("full_name", mentor.name)
+            .maybeSingle();
+          if (mentorReadError) throw mentorReadError;
+
+          const mentorPayload = {
+            full_name: mentor.name,
+            position: [mentor.role, mentor.company].filter(Boolean).join(" at "),
+            linkedin_url: mentor.linkedin_url ?? null,
+            description: mentor.bio ?? null,
+            profile_image_path: mentor.image_url ?? null,
+          };
+          if (existingMentor) {
+            const { error } = await supabase
+              .from(TABLE.mentors)
+              .update(mentorPayload)
+              .eq("id", existingMentor.id);
+            if (error) throw error;
+            mentorIds.push(existingMentor.id);
+          } else {
+            const { data, error } = await supabase
+              .from(TABLE.mentors)
+              .insert(mentorPayload)
+              .select("id")
+              .single();
+            if (error) throw error;
+            mentorIds.push(data.id);
+          }
+        }
+
+        const { error: clearMentorsError } = await supabase
+          .from(TABLE.eventMentors)
+          .delete()
+          .eq("event_id", eventId);
+        if (clearMentorsError) throw clearMentorsError;
+        if (mentorIds.length) {
+          const { error } = await supabase.from(TABLE.eventMentors).insert(
+            mentorIds.map((mentorId, sortOrder) => ({
+              event_id: eventId,
+              mentor_id: mentorId,
+              sort_order: sortOrder,
+            }))
+          );
+          if (error) throw error;
+        }
+
+        const sponsorIds: string[] = [];
+        for (const [index, logo] of (seed.sponsors ?? []).entries()) {
+          const { data: existingSponsor, error: sponsorReadError } =
+            await supabase
+              .from(TABLE.sponsors)
+              .select("id")
+              .eq("brand_logo_path", logo)
+              .maybeSingle();
+          if (sponsorReadError) throw sponsorReadError;
+
+          if (existingSponsor) {
+            sponsorIds.push(existingSponsor.id);
+          } else {
+            const { data, error } = await supabase
+              .from(TABLE.sponsors)
+              .insert({
+                name: `Seed Sponsor ${index + 1}`,
+                brand_logo_path: logo,
+              })
+              .select("id")
+              .single();
+            if (error) throw error;
+            sponsorIds.push(data.id);
+          }
+        }
+
+        const { error: clearSponsorsError } = await supabase
+          .from(TABLE.eventSponsors)
+          .delete()
+          .eq("event_id", eventId);
+        if (clearSponsorsError) throw clearSponsorsError;
+        if (sponsorIds.length) {
+          const { error } = await supabase.from(TABLE.eventSponsors).insert(
+            sponsorIds.map((sponsorId, sortOrder) => ({
+              event_id: eventId,
+              sponsor_id: sponsorId,
+              sort_order: sortOrder,
+            }))
+          );
+          if (error) throw error;
+        }
+      }
     }
 
     summary.push(format("Check-in sessions", sessionCounts));

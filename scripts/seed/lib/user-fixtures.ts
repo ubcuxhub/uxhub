@@ -202,7 +202,7 @@ export function validateUserFixtures(
 
         if (question.response_options && response) {
           const selected =
-            question.response_type === "multi_select"
+            question.response_type === "checkbox"
               ? response.split(",").map((value) => value.trim())
               : [response];
           const invalid = selected.find(

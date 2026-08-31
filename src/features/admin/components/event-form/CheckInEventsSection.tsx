@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarIcon } from "lucide-react";
+import { CalendarIcon, Plus, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -167,14 +167,6 @@ export const CheckInEventsSection = ({
             a name, start time, and end time.
           </FieldDescription>
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onAdd}
-          className="shrink-0"
-        >
-          Add
-        </Button>
       </div>
       <FieldGroup className="gap-4">
         {checkInEvents.map((item, index) => {
@@ -189,8 +181,19 @@ export const CheckInEventsSection = ({
           return (
             <FieldGroup
               key={`check-in-${index}`}
-              className="grid gap-3 rounded-lg border p-4"
+              className="relative grid gap-3 rounded-xl border bg-card p-4 pr-12"
             >
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="absolute right-2 top-2"
+                aria-label={`Remove check-in session ${index + 1}`}
+                onClick={() => onRemove(index)}
+                disabled={checkInEvents.length === 1}
+              >
+                <X />
+              </Button>
               <Field>
                 <FieldLabel htmlFor={`check_name_${index}`}>
                   Name <span className="text-destructive">*</span>
@@ -223,20 +226,18 @@ export const CheckInEventsSection = ({
                   Check-in end time must be after the start time.
                 </FieldError>
               )}
-              <div className="flex justify-end">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="text-destructive hover:text-destructive/80"
-                  onClick={() => onRemove(index)}
-                  disabled={checkInEvents.length === 1}
-                >
-                  Remove
-                </Button>
-              </div>
             </FieldGroup>
           );
         })}
+        <Button
+          type="button"
+          variant="outline"
+          className="min-h-20 w-full"
+          onClick={onAdd}
+        >
+          <Plus data-icon="inline-start" />
+          Add Check-In Session
+        </Button>
       </FieldGroup>
     </FieldSet>
   );
