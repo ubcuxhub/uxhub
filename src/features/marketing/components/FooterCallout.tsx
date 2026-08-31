@@ -3,6 +3,7 @@
 import React from "react";
 import Image from "next/image";
 import Button from "./Button";
+import MembershipCta from "./MembershipCta";
 
 export default function FooterCallout() {
   const handleContactClick = () => {
@@ -47,9 +48,7 @@ export default function FooterCallout() {
           </p>
 
           <div className="flex flex-col items-center justify-center gap-3 sm:flex-row pt-4">
-            <Button variant="primary" href="/portal/membership/join">
-              BECOME A MEMBER
-            </Button>
+            <MembershipCta />
 
             <Button
               variant="secondary"

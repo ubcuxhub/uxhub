@@ -3,6 +3,7 @@ import { FlowLink } from "@/components/shared/FlowLink";
 import { Button } from "@/components/ui/button";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { requireAuth } from "@/lib/auth/guards";
+import { hasActiveMembership } from "@/lib/membership";
 import { ArrowRight, CalendarDays, Sparkles } from "lucide-react";
 
 function BecomeMemberBanner() {
@@ -32,10 +33,7 @@ function BecomeMemberBanner() {
 export default async function PortalHome() {
   const user = await requireAuth();
   const firstName = user.name?.split(" ")[0] || user.email.split("@")[0] || "there";
-  const isMember =
-    Boolean(user.membership_type_id) &&
-    (!user.membership_expires_at ||
-      new Date(user.membership_expires_at) > new Date());
+  const isMember = hasActiveMembership(user);
 
   return (
     <PageContainer>

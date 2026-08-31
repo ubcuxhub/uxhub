@@ -2,7 +2,7 @@
 "use client";
 
 import Image from "next/image";
-import Button from "@/features/marketing/components/Button";
+import MembershipCta from "@/features/marketing/components/MembershipCta";
 
 export default function Hero() {
   return (
@@ -164,9 +164,7 @@ export default function Hero() {
             </p>
 
             <div className="mt-10 flex gap-4 sm:mt-12 md:mt-14">
-              <Button variant="primary" href="/portal/membership/join">
-                BECOME A MEMBER
-              </Button>
+              <MembershipCta />
             </div>
           </div>
         </div>

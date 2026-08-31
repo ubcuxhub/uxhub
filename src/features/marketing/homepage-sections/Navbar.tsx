@@ -6,6 +6,7 @@ import Image from "next/image";
 import { Menu } from "lucide-react";
 import Button from "@/features/marketing/components/Button";
 import { useUser } from "@/context/UserContext";
+import { hasActiveMembership } from "@/lib/membership";
 
 const navLink =
   "text-black no-underline font-sans font-medium leading-normal whitespace-nowrap decoration-transparent transition-all duration-200 hover:text-gray-600";
@@ -22,7 +23,7 @@ export default function Navbar() {
 
   const close = () => setOpen(false);
 
-  const isMember = Boolean(user?.membership_type_id) && (!user?.membership_expires_at || new Date(user.membership_expires_at) > new Date());
+  const isMember = hasActiveMembership(user);
 
   return (
     <div className="fixed inset-x-0 top-0 z-50 bg-white py-1">
