@@ -7,15 +7,10 @@ import MailingList from "@/features/marketing/homepage-sections/MailingListSecti
 import Navbar from "@/features/marketing/homepage-sections/Navbar";
 import TeamSection from "@/features/marketing/homepage-sections/TeamSection";
 import WhoWeAreSection from "@/features/marketing/homepage-sections/WhoWeAreSection";
-import { createPublicClient } from "@/lib/supabase/public";
-import { fetchEvents } from "@/lib/supabase-helpers/events";
 
 export const revalidate = 300;
 
-export default async function Home() {
-  const supabase = createPublicClient();
-  const events = (await fetchEvents(supabase)).slice(0, 2);
-
+export default function Home() {
   return (
     <main className="bg-white">
       <Navbar />
@@ -36,7 +31,7 @@ export default async function Home() {
         <MailingList />
         <WhoWeAreSection />
         <LogoCarousel />
-        <EventsSection events={events} />
+        <EventsSection />
         <TeamSection />
       </div>
 
