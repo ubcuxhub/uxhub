@@ -61,15 +61,21 @@ export default function Navbar() {
                       GO TO PORTAL
                     </Button>
                   )}
-                  {!isMember && (
-                    <Button variant="primary" withArrow={false} shorterHeight={true} href="/portal/membership/join">
-                      BECOME A MEMBER
+                  {!user ? (
+                    <Button variant="primary" withArrow={false} shorterHeight={true} href="/auth/login">
+                      LOGIN TO PORTAL
                     </Button>
+                  ) : (
+                    !isMember && (
+                      <Button variant="primary" withArrow={false} shorterHeight={true} href="/portal/membership/join">
+                        BECOME A MEMBER
+                      </Button>
+                    )
                   )}
                 </>
               ) : (
-                <Button variant="primary" withArrow={false} shorterHeight={true} href="/portal/membership/join">
-                  BECOME A MEMBER
+                <Button variant="primary" withArrow={false} shorterHeight={true} href="/auth/login">
+                  LOGIN TO PORTAL
                 </Button>
               )}
             </div>
@@ -122,15 +128,21 @@ export default function Navbar() {
                         GO TO PORTAL
                       </Button>
                     )}
-                    {!isMember && (
-                      <Button variant="primary" withArrow={false} shorterHeight={true} href="/portal/membership/join">
-                        BECOME A MEMBER
+                    {!user ? (
+                      <Button variant="primary" withArrow={false} shorterHeight={true} href="/auth/login">
+                        LOGIN TO PORTAL
                       </Button>
+                    ) : (
+                      !isMember && (
+                        <Button variant="primary" withArrow={false} shorterHeight={true} href="/portal/membership/join">
+                          BECOME A MEMBER
+                        </Button>
+                      )
                     )}
                   </>
                 ) : (
-                  <Button variant="primary" withArrow={false} shorterHeight={true} href="/portal/membership/join">
-                    BECOME A MEMBER
+                  <Button variant="primary" withArrow={false} shorterHeight={true} href="/auth/login">
+                    LOGIN TO PORTAL
                   </Button>
                 )}
               </div>
