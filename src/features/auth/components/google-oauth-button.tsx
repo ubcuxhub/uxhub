@@ -40,28 +40,23 @@ export function GoogleOAuthButton({
   };
 
   return (
-    <div className="space-y-3">
+    <div>
       <Button
         type="button"
         variant="outline"
-        className="w-full"
+        className="h-9 w-full rounded-md bg-background text-body font-medium text-foreground shadow-none"
         disabled={isLoading}
         onClick={handleGoogleOAuth}
       >
         <FcGoogle className="size-5" />
         {isLoading ? "Redirecting..." : "Continue with Google"}
       </Button>
-      {error ? <p className="text-small text-destructive">{error}</p> : null}
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t" />
-        </div>
-        <div className="relative flex justify-center text-small uppercase">
-          <span className="bg-card px-2 text-muted-foreground">
-            or continue with email
-          </span>
-        </div>
-      </div>
+
+      {error ? (
+        <p className="mt-3 text-small text-destructive" aria-live="polite">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

@@ -1,22 +1,19 @@
 "use client";
 
-import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { Input } from "@/components/ui/input";
+import { Field, FieldLabel } from "@/components/ui/field";
+import { createClient } from "@/lib/supabase/client";
+
+import { AuthPanel } from "./auth-panel";
+import { AuthSubmitButton } from "./auth-submit-button";
 import { GoogleOAuthButton } from "./google-oauth-button";
+
+const authInputClassName =
+  "h-10 rounded-md border-border bg-white text-body text-fg shadow-none placeholder:text-fg-muted focus-visible:ring-focus";
 
 export function LoginForm({
   className,
@@ -29,20 +26,27 @@ export function LoginForm({
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
+  const canSubmit = email.length > 0 && password.length > 0;
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!canSubmit) return;
+
     const supabase = createClient();
     setIsLoading(true);
     setError(null);
 
     try {
       const normalizedEmail = email.trim().toLowerCase();
+
       const { error } = await supabase.auth.signInWithPassword({
         email: normalizedEmail,
         password,
       });
+
       if (error) throw error;
-      // Update this route to redirect to an authenticated route. The user already has an active session.
+
       router.replace(nextPath);
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
@@ -52,64 +56,78 @@ export function LoginForm({
   };
 
   return (
-    <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-h2">Login</CardTitle>
-          <CardDescription>
-            Enter your email below to login to your account
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <GoogleOAuthButton nextPath={nextPath} />
-          <form onSubmit={handleLogin}>
-            <div className="mt-6 flex flex-col gap-6">
-              <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="m@example.com"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              <div className="grid gap-2">
-                <div className="flex items-center">
-                  <Label htmlFor="password">Password</Label>
-                  <Link
-                    href="/auth/forgot-password"
-                    className="ml-auto inline-block text-small underline-offset-4 hover:underline"
-                  >
-                    Forgot your password?
-                  </Link>
-                </div>
-                <Input
-                  id="password"
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
-              {error && <p className="text-small text-destructive">{error}</p>}
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading ? "Logging in..." : "Login"}
-              </Button>
-            </div>
-            <div className="mt-4 text-center text-small">
-              Don&apos;t have an account?{" "}
-              <Link
-                href={`/auth/sign-up?next=${encodeURIComponent(nextPath)}`}
-                className="underline underline-offset-4"
-              >
-                Sign up
-              </Link>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+    <AuthPanel
+      title="Sign in"
+      description="Continue to the UBC UX Hub Portal with:"
+      className={className}
+      {...props}
+    >
+      <GoogleOAuthButton nextPath={nextPath} />
+
+      <div className="my-6 text-center text-body text-fg-secondary">
+        or continue with email
+      </div>
+
+      <form onSubmit={handleLogin} className="space-y-6">
+        <Field>
+          <FieldLabel htmlFor="email" className="text-body text-fg">
+            Email
+          </FieldLabel>
+          <Input
+            id="email"
+            type="email"
+            placeholder="name@example.com"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={authInputClassName}
+          />
+        </Field>
+
+        <Field>
+          <div className="flex items-center justify-between gap-4">
+            <FieldLabel htmlFor="password" className="text-body text-fg">
+              Password
+            </FieldLabel>
+            <Link
+              href="/auth/forgot-password"
+              className="text-body text-fg underline-offset-4 hover:underline"
+            >
+              Forgot password?
+            </Link>
+          </div>
+
+          <Input
+            id="password"
+            type="password"
+            placeholder="Enter your password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className={authInputClassName}
+          />
+        </Field>
+
+        {error ? (
+          <p className="text-small text-destructive" aria-live="polite">
+            {error}
+          </p>
+        ) : null}
+
+        <AuthSubmitButton type="submit" disabled={!canSubmit || isLoading}>
+          {isLoading ? "Signing in..." : "Sign in"}
+        </AuthSubmitButton>
+
+        <p className="text-center text-body text-fg-secondary">
+          Don&apos;t have an account?{" "}
+          <Link
+            href={`/auth/sign-up?next=${encodeURIComponent(nextPath)}`}
+            className="font-medium text-fg underline underline-offset-4"
+          >
+            Sign up
+          </Link>
+        </p>
+      </form>
+    </AuthPanel>
   );
 }

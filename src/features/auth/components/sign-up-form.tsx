@@ -1,29 +1,30 @@
 "use client";
 
-import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { GoogleOAuthButton } from "./google-oauth-button";
+import { Input } from "@/components/ui/input";
+import {
+  Field,
+  FieldDescription,
+  FieldLabel,
+} from "@/components/ui/field";
+import { createClient } from "@/lib/supabase/client";
+
+import { AuthPanel } from "./auth-panel";
+import { AuthSubmitButton } from "./auth-submit-button";
 
 type SignUpFormData = {
+  firstName: string;
+  lastName: string;
   email: string;
   password: string;
   repeatPassword: string;
-  name: string;
 };
+
+const authInputClassName =
+  "h-10 rounded-md border-border bg-white text-body text-fg shadow-none placeholder:text-fg-muted focus-visible:ring-focus";
 
 export function SignUpForm({
   className,
@@ -31,18 +32,33 @@ export function SignUpForm({
   ...props
 }: React.ComponentPropsWithoutRef<"div"> & { nextPath?: string }) {
   const [formData, setFormData] = useState<SignUpFormData>({
+    firstName: "",
+    lastName: "",
     email: "",
     password: "",
     repeatPassword: "",
-    name: "",
   });
 
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
+  const fullName =
+    `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim();
+
+  const canSubmit =
+    formData.firstName.length > 0 &&
+    formData.lastName.length > 0 &&
+    formData.email.length > 0 &&
+    formData.password.length >= 8 &&
+    formData.repeatPassword.length > 0 &&
+    formData.password === formData.repeatPassword;
+
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!canSubmit) return;
+
     const supabase = createClient();
     setIsLoading(true);
     setError(null);
@@ -53,15 +69,24 @@ export function SignUpForm({
       return;
     }
 
+    if (formData.password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const normalizedEmail = formData.email.trim().toLowerCase();
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: normalizedEmail,
         password: formData.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(
+            nextPath,
+          )}`,
           data: {
-            full_name: formData.name,
+            full_name: fullName,
           },
         },
       });
@@ -71,14 +96,13 @@ export function SignUpForm({
       const user = authData.user;
       if (!user) throw new Error("User not returned from Supabase");
 
-      // When email confirmation is disabled, signUp returns a session and the
-      // authenticated route can create the profile immediately. Otherwise the
-      // confirmation callback creates it once the session exists.
       if (authData.session) {
         const res = await fetch("/api/auth/complete-profile", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: formData.name }),
+          body: JSON.stringify({
+            name: fullName,
+          }),
         });
 
         const result = await res.json();
@@ -89,9 +113,7 @@ export function SignUpForm({
         }
       }
 
-      router.push(
-        `/auth/sign-up-success?next=${encodeURIComponent(nextPath)}`,
-      );
+      router.push(`/auth/sign-up-success?next=${encodeURIComponent(nextPath)}`);
     } catch (error: unknown) {
       console.error("Sign up error:", error);
       setError(error instanceof Error ? error.message : "An error occurred");
@@ -105,85 +127,113 @@ export function SignUpForm({
   };
 
   return (
-    <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-h2">Sign up</CardTitle>
-          <CardDescription>Create a new account</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <GoogleOAuthButton nextPath={nextPath} />
-          <form onSubmit={handleSignUp} className="space-y-6">
-            <div className="space-y-4 pt-6">
-              <div className="space-y-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="name">Name *</Label>
-                  <Input
-                    id="name"
-                    placeholder="John Doe"
-                    required
-                    value={formData.name}
-                    onChange={(e) => handleChange("name", e.target.value)}
-                  />
-                </div>
+    <AuthPanel
+      title="Sign up"
+      description="Create a new account."
+      density="compact"
+      className={className}
+      {...props}
+    >
+      <form onSubmit={handleSignUp} className="space-y-4">
+        <div className="grid gap-6 sm:grid-cols-2">
+          <Field>
+            <FieldLabel htmlFor="first-name" className="text-body text-fg">
+              First Name *
+            </FieldLabel>
+            <Input
+              id="first-name"
+              placeholder="Enter your first name"
+              required
+              value={formData.firstName}
+              onChange={(e) => handleChange("firstName", e.target.value)}
+              className={authInputClassName}
+            />
+          </Field>
 
-                <div className="grid gap-2">
-                  <Label htmlFor="email">Email *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="m@example.com"
-                    required
-                    value={formData.email}
-                    onChange={(e) => handleChange("email", e.target.value)}
-                  />
-                </div>
-              </div>
+          <Field>
+            <FieldLabel htmlFor="last-name" className="text-body text-fg">
+              Last Name *
+            </FieldLabel>
+            <Input
+              id="last-name"
+              placeholder="Enter your last name"
+              required
+              value={formData.lastName}
+              onChange={(e) => handleChange("lastName", e.target.value)}
+              className={authInputClassName}
+            />
+          </Field>
+        </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="password">Password *</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    required
-                    value={formData.password}
-                    onChange={(e) => handleChange("password", e.target.value)}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="repeat-password">Confirm Password *</Label>
-                  <Input
-                    id="repeat-password"
-                    type="password"
-                    required
-                    value={formData.repeatPassword}
-                    onChange={(e) =>
-                      handleChange("repeatPassword", e.target.value)
-                    }
-                  />
-                </div>
-              </div>
-            </div>
+        <Field>
+          <FieldLabel htmlFor="email" className="text-body text-fg">
+            Email *
+          </FieldLabel>
+          <Input
+            id="email"
+            type="email"
+            placeholder="name@example.com"
+            required
+            value={formData.email}
+            onChange={(e) => handleChange("email", e.target.value)}
+            className={authInputClassName}
+          />
+        </Field>
 
-            {error && <p className="text-small text-destructive">{error}</p>}
+        <Field>
+          <FieldLabel htmlFor="password" className="text-body text-fg">
+            Password *
+          </FieldLabel>
+          <Input
+            id="password"
+            type="password"
+            placeholder="Enter your password"
+            required
+            minLength={8}
+            value={formData.password}
+            onChange={(e) => handleChange("password", e.target.value)}
+            className={authInputClassName}
+          />
+          <FieldDescription className="text-body text-fg-secondary">
+            Password must be at least 8 characters.
+          </FieldDescription>
+        </Field>
 
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Creating account..." : "Sign up"}
-            </Button>
+        <Field>
+          <FieldLabel htmlFor="repeat-password" className="text-body text-fg">
+            Confirm password *
+          </FieldLabel>
+          <Input
+            id="repeat-password"
+            type="password"
+            placeholder="Re-enter your password"
+            required
+            value={formData.repeatPassword}
+            onChange={(e) => handleChange("repeatPassword", e.target.value)}
+            className={authInputClassName}
+          />
+        </Field>
 
-            <div className="text-center text-small">
-              Already have an account?{" "}
-              <Link
-                href={`/auth/login?next=${encodeURIComponent(nextPath)}`}
-                className="underline underline-offset-4"
-              >
-                Login
-              </Link>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+        {error ? (
+          <p className="text-small text-destructive" aria-live="polite">
+            {error}
+          </p>
+        ) : null}
+
+        <AuthSubmitButton type="submit" disabled={!canSubmit || isLoading}>
+          {isLoading ? "Creating account..." : "Complete sign up"}
+        </AuthSubmitButton>
+
+        <p className="text-center text-body text-fg-secondary">
+          Already have an account?{" "}
+          <Link
+            href={`/auth/login?next=${encodeURIComponent(nextPath)}`}
+            className="font-medium text-fg underline underline-offset-4"
+          >
+            Sign in
+          </Link>
+        </p>
+      </form>
+    </AuthPanel>
   );
 }
