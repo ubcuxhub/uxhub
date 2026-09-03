@@ -36,13 +36,12 @@ export async function fetchEventRegistrationCount(
   supabase: DbClient,
   eventId: string
 ): Promise<number> {
-  const { count, error } = await supabase
-    .from(TABLES.eventRegistrations)
-    .select("id", { count: "exact", head: true })
-    .eq("event_id", eventId);
+  const { data, error } = await supabase.rpc("event_registration_count", {
+    p_event_id: eventId,
+  });
 
   if (error) throw error;
-  return count ?? 0;
+  return data ?? 0;
 }
 
 /** Returns all event registrations for a given user. */

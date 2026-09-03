@@ -220,6 +220,29 @@ begin
 end;
 $$;
 
+do $$
+declare
+  anon_registration_privileges integer;
+begin
+  select count(*)
+  into anon_registration_privileges
+  from information_schema.role_table_grants
+  where table_schema = 'public'
+    and table_name = 'event_registrations'
+    and grantee = 'anon';
+
+  if anon_registration_privileges <> 0 then
+    raise exception 'anon still has event_registrations table privileges';
+  end if;
+end;
+$$;
+
+set local role anon;
+
+select public.event_registration_count('00000000-0000-0000-0000-000000000001');
+
+reset role;
+
 select set_config(
   'request.jwt.claims',
   json_build_object(

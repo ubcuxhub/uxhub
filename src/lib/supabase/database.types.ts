@@ -801,6 +801,10 @@ export type Database = {
         Args: { target_event_id: string }
         Returns: undefined
       }
+      event_registration_count: {
+        Args: { p_event_id: string }
+        Returns: number
+      }
       finalize_paid_event_ticket: {
         Args: { p_purchase_id: string }
         Returns: string
