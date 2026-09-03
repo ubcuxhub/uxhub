@@ -4,6 +4,7 @@ import { useState } from "react";
 import { FcGoogle } from "react-icons/fc";
 
 import { Button } from "@/components/ui/button";
+import { FieldError, FieldSeparator } from "@/components/ui/field";
 import { createClient } from "@/lib/supabase/client";
 
 interface GoogleOAuthButtonProps {
@@ -44,7 +45,7 @@ export function GoogleOAuthButton({
       <Button
         type="button"
         variant="outline"
-        className="h-9 w-full rounded-md bg-background text-body font-medium text-foreground shadow-none"
+        className="h-10 w-full font-medium shadow-none"
         disabled={isLoading}
         onClick={handleGoogleOAuth}
       >
@@ -52,11 +53,13 @@ export function GoogleOAuthButton({
         {isLoading ? "Redirecting..." : "Continue with Google"}
       </Button>
 
-      {error ? (
-        <p className="mt-3 text-small text-destructive" aria-live="polite">
-          {error}
-        </p>
-      ) : null}
+      {error ? <FieldError className="mt-3">{error}</FieldError> : null}
+
+      {/* The provider set must stay identical on login and sign-up: with OAuth
+          the same button both creates and signs in to an account. */}
+      <FieldSeparator className="my-8 [&>[data-slot=field-separator-content]]:bg-card">
+        or continue with email
+      </FieldSeparator>
     </div>
   );
 }

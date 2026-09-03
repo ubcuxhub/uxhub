@@ -4,16 +4,22 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { Input } from "@/components/ui/input";
 import {
   Field,
   FieldDescription,
+  FieldError,
   FieldLabel,
 } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 
 import { AuthPanel } from "./auth-panel";
+import { authInputClassName } from "./auth-styles";
 import { AuthSubmitButton } from "./auth-submit-button";
+import { GoogleOAuthButton } from "./google-oauth-button";
+import { setPendingEmail } from "../pending-email";
+
+const MIN_PASSWORD_LENGTH = 8;
 
 type SignUpFormData = {
   firstName: string;
@@ -23,8 +29,9 @@ type SignUpFormData = {
   repeatPassword: string;
 };
 
-const authInputClassName =
-  "h-10 rounded-md border-border bg-white text-body text-fg shadow-none placeholder:text-fg-muted focus-visible:ring-focus";
+type SignUpFieldErrors = Partial<
+  Record<"password" | "repeatPassword", string>
+>;
 
 export function SignUpForm({
   className,
@@ -40,40 +47,41 @@ export function SignUpForm({
   });
 
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<SignUpFieldErrors>({});
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
   const fullName =
     `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim();
 
-  const canSubmit =
-    formData.firstName.length > 0 &&
-    formData.lastName.length > 0 &&
-    formData.email.length > 0 &&
-    formData.password.length >= 8 &&
-    formData.repeatPassword.length > 0 &&
-    formData.password === formData.repeatPassword;
+  // Validated on submit rather than gating the button, so a failing rule names
+  // itself on the field it belongs to instead of leaving a dead control.
+  const validate = (): SignUpFieldErrors => {
+    const errors: SignUpFieldErrors = {};
+
+    if (formData.password.length < MIN_PASSWORD_LENGTH) {
+      errors.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
+    }
+
+    if (formData.password !== formData.repeatPassword) {
+      errors.repeatPassword = "Passwords do not match.";
+    }
+
+    return errors;
+  };
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!canSubmit) return;
+    setError(null);
+
+    const errors = validate();
+    setFieldErrors(errors);
+
+    if (Object.keys(errors).length > 0) return;
 
     const supabase = createClient();
     setIsLoading(true);
-    setError(null);
-
-    if (formData.password !== formData.repeatPassword) {
-      setError("Passwords do not match");
-      setIsLoading(false);
-      return;
-    }
-
-    if (formData.password.length < 8) {
-      setError("Password must be at least 8 characters.");
-      setIsLoading(false);
-      return;
-    }
 
     try {
       const normalizedEmail = formData.email.trim().toLowerCase();
@@ -82,9 +90,7 @@ export function SignUpForm({
         email: normalizedEmail,
         password: formData.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(
-            nextPath,
-          )}`,
+          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
           data: {
             full_name: fullName,
           },
@@ -96,13 +102,14 @@ export function SignUpForm({
       const user = authData.user;
       if (!user) throw new Error("User not returned from Supabase");
 
+      // When email confirmation is disabled, signUp returns a session and the
+      // authenticated route can create the profile immediately. Otherwise the
+      // confirmation callback creates it once the session exists.
       if (authData.session) {
         const res = await fetch("/api/auth/complete-profile", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            name: fullName,
-          }),
+          body: JSON.stringify({ name: fullName }),
         });
 
         const result = await res.json();
@@ -113,7 +120,13 @@ export function SignUpForm({
         }
       }
 
-      router.push(`/auth/sign-up-success?next=${encodeURIComponent(nextPath)}`);
+      // Handed to the confirmation screen out of band so the address stays out
+      // of the URL, and with it browser history and referrers.
+      setPendingEmail(normalizedEmail);
+
+      router.push(
+        `/auth/sign-up-success?next=${encodeURIComponent(nextPath)}`,
+      );
     } catch (error: unknown) {
       console.error("Sign up error:", error);
       setError(error instanceof Error ? error.message : "An error occurred");
@@ -130,14 +143,15 @@ export function SignUpForm({
     <AuthPanel
       title="Sign up"
       description="Create a new account."
-      density="compact"
       className={className}
       {...props}
     >
+      <GoogleOAuthButton nextPath={nextPath} />
+
       <form onSubmit={handleSignUp} className="space-y-4">
         <div className="grid gap-6 sm:grid-cols-2">
           <Field>
-            <FieldLabel htmlFor="first-name" className="text-body text-fg">
+            <FieldLabel htmlFor="first-name" className="text-body text-foreground">
               First Name *
             </FieldLabel>
             <Input
@@ -151,7 +165,7 @@ export function SignUpForm({
           </Field>
 
           <Field>
-            <FieldLabel htmlFor="last-name" className="text-body text-fg">
+            <FieldLabel htmlFor="last-name" className="text-body text-foreground">
               Last Name *
             </FieldLabel>
             <Input
@@ -166,7 +180,7 @@ export function SignUpForm({
         </div>
 
         <Field>
-          <FieldLabel htmlFor="email" className="text-body text-fg">
+          <FieldLabel htmlFor="email" className="text-body text-foreground">
             Email *
           </FieldLabel>
           <Input
@@ -180,8 +194,8 @@ export function SignUpForm({
           />
         </Field>
 
-        <Field>
-          <FieldLabel htmlFor="password" className="text-body text-fg">
+        <Field data-invalid={fieldErrors.password ? true : undefined}>
+          <FieldLabel htmlFor="password" className="text-body text-foreground">
             Password *
           </FieldLabel>
           <Input
@@ -189,18 +203,23 @@ export function SignUpForm({
             type="password"
             placeholder="Enter your password"
             required
-            minLength={8}
+            minLength={MIN_PASSWORD_LENGTH}
+            aria-invalid={fieldErrors.password ? true : undefined}
             value={formData.password}
             onChange={(e) => handleChange("password", e.target.value)}
             className={authInputClassName}
           />
-          <FieldDescription className="text-body text-fg-secondary">
-            Password must be at least 8 characters.
-          </FieldDescription>
+          {fieldErrors.password ? (
+            <FieldError>{fieldErrors.password}</FieldError>
+          ) : (
+            <FieldDescription className="text-body">
+              Password must be at least {MIN_PASSWORD_LENGTH} characters.
+            </FieldDescription>
+          )}
         </Field>
 
-        <Field>
-          <FieldLabel htmlFor="repeat-password" className="text-body text-fg">
+        <Field data-invalid={fieldErrors.repeatPassword ? true : undefined}>
+          <FieldLabel htmlFor="repeat-password" className="text-body text-foreground">
             Confirm password *
           </FieldLabel>
           <Input
@@ -208,27 +227,27 @@ export function SignUpForm({
             type="password"
             placeholder="Re-enter your password"
             required
+            aria-invalid={fieldErrors.repeatPassword ? true : undefined}
             value={formData.repeatPassword}
             onChange={(e) => handleChange("repeatPassword", e.target.value)}
             className={authInputClassName}
           />
+          {fieldErrors.repeatPassword ? (
+            <FieldError>{fieldErrors.repeatPassword}</FieldError>
+          ) : null}
         </Field>
 
-        {error ? (
-          <p className="text-small text-destructive" aria-live="polite">
-            {error}
-          </p>
-        ) : null}
+        {error ? <FieldError>{error}</FieldError> : null}
 
-        <AuthSubmitButton type="submit" disabled={!canSubmit || isLoading}>
+        <AuthSubmitButton type="submit" disabled={isLoading}>
           {isLoading ? "Creating account..." : "Complete sign up"}
         </AuthSubmitButton>
 
-        <p className="text-center text-body text-fg-secondary">
+        <p className="text-center text-body text-muted-foreground">
           Already have an account?{" "}
           <Link
             href={`/auth/login?next=${encodeURIComponent(nextPath)}`}
-            className="font-medium text-fg underline underline-offset-4"
+            className="font-medium text-foreground underline underline-offset-4"
           >
             Sign in
           </Link>

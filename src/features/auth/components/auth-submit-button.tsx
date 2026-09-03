@@ -12,9 +12,11 @@ export function AuthSubmitButton({
 }: AuthSubmitButtonProps) {
   return (
     <Button
-      variant="ghost"
       className={cn(
-        "h-10 w-full rounded-md bg-action text-button font-medium text-primary-foreground shadow-none hover:bg-action-hover hover:text-primary-foreground disabled:!opacity-100 disabled:bg-[var(--action-disabled-bg)] disabled:text-[var(--action-disabled-text)]",
+        // The default variant is already bg-primary (--action-primary); only the
+        // hover and disabled tones differ from it, and both are designed tokens.
+        "h-10 w-full shadow-none hover:bg-action-hover",
+        "disabled:bg-action-disabled-bg disabled:text-action-disabled disabled:opacity-100",
         className,
       )}
       {...props}

@@ -4,16 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Field, FieldLabel } from "@/components/ui/field";
 import { createClient } from "@/lib/supabase/client";
 
 import { AuthPanel } from "./auth-panel";
+import { authInputClassName } from "./auth-styles";
 import { AuthSubmitButton } from "./auth-submit-button";
 import { GoogleOAuthButton } from "./google-oauth-button";
-
-const authInputClassName =
-  "h-10 rounded-md border-border bg-white text-body text-fg shadow-none placeholder:text-fg-muted focus-visible:ring-focus";
 
 export function LoginForm({
   className,
@@ -26,12 +24,8 @@ export function LoginForm({
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
-  const canSubmit = email.length > 0 && password.length > 0;
-
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!canSubmit) return;
 
     const supabase = createClient();
     setIsLoading(true);
@@ -64,13 +58,9 @@ export function LoginForm({
     >
       <GoogleOAuthButton nextPath={nextPath} />
 
-      <div className="my-6 text-center text-body text-fg-secondary">
-        or continue with email
-      </div>
-
       <form onSubmit={handleLogin} className="space-y-6">
         <Field>
-          <FieldLabel htmlFor="email" className="text-body text-fg">
+          <FieldLabel htmlFor="email" className="text-body text-foreground">
             Email
           </FieldLabel>
           <Input
@@ -86,12 +76,12 @@ export function LoginForm({
 
         <Field>
           <div className="flex items-center justify-between gap-4">
-            <FieldLabel htmlFor="password" className="text-body text-fg">
+            <FieldLabel htmlFor="password" className="text-body text-foreground">
               Password
             </FieldLabel>
             <Link
               href="/auth/forgot-password"
-              className="text-body text-fg underline-offset-4 hover:underline"
+              className="text-body text-foreground underline-offset-4 hover:underline"
             >
               Forgot password?
             </Link>
@@ -108,21 +98,17 @@ export function LoginForm({
           />
         </Field>
 
-        {error ? (
-          <p className="text-small text-destructive" aria-live="polite">
-            {error}
-          </p>
-        ) : null}
+        {error ? <FieldError>{error}</FieldError> : null}
 
-        <AuthSubmitButton type="submit" disabled={!canSubmit || isLoading}>
+        <AuthSubmitButton type="submit" disabled={isLoading}>
           {isLoading ? "Signing in..." : "Sign in"}
         </AuthSubmitButton>
 
-        <p className="text-center text-body text-fg-secondary">
+        <p className="text-center text-body text-muted-foreground">
           Don&apos;t have an account?{" "}
           <Link
             href={`/auth/sign-up?next=${encodeURIComponent(nextPath)}`}
-            className="font-medium text-fg underline underline-offset-4"
+            className="font-medium text-foreground underline underline-offset-4"
           >
             Sign up
           </Link>

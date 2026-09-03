@@ -1,11 +1,8 @@
 import { CheckEmailMessage } from "@/features/auth/components/check-email-message";
+import { redirectIfAuthenticated } from "@/lib/auth/guards";
 
-export default async function Page({
-  searchParams,
-}: {
-  searchParams: Promise<{ email?: string }>;
-}) {
-  const params = await searchParams;
+export default async function Page() {
+  await redirectIfAuthenticated();
 
-  return <CheckEmailMessage email={params.email ?? ""} />;
+  return <CheckEmailMessage />;
 }

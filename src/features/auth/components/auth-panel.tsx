@@ -7,7 +7,6 @@ interface AuthPanelProps extends ComponentPropsWithoutRef<typeof Card> {
   title: string;
   description?: string;
   children: ReactNode;
-  density?: "default" | "compact";
 }
 
 export function AuthPanel({
@@ -15,26 +14,22 @@ export function AuthPanel({
   description,
   children,
   className,
-  density = "default",
   ...props
 }: AuthPanelProps) {
   return (
     <Card
       className={cn(
-        "w-full max-w-[620px] gap-0 rounded-lg border-border bg-card px-10 text-card-foreground shadow-none",
-        density === "compact" ? "py-10" : "py-[100px]",
+        "w-full max-w-[620px] gap-0 rounded-lg bg-card px-10 py-16 text-card-foreground shadow-none",
         className,
       )}
       {...props}
     >
       <div className="mx-auto w-full max-w-[540px]">
         <CardHeader className="mb-7 px-0 text-center">
-          <CardTitle className="text-h1 text-foreground">
-            {title}
-          </CardTitle>
+          <CardTitle className="text-h1 text-foreground">{title}</CardTitle>
 
           {description ? (
-            <p className="mt-3 text-body font-normal leading-6 text-foreground">
+            <p className="mt-3 text-body leading-6 text-foreground">
               {description}
             </p>
           ) : null}

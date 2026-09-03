@@ -110,10 +110,12 @@
   /* Borders — border-border-subtle */
   --color-border-subtle: var(--border-subtle);
 
-  /* Action — bg-action, bg-action-hover, ring-focus, etc. */
+  /* Action — bg-action, bg-action-hover, ring-focus, text-action-disabled, etc. */
   --color-action: var(--action-primary);
   --color-action-hover: var(--action-primary-hover);
   --color-action-strong: var(--action-primary-strong);
+  --color-action-disabled: var(--action-disabled-text);
+  --color-action-disabled-bg: var(--action-disabled-bg);
   --color-focus: var(--action-focus);
 
   /* Status — bg-success-bg text-success, etc. */

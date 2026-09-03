@@ -4,15 +4,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import { Field, FieldLabel } from "@/components/ui/field";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { createClient } from "@/lib/supabase/client";
 
 import { AuthPanel } from "./auth-panel";
+import { authInputClassName } from "./auth-styles";
 import { AuthSubmitButton } from "./auth-submit-button";
-
-const authInputClassName =
-  "h-10 rounded-md border-border bg-background text-body text-foreground shadow-none placeholder:text-muted-foreground focus-visible:ring-focus";
+import { setPendingEmail } from "../pending-email";
 
 export function ForgotPasswordForm({
   className,
@@ -23,12 +22,8 @@ export function ForgotPasswordForm({
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
-  const canSubmit = email.length > 0;
-
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!canSubmit) return;
 
     const supabase = createClient();
     setIsLoading(true);
@@ -37,6 +32,7 @@ export function ForgotPasswordForm({
     try {
       const normalizedEmail = email.trim().toLowerCase();
 
+      // The url which will be included in the email. This URL needs to be configured in your redirect URLs in the Supabase dashboard at https://supabase.com/dashboard/project/_/auth/url-configuration
       const { error } = await supabase.auth.resetPasswordForEmail(
         normalizedEmail,
         {
@@ -46,9 +42,11 @@ export function ForgotPasswordForm({
 
       if (error) throw error;
 
-      router.push(
-        `/auth/check-email?email=${encodeURIComponent(normalizedEmail)}`,
-      );
+      // Handed to the confirmation screen out of band so the address stays out
+      // of the URL, and with it browser history and referrers.
+      setPendingEmail(normalizedEmail);
+
+      router.push("/auth/check-email");
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
     } finally {
@@ -65,7 +63,7 @@ export function ForgotPasswordForm({
     >
       <form onSubmit={handleForgotPassword} className="space-y-6">
         <Field className="gap-2">
-          <FieldLabel htmlFor="email" className="text-body font-normal text-foreground">
+          <FieldLabel htmlFor="email" className="text-body text-foreground">
             Email
           </FieldLabel>
           <Input
@@ -79,13 +77,9 @@ export function ForgotPasswordForm({
           />
         </Field>
 
-        {error ? (
-          <p className="text-small text-destructive" aria-live="polite">
-            {error}
-          </p>
-        ) : null}
+        {error ? <FieldError>{error}</FieldError> : null}
 
-        <AuthSubmitButton type="submit" disabled={!canSubmit || isLoading}>
+        <AuthSubmitButton type="submit" disabled={isLoading}>
           {isLoading ? "Sending..." : "Send reset link"}
         </AuthSubmitButton>
 
