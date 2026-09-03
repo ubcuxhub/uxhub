@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ApplicationReviewClient } from "@/features/admin/components/ApplicationReviewClient";
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
+import { hasCheckedInForApplication } from "@/lib/supabase-helpers/check-ins";
 import {
   fetchApplicationResponses,
   fetchEventApplicationById,
@@ -24,14 +25,16 @@ export default async function ApplicationReviewPage({
 
   if (!application || application.event_id !== eventId) notFound();
 
-  const [userInfo, reviewerInfo, event, responses] = await Promise.all([
-    fetchUserInfoContactById(supabase, application.user_id),
-    application.reviewer_id
-      ? fetchUserInfoContactById(supabase, application.reviewer_id)
-      : Promise.resolve(null),
-    fetchEventById(supabase, application.event_id),
-    fetchApplicationResponses(supabase, applicationId),
-  ]);
+  const [userInfo, reviewerInfo, event, responses, hasCheckedIn] =
+    await Promise.all([
+      fetchUserInfoContactById(supabase, application.user_id),
+      application.reviewer_id
+        ? fetchUserInfoContactById(supabase, application.reviewer_id)
+        : Promise.resolve(null),
+      fetchEventById(supabase, application.event_id),
+      fetchApplicationResponses(supabase, applicationId),
+      hasCheckedInForApplication(supabase, applicationId),
+    ]);
 
   if (!userInfo || !event) notFound();
 
@@ -42,6 +45,7 @@ export default async function ApplicationReviewPage({
       reviewerInfo={reviewerInfo}
       currentAdmin={{ id: admin.id, name: admin.name, email: admin.email }}
       event={event}
+      hasCheckedIn={hasCheckedIn}
       responses={responses}
     />
   );

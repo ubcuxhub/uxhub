@@ -107,6 +107,30 @@ export async function fetchCheckInStatuses(
   return statusMap;
 }
 
+/** True when the application's seat has a completed check-in. */
+export async function hasCheckedInForApplication(
+  supabase: DbClient,
+  applicationId: string
+): Promise<boolean> {
+  const { data: registration, error: registrationError } = await supabase
+    .from(TABLES.eventRegistrations)
+    .select("id")
+    .eq("application_id", applicationId)
+    .maybeSingle();
+
+  if (registrationError) throw registrationError;
+  if (!registration) return false;
+
+  const { count, error } = await supabase
+    .from(TABLES.checkIns)
+    .select("id", { count: "exact", head: true })
+    .eq("event_registration_id", registration.id)
+    .not("checked_in_at", "is", null);
+
+  if (error) throw error;
+  return (count ?? 0) > 0;
+}
+
 /** Returns the check-in row id for a registration/session pair, or null. */
 export async function fetchCheckInId(
   supabase: DbClient,

@@ -14,6 +14,7 @@ import { UserX, X, Check } from "lucide-react";
 
 interface StatusUpdateSectionProps {
   application: EventApplicationRow;
+  hasCheckedIn: boolean;
   isUpdating: boolean;
   onDecision: (
     status: Extract<ApplicationStatus, "accepted" | "rejected">
@@ -24,6 +25,7 @@ interface StatusUpdateSectionProps {
 
 export function StatusUpdateSection({
   application,
+  hasCheckedIn,
   isUpdating,
   onDecision,
   onMarkNotAttending,
@@ -106,24 +108,31 @@ export function StatusUpdateSection({
         )}
 
         {canMarkNotAttending && (
-          <Button
-            variant="outline"
-            onClick={onMarkNotAttending}
-            disabled={isUpdating}
-            className="w-full"
-          >
-            {isUpdating ? (
-              <>
-                <Spinner size="sm" className="mr-2" />
-                Updating...
-              </>
-            ) : (
-              <>
-                <UserX className="mr-2" />
-                Mark Not Attending
-              </>
+          <div className="space-y-2">
+            <Button
+              variant="outline"
+              onClick={onMarkNotAttending}
+              disabled={isUpdating || hasCheckedIn}
+              className="w-full"
+            >
+              {isUpdating ? (
+                <>
+                  <Spinner size="sm" className="mr-2" />
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <UserX className="mr-2" />
+                  Mark Not Attending
+                </>
+              )}
+            </Button>
+            {hasCheckedIn && (
+              <p className="text-small text-muted-foreground">
+                Applicant has already attended this event
+              </p>
             )}
-          </Button>
+          </div>
         )}
 
         {application.attendance_status === "not_attending" && (

@@ -27,6 +27,7 @@ interface ApplicationReviewClientProps {
   reviewerInfo: UserInfoContact | null;
   currentAdmin: UserInfoContact;
   event: EventRow;
+  hasCheckedIn: boolean;
   responses: ApplicationResponseWithQuestion[];
 }
 
@@ -36,6 +37,7 @@ export function ApplicationReviewClient({
   reviewerInfo,
   currentAdmin,
   event,
+  hasCheckedIn,
   responses,
 }: ApplicationReviewClientProps) {
   const [application, setApplication] =
@@ -78,7 +80,7 @@ export function ApplicationReviewClient({
   };
 
   const handleNotAttending = async () => {
-    if (isUpdating) return;
+    if (isUpdating || hasCheckedIn) return;
 
     setIsUpdating(true);
     setError(null);
@@ -160,6 +162,7 @@ export function ApplicationReviewClient({
             {/* Status Update Section */}
             <StatusUpdateSection
               application={application}
+              hasCheckedIn={hasCheckedIn}
               isUpdating={isUpdating}
               onDecision={handleDecision}
               onMarkNotAttending={handleNotAttending}
