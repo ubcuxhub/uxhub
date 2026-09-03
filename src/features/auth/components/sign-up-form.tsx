@@ -1,29 +1,37 @@
 "use client";
 
-import { cn } from "@/lib/utils";
-import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { createClient } from "@/lib/supabase/client";
+
+import { AuthPanel } from "./auth-panel";
+import { authInputClassName } from "./auth-styles";
+import { AuthSubmitButton } from "./auth-submit-button";
 import { GoogleOAuthButton } from "./google-oauth-button";
+import { setPendingEmail } from "../pending-email";
+
+const MIN_PASSWORD_LENGTH = 8;
 
 type SignUpFormData = {
+  firstName: string;
+  lastName: string;
   email: string;
   password: string;
   repeatPassword: string;
-  name: string;
 };
+
+type SignUpFieldErrors = Partial<
+  Record<"password" | "repeatPassword", string>
+>;
 
 export function SignUpForm({
   className,
@@ -31,37 +39,60 @@ export function SignUpForm({
   ...props
 }: React.ComponentPropsWithoutRef<"div"> & { nextPath?: string }) {
   const [formData, setFormData] = useState<SignUpFormData>({
+    firstName: "",
+    lastName: "",
     email: "",
     password: "",
     repeatPassword: "",
-    name: "",
   });
 
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<SignUpFieldErrors>({});
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const supabase = createClient();
-    setIsLoading(true);
-    setError(null);
+  const fullName =
+    `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim();
+
+  // Validated on submit rather than gating the button, so a failing rule names
+  // itself on the field it belongs to instead of leaving a dead control.
+  const validate = (): SignUpFieldErrors => {
+    const errors: SignUpFieldErrors = {};
+
+    if (formData.password.length < MIN_PASSWORD_LENGTH) {
+      errors.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
+    }
 
     if (formData.password !== formData.repeatPassword) {
-      setError("Passwords do not match");
-      setIsLoading(false);
-      return;
+      errors.repeatPassword = "Passwords do not match.";
     }
+
+    return errors;
+  };
+
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    setError(null);
+
+    const errors = validate();
+    setFieldErrors(errors);
+
+    if (Object.keys(errors).length > 0) return;
+
+    const supabase = createClient();
+    setIsLoading(true);
 
     try {
       const normalizedEmail = formData.email.trim().toLowerCase();
+
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: normalizedEmail,
         password: formData.password,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
           data: {
-            full_name: formData.name,
+            full_name: fullName,
           },
         },
       });
@@ -78,7 +109,7 @@ export function SignUpForm({
         const res = await fetch("/api/auth/complete-profile", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: formData.name }),
+          body: JSON.stringify({ name: fullName }),
         });
 
         const result = await res.json();
@@ -88,6 +119,10 @@ export function SignUpForm({
           throw new Error(result.error || "Failed to create user profile");
         }
       }
+
+      // Handed to the confirmation screen out of band so the address stays out
+      // of the URL, and with it browser history and referrers.
+      setPendingEmail(normalizedEmail);
 
       router.push(
         `/auth/sign-up-success?next=${encodeURIComponent(nextPath)}`,
@@ -105,85 +140,119 @@ export function SignUpForm({
   };
 
   return (
-    <div className={cn("flex flex-col gap-6", className)} {...props}>
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-h2">Sign up</CardTitle>
-          <CardDescription>Create a new account</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <GoogleOAuthButton nextPath={nextPath} />
-          <form onSubmit={handleSignUp} className="space-y-6">
-            <div className="space-y-4 pt-6">
-              <div className="space-y-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="name">Name *</Label>
-                  <Input
-                    id="name"
-                    placeholder="John Doe"
-                    required
-                    value={formData.name}
-                    onChange={(e) => handleChange("name", e.target.value)}
-                  />
-                </div>
+    <AuthPanel
+      title="Sign up"
+      description="Create a new account."
+      className={className}
+      {...props}
+    >
+      <GoogleOAuthButton nextPath={nextPath} />
 
-                <div className="grid gap-2">
-                  <Label htmlFor="email">Email *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="m@example.com"
-                    required
-                    value={formData.email}
-                    onChange={(e) => handleChange("email", e.target.value)}
-                  />
-                </div>
-              </div>
+      <form onSubmit={handleSignUp} className="space-y-4">
+        <div className="grid gap-6 sm:grid-cols-2">
+          <Field>
+            <FieldLabel htmlFor="first-name" className="text-body text-foreground">
+              First Name *
+            </FieldLabel>
+            <Input
+              id="first-name"
+              placeholder="Enter your first name"
+              required
+              value={formData.firstName}
+              onChange={(e) => handleChange("firstName", e.target.value)}
+              className={authInputClassName}
+            />
+          </Field>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="grid gap-2">
-                  <Label htmlFor="password">Password *</Label>
-                  <Input
-                    id="password"
-                    type="password"
-                    required
-                    value={formData.password}
-                    onChange={(e) => handleChange("password", e.target.value)}
-                  />
-                </div>
-                <div className="grid gap-2">
-                  <Label htmlFor="repeat-password">Confirm Password *</Label>
-                  <Input
-                    id="repeat-password"
-                    type="password"
-                    required
-                    value={formData.repeatPassword}
-                    onChange={(e) =>
-                      handleChange("repeatPassword", e.target.value)
-                    }
-                  />
-                </div>
-              </div>
-            </div>
+          <Field>
+            <FieldLabel htmlFor="last-name" className="text-body text-foreground">
+              Last Name *
+            </FieldLabel>
+            <Input
+              id="last-name"
+              placeholder="Enter your last name"
+              required
+              value={formData.lastName}
+              onChange={(e) => handleChange("lastName", e.target.value)}
+              className={authInputClassName}
+            />
+          </Field>
+        </div>
 
-            {error && <p className="text-small text-destructive">{error}</p>}
+        <Field>
+          <FieldLabel htmlFor="email" className="text-body text-foreground">
+            Email *
+          </FieldLabel>
+          <Input
+            id="email"
+            type="email"
+            placeholder="name@example.com"
+            required
+            value={formData.email}
+            onChange={(e) => handleChange("email", e.target.value)}
+            className={authInputClassName}
+          />
+        </Field>
 
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? "Creating account..." : "Sign up"}
-            </Button>
+        <Field data-invalid={fieldErrors.password ? true : undefined}>
+          <FieldLabel htmlFor="password" className="text-body text-foreground">
+            Password *
+          </FieldLabel>
+          <Input
+            id="password"
+            type="password"
+            placeholder="Enter your password"
+            required
+            minLength={MIN_PASSWORD_LENGTH}
+            aria-invalid={fieldErrors.password ? true : undefined}
+            value={formData.password}
+            onChange={(e) => handleChange("password", e.target.value)}
+            className={authInputClassName}
+          />
+          {fieldErrors.password ? (
+            <FieldError>{fieldErrors.password}</FieldError>
+          ) : (
+            <FieldDescription className="text-body">
+              Password must be at least {MIN_PASSWORD_LENGTH} characters.
+            </FieldDescription>
+          )}
+        </Field>
 
-            <div className="text-center text-small">
-              Already have an account?{" "}
-              <Link
-                href={`/auth/login?next=${encodeURIComponent(nextPath)}`}
-                className="underline underline-offset-4"
-              >
-                Login
-              </Link>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-    </div>
+        <Field data-invalid={fieldErrors.repeatPassword ? true : undefined}>
+          <FieldLabel htmlFor="repeat-password" className="text-body text-foreground">
+            Confirm password *
+          </FieldLabel>
+          <Input
+            id="repeat-password"
+            type="password"
+            placeholder="Re-enter your password"
+            required
+            aria-invalid={fieldErrors.repeatPassword ? true : undefined}
+            value={formData.repeatPassword}
+            onChange={(e) => handleChange("repeatPassword", e.target.value)}
+            className={authInputClassName}
+          />
+          {fieldErrors.repeatPassword ? (
+            <FieldError>{fieldErrors.repeatPassword}</FieldError>
+          ) : null}
+        </Field>
+
+        {error ? <FieldError>{error}</FieldError> : null}
+
+        <AuthSubmitButton type="submit" disabled={isLoading}>
+          {isLoading ? "Creating account..." : "Complete sign up"}
+        </AuthSubmitButton>
+
+        <p className="text-center text-body text-muted-foreground">
+          Already have an account?{" "}
+          <Link
+            href={`/auth/login?next=${encodeURIComponent(nextPath)}`}
+            className="font-medium text-foreground underline underline-offset-4"
+          >
+            Sign in
+          </Link>
+        </p>
+      </form>
+    </AuthPanel>
   );
 }
