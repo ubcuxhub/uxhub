@@ -5,56 +5,63 @@ import Image from "next/image";
 import { TEAM_MEMBERS } from "@/features/marketing/lib/team";
 import type { TeamMember } from "@/features/marketing/types";
 
+const SCROLL_SPEED = 0.9;
+const HOVER_SCROLL_SPEED = 0.25;
+
 export default function TeamSection() {
   const [hoveredMember, setHoveredMember] = useState<TeamMember | null>(null);
-  const [cardSize, setCardSize] = useState(120); // default for mobile
   const scrollRef = useRef<HTMLDivElement>(null);
+  const positionRef = useRef(0);
 
-  const GAP = 32; // matches gap-8
   const duplicatedMembers = [...TEAM_MEMBERS, ...TEAM_MEMBERS];
-
-  useEffect(() => {
-    // adjust card size when screen resizes
-    const updateSize = () => {
-      setCardSize(window.innerWidth >= 768 ? 150 : 120); // md breakpoint = 768px
-    };
-    updateSize();
-    window.addEventListener("resize", updateSize);
-    return () => window.removeEventListener("resize", updateSize);
-  }, []);
 
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
 
-    let animationId: number;
-    let position = 0;
-    let speed = 0.9;
+    // Width of one full copy of the list, measured from layout so the animation
+    // stays in step with whatever card size and gap the stylesheet applies.
+    let resetPoint = 0;
+    const measure = () => {
+      const first = el.children[0] as HTMLElement | undefined;
+      const copyStart = el.children[TEAM_MEMBERS.length] as
+        | HTMLElement
+        | undefined;
+      resetPoint =
+        first && copyStart ? copyStart.offsetLeft - first.offsetLeft : 0;
+    };
+    measure();
 
-    const cardTotal = cardSize + GAP;
-    const resetPoint = cardTotal * TEAM_MEMBERS.length;
+    let speed = SCROLL_SPEED;
+    let animationId = 0;
 
     const animate = () => {
-      position += speed;
-      const currentPosition = position % resetPoint;
-      el.style.transform = `translateX(-${currentPosition}px)`;
+      if (resetPoint > 0) {
+        positionRef.current = (positionRef.current + speed) % resetPoint;
+        el.style.transform = `translateX(-${positionRef.current}px)`;
+      }
       animationId = requestAnimationFrame(animate);
     };
-
     animationId = requestAnimationFrame(animate);
 
-    const slowDown = () => (speed = 0.25);
-    const speedUp = () => (speed = 0.9);
+    // Re-measure when the cards resize at a breakpoint; the modulo above keeps
+    // the current position in range, so the row never jumps back to the start.
+    const resizeObserver = new ResizeObserver(measure);
+    resizeObserver.observe(el);
+
+    const slowDown = () => (speed = HOVER_SCROLL_SPEED);
+    const speedUp = () => (speed = SCROLL_SPEED);
 
     el.addEventListener("mouseenter", slowDown);
     el.addEventListener("mouseleave", speedUp);
 
     return () => {
       cancelAnimationFrame(animationId);
+      resizeObserver.disconnect();
       el.removeEventListener("mouseenter", slowDown);
       el.removeEventListener("mouseleave", speedUp);
     };
-  }, [cardSize]);
+  }, []);
 
   return (
     <div id="team" className="w-full">
@@ -78,7 +85,7 @@ export default function TeamSection() {
             : ""}
         </div>
 
-        <div className="overflow-hidden">
+        <div className="w-full overflow-hidden">
           <div
             ref={scrollRef}
             className="flex w-max items-center gap-8 will-change-transform"
@@ -86,11 +93,7 @@ export default function TeamSection() {
             {duplicatedMembers.map((member, index) => (
               <div
                 key={`${member.name}-${index}`}
-                className="relative flex-shrink-0 overflow-hidden rounded-2xl"
-                style={{
-                  height: `${cardSize}px`,
-                  width: `${cardSize}px`,
-                }}
+                className="relative flex-shrink-0 overflow-hidden rounded-2xl size-[120px] md:size-[150px]"
                 onMouseEnter={() => setHoveredMember(member)}
                 onMouseLeave={() => setHoveredMember(null)}
               >
@@ -98,7 +101,7 @@ export default function TeamSection() {
                   src={member.image}
                   alt={member.name}
                   fill
-                  sizes="150px"
+                  sizes="(min-width: 768px) 150px, 120px"
                   className="object-cover object-top"
                 />
               </div>
