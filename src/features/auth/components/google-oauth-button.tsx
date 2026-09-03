@@ -4,6 +4,7 @@ import { useState } from "react";
 import { FcGoogle } from "react-icons/fc";
 
 import { Button } from "@/components/ui/button";
+import { FieldError } from "@/components/ui/field";
 import { createClient } from "@/lib/supabase/client";
 
 interface GoogleOAuthButtonProps {
@@ -40,28 +41,25 @@ export function GoogleOAuthButton({
   };
 
   return (
-    <div className="space-y-3">
+    <div>
       <Button
         type="button"
         variant="outline"
-        className="w-full"
+        className="h-10 w-full font-medium shadow-none"
         disabled={isLoading}
         onClick={handleGoogleOAuth}
       >
         <FcGoogle className="size-5" />
         {isLoading ? "Redirecting..." : "Continue with Google"}
       </Button>
-      {error ? <p className="text-small text-destructive">{error}</p> : null}
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t" />
-        </div>
-        <div className="relative flex justify-center text-small uppercase">
-          <span className="bg-card px-2 text-muted-foreground">
-            or continue with email
-          </span>
-        </div>
-      </div>
+
+      {error ? <FieldError className="mt-3">{error}</FieldError> : null}
+
+      {/* The provider set must stay identical on login and sign-up: with OAuth
+          the same button both creates and signs in to an account. */}
+      <p className="my-6 text-center text-body text-muted-foreground">
+        or continue with email
+      </p>
     </div>
   );
 }

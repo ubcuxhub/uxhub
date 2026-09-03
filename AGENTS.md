@@ -104,6 +104,11 @@ Read `supabase/README.md` before changing the schema.
   `src/lib/supabase/database.types.ts`.
 - Validate schema changes with `pnpm exec tsc --noEmit`, `pnpm lint`, and
   `pnpm build`.
+- Apply migrations to the hosted project with `npx supabase db push` before
+  deploying a branch that adds them. Nothing applies them automatically, and
+  `/events/[slug]` is prerendered against the database at build time, so a
+  deploy fails until the migrations land. `db push` is forward-only; correct a
+  bad migration with a new one.
 
 ## Plans
 

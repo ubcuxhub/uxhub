@@ -34,7 +34,9 @@ export async function EventCheckoutRoute({
   if (!event) notFound();
 
   const [applicationQuestions, existingRegistration] = await Promise.all([
-    fetchApplicationQuestions(supabase, event.id),
+    event.applications_enabled
+      ? fetchApplicationQuestions(supabase, event.id)
+      : Promise.resolve([]),
     fetchUserRegistration(supabase, event.id, user.id),
   ]);
   const isDirectPurchaseEvent = applicationQuestions.length === 0;

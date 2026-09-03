@@ -66,7 +66,7 @@ export function EventCard({ event, href, onClick, className }: EventCardProps) {
 
       <CardContent>
         <p className="line-clamp-3 text-sm text-muted-foreground">
-          {event.description}
+          {event.short_description || event.description}
         </p>
       </CardContent>
 

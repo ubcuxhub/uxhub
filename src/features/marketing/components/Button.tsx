@@ -12,6 +12,7 @@ interface ButtonProps {
   shorterHeight?: boolean;
   className?: string;
   href?: string;
+  external?: boolean;
 }
 
 const Button: React.FC<ButtonProps> = ({
@@ -22,6 +23,7 @@ const Button: React.FC<ButtonProps> = ({
   shorterHeight = false,
   className = "",
   href,
+  external = false,
 }) => {
   const baseStyles =
     "flex items-center justify-center gap-3 rounded-full px-6 transition-all duration-300 ease-in-out cursor-pointer";
@@ -47,6 +49,19 @@ const Button: React.FC<ButtonProps> = ({
   );
 
   const styles = `${baseStyles} ${height} ${variants[variant]} ${className} group`;
+
+  if (href && external) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={styles}
+      >
+        {content}
+      </a>
+    );
+  }
 
   return href ? (
     <FlowLink href={href} className={styles}>

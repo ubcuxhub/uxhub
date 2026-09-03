@@ -3,8 +3,15 @@
 import React from "react";
 import Image from "next/image";
 import Button from "./Button";
+import MembershipCta from "./MembershipCta";
+import { useUser } from "@/context/UserContext";
+import { hasActiveMembership } from "@/lib/membership";
 
 export default function FooterCallout() {
+  const { user, loading } = useUser();
+  // Matches MembershipCta: show the signed-out copy until the session resolves.
+  const isMember = !loading && hasActiveMembership(user);
+
   const handleContactClick = () => {
     window.location.href = "mailto:ubcuxhub@gmail.com";
   };
@@ -38,18 +45,19 @@ export default function FooterCallout() {
 
         <div className="mx-auto flex flex-col items-center justify-center gap-5 text-center">
           <h2 className="text-[40px] font-bold leading-tight text-white">
-            Ready to kickstart your design journey?
+            {isMember
+              ? "Ready for what's next?"
+              : "Ready to kickstart your design journey?"}
           </h2>
 
           <p className="font-sans mx-auto max-w-2xl text-base font-normal leading-normal text-white">
-            Join hundreds of student designers at UX Hub learning, building, and
-            supporting each other on their journey to better UI and better design.
+            {isMember
+              ? "You're part of UX Hub. Head to your portal for upcoming events, member pricing, and everything your membership unlocks."
+              : "Join hundreds of student designers at UX Hub learning, building, and supporting each other on their journey to better UI and better design."}
           </p>
 
           <div className="flex flex-col items-center justify-center gap-3 sm:flex-row pt-4">
-            <Button variant="primary" href="/portal/membership/join">
-              BECOME A MEMBER
-            </Button>
+            <MembershipCta />
 
             <Button
               variant="secondary"

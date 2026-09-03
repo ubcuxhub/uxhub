@@ -20,3 +20,45 @@ jobs:
       - run: pnpm lint
       - run: pnpm exec tsc --noEmit
       - run: pnpm test
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.6.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Applies every migration in supabase/migrations to a throwaway database,
+      # so a schema change that the app code does not match fails here rather
+      # than in a deploy. Nothing remote is touched.
+      - name: Start Supabase
+        run: supabase start
+
+      - name: Export Supabase env
+        run: |
+          status="$(supabase status -o json)"
+          {
+            echo "NEXT_PUBLIC_SUPABASE_URL=$(jq -r .API_URL <<<"$status")"
+            echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$(jq -r .ANON_KEY <<<"$status")"
+            echo "SUPABASE_SECRET_KEY=$(jq -r .SERVICE_ROLE_KEY <<<"$status")"
+          } >> "$GITHUB_ENV"
+
+      - run: pnpm install --frozen-lockfile
+
+      # Square credentials are never exercised by the build; these placeholders
+      # only satisfy the module-scope checks in src/lib/square/client.ts.
+      - name: Build
+        env:
+          SQUARE_ACCESS_TOKEN: ci-placeholder
+          SQUARE_WEBHOOK_SIGNATURE_KEY: ci-placeholder
+          NEXT_PUBLIC_SQUARE_APP_ID: ci-placeholder
+          NEXT_PUBLIC_SQUARE_LOCATION_ID: ci-placeholder
+        run: pnpm build
