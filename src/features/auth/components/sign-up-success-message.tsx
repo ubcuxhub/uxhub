@@ -12,7 +12,11 @@ import {
   subscribePendingEmail,
 } from "../pending-email";
 
-export function CheckEmailMessage() {
+export function SignUpSuccessMessage({
+  nextPath = "/portal",
+}: {
+  nextPath?: string;
+}) {
   // Session storage is client-only, so the address arrives after hydration.
   const email = useSyncExternalStore(
     subscribePendingEmail,
@@ -23,8 +27,12 @@ export function CheckEmailMessage() {
   const handleResend = async () => {
     const supabase = createClient();
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/update-password`,
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email,
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
+      },
     });
 
     if (error) throw error;
@@ -32,12 +40,12 @@ export function CheckEmailMessage() {
 
   return (
     <AuthMessage
-      title="Check your email!"
+      title="Thank you for signing up!"
       action={email ? <ResendEmailButton onResend={handleResend} /> : null}
       backLink={{ href: "/auth/login", label: "Back to log in" }}
     >
-      If an account exists for {email || "that email address"}, we&rsquo;ll send
-      a password reset link with instructions to continue.
+      We&rsquo;ve sent a confirmation link to {email || "your email address"}.
+      Confirm your account to finish signing up.
     </AuthMessage>
   );
 }

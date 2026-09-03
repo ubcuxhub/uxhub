@@ -15,10 +15,21 @@ export function setPendingEmail(email: string) {
   }
 }
 
-export function readPendingEmail(): string {
+/** Storage is written before navigation, so nothing changes while mounted. */
+export function subscribePendingEmail() {
+  return () => {};
+}
+
+/** Current value from session storage (client only). */
+export function getPendingEmailSnapshot(): string {
   try {
     return sessionStorage.getItem(PENDING_EMAIL_KEY) ?? "";
   } catch {
     return "";
   }
+}
+
+/** Server render has no session storage; the client reconciles after hydration. */
+export function getPendingEmailServerSnapshot(): string {
+  return "";
 }
