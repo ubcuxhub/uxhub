@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { requireAdmin } from "@/lib/auth/guards";
 import { createUniqueSlug, slugify } from "@/lib/slug";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import {
   adminDeleteEventImageByUrl,
   adminUpdateUserInfoById,
@@ -273,8 +274,9 @@ export async function reviewApplicationAction(
   status: Extract<ApplicationStatus, "accepted" | "rejected">
 ) {
   await requireAdmin();
+  const supabase = await createClient();
   const application = await reviewEventApplication(
-    supabaseAdmin,
+    supabase,
     applicationId,
     status
   );
@@ -288,8 +290,9 @@ export async function markApplicationNotAttendingAction(
   applicationId: string
 ) {
   await requireAdmin();
+  const supabase = await createClient();
   const application = await markEventApplicationNotAttending(
-    supabaseAdmin,
+    supabase,
     applicationId
   );
   revalidatePath(
