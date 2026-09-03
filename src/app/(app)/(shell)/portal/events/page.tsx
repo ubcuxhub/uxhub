@@ -7,8 +7,8 @@ const LINKTREE_URL = "https://linktr.ee/ubcuxhub";
 
 export default function PortalEvents() {
   return (
-    <PageContainer>
-      <div className="flex flex-col items-center gap-8 py-24 text-center">
+    <PageContainer className="flex flex-1 flex-col items-center justify-center">
+      <div className="flex flex-col items-center gap-8 text-center">
         <div className="flex flex-col gap-3">
           <h1 className="text-h1 tracking-tight">
             Events coming soon to the portal
