@@ -357,6 +357,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
     coffeeSeriesStart: addMonths(today, -3),
     coffeeSeriesEnd: addMonths(today, 9),
     portfolioReviewFuture: addMonths(today, 6),
+    resumeClinicFuture: addMonths(today, 8),
     studentPanelFuture: addMonths(today, 12),
     designSprintFuture: addMonths(today, 24),
     uxathonFuture: addMonths(today, 18),
@@ -731,6 +732,63 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
         name: "Door Check-in",
         start_time: timestamp(schedule.portfolioReviewFuture, 17, 45),
         end_time: timestamp(schedule.portfolioReviewFuture, 18, 45),
+      },
+    ],
+    applicationQuestions: [],
+  },
+  {
+    event: {
+      name: `Resume Clinic ${eventYear(schedule.resumeClinicFuture)}`,
+      slug: "resume-clinic-2027",
+      status: "active",
+      description:
+        "A short, practical night for turning a resume or one case study into something you can send this week. Bring a draft, get two rounds of written feedback from working designers, and leave with a revised version plus a short list of what to cut. No application — just grab a ticket.",
+      regular_price: 6.0,
+      member_price: 3.0,
+      location_building: "Henry Angus Building",
+      location_room: "Room 241",
+      location_address_url: "https://maps.app.goo.gl/Mn5vJ2Xa7Rq9Ld3W6",
+      start_date: dateString(schedule.resumeClinicFuture),
+      start_time: "18:00:00",
+      end_date: dateString(schedule.resumeClinicFuture),
+      end_time: "20:00:00",
+      max_capacity: 30,
+      image_url:
+        "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&q=80&w=800&h=800",
+      registration_start_time: openFutureRegistration(
+        schedule.resumeClinicFuture
+      ).start,
+      registration_end_time: openFutureRegistration(
+        schedule.resumeClinicFuture
+      ).end,
+      agenda: [
+        {
+          time: "6:00 PM",
+          title: "Check-in and pairing",
+          description: "Drop a printed or laptop draft at a review table.",
+        },
+        {
+          time: "6:15 PM",
+          title: "First review round",
+          description: "Fifteen minutes of written notes from a designer or senior peer.",
+        },
+        {
+          time: "6:50 PM",
+          title: "Revise in place",
+          description: "Apply the first-round notes while mentors rotate.",
+        },
+        {
+          time: "7:20 PM",
+          title: "Second review and wrap",
+          description: "A final pass plus one concrete next edit to make this week.",
+        },
+      ],
+    },
+    checkInSessions: [
+      {
+        name: "Door Check-in",
+        start_time: timestamp(schedule.resumeClinicFuture, 17, 45),
+        end_time: timestamp(schedule.resumeClinicFuture, 18, 45),
       },
     ],
     applicationQuestions: [],

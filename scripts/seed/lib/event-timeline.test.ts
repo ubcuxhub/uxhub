@@ -11,7 +11,7 @@ describe("relative event seed timeline", () => {
     const counts = { past: 0, ongoing: 0, upcoming: 0 };
     for (const event of events) counts[classifySeedEvent(event, fixedNow)] += 1;
 
-    expect(counts).toEqual({ past: 5, ongoing: 3, upcoming: 5 });
+    expect(counts).toEqual({ past: 5, ongoing: 3, upcoming: 6 });
   });
 
   it("assigns lifecycle statuses to match the seeded timeline", () => {
@@ -41,7 +41,7 @@ describe("relative event seed timeline", () => {
     ).toEqual(["design-sprint-2026", "student-panel-2026"]);
     expect(
       byPhase.upcoming.filter((event) => event.event.status === "active")
-    ).toHaveLength(3);
+    ).toHaveLength(4);
   });
 
   it("keeps long-running events active with registration open", () => {
@@ -67,7 +67,7 @@ describe("relative event seed timeline", () => {
     );
   });
 
-  it("opens registration for exactly four far-future events", () => {
+  it("opens registration for exactly five far-future events", () => {
     const openUpcoming = events.filter(
       (event) =>
         classifySeedEvent(event, fixedNow) === "upcoming" &&
@@ -77,7 +77,7 @@ describe("relative event seed timeline", () => {
           fixedNow.getTime()
     );
 
-    expect(openUpcoming).toHaveLength(4);
+    expect(openUpcoming).toHaveLength(5);
     for (const event of openUpcoming) {
       expect(classifySeedEvent(event, fixedNow)).toBe("upcoming");
       expect(new Date(event.event.registration_start_time!).getTime()).toBeLessThan(
@@ -120,6 +120,7 @@ describe("relative event seed timeline", () => {
       "get-to-know-ux-hub-2026",
       "design-sprint-2026",
       "portfolio-review-night-2027",
+      "resume-clinic-2027",
       "student-panel-2026",
       "coffee-chat-social-2026",
       "uxathon-2027",
