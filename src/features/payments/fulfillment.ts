@@ -7,11 +7,9 @@ import type { UserInfoRow } from "@/types/models";
 import type { CheckoutActionResult, CheckoutRequestInput } from "./types";
 import type { Database, Json } from "@/lib/supabase/database.types";
 import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
-import { fetchApplicationQuestions } from "@/lib/supabase-helpers/event-applications";
 import {
-  fetchEventRegistrationByPurchaseId,
   fetchUserRegistration,
-  updateEventRegistration,
+  finalizePaidEventTicket,
 } from "@/lib/supabase-helpers/event-registrations";
 import { fetchMembershipTypeBySlug } from "@/lib/supabase-helpers/memberships";
 import {
@@ -128,37 +126,13 @@ async function fulfillEventTicketPurchase(purchaseId: string) {
     throw new Error("Event ticket purchase is missing an event ID.");
   }
 
-  let registration = await fetchEventRegistrationByPurchaseId(adminDb, purchase.id);
+  await finalizePaidEventTicket(adminDb, purchase.id);
 
-  if (!registration) {
-    const reservation = await reserveEventTicketSeat(
-      purchase.event_id,
-      purchase.user_id,
-      purchase.id
-    );
+  const updatedPurchase = await fetchPurchaseById(adminDb, purchase.id);
 
-    if (!reservation?.registration_id || reservation.failure_reason) {
-      throw new Error(
-        formatReservationFailure(reservation?.failure_reason ?? null)
-      );
-    }
-
-    registration = await fetchEventRegistrationByPurchaseId(adminDb, purchase.id);
+  if (!updatedPurchase) {
+    throw new Error("Purchase not found after event fulfillment.");
   }
-
-  if (!registration) {
-    throw new Error("Reserved event registration could not be loaded.");
-  }
-
-  await updateEventRegistration(adminDb, registration.id, {
-    attending: true,
-    purchase_id: purchase.id,
-    status: "accepted",
-  });
-
-  const updatedPurchase = await updatePurchase(adminDb, purchase.id, {
-    fulfilled_at: new Date().toISOString(),
-  });
 
   await revalidatePurchasePaths(adminDb, purchase.id);
   after(() => sendPurchaseConfirmationEmail(adminDb, purchase.id));
@@ -323,14 +297,16 @@ async function createSquarePaymentForEventTicket(
     return { error: "Event not found." } as const;
   }
 
-  const applicationQuestions = event.applications_enabled
-    ? await fetchApplicationQuestions(adminDb, event.id)
-    : [];
-
-  if (applicationQuestions.length > 0) {
+  if (event.applications_enabled && !input.applicationId) {
     return {
       error:
         "This event uses an application flow and cannot be purchased directly.",
+    } as const;
+  }
+
+  if (!event.applications_enabled && input.applicationId) {
+    return {
+      error: "This event does not use applications.",
     } as const;
   }
 
@@ -349,6 +325,7 @@ async function createSquarePaymentForEventTicket(
 
   const purchase = await createPurchase(adminDb, {
     amount_cents: amountCents,
+    application_id: input.applicationId ?? null,
     currency: SQUARE_CURRENCY,
     event_id: event.id,
     idempotency_key: input.idempotencyKey,
@@ -392,15 +369,15 @@ async function createSquarePaymentForEventTicket(
 
     const reservation = await reserveEventTicketSeat(event.id, user.id, purchase.id);
 
-    if (!reservation?.registration_id || reservation.failure_reason) {
+    if (reservation?.failure_reason) {
       await cancelSquarePaymentIfPossible(payment.id);
       await updatePurchase(adminDb, purchase.id, {
-        failure_reason: formatReservationFailure(reservation?.failure_reason),
+        failure_reason: formatReservationFailure(reservation.failure_reason),
         status: "canceled",
       });
 
       return {
-        error: formatReservationFailure(reservation?.failure_reason),
+        error: formatReservationFailure(reservation.failure_reason),
       } as const;
     }
 

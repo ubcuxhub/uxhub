@@ -55,5 +55,6 @@ export function parseCheckoutRequest(
     buyerEmail,
     buyerPhone: asOptionalString(payload.buyerPhone),
     billingPostalCode: asOptionalString(payload.billingPostalCode),
+    applicationId: asOptionalString(payload.applicationId),
   };
 }

@@ -398,6 +398,7 @@ async function main(): Promise<void> {
     summary.push(format("Auth users", userSummary.authUsers));
     summary.push(format("User profiles", userSummary.profiles));
     summary.push(format("Purchases", userSummary.purchases));
+    summary.push(format("Event applications", userSummary.applications));
     summary.push(format("Event registrations", userSummary.registrations));
     summary.push(format("Application responses", userSummary.responses));
     summary.push(format("Check-ins", userSummary.checkIns));

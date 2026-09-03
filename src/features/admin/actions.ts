@@ -25,8 +25,11 @@ import {
 } from "@/lib/supabase-helpers/event-people";
 import {
   fetchRegistrationsForEvent,
-  updateEventRegistration,
 } from "@/lib/supabase-helpers/event-registrations";
+import {
+  markEventApplicationNotAttending,
+  reviewEventApplication,
+} from "@/lib/supabase-helpers/event-applications";
 import {
   fetchEventById,
   fetchEventIdByImageUrl,
@@ -124,6 +127,12 @@ const IMAGE_CONFLICT_SENTINEL = "EVENT_IMAGE_CONFLICT";
 const SAVE_CONFLICT_ERROR =
   "This event's cover image was changed somewhere else since this page loaded. Reload the page and apply your changes again.";
 
+const QUESTIONS_LOCKED_ERROR =
+  "Application questions cannot be changed after someone has applied.";
+
+const APPLICATION_MODE_LOCKED_ERROR =
+  "Application mode cannot be changed after someone has applied.";
+
 /**
  * Removes a cover image that is no longer referenced by any event.
  *
@@ -199,6 +208,12 @@ export async function saveAdminEventAction(
     if (error.message.includes(IMAGE_CONFLICT_SENTINEL)) {
       throw new Error(SAVE_CONFLICT_ERROR);
     }
+    if (error.message.includes("EVENT_APPLICATION_QUESTIONS_LOCKED")) {
+      throw new Error(QUESTIONS_LOCKED_ERROR);
+    }
+    if (error.message.includes("EVENT_APPLICATION_MODE_LOCKED")) {
+      throw new Error(APPLICATION_MODE_LOCKED_ERROR);
+    }
     throw error;
   }
   if (!data?.id) throw new Error("The event save returned no event id.");
@@ -253,20 +268,34 @@ export async function deleteAdminEventAction(eventId: string) {
   revalidatePath("/admin/events");
 }
 
-export async function updateApplicationStatusAction(
-  registrationId: string,
-  status: ApplicationStatus
+export async function reviewApplicationAction(
+  applicationId: string,
+  status: Extract<ApplicationStatus, "accepted" | "rejected">
 ) {
-  const admin = await requireAdmin();
+  await requireAdmin();
+  const application = await reviewEventApplication(
+    supabaseAdmin,
+    applicationId,
+    status
+  );
+  revalidatePath(
+    `/admin/events/${application.event_id}/review-applications`
+  );
+  return application;
+}
 
-  if (!["pending", "accepted", "declined"].includes(status)) {
-    throw new Error("Invalid application status.");
-  }
-
-  await updateEventRegistration(supabaseAdmin, registrationId, {
-    status,
-    reviewer_id: admin.id,
-  });
+export async function markApplicationNotAttendingAction(
+  applicationId: string
+) {
+  await requireAdmin();
+  const application = await markEventApplicationNotAttending(
+    supabaseAdmin,
+    applicationId
+  );
+  revalidatePath(
+    `/admin/events/${application.event_id}/review-applications`
+  );
+  return application;
 }
 
 export async function toggleCheckInAction(

@@ -1,22 +1,13 @@
-import type {
-  EventApplicationQuestionRow,
-  EventApplicationResponseInsert,
-} from "@/types/models";
+import type { EventApplicationQuestionRow } from "@/types/models";
+import type { EventApplicationSubmissionResponse } from "@/lib/supabase-helpers/event-applications";
 
 /**
- * Prepares response data for upsert into event_application_responses
+ * Prepares response data for the atomic application submission RPC.
  */
 export function prepareResponseData(
   questionRecords: Pick<EventApplicationQuestionRow, "id">[],
-  responses: Record<string, string | string[]>,
-  registrationId: string
-): EventApplicationResponseInsert[] {
-  if (!registrationId) {
-    throw new Error(
-      "Registration ID is required to save application responses"
-    );
-  }
-
+  responses: Record<string, string | string[]>
+): EventApplicationSubmissionResponse[] {
   return questionRecords.map((questionRecord, index) => {
     const questionId = `question_${index}`;
     const responseValue = responses[questionId];
@@ -29,9 +20,8 @@ export function prepareResponseData(
       responseText = responseValue || "";
     }
 
-    const responseData: EventApplicationResponseInsert = {
-      event_application_question_id: questionRecord.id,
-      event_registration_id: registrationId,
+    const responseData: EventApplicationSubmissionResponse = {
+      question_id: questionRecord.id,
       response: responseText,
     };
 

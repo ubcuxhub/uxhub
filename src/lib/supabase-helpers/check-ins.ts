@@ -47,7 +47,6 @@ export async function fetchAttendingRegistrations(
     `
     )
     .eq("event_id", eventId)
-    .eq("attending", true)
     .order("created_at", { ascending: false });
 
   if (error) throw error;

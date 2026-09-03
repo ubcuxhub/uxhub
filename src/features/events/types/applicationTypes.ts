@@ -1,10 +1,10 @@
-import type { ApplicationStatus } from "@/types/models";
+import type { EventApplicationRow } from "@/types/models";
 
-export interface GroupedRegistration {
-  user_id: string;
-  name: string;
-  email: string;
-  applicationDate: string;
-  status: ApplicationStatus;
-  registrationId: string;
+export interface ApplicationWithUserContact {
+  application: EventApplicationRow;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+  };
 }

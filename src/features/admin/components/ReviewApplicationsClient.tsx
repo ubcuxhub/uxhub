@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
 import { ApplicationListCard } from "@/features/admin";
 import {
-  type GroupedRegistration,
+  type ApplicationWithUserContact,
 } from "@/features/events";
 import type { ApplicationStatus } from "@/types/models";
 import { Button } from "@/components/ui/button";
@@ -14,13 +14,13 @@ import { PageContainer } from "@/components/shared/PageContainer";
 interface ReviewApplicationsClientProps {
   eventId: string;
   eventName: string;
-  registrations: GroupedRegistration[];
+  applications: ApplicationWithUserContact[];
 }
 
 export function ReviewApplicationsClient({
   eventId,
   eventName,
-  registrations,
+  applications,
 }: ReviewApplicationsClientProps) {
   const searchParams = useSearchParams();
 
@@ -38,26 +38,28 @@ export function ReviewApplicationsClient({
   const [statusFilters, setStatusFilters] =
     useState<Set<ApplicationStatus>>(initialStatusFilters);
 
-  const filteredRegistrations = useMemo(() => {
-    let filtered = [...registrations];
+  const filteredApplications = useMemo(() => {
+    let filtered = [...applications];
 
     // Apply search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
-        (reg) =>
-          reg.name.toLowerCase().includes(query) ||
-          reg.email.toLowerCase().includes(query)
+        ({ user }) =>
+          user.name.toLowerCase().includes(query) ||
+          user.email.toLowerCase().includes(query)
       );
     }
 
     // Apply status filters
     if (statusFilters.size > 0) {
-      filtered = filtered.filter((reg) => statusFilters.has(reg.status));
+      filtered = filtered.filter(({ application }) =>
+        statusFilters.has(application.status)
+      );
     }
 
     return filtered;
-  }, [registrations, searchQuery, statusFilters]);
+  }, [applications, searchQuery, statusFilters]);
 
   const toggleStatusFilter = (status: ApplicationStatus) => {
     setStatusFilters((prev) => {
@@ -119,11 +121,11 @@ export function ReviewApplicationsClient({
                     <Button
                       type="button"
                       variant={
-                        statusFilters.has("declined") ? "default" : "outline"
+                        statusFilters.has("rejected") ? "default" : "outline"
                       }
-                      onClick={() => toggleStatusFilter("declined")}
+                      onClick={() => toggleStatusFilter("rejected")}
                     >
-                      Declined
+                      Rejected
                     </Button>
                     <Button
                       type="button"
@@ -147,29 +149,30 @@ export function ReviewApplicationsClient({
                 </div>
 
                 {/* Applications List */}
-                {filteredRegistrations.length === 0 ? (
+                {filteredApplications.length === 0 ? (
                   <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed p-12 text-center">
                     <div className="text-2xl font-semibold">
-                      {registrations.length === 0
+                      {applications.length === 0
                         ? "No applications yet"
                         : "No applications match your filters"}
                     </div>
                     <p className="max-w-md text-sm text-muted-foreground">
-                      {registrations.length === 0
+                      {applications.length === 0
                         ? "Applications will appear here once users submit them."
                         : "Try adjusting your search or filter criteria."}
                     </p>
                   </div>
                 ) : (
                   <div className="grid gap-4">
-                    {filteredRegistrations.map((registration) => (
+                    {filteredApplications.map(({ application, user }) => (
                       <ApplicationListCard
-                        key={registration.user_id}
-                        registrationId={registration.registrationId}
-                        name={registration.name}
-                        email={registration.email}
-                        applicationDate={registration.applicationDate}
-                        status={registration.status}
+                        key={application.id}
+                        applicationId={application.id}
+                        name={user.name}
+                        email={user.email}
+                        applicationDate={application.submitted_at}
+                        status={application.status}
+                        attendanceStatus={application.attendance_status}
                         eventId={eventId}
                       />
                     ))}

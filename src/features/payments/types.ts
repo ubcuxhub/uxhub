@@ -16,6 +16,7 @@ export interface CheckoutRequestInput {
   buyerEmail: string;
   buyerPhone?: string | null;
   billingPostalCode?: string | null;
+  applicationId?: string | null;
 }
 
 export interface CheckoutActionSuccess {

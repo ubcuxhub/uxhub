@@ -42,6 +42,12 @@ export function formatReservationFailure(reason: string | null | undefined) {
   switch (reason) {
     case "APPLICATION_REQUIRED":
       return "This event uses an application flow and cannot be purchased directly.";
+    case "APPLICATION_NOT_ACCEPTED":
+      return "This application must be accepted before checkout can continue.";
+    case "APPLICATION_NOT_ALLOWED":
+      return "This event does not use applications.";
+    case "INVALID_PURCHASE":
+      return "This checkout attempt could not be matched to the event.";
     case "REGISTRATION_NOT_OPEN":
       return "Registration for this event is not open yet.";
     case "REGISTRATION_CLOSED":

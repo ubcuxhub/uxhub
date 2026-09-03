@@ -22,12 +22,13 @@ describe("user seed fixtures", () => {
 
   it("reports the representative dataset totals", () => {
     expect(getUserFixtureTotals(seedUsers)).toEqual({
+      applications: 5,
       authUsers: 3,
+      checkIns: 5,
       profiles: 3,
       purchases: 12,
-      registrations: 14,
+      registrations: 10,
       responses: 22,
-      checkIns: 5,
     });
   });
 
@@ -46,9 +47,7 @@ describe("user seed fixtures", () => {
             ? purchaseByKey.get(registration.purchaseKey)
             : null;
           const event = eventBySlug.get(registration.eventSlug);
-          return registration.status === "accepted" &&
-            purchase?.status === "completed" &&
-            event
+          return purchase?.status === "completed" && event
             ? [classifySeedEvent(event, fixedNow)]
             : [];
         })

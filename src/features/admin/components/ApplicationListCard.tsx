@@ -2,32 +2,34 @@
 
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { ApplicationStatus } from "@/types/models";
+import type { ApplicationStatus, AttendanceStatus } from "@/types/models";
 import { Clock, X, Check } from "lucide-react";
 import { formatTimestamp } from "@/lib/date";
 
 interface ApplicationListCardProps {
-  registrationId: string;
+  applicationId: string;
   name: string;
   email: string;
   applicationDate: string;
   status: ApplicationStatus;
+  attendanceStatus: AttendanceStatus | null;
   eventId: string;
 }
 
 export function ApplicationListCard({
-  registrationId,
+  applicationId,
   name,
   email,
   applicationDate,
   status,
+  attendanceStatus,
   eventId,
 }: ApplicationListCardProps) {
   const getStatusIcon = () => {
     switch (status) {
       case "pending":
         return <Clock className="text-warning" />;
-      case "declined":
+      case "rejected":
         return <X className="text-destructive" />;
       case "accepted":
         return <Check className="text-success" />;
@@ -38,8 +40,8 @@ export function ApplicationListCard({
     switch (status) {
       case "pending":
         return "Pending";
-      case "declined":
-        return "Declined";
+      case "rejected":
+        return "Rejected";
       case "accepted":
         return "Accepted";
     }
@@ -47,7 +49,7 @@ export function ApplicationListCard({
 
   return (
     <Link
-      href={`/admin/events/${eventId}/review-applications/${registrationId}`}
+      href={`/admin/events/${eventId}/review-applications/${applicationId}`}
     >
       <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
         <CardHeader>
@@ -64,8 +66,11 @@ export function ApplicationListCard({
             <span className="text-muted-foreground">
               Applied: {formatTimestamp(applicationDate)}
             </span>
-            <span className="text-muted-foreground capitalize">
+            <span className="text-muted-foreground">
               {getStatusText()}
+              {attendanceStatus
+                ? ` · ${attendanceStatus.replaceAll("_", " ")}`
+                : ""}
             </span>
           </div>
         </CardContent>

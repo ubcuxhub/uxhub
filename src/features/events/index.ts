@@ -2,5 +2,5 @@ export type {
   ApplicationQuestionTemplate,
 } from "./types/eventTypes";
 export type {
-  GroupedRegistration,
+  ApplicationWithUserContact,
 } from "./types/applicationTypes";

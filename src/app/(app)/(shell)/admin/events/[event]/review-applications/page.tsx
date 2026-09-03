@@ -4,7 +4,7 @@ import { ReviewApplicationsClient } from "@/features/admin/components/ReviewAppl
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchEventById } from "@/lib/supabase-helpers/events";
-import { fetchEventRegistrationsGroupedByUser } from "@/lib/supabase-helpers/event-registrations";
+import { fetchEventApplicationsWithUserContacts } from "@/lib/supabase-helpers/event-applications";
 
 interface ReviewApplicationsPageProps {
   params: Promise<{ event: string }>;
@@ -16,9 +16,9 @@ export default async function ReviewApplicationsPage({
   await requireAdmin();
   const { event: eventId } = await params;
   const supabase = await createClient();
-  const [event, registrations] = await Promise.all([
+  const [event, applications] = await Promise.all([
     fetchEventById(supabase, eventId),
-    fetchEventRegistrationsGroupedByUser(supabase, eventId),
+    fetchEventApplicationsWithUserContacts(supabase, eventId),
   ]);
 
   if (!event) notFound();
@@ -27,7 +27,7 @@ export default async function ReviewApplicationsPage({
     <ReviewApplicationsClient
       eventId={eventId}
       eventName={event.name}
-      registrations={registrations}
+      applications={applications}
     />
   );
 }

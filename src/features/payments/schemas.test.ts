@@ -55,6 +55,7 @@ describe("parseCheckoutRequest", () => {
       slug: "student",
       buyerPhone: "604-555-0100",
       billingPostalCode: null,
+      applicationId: null,
     });
   });
 });

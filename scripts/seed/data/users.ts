@@ -15,17 +15,26 @@ export interface SeedPurchase {
   status: "pending" | "authorized" | "completed" | "canceled" | "failed";
 }
 
+export interface SeedApplication {
+  attendanceStatus?:
+    | "awaiting_confirmation"
+    | "confirmed"
+    | "not_attending"
+    | null;
+  eventSlug: string;
+  responses: Record<string, string>;
+  reviewerEmail?: string;
+  status: "pending" | "accepted" | "rejected";
+}
+
 export interface SeedRegistration {
-  attending: boolean;
   checkIns?: Record<string, string>;
   eventSlug: string;
   purchaseKey?: string;
-  responses?: Record<string, string>;
-  reviewerEmail?: string;
-  status: "pending" | "declined" | "accepted";
 }
 
 export interface SeedUser {
+  applications: SeedApplication[];
   email: string;
   membershipSlug: string | null;
   password: string;
@@ -158,34 +167,12 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
         status: "completed",
       },
     ],
-    registrations: [
+    applications: [
       {
-        eventSlug: industryTalkPast.event.slug,
-        purchaseKey:
-          "seed:event:admin-explorer:industry-talk-ai-and-ux-2026",
-        status: "accepted",
-        attending: true,
-        checkIns: {
-          "Door Check-in": afterTimestamp(industryCheckIn, 8),
-        },
-      },
-      {
-        eventSlug: mentorshipOngoing.event.slug,
-        purchaseKey: "seed:event:admin-explorer:student-panel-2025",
-        status: "accepted",
-        attending: true,
-      },
-      {
-        eventSlug: thinkboxFuture.event.slug,
-        purchaseKey:
-          "seed:event:admin-explorer:thinkbox-office-tour-2027",
-        status: "accepted",
-        attending: true,
-      },
-      {
+        attendanceStatus: "confirmed",
         eventSlug: designSprintPast.event.slug,
+        reviewerEmail: "admin-explorer@gmail.com",
         status: "accepted",
-        attending: true,
         responses: {
           [designSprintQuestions.year]: "3",
           [designSprintQuestions.figma]: "Comfortable building screens",
@@ -193,21 +180,11 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
             "I want to practice turning research into a focused prototype and get more confident presenting design decisions.",
           [designSprintQuestions.dietary]: "Vegetarian",
         },
-        checkIns: {
-          "Morning Check-in": afterTimestamp(
-            designSprintCheckIns[0].start_time!,
-            6
-          ),
-          "Post-Lunch Check-in": afterTimestamp(
-            designSprintCheckIns[1].start_time!,
-            7
-          ),
-        },
       },
       {
         eventSlug: uxathonPast.event.slug,
-        status: "declined",
-        attending: false,
+        reviewerEmail: "admin-explorer@gmail.com",
+        status: "rejected",
         responses: {
           [uxathonQuestions.year]: "3",
           [uxathonQuestions.contribution]: "User research, Prototyping",
@@ -220,7 +197,6 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
       {
         eventSlug: designSprintFuture.event.slug,
         status: "pending",
-        attending: false,
         responses: {
           [designSprintQuestions.year]: "3",
           [designSprintQuestions.figma]:
@@ -228,6 +204,38 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
           [designSprintQuestions.goal]:
             "I want to mentor newer teammates while sharpening how I scope research under a tight deadline.",
           [designSprintQuestions.dietary]: "Vegetarian",
+        },
+      },
+    ],
+    registrations: [
+      {
+        eventSlug: industryTalkPast.event.slug,
+        purchaseKey:
+          "seed:event:admin-explorer:industry-talk-ai-and-ux-2026",
+        checkIns: {
+          "Door Check-in": afterTimestamp(industryCheckIn, 8),
+        },
+      },
+      {
+        eventSlug: mentorshipOngoing.event.slug,
+        purchaseKey: "seed:event:admin-explorer:student-panel-2025",
+      },
+      {
+        eventSlug: thinkboxFuture.event.slug,
+        purchaseKey:
+          "seed:event:admin-explorer:thinkbox-office-tour-2027",
+      },
+      {
+        eventSlug: designSprintPast.event.slug,
+        checkIns: {
+          "Morning Check-in": afterTimestamp(
+            designSprintCheckIns[0].start_time!,
+            6
+          ),
+          "Post-Lunch Check-in": afterTimestamp(
+            designSprintCheckIns[1].start_time!,
+            7
+          ),
         },
       },
     ],
@@ -294,34 +302,11 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
         status: "failed",
       },
     ],
-    registrations: [
-      {
-        eventSlug: industryTalkPast.event.slug,
-        purchaseKey: "seed:event:not-member:industry-talk-ai-and-ux-2026",
-        status: "accepted",
-        attending: true,
-        checkIns: {
-          "Door Check-in": afterTimestamp(industryCheckIn, 8),
-        },
-      },
-      {
-        eventSlug: mentorshipOngoing.event.slug,
-        purchaseKey: "seed:event:not-member:student-panel-2025",
-        status: "accepted",
-        attending: true,
-      },
-      {
-        eventSlug: thinkboxFuture.event.slug,
-        purchaseKey:
-          "seed:event:not-member:thinkbox-office-tour-2027:completed",
-        status: "accepted",
-        attending: true,
-      },
+    applications: [
       {
         eventSlug: uxathonPast.event.slug,
         reviewerEmail: "admin-explorer@gmail.com",
-        status: "declined",
-        attending: false,
+        status: "rejected",
         responses: {
           [uxathonQuestions.year]: "2",
           [uxathonQuestions.contribution]:
@@ -335,7 +320,6 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
       {
         eventSlug: designSprintFuture.event.slug,
         status: "pending",
-        attending: false,
         responses: {
           [designSprintQuestions.year]: "2",
           [designSprintQuestions.figma]: "I can follow a tutorial",
@@ -343,6 +327,24 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
             "I want to experience an end-to-end design process and leave with a project I can keep developing.",
           [designSprintQuestions.dietary]: "None",
         },
+      },
+    ],
+    registrations: [
+      {
+        eventSlug: industryTalkPast.event.slug,
+        purchaseKey: "seed:event:not-member:industry-talk-ai-and-ux-2026",
+        checkIns: {
+          "Door Check-in": afterTimestamp(industryCheckIn, 8),
+        },
+      },
+      {
+        eventSlug: mentorshipOngoing.event.slug,
+        purchaseKey: "seed:event:not-member:student-panel-2025",
+      },
+      {
+        eventSlug: thinkboxFuture.event.slug,
+        purchaseKey:
+          "seed:event:not-member:thinkbox-office-tour-2027:completed",
       },
     ],
   },
@@ -408,13 +410,12 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
         status: "completed",
       },
     ],
+    applications: [],
     registrations: [
       {
         eventSlug: industryTalkPast.event.slug,
         purchaseKey:
           "seed:event:mock-member:industry-talk-ai-and-ux-2026",
-        status: "accepted",
-        attending: true,
         checkIns: {
           "Door Check-in": afterTimestamp(industryCheckIn, 12),
         },
@@ -422,15 +423,11 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
       {
         eventSlug: mentorshipOngoing.event.slug,
         purchaseKey: "seed:event:mock-member:student-panel-2025",
-        status: "accepted",
-        attending: true,
       },
       {
         eventSlug: portfolioReviewFuture.event.slug,
         purchaseKey:
           "seed:event:mock-member:portfolio-review-night-2027",
-        status: "accepted",
-        attending: true,
       },
     ],
   },

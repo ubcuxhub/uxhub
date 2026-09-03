@@ -9,6 +9,7 @@ export const TABLES = {
   events: "events",
   userInfo: "user_info",
   eventRegistrations: "event_registrations",
+  eventApplications: "event_applications",
   eventApplicationQuestions: "event_application_questions",
   eventApplicationResponses: "event_application_responses",
   checkInSessions: "check_in_sessions",

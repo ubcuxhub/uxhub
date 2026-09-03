@@ -39,9 +39,7 @@ export default async function PortalEvents() {
     fetchRegistrationsForUser(supabase, user.id),
   ]);
   const registeredEventIds = new Set(
-    registrations
-      .filter((registration) => registration.status === "accepted")
-      .map((registration) => registration.event_id)
+    registrations.map((registration) => registration.event_id)
   );
   // Server-rendered categorization needs the request's current wall-clock time.
   // eslint-disable-next-line react-hooks/purity

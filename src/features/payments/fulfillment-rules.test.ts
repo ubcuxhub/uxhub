@@ -54,6 +54,9 @@ describe("payment fulfillment rules", () => {
 
   it.each([
     ["APPLICATION_REQUIRED", "This event uses an application flow and cannot be purchased directly."],
+    ["APPLICATION_NOT_ACCEPTED", "This application must be accepted before checkout can continue."],
+    ["APPLICATION_NOT_ALLOWED", "This event does not use applications."],
+    ["INVALID_PURCHASE", "This checkout attempt could not be matched to the event."],
     ["REGISTRATION_NOT_OPEN", "Registration for this event is not open yet."],
     ["REGISTRATION_CLOSED", "Registration for this event has closed."],
     ["ALREADY_REGISTERED", "You already have a registration for this event."],

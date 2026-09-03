@@ -209,10 +209,6 @@ export function CheckInManager({
   // Calculate statistics
   const stats = useMemo(() => {
     const total = allRegistrations.length;
-    const accepted = allRegistrations.filter(
-      (reg) => reg.status === "accepted"
-    ).length;
-    const attending = allRegistrations.filter((reg) => reg.attending).length;
 
     // Count checked in users (users with at least one check-in)
     const checkedInUserIds = new Set<string>();
@@ -224,7 +220,7 @@ export function CheckInManager({
     });
     const checkedIn = checkedInUserIds.size;
 
-    return { total, checkedIn, accepted, attending };
+    return { total, checkedIn };
   }, [allRegistrations, checkInStatuses]);
 
   return (
@@ -307,10 +303,8 @@ export function CheckInManager({
                 </Card>
 
                 {/* Statistics */}
-                <div className="grid gap-4 md:grid-cols-4">
+                <div className="grid gap-4 md:grid-cols-2">
                   <StatCard title="Total Registered" value={stats.total} />
-                  <StatCard title="Accepted" value={stats.accepted} />
-                  <StatCard title="Attending" value={stats.attending} />
                   <StatCard
                     title="Checked In"
                     value={stats.checkedIn}

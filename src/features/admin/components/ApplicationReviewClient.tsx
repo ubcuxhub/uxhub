@@ -6,94 +6,92 @@ import {
   ApplicationResponseCard,
   StatusUpdateSection,
 } from "@/features/admin";
-import type { ApplicationStatus, EventRow } from "@/types/models";
+import type {
+  ApplicationStatus,
+  EventApplicationRow,
+  EventRow,
+} from "@/types/models";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { SuccessOverlay } from "@/components/shared/SuccessOverlay";
-import { updateApplicationStatusAction } from "@/features/admin/actions";
-
-export interface AdminApplicationRegistration {
-  id: string;
-  event_id: string;
-  user_id: string;
-  status: ApplicationStatus;
-  created_at: string;
-}
-
-export interface AdminApplicationUser {
-  id: string;
-  name: string;
-  email: string;
-}
-
-export interface AdminApplicationResponse {
-  id: string;
-  event_registration_id: string;
-  event_application_question_id: string;
-  response: string;
-  created_at: string;
-  event_application_questions: {
-    id: string;
-    question: string;
-    response_type: string;
-    max_char_limit: number | null;
-    response_options: string[] | null;
-  } | null;
-}
+import {
+  markApplicationNotAttendingAction,
+  reviewApplicationAction,
+} from "@/features/admin/actions";
+import type { ApplicationResponseWithQuestion } from "@/lib/supabase-helpers/event-applications";
+import type { UserInfoContact } from "@/lib/supabase-helpers/users";
 
 interface ApplicationReviewClientProps {
-  registration: AdminApplicationRegistration;
-  userInfo: AdminApplicationUser;
+  application: EventApplicationRow;
+  userInfo: UserInfoContact;
+  reviewerInfo: UserInfoContact | null;
+  currentAdmin: UserInfoContact;
   event: EventRow;
-  responses: AdminApplicationResponse[];
+  responses: ApplicationResponseWithQuestion[];
 }
 
 export function ApplicationReviewClient({
-  registration: initialRegistration,
+  application: initialApplication,
   userInfo,
+  reviewerInfo,
+  currentAdmin,
   event,
   responses,
 }: ApplicationReviewClientProps) {
-  const registrationId = initialRegistration.id;
-  const [registration, setRegistration] =
-    useState<AdminApplicationRegistration>(initialRegistration);
+  const [application, setApplication] =
+    useState<EventApplicationRow>(initialApplication);
   const [error, setError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const displayedReviewer =
+    application.reviewer_id === reviewerInfo?.id
+      ? reviewerInfo
+      : application.reviewer_id === currentAdmin.id
+        ? currentAdmin
+        : null;
 
-  const handleStatusUpdate = async (newStatus: ApplicationStatus) => {
+  const handleDecision = async (
+    newStatus: Extract<ApplicationStatus, "accepted" | "rejected">
+  ) => {
     if (isUpdating) return;
 
     setIsUpdating(true);
     setError(null);
 
     try {
-      await updateApplicationStatusAction(registrationId, newStatus);
-
-      // Update local state
-      setRegistration({ ...registration, status: newStatus });
-
-      // Show success message
-      let message = "";
-      switch (newStatus) {
-        case "accepted":
-          message = "Application accepted";
-          break;
-        case "declined":
-          message = "Application declined";
-          break;
-        case "pending":
-          message = "Application reopened for review";
-          break;
-      }
-
-      setSuccessMessage(message);
+      const updated = await reviewApplicationAction(application.id, newStatus);
+      setApplication(updated);
+      setSuccessMessage(
+        newStatus === "accepted"
+          ? "Application accepted"
+          : "Application rejected"
+      );
     } catch (err) {
-      console.error("Error updating status:", err);
       setError(
         err instanceof Error
           ? err.message
           : "Failed to update application status"
+      );
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleNotAttending = async () => {
+    if (isUpdating) return;
+
+    setIsUpdating(true);
+    setError(null);
+
+    try {
+      const updated = await markApplicationNotAttendingAction(application.id);
+      setApplication(updated);
+      setSuccessMessage("Applicant marked as not attending");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Failed to update attendance"
       );
     } finally {
       setIsUpdating(false);
@@ -119,8 +117,8 @@ export function ApplicationReviewClient({
             <ApplicantInfoCard
               name={userInfo.name}
               email={userInfo.email}
-              applicationDate={registration.created_at}
-              status={registration.status}
+              application={application}
+              reviewer={displayedReviewer}
             />
 
             {/* Application Responses */}
@@ -151,7 +149,7 @@ export function ApplicationReviewClient({
                       <ApplicationResponseCard
                         key={response.id}
                         question={question.question}
-                        response={response.response}
+                        response={response.response ?? ""}
                       />
                     );
                   })}
@@ -161,9 +159,10 @@ export function ApplicationReviewClient({
 
             {/* Status Update Section */}
             <StatusUpdateSection
-              currentStatus={registration.status}
+              application={application}
               isUpdating={isUpdating}
-              onStatusUpdate={handleStatusUpdate}
+              onDecision={handleDecision}
+              onMarkNotAttending={handleNotAttending}
               error={error}
             />
       </PageContainer>

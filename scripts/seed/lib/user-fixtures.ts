@@ -1,14 +1,15 @@
-import type { SeedUser } from "../data/users.ts";
+import type { SeedApplication, SeedUser } from "../data/users.ts";
 import type { SeedEvent } from "../data/events.ts";
 import type { TablesInsert } from "../../../src/lib/supabase/database.types.ts";
 
 export interface UserFixtureTotals {
+  applications: number;
   authUsers: number;
+  checkIns: number;
   profiles: number;
   purchases: number;
   registrations: number;
   responses: number;
-  checkIns: number;
 }
 
 export type SeedEventPhase = "past" | "ongoing" | "upcoming";
@@ -22,28 +23,36 @@ export function classifySeedEvent(event: SeedEvent, now: Date): SeedEventPhase {
   return start > current ? "upcoming" : "past";
 }
 
+function isApplicationEvent(event: SeedEvent): boolean {
+  return event.applicationQuestions.length > 0;
+}
+
 export function getUserFixtureTotals(users: SeedUser[]): UserFixtureTotals {
   return users.reduce<UserFixtureTotals>(
     (totals, user) => {
       totals.authUsers += 1;
       totals.profiles += 1;
       totals.purchases += user.purchases.length;
+      totals.applications += user.applications.length;
       totals.registrations += user.registrations.length;
 
+      for (const application of user.applications) {
+        totals.responses += Object.keys(application.responses).length;
+      }
       for (const registration of user.registrations) {
-        totals.responses += Object.keys(registration.responses ?? {}).length;
         totals.checkIns += Object.keys(registration.checkIns ?? {}).length;
       }
 
       return totals;
     },
     {
+      applications: 0,
       authUsers: 0,
+      checkIns: 0,
       profiles: 0,
       purchases: 0,
       registrations: 0,
       responses: 0,
-      checkIns: 0,
     }
   );
 }
@@ -56,6 +65,48 @@ function assertUnique(values: string[], label: string): void {
       throw new Error(`Duplicate ${label} "${value}" in user seed data`);
     }
     seen.add(value);
+  }
+}
+
+function validateApplicationResponses(
+  application: SeedApplication,
+  event: SeedEvent,
+  email: string
+): void {
+  const questionByText = new Map(
+    event.applicationQuestions.map((question) => [question.question, question])
+  );
+
+  for (const question of event.applicationQuestions) {
+    if (question.is_required && !application.responses[question.question]?.trim()) {
+      throw new Error(
+        `Application for "${application.eventSlug}" by "${email}" is missing required response "${question.question}"`
+      );
+    }
+  }
+
+  for (const [questionText, response] of Object.entries(application.responses)) {
+    const question = questionByText.get(questionText);
+    if (!question) {
+      throw new Error(
+        `Application for "${application.eventSlug}" by "${email}" references unknown question "${questionText}"`
+      );
+    }
+
+    if (question.response_options && response) {
+      const selected =
+        question.response_type === "checkbox"
+          ? response.split(",").map((value) => value.trim())
+          : [response];
+      const invalid = selected.find(
+        (value) => !question.response_options?.includes(value)
+      );
+      if (invalid) {
+        throw new Error(
+          `Response "${invalid}" is invalid for question "${questionText}"`
+        );
+      }
+    }
   }
 }
 
@@ -94,10 +145,17 @@ export function validateUserFixtures(
     const purchaseByKey = new Map(
       user.purchases.map((purchase) => [purchase.idempotencyKey, purchase])
     );
+    const applicationSlugs = user.applications.map(
+      (application) => application.eventSlug
+    );
     const registrationSlugs = user.registrations.map(
       (registration) => registration.eventSlug
     );
+    assertUnique(applicationSlugs, `application event for ${user.email}`);
     assertUnique(registrationSlugs, `registration event for ${user.email}`);
+    const applicationsBySlug = new Map(
+      user.applications.map((application) => [application.eventSlug, application])
+    );
 
     const membershipPurchases = user.purchases.filter(
       (purchase) => purchase.kind === "membership"
@@ -157,11 +215,72 @@ export function validateUserFixtures(
       }
     }
 
+    for (const application of user.applications) {
+      const event = eventBySlug.get(application.eventSlug);
+      if (!event) {
+        throw new Error(
+          `Application for "${user.email}" references unknown event "${application.eventSlug}"`
+        );
+      }
+      if (!isApplicationEvent(event)) {
+        throw new Error(
+          `Application for "${application.eventSlug}" belongs to a direct-purchase event`
+        );
+      }
+
+      if (application.status === "pending") {
+        if (application.reviewerEmail || application.attendanceStatus) {
+          throw new Error(
+            `Pending application for "${application.eventSlug}" cannot have a reviewer or attendance status`
+          );
+        }
+      } else if (!application.reviewerEmail) {
+        throw new Error(
+          `Reviewed application for "${application.eventSlug}" needs a reviewer`
+        );
+      }
+
+      if (application.status === "accepted" && !application.attendanceStatus) {
+        throw new Error(
+          `Accepted application for "${application.eventSlug}" needs an attendance status`
+        );
+      }
+      if (application.status !== "accepted" && application.attendanceStatus) {
+        throw new Error(
+          `Non-accepted application for "${application.eventSlug}" cannot have an attendance status`
+        );
+      }
+
+      if (
+        application.reviewerEmail &&
+        !users.some((candidate) => candidate.email === application.reviewerEmail)
+      ) {
+        throw new Error(
+          `Application reviewer "${application.reviewerEmail}" is not a seed user`
+        );
+      }
+
+      validateApplicationResponses(application, event, user.email);
+    }
+
     for (const registration of user.registrations) {
       const event = eventBySlug.get(registration.eventSlug);
       if (!event) {
         throw new Error(
           `Registration for "${user.email}" references unknown event "${registration.eventSlug}"`
+        );
+      }
+
+      const application = applicationsBySlug.get(registration.eventSlug);
+      if (isApplicationEvent(event)) {
+        if (application?.status !== "accepted" || application.attendanceStatus !== "confirmed") {
+          throw new Error(
+            `Registration for "${registration.eventSlug}" needs a confirmed application`
+          );
+        }
+      } else if (application) {
+        throw new Error(
+          `Direct-purchase event "${registration.eventSlug}" cannot have an application`
         );
       }
 
@@ -177,43 +296,10 @@ export function validateUserFixtures(
             `Registration for "${registration.eventSlug}" has an invalid purchase link`
           );
         }
-      }
-
-      const questionByText = new Map(
-        event.applicationQuestions.map((question) => [question.question, question])
-      );
-      const responses = registration.responses ?? {};
-
-      for (const question of event.applicationQuestions) {
-        if (question.is_required && !responses[question.question]?.trim()) {
-          throw new Error(
-            `Registration for "${registration.eventSlug}" is missing required response "${question.question}"`
-          );
-        }
-      }
-
-      for (const [questionText, response] of Object.entries(responses)) {
-        const question = questionByText.get(questionText);
-        if (!question) {
-          throw new Error(
-            `Registration for "${registration.eventSlug}" references unknown question "${questionText}"`
-          );
-        }
-
-        if (question.response_options && response) {
-          const selected =
-            question.response_type === "checkbox"
-              ? response.split(",").map((value) => value.trim())
-              : [response];
-          const invalid = selected.find(
-            (value) => !question.response_options?.includes(value)
-          );
-          if (invalid) {
-            throw new Error(
-              `Response "${invalid}" is invalid for question "${questionText}"`
-            );
-          }
-        }
+      } else if (!isApplicationEvent(event)) {
+        throw new Error(
+          `Direct registration for "${registration.eventSlug}" needs a completed purchase`
+        );
       }
 
       const sessionNames = new Set(
@@ -228,9 +314,18 @@ export function validateUserFixtures(
       }
     }
 
+    for (const application of user.applications) {
+      if (application.attendanceStatus !== "confirmed") continue;
+      if (!registrationSlugs.includes(application.eventSlug)) {
+        throw new Error(
+          `Confirmed application for "${application.eventSlug}" needs a registration`
+        );
+      }
+    }
+
     const purchasedPhases = new Set<SeedEventPhase>();
     for (const registration of user.registrations) {
-      if (registration.status !== "accepted" || !registration.purchaseKey) continue;
+      if (!registration.purchaseKey) continue;
       const purchase = purchaseByKey.get(registration.purchaseKey);
       const event = eventBySlug.get(registration.eventSlug);
       if (purchase?.status === "completed" && event) {
