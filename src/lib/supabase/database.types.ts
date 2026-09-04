@@ -619,6 +619,7 @@ export type Database = {
         Row: {
           auth_user_id: string | null
           created_at: string | null
+          deleted_at: string | null
           dietary_restrictions: string | null
           email: string
           faculty: string | null
@@ -645,6 +646,7 @@ export type Database = {
         Insert: {
           auth_user_id?: string | null
           created_at?: string | null
+          deleted_at?: string | null
           dietary_restrictions?: string | null
           email: string
           faculty?: string | null
@@ -671,6 +673,7 @@ export type Database = {
         Update: {
           auth_user_id?: string | null
           created_at?: string | null
+          deleted_at?: string | null
           dietary_restrictions?: string | null
           email?: string
           faculty?: string | null
@@ -717,6 +720,10 @@ export type Database = {
     }
     Functions: {
       current_user_info_id: { Args: never; Returns: string }
+      delete_account: {
+        Args: { p_auth_user_id: string }
+        Returns: undefined
+      }
       delete_event_atomically: {
         Args: { target_event_id: string }
         Returns: undefined

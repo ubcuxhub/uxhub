@@ -13,6 +13,8 @@ import {
 } from "@/lib/theme";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
+import { DeleteAccountRow } from "./DeleteAccountRow";
+import { SettingsRow } from "./SettingsRow";
 
 export function GeneralSettings() {
   const router = useRouter();
@@ -35,14 +37,11 @@ export function GeneralSettings() {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
-        <div className="space-y-0.5">
-          <p className="text-table">Dark mode</p>
-          <p className="text-small text-muted-foreground">
-            Switch between light and dark themes on this device.
-          </p>
-        </div>
+    <div className="divide-y">
+      <SettingsRow
+        title="Dark mode"
+        description="Switch between light and dark themes on this device."
+      >
         <div className="flex items-center gap-2">
           {isDark ? (
             <Moon className="size-4 text-muted-foreground" />
@@ -55,20 +54,19 @@ export function GeneralSettings() {
             aria-label="Toggle dark mode"
           />
         </div>
-      </div>
+      </SettingsRow>
 
-      <div className="flex items-center justify-between gap-4 rounded-lg border p-4">
-        <div className="space-y-0.5">
-          <p className="text-table">Log out</p>
-          <p className="text-small text-muted-foreground">
-            Sign out of your UX Hub account on this device.
-          </p>
-        </div>
+      <SettingsRow
+        title="Log out"
+        description="Sign out of your UX Hub account on this device."
+      >
         <Button variant="secondary" onClick={handleLogout}>
           <LogOut />
           Logout
         </Button>
-      </div>
+      </SettingsRow>
+
+      <DeleteAccountRow />
     </div>
   );
 }

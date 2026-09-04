@@ -68,6 +68,10 @@ export async function updateUserInfoById(
  * Admin user directory rows: user_info joined with the related membership
  * type name. The `membership_types!membership_type_id(name)` hint pins the
  * foreign-key relationship used for the join.
+ *
+ * Rows left behind by self-serve account deletion are excluded — they are
+ * anonymized placeholders kept only so purchases and event registrations keep
+ * a referent, and they are not people an admin can act on.
  */
 export async function fetchAdminUserRecords(supabase: DbClient) {
   const { data, error } = await supabase
@@ -78,6 +82,7 @@ export async function fetchAdminUserRecords(supabase: DbClient) {
       membership_types!membership_type_id(name)
     `
     )
+    .is("deleted_at", null)
     .order("name", { ascending: true });
 
   if (error) throw error;
