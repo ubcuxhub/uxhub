@@ -43,12 +43,24 @@ export async function deleteAccountAction(
 
     return { ok: true };
   } catch (error) {
-    return {
-      ok: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : "Your account could not be deleted.",
-    };
+    // Supabase rejections are plain `{ message, code, details, hint }` objects,
+    // not Error instances, so an `instanceof Error` check drops the one piece of
+    // information worth having. Log the cause server-side and keep the message
+    // shown to the member generic — a database error is not theirs to read.
+    console.error("Account deletion failed", describeError(error));
+
+    return { ok: false, error: "Your account could not be deleted." };
   }
+}
+
+/** Best-effort readable cause for the server log, whatever the throw shape. */
+function describeError(error: unknown): unknown {
+  if (error instanceof Error) return error;
+
+  if (error && typeof error === "object" && "message" in error) {
+    const { message, code, details, hint } = error as Record<string, unknown>;
+    return { message, code, details, hint };
+  }
+
+  return error;
 }
