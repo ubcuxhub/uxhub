@@ -18,7 +18,7 @@ export default function FooterCallout() {
 
   return (
     <section className="w-full md:px-[20%]">
-      <div className="relative mx-auto max-h-[820px] md:rounded-[20px] rounded-none bg-gradient-to-br from-[#102A68] via-[#9578B1] to-[#EE9489] md:px-15 px-5 py-28 sm:py-16 md:py-35 lg:py-30">
+      <div className="relative mx-auto max-h-[820px] md:rounded-[20px] rounded-none bg-[image:var(--gradient-ux-hub-diagonal)] md:px-15 px-5 py-28 sm:py-16 md:py-35 lg:py-30">
         {/* cursor - top left */}
         <div className="absolute z-10 hidden md:block md:top-[40px] md:left-[40px] lg:top-[50px] lg:left-[60px] transition-transform duration-300 ease-in-out hover:scale-[1.15]">
           <Image
