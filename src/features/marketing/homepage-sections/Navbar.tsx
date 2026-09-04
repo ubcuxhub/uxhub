@@ -6,6 +6,7 @@ import Image from "next/image";
 import { Menu } from "lucide-react";
 import Button from "@/features/marketing/components/Button";
 import { useUser } from "@/context/UserContext";
+import { FLAGS } from "@/lib/flags";
 import { hasActiveMembership } from "@/lib/membership";
 
 const navLink =
@@ -47,9 +48,11 @@ export default function Navbar() {
             <Link href="/" className={navLink}>
               Home
             </Link>
-            <Link href="/events" className={navLink}>
-              Events
-            </Link>
+            {FLAGS.studentEvents && (
+              <Link href="/events" className={navLink}>
+                Events
+              </Link>
+            )}
             <Link href="mailto:ubcuxhub@gmail.com" className={navLink}>
               Contact Us
             </Link>
@@ -111,9 +114,11 @@ export default function Navbar() {
               <Link href="/" className={`${navLink} px-3 py-2`} onClick={close}>
                 Home
               </Link>
-              <Link href="/events" className={`${navLink} px-3 py-2`} onClick={close}>
-                Events
-              </Link>
+              {FLAGS.studentEvents && (
+                <Link href="/events" className={`${navLink} px-3 py-2`} onClick={close}>
+                  Events
+                </Link>
+              )}
               <Link
                 href="mailto:ubcuxhub@gmail.com"
                 className={`${navLink} px-3 py-2`}

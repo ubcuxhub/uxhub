@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 
 import { useUser } from "@/context/UserContext";
+import { FLAGS } from "@/lib/flags";
 import { SettingsDialog, openSettings } from "@/features/settings";
 import {
   Sidebar,
@@ -30,7 +31,9 @@ import {
 
 const studentItems = [
   { title: "Home", href: "/portal", icon: Home, exact: true },
-  { title: "Events", href: "/portal/events", icon: CalendarDays },
+  ...(FLAGS.studentEvents
+    ? [{ title: "Events", href: "/portal/events", icon: CalendarDays }]
+    : []),
 ];
 
 function useIsActive() {

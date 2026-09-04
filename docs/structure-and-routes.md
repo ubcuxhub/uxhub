@@ -2,7 +2,7 @@
 
 This repo is a single Next.js application for UBC UX Hub. It currently includes:
 
-- **Marketing site** - public homepage, public events listing, and an under-construction page
+- **Marketing site** - public homepage and public events listing
 - **Auth flows** - login, sign-up, email confirmation, password reset, and auth error handling
 - **Student portal** - auth-gated event browsing/application, membership purchase, purchase history, and profile management
 - **Admin portal** - admin-gated event management, application review, check-in, and user management
@@ -23,10 +23,9 @@ uxhub/
 │   │   ├── (marketing)/                  # Public routes
 │   │   │   ├── layout.tsx
 │   │   │   ├── page.tsx                  # Homepage
-│   │   │   ├── events/
-│   │   │   │   ├── page.tsx              # Public events listing
-│   │   │   │   └── [slug]/page.tsx       # Public event detail
-│   │   │   └── under-construction/page.tsx
+│   │   │   └── events/
+│   │   │       ├── page.tsx              # Public events listing
+│   │   │       └── [slug]/page.tsx       # Public event detail
 │   │   │
 │   │   ├── (auth)/auth/                  # Auth routes
 │   │   │   ├── layout.tsx
@@ -206,7 +205,6 @@ RLS-bypassing service-role key. Data lives in `scripts/seed/data/*.ts`, typed ag
 /
 /events
 /events/[slug]
-/under-construction
 ```
 
 `/events/[slug]` is the full public event-detail page that homepage and calendar cards link to. There are currently no separate public `/about`, `/team`, `/contact`, or `/membership` routes.

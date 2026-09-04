@@ -4,6 +4,7 @@ import { useSyncExternalStore } from "react";
 import { LogOut, Moon, Sun } from "lucide-react";
 import { useRouter } from "next/navigation";
 
+import { FLAGS } from "@/lib/flags";
 import { createClient } from "@/lib/supabase/client";
 import {
   getThemeServerSnapshot,
@@ -38,23 +39,25 @@ export function GeneralSettings() {
 
   return (
     <div className="flex flex-col">
-      <SettingsRow
-        title="Dark mode"
-        description="Switch between light and dark themes on this device."
-      >
-        <div className="flex items-center gap-2">
-          {isDark ? (
-            <Moon className="size-4 text-muted-foreground" />
-          ) : (
-            <Sun className="size-4 text-muted-foreground" />
-          )}
-          <Switch
-            checked={isDark}
-            onCheckedChange={handleThemeChange}
-            aria-label="Toggle dark mode"
-          />
-        </div>
-      </SettingsRow>
+      {FLAGS.darkMode && (
+        <SettingsRow
+          title="Dark mode"
+          description="Switch between light and dark themes on this device."
+        >
+          <div className="flex items-center gap-2">
+            {isDark ? (
+              <Moon className="size-4 text-muted-foreground" />
+            ) : (
+              <Sun className="size-4 text-muted-foreground" />
+            )}
+            <Switch
+              checked={isDark}
+              onCheckedChange={handleThemeChange}
+              aria-label="Toggle dark mode"
+            />
+          </div>
+        </SettingsRow>
+      )}
 
       <SettingsRow
         title="Log out"
