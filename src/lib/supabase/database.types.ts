@@ -10,7 +10,7 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -105,9 +105,9 @@ export type Database = {
           max_char_limit: number | null
           max_file_size_bytes: number | null
           question: string
-          restrict_file_types: boolean
           response_options: string[] | null
           response_type: Database["public"]["Enums"]["response_type"]
+          restrict_file_types: boolean
           sort_order: number
           updated_at: string | null
         }
@@ -121,9 +121,9 @@ export type Database = {
           max_char_limit?: number | null
           max_file_size_bytes?: number | null
           question: string
-          restrict_file_types?: boolean
           response_options?: string[] | null
           response_type: Database["public"]["Enums"]["response_type"]
+          restrict_file_types?: boolean
           sort_order?: number
           updated_at?: string | null
         }
@@ -137,9 +137,9 @@ export type Database = {
           max_char_limit?: number | null
           max_file_size_bytes?: number | null
           question?: string
-          restrict_file_types?: boolean
           response_options?: string[] | null
           response_type?: Database["public"]["Enums"]["response_type"]
+          restrict_file_types?: boolean
           sort_order?: number
           updated_at?: string | null
         }
@@ -191,6 +191,39 @@ export type Database = {
             columns: ["event_registration_id"]
             isOneToOne: false
             referencedRelation: "event_registrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_mentors: {
+        Row: {
+          event_id: string
+          mentor_id: string
+          sort_order: number
+        }
+        Insert: {
+          event_id: string
+          mentor_id: string
+          sort_order?: number
+        }
+        Update: {
+          event_id?: string
+          mentor_id?: string
+          sort_order?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_mentors_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_mentors_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "mentors"
             referencedColumns: ["id"]
           },
         ]
@@ -256,6 +289,39 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "user_info"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_sponsors: {
+        Row: {
+          event_id: string
+          sort_order: number
+          sponsor_id: string
+        }
+        Insert: {
+          event_id: string
+          sort_order?: number
+          sponsor_id: string
+        }
+        Update: {
+          event_id?: string
+          sort_order?: number
+          sponsor_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_sponsors_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_sponsors_sponsor_id_fkey"
+            columns: ["sponsor_id"]
+            isOneToOne: false
+            referencedRelation: "sponsors"
             referencedColumns: ["id"]
           },
         ]
@@ -350,105 +416,6 @@ export type Database = {
         }
         Relationships: []
       }
-      event_mentors: {
-        Row: {
-          event_id: string
-          mentor_id: string
-          sort_order: number
-        }
-        Insert: {
-          event_id: string
-          mentor_id: string
-          sort_order?: number
-        }
-        Update: {
-          event_id?: string
-          mentor_id?: string
-          sort_order?: number
-        }
-        Relationships: [
-          {
-            foreignKeyName: "event_mentors_event_id_fkey"
-            columns: ["event_id"]
-            isOneToOne: false
-            referencedRelation: "events"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "event_mentors_mentor_id_fkey"
-            columns: ["mentor_id"]
-            isOneToOne: false
-            referencedRelation: "mentors"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      event_sponsors: {
-        Row: {
-          event_id: string
-          sort_order: number
-          sponsor_id: string
-        }
-        Insert: {
-          event_id: string
-          sort_order?: number
-          sponsor_id: string
-        }
-        Update: {
-          event_id?: string
-          sort_order?: number
-          sponsor_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "event_sponsors_event_id_fkey"
-            columns: ["event_id"]
-            isOneToOne: false
-            referencedRelation: "events"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "event_sponsors_sponsor_id_fkey"
-            columns: ["sponsor_id"]
-            isOneToOne: false
-            referencedRelation: "sponsors"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      mentors: {
-        Row: {
-          created_at: string
-          description: string | null
-          full_name: string
-          id: string
-          linkedin_url: string | null
-          position: string | null
-          profile_image_path: string | null
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          description?: string | null
-          full_name: string
-          id?: string
-          linkedin_url?: string | null
-          position?: string | null
-          profile_image_path?: string | null
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          description?: string | null
-          full_name?: string
-          id?: string
-          linkedin_url?: string | null
-          position?: string | null
-          profile_image_path?: string | null
-          updated_at?: string
-        }
-        Relationships: []
-      }
       membership_types: {
         Row: {
           created_at: string | null
@@ -485,26 +452,35 @@ export type Database = {
         }
         Relationships: []
       }
-      sponsors: {
+      mentors: {
         Row: {
-          brand_logo_path: string | null
           created_at: string
+          description: string | null
+          full_name: string
           id: string
-          name: string
+          linkedin_url: string | null
+          position: string | null
+          profile_image_path: string | null
           updated_at: string
         }
         Insert: {
-          brand_logo_path?: string | null
           created_at?: string
+          description?: string | null
+          full_name: string
           id?: string
-          name: string
+          linkedin_url?: string | null
+          position?: string | null
+          profile_image_path?: string | null
           updated_at?: string
         }
         Update: {
-          brand_logo_path?: string | null
           created_at?: string
+          description?: string | null
+          full_name?: string
           id?: string
-          name?: string
+          linkedin_url?: string | null
+          position?: string | null
+          profile_image_path?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -591,6 +567,30 @@ export type Database = {
           },
         ]
       }
+      sponsors: {
+        Row: {
+          brand_logo_path: string | null
+          created_at: string
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          brand_logo_path?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          brand_logo_path?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       square_webhook_events: {
         Row: {
           created_at: string | null
@@ -637,8 +637,8 @@ export type Database = {
           role_access: Database["public"]["Enums"]["role_access_enum"]
           school_institution: string | null
           square_customer_id: string | null
-          student_status: Database["public"]["Enums"]["student_status"] | null
           student_number: number | null
+          student_status: Database["public"]["Enums"]["student_status"] | null
           updated_at: string | null
           user_type: Database["public"]["Enums"]["user_type"]
           year: Database["public"]["Enums"]["uni_year"] | null
@@ -664,8 +664,8 @@ export type Database = {
           role_access: Database["public"]["Enums"]["role_access_enum"]
           school_institution?: string | null
           square_customer_id?: string | null
-          student_status?: Database["public"]["Enums"]["student_status"] | null
           student_number?: number | null
+          student_status?: Database["public"]["Enums"]["student_status"] | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"]
           year?: Database["public"]["Enums"]["uni_year"] | null
@@ -691,8 +691,8 @@ export type Database = {
           role_access?: Database["public"]["Enums"]["role_access_enum"]
           school_institution?: string | null
           square_customer_id?: string | null
-          student_status?: Database["public"]["Enums"]["student_status"] | null
           student_number?: number | null
+          student_status?: Database["public"]["Enums"]["student_status"] | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"]
           year?: Database["public"]["Enums"]["uni_year"] | null
@@ -720,10 +720,7 @@ export type Database = {
     }
     Functions: {
       current_user_info_id: { Args: never; Returns: string }
-      delete_account: {
-        Args: { p_auth_user_id: string }
-        Returns: undefined
-      }
+      delete_account: { Args: { p_auth_user_id: string }; Returns: undefined }
       delete_event_atomically: {
         Args: { target_event_id: string }
         Returns: undefined
@@ -747,10 +744,10 @@ export type Database = {
           p_application_questions: Json
           p_check_in_sessions: Json
           p_event: Json
-          p_event_id: string | null
-          p_expected_image_url: string | null
+          p_event_id: string
+          p_expected_image_url: string
           p_mentors: Json
-          p_slug: string | null
+          p_slug: string
           p_sponsors: Json
         }
         Returns: Json
@@ -786,12 +783,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -815,11 +812,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -840,11 +837,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends DefaultSchemaTableNameOrOptions extends {
+  TableName extends (DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -865,11 +862,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never = never,
+    : never) = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -882,11 +879,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never = never,
+    : never) = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
