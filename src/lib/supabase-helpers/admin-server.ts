@@ -49,6 +49,22 @@ export async function adminUpdateUserInfoById(
   return data;
 }
 
+/**
+ * Permanently deletes a member's login and anonymizes their profile row.
+ *
+ * The work happens in the `delete_account` database function so the profile
+ * update and the `auth.users` delete share one transaction — the auth row
+ * cannot be removed until the profile stops referencing it, and a half-applied
+ * deletion would strand the member with a live login and a scrubbed profile.
+ */
+export async function adminDeleteAccount(authUserId: string): Promise<void> {
+  const { error } = await supabaseAdmin.rpc("delete_account", {
+    p_auth_user_id: authUserId,
+  });
+
+  if (error) throw error;
+}
+
 export async function adminInsertUserInfo(payload: UserInfoWritePayload) {
   const { data, error } = await supabaseAdmin
     .from(TABLES.userInfo)
