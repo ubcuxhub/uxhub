@@ -27,7 +27,7 @@ export default function MailingListSection() {
       className={[
         "transition-all duration-700 ease-in-out",
         isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10",
-        "bg-[linear-gradient(156deg,#102A68_-1.32%,#9578B1_77.58%,#EE9489_97.31%)]",
+        "bg-[image:var(--gradient-ux-hub-diagonal)]",
       ].join(" ")}
     >
       <div className="px-[5%] md:px-[10%] xl:px-[20%] py-20">

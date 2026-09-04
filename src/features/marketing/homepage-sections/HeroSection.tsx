@@ -26,7 +26,7 @@ export default function Hero() {
         {/* Browser window header with colored dots */}
         <div className="inline-flex h-[58px] w-full items-center justify-start gap-2 border-b border-[#C1C7CD] white py-[18px] pl-4 pr-6 sm:pl-6 sm:pr-10 md:pl-4 md:pr-[20px] lg:pl-4 lg:pr-[20px] rounded-t-[20px]">
           {/* Left circle - gradient */}
-          <div className="ml-[10px] h-5 w-5 rounded-full border border-[#C1C7CD] bg-[linear-gradient(156deg,#3A5A8A_-1.32%,#B899D1_77.58%,#F5B4AB_97.31%)]" />
+          <div className="ml-[10px] h-5 w-5 rounded-full border border-[#C1C7CD] bg-[image:var(--gradient-ux-hub-diagonal)]" />
           {/* Middle circle - white */}
           <div className="h-5 w-5 rounded-full border border-[#C1C7CD] bg-white" />
           {/* Right circle - gray */}
@@ -40,7 +40,7 @@ export default function Hero() {
               <div className="flex flex-wrap items-center gap-2">
                 <span>UBC&apos;s</span>
                 <span className="relative ml-1 inline-block">
-                  <span className="rounded-[80px] px-3 py-1.5 text-[#F5F5F5] sm:px-4 md:px-6 lg:px-6 bg-[linear-gradient(156deg,#3A5A8A_-1.32%,#B899D1_77.58%,#F5B4AB_97.31%)] text-[clamp(30px,8vw,56px)] leading-[1.1]">
+                  <span className="rounded-[80px] px-3 py-1.5 text-[#F5F5F5] sm:px-4 md:px-6 lg:px-6 bg-[image:var(--gradient-ux-hub-diagonal)] text-[clamp(30px,8vw,56px)] leading-[1.1]">
                     first-ever
                   </span>
 
@@ -146,9 +146,9 @@ export default function Hero() {
                         y2="49.6896"
                         gradientUnits="userSpaceOnUse"
                       >
-                        <stop stopColor="#00183B" />
-                        <stop offset="0.279794" stopColor="#9478B1" />
-                        <stop offset="0.695" stopColor="#E89595" />
+                        {/* Stops mirror --gradient-ux-hub-diagonal */}
+                        <stop stopColor="#3A5FC4" stopOpacity="0.9" />
+                        <stop offset="1" stopColor="#B67FC6" stopOpacity="0.9" />
                       </linearGradient>
                     </defs>
                   </svg>

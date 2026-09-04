@@ -344,6 +344,14 @@
   --color-black: #383838;
   --color-white: #f0eff2;
   --color-gray: #7a7a7a;
+
+  /* UX Hub brand gradient, marketing diagonal — same stops as --gradient-ux-hub */
+  --gradient-ux-hub-diagonal: linear-gradient(
+    156deg,
+    rgb(58 95 196 / 90%),
+    rgb(182 127 198 / 90%)
+  );
+
   background: var(--color-white);
   color: var(--color-black);
   font-family: var(--font-dm-sans), ui-sans-serif;
