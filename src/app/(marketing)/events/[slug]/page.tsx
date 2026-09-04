@@ -1,5 +1,6 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
+import { FLAGS } from "@/lib/flags";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -61,6 +62,10 @@ function parseAgenda(raw: Json | null): AgendaItem[] {
 export const revalidate = 300;
 
 export async function generateStaticParams() {
+  // Skip the build-time database read entirely while these pages are gated —
+  // otherwise the production build prerenders pages nobody can reach.
+  if (!FLAGS.studentEvents) return [];
+
   const events = await fetchEvents(createPublicClient());
   return events
     .filter((event) => event.slug)
@@ -74,6 +79,8 @@ interface EventDetailPageProps {
 export default async function EventDetailPage({
   params,
 }: EventDetailPageProps) {
+  if (!FLAGS.studentEvents) redirect("/#events");
+
   const { slug } = await params;
   const supabase = createPublicClient();
   const event = await fetchEventBySlug(supabase, slug, { status: "active" });

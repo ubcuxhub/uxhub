@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { EventConfirmation } from "./EventConfirmation";
 import { requireAuth } from "@/lib/auth/guards";
+import { FLAGS } from "@/lib/flags";
 import { createClient } from "@/lib/supabase/server";
 import { fetchPurchaseForUser } from "@/lib/supabase-helpers/purchases";
 import { withReturnTo } from "@/lib/auth/paths";
@@ -15,6 +16,8 @@ export async function EventConfirmationRoute({
   returnTo?: string;
   slug: string;
 }) {
+  if (!FLAGS.studentEvents) notFound();
+
   const user = await requireAuth(
     withReturnTo(
       `/portal/events/${slug}/confirmation/${purchaseId}`,

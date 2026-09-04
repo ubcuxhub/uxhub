@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { EventCheckout } from "@/features/events/components/EventCheckout";
 import { requireAuth } from "@/lib/auth/guards";
+import { FLAGS } from "@/lib/flags";
 import { createClient } from "@/lib/supabase/server";
 import { fetchApplicationQuestions } from "@/lib/supabase-helpers/event-applications";
 import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
@@ -25,6 +26,8 @@ export async function EventCheckoutRoute({
   returnTo?: string;
   slug: string;
 }) {
+  if (!FLAGS.studentEvents) notFound();
+
   const user = await requireAuth(
     withReturnTo(`/portal/events/${slug}/checkout`, returnTo),
   );

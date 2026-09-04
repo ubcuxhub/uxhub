@@ -2,8 +2,7 @@ import { ArrowUpRight } from "lucide-react";
 
 import { PageContainer } from "@/components/shared/PageContainer";
 import { Button } from "@/components/ui/button";
-
-const LINKTREE_URL = "https://linktr.ee/ubcuxhub";
+import { LINKTREE_URL } from "@/lib/constants";
 
 export default function PortalEvents() {
   return (

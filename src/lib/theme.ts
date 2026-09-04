@@ -1,3 +1,5 @@
+import { FLAGS } from "@/lib/flags";
+
 export type Theme = "light" | "dark";
 
 export const THEME_STORAGE_KEY = "uxhub-theme";
@@ -53,8 +55,18 @@ export function getThemeServerSnapshot(): Theme {
   return "light";
 }
 
+const enabledInitScript = `(function(){try{var k="${THEME_STORAGE_KEY}";var s=localStorage.getItem(k);var d=(s==="dark"||s==="light")?s==="dark":window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.classList.toggle("dark",d);}catch(e){}})();`;
+
+// With dark mode off we must actively force light rather than simply skip the
+// script: anyone who already toggled dark has it in localStorage, and everyone
+// else is subject to `prefers-color-scheme`. Clearing the key also means they
+// don't silently snap back to dark whenever the flag is turned on again.
+const disabledInitScript = `(function(){try{document.documentElement.classList.remove("dark");localStorage.removeItem("${THEME_STORAGE_KEY}");}catch(e){}})();`;
+
 /**
  * Inline script that applies the stored (or system-preferred) theme before
  * first paint, avoiding a flash of the wrong theme. Injected in the root layout.
  */
-export const themeInitScript = `(function(){try{var k="${THEME_STORAGE_KEY}";var s=localStorage.getItem(k);var d=(s==="dark"||s==="light")?s==="dark":window.matchMedia("(prefers-color-scheme: dark)").matches;document.documentElement.classList.toggle("dark",d);}catch(e){}})();`;
+export const themeInitScript = FLAGS.darkMode
+  ? enabledInitScript
+  : disabledInitScript;

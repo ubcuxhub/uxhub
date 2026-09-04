@@ -1,4 +1,5 @@
 import Button from "@/features/marketing/components/Button";
+import { LINKTREE_URL } from "@/lib/constants";
 
 const EventsSection = () => {
   return (
@@ -22,7 +23,7 @@ const EventsSection = () => {
           </p>
         </div>
 
-        <Button href="https://linktr.ee/ubcuxhub" external>
+        <Button href={LINKTREE_URL} external>
           LINKTREE
         </Button>
       </div>

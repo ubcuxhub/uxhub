@@ -3,8 +3,10 @@ import { FlowLink } from "@/components/shared/FlowLink";
 import { Button } from "@/components/ui/button";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { requireAuth } from "@/lib/auth/guards";
+import { LINKTREE_URL } from "@/lib/constants";
+import { FLAGS } from "@/lib/flags";
 import { hasActiveMembership } from "@/lib/membership";
-import { ArrowRight, CalendarDays, Sparkles } from "lucide-react";
+import { ArrowRight, ArrowUpRight, CalendarDays, Sparkles } from "lucide-react";
 
 function BecomeMemberBanner() {
   return (
@@ -46,12 +48,22 @@ export default async function PortalHome() {
           Welcome to the UBC UX Hub portal.
         </p>
       </div>
-      <Button asChild variant="outline">
-        <Link href="/portal/events">
-          <CalendarDays />
-          View your events
-        </Link>
-      </Button>
+      {FLAGS.studentEvents ? (
+        <Button asChild variant="outline">
+          <Link href="/portal/events">
+            <CalendarDays />
+            View your events
+          </Link>
+        </Button>
+      ) : (
+        <Button asChild variant="outline">
+          <a href={LINKTREE_URL} target="_blank" rel="noopener noreferrer">
+            <CalendarDays />
+            See our upcoming events
+            <ArrowUpRight />
+          </a>
+        </Button>
+      )}
     </PageContainer>
   );
 }

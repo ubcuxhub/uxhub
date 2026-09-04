@@ -1,4 +1,7 @@
+import { redirect } from "next/navigation";
+
 import { Card, CardTitle } from "@/components/ui/card";
+import { FLAGS } from "@/lib/flags";
 import Navbar from "@/features/marketing/homepage-sections/Navbar";
 import Footer from "@/features/marketing/homepage-sections/Footer";
 import { EventCard } from "@/components/shared/EventCard";
@@ -8,6 +11,10 @@ import { fetchEvents } from "@/lib/supabase-helpers/events";
 export const revalidate = 300;
 
 export default async function EventsPage() {
+  // Redirect rather than 404: this URL is public and indexed, and the homepage
+  // events section already carries the coming-soon copy and Linktree CTA.
+  if (!FLAGS.studentEvents) redirect("/#events");
+
   const supabase = createPublicClient();
   const events = await fetchEvents(supabase, {
     orderBy: "start_date",

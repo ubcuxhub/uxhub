@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { requireAuth } from "@/lib/auth/guards";
+import { FLAGS } from "@/lib/flags";
 import { createClient } from "@/lib/supabase/server";
 import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
 import { Calendar, MapPin } from "lucide-react";
@@ -15,6 +16,8 @@ interface PortalEventPageProps {
 export default async function PortalEventPage({
   params,
 }: PortalEventPageProps) {
+  if (!FLAGS.studentEvents) notFound();
+
   const { event: slug } = await params;
   await requireAuth();
   const supabase = await createClient();

@@ -1,3 +1,6 @@
+/** Where we point people for event announcements while the portal's event pages are gated. */
+export const LINKTREE_URL = "https://linktr.ee/ubcuxhub";
+
 export const FACULTIES = [
   "Faculty of Arts",
   "Faculty of Applied Science",
