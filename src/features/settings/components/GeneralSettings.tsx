@@ -37,7 +37,7 @@ export function GeneralSettings() {
   };
 
   return (
-    <div className="divide-y">
+    <div className="flex flex-col">
       <SettingsRow
         title="Dark mode"
         description="Switch between light and dark themes on this device."

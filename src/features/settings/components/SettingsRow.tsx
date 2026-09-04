@@ -11,9 +11,9 @@ interface SettingsRowProps {
 /**
  * One labelled setting and its control.
  *
- * Deliberately borderless — rows are separated by the `divide-y` on their
- * container rather than each being boxed, so a settings tab reads as a single
- * list instead of a stack of cards.
+ * Deliberately unadorned — no card, no rule between rows. Spacing alone
+ * separates them, so a settings tab reads as a single quiet list rather than a
+ * stack of boxes.
  */
 export function SettingsRow({
   title,
