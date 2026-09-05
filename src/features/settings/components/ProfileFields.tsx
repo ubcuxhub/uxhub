@@ -93,7 +93,7 @@ export function ProfileFields({
             type="number"
             value={formData.student_number}
             display={user.student_number?.toString()}
-            editing={editing}
+            editing={false}
             onChange={(student_number) => patch({ student_number })}
           />
         ) : null}
@@ -104,11 +104,6 @@ export function ProfileFields({
               {USER_TYPES.find((type) => type.value === user.user_type)?.label ??
                 user.user_type}
             </ReadValue>
-            {canChangeClassification ? (
-              <Button asChild variant="outline">
-                <FlowLink href="/portal/membership/join">Change</FlowLink>
-              </Button>
-            ) : null}
           </div>
         </Row>
 
