@@ -104,11 +104,6 @@ export function ProfileFields({
               {USER_TYPES.find((type) => type.value === user.user_type)?.label ??
                 user.user_type}
             </ReadValue>
-            {canChangeClassification ? (
-              <Button asChild variant="outline">
-                <FlowLink href="/portal/membership/join">Change</FlowLink>
-              </Button>
-            ) : null}
           </div>
         </Row>
 

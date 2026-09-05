@@ -131,17 +131,6 @@ export function ProfileSettings() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-end">
-        {saveStatus === "saving" && (
-          <span className="text-sm text-muted-foreground">Saving…</span>
-        )}
-        {saveStatus === "saved" && (
-          <span className="text-sm text-green-600 dark:text-green-400">Saved</span>
-        )}
-        {saveStatus === "error" && (
-          <span className="text-sm text-red-600 dark:text-red-400">Failed to save</span>
-        )}
-      </div>
       <ProfileFields
         user={user}
         formData={formData}
