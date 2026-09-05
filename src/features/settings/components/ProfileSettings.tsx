@@ -1,14 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Pencil } from "lucide-react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { useUser } from "@/context/UserContext";
 import { createClient } from "@/lib/supabase/client";
 import { updateUserInfoById } from "@/lib/supabase-helpers/users";
 import { fetchMembershipTypeById } from "@/lib/supabase-helpers/memberships";
 import { updateEligibilityProfileAction } from "@/features/memberships/actions";
 import { canEditMembershipClassification } from "@/features/memberships/lib/policy";
-import { Button } from "@/components/ui/button";
 import {
   ProfileFields,
   type ProfileFormData,
@@ -34,10 +32,10 @@ const emptyForm: ProfileFormData = {
 
 export function ProfileSettings() {
   const { user, refreshUser } = useUser();
-  const [isEditing, setIsEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState<ProfileFormData>(emptyForm);
   const [membershipName, setMembershipName] = useState<string | null>(null);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const resetForm = () => {
     if (!user) return;
@@ -74,13 +72,9 @@ export function ProfileSettings() {
       .catch(() => setMembershipName(null));
   }, [user?.membership_type_id]);
 
-  if (!user) return null;
-
-  const patch = (values: Partial<ProfileFormData>) =>
-    setFormData((current) => ({ ...current, ...values }));
-
-  const handleSave = async () => {
-    setSaving(true);
+  const handleSaveCallback = useCallback(async () => {
+    if (!user) return;
+    setSaveStatus("saving");
     try {
       const studentNumber = formData.student_number
         ? parseInt(formData.student_number)
@@ -108,13 +102,25 @@ export function ProfileSettings() {
         newsletter: formData.newsletter,
       });
       await refreshUser();
-      setIsEditing(false);
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 2000);
     } catch {
-      alert("Failed to update profile");
-    } finally {
-      setSaving(false);
+      setSaveStatus("error");
     }
-  };
+  }, [formData, user, refreshUser]);
+
+  useEffect(() => {
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    timeoutRef.current = setTimeout(() => handleSaveCallback(), 800);
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, [formData, handleSaveCallback]);
+
+  if (!user) return null;
+
+  const patch = (values: Partial<ProfileFormData>) =>
+    setFormData((current) => ({ ...current, ...values }));
 
   const membershipStatus = user.membership_type_id
     ? membershipName
@@ -126,33 +132,20 @@ export function ProfileSettings() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-end">
-        {!isEditing ? (
-          <Button variant="outline" onClick={() => setIsEditing(true)}>
-            <Pencil />
-            Edit
-          </Button>
-        ) : (
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                resetForm();
-                setIsEditing(false);
-              }}
-              disabled={saving}
-            >
-              Cancel
-            </Button>
-            <Button onClick={handleSave} disabled={saving}>
-              {saving ? "Saving…" : "Save"}
-            </Button>
-          </div>
+        {saveStatus === "saving" && (
+          <span className="text-sm text-muted-foreground">Saving…</span>
+        )}
+        {saveStatus === "saved" && (
+          <span className="text-sm text-green-600 dark:text-green-400">Saved</span>
+        )}
+        {saveStatus === "error" && (
+          <span className="text-sm text-red-600 dark:text-red-400">Failed to save</span>
         )}
       </div>
       <ProfileFields
         user={user}
         formData={formData}
-        editing={isEditing}
+        editing={true}
         membershipStatus={membershipStatus}
         canChangeClassification={canChangeClassification}
         patch={patch}

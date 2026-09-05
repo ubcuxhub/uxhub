@@ -93,7 +93,7 @@ export function ProfileFields({
             type="number"
             value={formData.student_number}
             display={user.student_number?.toString()}
-            editing={editing}
+            editing={false}
             onChange={(student_number) => patch({ student_number })}
           />
         ) : null}
