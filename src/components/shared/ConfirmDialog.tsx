@@ -79,7 +79,7 @@ export function ConfirmDialog({
         onOpenChange(next);
       }}
     >
-      <DialogContent closeDisabled={pending}>
+      <DialogContent closeDisabled={pending} mobileFullscreen>
         {/* Radix unmounts this while the dialog is closed, so the confirmation
             input below resets on its own — reopening never finds a primed
             button left over from last time. */}
@@ -118,12 +118,16 @@ function ConfirmDialogBody({
 
   const satisfied = confirmation ? confirmation.matches(typed) : true;
   const mismatch = Boolean(confirmation && typed && !satisfied);
+  const hasBody = Boolean(confirmation || error);
 
   return (
-    <>
-      <DialogHeader>
+    <div className="flex h-full min-h-0 flex-col gap-0 sm:h-auto sm:gap-4">
+      <DialogHeader className="shrink-0 border-b pb-5 pl-5 pr-20 pt-16 text-left sm:border-0 sm:p-0">
         <DialogTitle
-          className={cn(icon && "flex items-center gap-2 text-destructive")}
+          className={cn(
+            icon &&
+              "flex items-center gap-3 text-destructive [&_svg]:size-6 sm:gap-2 sm:[&_svg]:size-4",
+          )}
         >
           {icon}
           {title}
@@ -131,39 +135,49 @@ function ConfirmDialogBody({
         <DialogDescription>{description}</DialogDescription>
       </DialogHeader>
 
-      {confirmation ? (
-        <div className="space-y-2">
-          <Label htmlFor={inputId}>{confirmation.label}</Label>
-          <Input
-            id={inputId}
-            type={confirmation.type ?? "text"}
-            placeholder={confirmation.placeholder}
-            autoComplete="off"
-            autoCapitalize="none"
-            spellCheck={false}
-            disabled={pending}
-            value={typed}
-            onChange={(event) => setTyped(event.target.value)}
-            aria-describedby={confirmation.hint ? hintId : undefined}
-            aria-invalid={mismatch || undefined}
-            className={cn(mismatch && "border-destructive")}
-          />
-          {confirmation.hint ? (
-            <p id={hintId} className="text-small text-muted-foreground">
-              {confirmation.hint}
-            </p>
-          ) : null}
-          {mismatch && confirmation.mismatchMessage ? (
-            <p className="text-small text-destructive">
-              {confirmation.mismatchMessage}
-            </p>
-          ) : null}
+      {hasBody ? (
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:overflow-visible sm:p-0">
+          <div className="mx-auto w-full max-w-lg space-y-4">
+            {confirmation ? (
+              <div className="space-y-2">
+                <Label htmlFor={inputId}>{confirmation.label}</Label>
+                <Input
+                  id={inputId}
+                  type={confirmation.type ?? "text"}
+                  placeholder={confirmation.placeholder}
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  spellCheck={false}
+                  disabled={pending}
+                  value={typed}
+                  onChange={(event) => setTyped(event.target.value)}
+                  aria-describedby={confirmation.hint ? hintId : undefined}
+                  aria-invalid={mismatch || undefined}
+                  className={cn(mismatch && "border-destructive")}
+                />
+                {confirmation.hint ? (
+                  <p id={hintId} className="text-small text-muted-foreground">
+                    {confirmation.hint}
+                  </p>
+                ) : null}
+                {mismatch && confirmation.mismatchMessage ? (
+                  <p className="text-small text-destructive">
+                    {confirmation.mismatchMessage}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
+            {error ? (
+              <p className="text-small text-destructive">{error}</p>
+            ) : null}
+          </div>
         </div>
-      ) : null}
+      ) : (
+        <div className="flex-1 sm:hidden" />
+      )}
 
-      {error ? <p className="text-small text-destructive">{error}</p> : null}
-
-      <DialogFooter>
+      <DialogFooter className="mt-auto shrink-0 gap-3 border-t bg-background p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] [&>button]:w-full sm:mt-0 sm:gap-0 sm:border-0 sm:p-0 sm:[&>button]:w-auto">
         <Button
           type="button"
           variant="outline"
@@ -181,6 +195,6 @@ function ConfirmDialogBody({
           {pending ? (pendingLabel ?? confirmLabel) : confirmLabel}
         </Button>
       </DialogFooter>
-    </>
+    </div>
   );
 }
