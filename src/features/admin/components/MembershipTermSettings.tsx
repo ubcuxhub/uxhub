@@ -6,13 +6,6 @@ import { CalendarIcon, TriangleAlert } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Label } from "@/components/ui/label";
 import {
@@ -79,78 +72,76 @@ export function MembershipTermSettings({
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Membership term end</CardTitle>
-        <CardDescription>
+    <section className="space-y-5">
+      <div className="space-y-1">
+        <h2 className="text-subheading">Membership term end</h2>
+        <p className="max-w-prose text-small text-muted-foreground">
           Every membership expires on this date, no matter when it was bought.
           New memberships are cut short to match it, and once the date passes no
           new memberships can be purchased. Leave it empty to give each
           membership a full year from its purchase date.
-        </CardDescription>
-      </CardHeader>
+        </p>
+      </div>
 
-      <CardContent className="space-y-5">
-        <Alert icon={<TriangleAlert className="size-4" />}>
-          <AlertTitle>This applies to every account.</AlertTitle>
-          <AlertDescription>
-            Setting a date in the past ends every active membership immediately,
-            including admin accounts. Clearing the date restores them.
-          </AlertDescription>
-        </Alert>
+      <Alert icon={<TriangleAlert className="size-4" />}>
+        <AlertTitle>This applies to every account.</AlertTitle>
+        <AlertDescription>
+          Setting a date in the past ends every active membership immediately,
+          including admin accounts. Clearing the date restores them.
+        </AlertDescription>
+      </Alert>
 
-        <div className="max-w-xs space-y-2">
-          <Label htmlFor="membership-term-end">Term ends</Label>
-          <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                id="membership-term-end"
-                type="button"
-                variant="outline"
-                className={cn(
-                  "w-full justify-start text-left font-normal",
-                  !draft && "text-muted-foreground",
-                )}
-              >
-                <CalendarIcon data-icon="inline-start" />
-                {formatEventDate(draft) ?? "Pick a date"}
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-auto p-0" align="start">
-              <Calendar
-                mode="single"
-                selected={dateStringToDate(draft)}
-                onSelect={(date) => {
-                  if (!date) return;
-                  setDraft(dateToDateString(date));
-                  setPickerOpen(false);
-                }}
-              />
-            </PopoverContent>
-          </Popover>
-          <p className="text-small text-muted-foreground">
-            {saved
-              ? `Currently ending ${formatEventDate(saved, { month: "short" })}, end of day Pacific.`
-              : "No term end is set. Memberships last one year from purchase."}
-          </p>
-        </div>
+      <div className="max-w-xs space-y-2">
+        <Label htmlFor="membership-term-end">Term ends</Label>
+        <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              id="membership-term-end"
+              type="button"
+              variant="outline"
+              className={cn(
+                "w-full justify-start text-left font-normal",
+                !draft && "text-muted-foreground",
+              )}
+            >
+              <CalendarIcon data-icon="inline-start" />
+              {formatEventDate(draft) ?? "Pick a date"}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={dateStringToDate(draft)}
+              onSelect={(date) => {
+                if (!date) return;
+                setDraft(dateToDateString(date));
+                setPickerOpen(false);
+              }}
+            />
+          </PopoverContent>
+        </Popover>
+        <p className="text-small text-muted-foreground">
+          {saved
+            ? `Currently ending ${formatEventDate(saved, { month: "short" })}, end of day Pacific.`
+            : "No term end is set. Memberships last one year from purchase."}
+        </p>
+      </div>
 
-        <div className="flex gap-3">
-          <Button
-            disabled={!draft || !dirty || pending}
-            onClick={() => setConfirming("save")}
-          >
-            Save date
-          </Button>
-          <Button
-            variant="outline"
-            disabled={!saved || pending}
-            onClick={() => setConfirming("clear")}
-          >
-            Clear
-          </Button>
-        </div>
-      </CardContent>
+      <div className="flex gap-3">
+        <Button
+          disabled={!draft || !dirty || pending}
+          onClick={() => setConfirming("save")}
+        >
+          Save date
+        </Button>
+        <Button
+          variant="outline"
+          disabled={!saved || pending}
+          onClick={() => setConfirming("clear")}
+        >
+          Clear
+        </Button>
+      </div>
 
       <ConfirmDialog
         open={confirming !== null}
@@ -195,7 +186,6 @@ export function MembershipTermSettings({
         pending={pending}
         onConfirm={() => commit(confirming === "clear" ? null : draft)}
       />
-
-    </Card>
+    </section>
   );
 }
