@@ -99,7 +99,7 @@ function PurchaseRow({ purchase }: { purchase: PurchaseWithDetails }) {
 
 function EmptyPurchases() {
   return (
-    <div className="py-10 text-center">
+    <div className="flex h-full flex-col items-center justify-center text-center">
       <p className="text-button">No purchases yet</p>
       <p className="text-small text-muted-foreground">
         Your memberships and event tickets will appear here.
