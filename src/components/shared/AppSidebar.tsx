@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   PanelLeft,
   Settings,
+  SlidersHorizontal,
   Users,
 } from "lucide-react";
 
@@ -141,6 +142,20 @@ export function AppSidebar() {
                     <Link href="/admin/users">
                       <Users />
                       <span>Manage Users</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive("/admin/settings")}
+                    tooltip="Club Settings"
+                    className="h-9"
+                  >
+                    <Link href="/admin/settings">
+                      <SlidersHorizontal />
+                      <span>Club Settings</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

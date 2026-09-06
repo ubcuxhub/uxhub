@@ -9,9 +9,12 @@
  *   (`check_in_sessions`, `event_application_questions`). Read, diff by natural
  *   key, then insert/update the difference.
  *
- * Deletes are opt-in. `event_registrations`, `check_ins`, and
- * `event_application_responses` all cascade off these tables, so an unguarded
- * delete would take hand-made test data with it.
+ * Deletes are on by default and opt out through `--no-prune`, because a seed
+ * that only ever adds drifts away from its own data. What keeps that safe is
+ * scope, not restraint: only rows the seed owns are ever candidates. See
+ * `prune.ts` for the ownership rules and `index.ts` for the order deletions run
+ * in — `event_registrations`, `check_ins`, and `event_application_responses`
+ * cascade off these tables.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -181,7 +184,7 @@ export async function reconcileChildren<Row extends Record<string, unknown>>(
   for (const [key, id] of orphans) {
     if (!options.prune) {
       console.warn(
-        `  ! ${table} "${key}" exists but is not in the seed data (re-run with --prune to delete)`
+        `  ! ${table} "${key}" exists but is not in the seed data (--no-prune kept it)`
       );
       continue;
     }

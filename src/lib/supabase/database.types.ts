@@ -14,6 +14,35 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          id: boolean
+          membership_term_ends_at: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: boolean
+          membership_term_ends_at?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: boolean
+          membership_term_ends_at?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "app_settings_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "user_info"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       check_in_sessions: {
         Row: {
           created_at: string | null
@@ -624,12 +653,13 @@ export type Database = {
           email: string
           faculty: string | null
           faculty_email: string | null
+          first_name: string
           id: string
+          last_name: string
           major: string | null
           membership_expires_at: string | null
           membership_pre_ordered_type_id: string | null
           membership_type_id: string | null
-          name: string
           newsletter: boolean
           order_date_deprecated: string | null
           phone: string | null
@@ -651,12 +681,13 @@ export type Database = {
           email: string
           faculty?: string | null
           faculty_email?: string | null
+          first_name: string
           id?: string
+          last_name: string
           major?: string | null
           membership_expires_at?: string | null
           membership_pre_ordered_type_id?: string | null
           membership_type_id?: string | null
-          name: string
           newsletter?: boolean
           order_date_deprecated?: string | null
           phone?: string | null
@@ -678,12 +709,13 @@ export type Database = {
           email?: string
           faculty?: string | null
           faculty_email?: string | null
+          first_name?: string
           id?: string
+          last_name?: string
           major?: string | null
           membership_expires_at?: string | null
           membership_pre_ordered_type_id?: string | null
           membership_type_id?: string | null
-          name?: string
           newsletter?: boolean
           order_date_deprecated?: string | null
           phone?: string | null

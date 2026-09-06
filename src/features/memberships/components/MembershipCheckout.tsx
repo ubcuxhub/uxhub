@@ -1,29 +1,32 @@
 "use client";
 
 import { useState } from "react";
-import { LoaderCircle } from "lucide-react";
+import { Info, LoaderCircle } from "lucide-react";
 
 import { CheckoutPaymentSection } from "@/components/shared/CheckoutPaymentSection";
 import { FlowLink } from "@/components/shared/FlowLink";
 import { useFlowDialog } from "@/components/shared/FlowDialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { UserInfoRow, MembershipTypeRow } from "@/types/models";
 import { withReturnTo } from "@/lib/auth/paths";
+import { formatEventDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
 export function MembershipCheckout({
   backHref,
+  expiresAt,
   membershipType,
   returnTo,
   user,
 }: {
   backHref: string;
+  /**
+   * Set only when the club-wide term end shortens this membership to less than
+   * a year, in which case the buyer is warned before they pay.
+   */
+  expiresAt?: string | null;
   membershipType: MembershipTypeRow;
   returnTo?: string;
   user: UserInfoRow;
@@ -69,6 +72,21 @@ export function MembershipCheckout({
           </p>
         </div>
 
+        {expiresAt ? (
+          <Alert
+            className="mt-6"
+            icon={<Info className="size-4" />}
+            variant="info"
+          >
+            <AlertTitle>
+              This membership ends {formatEventDate(expiresAt) ?? "soon"}.
+            </AlertTitle>
+            <AlertDescription>
+              Memberships are valid until the end of the current school year.
+            </AlertDescription>
+          </Alert>
+        ) : null}
+
         <div className="mt-8 grid gap-6 lg:grid-cols-2">
           <CheckoutPaymentSection
             amount={formattedPrice}
@@ -77,7 +95,8 @@ export function MembershipCheckout({
             buttonLabel="Pay now"
             framed={false}
             initialEmail={user.email}
-            initialName={user.name}
+            initialFirstName={user.first_name}
+            initialLastName={user.last_name}
             initialPhone={user.phone}
             kind="membership"
             slug={membershipType.slug}

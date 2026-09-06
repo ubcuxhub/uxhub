@@ -5,7 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";
 
 interface CompleteProfileBody {
-  name?: string;
+  firstName?: string;
+  lastName?: string;
 }
 
 export async function POST(req: Request) {
@@ -35,17 +36,18 @@ export async function POST(req: Request) {
   }
 
   const body = (await req.json()) as CompleteProfileBody;
-  const name = body.name?.trim();
+  const firstName = body.firstName?.trim();
+  const lastName = body.lastName?.trim();
 
-  if (!name) {
+  if (!firstName || !lastName) {
     return NextResponse.json(
-      { error: "Name is required." },
+      { error: "First and last name are required." },
       { status: 400 }
     );
   }
 
   try {
-    const result = await ensureUserInfo(authUser, { name });
+    const result = await ensureUserInfo(authUser, { firstName, lastName });
 
     if (result.status === "conflict") {
       return NextResponse.json({ error: result.message }, { status: 409 });

@@ -9,6 +9,7 @@ import type {
   SortOption,
   UserRecord,
 } from "../types/userManagementTypes";
+import { formatUserName } from "@/lib/user-name";
 
 interface UserDirectoryPanelProps {
   users: UserRecord[];
@@ -103,7 +104,7 @@ export function UserDirectoryPanel({
                 onClick={() => onUserSelect(user)}
               >
                 <CardContent className="p-4">
-                  <div className="font-semibold">{user.name}</div>
+                  <div className="font-semibold">{formatUserName(user)}</div>
                   <div className="text-small text-muted-foreground">{user.email}</div>
                   {user.phone && (
                     <div className="text-small text-muted-foreground">{user.phone}</div>

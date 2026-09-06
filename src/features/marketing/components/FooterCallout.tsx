@@ -8,9 +8,9 @@ import { useUser } from "@/context/UserContext";
 import { hasActiveMembership } from "@/lib/membership";
 
 export default function FooterCallout() {
-  const { user, loading } = useUser();
+  const { user, membershipTermEndsAt, loading } = useUser();
   // Matches MembershipCta: show the signed-out copy until the session resolves.
-  const isMember = !loading && hasActiveMembership(user);
+  const isMember = !loading && hasActiveMembership(user, membershipTermEndsAt);
 
   const handleContactClick = () => {
     window.location.href = "mailto:ubcuxhub@gmail.com";

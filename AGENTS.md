@@ -38,9 +38,23 @@ colocated with the code they cover (e.g. `src/lib/slug.test.ts`,
 `pnpm test -- -t "test name"`. CI (`.github/workflows/ci.yml`) runs `pnpm lint`,
 `pnpm exec tsc --noEmit`, and `pnpm test` on every push and pull request.
 
-`pnpm seed` is idempotent and supplies local sample memberships and events.
-Use `pnpm seed -- --dry-run` to preview it. It refuses non-local Supabase
-targets unless explicitly passed `--allow-remote`.
+`pnpm seed` reconciles a database to the seed data. Read `scripts/seed/README.md`
+before changing it. It is idempotent, and on the default `local` target it also
+deletes seed-owned rows the data no longer describes, so a ticket bought through
+the UI is undone by re-running it. Pass `--no-prune` to keep those rows,
+`--dry-run` to preview. Pruning only ever touches seed events, seed membership
+tiers, and rows owned by the three fixture accounts — never anything belonging
+to an account created by hand.
+
+The ten fixture accounts all sign in with password `123456`; see
+`scripts/seed/README.md` for the membership x role grid.
+
+`pnpm seed --target=prod` writes demo events for admins while the student-facing
+events feature is unlaunched. It never deletes, never writes user fixtures, and
+forces every event to `draft` so nothing fabricated is reachable through the
+public API. It reads `SEED_PROD_SUPABASE_URL` and `SEED_PROD_SUPABASE_SECRET_KEY`
+and expects migrations to be applied already. Each target rejects a URL that does
+not match it, so a stale `.env.local` cannot silently redirect a run.
 
 ## Architecture
 
@@ -50,7 +64,8 @@ targets unless explicitly passed `--allow-remote`.
     password recovery
   - `(app)` - shared authenticated boundary and `UserProvider`
     - `(shell)` - sidebar-backed student and admin pages
-    - `(focused)` - sidebar-free membership onboarding and checkout flows
+    - `(confirmation)` - sidebar-free, full-viewport post-purchase pages
+  - `@flow` - parallel slot holding intercepted `(.)portal/*` routes
   - `api` - Square webhook, profile-completion, and event-image upload handlers
 - `src/features` - domain UI and behavior
   - `admin`, `auth`, `events`, `marketing`, `memberships`, `payments`, and
@@ -73,7 +88,15 @@ targets unless explicitly passed `--allow-remote`.
   `src/app/(app)/(shell)/admin/layout.tsx` adds `requireAdmin()`. Keep access
   control in these server-side guards rather than relying on client UI.
 - Route groups determine chrome without changing URLs: browsing pages live in
-  `(shell)` and focused onboarding/checkout pages live in `(focused)`.
+  `(shell)`, and post-purchase confirmations live in `(confirmation)`, which
+  drops the sidebar to fill the viewport.
+- Membership onboarding and checkout render in a dialog, and each of their
+  pages exists twice: canonically under
+  `(shell)/portal/membership/*` (direct navigation and refreshes) and
+  intercepted under `@flow/(.)portal/membership/*` (soft navigation from within
+  the app). Both layouts wrap children in `MembershipFlowDialog`, differing only
+  by `mode`. Add a page to one tree and you must add it to the other; put shared
+  behavior in the feature component so both pick it up.
 - Prefer the typed helpers in `src/lib/supabase-helpers` over scattering raw
   `.from(...)` calls. Use `TABLES` for table names. Keep RLS-bypassing
   service-role work server-only in `src/lib/supabase/admin.ts` and
@@ -139,6 +162,12 @@ key to client components.
   shared-style changes.
 - Supabase RLS checks live in `supabase/tests/rls.sql` (separate from the
   Vitest suite).
+- Do not verify changes by driving the app in a browser unless you are
+  explicitly asked to. Never sign in, and never type credentials — including
+  the local seed passwords in `scripts/seed/data/users.ts` — into a form. Take
+  automated verification as far as it goes (lint, types, Vitest, `pnpm build`,
+  direct `psql` queries), then hand the reviewer a list of what still needs
+  checking by hand and why.
 
 ## UI
 

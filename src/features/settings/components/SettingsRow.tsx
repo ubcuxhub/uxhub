@@ -13,7 +13,8 @@ interface SettingsRowProps {
  *
  * Deliberately unadorned — no card, no rule between rows. Spacing alone
  * separates them, so a settings tab reads as a single quiet list rather than a
- * stack of boxes.
+ * stack of boxes. Titles sit at the same size as the dialog's sidebar tabs;
+ * muted descriptions stay one step down.
  */
 export function SettingsRow({
   title,
@@ -29,7 +30,7 @@ export function SettingsRow({
       )}
     >
       <div className="min-w-0 space-y-0.5">
-        <p className="text-table">{title}</p>
+        <p className="text-button">{title}</p>
         <p className="text-small text-muted-foreground">{description}</p>
       </div>
       <div className="shrink-0 self-start sm:self-center">{children}</div>

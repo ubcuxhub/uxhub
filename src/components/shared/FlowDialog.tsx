@@ -42,6 +42,7 @@ interface FlowDialogProps {
   description: string;
   mode: FlowDialogMode;
   title: string;
+  allowCloseWhileBusy?: boolean;
   closeFallback?: string;
   className?: string;
 }
@@ -51,23 +52,35 @@ export function FlowDialog({
   description,
   mode,
   title,
+  allowCloseWhileBusy = false,
   closeFallback = "/portal",
   className,
 }: FlowDialogProps) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(true);
 
   const close = useCallback(() => {
-    if (busy) return;
+    if (busy && !allowCloseWhileBusy) return;
+
+    setOpen(false);
+
+    const returnTo = new URLSearchParams(window.location.search).get("returnTo");
+
+    if (returnTo) {
+      router.replace(safeReturnPath(returnTo, closeFallback));
+      return;
+    }
 
     if (mode === "intercepted") {
       router.back();
       return;
     }
 
-    const returnTo = new URLSearchParams(window.location.search).get("returnTo");
-    router.replace(safeReturnPath(returnTo, closeFallback));
-  }, [busy, closeFallback, mode, router]);
+    router.replace(closeFallback);
+  }, [allowCloseWhileBusy, busy, closeFallback, mode, router]);
+
+  const closeDisabled = busy && !allowCloseWhileBusy;
 
   const contextValue = useMemo(
     () => ({ busy, close, setBusy }),
@@ -77,9 +90,9 @@ export function FlowDialog({
   return (
     <FlowDialogContext.Provider value={contextValue}>
       <Dialog
-        open
-        onOpenChange={(open) => {
-          if (!open) close();
+        open={open}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) close();
         }}
       >
         <DialogContent
@@ -88,13 +101,13 @@ export function FlowDialog({
             "flex flex-col gap-0 overflow-hidden p-0",
             className,
           )}
-          closeDisabled={busy}
-          closeLabel={busy ? "Please wait" : "Close"}
+          closeDisabled={closeDisabled}
+          closeLabel={closeDisabled ? "Please wait" : "Close"}
           onEscapeKeyDown={(event) => {
-            if (busy) event.preventDefault();
+            if (closeDisabled) event.preventDefault();
           }}
           onInteractOutside={(event) => {
-            if (busy) event.preventDefault();
+            if (closeDisabled) event.preventDefault();
           }}
         >
           <DialogTitle className="sr-only">{title}</DialogTitle>

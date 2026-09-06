@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { requireAuth } from "@/lib/auth/guards";
 import { adminUpdateUserInfoById } from "@/lib/supabase-helpers/admin-server";
+import { fetchMembershipTermEndsAt } from "@/lib/supabase-helpers/app-settings";
+import { createClient } from "@/lib/supabase/server";
 import { FACULTIES, YEAR_LEVELS } from "@/lib/constants";
 import type {
   StudentStatus,
@@ -10,7 +12,14 @@ import type {
   UserType,
 } from "@/types/models";
 import { validateFacultyEmail, validateStudentNumber } from "./lib/validation";
-import { canEditMembershipClassification } from "./lib/policy";
+import {
+  DUPLICATE_STUDENT_NUMBER_MESSAGE,
+  isDuplicateStudentNumberError,
+} from "./lib/errors";
+import {
+  buildEligibilityUpdate,
+  canEditMembershipClassification,
+} from "./lib/policy";
 
 interface UpdateEligibilityInput {
   userType: UserType;
@@ -23,7 +32,8 @@ export async function updateEligibilityProfileAction(
   input: UpdateEligibilityInput
 ) {
   const user = await requireAuth();
-  if (!canEditMembershipClassification(user)) {
+  const termEndsAt = await fetchMembershipTermEndsAt(await createClient());
+  if (!canEditMembershipClassification(user, termEndsAt)) {
     throw new Error(
       "Eligibility details cannot be changed while a membership is active."
     );
@@ -39,21 +49,39 @@ export async function updateEligibilityProfileAction(
     if (error) throw new Error(error);
     studentNumber = Number(rawStudentNumber);
   }
-  if (
-    input.userType === "faculty" &&
-    (validateFacultyEmail(input.facultyEmail?.trim() ?? "") ||
-      input.facultyEmail?.trim().toLowerCase() !== user.email.toLowerCase())
-  ) {
-    throw new Error(
-      "Faculty eligibility requires signing in with the same UBC email address."
-    );
+  // Faculty eligibility is proved by the signed-in address, so the validated
+  // value is also what gets stored — leaving it unwritten would strand the
+  // profile as incomplete.
+  let facultyEmail: string | undefined;
+  if (input.userType === "faculty") {
+    const normalized = input.facultyEmail?.trim().toLowerCase() ?? "";
+    if (
+      validateFacultyEmail(normalized) ||
+      normalized !== user.email.toLowerCase()
+    ) {
+      throw new Error(
+        "Faculty eligibility requires signing in with the same UBC email address."
+      );
+    }
+    facultyEmail = normalized;
   }
 
-  await adminUpdateUserInfoById(user.id, {
-    user_type: input.userType,
-    student_number: studentNumber,
-    faculty: input.userType === "faculty" ? input.faculty?.trim() || null : null,
-  });
+  try {
+    await adminUpdateUserInfoById(
+      user.id,
+      buildEligibilityUpdate({
+        userType: input.userType,
+        studentNumber,
+        faculty: input.faculty,
+        facultyEmail,
+      }),
+    );
+  } catch (error) {
+    if (isDuplicateStudentNumberError(error)) {
+      throw new Error(DUPLICATE_STUDENT_NUMBER_MESSAGE);
+    }
+    throw error;
+  }
 }
 
 export type MembershipProfileInput =
@@ -90,7 +118,8 @@ export async function saveMembershipProfileAction(
 ): Promise<MembershipProfileResult> {
   try {
     const user = await requireAuth("/portal/membership/join");
-    if (!canEditMembershipClassification(user)) {
+    const termEndsAt = await fetchMembershipTermEndsAt(await createClient());
+    if (!canEditMembershipClassification(user, termEndsAt)) {
       return {
         ok: false,
         error:
@@ -179,6 +208,9 @@ export async function saveMembershipProfileAction(
     revalidatePath("/portal/membership");
     return { ok: true };
   } catch (error) {
+    if (isDuplicateStudentNumberError(error)) {
+      return { ok: false, error: DUPLICATE_STUDENT_NUMBER_MESSAGE };
+    }
     return {
       ok: false,
       error:

@@ -9,6 +9,7 @@ import type {
   EventRegistrationUpdate,
 } from "@/types/models";
 import type { GroupedRegistration } from "@/features/events/types/applicationTypes";
+import { formatUserName } from "@/lib/user-name";
 import type { ApplicationStatus } from "@/types/models";
 
 export async function fetchEventRegistrationById(
@@ -146,7 +147,7 @@ export async function fetchEventRegistrationsGroupedByUser(
 
       groupedMap.set(userId, {
         user_id: userId,
-        name: userInfo?.name ?? "Unknown User",
+        name: userInfo ? formatUserName(userInfo) : "Unknown User",
         email: userInfo?.email ?? "",
         applicationDate: reg.created_at ?? "",
         status,

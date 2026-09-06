@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { SuccessOverlay } from "@/components/shared/SuccessOverlay";
 import { updateApplicationStatusAction } from "@/features/admin/actions";
+import { formatUserName } from "@/lib/user-name";
 
 export interface AdminApplicationRegistration {
   id: string;
@@ -22,7 +23,8 @@ export interface AdminApplicationRegistration {
 
 export interface AdminApplicationUser {
   id: string;
-  name: string;
+  first_name: string;
+  last_name: string;
   email: string;
 }
 
@@ -117,7 +119,7 @@ export function ApplicationReviewClient({
 
             {/* Applicant Information */}
             <ApplicantInfoCard
-              name={userInfo.name}
+              name={formatUserName(userInfo)}
               email={userInfo.email}
               applicationDate={registration.created_at}
               status={registration.status}

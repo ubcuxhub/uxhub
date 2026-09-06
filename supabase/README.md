@@ -29,14 +29,43 @@ seed reconciler. It never targets the linked remote database.
 
 The seed data lives under `scripts/seed/data/` and includes memberships, past,
 ongoing, and upcoming events, purchases, registrations, check-ins, and these
-local login fixtures (all use password `ux-hub`):
+ten local login fixtures (all use password `123456`), covering every membership
+state crossed with admin and non-admin. The grid is listed in
+[`scripts/seed/README.md`](../scripts/seed/README.md); the three most useful are:
 
-- `admin-explorer@gmail.com` — administrator with an Explorer membership
-- `not-member@gmail.com` — basic user without a membership
-- `mock-member@example.com` — basic user with an Innovator membership
+- `admin-explorer@example.com` — administrator with an Explorer membership
+- `no-membership@example.com` — basic user without a membership
+- `student-innovator@example.com` — basic user with an Innovator membership
 
 To sync seed changes without destroying local data, run `pnpm seed`. Use
-`pnpm seed -- --dry-run` to preview the reconciliation.
+`pnpm seed --dry-run` to preview the reconciliation.
+
+### What `pnpm seed` deletes
+
+The seed reconciles *to* its data, so by default it also removes seed-owned rows
+the data no longer describes. That is what makes event checkout re-testable:
+buy a ticket as one of the fixture accounts, re-run `pnpm seed`, and the
+purchase and registration are gone, so the event is buyable again.
+
+Deletion is scoped by ownership, not by table:
+
+| Owned by the seed (prunable)                            | Never touched                            |
+| ------------------------------------------------------- | ---------------------------------------- |
+| Events and membership tiers matched by slug              | Events created through the admin UI\*    |
+| Mentors, sponsors, check-in sessions, application questions | Auth users and profiles created by hand |
+| Purchases and registrations belonging to the three fixture accounts | Purchases and registrations belonging to any other account |
+| Cover images under the `seed/covers/` storage prefix     | Covers uploaded through the admin UI (`covers/`) |
+
+\* An extra event is deleted unless a non-fixture purchase points at it —
+`purchases.event_id` is `on delete restrict`, so somebody else's ticket keeps the
+event alive and the run says so instead of forcing it.
+
+Pass `--no-prune` to sync without deleting anything. The `prod` target never
+deletes at all.
+
+Cover images come from `scripts/seed/data/images` (square PNGs) and are uploaded
+into the `event-images` bucket; fixtures reference them by file name through
+`imageKey`, and `image_url` is filled in at run time.
 
 ## When you change the schema
 
@@ -130,15 +159,21 @@ The bucket is provisioned in two places, and they are not redundant:
 | Remote / production  | the migration, applied with `supabase db push`      |
 | Local                | `pnpm seed` (`--only=storage` to run just this)     |
 
-Local needs its own path because this repo has no `supabase/config.toml`, so
-`supabase db reset` and `supabase migration up` are unavailable — only the
-`--linked` commands work. Keep the bucket settings in
-`scripts/seed/index.ts` in sync with the migration by hand.
+Seeding provisions the bucket locally so a fresh database is usable straight
+away. `pnpm seed --target=prod` does the opposite: it checks the bucket exists
+and fails with a `db push` instruction if it does not, rather than papering over
+a deploy that never ran. Keep the bucket settings in `scripts/seed/index.ts` in
+sync with the migration by hand.
 
-Objects are keyed `covers/<slug>-<uuid>.<ext>`. The key is unique per upload
-rather than derived from the event name: public storage URLs are CDN-cached with
-a long `cache-control`, so reusing a key would serve a stale image after a cover
-is replaced.
+Objects uploaded through the app are keyed `covers/<slug>-<uuid>.<ext>`. The key
+is unique per upload rather than derived from the event name: public storage
+URLs are CDN-cached with a long `cache-control`, so reusing a key would serve a
+stale image after a cover is replaced.
+
+Seed covers use the separate `seed/covers/<file>` prefix and stable keys, since
+the seed wants idempotency more than cache-busting (they carry a short
+`cache-control` instead). The split prefix is also what lets `pnpm seed` clear
+stale seed images without ever deleting a cover somebody uploaded by hand.
 
 ## Type-safety gaps to watch (these do NOT fail `tsc`)
 
@@ -151,7 +186,8 @@ strings the compiler cannot validate. A rename here breaks silently at runtime:
   column names. Update them when the filtered column changes.
 - **Embedded foreign-key hint joins** — e.g.
   `membership_types!membership_type_id(name)` in `fetchAdminUserRecords` and
-  `user_info!user_id(name, email)` in `fetchAttendingRegistrations`. These
+  `user_info!user_id(first_name, last_name, email)` in
+  `fetchAttendingRegistrations`. These
   embed relationship/FK names that change with schema edits.
 
 ## Debugging checklist when something breaks

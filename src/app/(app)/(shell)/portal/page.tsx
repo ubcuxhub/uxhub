@@ -6,14 +6,22 @@ import { requireAuth } from "@/lib/auth/guards";
 import { LINKTREE_URL } from "@/lib/constants";
 import { FLAGS } from "@/lib/flags";
 import { hasActiveMembership } from "@/lib/membership";
-import { ArrowRight, ArrowUpRight, CalendarDays, Sparkles } from "lucide-react";
+import { isMembershipTermClosed } from "@/features/memberships/lib/expiry";
+import { createClient } from "@/lib/supabase/server";
+import { fetchMembershipTermEndsAt } from "@/lib/supabase-helpers/app-settings";
+import {
+  ArrowRight,
+  ArrowUpRight,
+  CalendarDays,
+  UserRoundPlus,
+} from "lucide-react";
 
 function BecomeMemberBanner() {
   return (
     <div className="mb-8 flex flex-col gap-3 rounded-lg border bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-start gap-3">
         <div className="rounded-full bg-primary/10 p-2">
-          <Sparkles className="text-primary" />
+          <UserRoundPlus className="text-primary" />
         </div>
         <div>
           <h3 className="text-subheading">Become a UX Hub member</h3>
@@ -34,12 +42,16 @@ function BecomeMemberBanner() {
 
 export default async function PortalHome() {
   const user = await requireAuth();
-  const firstName = user.name?.split(" ")[0] || user.email.split("@")[0] || "there";
-  const isMember = hasActiveMembership(user);
+  const supabase = await createClient();
+  const termEndsAt = await fetchMembershipTermEndsAt(supabase);
+  const firstName = user.first_name || user.email.split("@")[0] || "there";
+  const isMember = hasActiveMembership(user, termEndsAt);
+  // Nothing to sell once the term has ended, so the prompt would lead nowhere.
+  const canJoin = !isMembershipTermClosed(termEndsAt);
 
   return (
     <PageContainer>
-      {!isMember && <BecomeMemberBanner />}
+      {!isMember && canJoin && <BecomeMemberBanner />}
       <div className="mb-8">
         <h1 className="mb-2 text-h1 tracking-tight">
           Hey, {firstName}!

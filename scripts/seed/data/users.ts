@@ -25,21 +25,55 @@ export interface SeedRegistration {
   status: "pending" | "declined" | "accepted";
 }
 
+export type SeedProfile = Omit<
+  TablesInsert<"user_info">,
+  | "auth_user_id"
+  | "email"
+  | "membership_expires_at"
+  | "membership_pre_ordered_type_id"
+  | "membership_type_id"
+>;
+
 export interface SeedUser {
   email: string;
   membershipSlug: string | null;
   password: string;
-  profile: Omit<
-    TablesInsert<"user_info">,
-    | "auth_user_id"
-    | "email"
-    | "membership_expires_at"
-    | "membership_pre_ordered_type_id"
-    | "membership_type_id"
-  >;
+  profile: SeedProfile;
   purchases: SeedPurchase[];
   registrations: SeedRegistration[];
+  /**
+   * Whether this account carries purchased registrations across the past,
+   * ongoing, and upcoming phases.
+   *
+   * Three accounts do, and they are what the portal's history, receipt, and
+   * check-in screens are tested against. The rest exist to cover the
+   * membership x role grid, and giving each of them a full event history would
+   * be a lot of hand-written fixture data to keep correct for very little.
+   * `validateUserFixtures` only holds the deep ones to phase coverage.
+   */
+  fullEventHistory: boolean;
 }
+
+/** Every fixture account signs in with this. Local only — see `lib/targets.ts`. */
+export const SEED_PASSWORD = "123456";
+
+/**
+ * Fixture accounts the seed used to create under a different address.
+ *
+ * Renaming a fixture leaves its old account behind, and that account still owns
+ * purchases under the same idempotency keys the new one wants — which would
+ * fail the "belongs to another user" guard in `reconcile-users.ts` on the next
+ * run. So the seed deletes these outright before writing anything.
+ *
+ * This is a deliberate, bounded exception to "never touch an account the seed
+ * did not create": every address here was created by an earlier version of this
+ * file. Never add an address a person signed up with.
+ */
+export const RETIRED_FIXTURE_EMAILS = [
+  "admin-explorer@gmail.com",
+  "not-member@gmail.com",
+  "mock-member@example.com",
+] as const;
 
 const designSprintQuestions = {
   year: "What year of study are you in?",
@@ -71,19 +105,161 @@ function afterTimestamp(value: string, minutes: number): string {
   return new Date(new Date(value).getTime() + minutes * 60 * 1000).toISOString();
 }
 
+/**
+ * Profile builders, one per `user_type`.
+ *
+ * The three types own mutually exclusive field sets, and
+ * `completeMembershipProfile` in src/features/memberships/actions.ts nulls the
+ * other two sets whenever a classification is chosen. These mirror that exactly
+ * so a fixture looks like an account somebody actually signed up for, rather
+ * than a row with a plausible-looking mix of student and faculty fields.
+ */
+interface CommonProfileInput {
+  firstName: string;
+  lastName: string;
+  phone: string;
+  pronouns: string;
+  admin?: boolean;
+  dietary?: string | null;
+  newsletter?: boolean;
+}
+
+function baseProfile(input: CommonProfileInput) {
+  return {
+    first_name: input.firstName,
+    last_name: input.lastName,
+    phone: input.phone,
+    preferred_pronouns: input.pronouns,
+    role_access: (input.admin ? "admin" : "basic") as "admin" | "basic",
+    dietary_restrictions: input.dietary ?? null,
+    newsletter: input.newsletter ?? false,
+    square_customer_id: null,
+  };
+}
+
+function studentProfile(
+  input: CommonProfileInput & {
+    studentNumber: number;
+    faculty: string;
+    major: string;
+    year: TablesInsert<"user_info">["year"];
+  }
+): SeedProfile {
+  return {
+    ...baseProfile(input),
+    user_type: "ubcStudent",
+    student_number: input.studentNumber,
+    faculty: input.faculty,
+    major: input.major,
+    year: input.year,
+    faculty_email: null,
+    school_institution: null,
+    student_status: null,
+  };
+}
+
+function facultyProfile(
+  input: CommonProfileInput & { email: string; faculty: string }
+): SeedProfile {
+  return {
+    ...baseProfile(input),
+    user_type: "faculty",
+    // Must equal the account's own address, and must be a ubc.ca domain:
+    // `completeMembershipProfile` rejects a mismatch and `validateFacultyEmail`
+    // enforces the domain.
+    faculty_email: input.email,
+    faculty: input.faculty,
+    student_number: null,
+    major: null,
+    year: null,
+    school_institution: null,
+    student_status: null,
+  };
+}
+
+function nonUbcProfile(
+  input: CommonProfileInput & {
+    schoolInstitution: string;
+    studentStatus: TablesInsert<"user_info">["student_status"];
+    year?: TablesInsert<"user_info">["year"];
+  }
+): SeedProfile {
+  return {
+    ...baseProfile(input),
+    user_type: "nonUbc",
+    school_institution: input.schoolInstitution,
+    student_status: input.studentStatus,
+    year: input.year ?? null,
+    faculty_email: null,
+    student_number: null,
+    faculty: null,
+    major: null,
+  };
+}
+
+/** Tier prices, in cents, as asserted by `validateUserFixtures`. */
+const MEMBERSHIP_PRICE_CENTS = {
+  explorer: 1200,
+  innovator: 1800,
+  faculty: 1800,
+  "non-ubc": 2400,
+} as const;
+
+type MembershipSlug = keyof typeof MEMBERSHIP_PRICE_CENTS;
+
+/**
+ * The membership purchase every member fixture needs.
+ *
+ * `validateUserFixtures` requires a member to hold a completed purchase for
+ * their own tier, so this is the minimum a grid account can carry.
+ */
+function membershipPurchase(
+  handle: string,
+  slug: MembershipSlug,
+  createdAt: string
+): SeedPurchase {
+  return {
+    amountCents: MEMBERSHIP_PRICE_CENTS[slug],
+    createdAt,
+    fulfilledAt: afterTimestamp(createdAt, 1),
+    idempotencyKey: `seed:membership:${handle}:${slug}`,
+    kind: "membership",
+    membershipSlug: slug,
+    squarePaymentId: `seed:payment:${handle}:${slug}`,
+    status: "completed",
+  };
+}
+
+/**
+ * Which events each fixture account has already bought.
+ *
+ * The rule that matters: nothing here touches `EVENT_PHASES.purchasable`. Those
+ * five upcoming events are left unbought by every account on purpose, so event
+ * checkout can be run again and again — and because `pnpm seed` prunes
+ * fixture-owned purchases, a ticket bought through the UI is undone by the next
+ * run. Purchase history instead hangs off the archived past events, the ongoing
+ * mentorship program, and the one upcoming event whose registration has already
+ * closed.
+ *
+ * `validateUserFixtures` requires every account to hold a completed, purchased
+ * registration in each of the past, ongoing, and upcoming phases, which is why
+ * all three buy the design-systems talk.
+ */
 export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
   const today = startOfUtcDay(now);
-  const designSprintPast = requireEvent(events, "design-sprint-2025");
-  const uxathonPast = requireEvent(events, "uxathon-2026");
-  const designSprintFuture = requireEvent(events, "design-sprint-2026");
-  const industryTalkPast = requireEvent(events, "industry-talk-ai-and-ux-2026");
-  const mentorshipOngoing = requireEvent(events, "student-panel-2025");
-  const thinkboxFuture = requireEvent(events, "thinkbox-office-tour-2027");
-  const portfolioReviewFuture = requireEvent(events, "portfolio-review-night-2027");
+  const getToKnowPast = requireEvent(events, "get-to-know-ux-hub");
+  const designSprintPast = requireEvent(events, "design-sprint-past");
+  const uxathonPast = requireEvent(events, "uxathon-past");
+  const industryTalkPast = requireEvent(events, "industry-talk-ai-and-ux");
+  const mentorshipOngoing = requireEvent(events, "mentorship-program");
+  const industryTalkUpcoming = requireEvent(events, "industry-talk-design-systems");
+  const researchWorkshopDraft = requireEvent(events, "ux-research-workshop");
+
   const industryCheckIn = industryTalkPast.checkInSessions[0]?.start_time;
+  const getToKnowCheckIn = getToKnowPast.checkInSessions[0]?.start_time;
   const designSprintCheckIns = designSprintPast.checkInSessions;
 
-  if (!industryCheckIn || designSprintCheckIns.length < 2) {
+  if (!industryCheckIn || !getToKnowCheckIn || designSprintCheckIns.length < 2) {
     throw new Error("Purchased event fixtures need their expected check-in sessions");
   }
 
@@ -92,48 +268,49 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
     if (!registrationStart) throw new Error(`Event "${event.event.slug}" has no registration start`);
     return afterTimestamp(registrationStart, 24 * 60);
   };
-  const futurePurchaseTime = timestamp(addDays(today, -7), 18);
+  const recentPurchaseTime = timestamp(addDays(today, -7), 18);
   const failedPurchaseTime = timestamp(addDays(today, -3), 18);
 
+  const gridPurchaseTime = timestamp(addDays(today, -60), 15);
+
   return [
+  /* ── Deep fixtures ───────────────────────────────────────────────────────
+   * Three accounts carrying purchased registrations across every phase. These
+   * are what the portal history, receipts, applications, and check-in screens
+   * are exercised against.
+   */
   {
-    email: "admin-explorer@gmail.com",
-    password: "ux-hub",
+    email: "admin-explorer@example.com",
+    password: SEED_PASSWORD,
     membershipSlug: "explorer",
-    profile: {
-      name: "Admin Explorer",
+    fullEventHistory: true,
+    profile: studentProfile({
+      firstName: "Riley",
+      lastName: "Chen",
       phone: "6045550101",
-      student_number: 10000001,
+      pronouns: "they/them",
+      admin: true,
+      dietary: "Vegetarian",
+      newsletter: true,
+      studentNumber: 10000001,
       faculty: "Faculty of Arts",
       major: "Cognitive Systems",
       year: "3",
-      role_access: "admin",
-      user_type: "ubcStudent",
-      dietary_restrictions: "Vegetarian",
-      newsletter: true,
-      preferred_pronouns: "they/them",
-      square_customer_id: null,
-    },
+    }),
     purchases: [
-      {
-        amountCents: 1200,
-        createdAt: timestamp(addDays(today, -30), 17),
-        fulfilledAt: timestamp(addDays(today, -30), 17, 1),
-        idempotencyKey: "seed:membership:admin-explorer:explorer",
-        kind: "membership",
-        membershipSlug: "explorer",
-        squarePaymentId: "seed:payment:admin-explorer:explorer",
-        status: "completed",
-      },
+      membershipPurchase(
+        "admin-explorer",
+        "explorer",
+        timestamp(addDays(today, -30), 17)
+      ),
       {
         amountCents: ticketPriceCents(industryTalkPast, true),
         createdAt: historicalPurchaseTime(industryTalkPast),
         eventSlug: industryTalkPast.event.slug,
         fulfilledAt: afterTimestamp(historicalPurchaseTime(industryTalkPast), 1),
-        idempotencyKey: "seed:event:admin-explorer:industry-talk-ai-and-ux-2026",
+        idempotencyKey: "seed:event:admin-explorer:industry-talk-ai-and-ux",
         kind: "event_ticket",
-        squarePaymentId:
-          "seed:payment:admin-explorer:industry-talk-ai-and-ux-2026",
+        squarePaymentId: "seed:payment:admin-explorer:industry-talk-ai-and-ux",
         status: "completed",
       },
       {
@@ -141,28 +318,27 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
         createdAt: historicalPurchaseTime(mentorshipOngoing),
         eventSlug: mentorshipOngoing.event.slug,
         fulfilledAt: afterTimestamp(historicalPurchaseTime(mentorshipOngoing), 1),
-        idempotencyKey: "seed:event:admin-explorer:student-panel-2025",
+        idempotencyKey: "seed:event:admin-explorer:mentorship-program",
         kind: "event_ticket",
-        squarePaymentId: "seed:payment:admin-explorer:student-panel-2025",
+        squarePaymentId: "seed:payment:admin-explorer:mentorship-program",
         status: "completed",
       },
       {
-        amountCents: ticketPriceCents(thinkboxFuture, true),
-        createdAt: futurePurchaseTime,
-        eventSlug: thinkboxFuture.event.slug,
-        fulfilledAt: afterTimestamp(futurePurchaseTime, 1),
-        idempotencyKey: "seed:event:admin-explorer:thinkbox-office-tour-2027",
+        amountCents: ticketPriceCents(industryTalkUpcoming, true),
+        createdAt: recentPurchaseTime,
+        eventSlug: industryTalkUpcoming.event.slug,
+        fulfilledAt: afterTimestamp(recentPurchaseTime, 1),
+        idempotencyKey: "seed:event:admin-explorer:industry-talk-design-systems",
         kind: "event_ticket",
         squarePaymentId:
-          "seed:payment:admin-explorer:thinkbox-office-tour-2027",
+          "seed:payment:admin-explorer:industry-talk-design-systems",
         status: "completed",
       },
     ],
     registrations: [
       {
         eventSlug: industryTalkPast.event.slug,
-        purchaseKey:
-          "seed:event:admin-explorer:industry-talk-ai-and-ux-2026",
+        purchaseKey: "seed:event:admin-explorer:industry-talk-ai-and-ux",
         status: "accepted",
         attending: true,
         checkIns: {
@@ -171,14 +347,13 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
       },
       {
         eventSlug: mentorshipOngoing.event.slug,
-        purchaseKey: "seed:event:admin-explorer:student-panel-2025",
+        purchaseKey: "seed:event:admin-explorer:mentorship-program",
         status: "accepted",
         attending: true,
       },
       {
-        eventSlug: thinkboxFuture.event.slug,
-        purchaseKey:
-          "seed:event:admin-explorer:thinkbox-office-tour-2027",
+        eventSlug: industryTalkUpcoming.event.slug,
+        purchaseKey: "seed:event:admin-explorer:industry-talk-design-systems",
         status: "accepted",
         attending: true,
       },
@@ -218,7 +393,9 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
         },
       },
       {
-        eventSlug: designSprintFuture.event.slug,
+        // Pending application on the draft workshop: the admin review queue
+        // needs something waiting in it.
+        eventSlug: researchWorkshopDraft.event.slug,
         status: "pending",
         attending: false,
         responses: {
@@ -233,33 +410,29 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
     ],
   },
   {
-    email: "not-member@gmail.com",
-    password: "ux-hub",
+    email: "no-membership@example.com",
+    password: SEED_PASSWORD,
     membershipSlug: null,
-    profile: {
-      name: "Not Member",
+    fullEventHistory: true,
+    profile: studentProfile({
+      firstName: "Maya",
+      lastName: "Patel",
       phone: "6045550102",
-      student_number: 10000002,
+      pronouns: "she/her",
+      studentNumber: 10000002,
       faculty: "Faculty of Science",
       major: "Computer Science",
       year: "2",
-      role_access: "basic",
-      user_type: "ubcStudent",
-      dietary_restrictions: null,
-      newsletter: false,
-      preferred_pronouns: "she/her",
-      square_customer_id: null,
-    },
+    }),
     purchases: [
       {
         amountCents: ticketPriceCents(industryTalkPast, false),
         createdAt: historicalPurchaseTime(industryTalkPast),
         eventSlug: industryTalkPast.event.slug,
         fulfilledAt: afterTimestamp(historicalPurchaseTime(industryTalkPast), 1),
-        idempotencyKey: "seed:event:not-member:industry-talk-ai-and-ux-2026",
+        idempotencyKey: "seed:event:no-membership:industry-talk-ai-and-ux",
         kind: "event_ticket",
-        squarePaymentId:
-          "seed:payment:not-member:industry-talk-ai-and-ux-2026",
+        squarePaymentId: "seed:payment:no-membership:industry-talk-ai-and-ux",
         status: "completed",
       },
       {
@@ -267,29 +440,32 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
         createdAt: historicalPurchaseTime(mentorshipOngoing),
         eventSlug: mentorshipOngoing.event.slug,
         fulfilledAt: afterTimestamp(historicalPurchaseTime(mentorshipOngoing), 1),
-        idempotencyKey: "seed:event:not-member:student-panel-2025",
+        idempotencyKey: "seed:event:no-membership:mentorship-program",
         kind: "event_ticket",
-        squarePaymentId: "seed:payment:not-member:student-panel-2025",
+        squarePaymentId: "seed:payment:no-membership:mentorship-program",
         status: "completed",
       },
       {
-        amountCents: ticketPriceCents(thinkboxFuture, false),
-        createdAt: futurePurchaseTime,
-        eventSlug: thinkboxFuture.event.slug,
-        fulfilledAt: afterTimestamp(futurePurchaseTime, 1),
+        amountCents: ticketPriceCents(industryTalkUpcoming, false),
+        createdAt: recentPurchaseTime,
+        eventSlug: industryTalkUpcoming.event.slug,
+        fulfilledAt: afterTimestamp(recentPurchaseTime, 1),
         idempotencyKey:
-          "seed:event:not-member:thinkbox-office-tour-2027:completed",
+          "seed:event:no-membership:industry-talk-design-systems:completed",
         kind: "event_ticket",
         squarePaymentId:
-          "seed:payment:not-member:thinkbox-office-tour-2027:completed",
+          "seed:payment:no-membership:industry-talk-design-systems:completed",
         status: "completed",
       },
       {
-        amountCents: ticketPriceCents(thinkboxFuture, false),
+        // The failed-payment path: a purchase row with no registration behind
+        // it, which is also the only kind an admin is allowed to delete.
+        amountCents: ticketPriceCents(industryTalkUpcoming, false),
         createdAt: failedPurchaseTime,
-        eventSlug: thinkboxFuture.event.slug,
+        eventSlug: industryTalkUpcoming.event.slug,
         failureReason: "Seeded card decline for testing",
-        idempotencyKey: "seed:event:not-member:thinkbox-office-tour-2027:failed",
+        idempotencyKey:
+          "seed:event:no-membership:industry-talk-design-systems:failed",
         kind: "event_ticket",
         status: "failed",
       },
@@ -297,7 +473,7 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
     registrations: [
       {
         eventSlug: industryTalkPast.event.slug,
-        purchaseKey: "seed:event:not-member:industry-talk-ai-and-ux-2026",
+        purchaseKey: "seed:event:no-membership:industry-talk-ai-and-ux",
         status: "accepted",
         attending: true,
         checkIns: {
@@ -306,20 +482,20 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
       },
       {
         eventSlug: mentorshipOngoing.event.slug,
-        purchaseKey: "seed:event:not-member:student-panel-2025",
+        purchaseKey: "seed:event:no-membership:mentorship-program",
         status: "accepted",
         attending: true,
       },
       {
-        eventSlug: thinkboxFuture.event.slug,
+        eventSlug: industryTalkUpcoming.event.slug,
         purchaseKey:
-          "seed:event:not-member:thinkbox-office-tour-2027:completed",
+          "seed:event:no-membership:industry-talk-design-systems:completed",
         status: "accepted",
         attending: true,
       },
       {
         eventSlug: uxathonPast.event.slug,
-        reviewerEmail: "admin-explorer@gmail.com",
+        reviewerEmail: "admin-explorer@example.com",
         status: "declined",
         attending: false,
         responses: {
@@ -333,7 +509,7 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
         },
       },
       {
-        eventSlug: designSprintFuture.event.slug,
+        eventSlug: researchWorkshopDraft.event.slug,
         status: "pending",
         attending: false,
         responses: {
@@ -347,43 +523,37 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
     ],
   },
   {
-    email: "mock-member@example.com",
-    password: "ux-hub",
+    email: "student-innovator@example.com",
+    password: SEED_PASSWORD,
     membershipSlug: "innovator",
-    profile: {
-      name: "Mock Member",
+    fullEventHistory: true,
+    profile: studentProfile({
+      firstName: "Daniel",
+      lastName: "Kim",
       phone: "6045550103",
-      student_number: 10000003,
+      pronouns: "he/him",
+      dietary: "Gluten-free",
+      newsletter: true,
+      studentNumber: 10000003,
       faculty: "Faculty of Applied Science",
       major: "Integrated Engineering",
       year: "4",
-      role_access: "basic",
-      user_type: "ubcStudent",
-      dietary_restrictions: "Gluten-free",
-      newsletter: true,
-      preferred_pronouns: "he/him",
-      square_customer_id: null,
-    },
+    }),
     purchases: [
-      {
-        amountCents: 1800,
-        createdAt: timestamp(addDays(today, -45), 16),
-        fulfilledAt: timestamp(addDays(today, -45), 16, 1),
-        idempotencyKey: "seed:membership:mock-member:innovator",
-        kind: "membership",
-        membershipSlug: "innovator",
-        squarePaymentId: "seed:payment:mock-member:innovator",
-        status: "completed",
-      },
+      membershipPurchase(
+        "student-innovator",
+        "innovator",
+        timestamp(addDays(today, -45), 16)
+      ),
       {
         amountCents: ticketPriceCents(industryTalkPast, true),
         createdAt: historicalPurchaseTime(industryTalkPast),
         eventSlug: industryTalkPast.event.slug,
         fulfilledAt: afterTimestamp(historicalPurchaseTime(industryTalkPast), 1),
-        idempotencyKey: "seed:event:mock-member:industry-talk-ai-and-ux-2026",
+        idempotencyKey: "seed:event:student-innovator:industry-talk-ai-and-ux",
         kind: "event_ticket",
         squarePaymentId:
-          "seed:payment:mock-member:industry-talk-ai-and-ux-2026",
+          "seed:payment:student-innovator:industry-talk-ai-and-ux",
         status: "completed",
       },
       {
@@ -391,28 +561,28 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
         createdAt: historicalPurchaseTime(mentorshipOngoing),
         eventSlug: mentorshipOngoing.event.slug,
         fulfilledAt: afterTimestamp(historicalPurchaseTime(mentorshipOngoing), 1),
-        idempotencyKey: "seed:event:mock-member:student-panel-2025",
+        idempotencyKey: "seed:event:student-innovator:mentorship-program",
         kind: "event_ticket",
-        squarePaymentId: "seed:payment:mock-member:student-panel-2025",
+        squarePaymentId: "seed:payment:student-innovator:mentorship-program",
         status: "completed",
       },
       {
-        amountCents: ticketPriceCents(portfolioReviewFuture, true),
-        createdAt: futurePurchaseTime,
-        eventSlug: portfolioReviewFuture.event.slug,
-        fulfilledAt: afterTimestamp(futurePurchaseTime, 1),
-        idempotencyKey: "seed:event:mock-member:portfolio-review-night-2027",
+        amountCents: ticketPriceCents(industryTalkUpcoming, true),
+        createdAt: recentPurchaseTime,
+        eventSlug: industryTalkUpcoming.event.slug,
+        fulfilledAt: afterTimestamp(recentPurchaseTime, 1),
+        idempotencyKey:
+          "seed:event:student-innovator:industry-talk-design-systems",
         kind: "event_ticket",
         squarePaymentId:
-          "seed:payment:mock-member:portfolio-review-night-2027",
+          "seed:payment:student-innovator:industry-talk-design-systems",
         status: "completed",
       },
     ],
     registrations: [
       {
         eventSlug: industryTalkPast.event.slug,
-        purchaseKey:
-          "seed:event:mock-member:industry-talk-ai-and-ux-2026",
+        purchaseKey: "seed:event:student-innovator:industry-talk-ai-and-ux",
         status: "accepted",
         attending: true,
         checkIns: {
@@ -421,18 +591,169 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
       },
       {
         eventSlug: mentorshipOngoing.event.slug,
-        purchaseKey: "seed:event:mock-member:student-panel-2025",
+        purchaseKey: "seed:event:student-innovator:mentorship-program",
         status: "accepted",
         attending: true,
       },
       {
-        eventSlug: portfolioReviewFuture.event.slug,
+        eventSlug: industryTalkUpcoming.event.slug,
         purchaseKey:
-          "seed:event:mock-member:portfolio-review-night-2027",
+          "seed:event:student-innovator:industry-talk-design-systems",
         status: "accepted",
         attending: true,
       },
+      {
+        // A free past event attended without a purchase behind it.
+        eventSlug: getToKnowPast.event.slug,
+        status: "accepted",
+        attending: true,
+        checkIns: {
+          "Door Check-in": afterTimestamp(getToKnowCheckIn, 5),
+        },
+      },
     ],
+  },
+
+  /* ── Grid fixtures ───────────────────────────────────────────────────────
+   * Every membership state crossed with both roles, so any combination can be
+   * signed into without hand-editing the database. Membership purchase only:
+   * event history lives on the three accounts above.
+   */
+  {
+    email: "student-explorer@example.com",
+    password: SEED_PASSWORD,
+    membershipSlug: "explorer",
+    fullEventHistory: false,
+    profile: studentProfile({
+      firstName: "Sofia",
+      lastName: "Martinez",
+      phone: "6045550104",
+      pronouns: "she/her",
+      studentNumber: 10000004,
+      faculty: "Faculty of Arts",
+      major: "Psychology",
+      year: "1",
+    }),
+    purchases: [
+      membershipPurchase("student-explorer", "explorer", gridPurchaseTime),
+    ],
+    registrations: [],
+  },
+  {
+    email: "faculty-member@ubc.ca",
+    password: SEED_PASSWORD,
+    membershipSlug: "faculty",
+    fullEventHistory: false,
+    profile: facultyProfile({
+      firstName: "Avery",
+      lastName: "Okafor",
+      phone: "6045550105",
+      pronouns: "they/them",
+      email: "faculty-member@ubc.ca",
+      faculty: "Faculty of Education",
+    }),
+    purchases: [
+      membershipPurchase("faculty-member", "faculty", gridPurchaseTime),
+    ],
+    registrations: [],
+  },
+  {
+    email: "non-ubc@example.com",
+    password: SEED_PASSWORD,
+    membershipSlug: "non-ubc",
+    fullEventHistory: false,
+    profile: nonUbcProfile({
+      firstName: "Mateo",
+      lastName: "Nguyen",
+      phone: "6045550106",
+      pronouns: "he/him",
+      schoolInstitution: "Emily Carr University of Art and Design",
+      studentStatus: "undergraduate",
+      year: "3",
+    }),
+    purchases: [
+      membershipPurchase("non-ubc", "non-ubc", gridPurchaseTime),
+    ],
+    registrations: [],
+  },
+  {
+    email: "admin-innovator@example.com",
+    password: SEED_PASSWORD,
+    membershipSlug: "innovator",
+    fullEventHistory: false,
+    profile: studentProfile({
+      firstName: "Priya",
+      lastName: "Shah",
+      phone: "6045550107",
+      pronouns: "she/her",
+      admin: true,
+      newsletter: true,
+      studentNumber: 10000005,
+      faculty: "Sauder School of Business",
+      major: "Business and Computer Science",
+      year: "4",
+    }),
+    purchases: [
+      membershipPurchase("admin-innovator", "innovator", gridPurchaseTime),
+    ],
+    registrations: [],
+  },
+  {
+    email: "admin-faculty@ubc.ca",
+    password: SEED_PASSWORD,
+    membershipSlug: "faculty",
+    fullEventHistory: false,
+    profile: facultyProfile({
+      firstName: "Nadia",
+      lastName: "Rahman",
+      phone: "6045550108",
+      pronouns: "she/her",
+      admin: true,
+      email: "admin-faculty@ubc.ca",
+      faculty: "Faculty of Science",
+    }),
+    purchases: [
+      membershipPurchase("admin-faculty", "faculty", gridPurchaseTime),
+    ],
+    registrations: [],
+  },
+  {
+    email: "admin-non-ubc@example.com",
+    password: SEED_PASSWORD,
+    membershipSlug: "non-ubc",
+    fullEventHistory: false,
+    profile: nonUbcProfile({
+      firstName: "Jordan",
+      lastName: "Dubois",
+      phone: "6045550109",
+      pronouns: "they/them",
+      admin: true,
+      schoolInstitution: "Simon Fraser University",
+      studentStatus: "graduate",
+    }),
+    purchases: [
+      membershipPurchase("admin-non-ubc", "non-ubc", gridPurchaseTime),
+    ],
+    registrations: [],
+  },
+  {
+    email: "admin-no-membership@example.com",
+    password: SEED_PASSWORD,
+    membershipSlug: null,
+    fullEventHistory: false,
+    profile: studentProfile({
+      firstName: "Lucas",
+      lastName: "Wong",
+      phone: "6045550110",
+      pronouns: "he/him",
+      admin: true,
+      studentNumber: 10000006,
+      faculty: "Faculty of Forestry",
+      major: "Urban Forestry",
+      year: "2",
+    }),
+    purchases: [],
+    registrations: [],
   },
   ];
 }

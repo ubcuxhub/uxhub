@@ -51,9 +51,6 @@ export function SignUpForm({
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
 
-  const fullName =
-    `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim();
-
   // Validated on submit rather than gating the button, so a failing rule names
   // itself on the field it belongs to instead of leaving a dead control.
   const validate = (): SignUpFieldErrors => {
@@ -92,7 +89,8 @@ export function SignUpForm({
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
           data: {
-            full_name: fullName,
+            first_name: formData.firstName.trim(),
+            last_name: formData.lastName.trim(),
           },
         },
       });
@@ -109,7 +107,10 @@ export function SignUpForm({
         const res = await fetch("/api/auth/complete-profile", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: fullName }),
+          body: JSON.stringify({
+            firstName: formData.firstName.trim(),
+            lastName: formData.lastName.trim(),
+          }),
         });
 
         const result = await res.json();

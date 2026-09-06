@@ -15,6 +15,7 @@ import {
   renderEventConfirmationEmail,
   renderMembershipConfirmationEmail,
 } from "@/lib/email/templates";
+import { formatUserName } from "@/lib/user-name";
 
 /**
  * Best-effort purchase confirmation email. Called from fulfillment, which runs
@@ -56,7 +57,7 @@ export async function sendPurchaseConfirmationEmail(
         rendered = renderMembershipConfirmationEmail({
           membershipType,
           purchase,
-          userName: recipient.name,
+          userName: formatUserName(recipient),
         });
       }
     } else if (purchase.kind === "event_ticket" && purchase.event_id) {
@@ -66,7 +67,7 @@ export async function sendPurchaseConfirmationEmail(
         rendered = renderEventConfirmationEmail({
           event,
           purchase,
-          userName: recipient.name,
+          userName: formatUserName(recipient),
         });
       }
     }

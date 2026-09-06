@@ -16,3 +16,9 @@ export const FACULTIES = [
 ] as const;
 
 export const YEAR_LEVELS = ["1", "2", "3", "4", "5+"] as const;
+
+export const STUDENT_STATUSES = [
+  { value: "undergraduate", label: "Undergraduate" },
+  { value: "graduate", label: "Graduate" },
+  { value: "other", label: "Other" },
+] as const;

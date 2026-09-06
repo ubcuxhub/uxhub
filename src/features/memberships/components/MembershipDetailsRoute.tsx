@@ -3,6 +3,9 @@ import { notFound, redirect } from "next/navigation";
 import { MembershipDetailsForm } from "./MembershipDetailsForm";
 import { requireAuth } from "@/lib/auth/guards";
 import { withReturnTo } from "@/lib/auth/paths";
+import { createClient } from "@/lib/supabase/server";
+import { fetchMembershipTermEndsAt } from "@/lib/supabase-helpers/app-settings";
+import { isMembershipTermClosed } from "@/features/memberships/lib/expiry";
 import {
   hasActiveOrPendingMembership,
   isMembershipAudience,
@@ -20,7 +23,13 @@ export async function MembershipDetailsRoute({
     withReturnTo(`/portal/membership/join/${audience}`, returnTo),
   );
 
-  if (hasActiveOrPendingMembership(user)) {
+  const supabase = await createClient();
+  const termEndsAt = await fetchMembershipTermEndsAt(supabase);
+
+  if (
+    isMembershipTermClosed(termEndsAt) ||
+    hasActiveOrPendingMembership(user, termEndsAt)
+  ) {
     redirect(withReturnTo("/portal/membership", returnTo));
   }
 

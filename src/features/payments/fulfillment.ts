@@ -36,17 +36,14 @@ import {
   normalizeSquareStatus,
 } from "./fulfillment-rules";
 import { isEligibleForMembership } from "@/features/memberships/lib/policy";
+import { resolveMembershipExpiry } from "@/features/memberships/lib/expiry";
+import { fetchMembershipTermEndsAt } from "@/lib/supabase-helpers/app-settings";
 import { ensureSquareCustomerId } from "./customer";
 import { sendPurchaseConfirmationEmail } from "./confirmation-email";
 import { revalidatePurchasePaths } from "./revalidation";
 
 const adminDb = supabaseAdmin as unknown as SupabaseClient<Database>;
 
-function getMembershipExpiryIsoString() {
-  const expiry = new Date();
-  expiry.setFullYear(expiry.getFullYear() + 1);
-  return expiry.toISOString();
-}
 async function cancelSquarePaymentIfPossible(paymentId: string) {
   try {
     await squareClient.payments.cancel({ paymentId });
@@ -101,8 +98,10 @@ async function fulfillMembershipPurchase(purchaseId: string) {
     fulfilled_at: new Date().toISOString(),
   });
 
+  const termEndsAt = await fetchMembershipTermEndsAt(adminDb);
+
   await updateUserInfoById(adminDb, purchase.user_id, {
-    membership_expires_at: getMembershipExpiryIsoString(),
+    membership_expires_at: resolveMembershipExpiry(termEndsAt),
     membership_pre_ordered_type_id: null,
     membership_type_id: purchase.membership_type_id,
     square_customer_id: purchase.square_customer_id,
@@ -253,7 +252,9 @@ async function createSquarePaymentForMembership(
     return { error: "Membership plan not found." } as const;
   }
 
-  if (!isEligibleForMembership(user, membershipType)) {
+  const termEndsAt = await fetchMembershipTermEndsAt(adminDb);
+
+  if (!isEligibleForMembership(user, membershipType, termEndsAt)) {
     return {
       error: "This membership tier is not available for your account.",
     } as const;

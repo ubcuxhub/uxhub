@@ -19,7 +19,8 @@ interface CheckoutPaymentSectionProps {
   disabledMessage?: string | null;
   framed?: boolean;
   initialEmail: string;
-  initialName: string;
+  initialFirstName: string;
+  initialLastName: string;
   initialPhone?: string | null;
   kind: PurchaseKind;
   slug: string;
@@ -40,7 +41,8 @@ export function CheckoutPaymentSection({
   disabledMessage = null,
   framed = true,
   initialEmail,
-  initialName,
+  initialFirstName,
+  initialLastName,
   initialPhone,
   kind,
   slug,
@@ -59,7 +61,8 @@ export function CheckoutPaymentSection({
       disabled={disabled}
       disabledMessage={disabledMessage}
       initialEmail={initialEmail}
-      initialName={initialName}
+      initialFirstName={initialFirstName}
+      initialLastName={initialLastName}
       initialPhone={initialPhone}
       kind={kind}
       slug={slug}

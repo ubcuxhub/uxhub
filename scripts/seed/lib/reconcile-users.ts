@@ -2,9 +2,11 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 
 import type { SeedUser } from "../data/users.ts";
 import { emptyCounts, type Counts } from "./reconcile.ts";
+import { planPrune, pruneKey } from "./prune.ts";
 import { getUserFixtureTotals } from "./user-fixtures.ts";
 
 const TABLE = {
+  appSettings: "app_settings",
   checkInSessions: "check_in_sessions",
   checkIns: "check_ins",
   eventApplicationQuestions: "event_application_questions",
@@ -28,6 +30,8 @@ export interface UserSeedSummary {
   registrations: Counts;
   responses: Counts;
   checkIns: Counts;
+  /** Fixture email -> `user_info.id`, for the prune pass in `index.ts`. */
+  profileIds: Map<string, string>;
 }
 
 interface ProfileRow {
@@ -70,6 +74,7 @@ function emptySummary(): UserSeedSummary {
     registrations: emptyCounts(),
     responses: emptyCounts(),
     checkIns: emptyCounts(),
+    profileIds: new Map(),
   };
 }
 
@@ -322,7 +327,11 @@ async function reconcileIdentities(
       email: fixture.email,
       password: fixture.password,
       email_confirm: true,
-      user_metadata: { full_name: fixture.profile.name, seed_managed: true },
+      user_metadata: {
+        first_name: fixture.profile.first_name,
+        last_name: fixture.profile.last_name,
+        seed_managed: true,
+      },
     };
 
     if (authUser) {
@@ -678,6 +687,13 @@ async function planDryRun(
   summary.authUsers = countsFor(totals.authUsers, state.authByEmail.size);
   summary.profiles = countsFor(totals.profiles, state.profileByEmail.size);
 
+  // Only profiles that already exist have an id to prune against. A first run
+  // has nothing to prune anyway.
+  for (const fixture of fixtures) {
+    const profile = state.profileByEmail.get(fixture.email);
+    if (profile) summary.profileIds.set(fixture.email, profile.id);
+  }
+
   if (!dependencies.complete) {
     summary.purchases = createdCounts(totals.purchases);
     summary.registrations = createdCounts(totals.registrations);
@@ -879,5 +895,368 @@ export async function reconcileUserFixtures(
     registrations: registrations.counts,
     responses,
     checkIns,
+    profileIds: identity.profileIds,
   };
+}
+
+export interface UserPruneSummary {
+  purchases: number;
+  registrations: number;
+  responses: number;
+  checkIns: number;
+}
+
+function emptyPruneSummary(): UserPruneSummary {
+  return { purchases: 0, registrations: 0, responses: 0, checkIns: 0 };
+}
+
+/**
+ * Deletes fixture-owned rows the seed data no longer describes.
+ *
+ * This is what makes a purchase reversible. Buy a ticket as one of the seed
+ * accounts and the row it writes is owned by a fixture profile but absent from
+ * `users.ts`, so the next `pnpm seed` removes it and the event is buyable
+ * again.
+ *
+ * Everything here is filtered by `user_id in (fixture profiles)`. A row written
+ * by an account somebody created by hand is never a candidate, even when it
+ * points at a seed event.
+ *
+ * Order matters. Registrations go first so their responses and check-ins
+ * cascade; purchases follow, because `event_registrations.purchase_id` is
+ * `on delete set null` and a surviving registration would otherwise silently
+ * lose its link.
+ */
+export async function pruneUserFixtures(
+  supabase: SupabaseClient,
+  fixtures: SeedUser[],
+  profileIds: Map<string, string>,
+  options: { dryRun: boolean }
+): Promise<UserPruneSummary> {
+  const summary = emptyPruneSummary();
+  const userIds = [...profileIds.values()];
+  if (userIds.length === 0) return summary;
+
+  const eventIdBySlug = new Map<string, string>();
+  const eventSlugById = new Map<string, string>();
+  const slugs = [
+    ...new Set(
+      fixtures.flatMap((fixture) =>
+        fixture.registrations.map((registration) => registration.eventSlug)
+      )
+    ),
+  ];
+  if (slugs.length > 0) {
+    const { data, error } = await supabase
+      .from(TABLE.events)
+      .select("id, slug")
+      .in("slug", slugs);
+    if (error) throw new Error(`Reading events failed: ${error.message}`);
+    for (const row of (data ?? []) as { id: string; slug: string | null }[]) {
+      if (!row.slug) continue;
+      eventIdBySlug.set(row.slug, row.id);
+      eventSlugById.set(row.id, row.slug);
+    }
+  }
+
+  /* ── Registrations ── */
+  const desiredRegistrations = new Set(
+    fixtures.flatMap((fixture) => {
+      const userId = profileIds.get(fixture.email);
+      if (!userId) return [];
+      return fixture.registrations.flatMap((registration) => {
+        const eventId = eventIdBySlug.get(registration.eventSlug);
+        return eventId ? [pruneKey(userId, eventId)] : [];
+      });
+    })
+  );
+
+  const { data: registrationRows, error: registrationError } = await supabase
+    .from(TABLE.eventRegistrations)
+    .select("id, event_id, user_id")
+    .in("user_id", userIds);
+  if (registrationError) {
+    throw new Error(`Reading event registrations failed: ${registrationError.message}`);
+  }
+
+  const registrations = (registrationRows ?? []) as {
+    event_id: string;
+    id: string;
+    user_id: string;
+  }[];
+  const registrationPlan = planPrune(
+    registrations,
+    (row) => pruneKey(row.user_id, row.event_id),
+    desiredRegistrations
+  );
+
+  summary.registrations = registrationPlan.remove.length;
+
+  if (!options.dryRun && registrationPlan.remove.length > 0) {
+    const { error } = await supabase
+      .from(TABLE.eventRegistrations)
+      .delete()
+      .in(
+        "id",
+        registrationPlan.remove.map((entry) => entry.row.id)
+      );
+    if (error) {
+      throw new Error(`Deleting stale event registrations failed: ${error.message}`);
+    }
+  }
+
+  /* ── Purchases ── */
+  const desiredPurchaseKeys = new Set(
+    fixtures.flatMap((fixture) =>
+      fixture.purchases.map((purchase) => purchase.idempotencyKey)
+    )
+  );
+
+  const { data: purchaseRows, error: purchaseError } = await supabase
+    .from(TABLE.purchases)
+    .select("id, idempotency_key, user_id")
+    .in("user_id", userIds);
+  if (purchaseError) {
+    throw new Error(`Reading purchases failed: ${purchaseError.message}`);
+  }
+
+  const purchasePlan = planPrune(
+    (purchaseRows ?? []) as { id: string; idempotency_key: string }[],
+    (row) => row.idempotency_key,
+    desiredPurchaseKeys
+  );
+
+  summary.purchases = purchasePlan.remove.length;
+
+  if (!options.dryRun && purchasePlan.remove.length > 0) {
+    const { error } = await supabase
+      .from(TABLE.purchases)
+      .delete()
+      .in(
+        "id",
+        purchasePlan.remove.map((entry) => entry.row.id)
+      );
+    if (error) {
+      throw new Error(`Deleting stale purchases failed: ${error.message}`);
+    }
+  }
+
+  /* ── Responses and check-ins on registrations we kept ── */
+  const keptRegistrationIdByKey = new Map<string, string>();
+  for (const row of registrationPlan.keep) {
+    const slug = eventSlugById.get(row.event_id);
+    if (slug) keptRegistrationIdByKey.set(pruneKey(row.user_id, slug), row.id);
+  }
+  const keptIds = [...keptRegistrationIdByKey.values()];
+  if (keptIds.length === 0) return summary;
+
+  const desiredResponses = new Set<string>();
+  const desiredCheckIns = new Set<string>();
+  for (const fixture of fixtures) {
+    const userId = profileIds.get(fixture.email);
+    if (!userId) continue;
+
+    for (const registration of fixture.registrations) {
+      const registrationId = keptRegistrationIdByKey.get(
+        pruneKey(userId, registration.eventSlug)
+      );
+      if (!registrationId) continue;
+
+      for (const question of Object.keys(registration.responses ?? {})) {
+        desiredResponses.add(pruneKey(registrationId, question));
+      }
+      for (const session of Object.keys(registration.checkIns ?? {})) {
+        desiredCheckIns.add(pruneKey(registrationId, session));
+      }
+    }
+  }
+
+  const [responseResult, checkInResult] = await Promise.all([
+    supabase
+      .from(TABLE.eventApplicationResponses)
+      .select(
+        "id, event_registration_id, event_application_questions(question)"
+      )
+      .in("event_registration_id", keptIds),
+    supabase
+      .from(TABLE.checkIns)
+      .select("id, event_registration_id, check_in_sessions(name)")
+      .in("event_registration_id", keptIds),
+  ]);
+  if (responseResult.error) {
+    throw new Error(`Reading application responses failed: ${responseResult.error.message}`);
+  }
+  if (checkInResult.error) {
+    throw new Error(`Reading check-ins failed: ${checkInResult.error.message}`);
+  }
+
+  // Embedded selects come back typed as unknown to PostgREST's parser; the
+  // shapes are asserted here rather than inferred.
+  const responseRows = (responseResult.data ?? []) as unknown as {
+    id: string;
+    event_registration_id: string;
+    event_application_questions: { question: string } | null;
+  }[];
+  const checkInRows = (checkInResult.data ?? []) as unknown as {
+    id: string;
+    event_registration_id: string;
+    check_in_sessions: { name: string } | null;
+  }[];
+
+  const responsePlan = planPrune(
+    responseRows,
+    (row) =>
+      row.event_application_questions
+        ? pruneKey(row.event_registration_id, row.event_application_questions.question)
+        : null,
+    desiredResponses
+  );
+  const checkInPlan = planPrune(
+    checkInRows,
+    (row) =>
+      row.check_in_sessions
+        ? pruneKey(row.event_registration_id, row.check_in_sessions.name)
+        : null,
+    desiredCheckIns
+  );
+
+  summary.responses = responsePlan.remove.length;
+  summary.checkIns = checkInPlan.remove.length;
+
+  if (options.dryRun) return summary;
+
+  if (responsePlan.remove.length > 0) {
+    const { error } = await supabase
+      .from(TABLE.eventApplicationResponses)
+      .delete()
+      .in(
+        "id",
+        responsePlan.remove.map((entry) => entry.row.id)
+      );
+    if (error) {
+      throw new Error(`Deleting stale application responses failed: ${error.message}`);
+    }
+  }
+
+  if (checkInPlan.remove.length > 0) {
+    const { error } = await supabase
+      .from(TABLE.checkIns)
+      .delete()
+      .in(
+        "id",
+        checkInPlan.remove.map((entry) => entry.row.id)
+      );
+    if (error) {
+      throw new Error(`Deleting stale check-ins failed: ${error.message}`);
+    }
+  }
+
+  return summary;
+}
+
+/**
+ * Hard-deletes fixture accounts the seed used to create under another address.
+ *
+ * Runs before the reconcile, not with the rest of the prune, because a renamed
+ * fixture's old account still owns purchases under the same idempotency keys
+ * the new one is about to write — and `reconcilePurchases` refuses to move a
+ * key between users. Leaving them would fail the run, not just leave clutter.
+ *
+ * Deletion order follows the foreign keys, all of which are `no action` rather
+ * than cascade: registrations (as attendee and as reviewer) must go before the
+ * profile, and the profile before the auth user, whose `auth_user_id` reference
+ * would otherwise hold it. Purchases cascade off the profile on their own.
+ *
+ * This is not `delete_account`: that anonymizes and keeps the row so real
+ * receipts keep a referent. These are fixtures, and they should leave nothing.
+ */
+export async function removeRetiredFixtures(
+  supabase: SupabaseClient,
+  emails: readonly string[],
+  options: { dryRun: boolean }
+): Promise<number> {
+  if (emails.length === 0) return 0;
+
+  const addresses = emails.map((email) => email.trim().toLowerCase());
+  const { data, error } = await supabase
+    .from(TABLE.userInfo)
+    .select("id, email, auth_user_id")
+    .in("email", addresses);
+  if (error) {
+    throw new Error(`Reading retired fixture profiles failed: ${error.message}`);
+  }
+
+  const profiles = (data ?? []) as ProfileRow[];
+
+  // The auth user can outlive its profile if a previous run was interrupted, so
+  // look those up independently rather than only through the profiles.
+  const authUsers = await listAllAuthUsers(supabase);
+  const retiredAuth = authUsers.filter((user) => {
+    const email = user.email?.trim().toLowerCase();
+    return email ? addresses.includes(email) : false;
+  });
+
+  if (profiles.length === 0 && retiredAuth.length === 0) return 0;
+  if (options.dryRun) {
+    return new Set([
+      ...profiles.map((profile) => profile.email.trim().toLowerCase()),
+      ...retiredAuth.map((user) => user.email?.trim().toLowerCase() ?? ""),
+    ]).size;
+  }
+
+  const profileIds = profiles.map((profile) => profile.id);
+
+  if (profileIds.length > 0) {
+    for (const column of ["user_id", "reviewer_id"] as const) {
+      const { error: registrationError } = await supabase
+        .from(TABLE.eventRegistrations)
+        .delete()
+        .in(column, profileIds);
+      if (registrationError) {
+        throw new Error(
+          `Deleting retired fixture registrations failed: ${registrationError.message}`
+        );
+      }
+    }
+
+    // `app_settings.updated_by` records who last moved the membership term
+    // date. It is attribution, not data anyone depends on, and the reference is
+    // `no action`, so it has to be released before the profile can go.
+    const { error: settingsError } = await supabase
+      .from(TABLE.appSettings)
+      .update({ updated_by: null })
+      .in("updated_by", profileIds);
+    if (settingsError) {
+      throw new Error(
+        `Clearing retired fixture settings attribution failed: ${settingsError.message}`
+      );
+    }
+
+    const { error: profileError } = await supabase
+      .from(TABLE.userInfo)
+      .delete()
+      .in("id", profileIds);
+    if (profileError) {
+      // A new table referencing `user_info` without a cascade lands here. The
+      // fix is to release the reference above, the way app_settings does.
+      throw new Error(
+        `Deleting retired fixture profiles failed: ${profileError.message}\n` +
+          "  A table still references them. Release it in removeRetiredFixtures."
+      );
+    }
+  }
+
+  for (const user of retiredAuth) {
+    const { error: authError } = await supabase.auth.admin.deleteUser(user.id);
+    if (authError) {
+      throw new Error(
+        `Deleting retired fixture Auth user "${user.email}" failed: ${authError.message}`
+      );
+    }
+  }
+
+  return new Set([
+    ...profiles.map((profile) => profile.email.trim().toLowerCase()),
+    ...retiredAuth.map((user) => user.email?.trim().toLowerCase() ?? ""),
+  ]).size;
 }

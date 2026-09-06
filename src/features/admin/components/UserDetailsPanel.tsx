@@ -63,10 +63,22 @@ export function UserDetailsPanel({
           </CardHeader>
           <CardContent className="space-y-4">
             <EditableUserField
-              label="Name"
-              field="name"
-              value={selectedUser.name}
-              isEditing={editingField === "name"}
+              label="First name"
+              field="first_name"
+              value={selectedUser.first_name}
+              isEditing={editingField === "first_name"}
+              editValue={editValue}
+              isSaving={isSaving}
+              onEditStart={onEditStart}
+              onEditCancel={onEditCancel}
+              onEditSave={onEditSave}
+              onValueChange={onValueChange}
+            />
+            <EditableUserField
+              label="Last name"
+              field="last_name"
+              value={selectedUser.last_name}
+              isEditing={editingField === "last_name"}
               editValue={editValue}
               isSaving={isSaving}
               onEditStart={onEditStart}

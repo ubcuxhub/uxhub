@@ -6,7 +6,8 @@ const validPayload = {
   slug: "student",
   token: "payment-token",
   idempotencyKey: "checkout-key",
-  buyerName: "Ada Lovelace",
+  buyerFirstName: "Ada",
+  buyerLastName: "Lovelace",
   buyerEmail: "ada@example.com",
 };
 
@@ -29,7 +30,8 @@ describe("parseCheckoutRequest", () => {
       { idempotencyKey: "" },
       "Checkout idempotency key is required.",
     ],
-    ["buyer name", { buyerName: 12 }, "Name is required."],
+    ["buyer first name", { buyerFirstName: 12 }, "First name is required."],
+    ["buyer last name", { buyerLastName: " " }, "Last name is required."],
     ["buyer email", { buyerEmail: "" }, "Email is required."],
     [
       "email shape",
@@ -47,6 +49,8 @@ describe("parseCheckoutRequest", () => {
       parseCheckoutRequest({
         ...validPayload,
         slug: " student ",
+        buyerFirstName: " Ada ",
+        buyerLastName: " Lovelace ",
         buyerPhone: " 604-555-0100 ",
         billingPostalCode: " ",
       })

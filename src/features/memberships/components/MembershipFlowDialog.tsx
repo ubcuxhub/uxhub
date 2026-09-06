@@ -16,6 +16,7 @@ export function MembershipFlowDialog({
       title="Become a UX Hub member"
       description="Choose the membership that fits you and check out securely."
       mode={mode}
+      allowCloseWhileBusy
     >
       {children}
     </FlowDialog>

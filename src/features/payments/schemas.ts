@@ -51,7 +51,8 @@ export function parseCheckoutRequest(
       payload.idempotencyKey,
       "Checkout idempotency key"
     ),
-    buyerName: asNonEmptyString(payload.buyerName, "Name"),
+    buyerFirstName: asNonEmptyString(payload.buyerFirstName, "First name"),
+    buyerLastName: asNonEmptyString(payload.buyerLastName, "Last name"),
     buyerEmail,
     buyerPhone: asOptionalString(payload.buyerPhone),
     billingPostalCode: asOptionalString(payload.billingPostalCode),

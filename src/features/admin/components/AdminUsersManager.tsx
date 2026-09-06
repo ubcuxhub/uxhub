@@ -10,6 +10,7 @@ import {
   type UserRecord,
 } from "@/features/admin";
 import { updateAdminUserAction } from "@/features/admin/actions";
+import { formatUserName } from "@/lib/user-name";
 
 interface AdminUsersManagerProps {
   initialUsers: UserRecord[];
@@ -35,7 +36,7 @@ export function AdminUsersManager({
       filtered = filtered.filter((user) => {
         const query = searchQuery.toLowerCase();
         if (searchOption === "name") {
-          return user.name.toLowerCase().includes(query);
+          return formatUserName(user).toLowerCase().includes(query);
         }
         return user.email.toLowerCase().includes(query);
       });
@@ -43,7 +44,10 @@ export function AdminUsersManager({
 
     filtered.sort((a, b) => {
       if (sortOption === "name") {
-        return a.name.localeCompare(b.name);
+        return (
+          a.last_name.localeCompare(b.last_name) ||
+          a.first_name.localeCompare(b.first_name)
+        );
       }
       return a.email.localeCompare(b.email);
     });
@@ -80,8 +84,12 @@ export function AdminUsersManager({
     setIsSaving(true);
 
     try {
+      const normalizedEditValue =
+        field === "first_name" || field === "last_name"
+          ? editValue.trim()
+          : editValue;
       const updateData: Record<string, string | number | boolean | null> = {
-        [field]: editValue,
+        [field]: normalizedEditValue,
       };
 
       if (field === "newsletter") {
