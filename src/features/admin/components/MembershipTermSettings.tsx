@@ -188,7 +188,7 @@ export function MembershipTermSettings({
               }
             : undefined
         }
-        confirmLabel={confirming === "clear" ? "Clear date" : "End memberships"}
+        confirmLabel={confirming === "clear" ? "Clear date" : "Confirm"}
         pendingLabel="Saving…"
         confirmVariant={confirming === "clear" ? "default" : "destructive"}
         error={error}
