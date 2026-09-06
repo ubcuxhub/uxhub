@@ -19,7 +19,7 @@ export function AuthPanel({
   return (
     <Card
       className={cn(
-        "w-full max-w-[620px] gap-0 rounded-lg bg-card px-10 py-16 text-card-foreground shadow-none",
+        "w-full max-w-[620px] gap-0 rounded-lg bg-card px-6 py-16 text-card-foreground shadow-none sm:px-10",
         className,
       )}
       {...props}

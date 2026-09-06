@@ -39,7 +39,7 @@ export default function AuthLayout({
 
         {/* Below lg the brand aside is hidden, so the gradient moves behind the
             card rather than leaving it white-on-white. */}
-        <section className="flex items-center justify-center bg-ux-hub px-6 py-10 sm:px-10 lg:bg-none lg:px-20">
+        <section className="flex items-center justify-center bg-ux-hub px-4 py-10 sm:px-10 lg:bg-none lg:px-20">
           {children}
         </section>
       </div>
