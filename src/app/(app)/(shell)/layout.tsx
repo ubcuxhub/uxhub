@@ -12,7 +12,7 @@ export default function ShellLayout({
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-12 items-center gap-2 px-4 md:hidden">
+        <header className="flex h-16 items-center gap-2 px-4 md:hidden">
           <SidebarTrigger />
           <span className="font-semibold">UBC UX Hub</span>
         </header>
