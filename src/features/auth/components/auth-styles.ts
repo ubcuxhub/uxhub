@@ -6,4 +6,4 @@
  * `--action-focus`, and `--muted-foreground` matches `--fg-muted` — so only the
  * taller control and the flat surface are actually overridden here.
  */
-export const authInputClassName = "h-10 shadow-none";
+export const authInputClassName = "h-11 shadow-none sm:h-10";

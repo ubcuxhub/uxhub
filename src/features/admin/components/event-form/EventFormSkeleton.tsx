@@ -12,7 +12,7 @@ export function EventFormSkeleton() {
           {Array.from({ length: fields }, (_, field) => (
             <div key={field} className="grid gap-2">
               <Skeleton className="h-4 w-28" />
-              <Skeleton className="h-10 w-full" />
+              <Skeleton className="h-11 w-full sm:h-9" />
             </div>
           ))}
         </section>
@@ -26,7 +26,7 @@ export function EventFormSkeleton() {
           <Skeleton className="h-32 w-full" />
         </section>
       ))}
-      <Skeleton className="h-10 w-32" />
+      <Skeleton className="h-11 w-32 sm:h-9" />
     </div>
   );
 }
