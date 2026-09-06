@@ -19,7 +19,7 @@ export default function AuthLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <main className="bg-background text-foreground">
+    <main className="min-h-svh bg-ux-hub text-foreground lg:bg-background">
       <script dangerouslySetInnerHTML={{ __html: authLightModeScript }} />
       <AuthLightMode />
 
