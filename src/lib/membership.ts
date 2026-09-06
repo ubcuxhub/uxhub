@@ -20,7 +20,9 @@ export function getEffectiveMembershipExpiry(
   user: MembershipExpiryUser | null | undefined,
   termEndsAt: string | null,
 ): string | null {
-  const own = user?.membership_expires_at ?? null;
+  if (!user?.membership_type_id) return null;
+
+  const own = user.membership_expires_at ?? null;
   if (!own) return termEndsAt;
   if (!termEndsAt) return own;
   return new Date(termEndsAt) < new Date(own) ? termEndsAt : own;

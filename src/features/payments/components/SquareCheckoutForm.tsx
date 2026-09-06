@@ -59,21 +59,14 @@ interface SquareCheckoutFormProps {
   slug: string;
   successHref?: string | ((purchaseId: string) => string);
   initialEmail: string;
-  initialName: string;
+  initialFirstName: string;
+  initialLastName: string;
   initialPhone?: string | null;
   disabled?: boolean;
   disabledMessage?: string | null;
   onSubmittingChange?: (submitting: boolean) => void;
   showAmount?: boolean;
   showSecurityMessage?: boolean;
-}
-
-function splitFullName(fullName: string) {
-  const parts = fullName.trim().split(/\s+/);
-  return {
-    givenName: parts[0] || undefined,
-    familyName: parts.slice(1).join(" ") || undefined,
-  };
 }
 
 function getSquareScriptUrl(applicationId: string) {
@@ -147,7 +140,8 @@ export function SquareCheckoutForm({
   slug,
   successHref,
   initialEmail,
-  initialName,
+  initialFirstName,
+  initialLastName,
   initialPhone,
   disabled = false,
   disabledMessage = null,
@@ -162,7 +156,8 @@ export function SquareCheckoutForm({
     getThemeServerSnapshot,
   );
   const containerId = useId().replace(/:/g, "");
-  const [buyerName, setBuyerName] = useState(initialName);
+  const [buyerFirstName, setBuyerFirstName] = useState(initialFirstName);
+  const [buyerLastName, setBuyerLastName] = useState(initialLastName);
   const [buyerEmail, setBuyerEmail] = useState(initialEmail);
   const [buyerPhone, setBuyerPhone] = useState(initialPhone ?? "");
   const [billingPostalCode, setBillingPostalCode] = useState("");
@@ -258,14 +253,13 @@ export function SquareCheckoutForm({
     setMessage("");
 
     try {
-      const { givenName, familyName } = splitFullName(buyerName);
       const tokenized = await card.tokenize({
         amount: (amountCents / 100).toFixed(2),
         billingContact: {
           countryCode: "CA",
           email: buyerEmail,
-          familyName,
-          givenName,
+          familyName: buyerLastName,
+          givenName: buyerFirstName,
           phone: buyerPhone || undefined,
           postalCode: billingPostalCode || undefined,
         },
@@ -286,7 +280,8 @@ export function SquareCheckoutForm({
       const result = await submitCheckoutAction({
         billingPostalCode,
         buyerEmail,
-        buyerName,
+        buyerFirstName,
+        buyerLastName,
         buyerPhone,
         idempotencyKey,
         kind,
@@ -320,15 +315,27 @@ export function SquareCheckoutForm({
     <form onSubmit={handleCheckout} className="space-y-4">
       {collectBuyerDetails ? (
         <>
-          <div className="space-y-2">
-            <Label htmlFor={`${containerId}-name`}>Full name</Label>
-            <Input
-              id={`${containerId}-name`}
-              autoComplete="name"
-              onChange={(event) => setBuyerName(event.target.value)}
-              required
-              value={buyerName}
-            />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-2">
+              <Label htmlFor={`${containerId}-first-name`}>First name</Label>
+              <Input
+                id={`${containerId}-first-name`}
+                autoComplete="given-name"
+                onChange={(event) => setBuyerFirstName(event.target.value)}
+                required
+                value={buyerFirstName}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor={`${containerId}-last-name`}>Last name</Label>
+              <Input
+                id={`${containerId}-last-name`}
+                autoComplete="family-name"
+                onChange={(event) => setBuyerLastName(event.target.value)}
+                required
+                value={buyerLastName}
+              />
+            </div>
           </div>
 
           <div className="space-y-2">

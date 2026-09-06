@@ -29,6 +29,15 @@ describe("getEffectiveMembershipExpiry", () => {
   it("returns null for a missing user", () => {
     expect(getEffectiveMembershipExpiry(null, null)).toBe(null);
   });
+
+  it("returns null for a user without a membership", () => {
+    expect(
+      getEffectiveMembershipExpiry(
+        { membership_type_id: null, membership_expires_at: null },
+        SOON
+      )
+    ).toBe(null);
+  });
 });
 
 describe("hasActiveMembership", () => {

@@ -39,7 +39,7 @@ export default async function PortalHome() {
   const user = await requireAuth();
   const supabase = await createClient();
   const termEndsAt = await fetchMembershipTermEndsAt(supabase);
-  const firstName = user.name?.split(" ")[0] || user.email.split("@")[0] || "there";
+  const firstName = user.first_name || user.email.split("@")[0] || "there";
   const isMember = hasActiveMembership(user, termEndsAt);
   // Nothing to sell once the term has ended, so the prompt would lead nowhere.
   const canJoin = !isMembershipTermClosed(termEndsAt);

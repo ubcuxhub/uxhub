@@ -18,7 +18,8 @@ import {
 const supabase = createClient();
 
 const emptyForm: ProfileFormData = {
-  name: "",
+  first_name: "",
+  last_name: "",
   preferred_pronouns: "",
   phone: "",
   student_number: "",
@@ -34,7 +35,8 @@ const emptyForm: ProfileFormData = {
 
 function toFormData(user: UserInfoRow): ProfileFormData {
   return {
-    name: user.name || "",
+    first_name: user.first_name,
+    last_name: user.last_name,
     preferred_pronouns: user.preferred_pronouns || "",
     phone: user.phone || "",
     student_number: user.student_number?.toString() || "",
@@ -68,6 +70,12 @@ export function ProfileSettings() {
     formData.student_number !== (user.student_number?.toString() ?? "")
       ? validateStudentNumber(formData.student_number)
       : null;
+  const firstNameError = formData.first_name.trim()
+    ? null
+    : "First name is required.";
+  const lastNameError = formData.last_name.trim()
+    ? null
+    : "Last name is required.";
 
   useEffect(() => {
     if (user) queueMicrotask(() => setFormData(toFormData(user)));
@@ -104,7 +112,8 @@ export function ProfileSettings() {
         });
       }
       await updateUserInfoById(supabase, user.id, {
-        name: formData.name,
+        first_name: formData.first_name.trim(),
+        last_name: formData.last_name.trim(),
         preferred_pronouns: formData.preferred_pronouns || null,
         phone: formData.phone || null,
         faculty: formData.faculty || null,
@@ -138,14 +147,21 @@ export function ProfileSettings() {
     if (!dirty) return;
     // Hold the write while a field is mid-edit and invalid; the inline error
     // under the field says why nothing is saving.
-    if (studentNumberError) return;
+    if (studentNumberError || firstNameError || lastNameError) return;
 
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => handleSaveCallback(), 800);
     return () => {
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [formData, user, studentNumberError, handleSaveCallback]);
+  }, [
+    formData,
+    user,
+    studentNumberError,
+    firstNameError,
+    lastNameError,
+    handleSaveCallback,
+  ]);
 
   if (!user) return null;
 
@@ -178,6 +194,8 @@ export function ProfileSettings() {
         membershipTermEndsAt={membershipTermEndsAt}
         canEditEligibility={canEditEligibility}
         studentNumberError={studentNumberError}
+        firstNameError={firstNameError}
+        lastNameError={lastNameError}
         patch={patch}
       />
     </div>

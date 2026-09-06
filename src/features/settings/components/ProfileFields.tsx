@@ -21,7 +21,8 @@ import type {
 } from "@/types/models";
 
 export type ProfileFormData = {
-  name: string;
+  first_name: string;
+  last_name: string;
   preferred_pronouns: string;
   phone: string;
   student_number: string;
@@ -54,6 +55,8 @@ interface ProfileFieldsProps {
   canEditEligibility: boolean;
   /** Format/uniqueness complaint about the typed student number, if any. */
   studentNumberError: string | null;
+  firstNameError: string | null;
+  lastNameError: string | null;
   patch: (values: Partial<ProfileFormData>) => void;
 }
 
@@ -69,15 +72,24 @@ export function ProfileFields({
   membershipTermEndsAt,
   canEditEligibility,
   studentNumberError,
+  firstNameError,
+  lastNameError,
   patch,
 }: ProfileFieldsProps) {
   return (
     <div className="space-y-8">
       <Section title="About you">
         <TextField
-          label="Name"
-          value={formData.name}
-          onChange={(name) => patch({ name })}
+          label="First name"
+          value={formData.first_name}
+          onChange={(first_name) => patch({ first_name })}
+          error={firstNameError}
+        />
+        <TextField
+          label="Last name"
+          value={formData.last_name}
+          onChange={(last_name) => patch({ last_name })}
+          error={lastNameError}
         />
         <TextField
           label="Pronouns"

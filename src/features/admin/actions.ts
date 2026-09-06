@@ -45,7 +45,8 @@ import type {
 import type { ApplicationStatus } from "@/types/models";
 
 const ADMIN_USER_FIELDS = new Set([
-  "name",
+  "first_name",
+  "last_name",
   "email",
   "phone",
   "newsletter",
@@ -67,6 +68,18 @@ function assertAdminUserUpdate(
 
   if (!ADMIN_USER_FIELDS.has(databaseField)) {
     throw new Error("This user field cannot be edited.");
+  }
+
+  if (databaseField === "first_name" || databaseField === "last_name") {
+    const normalizedName = typeof value === "string" ? value.trim() : "";
+    if (!normalizedName) {
+      throw new Error(
+        databaseField === "first_name"
+          ? "First name is required."
+          : "Last name is required."
+      );
+    }
+    return { [databaseField]: normalizedName } as UserInfoUpdate;
   }
 
   if (

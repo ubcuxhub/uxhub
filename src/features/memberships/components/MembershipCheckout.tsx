@@ -100,7 +100,8 @@ export function MembershipCheckout({
             buttonLabel="Pay now"
             framed={false}
             initialEmail={user.email}
-            initialName={user.name}
+            initialFirstName={user.first_name}
+            initialLastName={user.last_name}
             initialPhone={user.phone}
             kind="membership"
             slug={membershipType.slug}
