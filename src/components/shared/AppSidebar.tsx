@@ -86,7 +86,6 @@ export function AppSidebar() {
                     asChild
                     isActive={isActive(item.href, item.exact)}
                     tooltip={item.title}
-                    className="h-9"
                   >
                     <Link href={item.href}>
                       <item.icon />
@@ -109,7 +108,6 @@ export function AppSidebar() {
                     asChild
                     isActive={isActive("/admin", true)}
                     tooltip="Dashboard"
-                    className="h-9"
                   >
                     <Link href="/admin">
                       <LayoutDashboard />
@@ -123,7 +121,6 @@ export function AppSidebar() {
                     asChild
                     isActive={isActive("/admin/events")}
                     tooltip="Manage Events"
-                    className="h-9"
                   >
                     <Link href="/admin/events">
                       <CalendarDays />
@@ -137,7 +134,6 @@ export function AppSidebar() {
                     asChild
                     isActive={isActive("/admin/users")}
                     tooltip="Manage Users"
-                    className="h-9"
                   >
                     <Link href="/admin/users">
                       <Users />
@@ -151,7 +147,6 @@ export function AppSidebar() {
                     asChild
                     isActive={isActive("/admin/settings")}
                     tooltip="Club Settings"
-                    className="h-9"
                   >
                     <Link href="/admin/settings">
                       <SlidersHorizontal />
@@ -171,7 +166,7 @@ export function AppSidebar() {
             <SidebarMenuButton
               onClick={() => openSettings()}
               tooltip="Settings"
-              className="h-9 group-data-[collapsible=icon]:size-9!"
+              className="h-11 group-data-[collapsible=icon]:size-9! sm:h-9"
             >
               <Settings />
               <span>Settings</span>
@@ -182,7 +177,7 @@ export function AppSidebar() {
               onClick={toggleSidebar}
               tooltip={state === "collapsed" ? "Expand sidebar" : "Collapse sidebar"}
               aria-label={state === "collapsed" ? "Expand sidebar" : "Collapse sidebar"}
-              className="h-9 group-data-[collapsible=icon]:size-9!"
+              className="h-11 group-data-[collapsible=icon]:size-9! sm:h-9"
             >
               <PanelLeft />
               <span>Collapse sidebar</span>
