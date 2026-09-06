@@ -71,14 +71,14 @@ function PurchaseRow({ purchase }: { purchase: PurchaseWithDetails }) {
   const date = formatTimestamp(purchase.created_at) ?? "Unknown date";
 
   return (
-    <div className="flex items-start justify-between gap-4 py-4 first:pt-0 last:pb-0">
+    <div className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
       <div className="min-w-0 space-y-0.5">
         <p className="truncate text-button">{title}</p>
         <p className="text-small text-muted-foreground">
           {kind} · {date}
         </p>
       </div>
-      <div className="shrink-0 space-y-0.5 text-right">
+      <div className="flex w-full shrink-0 items-center justify-between gap-2 sm:w-auto sm:block sm:space-y-0.5 sm:text-right">
         <p className="text-button">
           {formatCurrency(purchase.amount_cents, purchase.currency)}
         </p>
