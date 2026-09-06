@@ -3,18 +3,29 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { TriangleAlert } from "lucide-react";
+
 import { FlowLink } from "@/components/shared/FlowLink";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import type { MembershipTypeRow, UserType } from "@/types/models";
 import { cn } from "@/lib/utils";
 import { withReturnTo } from "@/lib/auth/paths";
+import { formatEventDate } from "@/lib/date";
 import { membershipDetailsPath } from "@/features/memberships/lib/policy";
 
 export function MembershipPlans({
+  expiresAt,
   membershipTiers,
   returnTo,
   userType,
 }: {
+  /**
+   * Set only when the club-wide term end shortens these memberships to less
+   * than a year. Repeated on the checkout screen, which single-tier users reach
+   * without passing through here.
+   */
+  expiresAt?: string | null;
   membershipTiers: MembershipTypeRow[];
   returnTo?: string;
   userType: UserType;
@@ -40,6 +51,18 @@ export function MembershipPlans({
           Select the option that works best for you.
         </p>
       </div>
+
+      {expiresAt ? (
+        <Alert className="mt-6" icon={<TriangleAlert className="size-4" />}>
+          <AlertTitle>
+            These memberships end {formatEventDate(expiresAt) ?? "soon"}.
+          </AlertTitle>
+          <AlertDescription>
+            UX Hub memberships all expire at the end of the current term, not
+            one year from the day you buy them.
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       <div className="mt-8 grid gap-4">
         {membershipTiers.map((tier) => {

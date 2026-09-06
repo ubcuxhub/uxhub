@@ -31,7 +31,7 @@ const emptyForm: ProfileFormData = {
 };
 
 export function ProfileSettings() {
-  const { user, refreshUser } = useUser();
+  const { user, membershipTermEndsAt, refreshUser } = useUser();
   const [formData, setFormData] = useState<ProfileFormData>(emptyForm);
   const [membershipName, setMembershipName] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -127,7 +127,10 @@ export function ProfileSettings() {
       ? `${membershipName} member`
       : "Member"
     : "Not a member";
-  const canChangeClassification = canEditMembershipClassification(user);
+  const canChangeClassification = canEditMembershipClassification(
+    user,
+    membershipTermEndsAt,
+  );
 
   return (
     <div className="space-y-6">
@@ -136,6 +139,7 @@ export function ProfileSettings() {
         formData={formData}
         editing={true}
         membershipStatus={membershipStatus}
+        membershipTermEndsAt={membershipTermEndsAt}
         canChangeClassification={canChangeClassification}
         patch={patch}
       />

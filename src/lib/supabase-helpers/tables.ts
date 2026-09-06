@@ -6,6 +6,7 @@
  * subscriptions. A table rename then becomes a one-line edit here.
  */
 export const TABLES = {
+  appSettings: "app_settings",
   events: "events",
   userInfo: "user_info",
   eventRegistrations: "event_registrations",

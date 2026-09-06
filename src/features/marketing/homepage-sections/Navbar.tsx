@@ -14,7 +14,7 @@ const navLink =
 
 export default function Navbar() {
   const [open, setOpen] = useState(false);
-  const { user, loading } = useUser();
+  const { user, membershipTermEndsAt, loading } = useUser();
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
@@ -24,7 +24,7 @@ export default function Navbar() {
 
   const close = () => setOpen(false);
 
-  const isMember = hasActiveMembership(user);
+  const isMember = hasActiveMembership(user, membershipTermEndsAt);
 
   return (
     <div className="fixed inset-x-0 top-0 z-50 bg-white py-1">

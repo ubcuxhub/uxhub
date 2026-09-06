@@ -14,6 +14,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { FACULTIES, YEAR_LEVELS } from "@/lib/constants";
 import { formatEventDate } from "@/lib/date";
+import { getEffectiveMembershipExpiry } from "@/lib/membership";
 import { cn } from "@/lib/utils";
 import type {
   StudentStatus,
@@ -49,6 +50,8 @@ interface ProfileFieldsProps {
   formData: ProfileFormData;
   editing: boolean;
   membershipStatus: string;
+  /** Club-wide membership ceiling, or null when none is set. */
+  membershipTermEndsAt: string | null;
   canChangeClassification: boolean;
   patch: (values: Partial<ProfileFormData>) => void;
 }
@@ -58,6 +61,7 @@ export function ProfileFields({
   formData,
   editing,
   membershipStatus,
+  membershipTermEndsAt,
   canChangeClassification,
   patch,
 }: ProfileFieldsProps) {
@@ -205,10 +209,13 @@ export function ProfileFields({
             <ReadValue>{membershipStatus}</ReadValue>
           </Row>
           <Row label="Membership expires">
+            {/* Effective date, not the raw column: a club-wide term end can cut
+                a membership short, and this is where members check it. */}
             <ReadValue>
-              {formatEventDate(user.membership_expires_at, {
-                month: "short",
-              }) ?? "—"}
+              {formatEventDate(
+                getEffectiveMembershipExpiry(user, membershipTermEndsAt),
+                { month: "short" },
+              ) ?? "—"}
             </ReadValue>
           </Row>
           <Row label="Role">

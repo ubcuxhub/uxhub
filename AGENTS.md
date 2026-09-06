@@ -50,7 +50,8 @@ targets unless explicitly passed `--allow-remote`.
     password recovery
   - `(app)` - shared authenticated boundary and `UserProvider`
     - `(shell)` - sidebar-backed student and admin pages
-    - `(focused)` - sidebar-free membership onboarding and checkout flows
+    - `(confirmation)` - sidebar-free, full-viewport post-purchase pages
+  - `@flow` - parallel slot holding intercepted `(.)portal/*` routes
   - `api` - Square webhook, profile-completion, and event-image upload handlers
 - `src/features` - domain UI and behavior
   - `admin`, `auth`, `events`, `marketing`, `memberships`, `payments`, and
@@ -73,7 +74,15 @@ targets unless explicitly passed `--allow-remote`.
   `src/app/(app)/(shell)/admin/layout.tsx` adds `requireAdmin()`. Keep access
   control in these server-side guards rather than relying on client UI.
 - Route groups determine chrome without changing URLs: browsing pages live in
-  `(shell)` and focused onboarding/checkout pages live in `(focused)`.
+  `(shell)`, and post-purchase confirmations live in `(confirmation)`, which
+  drops the sidebar to fill the viewport.
+- Membership onboarding and checkout render in a dialog, and each of their
+  pages exists twice: canonically under
+  `(shell)/portal/membership/*` (direct navigation and refreshes) and
+  intercepted under `@flow/(.)portal/membership/*` (soft navigation from within
+  the app). Both layouts wrap children in `MembershipFlowDialog`, differing only
+  by `mode`. Add a page to one tree and you must add it to the other; put shared
+  behavior in the feature component so both pick it up.
 - Prefer the typed helpers in `src/lib/supabase-helpers` over scattering raw
   `.from(...)` calls. Use `TABLES` for table names. Keep RLS-bypassing
   service-role work server-only in `src/lib/supabase/admin.ts` and
@@ -139,6 +148,12 @@ key to client components.
   shared-style changes.
 - Supabase RLS checks live in `supabase/tests/rls.sql` (separate from the
   Vitest suite).
+- Do not verify changes by driving the app in a browser unless you are
+  explicitly asked to. Never sign in, and never type credentials — including
+  the local seed passwords in `scripts/seed/data/users.ts` — into a form. Take
+  automated verification as far as it goes (lint, types, Vitest, `pnpm build`,
+  direct `psql` queries), then hand the reviewer a list of what still needs
+  checking by hand and why.
 
 ## UI
 

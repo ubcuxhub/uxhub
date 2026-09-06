@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { LoaderCircle } from "lucide-react";
+import { LoaderCircle, TriangleAlert } from "lucide-react";
 
 import { CheckoutPaymentSection } from "@/components/shared/CheckoutPaymentSection";
 import { FlowLink } from "@/components/shared/FlowLink";
 import { useFlowDialog } from "@/components/shared/FlowDialog";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -15,15 +16,22 @@ import {
 } from "@/components/ui/card";
 import type { UserInfoRow, MembershipTypeRow } from "@/types/models";
 import { withReturnTo } from "@/lib/auth/paths";
+import { formatEventDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
 export function MembershipCheckout({
   backHref,
+  expiresAt,
   membershipType,
   returnTo,
   user,
 }: {
   backHref: string;
+  /**
+   * Set only when the club-wide term end shortens this membership to less than
+   * a year, in which case the buyer is warned before they pay.
+   */
+  expiresAt?: string | null;
   membershipType: MembershipTypeRow;
   returnTo?: string;
   user: UserInfoRow;
@@ -68,6 +76,21 @@ export function MembershipCheckout({
             Review your purchase for the {membershipType.name} membership.
           </p>
         </div>
+
+        {expiresAt ? (
+          <Alert
+            className="mt-6"
+            icon={<TriangleAlert className="size-4" />}
+          >
+            <AlertTitle>
+              This membership ends {formatEventDate(expiresAt) ?? "soon"}.
+            </AlertTitle>
+            <AlertDescription>
+              UX Hub memberships all expire at the end of the current term, not
+              one year from the day you buy them.
+            </AlertDescription>
+          </Alert>
+        ) : null}
 
         <div className="mt-8 grid gap-6 lg:grid-cols-2">
           <CheckoutPaymentSection
