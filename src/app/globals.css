@@ -336,6 +336,30 @@
   }
 }
 
+/* Extend overlay surfaces into iOS safe areas without moving their controls
+   underneath the status bar or browser toolbar. */
+@layer utilities {
+  .safe-area-bleed-y::before,
+  .safe-area-bleed-y::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    left: 0;
+    pointer-events: none;
+    background: inherit;
+  }
+
+  .safe-area-bleed-y::before {
+    bottom: 100%;
+    height: env(safe-area-inset-top, 0px);
+  }
+
+  .safe-area-bleed-y::after {
+    top: 100%;
+    height: env(safe-area-inset-bottom, 0px);
+  }
+}
+
 /* ── Marketing home scope (unchanged) ──────────────────────────────── */
 
 .marketing-home {
