@@ -173,6 +173,31 @@ describe("buildEligibilityUpdate", () => {
     });
   });
 
+  it("stores the verified faculty email alongside the faculty", () => {
+    expect(
+      buildEligibilityUpdate({
+        userType: "faculty",
+        studentNumber: null,
+        faculty: "Faculty of Arts",
+        facultyEmail: "prof@cs.ubc.ca",
+      })
+    ).toMatchObject({
+      user_type: "faculty",
+      faculty: "Faculty of Arts",
+      faculty_email: "prof@cs.ubc.ca",
+    });
+  });
+
+  it("only writes the faculty email for a faculty classification", () => {
+    const student = buildEligibilityUpdate({
+      userType: "ubcStudent",
+      studentNumber: 12345678,
+      facultyEmail: "prof@cs.ubc.ca",
+    });
+    // Not an owned column here, so it is cleared rather than stored.
+    expect(student.faculty_email).toBeNull();
+  });
+
   it("clears the student columns a faculty classification does not own", () => {
     expect(
       buildEligibilityUpdate({

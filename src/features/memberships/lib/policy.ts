@@ -139,6 +139,7 @@ export function buildEligibilityUpdate(input: {
   userType: UserType;
   studentNumber: number | null;
   faculty?: string | null;
+  facultyEmail?: string | null;
 }): UserInfoUpdate {
   const owned = OWNED_COLUMNS[input.userType];
   const update: UserInfoUpdate = { user_type: input.userType };
@@ -151,6 +152,9 @@ export function buildEligibilityUpdate(input: {
   }
   if (owned.has("faculty") && input.faculty !== undefined) {
     update.faculty = input.faculty?.trim() || null;
+  }
+  if (owned.has("faculty_email") && input.facultyEmail !== undefined) {
+    update.faculty_email = input.facultyEmail?.trim() || null;
   }
   return update;
 }

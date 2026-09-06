@@ -49,14 +49,21 @@ export async function updateEligibilityProfileAction(
     if (error) throw new Error(error);
     studentNumber = Number(rawStudentNumber);
   }
-  if (
-    input.userType === "faculty" &&
-    (validateFacultyEmail(input.facultyEmail?.trim() ?? "") ||
-      input.facultyEmail?.trim().toLowerCase() !== user.email.toLowerCase())
-  ) {
-    throw new Error(
-      "Faculty eligibility requires signing in with the same UBC email address."
-    );
+  // Faculty eligibility is proved by the signed-in address, so the validated
+  // value is also what gets stored — leaving it unwritten would strand the
+  // profile as incomplete.
+  let facultyEmail: string | undefined;
+  if (input.userType === "faculty") {
+    const normalized = input.facultyEmail?.trim().toLowerCase() ?? "";
+    if (
+      validateFacultyEmail(normalized) ||
+      normalized !== user.email.toLowerCase()
+    ) {
+      throw new Error(
+        "Faculty eligibility requires signing in with the same UBC email address."
+      );
+    }
+    facultyEmail = normalized;
   }
 
   try {
@@ -66,6 +73,7 @@ export async function updateEligibilityProfileAction(
         userType: input.userType,
         studentNumber,
         faculty: input.faculty,
+        facultyEmail,
       }),
     );
   } catch (error) {
