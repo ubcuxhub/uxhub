@@ -169,7 +169,7 @@ export function SettingsDialog() {
                     >
                       <t.icon />
                       <span>{t.label}</span>
-                      <ChevronRight className="ml-auto size-4!" />
+                      <ChevronRight className="ml-auto size-6! sm:size-4!" />
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}
