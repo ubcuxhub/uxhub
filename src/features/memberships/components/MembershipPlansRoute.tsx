@@ -8,8 +8,6 @@ import { fetchMembershipTermEndsAt } from "@/lib/supabase-helpers/app-settings";
 import { withReturnTo } from "@/lib/auth/paths";
 import {
   isMembershipTermClosed,
-  resolveMembershipExpiry,
-  termEndsBeforeFullYear,
 } from "@/features/memberships/lib/expiry";
 import {
   getEligibleMembershipTypes,
@@ -99,11 +97,6 @@ export async function MembershipPlansRoute({ returnTo }: { returnTo?: string }) 
 
   return (
     <MembershipPlans
-      expiresAt={
-        termEndsBeforeFullYear(termEndsAt)
-          ? resolveMembershipExpiry(termEndsAt)
-          : null
-      }
       membershipTiers={eligible}
       returnTo={returnTo}
       userType={user.user_type}
