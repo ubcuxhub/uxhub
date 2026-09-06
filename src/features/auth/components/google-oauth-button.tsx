@@ -45,7 +45,7 @@ export function GoogleOAuthButton({
       <Button
         type="button"
         variant="outline"
-        className="h-10 w-full font-medium shadow-none"
+        className="h-11 w-full font-medium shadow-none sm:h-10"
         disabled={isLoading}
         onClick={handleGoogleOAuth}
       >
