@@ -8,12 +8,7 @@ import { FlowLink } from "@/components/shared/FlowLink";
 import { useFlowDialog } from "@/components/shared/FlowDialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { UserInfoRow, MembershipTypeRow } from "@/types/models";
 import { withReturnTo } from "@/lib/auth/paths";
 import { formatEventDate } from "@/lib/date";
@@ -87,8 +82,7 @@ export function MembershipCheckout({
               This membership ends {formatEventDate(expiresAt) ?? "soon"}.
             </AlertTitle>
             <AlertDescription>
-              UX Hub memberships all expire at the end of the current term, not
-              one year from the day you buy them.
+              Memberships are valid until the end of the current school year.
             </AlertDescription>
           </Alert>
         ) : null}
