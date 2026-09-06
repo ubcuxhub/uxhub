@@ -38,9 +38,20 @@ colocated with the code they cover (e.g. `src/lib/slug.test.ts`,
 `pnpm test -- -t "test name"`. CI (`.github/workflows/ci.yml`) runs `pnpm lint`,
 `pnpm exec tsc --noEmit`, and `pnpm test` on every push and pull request.
 
-`pnpm seed` is idempotent and supplies local sample memberships and events.
-Use `pnpm seed -- --dry-run` to preview it. It refuses non-local Supabase
-targets unless explicitly passed `--allow-remote`.
+`pnpm seed` reconciles a database to the seed data. Read `scripts/seed/README.md`
+before changing it. It is idempotent, and on the default `local` target it also
+deletes seed-owned rows the data no longer describes, so a ticket bought through
+the UI is undone by re-running it. Pass `--no-prune` to keep those rows,
+`--dry-run` to preview. Pruning only ever touches seed events, seed membership
+tiers, and rows owned by the three fixture accounts — never anything belonging
+to an account created by hand.
+
+`pnpm seed --target=prod` writes demo events for admins while the student-facing
+events feature is unlaunched. It never deletes, never writes user fixtures, and
+forces every event to `draft` so nothing fabricated is reachable through the
+public API. It reads `SEED_PROD_SUPABASE_URL` and `SEED_PROD_SUPABASE_SECRET_KEY`
+and expects migrations to be applied already. Each target rejects a URL that does
+not match it, so a stale `.env.local` cannot silently redirect a run.
 
 ## Architecture
 

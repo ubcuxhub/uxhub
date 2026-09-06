@@ -71,19 +71,36 @@ function afterTimestamp(value: string, minutes: number): string {
   return new Date(new Date(value).getTime() + minutes * 60 * 1000).toISOString();
 }
 
+/**
+ * Which events each fixture account has already bought.
+ *
+ * The rule that matters: nothing here touches `EVENT_PHASES.purchasable`. Those
+ * five upcoming events are left unbought by every account on purpose, so event
+ * checkout can be run again and again — and because `pnpm seed` prunes
+ * fixture-owned purchases, a ticket bought through the UI is undone by the next
+ * run. Purchase history instead hangs off the archived past events, the ongoing
+ * mentorship program, and the one upcoming event whose registration has already
+ * closed.
+ *
+ * `validateUserFixtures` requires every account to hold a completed, purchased
+ * registration in each of the past, ongoing, and upcoming phases, which is why
+ * all three buy the design-systems talk.
+ */
 export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
   const today = startOfUtcDay(now);
-  const designSprintPast = requireEvent(events, "design-sprint-2025");
-  const uxathonPast = requireEvent(events, "uxathon-2026");
-  const designSprintFuture = requireEvent(events, "design-sprint-2026");
-  const industryTalkPast = requireEvent(events, "industry-talk-ai-and-ux-2026");
-  const mentorshipOngoing = requireEvent(events, "student-panel-2025");
-  const thinkboxFuture = requireEvent(events, "thinkbox-office-tour-2027");
-  const portfolioReviewFuture = requireEvent(events, "portfolio-review-night-2027");
+  const getToKnowPast = requireEvent(events, "get-to-know-ux-hub");
+  const designSprintPast = requireEvent(events, "design-sprint-past");
+  const uxathonPast = requireEvent(events, "uxathon-past");
+  const industryTalkPast = requireEvent(events, "industry-talk-ai-and-ux");
+  const mentorshipOngoing = requireEvent(events, "mentorship-program");
+  const industryTalkUpcoming = requireEvent(events, "industry-talk-design-systems");
+  const researchWorkshopDraft = requireEvent(events, "ux-research-workshop");
+
   const industryCheckIn = industryTalkPast.checkInSessions[0]?.start_time;
+  const getToKnowCheckIn = getToKnowPast.checkInSessions[0]?.start_time;
   const designSprintCheckIns = designSprintPast.checkInSessions;
 
-  if (!industryCheckIn || designSprintCheckIns.length < 2) {
+  if (!industryCheckIn || !getToKnowCheckIn || designSprintCheckIns.length < 2) {
     throw new Error("Purchased event fixtures need their expected check-in sessions");
   }
 
@@ -92,7 +109,7 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
     if (!registrationStart) throw new Error(`Event "${event.event.slug}" has no registration start`);
     return afterTimestamp(registrationStart, 24 * 60);
   };
-  const futurePurchaseTime = timestamp(addDays(today, -7), 18);
+  const recentPurchaseTime = timestamp(addDays(today, -7), 18);
   const failedPurchaseTime = timestamp(addDays(today, -3), 18);
 
   return [
@@ -130,10 +147,9 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
         createdAt: historicalPurchaseTime(industryTalkPast),
         eventSlug: industryTalkPast.event.slug,
         fulfilledAt: afterTimestamp(historicalPurchaseTime(industryTalkPast), 1),
-        idempotencyKey: "seed:event:admin-explorer:industry-talk-ai-and-ux-2026",
+        idempotencyKey: "seed:event:admin-explorer:industry-talk-ai-and-ux",
         kind: "event_ticket",
-        squarePaymentId:
-          "seed:payment:admin-explorer:industry-talk-ai-and-ux-2026",
+        squarePaymentId: "seed:payment:admin-explorer:industry-talk-ai-and-ux",
         status: "completed",
       },
       {
@@ -141,28 +157,27 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
         createdAt: historicalPurchaseTime(mentorshipOngoing),
         eventSlug: mentorshipOngoing.event.slug,
         fulfilledAt: afterTimestamp(historicalPurchaseTime(mentorshipOngoing), 1),
-        idempotencyKey: "seed:event:admin-explorer:student-panel-2025",
+        idempotencyKey: "seed:event:admin-explorer:mentorship-program",
         kind: "event_ticket",
-        squarePaymentId: "seed:payment:admin-explorer:student-panel-2025",
+        squarePaymentId: "seed:payment:admin-explorer:mentorship-program",
         status: "completed",
       },
       {
-        amountCents: ticketPriceCents(thinkboxFuture, true),
-        createdAt: futurePurchaseTime,
-        eventSlug: thinkboxFuture.event.slug,
-        fulfilledAt: afterTimestamp(futurePurchaseTime, 1),
-        idempotencyKey: "seed:event:admin-explorer:thinkbox-office-tour-2027",
+        amountCents: ticketPriceCents(industryTalkUpcoming, true),
+        createdAt: recentPurchaseTime,
+        eventSlug: industryTalkUpcoming.event.slug,
+        fulfilledAt: afterTimestamp(recentPurchaseTime, 1),
+        idempotencyKey: "seed:event:admin-explorer:industry-talk-design-systems",
         kind: "event_ticket",
         squarePaymentId:
-          "seed:payment:admin-explorer:thinkbox-office-tour-2027",
+          "seed:payment:admin-explorer:industry-talk-design-systems",
         status: "completed",
       },
     ],
     registrations: [
       {
         eventSlug: industryTalkPast.event.slug,
-        purchaseKey:
-          "seed:event:admin-explorer:industry-talk-ai-and-ux-2026",
+        purchaseKey: "seed:event:admin-explorer:industry-talk-ai-and-ux",
         status: "accepted",
         attending: true,
         checkIns: {
@@ -171,14 +186,13 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
       },
       {
         eventSlug: mentorshipOngoing.event.slug,
-        purchaseKey: "seed:event:admin-explorer:student-panel-2025",
+        purchaseKey: "seed:event:admin-explorer:mentorship-program",
         status: "accepted",
         attending: true,
       },
       {
-        eventSlug: thinkboxFuture.event.slug,
-        purchaseKey:
-          "seed:event:admin-explorer:thinkbox-office-tour-2027",
+        eventSlug: industryTalkUpcoming.event.slug,
+        purchaseKey: "seed:event:admin-explorer:industry-talk-design-systems",
         status: "accepted",
         attending: true,
       },
@@ -218,7 +232,9 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
         },
       },
       {
-        eventSlug: designSprintFuture.event.slug,
+        // Pending application on the draft workshop: the admin review queue
+        // needs something waiting in it.
+        eventSlug: researchWorkshopDraft.event.slug,
         status: "pending",
         attending: false,
         responses: {
@@ -256,10 +272,9 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
         createdAt: historicalPurchaseTime(industryTalkPast),
         eventSlug: industryTalkPast.event.slug,
         fulfilledAt: afterTimestamp(historicalPurchaseTime(industryTalkPast), 1),
-        idempotencyKey: "seed:event:not-member:industry-talk-ai-and-ux-2026",
+        idempotencyKey: "seed:event:not-member:industry-talk-ai-and-ux",
         kind: "event_ticket",
-        squarePaymentId:
-          "seed:payment:not-member:industry-talk-ai-and-ux-2026",
+        squarePaymentId: "seed:payment:not-member:industry-talk-ai-and-ux",
         status: "completed",
       },
       {
@@ -267,29 +282,32 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
         createdAt: historicalPurchaseTime(mentorshipOngoing),
         eventSlug: mentorshipOngoing.event.slug,
         fulfilledAt: afterTimestamp(historicalPurchaseTime(mentorshipOngoing), 1),
-        idempotencyKey: "seed:event:not-member:student-panel-2025",
+        idempotencyKey: "seed:event:not-member:mentorship-program",
         kind: "event_ticket",
-        squarePaymentId: "seed:payment:not-member:student-panel-2025",
+        squarePaymentId: "seed:payment:not-member:mentorship-program",
         status: "completed",
       },
       {
-        amountCents: ticketPriceCents(thinkboxFuture, false),
-        createdAt: futurePurchaseTime,
-        eventSlug: thinkboxFuture.event.slug,
-        fulfilledAt: afterTimestamp(futurePurchaseTime, 1),
+        amountCents: ticketPriceCents(industryTalkUpcoming, false),
+        createdAt: recentPurchaseTime,
+        eventSlug: industryTalkUpcoming.event.slug,
+        fulfilledAt: afterTimestamp(recentPurchaseTime, 1),
         idempotencyKey:
-          "seed:event:not-member:thinkbox-office-tour-2027:completed",
+          "seed:event:not-member:industry-talk-design-systems:completed",
         kind: "event_ticket",
         squarePaymentId:
-          "seed:payment:not-member:thinkbox-office-tour-2027:completed",
+          "seed:payment:not-member:industry-talk-design-systems:completed",
         status: "completed",
       },
       {
-        amountCents: ticketPriceCents(thinkboxFuture, false),
+        // The failed-payment path: a purchase row with no registration behind
+        // it, which is also the only kind an admin is allowed to delete.
+        amountCents: ticketPriceCents(industryTalkUpcoming, false),
         createdAt: failedPurchaseTime,
-        eventSlug: thinkboxFuture.event.slug,
+        eventSlug: industryTalkUpcoming.event.slug,
         failureReason: "Seeded card decline for testing",
-        idempotencyKey: "seed:event:not-member:thinkbox-office-tour-2027:failed",
+        idempotencyKey:
+          "seed:event:not-member:industry-talk-design-systems:failed",
         kind: "event_ticket",
         status: "failed",
       },
@@ -297,7 +315,7 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
     registrations: [
       {
         eventSlug: industryTalkPast.event.slug,
-        purchaseKey: "seed:event:not-member:industry-talk-ai-and-ux-2026",
+        purchaseKey: "seed:event:not-member:industry-talk-ai-and-ux",
         status: "accepted",
         attending: true,
         checkIns: {
@@ -306,14 +324,14 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
       },
       {
         eventSlug: mentorshipOngoing.event.slug,
-        purchaseKey: "seed:event:not-member:student-panel-2025",
+        purchaseKey: "seed:event:not-member:mentorship-program",
         status: "accepted",
         attending: true,
       },
       {
-        eventSlug: thinkboxFuture.event.slug,
+        eventSlug: industryTalkUpcoming.event.slug,
         purchaseKey:
-          "seed:event:not-member:thinkbox-office-tour-2027:completed",
+          "seed:event:not-member:industry-talk-design-systems:completed",
         status: "accepted",
         attending: true,
       },
@@ -333,7 +351,7 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
         },
       },
       {
-        eventSlug: designSprintFuture.event.slug,
+        eventSlug: researchWorkshopDraft.event.slug,
         status: "pending",
         attending: false,
         responses: {
@@ -380,10 +398,9 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
         createdAt: historicalPurchaseTime(industryTalkPast),
         eventSlug: industryTalkPast.event.slug,
         fulfilledAt: afterTimestamp(historicalPurchaseTime(industryTalkPast), 1),
-        idempotencyKey: "seed:event:mock-member:industry-talk-ai-and-ux-2026",
+        idempotencyKey: "seed:event:mock-member:industry-talk-ai-and-ux",
         kind: "event_ticket",
-        squarePaymentId:
-          "seed:payment:mock-member:industry-talk-ai-and-ux-2026",
+        squarePaymentId: "seed:payment:mock-member:industry-talk-ai-and-ux",
         status: "completed",
       },
       {
@@ -391,28 +408,27 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
         createdAt: historicalPurchaseTime(mentorshipOngoing),
         eventSlug: mentorshipOngoing.event.slug,
         fulfilledAt: afterTimestamp(historicalPurchaseTime(mentorshipOngoing), 1),
-        idempotencyKey: "seed:event:mock-member:student-panel-2025",
+        idempotencyKey: "seed:event:mock-member:mentorship-program",
         kind: "event_ticket",
-        squarePaymentId: "seed:payment:mock-member:student-panel-2025",
+        squarePaymentId: "seed:payment:mock-member:mentorship-program",
         status: "completed",
       },
       {
-        amountCents: ticketPriceCents(portfolioReviewFuture, true),
-        createdAt: futurePurchaseTime,
-        eventSlug: portfolioReviewFuture.event.slug,
-        fulfilledAt: afterTimestamp(futurePurchaseTime, 1),
-        idempotencyKey: "seed:event:mock-member:portfolio-review-night-2027",
+        amountCents: ticketPriceCents(industryTalkUpcoming, true),
+        createdAt: recentPurchaseTime,
+        eventSlug: industryTalkUpcoming.event.slug,
+        fulfilledAt: afterTimestamp(recentPurchaseTime, 1),
+        idempotencyKey: "seed:event:mock-member:industry-talk-design-systems",
         kind: "event_ticket",
         squarePaymentId:
-          "seed:payment:mock-member:portfolio-review-night-2027",
+          "seed:payment:mock-member:industry-talk-design-systems",
         status: "completed",
       },
     ],
     registrations: [
       {
         eventSlug: industryTalkPast.event.slug,
-        purchaseKey:
-          "seed:event:mock-member:industry-talk-ai-and-ux-2026",
+        purchaseKey: "seed:event:mock-member:industry-talk-ai-and-ux",
         status: "accepted",
         attending: true,
         checkIns: {
@@ -421,16 +437,24 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
       },
       {
         eventSlug: mentorshipOngoing.event.slug,
-        purchaseKey: "seed:event:mock-member:student-panel-2025",
+        purchaseKey: "seed:event:mock-member:mentorship-program",
         status: "accepted",
         attending: true,
       },
       {
-        eventSlug: portfolioReviewFuture.event.slug,
-        purchaseKey:
-          "seed:event:mock-member:portfolio-review-night-2027",
+        eventSlug: industryTalkUpcoming.event.slug,
+        purchaseKey: "seed:event:mock-member:industry-talk-design-systems",
         status: "accepted",
         attending: true,
+      },
+      {
+        // A free past event attended without a purchase behind it.
+        eventSlug: getToKnowPast.event.slug,
+        status: "accepted",
+        attending: true,
+        checkIns: {
+          "Door Check-in": afterTimestamp(getToKnowCheckIn, 5),
+        },
       },
     ],
   },
