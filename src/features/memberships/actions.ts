@@ -16,7 +16,10 @@ import {
   DUPLICATE_STUDENT_NUMBER_MESSAGE,
   isDuplicateStudentNumberError,
 } from "./lib/errors";
-import { canEditMembershipClassification } from "./lib/policy";
+import {
+  buildEligibilityUpdate,
+  canEditMembershipClassification,
+} from "./lib/policy";
 
 interface UpdateEligibilityInput {
   userType: UserType;
@@ -57,12 +60,14 @@ export async function updateEligibilityProfileAction(
   }
 
   try {
-    await adminUpdateUserInfoById(user.id, {
-      user_type: input.userType,
-      student_number: studentNumber,
-      faculty:
-        input.userType === "faculty" ? input.faculty?.trim() || null : null,
-    });
+    await adminUpdateUserInfoById(
+      user.id,
+      buildEligibilityUpdate({
+        userType: input.userType,
+        studentNumber,
+        faculty: input.faculty,
+      }),
+    );
   } catch (error) {
     if (isDuplicateStudentNumberError(error)) {
       throw new Error(DUPLICATE_STUDENT_NUMBER_MESSAGE);

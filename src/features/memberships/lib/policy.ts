@@ -1,4 +1,9 @@
-import type { MembershipTypeRow, UserInfoRow, UserType } from "@/types/models";
+import type {
+  MembershipTypeRow,
+  UserInfoRow,
+  UserInfoUpdate,
+  UserType,
+} from "@/types/models";
 import { hasActiveMembership } from "@/lib/membership";
 import { isMembershipTermClosed } from "@/features/memberships/lib/expiry";
 import {
@@ -92,6 +97,62 @@ export function canEditMembershipClassification(
   termEndsAt: string | null,
 ) {
   return !hasActiveOrPendingMembership(user, termEndsAt);
+}
+
+/**
+ * Every profile column that belongs to one classification rather than all of
+ * them. A classification change owns some of these and must clear the rest.
+ */
+const ELIGIBILITY_COLUMNS = [
+  "faculty",
+  "faculty_email",
+  "major",
+  "school_institution",
+  "student_number",
+  "student_status",
+  "year",
+] as const;
+
+type EligibilityColumn = (typeof ELIGIBILITY_COLUMNS)[number];
+
+/**
+ * Which of those columns each classification keeps. Mirrors the three branches
+ * of `saveMembershipProfileAction`; anything absent here is cleared on the way
+ * in, so a column the profile UI hides for a classification can never hold a
+ * stale value from a previous one.
+ */
+const OWNED_COLUMNS: Record<UserType, ReadonlySet<EligibilityColumn>> = {
+  ubcStudent: new Set(["faculty", "major", "student_number", "year"]),
+  faculty: new Set(["faculty", "faculty_email"]),
+  nonUbc: new Set(["school_institution", "student_status", "year"]),
+};
+
+/**
+ * The update a classification change writes.
+ *
+ * Owned columns the caller says nothing about are left out entirely, so
+ * correcting a student number does not disturb the major or year sitting
+ * beside it. Unowned columns are nulled — hidden must mean empty, or a switch
+ * away and back would resurrect details the member can no longer see or edit.
+ */
+export function buildEligibilityUpdate(input: {
+  userType: UserType;
+  studentNumber: number | null;
+  faculty?: string | null;
+}): UserInfoUpdate {
+  const owned = OWNED_COLUMNS[input.userType];
+  const update: UserInfoUpdate = { user_type: input.userType };
+
+  for (const column of ELIGIBILITY_COLUMNS) {
+    if (!owned.has(column)) update[column] = null;
+  }
+  if (owned.has("student_number")) {
+    update.student_number = input.studentNumber;
+  }
+  if (owned.has("faculty") && input.faculty !== undefined) {
+    update.faculty = input.faculty?.trim() || null;
+  }
+  return update;
 }
 
 export function isMembershipProfileComplete(user: MembershipEligibilityUser) {
