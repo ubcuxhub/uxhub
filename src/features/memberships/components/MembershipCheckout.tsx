@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { LoaderCircle, TriangleAlert } from "lucide-react";
+import { Info, LoaderCircle } from "lucide-react";
 
 import { CheckoutPaymentSection } from "@/components/shared/CheckoutPaymentSection";
 import { FlowLink } from "@/components/shared/FlowLink";
@@ -80,7 +80,8 @@ export function MembershipCheckout({
         {expiresAt ? (
           <Alert
             className="mt-6"
-            icon={<TriangleAlert className="size-4" />}
+            icon={<Info className="size-4" />}
+            variant="info"
           >
             <AlertTitle>
               This membership ends {formatEventDate(expiresAt) ?? "soon"}.

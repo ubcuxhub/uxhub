@@ -99,9 +99,7 @@ export function MembershipDetailsForm({
     }
 
     await refreshUser();
-    router.replace(
-      withReturnTo("/portal/membership", returnTo ?? "/portal"),
-    );
+    router.replace(withReturnTo("/portal/membership", returnTo ?? "/portal"));
     router.refresh();
   };
 
@@ -110,7 +108,9 @@ export function MembershipDetailsForm({
       <div>
         <h1 className="text-h2">Enter your details</h1>
         <p className="mt-2 text-small text-muted-foreground">
-          You can change this information later.
+          {audience === "student"
+            ? "You can change your other details later, but make sure your student number is correct before continuing."
+            : "You can change this information later."}
         </p>
       </div>
 
@@ -122,7 +122,7 @@ export function MembershipDetailsForm({
                 inputMode="numeric"
                 value={studentNumber}
                 onChange={(event) => setStudentNumber(event.target.value)}
-                placeholder="12345678"
+                placeholder="Enter your student number"
               />
             </Field>
             <div className="grid gap-5 sm:grid-cols-2">
@@ -184,7 +184,9 @@ export function MembershipDetailsForm({
         )}
       </div>
 
-      {error ? <p className="mt-4 text-small text-destructive">{error}</p> : null}
+      {error ? (
+        <p className="mt-4 text-small text-destructive">{error}</p>
+      ) : null}
 
       <div className="mt-auto flex justify-between gap-4 pt-8">
         <Button asChild variant="outline" disabled={saving}>
@@ -218,7 +220,8 @@ function Field({
   return (
     <div className="space-y-2">
       <Label>
-        {label}{required ? " *" : ""}
+        {label}
+        {required ? " *" : ""}
       </Label>
       {children}
     </div>

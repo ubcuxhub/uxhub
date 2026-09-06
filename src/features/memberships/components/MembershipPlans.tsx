@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { TriangleAlert } from "lucide-react";
+import { Info } from "lucide-react";
 
 import { FlowLink } from "@/components/shared/FlowLink";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -53,13 +53,16 @@ export function MembershipPlans({
       </div>
 
       {expiresAt ? (
-        <Alert className="mt-6" icon={<TriangleAlert className="size-4" />}>
+        <Alert
+          className="mt-6"
+          icon={<Info className="size-4" />}
+          variant="info"
+        >
           <AlertTitle>
             These memberships end {formatEventDate(expiresAt) ?? "soon"}.
           </AlertTitle>
           <AlertDescription>
-            UX Hub memberships all expire at the end of the current term, not
-            one year from the day you buy them.
+            Memberships are valid until the end of the current school year.
           </AlertDescription>
         </Alert>
       ) : null}

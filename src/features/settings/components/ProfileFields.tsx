@@ -138,7 +138,7 @@ export function ProfileFields({
                 label="Student number"
                 value={formData.student_number}
                 onChange={(student_number) => patch({ student_number })}
-                placeholder="12345678"
+                placeholder="Enter your student number"
                 inputMode="numeric"
                 maxLength={8}
                 error={studentNumberError}

@@ -107,7 +107,7 @@ describe("membership eligibility", () => {
     expect(isEligibleForMembership(student, membership, null)).toBe(false);
     expect(
       isEligibleForMembership(
-        { ...student, student_number: 12345678 },
+        { ...student, student_number: 28471936 },
         membership,
         null
       )
@@ -118,7 +118,7 @@ describe("membership eligibility", () => {
           ...student,
           faculty: "Arts",
           major: "Psychology",
-          student_number: 12345678,
+          student_number: 28471936,
           year: "2" as const,
         },
         membership,
@@ -132,12 +132,12 @@ describe("buildEligibilityUpdate", () => {
   it("keeps a UBC student's own columns when their student number changes", () => {
     const update = buildEligibilityUpdate({
       userType: "ubcStudent",
-      studentNumber: 12345678,
+      studentNumber: 28471936,
       faculty: "Faculty of Arts",
     });
     expect(update).toEqual({
       user_type: "ubcStudent",
-      student_number: 12345678,
+      student_number: 28471936,
       faculty: "Faculty of Arts",
       faculty_email: null,
       school_institution: null,
@@ -151,10 +151,10 @@ describe("buildEligibilityUpdate", () => {
   it("leaves the faculty untouched when the caller omits it", () => {
     const update = buildEligibilityUpdate({
       userType: "ubcStudent",
-      studentNumber: 12345678,
+      studentNumber: 28471936,
     });
     expect("faculty" in update).toBe(false);
-    expect(update.student_number).toBe(12345678);
+    expect(update.student_number).toBe(28471936);
   });
 
   it("clears every column an off-campus classification does not own", () => {
@@ -191,7 +191,7 @@ describe("buildEligibilityUpdate", () => {
   it("only writes the faculty email for a faculty classification", () => {
     const student = buildEligibilityUpdate({
       userType: "ubcStudent",
-      studentNumber: 12345678,
+      studentNumber: 28471936,
       facultyEmail: "prof@cs.ubc.ca",
     });
     // Not an owned column here, so it is cleared rather than stored.

@@ -56,17 +56,26 @@ export function FlowDialog({
 }: FlowDialogProps) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(true);
 
   const close = useCallback(() => {
     if (busy) return;
+
+    setOpen(false);
+
+    const returnTo = new URLSearchParams(window.location.search).get("returnTo");
+
+    if (returnTo) {
+      router.replace(safeReturnPath(returnTo, closeFallback));
+      return;
+    }
 
     if (mode === "intercepted") {
       router.back();
       return;
     }
 
-    const returnTo = new URLSearchParams(window.location.search).get("returnTo");
-    router.replace(safeReturnPath(returnTo, closeFallback));
+    router.replace(closeFallback);
   }, [busy, closeFallback, mode, router]);
 
   const contextValue = useMemo(
@@ -77,9 +86,9 @@ export function FlowDialog({
   return (
     <FlowDialogContext.Provider value={contextValue}>
       <Dialog
-        open
-        onOpenChange={(open) => {
-          if (!open) close();
+        open={open}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) close();
         }}
       >
         <DialogContent
