@@ -105,7 +105,9 @@ begin
   end if;
 
   update public.user_info
-  set first_name = first_name
+  set first_name = first_name,
+      school_institution = 'Updated institution',
+      student_status = 'graduate'
   where auth_user_id = auth.uid();
   get diagnostics changed_count = row_count;
   if changed_count <> 1 then

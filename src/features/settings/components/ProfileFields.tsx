@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FACULTIES, YEAR_LEVELS } from "@/lib/constants";
+import { FACULTIES, STUDENT_STATUSES, YEAR_LEVELS } from "@/lib/constants";
 import { formatEventDate } from "@/lib/date";
 import { getEffectiveMembershipExpiry } from "@/lib/membership";
 import { cn } from "@/lib/utils";
@@ -165,14 +165,15 @@ export function ProfileFields({
               value={formData.year}
               onChange={(year) => patch({ year })}
             />
-            <LockedField
+            <TextField
               label="School/institution"
-              value={user.school_institution}
+              value={formData.school_institution}
+              onChange={(school_institution) => patch({ school_institution })}
+              placeholder="Enter your school or institution"
             />
-            <LockedField
-              label="Student status"
-              value={user.student_status}
-              className="capitalize"
+            <StudentStatusField
+              value={formData.student_status}
+              onChange={(student_status) => patch({ student_status })}
             />
           </>
         )}
@@ -367,6 +368,31 @@ function YearField({
           {YEAR_LEVELS.map((year) => (
             <SelectItem key={year} value={year}>
               {year}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </Field>
+  );
+}
+
+function StudentStatusField({
+  onChange,
+  value,
+}: {
+  onChange: (value: StudentStatus) => void;
+  value: StudentStatus | "";
+}) {
+  return (
+    <Field label="Student status">
+      <Select value={value} onValueChange={onChange}>
+        <SelectTrigger>
+          <SelectValue placeholder="Select status" />
+        </SelectTrigger>
+        <SelectContent>
+          {STUDENT_STATUSES.map((status) => (
+            <SelectItem key={status.value} value={status.value}>
+              {status.label}
             </SelectItem>
           ))}
         </SelectContent>

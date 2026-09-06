@@ -15,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { FACULTIES, YEAR_LEVELS } from "@/lib/constants";
+import { FACULTIES, STUDENT_STATUSES, YEAR_LEVELS } from "@/lib/constants";
 import { withReturnTo } from "@/lib/auth/paths";
 import { useUser } from "@/context/UserContext";
 import type {
@@ -28,12 +28,6 @@ import {
   type MembershipProfileInput,
 } from "@/features/memberships/actions";
 import type { MembershipAudience } from "@/features/memberships/lib/policy";
-
-const STUDENT_STATUSES: Array<{ value: StudentStatus; label: string }> = [
-  { value: "undergraduate", label: "Undergraduate" },
-  { value: "graduate", label: "Graduate" },
-  { value: "other", label: "Other" },
-];
 
 export function MembershipDetailsForm({
   audience,

@@ -9,14 +9,19 @@ import { hasActiveMembership } from "@/lib/membership";
 import { isMembershipTermClosed } from "@/features/memberships/lib/expiry";
 import { createClient } from "@/lib/supabase/server";
 import { fetchMembershipTermEndsAt } from "@/lib/supabase-helpers/app-settings";
-import { ArrowRight, ArrowUpRight, CalendarDays, Sparkles } from "lucide-react";
+import {
+  ArrowRight,
+  ArrowUpRight,
+  CalendarDays,
+  UserRoundPlus,
+} from "lucide-react";
 
 function BecomeMemberBanner() {
   return (
     <div className="mb-8 flex flex-col gap-3 rounded-lg border bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
       <div className="flex items-start gap-3">
         <div className="rounded-full bg-primary/10 p-2">
-          <Sparkles className="text-primary" />
+          <UserRoundPlus className="text-primary" />
         </div>
         <div>
           <h3 className="text-subheading">Become a UX Hub member</h3>

@@ -120,6 +120,12 @@ export function ProfileSettings() {
         major: formData.major || null,
         year: formData.year || null,
         dietary_restrictions: formData.dietary_restrictions || null,
+        ...(user.user_type === "nonUbc"
+          ? {
+              school_institution: formData.school_institution.trim() || null,
+              student_status: formData.student_status || null,
+            }
+          : {}),
       });
       await refreshUser();
       setSaveStatus("saved");
