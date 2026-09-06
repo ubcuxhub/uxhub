@@ -7,8 +7,10 @@ import { createUniqueSlug, slugify } from "@/lib/slug";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
   adminDeleteEventImageByUrl,
+  adminUpdateMembershipTermEndsAt,
   adminUpdateUserInfoById,
 } from "@/lib/supabase-helpers/admin-server";
+import { datetimeLocalToTimestamptz } from "@/lib/date";
 import {
   fetchAttendingRegistrations,
   fetchCheckInId,
@@ -317,4 +319,35 @@ export async function fetchAdminCheckInSnapshotAction(eventId: string) {
     statuses: Array.from(statuses.entries()),
     allRegistrations,
   };
+}
+
+/**
+ * Sets or clears the club-wide membership term end date.
+ *
+ * `date` is a bare `YYYY-MM-DD` from a date input, or null to clear the
+ * ceiling. It is stored as the last second of that day in Pacific time — the
+ * date an admin picks means "through the end of that day" to a member in
+ * Vancouver, and storing UTC midnight would cut them off the previous
+ * afternoon.
+ *
+ * The whole app reads this, so the revalidation is layout-wide.
+ */
+export async function setMembershipTermEndsAtAction(date: string | null) {
+  const admin = await requireAdmin();
+
+  let value: string | null = null;
+
+  if (date) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new Error("Enter a valid date.");
+    }
+
+    value = datetimeLocalToTimestamptz(`${date}T23:59:59`);
+    if (!value) throw new Error("Enter a valid date.");
+  }
+
+  await adminUpdateMembershipTermEndsAt(value, admin.id);
+  revalidatePath("/", "layout");
+
+  return value;
 }

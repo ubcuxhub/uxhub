@@ -199,6 +199,24 @@ begin
   if visible_count <> 1 then
     raise exception 'registered user cannot read active event sponsor';
   end if;
+
+  -- The membership term end has to be readable by members and anonymous
+  -- visitors, since the marketing calls to action branch on it client-side.
+  select count(*) into visible_count from public.app_settings;
+  if visible_count <> 1 then
+    raise exception 'member cannot read app_settings, saw % rows', visible_count;
+  end if;
+
+  -- ...but only admins may move it. This one column ends every membership.
+  begin
+    update public.app_settings set membership_term_ends_at = now();
+    get diagnostics changed_count = row_count;
+    if changed_count <> 0 then
+      raise exception 'non-admin updated app_settings';
+    end if;
+  exception
+    when insufficient_privilege then null;
+  end;
 end;
 $$;
 
@@ -262,6 +280,12 @@ begin
   select count(*) into visible_count from public.sponsors;
   if visible_count <> 1 then
     raise exception 'admin should see sponsor catalog';
+  end if;
+
+  update public.app_settings set membership_term_ends_at = now();
+  get diagnostics changed_count = row_count;
+  if changed_count <> 1 then
+    raise exception 'admin could not set the membership term end';
   end if;
 end;
 $$;

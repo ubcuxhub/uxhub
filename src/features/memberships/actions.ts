@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { requireAuth } from "@/lib/auth/guards";
 import { adminUpdateUserInfoById } from "@/lib/supabase-helpers/admin-server";
+import { fetchMembershipTermEndsAt } from "@/lib/supabase-helpers/app-settings";
+import { createClient } from "@/lib/supabase/server";
 import { FACULTIES, YEAR_LEVELS } from "@/lib/constants";
 import type {
   StudentStatus,
@@ -27,7 +29,8 @@ export async function updateEligibilityProfileAction(
   input: UpdateEligibilityInput
 ) {
   const user = await requireAuth();
-  if (!canEditMembershipClassification(user)) {
+  const termEndsAt = await fetchMembershipTermEndsAt(await createClient());
+  if (!canEditMembershipClassification(user, termEndsAt)) {
     throw new Error(
       "Eligibility details cannot be changed while a membership is active."
     );
@@ -102,7 +105,8 @@ export async function saveMembershipProfileAction(
 ): Promise<MembershipProfileResult> {
   try {
     const user = await requireAuth("/portal/membership/join");
-    if (!canEditMembershipClassification(user)) {
+    const termEndsAt = await fetchMembershipTermEndsAt(await createClient());
+    if (!canEditMembershipClassification(user, termEndsAt)) {
       return {
         ok: false,
         error:

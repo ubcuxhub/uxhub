@@ -65,6 +65,26 @@ export async function adminDeleteAccount(authUserId: string): Promise<void> {
   if (error) throw error;
 }
 
+/**
+ * Sets the club-wide membership term end date.
+ *
+ * Writes the singleton `app_settings` row. Pass null to clear the ceiling and
+ * return every membership to its own one-year expiry.
+ */
+export async function adminUpdateMembershipTermEndsAt(
+  value: string | null,
+  updatedBy: string
+) {
+  const { data, error } = await supabaseAdmin
+    .from(TABLES.appSettings)
+    .update({ membership_term_ends_at: value, updated_by: updatedBy })
+    .eq("id", true)
+    .select();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function adminInsertUserInfo(payload: UserInfoWritePayload) {
   const { data, error } = await supabaseAdmin
     .from(TABLES.userInfo)

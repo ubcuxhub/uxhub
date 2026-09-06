@@ -1,4 +1,6 @@
 import type { MembershipTypeRow, UserInfoRow, UserType } from "@/types/models";
+import { hasActiveMembership } from "@/lib/membership";
+import { isMembershipTermClosed } from "@/features/memberships/lib/expiry";
 import {
   validateFacultyEmail,
   validateStudentNumber,
@@ -49,6 +51,7 @@ export type MembershipEligibilityUser = Pick<
   | "faculty"
   | "faculty_email"
   | "major"
+  | "membership_expires_at"
   | "membership_pre_ordered_type_id"
   | "membership_type_id"
   | "student_number"
@@ -62,19 +65,33 @@ export type MembershipEligibilityType = Pick<
   "eligible_user_types"
 >;
 
+/**
+ * Whether the user holds a membership that blocks buying another one.
+ *
+ * A pre-order blocks unconditionally — it is pending, not expired, and the
+ * payment may still land. A held membership only blocks while it is still
+ * active: `membership_type_id` is never cleared when a membership lapses, so
+ * checking it alone would leave every expired member permanently unable to
+ * renew, and would lock the whole club out the day the term end passes.
+ */
 export function hasActiveOrPendingMembership(
   user: Pick<
     MembershipEligibilityUser,
-    "membership_pre_ordered_type_id" | "membership_type_id"
+    | "membership_expires_at"
+    | "membership_pre_ordered_type_id"
+    | "membership_type_id"
   >,
+  termEndsAt: string | null,
 ) {
-  return Boolean(
-    user.membership_type_id || user.membership_pre_ordered_type_id,
-  );
+  if (user.membership_pre_ordered_type_id) return true;
+  return hasActiveMembership(user, termEndsAt);
 }
 
-export function canEditMembershipClassification(user: UserInfoRow) {
-  return !hasActiveOrPendingMembership(user);
+export function canEditMembershipClassification(
+  user: UserInfoRow,
+  termEndsAt: string | null,
+) {
+  return !hasActiveOrPendingMembership(user, termEndsAt);
 }
 
 export function isMembershipProfileComplete(user: MembershipEligibilityUser) {
@@ -100,13 +117,19 @@ export function isMembershipProfileComplete(user: MembershipEligibilityUser) {
  * payment server action. `eligible_user_types` on the tier row is the source of
  * truth for which audiences may buy it — do not reintroduce a slug list here,
  * or the two checks drift and the UI offers purchases the server rejects.
+ *
+ * `termEndsAt` closes sales once the club-wide term has ended. Enforcing it
+ * here rather than only in the UI is what stops a direct link to the checkout
+ * route from taking a payment for a membership that would expire immediately.
  */
 export function isEligibleForMembership(
   user: MembershipEligibilityUser,
   membership: MembershipEligibilityType,
+  termEndsAt: string | null,
 ) {
   return (
-    !hasActiveOrPendingMembership(user) &&
+    !isMembershipTermClosed(termEndsAt) &&
+    !hasActiveOrPendingMembership(user, termEndsAt) &&
     isMembershipProfileComplete(user) &&
     membership.eligible_user_types.includes(user.user_type)
   );
@@ -115,8 +138,9 @@ export function isEligibleForMembership(
 export function getEligibleMembershipTypes(
   user: MembershipEligibilityUser,
   membershipTypes: MembershipTypeRow[],
+  termEndsAt: string | null,
 ) {
   return membershipTypes.filter((membership) =>
-    isEligibleForMembership(user, membership),
+    isEligibleForMembership(user, membership, termEndsAt),
   );
 }

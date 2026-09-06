@@ -3,17 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { createClient } from "@/lib/supabase/client";
 import { deleteAccountAction } from "../actions";
 import { matchesConfirmationEmail } from "../lib/account-deletion";
@@ -31,22 +21,15 @@ export function DeleteAccountDialog({
   email,
 }: DeleteAccountDialogProps) {
   const router = useRouter();
-  const [confirmation, setConfirmation] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Reopening should start from a blank slate rather than a primed button.
   const handleOpenChange = (next: boolean) => {
-    if (!next) {
-      setConfirmation("");
-      setError(null);
-    }
+    if (!next) setError(null);
     onOpenChange(next);
   };
 
-  const confirmed = matchesConfirmationEmail(confirmation, email);
-
-  const handleDelete = async () => {
+  const handleDelete = async (confirmation: string) => {
     setDeleting(true);
     setError(null);
 
@@ -67,58 +50,29 @@ export function DeleteAccountDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent closeDisabled={deleting}>
-        <DialogHeader>
-          <DialogTitle>Delete account</DialogTitle>
-          <DialogDescription>
-            This permanently deletes your sign-in. You will not be able to log
-            back in, and this cannot be undone. Any active membership is
-            forfeited without a refund.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-2">
-          <Label htmlFor="delete-account-confirmation">
-            Confirm your email address
-          </Label>
-          <Input
-            id="delete-account-confirmation"
-            type="email"
-            autoComplete="off"
-            autoCapitalize="none"
-            spellCheck={false}
-            disabled={deleting}
-            value={confirmation}
-            onChange={(event) => setConfirmation(event.target.value)}
-            aria-describedby="delete-account-hint"
-          />
-          <p id="delete-account-hint" className="text-small text-muted-foreground">
+    <ConfirmDialog
+      open={open}
+      onOpenChange={handleOpenChange}
+      title="Delete account"
+      description="This permanently deletes your sign-in. You will not be able to log back in, and this cannot be undone. Any active membership is forfeited without a refund."
+      confirmation={{
+        label: "Confirm your email address",
+        type: "email",
+        // The server action re-checks this; the client copy only gates the
+        // button, so both sides share `matchesConfirmationEmail`.
+        matches: (typed) => matchesConfirmationEmail(typed, email),
+        hint: (
+          <>
             Type <span className="font-medium text-foreground">{email}</span> to
             confirm.
-          </p>
-          {error && <p className="text-small text-destructive">{error}</p>}
-        </div>
-
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={deleting}
-            onClick={() => handleOpenChange(false)}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            variant="destructive"
-            disabled={!confirmed || deleting}
-            onClick={handleDelete}
-          >
-            {deleting ? "Deleting..." : "Delete account"}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </>
+        ),
+      }}
+      confirmLabel="Delete account"
+      pendingLabel="Deleting..."
+      error={error}
+      pending={deleting}
+      onConfirm={handleDelete}
+    />
   );
 }
