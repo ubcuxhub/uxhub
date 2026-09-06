@@ -169,7 +169,7 @@ export function AppSidebar() {
         <SidebarMenu>
           <SidebarMenuItem>
             <SidebarMenuButton
-              onClick={() => openSettings("general")}
+              onClick={() => openSettings()}
               tooltip="Settings"
               className="h-9 group-data-[collapsible=icon]:size-9!"
             >

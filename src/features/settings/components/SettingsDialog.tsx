@@ -1,7 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Receipt, SlidersHorizontal, User } from "lucide-react";
+import {
+  ArrowLeft,
+  ChevronRight,
+  Receipt,
+  SlidersHorizontal,
+  User,
+} from "lucide-react";
 
 import {
   Dialog,
@@ -27,7 +33,8 @@ import { cn } from "@/lib/utils";
 
 type SettingsTab = "general" | "profile" | "purchases";
 
-const HASH_PREFIX = "#settings/";
+const SETTINGS_HASH = "#settings";
+const HASH_PREFIX = `${SETTINGS_HASH}/`;
 
 const TABS: Array<{
   id: SettingsTab;
@@ -39,31 +46,40 @@ const TABS: Array<{
   { id: "purchases", label: "Purchase history", icon: Receipt },
 ];
 
-/** Open the settings dialog to a given tab from anywhere (updates the hash). */
-export function openSettings(tab: SettingsTab = "general") {
-  window.location.hash = `settings/${tab}`;
+/** Open the settings menu, or deep-link directly to a given tab. */
+export function openSettings(tab?: SettingsTab) {
+  window.location.hash = tab ? `settings/${tab}` : "settings";
 }
 
-function parseHash(): SettingsTab | null {
+function parseHash(): { tab: SettingsTab; showMenu: boolean } | null {
   if (typeof window === "undefined") return null;
   const hash = window.location.hash;
+  if (hash === SETTINGS_HASH) return { tab: "general", showMenu: true };
   if (!hash.startsWith(HASH_PREFIX)) return null;
   const tab = hash.slice(HASH_PREFIX.length);
-  return TABS.some((t) => t.id === tab) ? (tab as SettingsTab) : null;
+  return TABS.some((t) => t.id === tab)
+    ? { tab: tab as SettingsTab, showMenu: false }
+    : null;
 }
 
 /**
  * Project-level settings dialog. Fully driven by the URL hash
- * (`#settings/<tab>`), so it deep-links and survives reloads. Renders nothing
- * until the hash matches, which keeps its heavier subtree unmounted while
- * closed.
+ * (`#settings` or `#settings/<tab>`), so it deep-links and survives reloads.
+ * On mobile, the root hash opens a minimal section list before drilling into a
+ * tab. Renders nothing until the hash matches, which keeps its heavier subtree
+ * unmounted while closed.
  */
 export function SettingsDialog() {
   // `null` means closed; a tab id means open on that tab.
   const [tab, setTab] = useState<SettingsTab | null>(null);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
 
   useEffect(() => {
-    const sync = () => setTab(parseHash());
+    const sync = () => {
+      const state = parseHash();
+      setTab(state?.tab ?? null);
+      setShowMobileMenu(state?.showMenu ?? false);
+    };
     sync();
     window.addEventListener("hashchange", sync);
     return () => window.removeEventListener("hashchange", sync);
@@ -71,13 +87,20 @@ export function SettingsDialog() {
 
   const selectTab = (next: SettingsTab) => {
     setTab(next);
+    setShowMobileMenu(false);
     // replaceState (not the hash setter) so tab switches don't stack history.
     window.history.replaceState(null, "", `${HASH_PREFIX}${next}`);
+  };
+
+  const showMenu = () => {
+    setShowMobileMenu(true);
+    window.history.replaceState(null, "", SETTINGS_HASH);
   };
 
   const handleOpenChange = (open: boolean) => {
     if (!open) {
       setTab(null);
+      setShowMobileMenu(false);
       window.history.replaceState(
         null,
         "",
@@ -123,33 +146,55 @@ export function SettingsDialog() {
             </SidebarContent>
           </Sidebar>
 
-          <main className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
-            <header className="flex shrink-0 flex-col gap-4 border-b px-4 py-4 pr-14 sm:border-b-0 sm:px-6 sm:py-6 sm:pr-16">
+          <div
+            className={cn(
+              "h-full min-w-0 flex-1 flex-col overflow-hidden sm:hidden",
+              showMobileMenu ? "flex" : "hidden",
+            )}
+          >
+            <header className="shrink-0 px-5 pb-3 pt-6 pr-14">
+              <h2 className="text-subheading">Settings</h2>
+            </header>
+
+            <nav
+              aria-label="Settings sections"
+              className="flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-2"
+            >
+              {TABS.map((t) => (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => selectTab(t.id)}
+                  className="flex w-full items-center gap-3 rounded-lg px-3 py-3.5 text-left text-button transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                >
+                  <t.icon className="size-5 text-muted-foreground" />
+                  <span>{t.label}</span>
+                  <ChevronRight className="ml-auto size-4 text-muted-foreground" />
+                </button>
+              ))}
+            </nav>
+          </div>
+
+          <main
+            className={cn(
+              "h-full min-w-0 flex-1 flex-col overflow-hidden sm:flex",
+              showMobileMenu ? "hidden" : "flex",
+            )}
+          >
+            <header className="flex shrink-0 items-center gap-2 px-4 py-4 pr-14 sm:px-6 sm:py-6 sm:pr-16">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                onClick={showMenu}
+                aria-label="Back to settings"
+                className="-ml-2 sm:hidden"
+              >
+                <ArrowLeft />
+              </Button>
               <h2 className="text-subheading">
                 {TABS.find((t) => t.id === tab)?.label ?? "Settings"}
               </h2>
-
-              <nav
-                aria-label="Settings sections"
-                className="flex flex-wrap gap-2 sm:hidden"
-              >
-                {TABS.map((t) => (
-                  <Button
-                    key={t.id}
-                    type="button"
-                    variant="ghost"
-                    onClick={() => selectTab(t.id)}
-                    aria-current={tab === t.id ? "page" : undefined}
-                    className={cn(
-                      "h-9 min-w-0 flex-none gap-2 px-3 text-small [&_svg]:size-4",
-                      tab === t.id && "bg-accent text-accent-foreground",
-                    )}
-                  >
-                    <t.icon />
-                    <span className="truncate">{t.label}</span>
-                  </Button>
-                ))}
-              </nav>
             </header>
 
             <div className="flex-1 overflow-y-auto px-4 py-5 sm:p-6 sm:pt-0">
