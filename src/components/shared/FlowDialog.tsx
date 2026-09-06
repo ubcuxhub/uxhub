@@ -42,6 +42,7 @@ interface FlowDialogProps {
   description: string;
   mode: FlowDialogMode;
   title: string;
+  allowCloseWhileBusy?: boolean;
   closeFallback?: string;
   className?: string;
 }
@@ -51,6 +52,7 @@ export function FlowDialog({
   description,
   mode,
   title,
+  allowCloseWhileBusy = false,
   closeFallback = "/portal",
   className,
 }: FlowDialogProps) {
@@ -59,7 +61,7 @@ export function FlowDialog({
   const [open, setOpen] = useState(true);
 
   const close = useCallback(() => {
-    if (busy) return;
+    if (busy && !allowCloseWhileBusy) return;
 
     setOpen(false);
 
@@ -76,7 +78,9 @@ export function FlowDialog({
     }
 
     router.replace(closeFallback);
-  }, [busy, closeFallback, mode, router]);
+  }, [allowCloseWhileBusy, busy, closeFallback, mode, router]);
+
+  const closeDisabled = busy && !allowCloseWhileBusy;
 
   const contextValue = useMemo(
     () => ({ busy, close, setBusy }),
@@ -97,13 +101,13 @@ export function FlowDialog({
             "flex flex-col gap-0 overflow-hidden p-0",
             className,
           )}
-          closeDisabled={busy}
-          closeLabel={busy ? "Please wait" : "Close"}
+          closeDisabled={closeDisabled}
+          closeLabel={closeDisabled ? "Please wait" : "Close"}
           onEscapeKeyDown={(event) => {
-            if (busy) event.preventDefault();
+            if (closeDisabled) event.preventDefault();
           }}
           onInteractOutside={(event) => {
-            if (busy) event.preventDefault();
+            if (closeDisabled) event.preventDefault();
           }}
         >
           <DialogTitle className="sr-only">{title}</DialogTitle>
