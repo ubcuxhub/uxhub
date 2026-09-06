@@ -24,15 +24,15 @@ export function SettingsRow({
   return (
     <div
       className={cn(
-        "flex items-center justify-between gap-4 py-4 first:pt-0 last:pb-0",
+        "flex flex-col items-start gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-center sm:justify-between sm:gap-4",
         className,
       )}
     >
-      <div className="space-y-0.5">
+      <div className="min-w-0 space-y-0.5">
         <p className="text-table">{title}</p>
         <p className="text-small text-muted-foreground">{description}</p>
       </div>
-      {children}
+      <div className="shrink-0 self-start sm:self-center">{children}</div>
     </div>
   );
 }

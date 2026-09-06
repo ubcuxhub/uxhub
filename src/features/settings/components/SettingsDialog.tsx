@@ -22,6 +22,8 @@ import {
 import { GeneralSettings } from "./GeneralSettings";
 import { ProfileSettings } from "./ProfileSettings";
 import { PurchaseHistorySettings } from "./PurchaseHistorySettings";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 type SettingsTab = "general" | "profile" | "purchases";
 
@@ -86,48 +88,75 @@ export function SettingsDialog() {
 
   return (
     <Dialog open={tab !== null} onOpenChange={handleOpenChange}>
-      <DialogContent size="large" className="flex overflow-hidden p-0">
-        <DialogTitle className="sr-only">Profile & settings</DialogTitle>
-        <DialogDescription className="sr-only">
-          Manage your profile and account settings.
-        </DialogDescription>
-        <SidebarProvider className="h-full min-h-0">
-          <Sidebar collapsible="none" className="flex w-48 bg-transparent">
-            <SidebarContent className="pt-8">
-              <SidebarGroup>
-                <SidebarGroupContent>
-                  <SidebarMenu>
-                    {TABS.map((t) => (
-                      <SidebarMenuItem key={t.id}>
-                        <SidebarMenuButton
-                          isActive={tab === t.id}
-                          onClick={() => selectTab(t.id)}
-                        >
-                          <t.icon />
-                          <span>{t.label}</span>
-                        </SidebarMenuButton>
-                      </SidebarMenuItem>
-                    ))}
-                  </SidebarMenu>
-                </SidebarGroupContent>
-              </SidebarGroup>
-            </SidebarContent>
-          </Sidebar>
+      <DialogContent
+      size="large"
+      className="flex h-svh w-screen max-w-none overflow-hidden rounded-none border-0 p-0 sm:h-[80vh] sm:w-[calc(100vw-1rem)] sm:max-w-[1000px] sm:rounded-lg sm:border"
+    >
+      <DialogTitle className="sr-only">Profile & settings</DialogTitle>
+      <DialogDescription className="sr-only">
+        Manage your profile and account settings.
+      </DialogDescription>
 
-          <main className="flex h-full flex-1 flex-col overflow-hidden">
-            <header className="flex shrink-0 items-center py-6 pl-6 pr-16">
-              <h2 className="text-subheading">
-                {TABS.find((t) => t.id === tab)?.label ?? "Settings"}
-              </h2>
-            </header>
-            <div className="flex-1 overflow-y-auto p-6 pt-0">
-              {tab === "general" && <GeneralSettings />}
-              {tab === "profile" && <ProfileSettings />}
-              {tab === "purchases" && <PurchaseHistorySettings />}
-            </div>
-          </main>
-        </SidebarProvider>
-      </DialogContent>
+      <SidebarProvider className="h-full min-h-0 w-full">
+        <Sidebar collapsible="none" className="hidden w-48 bg-transparent sm:flex">
+          <SidebarContent className="pt-8">
+            <SidebarGroup>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {TABS.map((t) => (
+                    <SidebarMenuItem key={t.id}>
+                      <SidebarMenuButton
+                        isActive={tab === t.id}
+                        onClick={() => selectTab(t.id)}
+                      >
+                        <t.icon />
+                        <span>{t.label}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          </SidebarContent>
+        </Sidebar>
+
+        <main className="flex h-full min-w-0 flex-1 flex-col overflow-hidden">
+          <header className="flex shrink-0 flex-col gap-4 border-b px-4 py-4 pr-14 sm:border-b-0 sm:px-6 sm:py-6 sm:pr-16">
+            <h2 className="text-subheading">
+              {TABS.find((t) => t.id === tab)?.label ?? "Settings"}
+            </h2>
+
+            <nav
+              aria-label="Settings sections"
+              className="flex flex-wrap gap-2 sm:hidden"
+            >
+              {TABS.map((t) => (
+                <Button
+                  key={t.id}
+                  type="button"
+                  variant="ghost"
+                  onClick={() => selectTab(t.id)}
+                  aria-current={tab === t.id ? "page" : undefined}
+                  className={cn(
+                    "h-9 min-w-0 flex-none gap-2 px-3 text-small [&_svg]:size-4",
+                    tab === t.id && "bg-accent text-accent-foreground",
+                  )}
+                >
+                  <t.icon />
+                  <span className="truncate">{t.label}</span>
+              </Button>
+              ))}
+            </nav>
+          </header>
+
+          <div className="flex-1 overflow-y-auto px-4 py-5 sm:p-6 sm:pt-0">
+            {tab === "general" && <GeneralSettings />}
+            {tab === "profile" && <ProfileSettings />}
+            {tab === "purchases" && <PurchaseHistorySettings />}
+          </div>
+        </main>
+      </SidebarProvider>
+    </DialogContent>
     </Dialog>
   );
 }

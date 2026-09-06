@@ -68,7 +68,7 @@ export function PurchaseHistorySettings() {
         return (
           <div
             key={purchase.id}
-            className="flex items-start justify-between gap-4 rounded-lg border p-4"
+            className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
           >
             <div className="min-w-0 space-y-1">
               <p className="truncate text-table">{title}</p>
@@ -77,11 +77,11 @@ export function PurchaseHistorySettings() {
                 {formatTimestamp(purchase.created_at) ?? "Unknown date"}
               </p>
             </div>
-            <div className="flex flex-col items-end gap-2">
+            <div className="flex w-full items-center justify-between gap-2 sm:w-auto sm:flex-col sm:items-end">
               <p className="text-table">
                 {formatCurrency(purchase.amount_cents, purchase.currency)}
               </p>
-              <Badge variant="secondary" className="capitalize">
+              <Badge variant="secondary" className="shrink-0 capitalize">
                 {purchase.status}
               </Badge>
             </div>
