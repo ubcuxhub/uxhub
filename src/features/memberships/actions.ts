@@ -10,6 +10,10 @@ import type {
   UserType,
 } from "@/types/models";
 import { validateFacultyEmail, validateStudentNumber } from "./lib/validation";
+import {
+  DUPLICATE_STUDENT_NUMBER_MESSAGE,
+  isDuplicateStudentNumberError,
+} from "./lib/errors";
 import { canEditMembershipClassification } from "./lib/policy";
 
 interface UpdateEligibilityInput {
@@ -49,11 +53,19 @@ export async function updateEligibilityProfileAction(
     );
   }
 
-  await adminUpdateUserInfoById(user.id, {
-    user_type: input.userType,
-    student_number: studentNumber,
-    faculty: input.userType === "faculty" ? input.faculty?.trim() || null : null,
-  });
+  try {
+    await adminUpdateUserInfoById(user.id, {
+      user_type: input.userType,
+      student_number: studentNumber,
+      faculty:
+        input.userType === "faculty" ? input.faculty?.trim() || null : null,
+    });
+  } catch (error) {
+    if (isDuplicateStudentNumberError(error)) {
+      throw new Error(DUPLICATE_STUDENT_NUMBER_MESSAGE);
+    }
+    throw error;
+  }
 }
 
 export type MembershipProfileInput =
@@ -179,6 +191,9 @@ export async function saveMembershipProfileAction(
     revalidatePath("/portal/membership");
     return { ok: true };
   } catch (error) {
+    if (isDuplicateStudentNumberError(error)) {
+      return { ok: false, error: DUPLICATE_STUDENT_NUMBER_MESSAGE };
+    }
     return {
       ok: false,
       error:

@@ -11,9 +11,9 @@ describe("membership validation", () => {
 
   it.each([
     ["", "Please enter your UBC student number."],
-    ["1234567", "Student number must be 8 digits."],
-    ["123456789", "Student number must be 8 digits."],
-    ["1234abcd", "Student number must be 8 digits."],
+    ["1234567", "Please enter a valid UBC student number."],
+    ["123456789", "Please enter a valid UBC student number."],
+    ["1234abcd", "Please enter a valid UBC student number."],
   ])("rejects invalid student number %j", (value, message) => {
     expect(validateStudentNumber(value)).toBe(message);
   });

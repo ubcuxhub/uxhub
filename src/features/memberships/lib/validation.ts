@@ -15,7 +15,7 @@ export function validateStudentNumber(raw: string): string | null {
   const value = raw.trim();
   if (!value) return "Please enter your UBC student number.";
   if (!STUDENT_NUMBER_PATTERN.test(value)) {
-    return "Student number must be 8 digits.";
+    return "Please enter a valid UBC student number.";
   }
   return null;
 }
