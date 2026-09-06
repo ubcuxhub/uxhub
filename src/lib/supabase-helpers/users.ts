@@ -4,7 +4,8 @@ import type { UserInfoRow, UserInfoUpdate } from "@/types/models";
 
 export interface UserInfoContact {
   id: string;
-  name: string;
+  first_name: string;
+  last_name: string;
   email: string;
 }
 
@@ -28,7 +29,7 @@ export async function fetchUserInfoContactById(
 ): Promise<UserInfoContact | null> {
   const { data, error } = await supabase
     .from(TABLES.userInfo)
-    .select("id, name, email")
+    .select("id, first_name, last_name, email")
     .eq("id", id)
     .maybeSingle();
 
@@ -44,7 +45,7 @@ export async function fetchUserInfoContactsByIds(
 
   const { data, error } = await supabase
     .from(TABLES.userInfo)
-    .select("id, name, email")
+    .select("id, first_name, last_name, email")
     .in("id", ids);
 
   if (error) throw error;
@@ -83,7 +84,8 @@ export async function fetchAdminUserRecords(supabase: DbClient) {
     `
     )
     .is("deleted_at", null)
-    .order("name", { ascending: true });
+    .order("last_name", { ascending: true })
+    .order("first_name", { ascending: true });
 
   if (error) throw error;
   return data ?? [];

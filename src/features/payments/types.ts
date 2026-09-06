@@ -12,7 +12,8 @@ export interface CheckoutRequestInput {
   slug: string;
   token: string;
   idempotencyKey: string;
-  buyerName: string;
+  buyerFirstName: string;
+  buyerLastName: string;
   buyerEmail: string;
   buyerPhone?: string | null;
   billingPostalCode?: string | null;

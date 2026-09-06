@@ -8,13 +8,15 @@ import type {
   AttendingRegistration,
   CheckInSession,
 } from "@/features/admin/types/checkInTypes";
+import { formatUserName } from "@/lib/user-name";
 
 type AttendingRegistrationQueryRow = Pick<
   EventRegistrationRow,
   "id" | "user_id"
 > & {
   user_info: {
-    name: string | null;
+    first_name: string | null;
+    last_name: string | null;
     email: string | null;
   } | null;
 };
@@ -43,7 +45,7 @@ export async function fetchAttendingRegistrations(
       `
       id,
       user_id,
-      user_info!user_id(name, email)
+      user_info!user_id(first_name, last_name, email)
     `
     )
     .eq("event_id", eventId)
@@ -58,7 +60,13 @@ export async function fetchAttendingRegistrations(
     return {
       id: reg.id,
       user_id: reg.user_id,
-      user_name: userInfo?.name || "Unknown User",
+      user_name:
+        userInfo?.first_name && userInfo.last_name
+          ? formatUserName({
+              first_name: userInfo.first_name,
+              last_name: userInfo.last_name,
+            })
+          : "Unknown User",
       user_email: userInfo?.email || "",
     };
   });

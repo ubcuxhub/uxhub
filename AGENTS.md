@@ -46,6 +46,9 @@ the UI is undone by re-running it. Pass `--no-prune` to keep those rows,
 tiers, and rows owned by the three fixture accounts — never anything belonging
 to an account created by hand.
 
+The ten fixture accounts all sign in with password `123456`; see
+`scripts/seed/README.md` for the membership x role grid.
+
 `pnpm seed --target=prod` writes demo events for admins while the student-facing
 events feature is unlaunched. It never deletes, never writes user fixtures, and
 forces every event to `draft` so nothing fabricated is reachable through the

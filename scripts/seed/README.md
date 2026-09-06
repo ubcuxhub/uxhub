@@ -70,11 +70,35 @@ can be run repeatedly. A test fails if a fixture purchase ever lands on one.
 The rest cover archived history, a closed registration window, a not-yet-open
 one, and a draft.
 
-`data/users.ts` — three local accounts, all with password `ux-hub`:
+`data/users.ts` — ten local accounts. **Password is `123456` for all of them.**
+They cover every membership state crossed with both roles:
 
-- `admin-explorer@gmail.com` — admin, Explorer membership
-- `not-member@gmail.com` — no membership, has a failed purchase
-- `mock-member@example.com` — Innovator membership
+| Membership | Non-admin                       | Admin                             |
+| ---------- | ------------------------------- | --------------------------------- |
+| Explorer   | `student-explorer@example.com`  | `admin-explorer@example.com`      |
+| Innovator  | `student-innovator@example.com` | `admin-innovator@example.com`     |
+| Faculty    | `faculty-member@ubc.ca`         | `admin-faculty@ubc.ca`            |
+| Non-UBC    | `non-ubc@example.com`           | `admin-non-ubc@example.com`       |
+| None       | `no-membership@example.com`     | `admin-no-membership@example.com` |
+
+The tier decides `user_type` — `isEligibleForMembership` checks
+`eligible_user_types.includes(user_type)` — so the faculty accounts are
+`faculty` and need a `ubc.ca` address matching their own `faculty_email`, and
+the non-UBC ones are `nonUbc`. Each type owns a mutually exclusive field set,
+mirroring `completeMembershipProfile`; the validator rejects a fixture that
+mixes them.
+
+Three of the ten are **deep** fixtures (`fullEventHistory: true`) carrying
+purchased registrations across every phase, applications, and check-ins:
+`admin-explorer@example.com`, `no-membership@example.com`, and
+`student-innovator@example.com`. The other seven hold a membership purchase at
+most — giving each of them a full timeline would be a lot of fixture data to
+keep correct for very little.
+
+Renaming a fixture leaves its old account behind, holding the idempotency keys
+the new one needs. `RETIRED_FIXTURE_EMAILS` lists those addresses and the seed
+deletes them before writing. Only ever put an address there that an earlier
+version of the seed created.
 
 `data/images/` — square PNGs uploaded to `event-images` under `seed/covers/`.
 Fixtures reference them by file name through `imageKey`; `image_url` is filled

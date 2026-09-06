@@ -6,6 +6,7 @@ import { planPrune, pruneKey } from "./prune.ts";
 import { getUserFixtureTotals } from "./user-fixtures.ts";
 
 const TABLE = {
+  appSettings: "app_settings",
   checkInSessions: "check_in_sessions",
   checkIns: "check_ins",
   eventApplicationQuestions: "event_application_questions",
@@ -326,7 +327,11 @@ async function reconcileIdentities(
       email: fixture.email,
       password: fixture.password,
       email_confirm: true,
-      user_metadata: { full_name: fixture.profile.name, seed_managed: true },
+      user_metadata: {
+        first_name: fixture.profile.first_name,
+        last_name: fixture.profile.last_name,
+        seed_managed: true,
+      },
     };
 
     if (authUser) {
@@ -1147,4 +1152,111 @@ export async function pruneUserFixtures(
   }
 
   return summary;
+}
+
+/**
+ * Hard-deletes fixture accounts the seed used to create under another address.
+ *
+ * Runs before the reconcile, not with the rest of the prune, because a renamed
+ * fixture's old account still owns purchases under the same idempotency keys
+ * the new one is about to write — and `reconcilePurchases` refuses to move a
+ * key between users. Leaving them would fail the run, not just leave clutter.
+ *
+ * Deletion order follows the foreign keys, all of which are `no action` rather
+ * than cascade: registrations (as attendee and as reviewer) must go before the
+ * profile, and the profile before the auth user, whose `auth_user_id` reference
+ * would otherwise hold it. Purchases cascade off the profile on their own.
+ *
+ * This is not `delete_account`: that anonymizes and keeps the row so real
+ * receipts keep a referent. These are fixtures, and they should leave nothing.
+ */
+export async function removeRetiredFixtures(
+  supabase: SupabaseClient,
+  emails: readonly string[],
+  options: { dryRun: boolean }
+): Promise<number> {
+  if (emails.length === 0) return 0;
+
+  const addresses = emails.map((email) => email.trim().toLowerCase());
+  const { data, error } = await supabase
+    .from(TABLE.userInfo)
+    .select("id, email, auth_user_id")
+    .in("email", addresses);
+  if (error) {
+    throw new Error(`Reading retired fixture profiles failed: ${error.message}`);
+  }
+
+  const profiles = (data ?? []) as ProfileRow[];
+
+  // The auth user can outlive its profile if a previous run was interrupted, so
+  // look those up independently rather than only through the profiles.
+  const authUsers = await listAllAuthUsers(supabase);
+  const retiredAuth = authUsers.filter((user) => {
+    const email = user.email?.trim().toLowerCase();
+    return email ? addresses.includes(email) : false;
+  });
+
+  if (profiles.length === 0 && retiredAuth.length === 0) return 0;
+  if (options.dryRun) {
+    return new Set([
+      ...profiles.map((profile) => profile.email.trim().toLowerCase()),
+      ...retiredAuth.map((user) => user.email?.trim().toLowerCase() ?? ""),
+    ]).size;
+  }
+
+  const profileIds = profiles.map((profile) => profile.id);
+
+  if (profileIds.length > 0) {
+    for (const column of ["user_id", "reviewer_id"] as const) {
+      const { error: registrationError } = await supabase
+        .from(TABLE.eventRegistrations)
+        .delete()
+        .in(column, profileIds);
+      if (registrationError) {
+        throw new Error(
+          `Deleting retired fixture registrations failed: ${registrationError.message}`
+        );
+      }
+    }
+
+    // `app_settings.updated_by` records who last moved the membership term
+    // date. It is attribution, not data anyone depends on, and the reference is
+    // `no action`, so it has to be released before the profile can go.
+    const { error: settingsError } = await supabase
+      .from(TABLE.appSettings)
+      .update({ updated_by: null })
+      .in("updated_by", profileIds);
+    if (settingsError) {
+      throw new Error(
+        `Clearing retired fixture settings attribution failed: ${settingsError.message}`
+      );
+    }
+
+    const { error: profileError } = await supabase
+      .from(TABLE.userInfo)
+      .delete()
+      .in("id", profileIds);
+    if (profileError) {
+      // A new table referencing `user_info` without a cascade lands here. The
+      // fix is to release the reference above, the way app_settings does.
+      throw new Error(
+        `Deleting retired fixture profiles failed: ${profileError.message}\n` +
+          "  A table still references them. Release it in removeRetiredFixtures."
+      );
+    }
+  }
+
+  for (const user of retiredAuth) {
+    const { error: authError } = await supabase.auth.admin.deleteUser(user.id);
+    if (authError) {
+      throw new Error(
+        `Deleting retired fixture Auth user "${user.email}" failed: ${authError.message}`
+      );
+    }
+  }
+
+  return new Set([
+    ...profiles.map((profile) => profile.email.trim().toLowerCase()),
+    ...retiredAuth.map((user) => user.email?.trim().toLowerCase() ?? ""),
+  ]).size;
 }

@@ -4,7 +4,6 @@ import {
   formatReservationFailure,
   getSquareErrorMessage,
   normalizeSquareStatus,
-  splitBuyerName,
 } from "./fulfillment-rules";
 
 describe("payment fulfillment rules", () => {
@@ -17,15 +16,6 @@ describe("payment fulfillment rules", () => {
     [undefined, "pending"],
   ])("normalizes Square status %s", (status, expected) => {
     expect(normalizeSquareStatus(status)).toBe(expected);
-  });
-
-  it.each([
-    ["Ada Lovelace", { givenName: "Ada", familyName: "Lovelace" }],
-    ["  Ada   Byron Lovelace ", { givenName: "Ada", familyName: "Byron Lovelace" }],
-    ["Ada", { givenName: "Ada", familyName: undefined }],
-    [" ", { givenName: undefined, familyName: undefined }],
-  ])("splits buyer name %j", (name, expected) => {
-    expect(splitBuyerName(name)).toEqual(expected);
   });
 
   it("prefers a Square error detail", () => {

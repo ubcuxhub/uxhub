@@ -12,8 +12,8 @@ update public.user_info
 set role_access = 'basic'
 where id = :'user_a_id';
 
-insert into public.user_info (email, name, role_access)
-values ('rls-user-b@example.test', 'RLS User B', 'basic')
+insert into public.user_info (email, first_name, last_name, role_access)
+values ('rls-user-b@example.test', 'RLS', 'User B', 'basic')
 returning id \gset user_b_
 
 insert into public.events (
@@ -105,7 +105,7 @@ begin
   end if;
 
   update public.user_info
-  set name = name
+  set first_name = first_name
   where auth_user_id = auth.uid();
   get diagnostics changed_count = row_count;
   if changed_count <> 1 then

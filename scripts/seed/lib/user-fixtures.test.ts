@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { membershipTypes } from "../data/membership-types.ts";
 import { buildSeedEvents } from "../data/events.ts";
-import { buildSeedUsers } from "../data/users.ts";
+import { buildSeedUsers, SEED_PASSWORD } from "../data/users.ts";
 import {
   classifySeedEvent,
   getUserFixtureTotals,
@@ -22,21 +22,59 @@ describe("user seed fixtures", () => {
 
   it("reports the representative dataset totals", () => {
     expect(getUserFixtureTotals(seedUsers)).toEqual({
-      authUsers: 3,
-      profiles: 3,
-      purchases: 12,
+      authUsers: 10,
+      profiles: 10,
+      purchases: 18,
       registrations: 15,
       responses: 22,
       checkIns: 6,
     });
   });
 
-  it("gives every user purchased coverage across all timeline phases", () => {
+  it("covers every membership state crossed with both roles", () => {
+    const grid = seedUsers
+      .map((user) => `${user.membershipSlug ?? "none"}/${user.profile.role_access}`)
+      .sort();
+
+    expect(grid).toEqual(
+      [
+        "explorer/basic",
+        "explorer/admin",
+        "innovator/basic",
+        "innovator/admin",
+        "faculty/basic",
+        "faculty/admin",
+        "non-ubc/basic",
+        "non-ubc/admin",
+        "none/basic",
+        "none/admin",
+      ].sort()
+    );
+  });
+
+  it("reaches every user type", () => {
+    const types = new Set(seedUsers.map((user) => user.profile.user_type));
+
+    expect(types).toEqual(new Set(["ubcStudent", "faculty", "nonUbc"]));
+  });
+
+  it("signs every account in with the same password", () => {
+    for (const user of seedUsers) {
+      expect(user.password).toBe(SEED_PASSWORD);
+      // Supabase enforces minimum_password_length = 6 (supabase/config.toml).
+      expect(user.password.length).toBeGreaterThanOrEqual(6);
+    }
+  });
+
+  it("gives the deep fixtures purchased coverage across all timeline phases", () => {
     const eventBySlug = new Map(
       seedEvents.map((event) => [event.event.slug, event])
     );
 
-    for (const user of seedUsers) {
+    const deep = seedUsers.filter((user) => user.fullEventHistory);
+    expect(deep).toHaveLength(3);
+
+    for (const user of deep) {
       const purchaseByKey = new Map(
         user.purchases.map((purchase) => [purchase.idempotencyKey, purchase])
       );

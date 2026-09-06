@@ -7,6 +7,7 @@ import {
   adminUpdateUserInfoById,
 } from "@/lib/supabase-helpers/admin-server";
 import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";
+import { getUserNameFromMetadata } from "@/lib/user-name";
 
 export type EnsureUserInfoResult =
   | { status: "ok" }
@@ -14,19 +15,6 @@ export type EnsureUserInfoResult =
 
 const LINKED_ELSEWHERE_MESSAGE =
   "An account with this email is already linked to another sign-in method.";
-
-function getNameFromMetadata(metadata: Record<string, unknown>) {
-  const candidateKeys = ["full_name", "name", "given_name"];
-
-  for (const key of candidateKeys) {
-    const value = metadata[key];
-    if (typeof value === "string" && value.trim()) {
-      return value.trim();
-    }
-  }
-
-  return "";
-}
 
 /**
  * Guarantees the signed-in auth user has a `user_info` profile row.
@@ -42,7 +30,7 @@ function getNameFromMetadata(metadata: Record<string, unknown>) {
  */
 export async function ensureUserInfo(
   authUser: User,
-  overrides?: { name?: string }
+  overrides?: { firstName?: string; lastName?: string }
 ): Promise<EnsureUserInfoResult> {
   const supabase = await createClient();
 
@@ -64,15 +52,22 @@ export async function ensureUserInfo(
     };
   }
 
-  const name =
-    overrides?.name?.trim() ||
-    getNameFromMetadata(authUser.user_metadata ?? {}) ||
-    normalizedEmail.split("@")[0];
+  const metadataName = getUserNameFromMetadata(authUser.user_metadata ?? {});
+  const firstName = overrides?.firstName?.trim() || metadataName?.first_name;
+  const lastName = overrides?.lastName?.trim() || metadataName?.last_name;
+
+  if (!firstName || !lastName) {
+    return {
+      status: "conflict",
+      message: "Your account is missing a first or last name.",
+    };
+  }
 
   const payload = {
     auth_user_id: authUser.id,
     email: normalizedEmail,
-    name,
+    first_name: firstName,
+    last_name: lastName,
   };
 
   const existingByEmail = await adminFindUserInfoByEmail(normalizedEmail);

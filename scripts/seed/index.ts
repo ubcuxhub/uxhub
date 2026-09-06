@@ -49,10 +49,15 @@ import {
 } from "./lib/images.ts";
 import { membershipTypes } from "./data/membership-types.ts";
 import { buildSeedEvents, type SeedEvent } from "./data/events.ts";
-import { buildSeedUsers, type SeedUser } from "./data/users.ts";
+import {
+  buildSeedUsers,
+  RETIRED_FIXTURE_EMAILS,
+  type SeedUser,
+} from "./data/users.ts";
 import {
   pruneUserFixtures,
   reconcileUserFixtures,
+  removeRetiredFixtures,
 } from "./lib/reconcile-users.ts";
 import { validateUserFixtures } from "./lib/user-fixtures.ts";
 import {
@@ -666,6 +671,19 @@ async function main(): Promise<void> {
   let profileIds = new Map<string, string>();
 
   if (!skipUsers && shouldRun(options, "users")) {
+    // Before anything is written: a renamed fixture's old account still holds
+    // the idempotency keys the new one needs.
+    if (options.prune) {
+      const retired = await removeRetiredFixtures(
+        supabase,
+        RETIRED_FIXTURE_EMAILS,
+        options
+      );
+      if (retired > 0) {
+        summary.push(`Retired fixture accounts: ${retired} deleted`);
+      }
+    }
+
     const userSummary = await reconcileUserFixtures(supabase, seedUsers, {
       allowPlannedDependencies:
         options.dryRun &&

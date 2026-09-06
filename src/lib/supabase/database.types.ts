@@ -653,12 +653,13 @@ export type Database = {
           email: string
           faculty: string | null
           faculty_email: string | null
+          first_name: string
           id: string
+          last_name: string
           major: string | null
           membership_expires_at: string | null
           membership_pre_ordered_type_id: string | null
           membership_type_id: string | null
-          name: string
           newsletter: boolean
           order_date_deprecated: string | null
           phone: string | null
@@ -680,12 +681,13 @@ export type Database = {
           email: string
           faculty?: string | null
           faculty_email?: string | null
+          first_name: string
           id?: string
+          last_name: string
           major?: string | null
           membership_expires_at?: string | null
           membership_pre_ordered_type_id?: string | null
           membership_type_id?: string | null
-          name: string
           newsletter?: boolean
           order_date_deprecated?: string | null
           phone?: string | null
@@ -707,12 +709,13 @@ export type Database = {
           email?: string
           faculty?: string | null
           faculty_email?: string | null
+          first_name?: string
           id?: string
+          last_name?: string
           major?: string | null
           membership_expires_at?: string | null
           membership_pre_ordered_type_id?: string | null
           membership_type_id?: string | null
-          name?: string
           newsletter?: boolean
           order_date_deprecated?: string | null
           phone?: string | null

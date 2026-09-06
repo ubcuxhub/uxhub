@@ -1,13 +1,5 @@
 import { SquareError } from "square";
 
-export function splitBuyerName(fullName: string) {
-  const parts = fullName.trim().split(/\s+/);
-  const givenName = parts[0] || undefined;
-  const familyName = parts.slice(1).join(" ") || undefined;
-
-  return { givenName, familyName };
-}
-
 export function normalizeSquareStatus(status: string | undefined) {
   switch (status) {
     case "APPROVED":

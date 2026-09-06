@@ -29,11 +29,13 @@ seed reconciler. It never targets the linked remote database.
 
 The seed data lives under `scripts/seed/data/` and includes memberships, past,
 ongoing, and upcoming events, purchases, registrations, check-ins, and these
-local login fixtures (all use password `ux-hub`):
+ten local login fixtures (all use password `123456`), covering every membership
+state crossed with admin and non-admin. The grid is listed in
+[`scripts/seed/README.md`](../scripts/seed/README.md); the three most useful are:
 
-- `admin-explorer@gmail.com` — administrator with an Explorer membership
-- `not-member@gmail.com` — basic user without a membership
-- `mock-member@example.com` — basic user with an Innovator membership
+- `admin-explorer@example.com` — administrator with an Explorer membership
+- `no-membership@example.com` — basic user without a membership
+- `student-innovator@example.com` — basic user with an Innovator membership
 
 To sync seed changes without destroying local data, run `pnpm seed`. Use
 `pnpm seed --dry-run` to preview the reconciliation.
@@ -184,7 +186,8 @@ strings the compiler cannot validate. A rename here breaks silently at runtime:
   column names. Update them when the filtered column changes.
 - **Embedded foreign-key hint joins** — e.g.
   `membership_types!membership_type_id(name)` in `fetchAdminUserRecords` and
-  `user_info!user_id(name, email)` in `fetchAttendingRegistrations`. These
+  `user_info!user_id(first_name, last_name, email)` in
+  `fetchAttendingRegistrations`. These
   embed relationship/FK names that change with schema edits.
 
 ## Debugging checklist when something breaks

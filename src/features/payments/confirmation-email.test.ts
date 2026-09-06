@@ -20,8 +20,9 @@ vi.mock("@/lib/supabase-helpers/purchases", () => ({
 vi.mock("@/lib/supabase-helpers/users", () => ({
   fetchUserInfoContactById: async () => ({
     email: "ada@example.com",
+    first_name: "Ada",
     id: "user-1",
-    name: "Ada",
+    last_name: "Lovelace",
   }),
 }));
 

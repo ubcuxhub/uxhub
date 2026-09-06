@@ -102,7 +102,8 @@ export function EventCheckout({
             disabledMessage={disabledMessage}
             framed={false}
             initialEmail={user.email}
-            initialName={user.name}
+            initialFirstName={user.first_name}
+            initialLastName={user.last_name}
             initialPhone={user.phone}
             kind="event_ticket"
             slug={slug}
