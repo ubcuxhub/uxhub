@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  buildEligibilityUpdate,
   hasActiveOrPendingMembership,
   isEligibleForMembership,
 } from "./policy";
@@ -124,5 +125,94 @@ describe("membership eligibility", () => {
         null
       )
     ).toBe(true);
+  });
+});
+
+describe("buildEligibilityUpdate", () => {
+  it("keeps a UBC student's own columns when their student number changes", () => {
+    const update = buildEligibilityUpdate({
+      userType: "ubcStudent",
+      studentNumber: 12345678,
+      faculty: "Faculty of Arts",
+    });
+    expect(update).toEqual({
+      user_type: "ubcStudent",
+      student_number: 12345678,
+      faculty: "Faculty of Arts",
+      faculty_email: null,
+      school_institution: null,
+      student_status: null,
+    });
+    // Owned but unmentioned: left alone rather than nulled.
+    expect("major" in update).toBe(false);
+    expect("year" in update).toBe(false);
+  });
+
+  it("leaves the faculty untouched when the caller omits it", () => {
+    const update = buildEligibilityUpdate({
+      userType: "ubcStudent",
+      studentNumber: 12345678,
+    });
+    expect("faculty" in update).toBe(false);
+    expect(update.student_number).toBe(12345678);
+  });
+
+  it("clears every column an off-campus classification does not own", () => {
+    expect(
+      buildEligibilityUpdate({
+        userType: "nonUbc",
+        studentNumber: null,
+        faculty: "Faculty of Arts",
+      })
+    ).toEqual({
+      user_type: "nonUbc",
+      faculty: null,
+      faculty_email: null,
+      major: null,
+      student_number: null,
+    });
+  });
+
+  it("stores the verified faculty email alongside the faculty", () => {
+    expect(
+      buildEligibilityUpdate({
+        userType: "faculty",
+        studentNumber: null,
+        faculty: "Faculty of Arts",
+        facultyEmail: "prof@cs.ubc.ca",
+      })
+    ).toMatchObject({
+      user_type: "faculty",
+      faculty: "Faculty of Arts",
+      faculty_email: "prof@cs.ubc.ca",
+    });
+  });
+
+  it("only writes the faculty email for a faculty classification", () => {
+    const student = buildEligibilityUpdate({
+      userType: "ubcStudent",
+      studentNumber: 12345678,
+      facultyEmail: "prof@cs.ubc.ca",
+    });
+    // Not an owned column here, so it is cleared rather than stored.
+    expect(student.faculty_email).toBeNull();
+  });
+
+  it("clears the student columns a faculty classification does not own", () => {
+    expect(
+      buildEligibilityUpdate({
+        userType: "faculty",
+        studentNumber: null,
+        faculty: "  ",
+      })
+    ).toEqual({
+      user_type: "faculty",
+      faculty: null,
+      major: null,
+      school_institution: null,
+      student_number: null,
+      student_status: null,
+      year: null,
+    });
   });
 });

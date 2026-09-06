@@ -25,9 +25,9 @@ describe("user seed fixtures", () => {
       authUsers: 3,
       profiles: 3,
       purchases: 12,
-      registrations: 14,
+      registrations: 15,
       responses: 22,
-      checkIns: 5,
+      checkIns: 6,
     });
   });
 

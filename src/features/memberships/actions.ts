@@ -16,7 +16,10 @@ import {
   DUPLICATE_STUDENT_NUMBER_MESSAGE,
   isDuplicateStudentNumberError,
 } from "./lib/errors";
-import { canEditMembershipClassification } from "./lib/policy";
+import {
+  buildEligibilityUpdate,
+  canEditMembershipClassification,
+} from "./lib/policy";
 
 interface UpdateEligibilityInput {
   userType: UserType;
@@ -46,23 +49,33 @@ export async function updateEligibilityProfileAction(
     if (error) throw new Error(error);
     studentNumber = Number(rawStudentNumber);
   }
-  if (
-    input.userType === "faculty" &&
-    (validateFacultyEmail(input.facultyEmail?.trim() ?? "") ||
-      input.facultyEmail?.trim().toLowerCase() !== user.email.toLowerCase())
-  ) {
-    throw new Error(
-      "Faculty eligibility requires signing in with the same UBC email address."
-    );
+  // Faculty eligibility is proved by the signed-in address, so the validated
+  // value is also what gets stored — leaving it unwritten would strand the
+  // profile as incomplete.
+  let facultyEmail: string | undefined;
+  if (input.userType === "faculty") {
+    const normalized = input.facultyEmail?.trim().toLowerCase() ?? "";
+    if (
+      validateFacultyEmail(normalized) ||
+      normalized !== user.email.toLowerCase()
+    ) {
+      throw new Error(
+        "Faculty eligibility requires signing in with the same UBC email address."
+      );
+    }
+    facultyEmail = normalized;
   }
 
   try {
-    await adminUpdateUserInfoById(user.id, {
-      user_type: input.userType,
-      student_number: studentNumber,
-      faculty:
-        input.userType === "faculty" ? input.faculty?.trim() || null : null,
-    });
+    await adminUpdateUserInfoById(
+      user.id,
+      buildEligibilityUpdate({
+        userType: input.userType,
+        studentNumber,
+        faculty: input.faculty,
+        facultyEmail,
+      }),
+    );
   } catch (error) {
     if (isDuplicateStudentNumberError(error)) {
       throw new Error(DUPLICATE_STUDENT_NUMBER_MESSAGE);
