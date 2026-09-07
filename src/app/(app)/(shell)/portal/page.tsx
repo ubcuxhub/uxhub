@@ -34,9 +34,7 @@ export default async function PortalHome() {
     <PageContainer>
       <div className="mb-8">
         <h1 className="mb-2 text-h1 tracking-tight">Hey, {firstName}!</h1>
-        <p className="text-muted-foreground">
-          Welcome to the UBC UX Hub portal.
-        </p>
+        <p className="text-muted-foreground">Welcome to the UX Hub portal.</p>
       </div>
 
       {membershipType ? (
