@@ -11,6 +11,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "email:templates": "node scripts/build-auth-templates.ts",
+    "payment-smoke": "node --env-file=.env.local scripts/payment-smoke/index.ts",
     "seed": "node --env-file=.env.local scripts/seed/index.ts",
     "types:supabase": "supabase gen types typescript --project-id otsvpvnoqwlenghobdal --schema public > src/lib/supabase/database.types.ts",
     "supabase:local": "chmod +x \"supabase/reset-local.sh\" && ./supabase/reset-local.sh"

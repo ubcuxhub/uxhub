@@ -21,7 +21,10 @@ describe("membership eligibility", () => {
     year: null,
   };
 
-  const nonUbcTier = { eligible_user_types: ["nonUbc" as const] };
+  const nonUbcTier = {
+    active: true,
+    eligible_user_types: ["nonUbc" as const],
+  };
 
   it("allows an eligible user with no existing membership", () => {
     expect(isEligibleForMembership(baseUser, nonUbcTier, null)).toBe(true);
@@ -45,7 +48,7 @@ describe("membership eligibility", () => {
     expect(
       isEligibleForMembership(
         baseUser,
-        { eligible_user_types: ["faculty"] },
+        { active: true, eligible_user_types: ["faculty"] },
         null
       )
     ).toBe(false);
@@ -100,9 +103,22 @@ describe("membership eligibility", () => {
     expect(isEligibleForMembership(baseUser, nonUbcTier, FUTURE)).toBe(true);
   });
 
+  it("rejects inactive membership tiers", () => {
+    expect(
+      isEligibleForMembership(
+        baseUser,
+        { ...nonUbcTier, active: false },
+        null,
+      ),
+    ).toBe(false);
+  });
+
   it("requires a complete student profile for UBC students", () => {
     const student = { ...baseUser, user_type: "ubcStudent" as const };
-    const membership = { eligible_user_types: ["ubcStudent" as const] };
+    const membership = {
+      active: true,
+      eligible_user_types: ["ubcStudent" as const],
+    };
 
     expect(isEligibleForMembership(student, membership, null)).toBe(false);
     expect(

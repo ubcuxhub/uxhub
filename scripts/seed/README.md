@@ -132,3 +132,41 @@ real run cannot disagree about what would go.
 
 Changing a slug is safe locally: prune removes the row under the old slug. On
 prod it leaves the old row behind, to be deleted by hand.
+
+## Production payment smoke test
+
+The payment smoke-test tier is intentionally separate from the normal seed. It
+creates one public `Payment Smoke Test` membership for `$1.23 CAD` and never
+creates users or fabricated purchases. Apply all migrations before using it so
+the `membership_types.active` column exists.
+
+Use a dedicated basic-role account created through the normal production sign-up
+flow. The account must have a complete membership profile and no active or
+pending membership.
+
+```bash
+pnpm payment-smoke seed --target=prod --dry-run
+pnpm payment-smoke seed --target=prod
+
+# Complete the real checkout in production, then inspect application state.
+pnpm payment-smoke status --target=prod
+
+pnpm payment-smoke unseed --target=prod --dry-run
+pnpm payment-smoke unseed --target=prod
+```
+
+Every command requires an explicit target and uses the same target-specific
+environment variables and URL checks as `pnpm seed`. `seed` is idempotent and
+refuses to overwrite a membership whose fixed name or slug belongs to another
+row.
+
+`status` reports purchase, fulfillment, webhook, and confirmation-email state.
+It cannot confirm settlement; verify the payment's gross amount, fee, net amount,
+and transfer in Square Dashboard, then confirm the transfer in the linked bank
+account.
+
+`unseed` first makes the tier inactive so it cannot be offered, assigned, or
+purchased. It deletes an unreferenced tier. After a real purchase, it retains the
+inactive tier because purchases and membership profiles deliberately keep their
+financial references. It never removes purchases, webhook events, users, or
+membership assignments.

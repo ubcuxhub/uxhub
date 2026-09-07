@@ -103,6 +103,19 @@ describe("resolveTarget", () => {
       })
     ).toThrow(/Missing SEED_PROD_SUPABASE_URL/);
   });
+
+  it("rejects anon credentials before querying a target", () => {
+    const anonPayload = Buffer.from(JSON.stringify({ role: "anon" })).toString(
+      "base64url"
+    );
+
+    expect(() =>
+      resolveTarget("prod", {
+        SEED_PROD_SUPABASE_URL: prodEnv.SEED_PROD_SUPABASE_URL,
+        SEED_PROD_SUPABASE_SECRET_KEY: `header.${anonPayload}.signature`,
+      })
+    ).toThrow(/configured role: anon/);
+  });
 });
 
 describe("target policies", () => {

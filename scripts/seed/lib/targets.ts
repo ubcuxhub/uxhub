@@ -78,6 +78,20 @@ export function parseTarget(value: string): SeedTarget {
   );
 }
 
+function secretKeyRole(secretKey: string): string | null {
+  if (secretKey.startsWith("sb_secret_")) return "service_role";
+  if (secretKey.split(".").length !== 3) return null;
+
+  try {
+    const payload = JSON.parse(
+      Buffer.from(secretKey.split(".")[1], "base64url").toString("utf8")
+    ) as { role?: unknown };
+    return typeof payload.role === "string" ? payload.role : null;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Reads the target's credentials and checks the URL matches the target's shape.
  *
@@ -96,6 +110,15 @@ export function resolveTarget(
     throw new Error(
       `Missing ${keys.url} or ${keys.secretKey} for --target=${target}.\n` +
         `  Add both to .env.local. Run via \`pnpm seed\`, which loads it with --env-file.`
+    );
+  }
+
+  const keyRole = secretKeyRole(secretKey);
+  if (keyRole !== "service_role") {
+    const detail = keyRole ? ` (configured role: ${keyRole})` : "";
+    throw new Error(
+      `${keys.secretKey} must be a Supabase secret/service-role key${detail}.\n` +
+        "  An anon or publishable key can read public rows but cannot run the seed."
     );
   }
 

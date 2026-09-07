@@ -7,19 +7,27 @@ export type MembershipOrderBy = "price" | "name";
 interface FetchMembershipTypesOptions {
   orderBy?: MembershipOrderBy;
   ascending?: boolean;
+  includeInactive?: boolean;
 }
 
-/** Lists membership tiers, ordered by price ascending by default. */
+/** Lists active membership tiers, ordered by price ascending by default. */
 export async function fetchMembershipTypes(
   supabase: DbClient,
   options: FetchMembershipTypesOptions = {}
 ): Promise<MembershipTypeRow[]> {
-  const { orderBy = "price", ascending = true } = options;
+  const {
+    orderBy = "price",
+    ascending = true,
+    includeInactive = false,
+  } = options;
 
-  const { data, error } = await supabase
-    .from(TABLES.membershipTypes)
-    .select("*")
-    .order(orderBy, { ascending });
+  let query = supabase.from(TABLES.membershipTypes).select("*");
+
+  if (!includeInactive) {
+    query = query.eq("active", true);
+  }
+
+  const { data, error } = await query.order(orderBy, { ascending });
 
   if (error) throw error;
   return data ?? [];
@@ -65,6 +73,7 @@ export async function fetchMembershipTypeOptions(
   const { data, error } = await supabase
     .from(TABLES.membershipTypes)
     .select("id, name")
+    .eq("active", true)
     .order("name", { ascending: true });
 
   if (error) throw error;

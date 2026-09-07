@@ -67,7 +67,7 @@ export type MembershipEligibilityUser = Pick<
 /** The tier columns membership eligibility reads. */
 export type MembershipEligibilityType = Pick<
   MembershipTypeRow,
-  "eligible_user_types"
+  "active" | "eligible_user_types"
 >;
 
 /**
@@ -193,6 +193,7 @@ export function isEligibleForMembership(
   termEndsAt: string | null,
 ) {
   return (
+    membership.active &&
     !isMembershipTermClosed(termEndsAt) &&
     !hasActiveOrPendingMembership(user, termEndsAt) &&
     isMembershipProfileComplete(user) &&

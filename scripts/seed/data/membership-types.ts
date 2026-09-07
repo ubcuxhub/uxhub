@@ -17,6 +17,7 @@ import type { TablesInsert } from "../../../src/lib/supabase/database.types.ts";
 
 export const membershipTypes: TablesInsert<"membership_types">[] = [
   {
+    active: true,
     name: "explorer",
     slug: "explorer",
     eligible_user_types: ["ubcStudent"],
@@ -31,6 +32,7 @@ export const membershipTypes: TablesInsert<"membership_types">[] = [
     ],
   },
   {
+    active: true,
     name: "innovator",
     slug: "innovator",
     eligible_user_types: ["ubcStudent"],
@@ -46,6 +48,7 @@ export const membershipTypes: TablesInsert<"membership_types">[] = [
     ],
   },
   {
+    active: true,
     name: "faculty",
     slug: "faculty",
     eligible_user_types: ["faculty"],
@@ -60,6 +63,7 @@ export const membershipTypes: TablesInsert<"membership_types">[] = [
     ],
   },
   {
+    active: true,
     name: "nonUbc",
     slug: "non-ubc",
     eligible_user_types: ["nonUbc"],

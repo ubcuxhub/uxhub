@@ -447,6 +447,7 @@ export type Database = {
       }
       membership_types: {
         Row: {
+          active: boolean
           created_at: string | null
           description: string
           eligible_user_types: Database["public"]["Enums"]["user_type"][]
@@ -458,6 +459,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          active?: boolean
           created_at?: string | null
           description: string
           eligible_user_types?: Database["public"]["Enums"]["user_type"][]
@@ -469,6 +471,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          active?: boolean
           created_at?: string | null
           description?: string
           eligible_user_types?: Database["public"]["Enums"]["user_type"][]
