@@ -29,7 +29,7 @@ export function MembershipCard({
   const expiryDate = formatEventDate(expiresAt);
 
   return (
-    <section className="max-w-xl overflow-hidden rounded-2xl bg-[image:var(--gradient-ux-hub)] text-white shadow-sm">
+    <section className="max-w-[490px] overflow-hidden rounded-2xl bg-[image:var(--gradient-ux-hub)] text-white shadow-sm">
       <div className="p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -47,7 +47,7 @@ export function MembershipCard({
           />
         </div>
 
-        <span className="mt-3 inline-flex items-center rounded-full bg-white/15 px-3 py-1 text-badge ring-1 ring-inset ring-white/25">
+        <span className="mt-3 inline-flex items-center rounded-full bg-white/15 px-3 py-1.5 text-badge ring-1 ring-inset ring-white/25">
           {formatMembershipTypeName(membershipType.name)} member
         </span>
 
