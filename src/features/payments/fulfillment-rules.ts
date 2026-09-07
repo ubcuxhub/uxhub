@@ -38,7 +38,7 @@ function formatSquareErrorCode(code: string | undefined) {
     case "CARD_DECLINED_CALL_ISSUER":
       return "Your bank declined the payment and asked you to contact them. Call the number on the back of your card, or use a different card.";
     case "CARD_DECLINED_VERIFICATION_REQUIRED":
-      return "Your bank needs to verify this payment before it can go through. Please use a different card.";
+      return "Your bank needs to verify this payment. Complete the verification prompt and try again, or use a different card.";
     case "ALLOWABLE_PIN_TRIES_EXCEEDED":
       return "This card is temporarily locked after too many failed attempts. Please use a different card.";
     case "TRANSACTION_LIMIT":

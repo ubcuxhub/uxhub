@@ -37,6 +37,7 @@ To receive Square webhook notifications during local development, you need to ex
 4. Update your `.env.local` file with the signature key and notification URL:
    - `SQUARE_WEBHOOK_SIGNATURE_KEY`: Your webhook signature key from the Square Developer Console.
    - `SQUARE_WEBHOOK_NOTIFICATION_URL`: `https://your-subdomain.ngrok-free.dev/api/square/webhook`
+   - `SQUARE_WEBHOOK_ENDPOINTS`: only when the app answers on more than one hostname. One `<url>|<signature key>` pair per subscription, comma-separated.
 
 ## Testing Payments (Square Sandbox)
 

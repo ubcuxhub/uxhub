@@ -1,6 +1,14 @@
 "use client";
 
 import { payments } from "@square/web-sdk";
+import type {
+  BillingContact,
+  Card,
+  CardClassSelectors,
+  ChargeCardVerificationDetails,
+  Payments,
+  TokenResult,
+} from "@square/web-sdk";
 import {
   startTransition,
   useEffect,
@@ -20,35 +28,6 @@ import {
   subscribeTheme,
   type Theme,
 } from "@/lib/theme";
-
-interface CardTokenizerResult {
-  errors?: { message?: string }[];
-  status: string;
-  token?: string;
-}
-
-interface CardInstance {
-  attach(target: string): Promise<void>;
-  configure(options: { style: SquareCardStyle }): Promise<void>;
-  destroy?(): Promise<boolean> | Promise<void> | void;
-  tokenize(verificationDetails?: {
-    amount: string;
-    billingContact: {
-      countryCode: string;
-      email: string;
-      familyName?: string;
-      givenName?: string;
-      phone?: string;
-      postalCode?: string;
-    };
-    customerInitiated: boolean;
-    currencyCode: string;
-    intent: "CHARGE";
-    sellerKeyedIn: boolean;
-  }): Promise<CardTokenizerResult>;
-}
-
-type SquareCardStyle = Record<string, Record<string, string>>;
 
 interface SquareCheckoutFormProps {
   amountCents: number;
@@ -75,7 +54,7 @@ function getSquareScriptUrl(applicationId: string) {
     : "https://web.squarecdn.com/v1/square.js";
 }
 
-function getSquareCardStyle(theme: Theme): SquareCardStyle {
+function getCardClassSelectors(theme: Theme): CardClassSelectors {
   const colors =
     theme === "dark"
       ? {
@@ -131,6 +110,16 @@ function getSquareCardStyle(theme: Theme): SquareCardStyle {
   };
 }
 
+function getTokenizationMessage(result: TokenResult) {
+  if (result.status === "OK" || !("errors" in result)) {
+    return null;
+  }
+
+  const [firstError] = result.errors;
+
+  return firstError && "message" in firstError ? firstError.message : null;
+}
+
 export function SquareCheckoutForm({
   amountCents,
   amountLabel,
@@ -161,7 +150,8 @@ export function SquareCheckoutForm({
   const [buyerEmail, setBuyerEmail] = useState(initialEmail);
   const [buyerPhone, setBuyerPhone] = useState(initialPhone ?? "");
   const [billingPostalCode, setBillingPostalCode] = useState("");
-  const [card, setCard] = useState<CardInstance | null>(null);
+  const [card, setCard] = useState<Card | null>(null);
+  const [squarePayments, setSquarePayments] = useState<Payments | null>(null);
   const [initializing, setInitializing] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState(disabledMessage ?? "");
@@ -183,25 +173,25 @@ export function SquareCheckoutForm({
     }
 
     let mounted = true;
-    let nextCard: CardInstance | null = null;
+    let nextCard: Card | null = null;
 
     const initialize = async () => {
       try {
-        const squarePayments = await payments(applicationId, locationId, {
+        const nextPayments = await payments(applicationId, locationId, {
           scriptSrc: getSquareScriptUrl(applicationId),
         });
 
-        if (!squarePayments || !mounted) {
+        if (!nextPayments || !mounted) {
           return;
         }
 
         try {
-          nextCard = (await squarePayments.card({
-            style: getSquareCardStyle(getThemeSnapshot()),
-          })) as unknown as CardInstance;
+          nextCard = await nextPayments.card({
+            style: getCardClassSelectors(getThemeSnapshot()),
+          });
         } catch (error) {
           console.error("Square theme setup failed:", error);
-          nextCard = (await squarePayments.card()) as unknown as CardInstance;
+          nextCard = await nextPayments.card();
         }
 
         await nextCard.attach(`#${containerId}`);
@@ -210,6 +200,7 @@ export function SquareCheckoutForm({
           return;
         }
 
+        setSquarePayments(nextPayments);
         setCard(nextCard);
       } catch (error) {
         console.error("Square initialization failed:", error);
@@ -227,7 +218,7 @@ export function SquareCheckoutForm({
 
     return () => {
       mounted = false;
-      void nextCard?.destroy?.();
+      void nextCard?.destroy();
     };
   }, [containerId, disabled]);
 
@@ -236,7 +227,7 @@ export function SquareCheckoutForm({
       return;
     }
 
-    void card.configure({ style: getSquareCardStyle(theme) }).catch((error) => {
+    void card.configure({ style: getCardClassSelectors(theme) }).catch((error) => {
       console.error("Square theme update failed:", error);
     });
   }, [card, theme]);
@@ -253,29 +244,45 @@ export function SquareCheckoutForm({
     setMessage("");
 
     try {
-      const tokenized = await card.tokenize({
+      const billingContact: BillingContact = {
+        countryCode: "CA",
+        email: buyerEmail,
+        familyName: buyerLastName,
+        givenName: buyerFirstName,
+        phone: buyerPhone || undefined,
+        postalCode: billingPostalCode || undefined,
+      };
+      const verificationDetails: ChargeCardVerificationDetails = {
         amount: (amountCents / 100).toFixed(2),
-        billingContact: {
-          countryCode: "CA",
-          email: buyerEmail,
-          familyName: buyerLastName,
-          givenName: buyerFirstName,
-          phone: buyerPhone || undefined,
-          postalCode: billingPostalCode || undefined,
-        },
+        billingContact,
         customerInitiated: true,
         currencyCode: "CAD",
         intent: "CHARGE",
         sellerKeyedIn: false,
-      });
+      };
+
+      const tokenized = await card.tokenize(verificationDetails);
 
       if (tokenized.status !== "OK" || !tokenized.token) {
         setMessage(
-          tokenized.errors?.[0]?.message ||
+          getTokenizationMessage(tokenized) ||
             "Card details could not be verified. Please check your information."
         );
         return;
       }
+
+      /**
+       * Issuers may require Strong Customer Authentication before they will
+       * authorize a card-not-present payment. This runs the buyer through the
+       * bank's challenge when one is needed, and the resulting token is what
+       * tells Square the buyer was verified.
+       */
+      const verification = await squarePayments
+        ?.verifyBuyer(tokenized.token, verificationDetails)
+        .catch((error) => {
+          console.error("Square buyer verification failed:", error);
+          return null;
+        });
 
       const result = await submitCheckoutAction({
         billingPostalCode,
@@ -287,6 +294,7 @@ export function SquareCheckoutForm({
         kind,
         slug,
         token: tokenized.token,
+        verificationToken: verification?.token,
       });
 
       if (!result.ok) {

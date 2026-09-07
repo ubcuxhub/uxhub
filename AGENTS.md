@@ -101,6 +101,10 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
   `.from(...)` calls. Use `TABLES` for table names. Keep RLS-bypassing
   service-role work server-only in `src/lib/supabase/admin.ts` and
   `admin-server.ts`.
+- Card checkout is two steps: `card.tokenize()` produces the payment token, and
+  `payments.verifyBuyer()` runs the issuer's Strong Customer Authentication
+  challenge. Both tokens must reach `payments.create`, or cards whose issuer
+  requires verification are declined.
 - Prefer colocated server actions for first-party mutations. Reserve route
   handlers for callbacks, webhooks, uploads, and flows that require an HTTP
   endpoint.
@@ -147,7 +151,10 @@ Local values belong in the git-ignored `.env.local`.
   `NEXT_PUBLIC_SQUARE_LOCATION_ID`, and `SQUARE_ACCESS_TOKEN`
 - Square webhooks: `SQUARE_WEBHOOK_SIGNATURE_KEY`; set
   `SQUARE_WEBHOOK_NOTIFICATION_URL` when the externally registered URL differs
-  from the incoming request URL
+  from the incoming request URL. When the app answers on more than one hostname,
+  list one `<url>|<signature key>` pair per subscription in
+  `SQUARE_WEBHOOK_ENDPOINTS`, comma-separated: Square signs each delivery with
+  that subscription's own key over its own registered URL
 
 `SQUARE_ENV` is optional and defaults to the sandbox; set it to `production`
 only for production credentials.

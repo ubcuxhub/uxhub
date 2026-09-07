@@ -59,6 +59,20 @@ describe("parseCheckoutRequest", () => {
       slug: "student",
       buyerPhone: "604-555-0100",
       billingPostalCode: null,
+      verificationToken: null,
     });
+  });
+
+  it("keeps the buyer verification token when one is present", () => {
+    expect(
+      parseCheckoutRequest({
+        ...validPayload,
+        verificationToken: " verification-token ",
+      }).verificationToken
+    ).toBe("verification-token");
+  });
+
+  it("treats a missing buyer verification token as absent", () => {
+    expect(parseCheckoutRequest(validPayload).verificationToken).toBeNull();
   });
 });

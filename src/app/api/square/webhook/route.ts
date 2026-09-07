@@ -1,10 +1,7 @@
 import { NextResponse } from "next/server";
 import { WebhooksHelper, type PaymentUpdatedEvent } from "square";
 import { processSquarePaymentEvent } from "@/features/payments/fulfillment";
-import {
-  getSquareWebhookNotificationUrl,
-  getSquareWebhookSignatureKey,
-} from "@/lib/square/client";
+import { getSquareWebhookEndpoints } from "@/lib/square/client";
 
 export async function POST(request: Request) {
   const rawBody = await request.text();
@@ -14,14 +11,19 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Missing Square signature" }, { status: 400 });
   }
 
-  const isValid = await WebhooksHelper.verifySignature({
-    notificationUrl: getSquareWebhookNotificationUrl(request.url),
-    requestBody: rawBody,
-    signatureHeader,
-    signatureKey: getSquareWebhookSignatureKey(),
-  });
+  const endpoints = getSquareWebhookEndpoints(request.url);
+  const verifications = await Promise.all(
+    endpoints.map((endpoint) =>
+      WebhooksHelper.verifySignature({
+        notificationUrl: endpoint.notificationUrl,
+        requestBody: rawBody,
+        signatureHeader,
+        signatureKey: endpoint.signatureKey,
+      }).catch(() => false)
+    )
+  );
 
-  if (!isValid) {
+  if (!verifications.some(Boolean)) {
     return NextResponse.json({ error: "Invalid Square signature" }, { status: 403 });
   }
 

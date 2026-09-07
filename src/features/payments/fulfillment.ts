@@ -288,6 +288,7 @@ async function createSquarePaymentForMembership(
       note: `UX Hub membership purchase: ${membershipType.name}`,
       referenceId: purchase.id,
       sourceId: input.token,
+      verificationToken: input.verificationToken ?? undefined,
     });
 
     const payment = paymentResponse.payment;
@@ -383,6 +384,7 @@ async function createSquarePaymentForEventTicket(
       note: `UX Hub event ticket: ${event.name}`,
       referenceId: purchase.id,
       sourceId: input.token,
+      verificationToken: input.verificationToken ?? undefined,
     });
 
     const payment = paymentResponse.payment;

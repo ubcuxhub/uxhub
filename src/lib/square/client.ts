@@ -2,6 +2,8 @@ import "server-only";
 
 import { SquareClient, SquareEnvironment } from "square";
 
+import { parseSquareWebhookEndpoints } from "./webhook";
+
 export const SQUARE_CURRENCY = "CAD" as const;
 
 function requiredEnv(name: string): string {
@@ -18,12 +20,13 @@ export function getSquareLocationId() {
   return requiredEnv("NEXT_PUBLIC_SQUARE_LOCATION_ID");
 }
 
-export function getSquareWebhookSignatureKey() {
-  return requiredEnv("SQUARE_WEBHOOK_SIGNATURE_KEY");
-}
-
-export function getSquareWebhookNotificationUrl(fallbackUrl: string) {
-  return process.env.SQUARE_WEBHOOK_NOTIFICATION_URL || fallbackUrl;
+export function getSquareWebhookEndpoints(fallbackUrl: string) {
+  return parseSquareWebhookEndpoints({
+    endpoints: process.env.SQUARE_WEBHOOK_ENDPOINTS,
+    fallbackUrl,
+    notificationUrl: process.env.SQUARE_WEBHOOK_NOTIFICATION_URL,
+    signatureKey: process.env.SQUARE_WEBHOOK_SIGNATURE_KEY,
+  });
 }
 
 function getSquareEnvironment() {

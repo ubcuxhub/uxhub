@@ -56,5 +56,6 @@ export function parseCheckoutRequest(
     buyerEmail,
     buyerPhone: asOptionalString(payload.buyerPhone),
     billingPostalCode: asOptionalString(payload.billingPostalCode),
+    verificationToken: asOptionalString(payload.verificationToken),
   };
 }
