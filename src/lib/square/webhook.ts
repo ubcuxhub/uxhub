@@ -1,3 +1,5 @@
+import { serialization, type PaymentUpdatedEvent } from "square";
+
 export interface SquareWebhookEndpoint {
   notificationUrl: string;
   signatureKey: string;
@@ -8,6 +10,35 @@ interface SquareWebhookEnv {
   fallbackUrl: string;
   notificationUrl: string | undefined;
   signatureKey: string | undefined;
+}
+
+export function parseSquarePaymentUpdatedEvent(
+  payload: unknown
+): PaymentUpdatedEvent {
+  const result = serialization.PaymentUpdatedEvent.parse(payload, {
+    unrecognizedObjectKeys: "passthrough",
+  });
+
+  if (!result.ok) {
+    const details = result.errors
+      .map((error) => `${error.path.join(".")}: ${error.message}`)
+      .join(", ");
+    throw new Error(`Invalid Square payment.updated payload: ${details}`);
+  }
+
+  const event = result.value;
+
+  if (
+    event.type !== "payment.updated" ||
+    !event.eventId ||
+    !event.data?.object?.payment?.id
+  ) {
+    throw new Error(
+      "Invalid Square payment.updated payload: missing event ID or payment ID."
+    );
+  }
+
+  return event;
 }
 
 /**

@@ -1,7 +1,57 @@
 import { describe, expect, it } from "vitest";
-import { parseSquareWebhookEndpoints } from "./webhook";
+import {
+  parseSquarePaymentUpdatedEvent,
+  parseSquareWebhookEndpoints,
+} from "./webhook";
 
 const fallbackUrl = "https://request.example/api/square/webhook";
+
+describe("parseSquarePaymentUpdatedEvent", () => {
+  it("normalizes Square's snake_case wire payload", () => {
+    const event = parseSquarePaymentUpdatedEvent({
+      merchant_id: "merchant-1",
+      type: "payment.updated",
+      event_id: "event-1",
+      created_at: "2026-09-07T20:43:07Z",
+      data: {
+        type: "payment",
+        id: "payment-1",
+        object: {
+          payment: {
+            id: "payment-1",
+            status: "COMPLETED",
+            customer_id: "customer-1",
+          },
+        },
+      },
+    });
+
+    expect(event).toMatchObject({
+      merchantId: "merchant-1",
+      type: "payment.updated",
+      eventId: "event-1",
+      createdAt: "2026-09-07T20:43:07Z",
+      data: {
+        object: {
+          payment: {
+            id: "payment-1",
+            status: "COMPLETED",
+            customerId: "customer-1",
+          },
+        },
+      },
+    });
+  });
+
+  it("rejects a payment update without an event ID", () => {
+    expect(() =>
+      parseSquarePaymentUpdatedEvent({
+        type: "payment.updated",
+        data: { object: { payment: { id: "payment-1" } } },
+      })
+    ).toThrow(/missing event ID or payment ID/);
+  });
+});
 
 describe("parseSquareWebhookEndpoints", () => {
   it("pairs each configured subscription with its own key", () => {

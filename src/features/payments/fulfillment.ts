@@ -499,7 +499,8 @@ export async function executeCheckoutForUser(
 }
 
 export async function processSquarePaymentEvent(
-  event: PaymentUpdatedEvent
+  event: PaymentUpdatedEvent,
+  rawPayload: Json = event as Json
 ) {
   const eventId = event.eventId;
   const eventType = event.type;
@@ -512,7 +513,7 @@ export async function processSquarePaymentEvent(
   const wasRecorded = await recordSquareWebhookEvent(adminDb, {
     event_id: eventId,
     event_type: eventType,
-    payload: event as Json,
+    payload: rawPayload,
   });
 
   if (!wasRecorded) {

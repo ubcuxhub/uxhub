@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
-import { WebhooksHelper, type PaymentUpdatedEvent } from "square";
+import { WebhooksHelper } from "square";
 import { processSquarePaymentEvent } from "@/features/payments/fulfillment";
 import { getSquareWebhookEndpoints } from "@/lib/square/client";
+import type { Json } from "@/lib/supabase/database.types";
+import { parseSquarePaymentUpdatedEvent } from "@/lib/square/webhook";
 
 export async function POST(request: Request) {
   const rawBody = await request.text();
@@ -27,12 +29,39 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid Square signature" }, { status: 403 });
   }
 
-  try {
-    const payload = JSON.parse(rawBody) as PaymentUpdatedEvent;
+  let rawPayload: unknown;
 
-    if (payload.type === "payment.updated") {
-      await processSquarePaymentEvent(payload);
-    }
+  try {
+    rawPayload = JSON.parse(rawBody);
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
+  }
+
+  if (
+    typeof rawPayload !== "object" ||
+    rawPayload === null ||
+    Array.isArray(rawPayload)
+  ) {
+    return NextResponse.json({ error: "Invalid webhook payload" }, { status: 400 });
+  }
+
+  const eventType = (rawPayload as Record<string, unknown>).type;
+
+  if (eventType !== "payment.updated") {
+    return NextResponse.json({ ok: true });
+  }
+
+  let event;
+
+  try {
+    event = parseSquarePaymentUpdatedEvent(rawPayload);
+  } catch (error) {
+    console.error("Invalid Square payment.updated payload:", error);
+    return NextResponse.json({ error: "Invalid webhook payload" }, { status: 400 });
+  }
+
+  try {
+    await processSquarePaymentEvent(event, rawPayload as Json);
 
     return NextResponse.json({ ok: true });
   } catch (error) {
