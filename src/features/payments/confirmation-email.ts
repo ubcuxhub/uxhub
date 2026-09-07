@@ -7,6 +7,7 @@ import { fetchMembershipTypeById } from "@/lib/supabase-helpers/memberships";
 import {
   claimPurchaseConfirmationEmail,
   fetchPurchaseById,
+  releasePurchaseConfirmationEmailClaim,
   updatePurchase,
 } from "@/lib/supabase-helpers/purchases";
 import { fetchUserInfoContactById } from "@/lib/supabase-helpers/users";
@@ -20,7 +21,8 @@ import { formatUserName } from "@/lib/user-name";
 /**
  * Best-effort purchase confirmation email. Called from fulfillment, which runs
  * from both the synchronous checkout and the Square webhook. An atomic attempt
- * claim keeps it to one send per purchase. Never throws: the payment has
+ * claim keeps concurrent passes to one send per purchase, and a failed send
+ * hands the claim back so a later pass can retry. Never throws: the payment has
  * already succeeded by this point.
  */
 export async function sendPurchaseConfirmationEmail(
@@ -85,11 +87,24 @@ export async function sendPurchaseConfirmationEmail(
       return;
     }
 
-    const emailSent = await sendEmail({
-      html: rendered.html,
-      subject: rendered.subject,
-      to: recipient.email,
-    });
+    let emailSent = false;
+
+    try {
+      emailSent = await sendEmail({
+        html: rendered.html,
+        subject: rendered.subject,
+        to: recipient.email,
+      });
+    } finally {
+      if (!emailSent) {
+        await releasePurchaseConfirmationEmailClaim(
+          adminDb,
+          claimedPurchase.id
+        ).catch((error) => {
+          console.error("Releasing the confirmation email claim failed:", error);
+        });
+      }
+    }
 
     if (!emailSent) {
       return;
