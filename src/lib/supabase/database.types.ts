@@ -760,6 +760,7 @@ export type Database = {
       get_user_info_id: { Args: never; Returns: string }
       is_admin: { Args: never; Returns: boolean }
       is_authenticated: { Args: never; Returns: boolean }
+      is_manager: { Args: never; Returns: boolean }
       release_paid_event_ticket_reservation: {
         Args: { p_purchase_id: string }
         Returns: undefined
@@ -784,6 +785,13 @@ export type Database = {
         }
         Returns: Json
       }
+      set_user_role: {
+        Args: {
+          p_role: Database["public"]["Enums"]["role_access_enum"]
+          p_target_user_id: string
+        }
+        Returns: Database["public"]["Enums"]["role_access_enum"]
+      }
     }
     Enums: {
       application_status: "pending" | "declined" | "accepted"
@@ -796,7 +804,7 @@ export type Database = {
         | "multiple_choice"
         | "dropdown"
         | "file_upload"
-      role_access_enum: "basic" | "admin"
+      role_access_enum: "basic" | "admin" | "manager"
       student_status: "undergraduate" | "graduate" | "other"
       uni_year: "1" | "2" | "3" | "4" | "5+"
       user_type: "ubcStudent" | "faculty" | "nonUbc"
@@ -938,7 +946,7 @@ export const Constants = {
         "dropdown",
         "file_upload",
       ],
-      role_access_enum: ["basic", "admin"],
+      role_access_enum: ["basic", "admin", "manager"],
       student_status: ["undergraduate", "graduate", "other"],
       uni_year: ["1", "2", "3", "4", "5+"],
       user_type: ["ubcStudent", "faculty", "nonUbc"],

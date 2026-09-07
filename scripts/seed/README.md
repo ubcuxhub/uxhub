@@ -70,8 +70,8 @@ can be run repeatedly. A test fails if a fixture purchase ever lands on one.
 The rest cover archived history, a closed registration window, a not-yet-open
 one, and a draft.
 
-`data/users.ts` — ten local accounts. **Password is `123456` for all of them.**
-They cover every membership state crossed with both roles:
+`data/users.ts` — eleven local accounts. **Password is `123456` for all of them.**
+Ten cover every membership state crossed with the basic and admin roles:
 
 | Membership | Non-admin                       | Admin                             |
 | ---------- | ------------------------------- | --------------------------------- |
@@ -81,6 +81,9 @@ They cover every membership state crossed with both roles:
 | Non-UBC    | `non-ubc@example.com`           | `admin-non-ubc@example.com`       |
 | None       | `no-membership@example.com`     | `admin-no-membership@example.com` |
 
+`manager-no-membership@example.com` is the dedicated manager fixture. It can
+edit users and roles and is the only fixture that can access Club Settings.
+
 The tier decides `user_type` — `isEligibleForMembership` checks
 `eligible_user_types.includes(user_type)` — so the faculty accounts are
 `faculty` and need a `ubc.ca` address matching their own `faculty_email`, and
@@ -88,10 +91,10 @@ the non-UBC ones are `nonUbc`. Each type owns a mutually exclusive field set,
 mirroring `completeMembershipProfile`; the validator rejects a fixture that
 mixes them.
 
-Three of the ten are **deep** fixtures (`fullEventHistory: true`) carrying
+Three of the eleven are **deep** fixtures (`fullEventHistory: true`) carrying
 purchased registrations across every phase, applications, and check-ins:
 `admin-explorer@example.com`, `no-membership@example.com`, and
-`student-innovator@example.com`. The other seven hold a membership purchase at
+`student-innovator@example.com`. The other eight hold a membership purchase at
 most — giving each of them a full timeline would be a lot of fixture data to
 keep correct for very little.
 

@@ -46,7 +46,7 @@ the UI is undone by re-running it. Pass `--no-prune` to keep those rows,
 tiers, and rows owned by the three fixture accounts — never anything belonging
 to an account created by hand.
 
-The ten fixture accounts all sign in with password `123456`; see
+The eleven fixture accounts all sign in with password `123456`; see
 `scripts/seed/README.md` for the membership x role grid.
 
 `pnpm seed --target=prod` writes demo events for admins while the student-facing
@@ -181,4 +181,3 @@ key to client components.
 Reuse `src/components/ui` primitives and `src/components/shared` composites
 before adding new primitives. Follow the existing shadcn conventions and use
 design tokens from `src/app/globals.css` instead of duplicating one-off styles.
-

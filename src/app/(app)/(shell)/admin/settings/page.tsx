@@ -1,16 +1,17 @@
 import { PageContainer } from "@/components/shared/PageContainer";
 import { MembershipTermSettings } from "@/features/admin/components/MembershipTermSettings";
 import { MembershipTypeSettings } from "@/features/admin/components/MembershipTypeSettings";
+import { requireManager } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchMembershipTermEndsAt } from "@/lib/supabase-helpers/app-settings";
 import { fetchMembershipTypes } from "@/lib/supabase-helpers/memberships";
 
-// `requireAdmin()` is applied by the admin layout, so this page only reads.
 export default async function AdminSettingsPage() {
+  await requireManager();
   const supabase = await createClient();
   const [termEndsAt, membershipTypes] = await Promise.all([
     fetchMembershipTermEndsAt(supabase),
-    // Retired tiers stay editable here, so admins can put one back on sale.
+    // Retired tiers stay editable here, so managers can put one back on sale.
     fetchMembershipTypes(supabase, { includeInactive: true }),
   ]);
 

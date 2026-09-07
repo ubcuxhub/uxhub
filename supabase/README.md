@@ -29,11 +29,13 @@ seed reconciler. It never targets the linked remote database.
 
 The seed data lives under `scripts/seed/data/` and includes memberships, past,
 ongoing, and upcoming events, purchases, registrations, check-ins, and these
-ten local login fixtures (all use password `123456`), covering every membership
-state crossed with admin and non-admin. The grid is listed in
+eleven local login fixtures (all use password `123456`). Ten cover every
+membership state crossed with admin and non-admin, and one is the dedicated
+manager. The grid is listed in
 [`scripts/seed/README.md`](../scripts/seed/README.md); the three most useful are:
 
 - `admin-explorer@example.com` — administrator with an Explorer membership
+- `manager-no-membership@example.com` — manager without a membership
 - `no-membership@example.com` — basic user without a membership
 - `student-innovator@example.com` — basic user with an Innovator membership
 

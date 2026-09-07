@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { ensureUserInfo } from "@/lib/auth/ensure-user-info";
 import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";
 import { getSafeInternalPath } from "@/lib/auth/paths";
+import { hasAdminAccess, hasManagerAccess } from "@/lib/auth/roles";
 
 function authErrorPath(message: string) {
   return `/auth/error?error=${encodeURIComponent(message)}`;
@@ -83,7 +84,17 @@ export async function redirectIfAuthenticated(redirectTo = "/portal") {
 export async function requireAdmin(): Promise<UserInfoRow> {
   const user = await requireAuth();
 
-  if (user.role_access !== "admin") {
+  if (!hasAdminAccess(user.role_access)) {
+    redirect("/401");
+  }
+
+  return user;
+}
+
+export async function requireManager(): Promise<UserInfoRow> {
+  const user = await requireAuth();
+
+  if (!hasManagerAccess(user.role_access)) {
     redirect("/401");
   }
 

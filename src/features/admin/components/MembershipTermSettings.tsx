@@ -87,7 +87,7 @@ export function MembershipTermSettings({
         <AlertTitle>This applies to every account.</AlertTitle>
         <AlertDescription>
           Setting a date in the past ends every active membership immediately,
-          including admin accounts. Clearing the date restores them.
+          including admin and manager accounts. Clearing the date restores them.
         </AlertDescription>
       </Alert>
 
@@ -159,7 +159,7 @@ export function MembershipTermSettings({
         description={
           confirming === "clear"
             ? "Every membership goes back to expiring one year after it was purchased, and memberships go back on sale."
-            : `Every membership will expire on ${formatEventDate(draft)}, including admin accounts. Members whose access ends on that date lose it as soon as it passes.`
+            : `Every membership will expire on ${formatEventDate(draft)}, including admin and manager accounts. Members whose access ends on that date lose it as soon as it passes.`
         }
         // Clearing the date only ever restores access, so it needs no challenge.
         confirmation={

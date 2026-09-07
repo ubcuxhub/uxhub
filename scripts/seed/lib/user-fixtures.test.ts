@@ -22,8 +22,8 @@ describe("user seed fixtures", () => {
 
   it("reports the representative dataset totals", () => {
     expect(getUserFixtureTotals(seedUsers)).toEqual({
-      authUsers: 10,
-      profiles: 10,
+      authUsers: 11,
+      profiles: 11,
       purchases: 18,
       registrations: 15,
       responses: 22,
@@ -31,7 +31,7 @@ describe("user seed fixtures", () => {
     });
   });
 
-  it("covers every membership state crossed with both roles", () => {
+  it("covers the basic/admin grid and a dedicated manager", () => {
     const grid = seedUsers
       .map((user) => `${user.membershipSlug ?? "none"}/${user.profile.role_access}`)
       .sort();
@@ -48,6 +48,7 @@ describe("user seed fixtures", () => {
         "non-ubc/admin",
         "none/basic",
         "none/admin",
+        "none/manager",
       ].sort()
     );
   });

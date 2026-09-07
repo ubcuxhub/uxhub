@@ -15,6 +15,7 @@ interface EditableUserFieldProps {
   onEditCancel: () => void;
   onEditSave: (field: string) => void;
   onValueChange: (value: string) => void;
+  canEdit?: boolean;
 }
 
 export function EditableUserField({
@@ -28,6 +29,7 @@ export function EditableUserField({
   onEditCancel,
   onEditSave,
   onValueChange,
+  canEdit = true,
 }: EditableUserFieldProps) {
   const displayValue = value === null || value === undefined ? "—" : String(value);
 
@@ -52,13 +54,15 @@ export function EditableUserField({
       ) : (
         <div className="flex items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-small">
           <span className={!value ? "text-muted-foreground" : ""}>{displayValue}</span>
-          <Button
-            variant="ghost"
-            onClick={() => onEditStart(field, value ?? null)}
-            className="h-6 px-2"
-          >
-            Edit
-          </Button>
+          {canEdit && (
+            <Button
+              variant="ghost"
+              onClick={() => onEditStart(field, value ?? null)}
+              className="h-6 px-2"
+            >
+              Edit
+            </Button>
+          )}
         </div>
       )}
     </div>

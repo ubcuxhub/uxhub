@@ -2,12 +2,20 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
-import { EditableUserField } from "./EditableUserField";
-import { MembershipTypeField } from "./MembershipTypeField";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { RoleAccess } from "@/types/models";
 import type {
   MembershipTypeOption,
   UserRecord,
 } from "../types/userManagementTypes";
+import { EditableUserField } from "./EditableUserField";
+import { MembershipTypeField } from "./MembershipTypeField";
 
 interface UserDetailsPanelProps {
   selectedUser: UserRecord | null;
@@ -15,10 +23,15 @@ interface UserDetailsPanelProps {
   editValue: string;
   isSaving: boolean;
   membershipTypes: MembershipTypeOption[];
-  onEditStart: (field: string, currentValue: string | number | boolean | null) => void;
+  canManageUsers: boolean;
+  onEditStart: (
+    field: string,
+    currentValue: string | number | boolean | null
+  ) => void;
   onEditCancel: () => void;
   onEditSave: (field: string) => void;
   onValueChange: (value: string) => void;
+  onRoleChangeRequest: (role: RoleAccess) => void;
 }
 
 export function UserDetailsPanel({
@@ -27,10 +40,12 @@ export function UserDetailsPanel({
   editValue,
   isSaving,
   membershipTypes,
+  canManageUsers,
   onEditStart,
   onEditCancel,
   onEditSave,
   onValueChange,
+  onRoleChangeRequest,
 }: UserDetailsPanelProps) {
   if (!selectedUser) {
     return (
@@ -39,7 +54,7 @@ export function UserDetailsPanel({
           <div className="text-center text-muted-foreground">
             <p className="text-subheading mb-2">No user selected</p>
             <p className="text-small">
-              Select a user from the directory to view and edit their information
+              Select a user from the directory to view their information
             </p>
           </div>
         </div>
@@ -53,7 +68,9 @@ export function UserDetailsPanel({
         <div>
           <h2 className="mb-2 text-h2">User Details</h2>
           <p className="text-small text-muted-foreground">
-            View and edit user information
+            {canManageUsers
+              ? "View and edit user information"
+              : "View user information"}
           </p>
         </div>
 
@@ -73,6 +90,7 @@ export function UserDetailsPanel({
               onEditCancel={onEditCancel}
               onEditSave={onEditSave}
               onValueChange={onValueChange}
+              canEdit={canManageUsers}
             />
             <EditableUserField
               label="Last name"
@@ -85,6 +103,7 @@ export function UserDetailsPanel({
               onEditCancel={onEditCancel}
               onEditSave={onEditSave}
               onValueChange={onValueChange}
+              canEdit={canManageUsers}
             />
             <EditableUserField
               label="Email"
@@ -97,6 +116,7 @@ export function UserDetailsPanel({
               onEditCancel={onEditCancel}
               onEditSave={onEditSave}
               onValueChange={onValueChange}
+              canEdit={canManageUsers}
             />
             <EditableUserField
               label="Phone"
@@ -109,6 +129,7 @@ export function UserDetailsPanel({
               onEditCancel={onEditCancel}
               onEditSave={onEditSave}
               onValueChange={onValueChange}
+              canEdit={canManageUsers}
             />
           </CardContent>
         </Card>
@@ -129,6 +150,7 @@ export function UserDetailsPanel({
               onEditCancel={onEditCancel}
               onEditSave={onEditSave}
               onValueChange={onValueChange}
+              canEdit={canManageUsers}
             />
             <EditableUserField
               label="Order Date"
@@ -141,6 +163,7 @@ export function UserDetailsPanel({
               onEditCancel={onEditCancel}
               onEditSave={onEditSave}
               onValueChange={onValueChange}
+              canEdit={canManageUsers}
             />
             <EditableUserField
               label="Newsletter"
@@ -153,6 +176,7 @@ export function UserDetailsPanel({
               onEditCancel={onEditCancel}
               onEditSave={onEditSave}
               onValueChange={onValueChange}
+              canEdit={canManageUsers}
             />
           </CardContent>
         </Card>
@@ -173,6 +197,7 @@ export function UserDetailsPanel({
               onEditCancel={onEditCancel}
               onEditSave={onEditSave}
               onValueChange={onValueChange}
+              canEdit={canManageUsers}
             />
             <EditableUserField
               label="Faculty"
@@ -185,6 +210,7 @@ export function UserDetailsPanel({
               onEditCancel={onEditCancel}
               onEditSave={onEditSave}
               onValueChange={onValueChange}
+              canEdit={canManageUsers}
             />
             <EditableUserField
               label="Major"
@@ -197,6 +223,7 @@ export function UserDetailsPanel({
               onEditCancel={onEditCancel}
               onEditSave={onEditSave}
               onValueChange={onValueChange}
+              canEdit={canManageUsers}
             />
             <EditableUserField
               label="Year"
@@ -209,6 +236,7 @@ export function UserDetailsPanel({
               onEditCancel={onEditCancel}
               onEditSave={onEditSave}
               onValueChange={onValueChange}
+              canEdit={canManageUsers}
             />
           </CardContent>
         </Card>
@@ -218,18 +246,31 @@ export function UserDetailsPanel({
             <CardTitle>System Information</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <EditableUserField
-              label="Role Access"
-              field="role_access"
-              value={selectedUser.role_access}
-              isEditing={editingField === "role_access"}
-              editValue={editValue}
-              isSaving={isSaving}
-              onEditStart={onEditStart}
-              onEditCancel={onEditCancel}
-              onEditSave={onEditSave}
-              onValueChange={onValueChange}
-            />
+            <div className="space-y-2">
+              <Label>Role Access</Label>
+              {canManageUsers ? (
+                <Select
+                  value={selectedUser.role_access}
+                  onValueChange={(role) =>
+                    onRoleChangeRequest(role as RoleAccess)
+                  }
+                  disabled={isSaving}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="basic">Basic</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="manager">Manager</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="rounded-md border border-input bg-background px-3 py-2 text-small capitalize">
+                  {selectedUser.role_access}
+                </div>
+              )}
+            </div>
             <div className="space-y-2">
               <Label>Auth User ID</Label>
               <div className="rounded-md border border-input bg-muted px-3 py-2 text-small text-muted-foreground">
