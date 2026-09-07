@@ -85,6 +85,28 @@ export async function adminUpdateMembershipTermEndsAt(
   return data;
 }
 
+/**
+ * Updates one membership tier.
+ *
+ * Service-role because `membership_types` ships a single RLS policy —
+ * `SELECT USING (true)` — and no write policy at all: an anon-key update does
+ * not error, it just matches zero rows. `updated_at` is left alone; the
+ * `update_membership_types_updated_at` trigger maintains it.
+ */
+export async function adminUpdateMembershipTypeById(
+  id: string,
+  payload: Record<string, unknown>
+) {
+  const { data, error } = await supabaseAdmin
+    .from(TABLES.membershipTypes)
+    .update(payload)
+    .eq("id", id)
+    .select();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function adminInsertUserInfo(payload: UserInfoWritePayload) {
   const { data, error } = await supabaseAdmin
     .from(TABLES.userInfo)

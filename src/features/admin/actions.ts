@@ -8,9 +8,14 @@ import { supabaseAdmin } from "@/lib/supabase/admin";
 import {
   adminDeleteEventImageByUrl,
   adminUpdateMembershipTermEndsAt,
+  adminUpdateMembershipTypeById,
   adminUpdateUserInfoById,
 } from "@/lib/supabase-helpers/admin-server";
 import { datetimeLocalToTimestamptz } from "@/lib/date";
+import {
+  validateMembershipTypeInput,
+  type MembershipTypeInput,
+} from "@/features/admin/lib/membership-type";
 import {
   fetchAttendingRegistrations,
   fetchCheckInId,
@@ -363,4 +368,49 @@ export async function setMembershipTermEndsAtAction(date: string | null) {
   revalidatePath("/", "layout");
 
   return value;
+}
+
+/**
+ * Edits one membership tier from Club Settings.
+ *
+ * The update is built here from three named columns rather than from the
+ * caller's payload, in the spirit of `ADMIN_USER_FIELDS` above: `slug` is
+ * absent because checkout URLs are `/portal/membership/<slug>/checkout` and a
+ * rename breaks live links; `name` because it is already printed on sent
+ * receipts; `eligible_user_types` because emptying it would silently make a
+ * tier unpurchasable for everyone.
+ */
+export async function updateMembershipTypeAction(
+  id: string,
+  input: MembershipTypeInput
+) {
+  await requireAdmin();
+
+  if (!id) throw new Error("Membership tier not found.");
+
+  const description = input.description.trim();
+  const problem = validateMembershipTypeInput({ ...input, description });
+  if (problem) throw new Error(problem);
+
+  const updated = await adminUpdateMembershipTypeById(id, {
+    active: input.active,
+    description,
+    price: input.price,
+  });
+
+  // Tier copy and price render on the portal home card, the membership plans
+  // dialog, and the checkout summary, which sit under different layouts.
+  revalidatePath("/", "layout");
+
+  const row = updated?.[0] as
+    | { active: boolean; description: string; price: number }
+    | undefined;
+
+  if (!row) throw new Error("Membership tier not found.");
+
+  return {
+    active: row.active,
+    description: row.description,
+    price: Number(row.price),
+  };
 }

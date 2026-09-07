@@ -217,5 +217,11 @@ strings the compiler cannot validate. A rename here breaks silently at runtime:
   backfill, update helpers, then drop the old column in a later migration. This
   reduces branch conflicts and deployment risk.
 - Don't mix `supabase db pull` and `supabase db push` in the same workflow.
+- **Migrations no longer own membership tier copy.** Admins edit
+  `membership_types.description`, `price`, and `active` on `/admin/settings`, so
+  a migration that writes those columns silently overwrites what they typed.
+  `20260907120000_simplify_membership_benefits.sql` set the descriptions
+  because no other path reached the production rows; it is the last of its kind.
+  `name` and `slug` are not editable, so they stay migration-owned.
 
 test
