@@ -10,11 +10,11 @@ import type {
   TokenResult,
 } from "@square/web-sdk";
 import {
-  startTransition,
   useEffect,
   useId,
   useState,
   useSyncExternalStore,
+  useTransition,
 } from "react";
 import { useRouter } from "next/navigation";
 import { submitCheckoutAction } from "@/features/payments/actions";
@@ -154,6 +154,13 @@ export function SquareCheckoutForm({
   const [squarePayments, setSquarePayments] = useState<Payments | null>(null);
   const [initializing, setInitializing] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  /**
+   * The redirect to the confirmation page is a transition, so it stays pending
+   * while that route renders. Treating it as busy keeps the processing state up
+   * until the navigation commits instead of briefly restoring this form.
+   */
+  const [redirecting, startRedirect] = useTransition();
+  const busy = submitting || redirecting;
   const [message, setMessage] = useState(disabledMessage ?? "");
   const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
 
@@ -223,6 +230,10 @@ export function SquareCheckoutForm({
   }, [containerId, disabled]);
 
   useEffect(() => {
+    onSubmittingChange?.(busy);
+  }, [busy, onSubmittingChange]);
+
+  useEffect(() => {
     if (!card) {
       return;
     }
@@ -235,12 +246,11 @@ export function SquareCheckoutForm({
   const handleCheckout = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (disabled || !card || submitting) {
+    if (disabled || !card || busy) {
       return;
     }
 
     setSubmitting(true);
-    onSubmittingChange?.(true);
     setMessage("");
 
     try {
@@ -303,7 +313,7 @@ export function SquareCheckoutForm({
         return;
       }
 
-      startTransition(() => {
+      startRedirect(() => {
         const destination =
           typeof successHref === "function"
             ? successHref(result.purchaseId)
@@ -315,7 +325,6 @@ export function SquareCheckoutForm({
       setMessage("Payment failed. Please try again.");
     } finally {
       setSubmitting(false);
-      onSubmittingChange?.(false);
     }
   };
 
@@ -409,10 +418,10 @@ export function SquareCheckoutForm({
 
       <Button
         className="w-full"
-        disabled={disabled || initializing || submitting || !card}
+        disabled={disabled || initializing || busy || !card}
         type="submit"
       >
-        {submitting ? "Processing..." : buttonLabel}
+        {busy ? "Processing..." : buttonLabel}
       </Button>
     </form>
   );
