@@ -17,7 +17,6 @@ function smokeTier(
   return {
     ...PAYMENT_SMOKE_TIER,
     eligible_user_types: [...PAYMENT_SMOKE_TIER.eligible_user_types],
-    features: [...PAYMENT_SMOKE_TIER.features],
     id: "smoke-tier",
     ...overrides,
   };

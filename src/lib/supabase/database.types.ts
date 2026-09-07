@@ -451,7 +451,6 @@ export type Database = {
           created_at: string | null
           description: string
           eligible_user_types: Database["public"]["Enums"]["user_type"][]
-          features: string[] | null
           id: string
           name: string
           price: number
@@ -463,7 +462,6 @@ export type Database = {
           created_at?: string | null
           description: string
           eligible_user_types?: Database["public"]["Enums"]["user_type"][]
-          features?: string[] | null
           id?: string
           name: string
           price: number
@@ -475,7 +473,6 @@ export type Database = {
           created_at?: string | null
           description?: string
           eligible_user_types?: Database["public"]["Enums"]["user_type"][]
-          features?: string[] | null
           id?: string
           name?: string
           price?: number

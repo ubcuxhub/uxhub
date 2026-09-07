@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { Check, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 import { FlowLink } from "@/components/shared/FlowLink";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,10 @@ import type { MembershipTypeRow } from "@/types/models";
  * The member-facing membership card on the portal home page.
  *
  * It is the student's proof of membership at the door, so the tier, the
- * cardholder, and the expiry all have to be readable at a glance — everything
- * else (benefits, the reminder to still register) sits underneath them.
+ * cardholder, and the expiry all have to be readable at a glance. The benefit
+ * line is the tier's own `description`, the same sentence they read when they
+ * picked the tier — one string, so what you bought and what your card says
+ * cannot drift apart.
  */
 export function MembershipCard({
   cardholder,
@@ -22,10 +24,9 @@ export function MembershipCard({
   cardholder: string;
   /** Effective expiry, already capped by the club-wide term end. */
   expiresAt: string | null;
-  membershipType: Pick<MembershipTypeRow, "features" | "name">;
+  membershipType: Pick<MembershipTypeRow, "description" | "name">;
 }) {
   const expiryDate = formatEventDate(expiresAt);
-  const benefits = membershipType.features ?? [];
 
   return (
     <section className="max-w-xl overflow-hidden rounded-2xl bg-[image:var(--gradient-ux-hub)] text-white shadow-sm">
@@ -50,23 +51,13 @@ export function MembershipCard({
           {formatMembershipTypeName(membershipType.name)} member
         </span>
 
-        {benefits.length > 0 && (
-          <ul className="mt-6 space-y-2 border-t border-white/20 pt-6">
-            {benefits.map((benefit) => (
-              <li key={benefit} className="flex gap-2.5 text-small text-white/90">
-                <Check className="mt-0.5 size-4 shrink-0" aria-hidden />
-                {benefit}
-              </li>
-            ))}
-          </ul>
-        )}
+        <p className="mt-6 border-t border-white/20 pt-6 text-small text-white/90">
+          {membershipType.description}
+        </p>
       </div>
 
       <div className="border-t border-white/20 bg-black/10 px-6 py-4 text-small text-white/80">
-        <p>
-          Show this card at UX Hub events for member entry — you still need to
-          register for each one.
-        </p>
+        <p>Show this card at the door. You still need to register for each event.</p>
         {expiryDate && <p className="mt-1">Valid until {expiryDate}</p>}
       </div>
     </section>

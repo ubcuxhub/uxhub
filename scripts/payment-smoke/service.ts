@@ -4,7 +4,6 @@ export interface PaymentSmokeTierRow {
   active: boolean;
   description: string;
   eligible_user_types: ("faculty" | "nonUbc" | "ubcStudent")[];
-  features: string[] | null;
   id: string;
   name: string;
   price: number;
@@ -63,7 +62,6 @@ function isCanonicalTier(tier: PaymentSmokeTierRow) {
     tier.active === PAYMENT_SMOKE_TIER.active &&
     tier.description === PAYMENT_SMOKE_TIER.description &&
     arraysEqual(tier.eligible_user_types, PAYMENT_SMOKE_TIER.eligible_user_types) &&
-    arraysEqual(tier.features, PAYMENT_SMOKE_TIER.features) &&
     tier.name === PAYMENT_SMOKE_TIER.name &&
     Number(tier.price) === PAYMENT_SMOKE_TIER.price &&
     tier.slug === PAYMENT_SMOKE_TIER.slug

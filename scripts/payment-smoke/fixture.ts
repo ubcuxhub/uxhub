@@ -5,7 +5,6 @@ export const PAYMENT_SMOKE_TIER = {
   description:
     "Live production payment verification tier. Purchase only when coordinating a UX Hub payment test.",
   eligible_user_types: ["ubcStudent", "faculty", "nonUbc"],
-  features: ["Live Square checkout and settlement verification"],
   name: "Payment Smoke Test",
   price: 1.23,
   slug: "payment-smoke-test",

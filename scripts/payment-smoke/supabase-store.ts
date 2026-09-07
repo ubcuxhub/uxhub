@@ -9,7 +9,7 @@ import type {
 } from "./service.ts";
 
 const TIER_COLUMNS =
-  "id, active, description, eligible_user_types, features, name, price, slug";
+  "id, active, description, eligible_user_types, name, price, slug";
 
 export class SupabasePaymentSmokeStore implements PaymentSmokeStore {
   private readonly supabase: SupabaseClient<Database>;
