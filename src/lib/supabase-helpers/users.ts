@@ -37,6 +37,28 @@ export async function fetchUserInfoContactById(
   return data;
 }
 
+/**
+ * Just the membership fields, for callers that need a member's expiry without
+ * pulling the whole user row. Pair with `getEffectiveMembershipExpiry` so the
+ * club-wide term end is applied.
+ */
+export async function fetchUserMembershipExpiryById(
+  supabase: DbClient,
+  id: string
+): Promise<Pick<
+  UserInfoRow,
+  "membership_expires_at" | "membership_type_id"
+> | null> {
+  const { data, error } = await supabase
+    .from(TABLES.userInfo)
+    .select("membership_expires_at, membership_type_id")
+    .eq("id", id)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function fetchUserInfoContactsByIds(
   supabase: DbClient,
   ids: string[]
