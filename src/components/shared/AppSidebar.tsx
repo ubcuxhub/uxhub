@@ -102,7 +102,7 @@ export function AppSidebar() {
 
         {isAdmin && (
           <SidebarGroup className="p-3 group-data-[collapsible=icon]:p-2">
-            <SidebarGroupLabel>Admin</SidebarGroupLabel>
+            <SidebarGroupLabel className="uppercase">Admin</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
