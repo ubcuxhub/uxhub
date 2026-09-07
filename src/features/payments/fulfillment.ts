@@ -31,6 +31,7 @@ import {
 } from "@/lib/square/client";
 import {
   formatReservationFailure,
+  getSquareErrorDiagnostic,
   getSquareErrorMessage,
   getPurchaseRedirectPath,
   normalizeSquareStatus,
@@ -301,6 +302,11 @@ async function createSquarePaymentForMembership(
       purchaseId: purchase.id,
     } as const;
   } catch (error) {
+    console.error(
+      `Square membership payment failed for purchase ${purchase.id}:`,
+      getSquareErrorDiagnostic(error)
+    );
+
     await updatePurchase(adminDb, purchase.id, {
       failure_reason: getSquareErrorMessage(error),
       status: "failed",
@@ -420,6 +426,11 @@ async function createSquarePaymentForEventTicket(
       purchaseId: purchase.id,
     } as const;
   } catch (error) {
+    console.error(
+      `Square event ticket payment failed for purchase ${purchase.id}:`,
+      getSquareErrorDiagnostic(error)
+    );
+
     const purchaseRecord = await fetchPurchaseById(adminDb, purchase.id);
     const paymentId = purchaseRecord?.square_payment_id ?? null;
 

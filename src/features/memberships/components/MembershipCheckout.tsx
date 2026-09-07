@@ -50,9 +50,9 @@ export function MembershipCheckout({
     );
 
   return (
-    <div className="min-h-full">
+    <div className="flex min-h-full flex-col">
       {processing ? (
-        <div className="flex min-h-full items-center justify-center text-center">
+        <div className="flex flex-1 items-center justify-center text-center">
           <div className="max-w-md">
             <LoaderCircle className="mx-auto size-12 animate-spin text-primary" />
             <h1 className="mt-6 text-h2">Processing your payment</h1>
@@ -64,7 +64,7 @@ export function MembershipCheckout({
         </div>
       ) : null}
 
-      <div className={cn("flex min-h-full flex-col", processing && "hidden")}>
+      <div className={cn("flex flex-1 flex-col", processing && "hidden")}>
         <div>
           <h1 className="text-h2">Checkout</h1>
           <p className="mt-2 text-small text-muted-foreground">

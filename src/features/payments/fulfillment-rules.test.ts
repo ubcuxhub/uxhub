@@ -2,9 +2,20 @@ import { describe, expect, it } from "vitest";
 import { SquareError } from "square";
 import {
   formatReservationFailure,
+  getSquareErrorDiagnostic,
   getSquareErrorMessage,
   normalizeSquareStatus,
 } from "./fulfillment-rules";
+
+function squareError(
+  errors: { category: string; code: string; detail?: string }[],
+  body?: unknown
+) {
+  return new SquareError({
+    message: "Request failed",
+    body: body ?? { errors },
+  });
+}
 
 describe("payment fulfillment rules", () => {
   it.each([
@@ -18,21 +29,99 @@ describe("payment fulfillment rules", () => {
     expect(normalizeSquareStatus(status)).toBe(expected);
   });
 
-  it("prefers a Square error detail", () => {
-    const error = new SquareError({
-      message: "Request failed",
-      body: {
-        errors: [
-          {
-            category: "PAYMENT_METHOD_ERROR",
-            code: "CARD_DECLINED",
-            detail: "Card declined",
-          },
-        ],
+  it.each([
+    [
+      "CVV_FAILURE",
+      "The security code (CVC) on your card was rejected. Check the code and try again, or use a different card.",
+    ],
+    ["CARD_EXPIRED", "This card has expired. Please use a different card."],
+    [
+      "INSUFFICIENT_FUNDS",
+      "Your card was declined for insufficient funds. Please use a different card.",
+    ],
+    [
+      "GENERIC_DECLINE",
+      "Your bank declined this payment. Check your card details and try again, or use a different card.",
+    ],
+    [
+      "CARD_TOKEN_EXPIRED",
+      "This checkout session expired before the payment finished. Refresh the page and try again.",
+    ],
+  ])("explains the Square decline code %s", (code, expected) => {
+    const error = squareError([
+      { category: "PAYMENT_METHOD_ERROR", code, detail: `Authorization error: '${code}'` },
+    ]);
+
+    expect(getSquareErrorMessage(error)).toBe(expected);
+  });
+
+  it("reports a rejected security code behind a generic decline", () => {
+    const error = squareError([], {
+      errors: [
+        {
+          category: "PAYMENT_METHOD_ERROR",
+          code: "GENERIC_DECLINE",
+          detail: "Authorization error: 'GENERIC_DECLINE'",
+        },
+      ],
+      payment: {
+        card_details: { avs_status: "AVS_ACCEPTED", cvv_status: "CVV_REJECTED" },
       },
     });
 
-    expect(getSquareErrorMessage(error)).toBe("Card declined");
+    expect(getSquareErrorMessage(error)).toBe(
+      "The security code (CVC) on your card was rejected. Check the code and try again, or use a different card."
+    );
+  });
+
+  it("reports a rejected postal code behind a generic decline", () => {
+    const error = squareError([], {
+      errors: [
+        {
+          category: "PAYMENT_METHOD_ERROR",
+          code: "GENERIC_DECLINE",
+          detail: "Authorization error: 'GENERIC_DECLINE'",
+        },
+      ],
+      payment: {
+        card_details: { avs_status: "AVS_REJECTED", cvv_status: "CVV_ACCEPTED" },
+      },
+    });
+
+    expect(getSquareErrorMessage(error)).toBe(
+      "The postal code did not match the one on file for your card. Check it and try again."
+    );
+  });
+
+  it("falls back to the Square detail for an unmapped code", () => {
+    const error = squareError([
+      {
+        category: "API_ERROR",
+        code: "SOMETHING_NEW",
+        detail: "Square said something unfamiliar",
+      },
+    ]);
+
+    expect(getSquareErrorMessage(error)).toBe("Square said something unfamiliar");
+  });
+
+  it("keeps the raw Square codes for the server log", () => {
+    const error = squareError([], {
+      errors: [
+        {
+          category: "PAYMENT_METHOD_ERROR",
+          code: "GENERIC_DECLINE",
+          detail: "Authorization error: 'GENERIC_DECLINE'",
+        },
+      ],
+      payment: {
+        card_details: { avs_status: "AVS_ACCEPTED", cvv_status: "CVV_REJECTED" },
+      },
+    });
+
+    expect(getSquareErrorDiagnostic(error)).toBe(
+      "GENERIC_DECLINE (PAYMENT_METHOD_ERROR): Authorization error: 'GENERIC_DECLINE' | cvv=CVV_REJECTED avs=AVS_ACCEPTED"
+    );
   });
 
   it("uses ordinary error messages and falls back for unknown values", () => {
