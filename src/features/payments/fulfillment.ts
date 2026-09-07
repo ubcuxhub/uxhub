@@ -109,7 +109,6 @@ async function fulfillMembershipPurchase(purchaseId: string) {
   });
 
   await revalidatePurchasePaths(adminDb, purchase.id);
-  after(() => sendPurchaseConfirmationEmail(adminDb, purchase.id));
   return updatedPurchase;
 }
 
@@ -161,22 +160,30 @@ async function fulfillEventTicketPurchase(purchaseId: string) {
   });
 
   await revalidatePurchasePaths(adminDb, purchase.id);
-  after(() => sendPurchaseConfirmationEmail(adminDb, purchase.id));
   return updatedPurchase;
 }
 
 async function fulfillCompletedPurchase(purchaseId: string) {
   const purchase = await fetchPurchaseById(adminDb, purchaseId);
 
-  if (!purchase || purchase.fulfilled_at) {
+  if (!purchase) {
     return purchase;
   }
 
-  if (purchase.kind === "membership") {
-    return fulfillMembershipPurchase(purchase.id);
-  }
+  const fulfilled = purchase.fulfilled_at
+    ? purchase
+    : purchase.kind === "membership"
+      ? await fulfillMembershipPurchase(purchase.id)
+      : await fulfillEventTicketPurchase(purchase.id);
 
-  return fulfillEventTicketPurchase(purchase.id);
+  /**
+   * Sent on every pass that sees a completed payment rather than only the one
+   * that fulfilled it, so a send that failed earlier is retried by a later
+   * webhook delivery. `confirmation_email_sent_at` keeps it to one send.
+   */
+  after(() => sendPurchaseConfirmationEmail(adminDb, purchase.id));
+
+  return fulfilled;
 }
 
 async function applyPaymentStateToPurchase(purchaseId: string, payment: Payment) {

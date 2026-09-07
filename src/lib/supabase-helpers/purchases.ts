@@ -109,6 +109,23 @@ export async function claimPurchaseConfirmationEmail(
   return data;
 }
 
+/**
+ * Hands the claim back when a send fails, so a later fulfillment pass may try
+ * again. Scoped to rows that never sent, so a successful send is never undone.
+ */
+export async function releasePurchaseConfirmationEmailClaim(
+  supabase: DbClient,
+  purchaseId: string
+): Promise<void> {
+  const { error } = await supabase
+    .from(TABLES.purchases)
+    .update({ confirmation_email_attempted_at: null })
+    .eq("id", purchaseId)
+    .is("confirmation_email_sent_at", null);
+
+  if (error) throw error;
+}
+
 export async function fetchPurchasesForUser(
   supabase: DbClient,
   userId: string

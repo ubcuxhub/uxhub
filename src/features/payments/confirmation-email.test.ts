@@ -9,11 +9,14 @@ vi.mock("@/lib/email/client", () => ({
 
 const fetchPurchaseById = vi.fn();
 const claimPurchaseConfirmationEmail = vi.fn();
+const releasePurchaseConfirmationEmailClaim = vi.fn();
 const updatePurchase = vi.fn();
 vi.mock("@/lib/supabase-helpers/purchases", () => ({
   claimPurchaseConfirmationEmail: (...args: unknown[]) =>
     claimPurchaseConfirmationEmail(...args),
   fetchPurchaseById: (...args: unknown[]) => fetchPurchaseById(...args),
+  releasePurchaseConfirmationEmailClaim: (...args: unknown[]) =>
+    releasePurchaseConfirmationEmailClaim(...args),
   updatePurchase: (...args: unknown[]) => updatePurchase(...args),
 }));
 
@@ -56,6 +59,7 @@ describe("sendPurchaseConfirmationEmail", () => {
     vi.clearAllMocks();
     sendEmail.mockResolvedValue(true);
     claimPurchaseConfirmationEmail.mockResolvedValue(completedMembershipPurchase);
+    releasePurchaseConfirmationEmailClaim.mockResolvedValue(undefined);
   });
 
   it("claims the purchase, sends once, and stamps it after Resend accepts", async () => {
@@ -75,6 +79,7 @@ describe("sendPurchaseConfirmationEmail", () => {
         confirmation_email_sent_at: expect.any(String),
       })
     );
+    expect(releasePurchaseConfirmationEmailClaim).not.toHaveBeenCalled();
   });
 
   it("does not resend when the purchase was already emailed", async () => {
@@ -125,6 +130,27 @@ describe("sendPurchaseConfirmationEmail", () => {
 
     expect(updatePurchase).not.toHaveBeenCalled();
     expect(consoleError).toHaveBeenCalled();
+    expect(releasePurchaseConfirmationEmailClaim).toHaveBeenCalledWith(
+      adminDb,
+      "purchase-1"
+    );
+    consoleError.mockRestore();
+  });
+
+  it("keeps the claim released when releasing it also fails", async () => {
+    fetchPurchaseById.mockResolvedValue(completedMembershipPurchase);
+    sendEmail.mockRejectedValue(new Error("Resend is down"));
+    releasePurchaseConfirmationEmailClaim.mockRejectedValue(
+      new Error("Database is down")
+    );
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+
+    await expect(
+      sendPurchaseConfirmationEmail(adminDb, "purchase-1")
+    ).resolves.toBeUndefined();
+
     consoleError.mockRestore();
   });
 
@@ -136,5 +162,9 @@ describe("sendPurchaseConfirmationEmail", () => {
 
     expect(claimPurchaseConfirmationEmail).toHaveBeenCalledTimes(1);
     expect(updatePurchase).not.toHaveBeenCalled();
+    expect(releasePurchaseConfirmationEmailClaim).toHaveBeenCalledWith(
+      adminDb,
+      "purchase-1"
+    );
   });
 });
