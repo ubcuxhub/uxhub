@@ -83,13 +83,22 @@ function readCardDetail(body: unknown, key: "avs_status" | "cvv_status") {
  * A declined card often reports the useful reason on the payment rather than in
  * the error code: Square returns a bare GENERIC_DECLINE while `card_details`
  * records the rejected security code or postal code.
+ *
+ * A rejected status is only evidence about that field when the other field
+ * passed. `CVV_REJECTED` means the issuer returned no positive CVV match on the
+ * authorization, which is also what a decline for an unrelated reason — a wrong
+ * expiry, say — looks like. So name a field only when the other one is accepted,
+ * and otherwise let the caller fall back to the generic decline wording.
  */
 function formatDeclineDetail(body: unknown) {
-  if (readCardDetail(body, "cvv_status") === "CVV_REJECTED") {
+  const cvv = readCardDetail(body, "cvv_status");
+  const avs = readCardDetail(body, "avs_status");
+
+  if (cvv === "CVV_REJECTED" && avs === "AVS_ACCEPTED") {
     return formatSquareErrorCode("CVV_FAILURE");
   }
 
-  if (readCardDetail(body, "avs_status") === "AVS_REJECTED") {
+  if (avs === "AVS_REJECTED" && cvv === "CVV_ACCEPTED") {
     return formatSquareErrorCode("ADDRESS_VERIFICATION_FAILURE");
   }
 

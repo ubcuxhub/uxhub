@@ -55,7 +55,7 @@ describe("payment fulfillment rules", () => {
     expect(getSquareErrorMessage(error)).toBe(expected);
   });
 
-  it("reports a rejected security code behind a generic decline", () => {
+  it("reports a rejected security code when the postal code passed", () => {
     const error = squareError([], {
       errors: [
         {
@@ -74,7 +74,7 @@ describe("payment fulfillment rules", () => {
     );
   });
 
-  it("reports a rejected postal code behind a generic decline", () => {
+  it("reports a rejected postal code when the security code passed", () => {
     const error = squareError([], {
       errors: [
         {
@@ -92,6 +92,33 @@ describe("payment fulfillment rules", () => {
       "The postal code did not match the one on file for your card. Check it and try again."
     );
   });
+
+  it.each([
+    ["AVS_REJECTED", "CVV_REJECTED"],
+    ["AVS_NOT_CHECKED", "CVV_REJECTED"],
+    ["AVS_REJECTED", "CVV_NOT_CHECKED"],
+    [undefined, "CVV_REJECTED"],
+  ])(
+    "stays generic when avs=%s and cvv=%s isolate no single field",
+    (avsStatus, cvvStatus) => {
+      const error = squareError([], {
+        errors: [
+          {
+            category: "PAYMENT_METHOD_ERROR",
+            code: "GENERIC_DECLINE",
+            detail: "Authorization error: 'GENERIC_DECLINE'",
+          },
+        ],
+        payment: {
+          card_details: { avs_status: avsStatus, cvv_status: cvvStatus },
+        },
+      });
+
+      expect(getSquareErrorMessage(error)).toBe(
+        "Your bank declined this payment. Check your card details and try again, or use a different card."
+      );
+    }
+  );
 
   it("falls back to the Square detail for an unmapped code", () => {
     const error = squareError([
