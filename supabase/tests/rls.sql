@@ -36,6 +36,16 @@ values (
 )
 returning id \gset event_
 
+insert into public.events (
+  name, description, regular_price, member_price, max_capacity, slug,
+  registration_start_time, registration_end_time, status
+)
+values (
+  'RLS Draft Event', 'RLS draft event', 0, 0, 10, 'rls-draft-event',
+  now() - interval '1 hour', now() + interval '1 hour', 'draft'
+)
+returning id \gset draft_event_
+
 insert into public.event_application_questions (
   event_id, question, response_type
 )
@@ -98,6 +108,7 @@ select set_config(
   true
 );
 select set_config('rls.event_id', :'event_id', true);
+select set_config('rls.draft_event_id', :'draft_event_id', true);
 select set_config('rls.user_a_id', :'user_a_id', true);
 select set_config('rls.user_b_id', :'user_b_id', true);
 select set_config('rls.question_id', :'question_id', true);
@@ -113,6 +124,13 @@ begin
   select count(*) into visible_count from public.user_info;
   if visible_count <> 1 then
     raise exception 'user A should see exactly their own user_info row, saw %', visible_count;
+  end if;
+
+  select count(*) into visible_count
+  from public.events
+  where id = current_setting('rls.draft_event_id')::uuid;
+  if visible_count <> 0 then
+    raise exception 'basic user can see a draft event';
   end if;
 
   update public.user_info
@@ -266,6 +284,13 @@ begin
     raise exception 'admin should see all user_info rows, saw %', visible_count;
   end if;
 
+  select count(*) into visible_count
+  from public.events
+  where id = current_setting('rls.draft_event_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'admin cannot see a draft event';
+  end if;
+
   select count(*) into visible_count from public.event_registrations;
   if visible_count <> 2 then
     raise exception 'admin should see both registrations, saw %', visible_count;
@@ -351,6 +376,13 @@ declare
 begin
   if not public.is_admin() or not public.is_manager() then
     raise exception 'manager should have manager and inherited admin access';
+  end if;
+
+  select count(*) into changed_count
+  from public.events
+  where id = current_setting('rls.draft_event_id')::uuid;
+  if changed_count <> 1 then
+    raise exception 'manager cannot see a draft event';
   end if;
 
   update public.user_info
