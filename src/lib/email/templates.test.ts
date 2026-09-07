@@ -91,6 +91,33 @@ describe("renderMembershipConfirmationEmail", () => {
     expect(html).toContain("$15.00");
   });
 
+  it("names the expiry date when one is known", () => {
+    const { html } = renderMembershipConfirmationEmail({
+      expiresAt: "2027-08-01T18:30:00Z",
+      membershipType: { name: "Innovator" },
+      purchase,
+      userName: "Ada",
+    });
+
+    expect(html).toContain("Expires on");
+    expect(html).toContain("August 1, 2027");
+    expect(html).toContain("active until August 1, 2027");
+    expect(html).not.toContain("for the next year");
+  });
+
+  it("falls back to the general wording without an expiry", () => {
+    const { html } = renderMembershipConfirmationEmail({
+      expiresAt: null,
+      membershipType: { name: "Innovator" },
+      purchase,
+      userName: "Ada",
+    });
+
+    expect(html).not.toContain("Expires on");
+    expect(html).not.toContain("null");
+    expect(html).toContain("active for the next year");
+  });
+
   it("formats the amount using the purchase currency", () => {
     const { html } = renderMembershipConfirmationEmail({
       membershipType: { name: "Innovator" },

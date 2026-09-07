@@ -20,6 +20,7 @@ vi.mock("@/lib/supabase-helpers/purchases", () => ({
   updatePurchase: (...args: unknown[]) => updatePurchase(...args),
 }));
 
+const fetchUserMembershipExpiryById = vi.fn();
 vi.mock("@/lib/supabase-helpers/users", () => ({
   fetchUserInfoContactById: async () => ({
     email: "ada@example.com",
@@ -27,6 +28,14 @@ vi.mock("@/lib/supabase-helpers/users", () => ({
     id: "user-1",
     last_name: "Lovelace",
   }),
+  fetchUserMembershipExpiryById: (...args: unknown[]) =>
+    fetchUserMembershipExpiryById(...args),
+}));
+
+const fetchMembershipTermEndsAt = vi.fn();
+vi.mock("@/lib/supabase-helpers/app-settings", () => ({
+  fetchMembershipTermEndsAt: (...args: unknown[]) =>
+    fetchMembershipTermEndsAt(...args),
 }));
 
 vi.mock("@/lib/supabase-helpers/memberships", () => ({
@@ -60,6 +69,24 @@ describe("sendPurchaseConfirmationEmail", () => {
     sendEmail.mockResolvedValue(true);
     claimPurchaseConfirmationEmail.mockResolvedValue(completedMembershipPurchase);
     releasePurchaseConfirmationEmailClaim.mockResolvedValue(undefined);
+    fetchUserMembershipExpiryById.mockResolvedValue({
+      membership_expires_at: "2027-08-01T18:30:00Z",
+      membership_type_id: "membership-1",
+    });
+    fetchMembershipTermEndsAt.mockResolvedValue(null);
+  });
+
+  it("puts the member's effective expiry in the membership receipt", async () => {
+    fetchPurchaseById.mockResolvedValue(completedMembershipPurchase);
+    fetchMembershipTermEndsAt.mockResolvedValue("2027-05-01T18:30:00Z");
+
+    await sendPurchaseConfirmationEmail(adminDb, "purchase-1");
+
+    expect(sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        html: expect.stringContaining("May 1, 2027"),
+      })
+    );
   });
 
   it("claims the purchase, sends once, and stamps it after Resend accepts", async () => {

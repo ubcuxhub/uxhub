@@ -21,10 +21,17 @@ export function detailRow(label: string, value: string | null | undefined) {
 }
 
 export function renderMembershipConfirmationEmail({
+  expiresAt,
   membershipType,
   purchase,
   userName,
 }: {
+  /**
+   * The member's effective expiry, already capped by the club-wide term end.
+   * Null when it could not be read, in which case the email falls back to the
+   * general "a year from purchase" wording rather than naming a wrong date.
+   */
+  expiresAt?: string | null;
   membershipType: Pick<MembershipTypeRow, "name">;
   purchase: Pick<
     PurchaseRow,
@@ -32,17 +39,21 @@ export function renderMembershipConfirmationEmail({
   >;
   userName: string;
 }) {
+  const expiryDate = formatEventDate(expiresAt);
   const details = [
     detailRow("Membership", membershipType.name),
     detailRow("Amount paid", formatAmount(purchase.amount_cents, purchase.currency)),
     detailRow("Purchased on", formatEventDate(purchase.created_at)),
+    detailRow("Expires on", expiryDate),
     detailRow("Order ID", purchase.id),
   ].join("");
 
   return {
     html: renderEmailLayout({
       heading: "Your UX Hub membership is active",
-      intro: `Hi ${userName}, thanks for joining. Your ${membershipType.name} membership is confirmed and active for the next year.`,
+      intro: `Hi ${userName}, thanks for joining. Your ${membershipType.name} membership is confirmed and active ${
+        expiryDate ? `until ${expiryDate}` : "for the next year"
+      }.`,
       body: `<table role="presentation" cellpadding="0" cellspacing="0">${details}</table>`,
     }),
     subject: `Your ${membershipType.name} membership is confirmed`,

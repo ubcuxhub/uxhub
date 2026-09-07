@@ -10,7 +10,12 @@ import {
   releasePurchaseConfirmationEmailClaim,
   updatePurchase,
 } from "@/lib/supabase-helpers/purchases";
-import { fetchUserInfoContactById } from "@/lib/supabase-helpers/users";
+import {
+  fetchUserInfoContactById,
+  fetchUserMembershipExpiryById,
+} from "@/lib/supabase-helpers/users";
+import { fetchMembershipTermEndsAt } from "@/lib/supabase-helpers/app-settings";
+import { getEffectiveMembershipExpiry } from "@/lib/membership";
 import { sendEmail } from "@/lib/email/client";
 import {
   renderEventConfirmationEmail,
@@ -56,7 +61,18 @@ export async function sendPurchaseConfirmationEmail(
       );
 
       if (membershipType) {
+        /**
+         * Read back the expiry fulfillment stamped on the member rather than
+         * recomputing it, and cap it the same way every other surface does, so
+         * the date in the receipt is the date the app will honor.
+         */
+        const [member, termEndsAt] = await Promise.all([
+          fetchUserMembershipExpiryById(adminDb, purchase.user_id),
+          fetchMembershipTermEndsAt(adminDb),
+        ]);
+
         rendered = renderMembershipConfirmationEmail({
+          expiresAt: getEffectiveMembershipExpiry(member, termEndsAt),
           membershipType,
           purchase,
           userName: formatUserName(recipient),
