@@ -2,15 +2,25 @@
 
 begin;
 
-select id, auth_user_id, email
-from public.user_info
-where auth_user_id is not null
-limit 1
+insert into auth.users (
+  id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+)
+values (
+  gen_random_uuid(), 'authenticated', 'authenticated',
+  'rls-user-a@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()
+)
+returning id as auth_user_id, email
 \gset user_a_
 
-update public.user_info
-set role_access = 'basic'
-where id = :'user_a_id';
+insert into public.user_info (
+  auth_user_id, email, first_name, last_name, role_access
+)
+values (
+  :'user_a_auth_user_id', :'user_a_email', 'RLS', 'User A', 'basic'
+)
+returning id
+\gset user_a_
 
 insert into public.user_info (email, first_name, last_name, role_access)
 values ('rls-user-b@example.test', 'RLS', 'User B', 'basic')
@@ -88,6 +98,7 @@ select set_config(
   true
 );
 select set_config('rls.event_id', :'event_id', true);
+select set_config('rls.user_a_id', :'user_a_id', true);
 select set_config('rls.user_b_id', :'user_b_id', true);
 select set_config('rls.question_id', :'question_id', true);
 \o
@@ -284,11 +295,158 @@ begin
     raise exception 'admin should see sponsor catalog';
   end if;
 
+  update public.user_info
+  set first_name = 'Admin tried to edit'
+  where id = current_setting('rls.user_b_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'admin updated another user';
+  end if;
+
+  begin
+    perform public.set_user_role(
+      current_setting('rls.user_b_id')::uuid,
+      'admin'::public.role_access_enum
+    );
+    raise exception 'admin changed another user role';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  update public.app_settings set membership_term_ends_at = now();
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'admin updated app_settings';
+  end if;
+end;
+$$;
+
+reset role;
+
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+update public.user_info
+set role_access = 'manager'
+where id = :'user_a_id';
+
+\o /dev/null
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'user_a_auth_user_id',
+    'email', :'user_a_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+\o
+
+set local role authenticated;
+
+do $$
+declare
+  changed_count integer;
+  assigned_role public.role_access_enum;
+begin
+  if not public.is_admin() or not public.is_manager() then
+    raise exception 'manager should have manager and inherited admin access';
+  end if;
+
+  update public.user_info
+  set first_name = 'Manager edit'
+  where id = current_setting('rls.user_b_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 1 then
+    raise exception 'manager could not update another user';
+  end if;
+
   update public.app_settings set membership_term_ends_at = now();
   get diagnostics changed_count = row_count;
   if changed_count <> 1 then
-    raise exception 'admin could not set the membership term end';
+    raise exception 'manager could not update app_settings';
   end if;
+
+  assigned_role := public.set_user_role(
+    current_setting('rls.user_b_id')::uuid,
+    'manager'::public.role_access_enum
+  );
+  if assigned_role <> 'manager'::public.role_access_enum then
+    raise exception 'manager could not promote another manager';
+  end if;
+
+  assigned_role := public.set_user_role(
+    current_setting('rls.user_b_id')::uuid,
+    'admin'::public.role_access_enum
+  );
+  if assigned_role <> 'admin'::public.role_access_enum then
+    raise exception 'manager could not demote another manager';
+  end if;
+
+  perform public.set_user_role(
+    current_setting('rls.user_b_id')::uuid,
+    'manager'::public.role_access_enum
+  );
+  assigned_role := public.set_user_role(
+    current_setting('rls.user_a_id')::uuid,
+    'basic'::public.role_access_enum
+  );
+  if assigned_role <> 'basic'::public.role_access_enum then
+    raise exception 'manager could not demote self while another manager exists';
+  end if;
+end;
+$$;
+
+reset role;
+
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+update public.user_info
+set role_access = case
+  when id = :'user_a_id' then 'manager'::public.role_access_enum
+  else 'basic'::public.role_access_enum
+end
+where id in (:'user_a_id', :'user_b_id');
+
+\o /dev/null
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'user_a_auth_user_id',
+    'email', :'user_a_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+\o
+
+set local role authenticated;
+
+do $$
+begin
+  begin
+    perform public.set_user_role(
+      current_setting('rls.user_a_id')::uuid,
+      'admin'::public.role_access_enum
+    );
+    raise exception 'final manager demoted itself';
+  exception
+    when raise_exception then
+      if sqlerrm <> 'The final manager cannot be demoted' then
+        raise;
+      end if;
+  end;
+
+  begin
+    perform public.set_user_role(
+      '00000000-0000-0000-0000-000000000000'::uuid,
+      'admin'::public.role_access_enum
+    );
+    raise exception 'manager changed a missing user';
+  exception
+    when no_data_found then null;
+  end;
 end;
 $$;
 

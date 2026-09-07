@@ -15,6 +15,7 @@ import {
 
 import { useUser } from "@/context/UserContext";
 import { FLAGS } from "@/lib/flags";
+import { hasAdminAccess, hasManagerAccess } from "@/lib/auth/roles";
 import { SettingsDialog, openSettings } from "@/features/settings";
 import {
   Sidebar,
@@ -50,7 +51,8 @@ export function AppSidebar() {
   const { user } = useUser();
   const { state, toggleSidebar } = useSidebar();
   const isActive = useIsActive();
-  const isAdmin = user?.role_access === "admin";
+  const isAdmin = hasAdminAccess(user?.role_access);
+  const isManager = hasManagerAccess(user?.role_access);
 
   return (
     <Sidebar collapsible="icon">
@@ -142,18 +144,20 @@ export function AppSidebar() {
                   </SidebarMenuButton>
                 </SidebarMenuItem>
 
-                <SidebarMenuItem>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive("/admin/settings")}
-                    tooltip="Club Settings"
-                  >
-                    <Link href="/admin/settings">
-                      <SlidersHorizontal />
-                      <span>Club Settings</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
+                {isManager && (
+                  <SidebarMenuItem>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={isActive("/admin/settings")}
+                      tooltip="Club Settings"
+                    >
+                      <Link href="/admin/settings">
+                        <SlidersHorizontal />
+                        <span>Club Settings</span>
+                      </Link>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                )}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

@@ -120,6 +120,7 @@ interface CommonProfileInput {
   phone: string;
   pronouns: string;
   admin?: boolean;
+  role?: TablesInsert<"user_info">["role_access"];
   dietary?: string | null;
   newsletter?: boolean;
 }
@@ -130,7 +131,7 @@ function baseProfile(input: CommonProfileInput) {
     last_name: input.lastName,
     phone: input.phone,
     preferred_pronouns: input.pronouns,
-    role_access: (input.admin ? "admin" : "basic") as "admin" | "basic",
+    role_access: input.role ?? (input.admin ? "admin" : "basic"),
     dietary_restrictions: input.dietary ?? null,
     newsletter: input.newsletter ?? false,
     square_customer_id: null,
@@ -751,6 +752,25 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
       faculty: "Faculty of Forestry",
       major: "Urban Forestry",
       year: "2",
+    }),
+    purchases: [],
+    registrations: [],
+  },
+  {
+    email: "manager-no-membership@example.com",
+    password: SEED_PASSWORD,
+    membershipSlug: null,
+    fullEventHistory: false,
+    profile: studentProfile({
+      firstName: "Morgan",
+      lastName: "Lee",
+      phone: "6045550111",
+      pronouns: "they/them",
+      role: "manager",
+      studentNumber: 10000007,
+      faculty: "Faculty of Arts",
+      major: "Design",
+      year: "4",
     }),
     purchases: [],
     registrations: [],

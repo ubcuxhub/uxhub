@@ -1,6 +1,10 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { useUser } from "@/context/UserContext";
 import {
   UserDetailsPanel,
   UserDirectoryPanel,
@@ -9,18 +13,26 @@ import {
   type SortOption,
   type UserRecord,
 } from "@/features/admin";
-import { updateAdminUserAction } from "@/features/admin/actions";
+import {
+  updateManagerUserAction,
+  updateUserRoleAction,
+} from "@/features/admin/actions";
 import { formatUserName } from "@/lib/user-name";
+import type { RoleAccess } from "@/types/models";
 
 interface AdminUsersManagerProps {
   initialUsers: UserRecord[];
   membershipTypes: MembershipTypeOption[];
+  canManageUsers: boolean;
 }
 
 export function AdminUsersManager({
   initialUsers,
   membershipTypes,
+  canManageUsers,
 }: AdminUsersManagerProps) {
+  const router = useRouter();
+  const { refreshUser } = useUser();
   const [users, setUsers] = useState<UserRecord[]>(initialUsers);
   const [selectedUser, setSelectedUser] = useState<UserRecord | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -29,6 +41,8 @@ export function AdminUsersManager({
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
+  const [pendingRole, setPendingRole] = useState<RoleAccess | null>(null);
+  const [roleError, setRoleError] = useState<string | null>(null);
   const filteredUsers = useMemo(() => {
     let filtered = [...users];
 
@@ -65,6 +79,7 @@ export function AdminUsersManager({
     field: string,
     currentValue: string | number | boolean | null
   ) => {
+    if (!canManageUsers) return;
     setEditingField(field);
     if (field === "membership_type_id") {
       setEditValue(currentValue?.toString() || "__none__");
@@ -104,7 +119,9 @@ export function AdminUsersManager({
         if (editValue === "__none__" || editValue === "") {
           updateData.membership_type_id = null;
         } else {
-          const membershipType = membershipTypes.find((mt) => mt.id === editValue);
+          const membershipType = membershipTypes.find(
+            (membership) => membership.id === editValue
+          );
           if (membershipType) {
             updateData.membership_type_id = editValue;
           }
@@ -115,13 +132,12 @@ export function AdminUsersManager({
         throw new Error("The selected user has no id.");
       }
 
-      await updateAdminUserAction(
-        selectedUser.id,
-        field,
-        updateData[field]
-      );
+      await updateManagerUserAction(selectedUser.id, field, updateData[field]);
 
-      let updatedUser: UserRecord = { ...selectedUser, [field]: updateData[field] };
+      let updatedUser: UserRecord = {
+        ...selectedUser,
+        [field]: updateData[field],
+      };
 
       if (field === "membership_type_id") {
         if (editValue === "__none__" || editValue === "") {
@@ -131,7 +147,9 @@ export function AdminUsersManager({
             membership_type_name: null,
           };
         } else {
-          const membershipType = membershipTypes.find((mt) => mt.id === editValue);
+          const membershipType = membershipTypes.find(
+            (membership) => membership.id === editValue
+          );
           updatedUser = {
             ...updatedUser,
             membership_type_id: editValue || null,
@@ -142,7 +160,9 @@ export function AdminUsersManager({
 
       setSelectedUser(updatedUser);
       setUsers((prevUsers) =>
-        prevUsers.map((user) => (user.email === updatedUser.email ? updatedUser : user))
+        prevUsers.map((user) =>
+          user.id === updatedUser.id ? updatedUser : user
+        )
       );
       setEditingField(null);
       setEditValue("");
@@ -154,32 +174,92 @@ export function AdminUsersManager({
     }
   };
 
+  const handleRoleChangeRequest = (role: RoleAccess) => {
+    if (!canManageUsers || !selectedUser || role === selectedUser.role_access) {
+      return;
+    }
+
+    setRoleError(null);
+    setPendingRole(role);
+  };
+
+  const handleRoleChangeConfirm = async () => {
+    if (!selectedUser?.id || !pendingRole) return;
+
+    setIsSaving(true);
+    setRoleError(null);
+
+    try {
+      const role = await updateUserRoleAction(selectedUser.id, pendingRole);
+      const updatedUser = { ...selectedUser, role_access: role };
+
+      setSelectedUser(updatedUser);
+      setUsers((current) =>
+        current.map((user) =>
+          user.id === updatedUser.id ? updatedUser : user
+        )
+      );
+      setPendingRole(null);
+      await refreshUser();
+      router.refresh();
+    } catch (error) {
+      setRoleError(
+        error instanceof Error ? error.message : "Failed to update the role."
+      );
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   return (
     <div className="flex min-h-full overflow-hidden">
-          <UserDirectoryPanel
-            users={filteredUsers}
-            selectedUser={selectedUser}
-            isLoading={false}
-            error={null}
-            searchQuery={searchQuery}
-            searchOption={searchOption}
-            sortOption={sortOption}
-            onSearchQueryChange={setSearchQuery}
-            onSearchOptionChange={setSearchOption}
-            onSortOptionChange={setSortOption}
-            onUserSelect={handleUserSelect}
-          />
-          <UserDetailsPanel
-            selectedUser={selectedUser}
-            editingField={editingField}
-            editValue={editValue}
-            isSaving={isSaving}
-            membershipTypes={membershipTypes}
-            onEditStart={handleEditStart}
-            onEditCancel={handleEditCancel}
-            onEditSave={handleEditSave}
-            onValueChange={setEditValue}
-          />
+      <UserDirectoryPanel
+        users={filteredUsers}
+        selectedUser={selectedUser}
+        isLoading={false}
+        error={null}
+        searchQuery={searchQuery}
+        searchOption={searchOption}
+        sortOption={sortOption}
+        onSearchQueryChange={setSearchQuery}
+        onSearchOptionChange={setSearchOption}
+        onSortOptionChange={setSortOption}
+        onUserSelect={handleUserSelect}
+      />
+      <UserDetailsPanel
+        selectedUser={selectedUser}
+        editingField={editingField}
+        editValue={editValue}
+        isSaving={isSaving}
+        membershipTypes={membershipTypes}
+        canManageUsers={canManageUsers}
+        onEditStart={handleEditStart}
+        onEditCancel={handleEditCancel}
+        onEditSave={handleEditSave}
+        onValueChange={setEditValue}
+        onRoleChangeRequest={handleRoleChangeRequest}
+      />
+      <ConfirmDialog
+        open={pendingRole !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingRole(null);
+            setRoleError(null);
+          }
+        }}
+        title="Change role access?"
+        description={
+          selectedUser && pendingRole
+            ? `Change ${formatUserName(selectedUser)} from ${selectedUser.role_access} to ${pendingRole}?`
+            : "Confirm this role change."
+        }
+        confirmLabel="Change role"
+        pendingLabel="Changing role..."
+        confirmVariant={pendingRole === "basic" ? "destructive" : "default"}
+        error={roleError}
+        pending={isSaving}
+        onConfirm={() => void handleRoleChangeConfirm()}
+      />
     </div>
   );
 }

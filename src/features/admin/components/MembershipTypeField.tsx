@@ -22,6 +22,7 @@ interface MembershipTypeFieldProps {
   onEditCancel: () => void;
   onEditSave: (field: string) => void;
   onValueChange: (value: string) => void;
+  canEdit?: boolean;
 }
 
 export function MembershipTypeField({
@@ -35,6 +36,7 @@ export function MembershipTypeField({
   onEditCancel,
   onEditSave,
   onValueChange,
+  canEdit = true,
 }: MembershipTypeFieldProps) {
   return (
     <div className="space-y-2">
@@ -67,13 +69,20 @@ export function MembershipTypeField({
       ) : (
         <div className="flex items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-small">
           <span className={!value ? "text-muted-foreground" : ""}>{value || "None"}</span>
-          <Button
-            variant="ghost"
-            onClick={() => onEditStart("membership_type_id", selectedMembershipTypeId ?? null)}
-            className="h-6 px-2"
-          >
-            Edit
-          </Button>
+          {canEdit && (
+            <Button
+              variant="ghost"
+              onClick={() =>
+                onEditStart(
+                  "membership_type_id",
+                  selectedMembershipTypeId ?? null
+                )
+              }
+              className="h-6 px-2"
+            >
+              Edit
+            </Button>
+          )}
         </div>
       )}
     </div>

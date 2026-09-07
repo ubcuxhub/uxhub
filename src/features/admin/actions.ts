@@ -2,9 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 
-import { requireAdmin } from "@/lib/auth/guards";
+import { requireAdmin, requireManager } from "@/lib/auth/guards";
 import { createUniqueSlug, slugify } from "@/lib/slug";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { createClient } from "@/lib/supabase/server";
 import {
   adminDeleteEventImageByUrl,
   adminUpdateMembershipTermEndsAt,
@@ -47,9 +48,9 @@ import type {
   SponsorRow,
   UserInfoUpdate,
 } from "@/types/models";
-import type { ApplicationStatus } from "@/types/models";
+import type { ApplicationStatus, RoleAccess } from "@/types/models";
 
-const ADMIN_USER_FIELDS = new Set([
+const MANAGER_USER_FIELDS = new Set([
   "first_name",
   "last_name",
   "email",
@@ -59,19 +60,18 @@ const ADMIN_USER_FIELDS = new Set([
   "faculty",
   "major",
   "year",
-  "role_access",
   "membership_type_id",
   "order_date_deprecated",
 ]);
 
-function assertAdminUserUpdate(
+function assertManagerUserUpdate(
   field: string,
   value: string | number | boolean | null
 ): UserInfoUpdate {
   const databaseField =
     field === "order_date" ? "order_date_deprecated" : field;
 
-  if (!ADMIN_USER_FIELDS.has(databaseField)) {
+  if (!MANAGER_USER_FIELDS.has(databaseField)) {
     throw new Error("This user field cannot be edited.");
   }
 
@@ -88,14 +88,6 @@ function assertAdminUserUpdate(
   }
 
   if (
-    databaseField === "role_access" &&
-    value !== "basic" &&
-    value !== "admin"
-  ) {
-    throw new Error("Invalid role.");
-  }
-
-  if (
     databaseField === "year" &&
     value !== null &&
     !["1", "2", "3", "4", "5+"].includes(String(value))
@@ -106,20 +98,46 @@ function assertAdminUserUpdate(
   return { [databaseField]: value } as UserInfoUpdate;
 }
 
-export async function updateAdminUserAction(
+export async function updateManagerUserAction(
   userId: string,
   field: string,
   value: string | number | boolean | null
 ) {
-  await requireAdmin();
+  await requireManager();
 
   if (!userId) {
     throw new Error("A user id is required.");
   }
 
-  const payload = assertAdminUserUpdate(field, value);
+  const payload = assertManagerUserUpdate(field, value);
   await adminUpdateUserInfoById(userId, payload);
   revalidatePath("/admin/users");
+}
+
+export async function updateUserRoleAction(
+  userId: string,
+  role: RoleAccess
+): Promise<RoleAccess> {
+  await requireManager();
+
+  if (!userId) {
+    throw new Error("A user id is required.");
+  }
+  if (role !== "basic" && role !== "admin" && role !== "manager") {
+    throw new Error("Invalid role.");
+  }
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("set_user_role", {
+    p_target_user_id: userId,
+    p_role: role,
+  });
+
+  if (error) throw error;
+  if (!data) throw new Error("The role update returned no role.");
+
+  revalidatePath("/admin/users");
+  return data;
 }
 
 export interface SaveAdminEventInput {
@@ -344,14 +362,14 @@ export async function fetchAdminCheckInSnapshotAction(eventId: string) {
  *
  * `date` is a bare `YYYY-MM-DD` from a date input, or null to clear the
  * ceiling. It is stored as the last second of that day in Pacific time — the
- * date an admin picks means "through the end of that day" to a member in
+ * date a manager picks means "through the end of that day" to a member in
  * Vancouver, and storing UTC midnight would cut them off the previous
  * afternoon.
  *
  * The whole app reads this, so the revalidation is layout-wide.
  */
 export async function setMembershipTermEndsAtAction(date: string | null) {
-  const admin = await requireAdmin();
+  const manager = await requireManager();
 
   let value: string | null = null;
 
@@ -364,7 +382,7 @@ export async function setMembershipTermEndsAtAction(date: string | null) {
     if (!value) throw new Error("Enter a valid date.");
   }
 
-  await adminUpdateMembershipTermEndsAt(value, admin.id);
+  await adminUpdateMembershipTermEndsAt(value, manager.id);
   revalidatePath("/", "layout");
 
   return value;
@@ -374,7 +392,7 @@ export async function setMembershipTermEndsAtAction(date: string | null) {
  * Edits one membership tier from Club Settings.
  *
  * The update is built here from three named columns rather than from the
- * caller's payload, in the spirit of `ADMIN_USER_FIELDS` above: `slug` is
+ * caller's payload, in the spirit of `MANAGER_USER_FIELDS` above: `slug` is
  * absent because checkout URLs are `/portal/membership/<slug>/checkout` and a
  * rename breaks live links; `name` because it is already printed on sent
  * receipts; `eligible_user_types` because emptying it would silently make a
@@ -384,7 +402,7 @@ export async function updateMembershipTypeAction(
   id: string,
   input: MembershipTypeInput
 ) {
-  await requireAdmin();
+  await requireManager();
 
   if (!id) throw new Error("Membership tier not found.");
 
