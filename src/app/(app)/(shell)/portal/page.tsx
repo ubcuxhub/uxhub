@@ -1,44 +1,18 @@
-import Link from "next/link";
-import { FlowLink } from "@/components/shared/FlowLink";
-import { Button } from "@/components/ui/button";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { requireAuth } from "@/lib/auth/guards";
-import { LINKTREE_URL } from "@/lib/constants";
-import { FLAGS } from "@/lib/flags";
-import { hasActiveMembership } from "@/lib/membership";
+import {
+  getEffectiveMembershipExpiry,
+  hasActiveMembership,
+} from "@/lib/membership";
 import { isMembershipTermClosed } from "@/features/memberships/lib/expiry";
+import {
+  MembershipCard,
+  MembershipCardEmptyState,
+} from "@/features/memberships/components/MembershipCard";
+import { formatUserName } from "@/lib/user-name";
 import { createClient } from "@/lib/supabase/server";
 import { fetchMembershipTermEndsAt } from "@/lib/supabase-helpers/app-settings";
-import {
-  ArrowRight,
-  ArrowUpRight,
-  CalendarDays,
-  UserRoundPlus,
-} from "lucide-react";
-
-function BecomeMemberBanner() {
-  return (
-    <div className="mb-8 flex flex-col gap-3 rounded-lg border bg-primary/5 p-4 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-start gap-3">
-        <div className="rounded-full bg-primary/10 p-2">
-          <UserRoundPlus className="text-primary" />
-        </div>
-        <div>
-          <h3 className="text-subheading">Become a UX Hub member</h3>
-          <p className="text-small text-muted-foreground">
-            Unlock member pricing on events and exclusive perks.
-          </p>
-        </div>
-      </div>
-      <Button asChild className="shrink-0">
-        <FlowLink href="/portal/membership/join">
-          Become a member
-          <ArrowRight />
-        </FlowLink>
-      </Button>
-    </div>
-  );
-}
+import { fetchMembershipTypeById } from "@/lib/supabase-helpers/memberships";
 
 export default async function PortalHome() {
   const user = await requireAuth();
@@ -49,32 +23,30 @@ export default async function PortalHome() {
   // Nothing to sell once the term has ended, so the prompt would lead nowhere.
   const canJoin = !isMembershipTermClosed(termEndsAt);
 
+  // Only a current member needs the tier row; the empty state says the same
+  // thing whatever they would have bought.
+  const membershipType =
+    isMember && user.membership_type_id
+      ? await fetchMembershipTypeById(supabase, user.membership_type_id)
+      : null;
+
   return (
     <PageContainer>
-      {!isMember && canJoin && <BecomeMemberBanner />}
       <div className="mb-8">
-        <h1 className="mb-2 text-h1 tracking-tight">
-          Hey, {firstName}!
-        </h1>
+        <h1 className="mb-2 text-h1 tracking-tight">Hey, {firstName}!</h1>
         <p className="text-muted-foreground">
           Welcome to the UBC UX Hub portal.
         </p>
       </div>
-      {FLAGS.studentEvents ? (
-        <Button asChild variant="outline">
-          <Link href="/portal/events">
-            <CalendarDays />
-            View your events
-          </Link>
-        </Button>
+
+      {membershipType ? (
+        <MembershipCard
+          cardholder={formatUserName(user) || firstName}
+          expiresAt={getEffectiveMembershipExpiry(user, termEndsAt)}
+          membershipType={membershipType}
+        />
       ) : (
-        <Button asChild variant="outline">
-          <a href={LINKTREE_URL} target="_blank" rel="noopener noreferrer">
-            <CalendarDays />
-            See our upcoming events
-            <ArrowUpRight />
-          </a>
-        </Button>
+        canJoin && !isMember && <MembershipCardEmptyState />
       )}
     </PageContainer>
   );
