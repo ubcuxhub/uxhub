@@ -70,6 +70,26 @@ export async function fetchPurchaseBySquarePaymentId(
   return data;
 }
 
+export async function fetchNonterminalMembershipPurchase(
+  supabase: DbClient,
+  userId: string,
+  membershipTypeId: string,
+): Promise<PurchaseRow | null> {
+  const { data, error } = await supabase
+    .from(TABLES.purchases)
+    .select("*")
+    .eq("user_id", userId)
+    .eq("kind", "membership")
+    .eq("membership_type_id", membershipTypeId)
+    .in("status", ["pending", "authorized"])
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
 export async function updatePurchase(
   supabase: DbClient,
   purchaseId: string,

@@ -116,8 +116,9 @@ function optionalText(value: string) {
 export async function saveMembershipProfileAction(
   input: MembershipProfileInput
 ): Promise<MembershipProfileResult> {
+  const user = await requireAuth("/portal/membership/join");
+
   try {
-    const user = await requireAuth("/portal/membership/join");
     const termEndsAt = await fetchMembershipTermEndsAt(await createClient());
     if (!canEditMembershipClassification(user, termEndsAt)) {
       return {
@@ -211,12 +212,10 @@ export async function saveMembershipProfileAction(
     if (isDuplicateStudentNumberError(error)) {
       return { ok: false, error: DUPLICATE_STUDENT_NUMBER_MESSAGE };
     }
+    console.error("saveMembershipProfileAction failed.");
     return {
       ok: false,
-      error:
-        error instanceof Error
-          ? error.message
-          : "Your membership details could not be saved.",
+      error: "Your membership details could not be saved. Please try again.",
     };
   }
 }

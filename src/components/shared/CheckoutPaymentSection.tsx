@@ -29,6 +29,7 @@ interface CheckoutPaymentSectionProps {
   showAmount?: boolean;
   showSecurityMessage?: boolean;
   title?: string;
+  userId: string;
 }
 
 export function CheckoutPaymentSection({
@@ -51,6 +52,7 @@ export function CheckoutPaymentSection({
   showAmount = true,
   showSecurityMessage = true,
   title = "Secure Checkout",
+  userId,
 }: CheckoutPaymentSectionProps) {
   const form = (
     <SquareCheckoutForm
@@ -70,6 +72,7 @@ export function CheckoutPaymentSection({
       onSubmittingChange={onSubmittingChange}
       showAmount={showAmount}
       showSecurityMessage={showSecurityMessage}
+      userId={userId}
     />
   );
 

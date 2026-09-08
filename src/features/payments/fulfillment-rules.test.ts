@@ -4,6 +4,8 @@ import {
   formatReservationFailure,
   getSquareErrorDiagnostic,
   getSquareErrorMessage,
+  isDefinitiveSquareFailure,
+  matchesReferencedPurchase,
   normalizeSquareStatus,
 } from "./fulfillment-rules";
 
@@ -156,6 +158,75 @@ describe("payment fulfillment rules", () => {
       "Network unavailable"
     );
     expect(getSquareErrorMessage(null, "Try again.")).toBe("Try again.");
+  });
+
+  it("only treats definite payment-method declines as terminal", () => {
+    expect(
+      isDefinitiveSquareFailure(
+        squareError([
+          {
+            category: "PAYMENT_METHOD_ERROR",
+            code: "GENERIC_DECLINE",
+          },
+        ]),
+      ),
+    ).toBe(true);
+    expect(
+      isDefinitiveSquareFailure(
+        squareError([{ category: "API_ERROR", code: "GATEWAY_TIMEOUT" }]),
+      ),
+    ).toBe(false);
+    expect(isDefinitiveSquareFailure(new Error("Network disconnected"))).toBe(
+      false,
+    );
+  });
+
+  it("matches a webhook payment to the purchase reference it can repair", () => {
+    const purchase = {
+      amount_cents: 1_500,
+      currency: "CAD",
+      id: "purchase-1",
+      square_payment_id: null,
+    };
+
+    expect(
+      matchesReferencedPurchase(
+        {
+          amountMoney: { amount: BigInt(1_500), currency: "CAD" },
+          id: "square-payment-1",
+          referenceId: "purchase-1",
+        },
+        purchase,
+      ),
+    ).toBe(true);
+    expect(
+      matchesReferencedPurchase(
+        {
+          amountMoney: { amount: BigInt(1_501), currency: "CAD" },
+          id: "square-payment-1",
+          referenceId: "purchase-1",
+        },
+        purchase,
+      ),
+    ).toBe(false);
+  });
+
+  it("does not replace a different persisted Square payment", () => {
+    expect(
+      matchesReferencedPurchase(
+        {
+          amountMoney: { amount: BigInt(1_500), currency: "CAD" },
+          id: "square-payment-2",
+          referenceId: "purchase-1",
+        },
+        {
+          amount_cents: 1_500,
+          currency: "CAD",
+          id: "purchase-1",
+          square_payment_id: "square-payment-1",
+        },
+      ),
+    ).toBe(false);
   });
 
   it.each([

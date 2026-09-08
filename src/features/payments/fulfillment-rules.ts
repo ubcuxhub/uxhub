@@ -1,5 +1,37 @@
 import { SquareError } from "square";
 
+interface ReferencedSquarePayment {
+  amountMoney?: {
+    amount?: bigint | null;
+    currency?: string | null;
+  };
+  id?: string;
+  referenceId?: string;
+}
+
+interface ReferencedPurchase {
+  amount_cents: number;
+  currency: string;
+  id: string;
+  square_payment_id: string | null;
+}
+
+export function matchesReferencedPurchase(
+  payment: ReferencedSquarePayment,
+  purchase: ReferencedPurchase | null,
+) {
+  return Boolean(
+    purchase &&
+      payment.id &&
+      payment.referenceId === purchase.id &&
+      payment.amountMoney?.amount !== undefined &&
+      String(payment.amountMoney.amount) === String(purchase.amount_cents) &&
+      payment.amountMoney.currency === purchase.currency &&
+      (!purchase.square_payment_id ||
+        purchase.square_payment_id === payment.id),
+  );
+}
+
 export function normalizeSquareStatus(status: string | undefined) {
   switch (status) {
     case "APPROVED":
@@ -124,6 +156,33 @@ export function getSquareErrorMessage(
   }
 
   return fallback;
+}
+
+const AMBIGUOUS_SQUARE_CODES = new Set([
+  "CARD_TOKEN_USED",
+  "GATEWAY_TIMEOUT",
+  "IDEMPOTENCY_KEY_REUSED",
+  "RATE_LIMITED",
+  "SERVICE_UNAVAILABLE",
+  "TEMPORARY_ERROR",
+]);
+
+/**
+ * Only a definite payment-method rejection permits a fresh checkout attempt.
+ * Transport and service errors can arrive after Square accepted a charge, so
+ * those attempts stay pending and retain their idempotency key.
+ */
+export function isDefinitiveSquareFailure(error: unknown) {
+  if (!(error instanceof SquareError) || error.errors.length === 0) {
+    return false;
+  }
+
+  return error.errors.every(
+    (entry) =>
+      entry.category === "PAYMENT_METHOD_ERROR" &&
+      Boolean(entry.code) &&
+      !AMBIGUOUS_SQUARE_CODES.has(entry.code),
+  );
 }
 
 /**
