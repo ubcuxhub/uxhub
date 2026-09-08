@@ -54,6 +54,7 @@ export async function requireAuth(nextPath?: string): Promise<UserInfoRow> {
 
 export async function redirectIfAuthenticated(redirectTo = "/portal") {
   const supabase = await createClient();
+  const safeRedirectTo = getSafeInternalPath(redirectTo);
 
   const {
     data: { user: authUser },
@@ -69,7 +70,7 @@ export async function redirectIfAuthenticated(redirectTo = "/portal") {
   );
 
   if (userInfo) {
-    redirect(redirectTo);
+    redirect(safeRedirectTo);
   }
 
   const ensured = await ensureUserInfo(authUser);
@@ -78,7 +79,7 @@ export async function redirectIfAuthenticated(redirectTo = "/portal") {
     redirect(authErrorPath(ensured.message));
   }
 
-  redirect(redirectTo);
+  redirect(safeRedirectTo);
 }
 
 export async function requireAdmin(): Promise<UserInfoRow> {

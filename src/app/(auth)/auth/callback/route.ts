@@ -1,18 +1,9 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { ensureUserInfo } from "@/lib/auth/ensure-user-info";
+import { getSafeInternalPath } from "@/lib/auth/paths";
 import { getRequestOrigin } from "@/lib/http/request-origin";
 import { createClient } from "@/lib/supabase/server";
-
-const DEFAULT_NEXT_PATH = "/portal";
-
-function getSafeNextPath(next: string | null) {
-  if (!next || !next.startsWith("/") || next.startsWith("//")) {
-    return DEFAULT_NEXT_PATH;
-  }
-
-  return next;
-}
 
 function redirectToAuthError(origin: string, message: string) {
   const url = new URL("/auth/error", origin);
@@ -27,7 +18,7 @@ export async function GET(request: NextRequest) {
   // cookies set below are not sent with the follow-up request.
   const origin = getRequestOrigin(request);
   const code = searchParams.get("code");
-  const nextPath = getSafeNextPath(searchParams.get("next"));
+  const nextPath = getSafeInternalPath(searchParams.get("next"));
   const providerError =
     searchParams.get("error_description") || searchParams.get("error");
 
