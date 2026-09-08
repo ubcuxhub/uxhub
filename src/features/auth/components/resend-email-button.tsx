@@ -1,7 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
+import { withDeadline } from "@/lib/async/deadline";
+import { useNavigationRecovery } from "@/lib/async/use-navigation-recovery";
+
+import {
+  AUTH_ACTION_ERRORS,
+  getAuthActionErrorMessage,
+} from "../auth-errors";
 import {
   getRemainingCooldownSeconds,
   getResendCooldownMessage,
@@ -10,7 +17,7 @@ import {
 
 interface ResendEmailButtonProps {
   /** Performs the resend; throwing surfaces the message to the user. */
-  onResend: () => Promise<void>;
+  onResend: () => Promise<"navigating" | void>;
 }
 
 export function ResendEmailButton({ onResend }: ResendEmailButtonProps) {
@@ -18,6 +25,14 @@ export function ResendEmailButton({ onResend }: ResendEmailButtonProps) {
   const [isResending, setIsResending] = useState(false);
   const [cooldownEndsAt, setCooldownEndsAt] = useState<number | null>(null);
   const [cooldownSeconds, setCooldownSeconds] = useState<number | null>(null);
+  const resendingRef = useRef(false);
+  const recoverStalledNavigation = useNavigationRecovery(() => {
+    resendingRef.current = false;
+    setIsResending(false);
+    setStatus(
+      "You are signed in, but the next page did not load. Return to sign in and try again.",
+    );
+  });
 
   useEffect(() => {
     if (cooldownEndsAt === null) return;
@@ -44,12 +59,20 @@ export function ResendEmailButton({ onResend }: ResendEmailButtonProps) {
   }, [cooldownEndsAt]);
 
   const handleResend = async () => {
+    if (resendingRef.current || cooldownSeconds !== null) return;
+
+    resendingRef.current = true;
     setIsResending(true);
     setStatus(null);
+    let navigationStarted = false;
 
     try {
-      await onResend();
-      setStatus("Email resent.");
+      const result = await withDeadline(() => onResend(), {
+        operation: "Email resend",
+      });
+      navigationStarted = result === "navigating";
+      if (navigationStarted) recoverStalledNavigation();
+      else setStatus("Email resent.");
     } catch (error: unknown) {
       const retryAfterSeconds = getResendCooldownSeconds(error);
 
@@ -60,12 +83,13 @@ export function ResendEmailButton({ onResend }: ResendEmailButtonProps) {
           setCooldownSeconds(retryAfterSeconds);
         }
       } else {
-        setStatus(
-          error instanceof Error ? error.message : "Unable to resend email.",
-        );
+        setStatus(getAuthActionErrorMessage(error, AUTH_ACTION_ERRORS.resend));
       }
     } finally {
-      setIsResending(false);
+      if (!navigationStarted) {
+        resendingRef.current = false;
+        setIsResending(false);
+      }
     }
   };
 

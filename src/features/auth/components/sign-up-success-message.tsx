@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 
+import { withDeadline } from "@/lib/async/deadline";
 import { createClient } from "@/lib/supabase/client";
 
 import { AuthMessage } from "./auth-message";
@@ -42,12 +43,18 @@ export function SignUpSuccessMessage({
     let active = true;
 
     const checkSession = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      try {
+        const {
+          data: { session },
+        } = await withDeadline(() => supabase.auth.getSession(), {
+          operation: "Session check",
+        });
 
-      if (active && session?.user) {
-        redirectAuthenticatedUser();
+        if (active && session?.user) {
+          redirectAuthenticatedUser();
+        }
+      } catch {
+        // The auth-state subscription and later focus checks remain available.
       }
     };
 
@@ -78,23 +85,29 @@ export function SignUpSuccessMessage({
     };
   }, [redirectAuthenticatedUser, supabase]);
 
-  const handleResend = async () => {
+  const handleResend = async (): Promise<"navigating" | void> => {
     const {
       data: { session },
-    } = await supabase.auth.getSession();
+    } = await withDeadline(() => supabase.auth.getSession(), {
+      operation: "Session check",
+    });
 
     if (session?.user) {
       redirectAuthenticatedUser();
-      return;
+      return "navigating";
     }
 
-    const { error } = await supabase.auth.resend({
-      type: "signup",
-      email,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
-      },
-    });
+    const { error } = await withDeadline(
+      () =>
+        supabase.auth.resend({
+          type: "signup",
+          email,
+          options: {
+            emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
+          },
+        }),
+      { operation: "Confirmation email resend" },
+    );
 
     if (error) throw error;
   };
