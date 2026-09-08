@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import {
   Field,
@@ -11,13 +11,22 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+  isAsyncTimeoutError,
+  withDeadline,
+} from "@/lib/async/deadline";
+import { useNavigationRecovery } from "@/lib/async/use-navigation-recovery";
 import { createClient } from "@/lib/supabase/client";
 
+import {
+  AUTH_ACTION_ERRORS,
+  getAuthActionErrorMessage,
+} from "../auth-errors";
+import { setPendingEmail } from "../pending-email";
 import { AuthPanel } from "./auth-panel";
 import { authInputClassName } from "./auth-styles";
 import { AuthSubmitButton } from "./auth-submit-button";
 import { GoogleOAuthButton } from "./google-oauth-button";
-import { setPendingEmail } from "../pending-email";
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -49,7 +58,15 @@ export function SignUpForm({
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<SignUpFieldErrors>({});
   const [isLoading, setIsLoading] = useState(false);
+  const submittingRef = useRef(false);
   const router = useRouter();
+  const recoverStalledNavigation = useNavigationRecovery(() => {
+    submittingRef.current = false;
+    setIsLoading(false);
+    setError(
+      "Your account was created, but the next page did not load. Check your email or try signing in.",
+    );
+  });
 
   // Validated on submit rather than gating the button, so a failing rule names
   // itself on the field it belongs to instead of leaving a dead control.
@@ -69,6 +86,7 @@ export function SignUpForm({
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current) return;
 
     setError(null);
 
@@ -78,22 +96,28 @@ export function SignUpForm({
     if (Object.keys(errors).length > 0) return;
 
     const supabase = createClient();
+    submittingRef.current = true;
     setIsLoading(true);
+    let navigationStarted = false;
 
     try {
       const normalizedEmail = formData.email.trim().toLowerCase();
 
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: normalizedEmail,
-        password: formData.password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
-          data: {
-            first_name: formData.firstName.trim(),
-            last_name: formData.lastName.trim(),
-          },
-        },
-      });
+      const { data: authData, error: authError } = await withDeadline(
+        () =>
+          supabase.auth.signUp({
+            email: normalizedEmail,
+            password: formData.password,
+            options: {
+              emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`,
+              data: {
+                first_name: formData.firstName.trim(),
+                last_name: formData.lastName.trim(),
+              },
+            },
+          }),
+        { operation: "Account creation" },
+      );
 
       if (authError) throw authError;
 
@@ -104,20 +128,25 @@ export function SignUpForm({
       // authenticated route can create the profile immediately. Otherwise the
       // confirmation callback creates it once the session exists.
       if (authData.session) {
-        const res = await fetch("/api/auth/complete-profile", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            firstName: formData.firstName.trim(),
-            lastName: formData.lastName.trim(),
-          }),
-        });
+        const { response, result } = await withDeadline(
+          async (signal) => {
+            const response = await fetch("/api/auth/complete-profile", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                firstName: formData.firstName.trim(),
+                lastName: formData.lastName.trim(),
+              }),
+              signal,
+            });
+            const result = (await response.json()) as { error?: string };
+            return { response, result };
+          },
+          { operation: "Profile creation" },
+        );
 
-        const result = await res.json();
-
-        if (!res.ok) {
-          console.error("Failed to create user profile:", result.error);
-          throw new Error(result.error || "Failed to create user profile");
+        if (!response.ok) {
+          throw new Error(result.error || AUTH_ACTION_ERRORS.profile);
         }
       }
 
@@ -128,11 +157,19 @@ export function SignUpForm({
       router.push(
         `/auth/sign-up-success?next=${encodeURIComponent(nextPath)}`,
       );
+      navigationStarted = true;
+      recoverStalledNavigation();
     } catch (error: unknown) {
-      console.error("Sign up error:", error);
-      setError(error instanceof Error ? error.message : "An error occurred");
+      setError(
+        isAsyncTimeoutError(error)
+          ? "We could not confirm whether your account was created. Check your email or try signing in before submitting again."
+          : getAuthActionErrorMessage(error, AUTH_ACTION_ERRORS.signUp),
+      );
     } finally {
-      setIsLoading(false);
+      if (!navigationStarted) {
+        submittingRef.current = false;
+        setIsLoading(false);
+      }
     }
   };
 

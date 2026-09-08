@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Check, CircleAlert, LoaderCircle } from "lucide-react";
@@ -8,6 +8,7 @@ import { Check, CircleAlert, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { PurchaseWithDetails } from "@/lib/supabase-helpers/purchases";
 import { useUser } from "@/context/UserContext";
+import { useConfirmationPolling } from "@/features/payments/use-confirmation-polling";
 
 export function MembershipConfirmation({
   purchase,
@@ -20,6 +21,8 @@ export function MembershipConfirmation({
   const completed = purchase.status === "completed";
   const failed = purchase.status === "failed" || purchase.status === "canceled";
   const pending = !completed && !failed;
+  const refresh = useCallback(() => router.refresh(), [router]);
+  const pollingCutoffReached = useConfirmationPolling(pending, refresh);
 
   useEffect(() => {
     if (completed && !refreshedUser.current) {
@@ -27,13 +30,6 @@ export function MembershipConfirmation({
       void refreshUser();
     }
   }, [completed, refreshUser]);
-
-  useEffect(() => {
-    if (!pending) return;
-
-    const refreshInterval = window.setInterval(() => router.refresh(), 3000);
-    return () => window.clearInterval(refreshInterval);
-  }, [pending, router]);
 
   return (
     <div className="text-center">
@@ -50,7 +46,9 @@ export function MembershipConfirmation({
             ? "Membership confirmed"
             : failed
               ? "Payment wasn’t completed"
-              : "Membership processing"}
+              : pollingCutoffReached
+                ? "Membership is still processing"
+                : "Membership processing"}
         </h1>
         <p className="mt-3 text-muted-foreground">
           {completed
@@ -59,7 +57,9 @@ export function MembershipConfirmation({
               : `Your ${purchase.membership_types?.name ?? "UX Hub"} membership is now active.`
             : failed
               ? purchase.failure_reason ?? "Your payment could not be completed."
-              : "We’re still confirming your payment and membership details."}
+              : pollingCutoffReached
+                ? "This is taking longer than expected. You can leave this page and check your purchases later; we won’t submit another charge."
+                : "We’re still confirming your payment and membership details."}
         </p>
         {/*
           A completed purchase makes /portal/membership a dead end: the plans
@@ -68,8 +68,20 @@ export function MembershipConfirmation({
           a tier.
         */}
         <Button asChild className="mt-8">
-          <Link href={completed ? "/portal" : "/portal/membership"}>
-            {completed ? "Go to portal" : "Back to membership"}
+          <Link
+            href={
+              completed
+                ? "/portal"
+                : pollingCutoffReached
+                  ? "/portal#settings/purchases"
+                  : "/portal/membership"
+            }
+          >
+            {completed
+              ? "Go to portal"
+              : pollingCutoffReached
+                ? "View purchases"
+                : "Back to membership"}
           </Link>
         </Button>
       </div>

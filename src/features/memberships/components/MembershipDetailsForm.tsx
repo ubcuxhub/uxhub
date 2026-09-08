@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { FlowLink } from "@/components/shared/FlowLink";
@@ -28,6 +28,13 @@ import {
   type MembershipProfileInput,
 } from "@/features/memberships/actions";
 import type { MembershipAudience } from "@/features/memberships/lib/policy";
+import {
+  ASYNC_DEADLINES,
+  getAsyncErrorMessage,
+  isAsyncTimeoutError,
+  withDeadline,
+} from "@/lib/async/deadline";
+import { useNavigationRecovery } from "@/lib/async/use-navigation-recovery";
 
 export function MembershipDetailsForm({
   audience,
@@ -56,8 +63,20 @@ export function MembershipDetailsForm({
   );
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [navigating, startNavigation] = useTransition();
+  const [navigationTimedOut, setNavigationTimedOut] = useState(false);
+  const pending = saving || (navigating && !navigationTimedOut);
+  const recoverStalledNavigation = useNavigationRecovery(() => {
+    setNavigationTimedOut(true);
+    setBusy(false);
+    setError(
+      "Your details were saved, but the next page did not load. Try continuing again.",
+    );
+  });
 
   const save = async () => {
+    if (pending) return;
+
     let input: MembershipProfileInput;
     if (audience === "student") {
       if (!studentNumber || !faculty || !year || !major.trim()) {
@@ -83,18 +102,45 @@ export function MembershipDetailsForm({
 
     setSaving(true);
     setBusy(true);
+    setNavigationTimedOut(false);
     setError(null);
-    const result = await saveMembershipProfileAction(input);
-    if (!result.ok) {
-      setError(result.error);
+
+    try {
+      const result = await withDeadline(
+        () => saveMembershipProfileAction(input),
+        {
+          operation: "Saving membership details",
+          timeoutMs: ASYNC_DEADLINES.userAction,
+        },
+      );
+
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+
+      void withDeadline(() => refreshUser(), {
+        operation: "Refreshing membership details",
+        timeoutMs: ASYNC_DEADLINES.userAction,
+      }).catch(() => undefined);
+
+      startNavigation(() => {
+        router.replace(
+          withReturnTo("/portal/membership", returnTo ?? "/portal"),
+        );
+        router.refresh();
+      });
+      recoverStalledNavigation();
+    } catch (saveError) {
+      setError(
+        isAsyncTimeoutError(saveError)
+          ? getAsyncErrorMessage(saveError)
+          : "Your membership details could not be saved. Please try again.",
+      );
+    } finally {
       setSaving(false);
       setBusy(false);
-      return;
     }
-
-    await refreshUser();
-    router.replace(withReturnTo("/portal/membership", returnTo ?? "/portal"));
-    router.refresh();
   };
 
   return (
@@ -183,7 +229,7 @@ export function MembershipDetailsForm({
       ) : null}
 
       <div className="mt-auto flex justify-between gap-4 pt-8">
-        <Button asChild variant="outline" disabled={saving}>
+        <Button asChild variant="outline" disabled={pending}>
           <FlowLink
             href={withReturnTo(
               "/portal/membership/join",
@@ -194,8 +240,8 @@ export function MembershipDetailsForm({
             Back
           </FlowLink>
         </Button>
-        <Button onClick={save} disabled={saving}>
-          {saving ? "Saving…" : "Next"}
+        <Button onClick={save} disabled={pending}>
+          {pending ? "Saving…" : "Next"}
         </Button>
       </div>
     </div>

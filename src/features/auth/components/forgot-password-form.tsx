@@ -2,16 +2,25 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import {
+  isAsyncTimeoutError,
+  withDeadline,
+} from "@/lib/async/deadline";
+import { useNavigationRecovery } from "@/lib/async/use-navigation-recovery";
 import { createClient } from "@/lib/supabase/client";
 
+import {
+  AUTH_ACTION_ERRORS,
+  getAuthActionErrorMessage,
+} from "../auth-errors";
+import { setPendingEmail } from "../pending-email";
 import { AuthPanel } from "./auth-panel";
 import { authInputClassName } from "./auth-styles";
 import { AuthSubmitButton } from "./auth-submit-button";
-import { setPendingEmail } from "../pending-email";
 
 export function ForgotPasswordForm({
   className,
@@ -20,24 +29,36 @@ export function ForgotPasswordForm({
   const [email, setEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const submittingRef = useRef(false);
   const router = useRouter();
+  const recoverStalledNavigation = useNavigationRecovery(() => {
+    submittingRef.current = false;
+    setIsLoading(false);
+    setError(
+      "The reset email was requested, but the next page did not load. Check your inbox before trying again.",
+    );
+  });
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submittingRef.current) return;
 
     const supabase = createClient();
+    submittingRef.current = true;
     setIsLoading(true);
     setError(null);
+    let navigationStarted = false;
 
     try {
       const normalizedEmail = email.trim().toLowerCase();
 
       // The url which will be included in the email. This URL needs to be configured in your redirect URLs in the Supabase dashboard at https://supabase.com/dashboard/project/_/auth/url-configuration
-      const { error } = await supabase.auth.resetPasswordForEmail(
-        normalizedEmail,
-        {
-          redirectTo: `${window.location.origin}/auth/update-password`,
-        },
+      const { error } = await withDeadline(
+        () =>
+          supabase.auth.resetPasswordForEmail(normalizedEmail, {
+            redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/auth/update-password")}`,
+          }),
+        { operation: "Password reset email" },
       );
 
       if (error) throw error;
@@ -47,10 +68,19 @@ export function ForgotPasswordForm({
       setPendingEmail(normalizedEmail);
 
       router.push("/auth/check-email");
+      navigationStarted = true;
+      recoverStalledNavigation();
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred");
+      setError(
+        isAsyncTimeoutError(error)
+          ? "We could not confirm whether the reset email was sent. Check your inbox before requesting another."
+          : getAuthActionErrorMessage(error, AUTH_ACTION_ERRORS.passwordReset),
+      );
     } finally {
-      setIsLoading(false);
+      if (!navigationStarted) {
+        submittingRef.current = false;
+        setIsLoading(false);
+      }
     }
   };
 

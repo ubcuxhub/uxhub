@@ -3,7 +3,7 @@ import "server-only";
 import { after } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Payment, PaymentUpdatedEvent } from "square";
-import type { UserInfoRow } from "@/types/models";
+import type { PurchaseRow, UserInfoRow } from "@/types/models";
 import type { CheckoutActionResult, CheckoutRequestInput } from "./types";
 import type { Database, Json } from "@/lib/supabase/database.types";
 import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
@@ -16,6 +16,7 @@ import {
 import { fetchMembershipTypeBySlug } from "@/lib/supabase-helpers/memberships";
 import {
   createPurchase,
+  fetchNonterminalMembershipPurchase,
   fetchPurchaseById,
   fetchPurchaseByIdempotencyKey,
   fetchPurchaseBySquarePaymentId,
@@ -34,6 +35,8 @@ import {
   getSquareErrorDiagnostic,
   getSquareErrorMessage,
   getPurchaseRedirectPath,
+  isDefinitiveSquareFailure,
+  matchesReferencedPurchase,
   normalizeSquareStatus,
 } from "./fulfillment-rules";
 import { isEligibleForMembership } from "@/features/memberships/lib/policy";
@@ -42,6 +45,7 @@ import { fetchMembershipTermEndsAt } from "@/lib/supabase-helpers/app-settings";
 import { ensureSquareCustomerId } from "./customer";
 import { sendPurchaseConfirmationEmail } from "./confirmation-email";
 import { revalidatePurchasePaths } from "./revalidation";
+import { getExistingCheckoutResult } from "./checkout-results";
 
 const adminDb = supabaseAdmin as unknown as SupabaseClient<Database>;
 
@@ -201,6 +205,33 @@ async function applyPaymentStateToPurchase(purchaseId: string, payment: Payment)
   return updatedPurchase;
 }
 
+async function reconcilePurchaseIfPossible(
+  purchase: PurchaseRow,
+): Promise<PurchaseRow> {
+  if (
+    !purchase.square_payment_id ||
+    (purchase.status !== "pending" && purchase.status !== "authorized")
+  ) {
+    return purchase;
+  }
+
+  try {
+    const response = await squareClient.payments.get({
+      paymentId: purchase.square_payment_id,
+    });
+
+    if (response.payment) {
+      return await applyPaymentStateToPurchase(purchase.id, response.payment);
+    }
+  } catch {
+    console.error(
+      `Square payment reconciliation failed for purchase ${purchase.id}.`,
+    );
+  }
+
+  return purchase;
+}
+
 async function handleExistingCheckoutAttempt(
   user: UserInfoRow,
   idempotencyKey: string
@@ -215,39 +246,16 @@ async function handleExistingCheckoutAttempt(
   }
 
   if (existingPurchase.user_id !== user.id) {
-    return {
-      ok: false,
-      error: "This checkout attempt belongs to a different account.",
-    };
+    return getExistingCheckoutResult(existingPurchase, user.id);
   }
 
-  if (existingPurchase.status === "completed") {
-    await fulfillCompletedPurchase(existingPurchase.id);
+  const reconciledPurchase = await reconcilePurchaseIfPossible(existingPurchase);
 
-    return {
-      ok: true,
-      purchaseId: existingPurchase.id,
-      redirectTo: getPurchaseRedirectPath(),
-    };
+  if (reconciledPurchase.status === "completed") {
+    await fulfillCompletedPurchase(reconciledPurchase.id);
   }
 
-  if (
-    existingPurchase.status === "failed" ||
-    existingPurchase.status === "canceled"
-  ) {
-    return {
-      ok: false,
-      error:
-        existingPurchase.failure_reason ||
-        "Your previous checkout attempt did not complete. Please try again.",
-    };
-  }
-
-  return {
-    ok: false,
-    error:
-      "This checkout attempt is already being processed. Please check your purchases page in a moment.",
-  };
+  return getExistingCheckoutResult(reconciledPurchase, user.id);
 }
 
 async function createSquarePaymentForMembership(
@@ -257,7 +265,7 @@ async function createSquarePaymentForMembership(
   const membershipType = await fetchMembershipTypeBySlug(adminDb, input.slug);
 
   if (!membershipType) {
-    return { error: "Membership plan not found." } as const;
+    return { error: "Membership plan not found.", terminal: true } as const;
   }
 
   const termEndsAt = await fetchMembershipTermEndsAt(adminDb);
@@ -265,7 +273,33 @@ async function createSquarePaymentForMembership(
   if (!isEligibleForMembership(user, membershipType, termEndsAt)) {
     return {
       error: "This membership tier is not available for your account.",
+      terminal: true,
     } as const;
+  }
+
+  const nonterminalPurchase = await fetchNonterminalMembershipPurchase(
+    adminDb,
+    user.id,
+    membershipType.id,
+  );
+
+  if (nonterminalPurchase) {
+    const reconciledPurchase =
+      await reconcilePurchaseIfPossible(nonterminalPurchase);
+    const existingResult = getExistingCheckoutResult(
+      reconciledPurchase,
+      user.id,
+    );
+
+    return existingResult.ok
+      ? {
+          purchaseId: existingResult.purchaseId,
+          resolution: existingResult.resolution,
+        } as const
+      : {
+          error: existingResult.error,
+          terminal: existingResult.terminal,
+        } as const;
   }
 
   const customerId = await ensureSquareCustomerId(user, input);
@@ -304,10 +338,12 @@ async function createSquarePaymentForMembership(
       throw new Error("Square did not return a payment ID.");
     }
 
-    await applyPaymentStateToPurchase(purchase.id, payment);
+    const updatedPurchase = await applyPaymentStateToPurchase(purchase.id, payment);
 
     return {
       purchaseId: purchase.id,
+      resolution:
+        updatedPurchase.status === "completed" ? "completed" : "processing",
     } as const;
   } catch (error) {
     console.error(
@@ -315,13 +351,21 @@ async function createSquarePaymentForMembership(
       getSquareErrorDiagnostic(error)
     );
 
-    await updatePurchase(adminDb, purchase.id, {
-      failure_reason: getSquareErrorMessage(error),
-      status: "failed",
-    });
+    if (isDefinitiveSquareFailure(error)) {
+      await updatePurchase(adminDb, purchase.id, {
+        failure_reason: getSquareErrorMessage(error),
+        status: "failed",
+      });
+
+      return {
+        error: getSquareErrorMessage(error),
+        terminal: true,
+      } as const;
+    }
 
     return {
-      error: getSquareErrorMessage(error),
+      purchaseId: purchase.id,
+      resolution: "processing",
     } as const;
   }
 }
@@ -335,7 +379,7 @@ async function createSquarePaymentForEventTicket(
   });
 
   if (!event) {
-    return { error: "Event not found." } as const;
+    return { error: "Event not found.", terminal: true } as const;
   }
 
   const applicationQuestions = event.applications_enabled
@@ -346,6 +390,7 @@ async function createSquarePaymentForEventTicket(
     return {
       error:
         "This event uses an application flow and cannot be purchased directly.",
+      terminal: true,
     } as const;
   }
 
@@ -354,6 +399,7 @@ async function createSquarePaymentForEventTicket(
   if (existingRegistration) {
     return {
       error: "You already have a registration for this event.",
+      terminal: true,
     } as const;
   }
 
@@ -374,7 +420,10 @@ async function createSquarePaymentForEventTicket(
   });
 
   if (!purchase) {
-    return { error: "Could not initialize the purchase." } as const;
+    return {
+      error: "Could not initialize the purchase.",
+      terminal: false,
+    } as const;
   }
 
   try {
@@ -417,6 +466,7 @@ async function createSquarePaymentForEventTicket(
 
       return {
         error: formatReservationFailure(reservation?.failure_reason),
+        terminal: true,
       } as const;
     }
 
@@ -429,10 +479,15 @@ async function createSquarePaymentForEventTicket(
       throw new Error("Square did not return the completed payment.");
     }
 
-    await applyPaymentStateToPurchase(purchase.id, capturedPayment);
+    const updatedPurchase = await applyPaymentStateToPurchase(
+      purchase.id,
+      capturedPayment,
+    );
 
     return {
       purchaseId: purchase.id,
+      resolution:
+        updatedPurchase.status === "completed" ? "completed" : "processing",
     } as const;
   } catch (error) {
     console.error(
@@ -443,18 +498,26 @@ async function createSquarePaymentForEventTicket(
     const purchaseRecord = await fetchPurchaseById(adminDb, purchase.id);
     const paymentId = purchaseRecord?.square_payment_id ?? null;
 
-    if (paymentId) {
+    if (paymentId && isDefinitiveSquareFailure(error)) {
       await cancelSquarePaymentIfPossible(paymentId);
     }
 
-    await releaseEventTicketSeatReservation(purchase.id).catch(() => undefined);
-    await updatePurchase(adminDb, purchase.id, {
-      failure_reason: getSquareErrorMessage(error),
-      status: "failed",
-    });
+    if (isDefinitiveSquareFailure(error)) {
+      await releaseEventTicketSeatReservation(purchase.id).catch(() => undefined);
+      await updatePurchase(adminDb, purchase.id, {
+        failure_reason: getSquareErrorMessage(error),
+        status: "failed",
+      });
+
+      return {
+        error: getSquareErrorMessage(error),
+        terminal: true,
+      } as const;
+    }
 
     return {
-      error: getSquareErrorMessage(error),
+      purchaseId: purchase.id,
+      resolution: "processing",
     } as const;
   }
 }
@@ -481,6 +544,7 @@ export async function executeCheckoutForUser(
     return {
       ok: false,
       error: result.error,
+      terminal: result.terminal,
     };
   }
 
@@ -488,6 +552,7 @@ export async function executeCheckoutForUser(
     return {
       ok: false,
       error: "Checkout finished without a purchase record.",
+      terminal: false,
     };
   }
 
@@ -495,6 +560,7 @@ export async function executeCheckoutForUser(
     ok: true,
     purchaseId: result.purchaseId,
     redirectTo: getPurchaseRedirectPath(),
+    resolution: result.resolution,
   };
 }
 
@@ -520,11 +586,19 @@ export async function processSquarePaymentEvent(
     return;
   }
 
-  const purchase = await fetchPurchaseBySquarePaymentId(adminDb, payment.id);
+  let purchase = await fetchPurchaseBySquarePaymentId(adminDb, payment.id);
 
-  if (!purchase) {
-    return;
+  // A create-payment response can be lost after Square accepts the charge but
+  // before we persist its payment ID. Square echoes our purchase ID as the
+  // reference ID, so a signed webhook can safely repair that ambiguous state.
+  if (!purchase && payment.referenceId) {
+    const candidate = await fetchPurchaseById(adminDb, payment.referenceId);
+    if (matchesReferencedPurchase(payment, candidate)) {
+      purchase = candidate;
+    }
   }
+
+  if (!purchase) return;
 
   await applyPaymentStateToPurchase(purchase.id, payment);
 }

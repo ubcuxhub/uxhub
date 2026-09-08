@@ -12,6 +12,7 @@ import type {
 import {
   useEffect,
   useId,
+  useMemo,
   useState,
   useSyncExternalStore,
   useTransition,
@@ -22,6 +23,18 @@ import type { PurchaseKind } from "@/features/payments/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  ASYNC_DEADLINES,
+  getAsyncErrorMessage,
+  isAsyncTimeoutError,
+  withDeadline,
+} from "@/lib/async/deadline";
+import { useNavigationRecovery } from "@/lib/async/use-navigation-recovery";
+import {
+  clearCheckoutAttemptKey,
+  getOrCreateCheckoutAttemptKey,
+  rotateCheckoutAttemptKey,
+} from "@/features/payments/checkout-attempt";
 import {
   getThemeServerSnapshot,
   getThemeSnapshot,
@@ -46,6 +59,7 @@ interface SquareCheckoutFormProps {
   onSubmittingChange?: (submitting: boolean) => void;
   showAmount?: boolean;
   showSecurityMessage?: boolean;
+  userId: string;
 }
 
 function getSquareScriptUrl(applicationId: string) {
@@ -137,6 +151,7 @@ export function SquareCheckoutForm({
   onSubmittingChange,
   showAmount = true,
   showSecurityMessage = true,
+  userId,
 }: SquareCheckoutFormProps) {
   const router = useRouter();
   const theme = useSyncExternalStore(
@@ -160,9 +175,30 @@ export function SquareCheckoutForm({
    * until the navigation commits instead of briefly restoring this form.
    */
   const [redirecting, startRedirect] = useTransition();
-  const busy = submitting || redirecting;
+  const [redirectTimedOut, setRedirectTimedOut] = useState(false);
+  const busy = submitting || (redirecting && !redirectTimedOut);
   const [message, setMessage] = useState(disabledMessage ?? "");
-  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
+  const recoverStalledNavigation = useNavigationRecovery(() => {
+    setRedirectTimedOut(true);
+    setMessage(
+      "Your payment was submitted, but the confirmation page did not load. Check Purchases before trying again.",
+    );
+  });
+  const checkoutScope = useMemo(
+    () => ({ kind, slug, userId }),
+    [kind, slug, userId],
+  );
+  const [idempotencyKey, setIdempotencyKey] = useState("");
+
+  useEffect(() => {
+    try {
+      setIdempotencyKey(
+        getOrCreateCheckoutAttemptKey(sessionStorage, checkoutScope),
+      );
+    } catch {
+      setIdempotencyKey(crypto.randomUUID());
+    }
+  }, [checkoutScope]);
 
   useEffect(() => {
     if (disabled) {
@@ -184,35 +220,61 @@ export function SquareCheckoutForm({
 
     const initialize = async () => {
       try {
-        const nextPayments = await payments(applicationId, locationId, {
-          scriptSrc: getSquareScriptUrl(applicationId),
-        });
+        const initialized = await withDeadline(
+          async (signal) => {
+            const nextPayments = await payments(applicationId, locationId, {
+              scriptSrc: getSquareScriptUrl(applicationId),
+            });
 
-        if (!nextPayments || !mounted) {
+            if (!nextPayments || !mounted || signal.aborted) {
+              return null;
+            }
+
+            try {
+              nextCard = await nextPayments.card({
+                style: getCardClassSelectors(getThemeSnapshot()),
+              });
+            } catch {
+              if (signal.aborted || !mounted) return null;
+              console.error("Square theme setup failed.");
+              nextCard = await nextPayments.card();
+            }
+
+            if (!nextCard) return null;
+            if (signal.aborted || !mounted) {
+              void nextCard.destroy();
+              return null;
+            }
+
+            await nextCard.attach(`#${containerId}`);
+
+            if (signal.aborted || !mounted) {
+              void nextCard.destroy();
+              return null;
+            }
+
+            return { card: nextCard, payments: nextPayments };
+          },
+          {
+            operation: "Loading payment form",
+            timeoutMs: ASYNC_DEADLINES.userAction,
+          },
+        );
+
+        if (!initialized || !mounted) {
           return;
         }
 
-        try {
-          nextCard = await nextPayments.card({
-            style: getCardClassSelectors(getThemeSnapshot()),
-          });
-        } catch (error) {
-          console.error("Square theme setup failed:", error);
-          nextCard = await nextPayments.card();
-        }
-
-        await nextCard.attach(`#${containerId}`);
-
-        if (!mounted) {
-          return;
-        }
-
-        setSquarePayments(nextPayments);
-        setCard(nextCard);
+        setSquarePayments(initialized.payments);
+        setCard(initialized.card);
       } catch (error) {
-        console.error("Square initialization failed:", error);
+        console.error("Square initialization failed.");
         if (mounted) {
-          setMessage("Payment form failed to load. Please refresh and try again.");
+          setMessage(
+            isAsyncTimeoutError(error)
+              ? getAsyncErrorMessage(error)
+              : "Payment form failed to load. Please refresh and try again.",
+          );
         }
       } finally {
         if (mounted) {
@@ -238,19 +300,26 @@ export function SquareCheckoutForm({
       return;
     }
 
-    void card.configure({ style: getCardClassSelectors(theme) }).catch((error) => {
-      console.error("Square theme update failed:", error);
+    void card.configure({ style: getCardClassSelectors(theme) }).catch(() => {
+      console.error("Square theme update failed.");
     });
   }, [card, theme]);
 
   const handleCheckout = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (disabled || !card || busy) {
+    if (
+      disabled ||
+      !card ||
+      !squarePayments ||
+      !idempotencyKey ||
+      busy
+    ) {
       return;
     }
 
     setSubmitting(true);
+    setRedirectTimedOut(false);
     setMessage("");
 
     try {
@@ -271,7 +340,13 @@ export function SquareCheckoutForm({
         sellerKeyedIn: false,
       };
 
-      const tokenized = await card.tokenize(verificationDetails);
+      const tokenized = await withDeadline(
+        () => card.tokenize(verificationDetails),
+        {
+          operation: "Verifying card details",
+          timeoutMs: ASYNC_DEADLINES.checkout,
+        },
+      );
 
       if (tokenized.status !== "OK" || !tokenized.token) {
         setMessage(
@@ -287,30 +362,72 @@ export function SquareCheckoutForm({
        * bank's challenge when one is needed, and the resulting token is what
        * tells Square the buyer was verified.
        */
-      const verification = await squarePayments
-        ?.verifyBuyer(tokenized.token, verificationDetails)
-        .catch((error) => {
-          console.error("Square buyer verification failed:", error);
-          return null;
-        });
+      let verification;
+      try {
+        verification = await withDeadline(
+          () => squarePayments.verifyBuyer(tokenized.token, verificationDetails),
+          {
+            operation: "Verifying payment with your bank",
+            timeoutMs: ASYNC_DEADLINES.checkout,
+          },
+        );
+      } catch (verificationError) {
+        console.error("Square buyer verification failed.");
+        setMessage(
+          isAsyncTimeoutError(verificationError)
+            ? getAsyncErrorMessage(verificationError)
+            : "Your bank could not verify this payment. Please try again or use a different card.",
+        );
+        return;
+      }
 
-      const result = await submitCheckoutAction({
-        billingPostalCode,
-        buyerEmail,
-        buyerFirstName,
-        buyerLastName,
-        buyerPhone,
-        idempotencyKey,
-        kind,
-        slug,
-        token: tokenized.token,
-        verificationToken: verification?.token,
-      });
+      if (!verification?.token) {
+        setMessage(
+          "Your bank could not verify this payment. Please try again or use a different card.",
+        );
+        return;
+      }
+
+      const result = await withDeadline(
+        () =>
+          submitCheckoutAction({
+            billingPostalCode,
+            buyerEmail,
+            buyerFirstName,
+            buyerLastName,
+            buyerPhone,
+            idempotencyKey,
+            kind,
+            slug,
+            token: tokenized.token,
+            verificationToken: verification.token,
+          }),
+        {
+          operation: "Confirming payment",
+          timeoutMs: ASYNC_DEADLINES.checkout,
+        },
+      );
 
       if (!result.ok) {
         setMessage(result.error);
-        setIdempotencyKey(crypto.randomUUID());
+        if (result.terminal) {
+          try {
+            setIdempotencyKey(
+              rotateCheckoutAttemptKey(sessionStorage, checkoutScope),
+            );
+          } catch {
+            setIdempotencyKey(crypto.randomUUID());
+          }
+        }
         return;
+      }
+
+      if (result.resolution === "completed") {
+        try {
+          clearCheckoutAttemptKey(sessionStorage, checkoutScope);
+        } catch {
+          // Storage may be unavailable; navigation can still complete.
+        }
       }
 
       startRedirect(() => {
@@ -320,9 +437,14 @@ export function SquareCheckoutForm({
             : successHref || result.redirectTo;
         router.replace(destination);
       });
+      recoverStalledNavigation();
     } catch (error) {
-      console.error("Checkout failed:", error);
-      setMessage("Payment failed. Please try again.");
+      console.error("Checkout did not finish before its deadline.");
+      setMessage(
+        isAsyncTimeoutError(error)
+          ? getAsyncErrorMessage(error)
+          : "Payment could not be confirmed. Check your purchases before trying again.",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -418,7 +540,14 @@ export function SquareCheckoutForm({
 
       <Button
         className="w-full"
-        disabled={disabled || initializing || busy || !card}
+        disabled={
+          disabled ||
+          initializing ||
+          busy ||
+          !card ||
+          !squarePayments ||
+          !idempotencyKey
+        }
         type="submit"
       >
         {busy ? "Processing..." : buttonLabel}

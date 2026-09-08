@@ -21,46 +21,50 @@ export type DeleteAccountResult = { ok: true } | { ok: false; error: string };
 export async function deleteAccountAction(
   confirmationEmail: string
 ): Promise<DeleteAccountResult> {
+  // Keep authentication outside the deletion catch. `requireAuth` redirects by
+  // throwing a Next control-flow exception, which must reach the framework.
+  const user = await requireAuth();
+
+  if (!matchesConfirmationEmail(confirmationEmail, user.email)) {
+    return {
+      ok: false,
+      error: "That does not match the email address on this account.",
+    };
+  }
+
+  if (!user.auth_user_id) {
+    return {
+      ok: false,
+      error:
+        "This profile is not linked to a sign-in, so there is nothing to delete. Contact the UX Hub team for help.",
+    };
+  }
+
   try {
-    const user = await requireAuth();
-
-    if (!matchesConfirmationEmail(confirmationEmail, user.email)) {
-      return {
-        ok: false,
-        error: "That does not match the email address on this account.",
-      };
-    }
-
-    if (!user.auth_user_id) {
-      return {
-        ok: false,
-        error:
-          "This profile is not linked to a sign-in, so there is nothing to delete. Contact the UX Hub team for help.",
-      };
-    }
-
     await adminDeleteAccount(user.auth_user_id);
 
     return { ok: true };
   } catch (error) {
-    // Supabase rejections are plain `{ message, code, details, hint }` objects,
-    // not Error instances, so an `instanceof Error` check drops the one piece of
-    // information worth having. Log the cause server-side and keep the message
-    // shown to the member generic — a database error is not theirs to read.
-    console.error("Account deletion failed", describeError(error));
+    // Keep logs diagnostic but free of messages/details that could contain
+    // account data. A database error is not safe or useful member-facing copy.
+    console.error("Account deletion failed", safeErrorMetadata(error));
 
     return { ok: false, error: "Your account could not be deleted." };
   }
 }
 
-/** Best-effort readable cause for the server log, whatever the throw shape. */
-function describeError(error: unknown): unknown {
-  if (error instanceof Error) return error;
-
-  if (error && typeof error === "object" && "message" in error) {
-    const { message, code, details, hint } = error as Record<string, unknown>;
-    return { message, code, details, hint };
+function safeErrorMetadata(error: unknown) {
+  if (error instanceof Error) {
+    return { errorType: error.name };
   }
 
-  return error;
+  if (error && typeof error === "object") {
+    const code = (error as Record<string, unknown>).code;
+    return {
+      errorType: "SupabaseError",
+      ...(typeof code === "string" ? { code } : {}),
+    };
+  }
+
+  return { errorType: typeof error };
 }
