@@ -7,9 +7,9 @@ export default async function Page({
 }: {
   searchParams: Promise<{ next?: string }>;
 }) {
-  await redirectIfAuthenticated();
-
   const params = await searchParams;
+  const nextPath = getSafeInternalPath(params.next);
+  await redirectIfAuthenticated(nextPath);
 
-  return <SignUpSuccessMessage nextPath={getSafeInternalPath(params.next)} />;
+  return <SignUpSuccessMessage nextPath={nextPath} />;
 }

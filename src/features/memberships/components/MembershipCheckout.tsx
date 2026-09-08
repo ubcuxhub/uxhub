@@ -105,6 +105,7 @@ export function MembershipCheckout({
             showAmount={false}
             showSecurityMessage={false}
             title="Payment details"
+            userId={user.id}
           />
 
           <Card className="self-start">

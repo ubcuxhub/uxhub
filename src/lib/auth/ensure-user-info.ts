@@ -36,8 +36,8 @@ export async function ensureUserInfo(
 
   const existingByAuthId = await fetchUserInfoByAuthId(
     supabase,
-    authUser.id
-  ).catch(() => null);
+    authUser.id,
+  );
 
   if (existingByAuthId) {
     return { status: "ok" };
@@ -84,11 +84,39 @@ export async function ensureUserInfo(
     return { status: "ok" };
   }
 
-  await adminInsertUserInfo({
-    ...payload,
-    newsletter: false,
-    role_access: "basic",
-  });
+  try {
+    await adminInsertUserInfo({
+      ...payload,
+      newsletter: false,
+      role_access: "basic",
+    });
+  } catch (insertError) {
+    // Another request may have created or adopted this row after both lookups
+    // above. Reconcile against the desired final state before deciding that
+    // the insert failed; this makes retries after a lost response safe.
+    const racedByAuthId = await fetchUserInfoByAuthId(supabase, authUser.id);
+
+    if (racedByAuthId) {
+      return { status: "ok" };
+    }
+
+    const racedByEmail = await adminFindUserInfoByEmail(normalizedEmail);
+
+    if (!racedByEmail) {
+      throw insertError;
+    }
+
+    if (
+      racedByEmail.auth_user_id &&
+      racedByEmail.auth_user_id !== authUser.id
+    ) {
+      return { status: "conflict", message: LINKED_ELSEWHERE_MESSAGE };
+    }
+
+    if (!racedByEmail.auth_user_id) {
+      await adminUpdateUserInfoById(racedByEmail.id, payload);
+    }
+  }
 
   return { status: "ok" };
 }

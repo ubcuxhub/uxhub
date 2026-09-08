@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 
+import { withDeadline } from "@/lib/async/deadline";
 import { createClient } from "@/lib/supabase/client";
 
 import { AuthMessage } from "./auth-message";
@@ -23,9 +24,13 @@ export function CheckEmailMessage() {
   const handleResend = async () => {
     const supabase = createClient();
 
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/update-password`,
-    });
+    const { error } = await withDeadline(
+      () =>
+        supabase.auth.resetPasswordForEmail(email, {
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/auth/update-password")}`,
+        }),
+      { operation: "Password reset email resend" },
+    );
 
     if (error) throw error;
   };
