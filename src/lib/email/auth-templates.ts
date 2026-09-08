@@ -19,9 +19,7 @@ import { ctaButton, renderEmailLayout } from "./layout.ts";
 /**
  * `{{ .ConfirmationURL }}` rather than `{{ .TokenHash }}` on purpose: it
  * honours the `emailRedirectTo` each form sets, so confirmation links reach
- * `/auth/callback`, which creates the `user_info` profile row. A token-hash
- * link would land on `/auth/confirm`, which establishes the session but never
- * creates that row.
+ * `/auth/callback`, which creates the `user_info` profile row.
  */
 const CONFIRMATION_URL = "{{ .ConfirmationURL }}";
 
