@@ -15,6 +15,14 @@ export function setPendingEmail(email: string) {
   }
 }
 
+export function clearPendingEmail() {
+  try {
+    sessionStorage.removeItem(PENDING_EMAIL_KEY);
+  } catch {
+    // ignore storage failures (e.g. private mode)
+  }
+}
+
 /** Storage is written before navigation, so nothing changes while mounted. */
 export function subscribePendingEmail() {
   return () => {};
