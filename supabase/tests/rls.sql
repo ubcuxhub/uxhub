@@ -26,6 +26,18 @@ insert into public.user_info (email, first_name, last_name, role_access)
 values ('rls-user-b@example.test', 'RLS', 'User B', 'basic')
 returning id \gset user_b_
 
+-- This account has no public profile
+insert into auth.users (
+  id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+)
+values (
+  gen_random_uuid(), 'authenticated', 'authenticated',
+  'rls-unprofiled@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()
+)
+returning id as auth_user_id, email
+\gset unprofiled_
+
 insert into public.events (
   name, description, regular_price, member_price, max_capacity, slug,
   registration_start_time, registration_end_time, status
@@ -247,6 +259,43 @@ begin
     end if;
   exception
     when insufficient_privilege then null;
+  end;
+end;
+$$;
+
+reset role;
+
+\o /dev/null
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'unprofiled_auth_user_id',
+    'email', :'unprofiled_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+\o
+
+set local role authenticated;
+
+do $$
+begin
+  begin
+    insert into public.user_info (
+      auth_user_id, email, first_name, last_name, role_access
+    )
+    values (
+      auth.uid(),
+      'rls-unprofiled@example.test',
+      'Evil',
+      'Insert',
+      'admin'::public.role_access_enum
+    );
+    raise exception 'unprofiled user self-inserted an admin profile';
+  exception
+    when insufficient_privilege then
+      null;
   end;
 end;
 $$;
