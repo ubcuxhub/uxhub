@@ -1,9 +1,7 @@
 import { redirect } from "next/navigation";
 
 import type { UserInfoRow } from "@/types/models";
-import { createClient } from "@/lib/supabase/server";
-import { ensureUserInfo } from "@/lib/auth/ensure-user-info";
-import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";
+import { loadCurrentUser } from "@/lib/auth/current-user";
 import { getSafeInternalPath } from "@/lib/auth/paths";
 import { hasAdminAccess, hasManagerAccess } from "@/lib/auth/roles";
 
@@ -11,72 +9,41 @@ function authErrorPath(message: string) {
   return `/auth/error?error=${encodeURIComponent(message)}`;
 }
 
+/**
+ * Uncached wrappers over `loadCurrentUser()`.
+ *
+ * The redirects stay out here on purpose: `redirect()` throws, and a throw
+ * inside the cached loader would memoize a rejected promise for the rest of the
+ * request. See the note in `current-user.ts`.
+ */
 export async function requireAuth(nextPath?: string): Promise<UserInfoRow> {
-  const supabase = await createClient();
+  const result = await loadCurrentUser();
 
-  const {
-    data: { user: authUser },
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !authUser) {
+  if (result.status === "unauthenticated") {
     const safeNextPath = getSafeInternalPath(nextPath);
     redirect(`/auth/login?next=${encodeURIComponent(safeNextPath)}`);
   }
 
-  const userInfo = await fetchUserInfoByAuthId(supabase, authUser.id).catch(
-    () => null
-  );
-
-  if (userInfo) {
-    return userInfo;
+  if (result.status === "error") {
+    redirect(authErrorPath(result.message));
   }
 
-  // An authenticated user without a profile row predates the sign-up flow that
-  // creates one, or lost it to a failed insert. Repair it here rather than
-  // stranding the session, then re-read so the returned row is the typed one.
-  const ensured = await ensureUserInfo(authUser);
-
-  if (ensured.status === "conflict") {
-    redirect(authErrorPath(ensured.message));
-  }
-
-  const repaired = await fetchUserInfoByAuthId(supabase, authUser.id).catch(
-    () => null
-  );
-
-  if (!repaired) {
-    redirect(authErrorPath("Unable to load your profile."));
-  }
-
-  return repaired;
+  return result.user;
 }
 
 export async function redirectIfAuthenticated(redirectTo = "/portal") {
-  const supabase = await createClient();
+  const result = await loadCurrentUser();
+  // An open redirect here would let a crafted auth link bounce a signed-in
+  // user off-site, so the destination is sanitized before it is ever used.
   const safeRedirectTo = getSafeInternalPath(redirectTo);
 
-  const {
-    data: { user: authUser },
-  } = await supabase.auth.getUser();
-
-  if (!authUser) return;
+  if (result.status === "unauthenticated") return;
 
   // Auth pages should send signed-in users to the portal. Sign-up creates the
-  // profile row, so a missing one is a repairable leftover, not a reason to ask
-  // for the details again.
-  const userInfo = await fetchUserInfoByAuthId(supabase, authUser.id).catch(
-    () => null
-  );
-
-  if (userInfo) {
-    redirect(safeRedirectTo);
-  }
-
-  const ensured = await ensureUserInfo(authUser);
-
-  if (ensured.status === "conflict") {
-    redirect(authErrorPath(ensured.message));
+  // profile row, so a missing one is a repairable leftover the loader has
+  // already dealt with, not a reason to ask for the details again.
+  if (result.status === "error") {
+    redirect(authErrorPath(result.message));
   }
 
   redirect(safeRedirectTo);

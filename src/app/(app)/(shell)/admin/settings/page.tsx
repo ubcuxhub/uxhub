@@ -3,14 +3,14 @@ import { MembershipTermSettings } from "@/features/admin/components/MembershipTe
 import { MembershipTypeSettings } from "@/features/admin/components/MembershipTypeSettings";
 import { requireManager } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
-import { fetchMembershipTermEndsAt } from "@/lib/supabase-helpers/app-settings";
+import { getMembershipTermEndsAt } from "@/lib/app-settings";
 import { fetchMembershipTypes } from "@/lib/supabase-helpers/memberships";
 
 export default async function AdminSettingsPage() {
   await requireManager();
   const supabase = await createClient();
   const [termEndsAt, membershipTypes] = await Promise.all([
-    fetchMembershipTermEndsAt(supabase),
+    getMembershipTermEndsAt(),
     // Retired tiers stay editable here, so managers can put one back on sale.
     fetchMembershipTypes(supabase, { includeInactive: true }),
   ]);

@@ -24,7 +24,16 @@ export async function proxy(req: NextRequest) {
     }
   );
 
-  await supabase.auth.getUser();
+  // Refresh only. Authorization happens in src/lib/auth/guards.ts and in RLS,
+  // so this must not spend a round trip verifying a token it never reads.
+  // getUser() always issues GET /auth/v1/user; getSession() reads the cookie
+  // locally and only reaches the network when the token is near expiry. That
+  // on-demand refresh is not gated by autoRefreshToken, which @supabase/ssr
+  // sets to false -- that flag only disables the background ticker.
+  //
+  // Discard the result. Reading .user off it trips auth-js's insecure-user
+  // warning proxy on every request.
+  await supabase.auth.getSession();
 
   return res;
 }
