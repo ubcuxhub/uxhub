@@ -203,8 +203,10 @@ strings the compiler cannot validate. A rename here breaks silently at runtime:
   strings (see type-safety gaps).
 - **Join returns null/empty unexpectedly?** Check the embedded FK-hint join
   strings.
-- **RLS errors (e.g. rows missing or writes rejected)?** Review the policies in
-  the migrations. Anon-key access (the typed helpers) is governed by RLS;
+- **RLS errors (e.g. rows missing or writes rejected)?** Run `pnpm test:rls`
+  first — it exercises every policy against the local database as anon, a
+  member, an admin, and a manager, and names the first one that misbehaves.
+  Then review the policies in the migrations. Anon-key access (the typed helpers) is governed by RLS;
   service-role helpers in `admin-server.ts` bypass it.
 - **A write "succeeds" but nothing changes?** The service-role client in
   `src/lib/supabase/admin.ts` is intentionally untyped, so writes to columns

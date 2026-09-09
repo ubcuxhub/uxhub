@@ -168,7 +168,11 @@ key to client components.
 - Also run `pnpm build` after route, dependency, configuration, schema, or
   shared-style changes.
 - Supabase RLS checks live in `supabase/tests/rls.sql` (separate from the
-  Vitest suite).
+  Vitest suite). Run them with `pnpm test:rls`, which targets the local
+  database unless `SUPABASE_DB_URL` says otherwise. The whole script runs in a
+  transaction it rolls back, and every assertion is scoped to its own fixtures,
+  so it is safe and repeatable against a seeded database. CI runs it in the
+  build job against the throwaway database `supabase start` creates.
 - Do not verify changes by driving the app in a browser unless you are
   explicitly asked to. Never sign in, and never type credentials — including
   the local seed passwords in `scripts/seed/data/users.ts` — into a form. Take

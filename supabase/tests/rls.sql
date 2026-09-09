@@ -124,6 +124,8 @@ select set_config('rls.draft_event_id', :'draft_event_id', true);
 select set_config('rls.user_a_id', :'user_a_id', true);
 select set_config('rls.user_b_id', :'user_b_id', true);
 select set_config('rls.question_id', :'question_id', true);
+select set_config('rls.mentor_id', :'mentor_id', true);
+select set_config('rls.sponsor_id', :'sponsor_id', true);
 \o
 
 set local role authenticated;
@@ -165,7 +167,9 @@ begin
       null;
   end;
 
-  select count(*) into visible_count from public.event_registrations;
+  select count(*) into visible_count
+  from public.event_registrations
+  where event_id = current_setting('rls.event_id')::uuid;
   if visible_count <> 0 then
     raise exception 'user A can read user B registration';
   end if;
@@ -216,29 +220,38 @@ begin
   where user_id = public.current_user_info_id();
 
   select count(*) into visible_count
-  from public.event_application_responses;
+  from public.event_application_responses response
+  join public.event_registrations registration
+    on registration.id = response.event_registration_id
+  where registration.event_id = current_setting('rls.event_id')::uuid;
   if visible_count <> 1 then
     raise exception 'user A should see one own response, saw %', visible_count;
   end if;
 
   select count(*) into visible_count
-  from public.event_application_questions;
+  from public.event_application_questions
+  where event_id = current_setting('rls.event_id')::uuid;
   if visible_count <> 1 then
     raise exception 'user A cannot read open application questions';
   end if;
 
   select count(*) into visible_count
-  from public.check_in_sessions;
+  from public.check_in_sessions
+  where event_id = current_setting('rls.event_id')::uuid;
   if visible_count <> 1 then
     raise exception 'registered user cannot read their check-in session';
   end if;
 
-  select count(*) into visible_count from public.mentors;
+  select count(*) into visible_count
+  from public.mentors
+  where id = current_setting('rls.mentor_id')::uuid;
   if visible_count <> 1 then
     raise exception 'registered user cannot read active event mentor';
   end if;
 
-  select count(*) into visible_count from public.sponsors;
+  select count(*) into visible_count
+  from public.sponsors
+  where id = current_setting('rls.sponsor_id')::uuid;
   if visible_count <> 1 then
     raise exception 'registered user cannot read active event sponsor';
   end if;
@@ -340,9 +353,14 @@ declare
   visible_count integer;
   changed_count integer;
 begin
-  select count(*) into visible_count from public.user_info;
+  select count(*) into visible_count
+  from public.user_info
+  where id in (
+    current_setting('rls.user_a_id')::uuid,
+    current_setting('rls.user_b_id')::uuid
+  );
   if visible_count <> 2 then
-    raise exception 'admin should see all user_info rows, saw %', visible_count;
+    raise exception 'admin should see both user_info rows, saw %', visible_count;
   end if;
 
   select count(*) into visible_count
@@ -352,7 +370,9 @@ begin
     raise exception 'admin cannot see a draft event';
   end if;
 
-  select count(*) into visible_count from public.event_registrations;
+  select count(*) into visible_count
+  from public.event_registrations
+  where event_id = current_setting('rls.event_id')::uuid;
   if visible_count <> 2 then
     raise exception 'admin should see both registrations, saw %', visible_count;
   end if;
@@ -376,17 +396,24 @@ begin
   end if;
 
   select count(*) into visible_count
-  from public.event_application_responses;
+  from public.event_application_responses response
+  join public.event_registrations registration
+    on registration.id = response.event_registration_id
+  where registration.event_id = current_setting('rls.event_id')::uuid;
   if visible_count <> 2 then
     raise exception 'admin should see both responses, saw %', visible_count;
   end if;
 
-  select count(*) into visible_count from public.mentors;
+  select count(*) into visible_count
+  from public.mentors
+  where id = current_setting('rls.mentor_id')::uuid;
   if visible_count <> 1 then
     raise exception 'admin should see mentor catalog';
   end if;
 
-  select count(*) into visible_count from public.sponsors;
+  select count(*) into visible_count
+  from public.sponsors
+  where id = current_setting('rls.sponsor_id')::uuid;
   if visible_count <> 1 then
     raise exception 'admin should see sponsor catalog';
   end if;
@@ -505,6 +532,16 @@ reset role;
 \o /dev/null
 select set_config('request.jwt.claims', '{}', true);
 \o
+-- The final-manager invariant is global: set_user_role refuses the demotion
+-- only when no other manager is left anywhere. A seeded database ships its own
+-- manager fixture, so stand every non-fixture manager down first. This runs as
+-- superuser inside the transaction the script rolls back, so it never outlives
+-- the test.
+update public.user_info
+set role_access = 'basic'::public.role_access_enum
+where role_access = 'manager'::public.role_access_enum
+  and id not in (:'user_a_id', :'user_b_id');
+
 update public.user_info
 set role_access = case
   when id = :'user_a_id' then 'manager'::public.role_access_enum
