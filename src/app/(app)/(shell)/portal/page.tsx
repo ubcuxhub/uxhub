@@ -11,13 +11,13 @@ import {
 } from "@/features/memberships/components/MembershipCard";
 import { formatUserName } from "@/lib/user-name";
 import { createClient } from "@/lib/supabase/server";
-import { fetchMembershipTermEndsAt } from "@/lib/supabase-helpers/app-settings";
+import { getMembershipTermEndsAt } from "@/lib/app-settings";
 import { fetchMembershipTypeById } from "@/lib/supabase-helpers/memberships";
 
 export default async function PortalHome() {
   const user = await requireAuth();
   const supabase = await createClient();
-  const termEndsAt = await fetchMembershipTermEndsAt(supabase);
+  const termEndsAt = await getMembershipTermEndsAt();
   const firstName = user.first_name || user.email.split("@")[0] || "there";
   const isMember = hasActiveMembership(user, termEndsAt);
   // Nothing to sell once the term has ended, so the prompt would lead nowhere.

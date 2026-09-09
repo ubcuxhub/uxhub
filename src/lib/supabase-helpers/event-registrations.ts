@@ -52,6 +52,38 @@ export async function fetchEventRegistrationCount(
   return count ?? 0;
 }
 
+/**
+ * Registration totals for many events in one round trip.
+ *
+ * The listing pages that need counts for a whole table would otherwise issue
+ * one head query per event, so this defers to the `event_registration_counts`
+ * function, which aggregates in Postgres under the caller's own RLS.
+ *
+ * Events with no registrations are absent from the result, so every requested
+ * id is seeded to zero before the returned rows are folded in.
+ */
+export async function fetchEventRegistrationCounts(
+  supabase: DbClient,
+  eventIds: string[]
+): Promise<Map<string, number>> {
+  if (eventIds.length === 0) return new Map();
+
+  const { data, error } = await supabase.rpc("event_registration_counts", {
+    p_event_ids: eventIds,
+  });
+
+  if (error) throw error;
+
+  const counts = new Map<string, number>(eventIds.map((id) => [id, 0]));
+
+  for (const row of data ?? []) {
+    // PostgREST can serialize bigint as a string.
+    counts.set(row.event_id, Number(row.registration_count));
+  }
+
+  return counts;
+}
+
 /** Returns all event registrations for a given user. */
 export async function fetchRegistrationsForUser(
   supabase: DbClient,

@@ -757,6 +757,13 @@ export type Database = {
         Args: { target_event_id: string }
         Returns: undefined
       }
+      event_registration_counts: {
+        Args: { p_event_ids: string[] }
+        Returns: {
+          event_id: string
+          registration_count: number
+        }[]
+      }
       get_user_info_id: { Args: never; Returns: string }
       is_admin: { Args: never; Returns: boolean }
       is_authenticated: { Args: never; Returns: boolean }

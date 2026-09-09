@@ -243,6 +243,18 @@ begin
     raise exception 'registered user cannot read active event sponsor';
   end if;
 
+  -- The admin dashboard reads registration totals through this function rather
+  -- than one head-count per event. It is security invoker, so a member must
+  -- only ever count their own row -- both user A and user B are registered for
+  -- this event, and user A may see exactly one of them.
+  select registration_count into visible_count
+  from public.event_registration_counts(
+    array[current_setting('rls.event_id')::uuid]
+  );
+  if visible_count <> 1 then
+    raise exception 'member counted other registrations, saw %', visible_count;
+  end if;
+
   -- The membership term end has to be readable by members and anonymous
   -- visitors, since the marketing calls to action branch on it client-side.
   select count(*) into visible_count from public.app_settings;
@@ -343,6 +355,16 @@ begin
   select count(*) into visible_count from public.event_registrations;
   if visible_count <> 2 then
     raise exception 'admin should see both registrations, saw %', visible_count;
+  end if;
+
+  -- Same function, admin context: the count must cover every registration on
+  -- the event, not just the caller's.
+  select registration_count into visible_count
+  from public.event_registration_counts(
+    array[current_setting('rls.event_id')::uuid]
+  );
+  if visible_count <> 2 then
+    raise exception 'admin undercounted registrations, saw %', visible_count;
   end if;
 
   update public.event_registrations

@@ -8,7 +8,7 @@ import {
   fetchMembershipTypes,
 } from "@/lib/supabase-helpers/memberships";
 import { withReturnTo } from "@/lib/auth/paths";
-import { fetchMembershipTermEndsAt } from "@/lib/supabase-helpers/app-settings";
+import { getMembershipTermEndsAt } from "@/lib/app-settings";
 import {
   resolveMembershipExpiry,
   termEndsBeforeFullYear,
@@ -33,7 +33,7 @@ export async function MembershipCheckoutRoute({
   const [membershipType, membershipTypes, termEndsAt] = await Promise.all([
     fetchMembershipTypeBySlug(supabase, slug),
     fetchMembershipTypes(supabase, { orderBy: "price" }),
-    fetchMembershipTermEndsAt(supabase),
+    getMembershipTermEndsAt(),
   ]);
 
   if (!membershipType) notFound();

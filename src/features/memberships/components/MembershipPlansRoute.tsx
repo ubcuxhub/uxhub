@@ -4,7 +4,7 @@ import { MembershipPlans } from "./MembershipPlans";
 import { requireAuth } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchMembershipTypes } from "@/lib/supabase-helpers/memberships";
-import { fetchMembershipTermEndsAt } from "@/lib/supabase-helpers/app-settings";
+import { getMembershipTermEndsAt } from "@/lib/app-settings";
 import { withReturnTo } from "@/lib/auth/paths";
 import {
   isMembershipTermClosed,
@@ -36,7 +36,7 @@ function MembershipNotice({
 export async function MembershipPlansRoute({ returnTo }: { returnTo?: string }) {
   const user = await requireAuth(withReturnTo("/portal/membership", returnTo));
   const supabase = await createClient();
-  const termEndsAt = await fetchMembershipTermEndsAt(supabase);
+  const termEndsAt = await getMembershipTermEndsAt();
 
   if (hasActiveOrPendingMembership(user, termEndsAt)) {
     const pending = Boolean(user.membership_pre_ordered_type_id);

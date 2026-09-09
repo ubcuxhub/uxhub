@@ -9,7 +9,7 @@ import {
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchEvents } from "@/lib/supabase-helpers/events";
-import { fetchEventRegistrationCount } from "@/lib/supabase-helpers/event-registrations";
+import { fetchEventRegistrationCounts } from "@/lib/supabase-helpers/event-registrations";
 
 export default async function AdminEventsPage() {
   await requireAdmin();
@@ -18,28 +18,30 @@ export default async function AdminEventsPage() {
     orderBy: "created_at",
     ascending: false,
   });
-  const now = new Date();
-  const rows: AdminEventTableRow[] = await Promise.all(
-    events.map(async (event) => {
-      const registrationStart = event.registration_start_time
-        ? new Date(event.registration_start_time)
-        : null;
-      const registrationEnd = event.registration_end_time
-        ? new Date(event.registration_end_time)
-        : null;
-
-      return {
-        event,
-        registrationCount: await fetchEventRegistrationCount(
-          supabase,
-          event.id
-        ),
-        registrationOpen:
-          (!registrationStart || now >= registrationStart) &&
-          (!registrationEnd || now <= registrationEnd),
-      };
-    })
+  // One aggregate call rather than a head-count per event: the per-event form
+  // meant a thirty-event dashboard opened thirty concurrent PostgREST requests.
+  const registrationCounts = await fetchEventRegistrationCounts(
+    supabase,
+    events.map((event) => event.id)
   );
+
+  const now = new Date();
+  const rows: AdminEventTableRow[] = events.map((event) => {
+    const registrationStart = event.registration_start_time
+      ? new Date(event.registration_start_time)
+      : null;
+    const registrationEnd = event.registration_end_time
+      ? new Date(event.registration_end_time)
+      : null;
+
+    return {
+      event,
+      registrationCount: registrationCounts.get(event.id) ?? 0,
+      registrationOpen:
+        (!registrationStart || now >= registrationStart) &&
+        (!registrationEnd || now <= registrationEnd),
+    };
+  });
 
   return (
     <PageContainer className="flex flex-col gap-8">
