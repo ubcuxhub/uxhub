@@ -49,9 +49,17 @@ jobs:
             echo "NEXT_PUBLIC_SUPABASE_URL=$(jq -r .API_URL <<<"$status")"
             echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$(jq -r .ANON_KEY <<<"$status")"
             echo "SUPABASE_SECRET_KEY=$(jq -r .SERVICE_ROLE_KEY <<<"$status")"
+            echo "SUPABASE_DB_URL=$(jq -r .DB_URL <<<"$status")"
           } >> "$GITHUB_ENV"
 
       - run: pnpm install --frozen-lockfile
+
+      # The RLS policies are the only thing standing between one member and
+      # another member's data, and nothing else in CI exercises them. The
+      # throwaway database above already has every migration applied, and
+      # SUPABASE_DB_URL points the suite at it.
+      - name: Verify RLS policies
+        run: pnpm test:rls
 
       # Square credentials are never exercised by the build; these placeholders
       # only satisfy the module-scope checks in src/lib/square/client.ts.
