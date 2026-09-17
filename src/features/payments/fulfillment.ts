@@ -7,6 +7,7 @@ import type { PurchaseRow, UserInfoRow } from "@/types/models";
 import type { CheckoutActionResult, CheckoutRequestInput } from "./types";
 import type { Database, Json } from "@/lib/supabase/database.types";
 import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
+import { log } from "@/lib/log";
 import { fetchApplicationQuestions } from "@/lib/supabase-helpers/event-applications";
 import {
   fetchEventRegistrationByPurchaseId,
@@ -224,9 +225,7 @@ async function reconcilePurchaseIfPossible(
       return await applyPaymentStateToPurchase(purchase.id, response.payment);
     }
   } catch {
-    console.error(
-      `Square payment reconciliation failed for purchase ${purchase.id}.`,
-    );
+    log.error("payment.reconciliation_failed", { purchaseId: purchase.id });
   }
 
   return purchase;
@@ -346,10 +345,10 @@ async function createSquarePaymentForMembership(
         updatedPurchase.status === "completed" ? "completed" : "processing",
     } as const;
   } catch (error) {
-    console.error(
-      `Square membership payment failed for purchase ${purchase.id}:`,
-      getSquareErrorDiagnostic(error)
-    );
+    log.error("payment.membership_charge_failed", {
+      purchaseId: purchase.id,
+      diagnostic: getSquareErrorDiagnostic(error),
+    });
 
     if (isDefinitiveSquareFailure(error)) {
       await updatePurchase(adminDb, purchase.id, {
@@ -490,10 +489,10 @@ async function createSquarePaymentForEventTicket(
         updatedPurchase.status === "completed" ? "completed" : "processing",
     } as const;
   } catch (error) {
-    console.error(
-      `Square event ticket payment failed for purchase ${purchase.id}:`,
-      getSquareErrorDiagnostic(error)
-    );
+    log.error("payment.ticket_charge_failed", {
+      purchaseId: purchase.id,
+      diagnostic: getSquareErrorDiagnostic(error),
+    });
 
     const purchaseRecord = await fetchPurchaseById(adminDb, purchase.id);
     const paymentId = purchaseRecord?.square_payment_id ?? null;

@@ -1,6 +1,7 @@
 "use server";
 
 import { requireAuth } from "@/lib/auth/guards";
+import { errorFields, log } from "@/lib/log";
 import { executeCheckoutForUser } from "./fulfillment";
 import { parseCheckoutRequest } from "./schemas";
 import type { CheckoutActionResult } from "./types";
@@ -15,7 +16,7 @@ export async function submitCheckoutAction(
 
     return await executeCheckoutForUser(user, payload);
   } catch (error) {
-    console.error("submitCheckoutAction failed:", error);
+    log.error("checkout.submit_failed", errorFields(error));
 
     return {
       ok: false,

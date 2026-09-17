@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/database.types";
 import { fetchEventById } from "@/lib/supabase-helpers/events";
+import { errorFields, log } from "@/lib/log";
 import { fetchMembershipTypeById } from "@/lib/supabase-helpers/memberships";
 import {
   claimPurchaseConfirmationEmail,
@@ -117,7 +118,10 @@ export async function sendPurchaseConfirmationEmail(
           adminDb,
           claimedPurchase.id
         ).catch((error) => {
-          console.error("Releasing the confirmation email claim failed:", error);
+          log.error("email.confirmation_claim_release_failed", {
+            purchaseId: claimedPurchase.id,
+            ...errorFields(error),
+          });
         });
       }
     }
@@ -130,6 +134,6 @@ export async function sendPurchaseConfirmationEmail(
       confirmation_email_sent_at: new Date().toISOString(),
     });
   } catch (error) {
-    console.error("sendPurchaseConfirmationEmail failed:", error);
+    log.error("email.confirmation_send_failed", errorFields(error));
   }
 }

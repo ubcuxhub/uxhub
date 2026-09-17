@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAuth } from "@/lib/auth/guards";
+import { errorFields, log } from "@/lib/log";
 import { adminUpdateUserInfoById } from "@/lib/supabase-helpers/admin-server";
 import { fetchMembershipTermEndsAt } from "@/lib/supabase-helpers/app-settings";
 import { createClient } from "@/lib/supabase/server";
@@ -212,7 +213,7 @@ export async function saveMembershipProfileAction(
     if (isDuplicateStudentNumberError(error)) {
       return { ok: false, error: DUPLICATE_STUDENT_NUMBER_MESSAGE };
     }
-    console.error("saveMembershipProfileAction failed.");
+    log.error("membership.profile_save_failed", errorFields(error));
     return {
       ok: false,
       error: "Your membership details could not be saved. Please try again.",

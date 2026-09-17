@@ -7,6 +7,7 @@ import {
   EVENT_IMAGE_MAX_BYTES,
   parseEventImageUpload,
 } from "@/lib/event-image";
+import { errorFields, log } from "@/lib/log";
 import { adminUploadEventImage } from "@/lib/supabase-helpers/admin-server";
 
 export async function POST(req: NextRequest) {
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true, url });
   } catch (error) {
-    console.error("Image upload error:", error);
+    log.error("upload.event_image_failed", errorFields(error));
     return NextResponse.json(
       { error: "Failed to upload image." },
       { status: 500 }

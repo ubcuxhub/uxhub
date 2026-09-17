@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { WebhooksHelper } from "square";
 import { processSquarePaymentEvent } from "@/features/payments/fulfillment";
+import { errorFields, log } from "@/lib/log";
 import { getSquareWebhookEndpoints } from "@/lib/square/client";
 import type { Json } from "@/lib/supabase/database.types";
 import { parseSquarePaymentUpdatedEvent } from "@/lib/square/webhook";
@@ -56,7 +57,7 @@ export async function POST(request: Request) {
   try {
     event = parseSquarePaymentUpdatedEvent(rawPayload);
   } catch (error) {
-    console.error("Invalid Square payment.updated payload:", error);
+    log.error("webhook.square_payload_invalid", errorFields(error));
     return NextResponse.json({ error: "Invalid webhook payload" }, { status: 400 });
   }
 
@@ -65,7 +66,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
-    console.error("Square webhook handling failed:", error);
+    log.error("webhook.square_handling_failed", errorFields(error));
     return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 });
   }
 }

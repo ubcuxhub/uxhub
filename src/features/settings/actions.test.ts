@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("server-only", () => ({}));
+
 import { deleteAccountAction } from "./actions";
 
 const requireAuth = vi.hoisted(() => vi.fn());
@@ -35,10 +37,14 @@ describe("deleteAccountAction", () => {
       ok: false,
       error: "Your account could not be deleted.",
     });
-    expect(consoleError).toHaveBeenCalledWith(
-      "Account deletion failed",
-      { errorType: "Error" },
-    );
+    expect(consoleError).toHaveBeenCalledOnce();
+
+    // The database error's message can quote account data, so it must not
+    // reach the log.
+    const [line] = consoleError.mock.calls[0] as [string];
+    expect(line).toContain("account.deletion_failed");
+    expect(line).toContain("Error");
+    expect(line).not.toContain("database details");
 
     consoleError.mockRestore();
   });

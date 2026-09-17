@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireAdmin, requireManager } from "@/lib/auth/guards";
 import { createUniqueSlug, slugify } from "@/lib/slug";
+import { errorFields, log } from "@/lib/log";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -175,7 +176,7 @@ async function discardEventImage(imageUrl: string | null | undefined) {
   try {
     await adminDeleteEventImageByUrl(imageUrl);
   } catch (error) {
-    console.error("Failed to delete event image:", error);
+    log.error("admin.event_image_delete_failed", errorFields(error));
   }
 }
 

@@ -120,6 +120,11 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
 - Marketing typography and colors are scoped by `.marketing-home` in
   `src/app/globals.css`; keep marketing-only styles inside that boundary.
 - Use the `@/*` alias for imports from `src/*`.
+- Server code logs through `log` from `@/lib/log`, which emits one structured
+  JSON line per event. Name events as stable dot-paths (`payment.ticket_charge_failed`),
+  identify records by id, and pass errors through `errorFields` so a message can
+  never carry row data. An eslint rule keeps `console` out of `src/**/*.ts`;
+  client components use `console` directly.
 
 ## Database Changes
 

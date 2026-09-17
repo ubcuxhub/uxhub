@@ -1,6 +1,7 @@
 import "server-only";
 
 import { Resend } from "resend";
+import { log } from "@/lib/log";
 
 interface SendEmailInput {
   html: string;
@@ -36,7 +37,7 @@ export async function sendEmail({ html, subject, to }: SendEmailInput) {
   // Local development runs without Resend credentials. Log instead of throwing
   // so checkout still completes end to end.
   if (!client) {
-    console.info(`[email] RESEND_API_KEY is unset; skipped "${subject}" to ${to}`);
+    log.info("email.skipped_no_api_key", { subject });
     return false;
   }
 

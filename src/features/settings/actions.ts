@@ -1,6 +1,7 @@
 "use server";
 
 import { requireAuth } from "@/lib/auth/guards";
+import { errorFields, log } from "@/lib/log";
 import { adminDeleteAccount } from "@/lib/supabase-helpers/admin-server";
 import { matchesConfirmationEmail } from "./lib/account-deletion";
 
@@ -45,26 +46,8 @@ export async function deleteAccountAction(
 
     return { ok: true };
   } catch (error) {
-    // Keep logs diagnostic but free of messages/details that could contain
-    // account data. A database error is not safe or useful member-facing copy.
-    console.error("Account deletion failed", safeErrorMetadata(error));
+    log.error("account.deletion_failed", errorFields(error));
 
     return { ok: false, error: "Your account could not be deleted." };
   }
-}
-
-function safeErrorMetadata(error: unknown) {
-  if (error instanceof Error) {
-    return { errorType: error.name };
-  }
-
-  if (error && typeof error === "object") {
-    const code = (error as Record<string, unknown>).code;
-    return {
-      errorType: "SupabaseError",
-      ...(typeof code === "string" ? { code } : {}),
-    };
-  }
-
-  return { errorType: typeof error };
 }
