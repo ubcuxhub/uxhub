@@ -3,7 +3,7 @@ import type {
   UserInfoRow,
   UserInfoUpdate,
   UserType,
-} from "@/types/models";
+} from "@/lib/supabase/models";
 import { hasActiveMembership } from "@/lib/membership";
 import { isMembershipTermClosed } from "@/features/memberships/lib/expiry";
 import {

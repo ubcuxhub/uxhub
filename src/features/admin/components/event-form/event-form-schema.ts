@@ -2,7 +2,7 @@ import {
   ResponseType,
   type EventStatus,
   type EventType,
-} from "@/types/models";
+} from "@/lib/supabase/models";
 import type { ApplicationQuestionTemplate } from "@/features/events/types/eventTypes";
 import type { CheckInSessionDraft } from "@/features/admin/types/checkInTypes";
 import { getPacificStartDefaults } from "@/lib/date";

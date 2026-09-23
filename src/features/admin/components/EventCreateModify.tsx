@@ -6,7 +6,7 @@ import type {
   EventRow,
   MentorRow,
   SponsorRow,
-} from "@/types/models";
+} from "@/lib/supabase/models";
 import { Button } from "@/components/ui/button";
 import {
   Field,

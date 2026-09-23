@@ -6,10 +6,10 @@ import {
   type AttendingRegistration,
   type CheckInSession,
 } from "@/features/admin";
-import type { EventRow } from "@/types/models";
+import type { EventRow } from "@/lib/supabase/models";
 import { createClient } from "@/lib/supabase/client";
 import { TABLES } from "@/lib/supabase-helpers/tables";
-import type { EventRegistrationRow } from "@/types/models";
+import type { EventRegistrationRow } from "@/lib/supabase/models";
 import {
   fetchAdminCheckInSnapshotAction,
   toggleCheckInAction,

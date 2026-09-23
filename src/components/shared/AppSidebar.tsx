@@ -13,7 +13,7 @@ import {
   Users,
 } from "lucide-react";
 
-import { useUser } from "@/context/UserContext";
+import { useUser } from "@/lib/auth/user-context";
 import { FLAGS } from "@/lib/flags";
 import { hasAdminAccess, hasManagerAccess } from "@/lib/auth/roles";
 import { SettingsDialog, openSettings } from "@/features/settings";

@@ -10,7 +10,7 @@ import {
   isAsyncTimeoutError,
   withDeadline,
 } from "@/lib/async/deadline";
-import { useNavigationRecovery } from "@/lib/async/use-navigation-recovery";
+import { useNavigationRecovery } from "@/hooks/use-navigation-recovery";
 import { createClient } from "@/lib/supabase/client";
 
 import {

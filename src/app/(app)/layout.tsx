@@ -1,4 +1,4 @@
-import { UserProvider } from "@/context/UserContext";
+import { UserProvider } from "@/lib/auth/user-context";
 import { requireAuth } from "@/lib/auth/guards";
 import { getMembershipTermEndsAt } from "@/lib/app-settings";
 import { headers } from "next/headers";

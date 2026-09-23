@@ -8,7 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { ApplicationStatus } from "@/types/models";
+import type { ApplicationStatus } from "@/lib/supabase/models";
 import { Clock, X, Check, User, Mail, Calendar } from "lucide-react";
 import { formatTimestamp } from "@/lib/date";
 

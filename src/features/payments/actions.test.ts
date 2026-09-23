@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { UserInfoRow } from "@/types/models";
+import type { UserInfoRow } from "@/lib/supabase/models";
 import { submitCheckoutAction } from "./actions";
 
 vi.mock("server-only", () => ({}));

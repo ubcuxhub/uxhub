@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { UserInfoRow } from "@/types/models";
+import type { UserInfoRow } from "@/lib/supabase/models";
 
 vi.mock("server-only", () => ({}));
 

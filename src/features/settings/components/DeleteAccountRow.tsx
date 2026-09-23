@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { useUser } from "@/context/UserContext";
+import { useUser } from "@/lib/auth/user-context";
 import { DeleteAccountDialog } from "./DeleteAccountDialog";
 import { SettingsRow } from "./SettingsRow";
 

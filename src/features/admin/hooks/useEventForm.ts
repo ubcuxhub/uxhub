@@ -19,7 +19,7 @@ import type {
   EventUpdate,
   MentorRow,
   SponsorRow,
-} from "@/types/models";
+} from "@/lib/supabase/models";
 import type { CheckInSessionDraft } from "@/features/admin/types/checkInTypes";
 import {
   createFormSnapshot,

@@ -1,4 +1,4 @@
-import type { CheckInSessionRow } from "@/types/models";
+import type { CheckInSessionRow } from "@/lib/supabase/models";
 
 export type CheckInSession = CheckInSessionRow;
 

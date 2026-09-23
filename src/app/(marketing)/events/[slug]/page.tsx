@@ -15,7 +15,7 @@ import {
   fetchEventMentors,
   fetchEventSponsors,
 } from "@/lib/supabase-helpers/event-people";
-import type { EventRow } from "@/types/models";
+import type { EventRow } from "@/lib/supabase/models";
 import { formatEventDate, formatEventTime } from "@/lib/date";
 import { EventRegistrationAction } from "@/features/events/components/EventRegistrationAction";
 import Navbar from "@/features/marketing/homepage-sections/Navbar";

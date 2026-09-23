@@ -1,7 +1,7 @@
 import {
   ResponseType,
   type ResponseType as ResponseTypeValue,
-} from "@/types/models";
+} from "@/lib/supabase/models";
 
 export { ResponseType };
 

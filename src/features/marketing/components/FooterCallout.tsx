@@ -4,7 +4,7 @@ import React from "react";
 import Image from "next/image";
 import Button from "./Button";
 import MembershipCta from "./MembershipCta";
-import { useUser } from "@/context/UserContext";
+import { useUser } from "@/lib/auth/user-context";
 import { hasActiveMembership } from "@/lib/membership";
 
 export default function FooterCallout() {

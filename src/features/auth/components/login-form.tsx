@@ -7,7 +7,7 @@ import { useRef, useState } from "react";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { withDeadline } from "@/lib/async/deadline";
-import { useNavigationRecovery } from "@/lib/async/use-navigation-recovery";
+import { useNavigationRecovery } from "@/hooks/use-navigation-recovery";
 import { createClient } from "@/lib/supabase/client";
 
 import {

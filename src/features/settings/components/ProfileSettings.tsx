@@ -2,14 +2,14 @@
 
 import { useCallback, useEffect, useState, useRef } from "react";
 import { Check, CircleAlert, Loader2 } from "lucide-react";
-import { useUser } from "@/context/UserContext";
+import { useUser } from "@/lib/auth/user-context";
 import { createClient } from "@/lib/supabase/client";
 import { updateUserInfoById } from "@/lib/supabase-helpers/users";
 import { fetchMembershipTypeById } from "@/lib/supabase-helpers/memberships";
 import { updateEligibilityProfileAction } from "@/features/memberships/actions";
 import { canEditMembershipClassification } from "@/features/memberships/lib/policy";
 import { validateStudentNumber } from "@/features/memberships/lib/validation";
-import type { UserInfoRow } from "@/types/models";
+import type { UserInfoRow } from "@/lib/supabase/models";
 import {
   ProfileFields,
   type ProfileFormData,

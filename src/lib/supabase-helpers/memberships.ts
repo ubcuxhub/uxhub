@@ -1,6 +1,6 @@
 import type { DbClient } from "./types";
 import { TABLES } from "./tables";
-import type { MembershipTypeRow } from "@/types/models";
+import type { MembershipTypeRow } from "@/lib/supabase/models";
 
 export type MembershipOrderBy = "price" | "name";
 

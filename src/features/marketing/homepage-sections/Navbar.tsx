@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import Button from "@/features/marketing/components/Button";
-import { useUser } from "@/context/UserContext";
+import { useUser } from "@/lib/auth/user-context";
 import { FLAGS } from "@/lib/flags";
 import { hasActiveMembership } from "@/lib/membership";
 

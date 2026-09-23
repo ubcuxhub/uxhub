@@ -1,6 +1,6 @@
 import { cache } from "react";
 
-import type { UserInfoRow } from "@/types/models";
+import type { UserInfoRow } from "@/lib/supabase/models";
 import { createClient } from "@/lib/supabase/server";
 import { ensureUserInfo } from "@/lib/auth/ensure-user-info";
 import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";

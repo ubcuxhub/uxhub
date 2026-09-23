@@ -4,7 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import { createClient } from "@/lib/supabase/client";
 import { fetchMembershipTermEndsAt } from "@/lib/supabase-helpers/app-settings";
 import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";
-import type { UserInfoRow } from "@/types/models";
+import type { UserInfoRow } from "@/lib/supabase/models";
 
 const supabase = createClient();
 

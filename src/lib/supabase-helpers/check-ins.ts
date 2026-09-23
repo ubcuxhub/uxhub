@@ -3,7 +3,7 @@ import { TABLES } from "./tables";
 import type {
   CheckInSessionInsert,
   EventRegistrationRow,
-} from "@/types/models";
+} from "@/lib/supabase/models";
 import type {
   AttendingRegistration,
   CheckInSession,

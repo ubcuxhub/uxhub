@@ -6,7 +6,7 @@ import {
   ApplicationResponseCard,
   StatusUpdateSection,
 } from "@/features/admin";
-import type { ApplicationStatus, EventRow } from "@/types/models";
+import type { ApplicationStatus, EventRow } from "@/lib/supabase/models";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { SuccessOverlay } from "@/components/shared/SuccessOverlay";

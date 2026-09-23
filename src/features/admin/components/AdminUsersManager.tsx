@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { useUser } from "@/context/UserContext";
+import { useUser } from "@/lib/auth/user-context";
 import {
   UserDetailsPanel,
   UserDirectoryPanel,
@@ -18,7 +18,7 @@ import {
   updateUserRoleAction,
 } from "@/features/admin/actions";
 import { formatUserName } from "@/lib/user-name";
-import type { RoleAccess } from "@/types/models";
+import type { RoleAccess } from "@/lib/supabase/models";
 
 interface AdminUsersManagerProps {
   initialUsers: UserRecord[];

@@ -1,7 +1,7 @@
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { UserInfoRow } from "@/types/models";
+import type { UserInfoRow } from "@/lib/supabase/models";
 import type { CheckoutRequestInput } from "./types";
 import type { Database } from "@/lib/supabase/database.types";
 import { supabaseAdmin } from "@/lib/supabase/admin";

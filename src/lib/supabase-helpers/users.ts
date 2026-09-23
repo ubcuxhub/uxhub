@@ -1,6 +1,6 @@
 import type { DbClient } from "./types";
 import { TABLES } from "./tables";
-import type { UserInfoRow, UserInfoUpdate } from "@/types/models";
+import type { UserInfoRow, UserInfoUpdate } from "@/lib/supabase/models";
 
 export interface UserInfoContact {
   id: string;

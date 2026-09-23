@@ -28,7 +28,7 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { saveAdminSponsorAction } from "@/features/admin/actions";
-import type { SponsorRow } from "@/types/models";
+import type { SponsorRow } from "@/lib/supabase/models";
 import type { SponsorDraft } from "./event-form-schema";
 
 interface SponsorsSectionProps {

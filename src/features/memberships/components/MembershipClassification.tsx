@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { withReturnTo } from "@/lib/auth/paths";
-import type { UserType } from "@/types/models";
+import type { UserType } from "@/lib/supabase/models";
 import {
   userTypeToAudience,
   type MembershipAudience,

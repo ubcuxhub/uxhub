@@ -12,7 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatMembershipTypeName } from "@/features/memberships/lib/display";
 import { parseMembershipPrice } from "@/features/admin/lib/membership-type";
 import { updateMembershipTypeAction } from "@/features/admin/actions";
-import type { MembershipTypeRow } from "@/types/models";
+import type { MembershipTypeRow } from "@/lib/supabase/models";
 
 const currency = new Intl.NumberFormat("en-CA", {
   style: "currency",

@@ -1,7 +1,7 @@
 "use client";
 
 import Button from "@/features/marketing/components/Button";
-import { useUser } from "@/context/UserContext";
+import { useUser } from "@/lib/auth/user-context";
 import { isMembershipTermClosed } from "@/features/memberships/lib/expiry";
 import { hasActiveMembership } from "@/lib/membership";
 

@@ -5,7 +5,7 @@ import type {
   SponsorInsert,
   SponsorRow,
   SponsorUpdate,
-} from "@/types/models";
+} from "@/lib/supabase/models";
 import { TABLES } from "./tables";
 import type { DbClient } from "./types";
 

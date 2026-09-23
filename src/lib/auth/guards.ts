@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-import type { UserInfoRow } from "@/types/models";
+import type { UserInfoRow } from "@/lib/supabase/models";
 import { loadCurrentUser } from "@/lib/auth/current-user";
 import { getSafeInternalPath } from "@/lib/auth/paths";
 import { hasAdminAccess, hasManagerAccess } from "@/lib/auth/roles";

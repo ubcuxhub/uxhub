@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { FlowLink } from "@/components/shared/FlowLink";
 import { Button } from "@/components/ui/button";
-import type { MembershipTypeRow, UserType } from "@/types/models";
+import type { MembershipTypeRow, UserType } from "@/lib/supabase/models";
 import { cn } from "@/lib/utils";
 import { withReturnTo } from "@/lib/auth/paths";
 import { membershipDetailsPath } from "@/features/memberships/lib/policy";

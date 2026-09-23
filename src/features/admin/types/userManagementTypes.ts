@@ -1,4 +1,4 @@
-import type { UserInfoRow } from "@/types/models";
+import type { UserInfoRow } from "@/lib/supabase/models";
 
 export type UserRecord = UserInfoRow & {
   id?: string;

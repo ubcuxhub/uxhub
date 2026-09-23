@@ -17,12 +17,12 @@ import {
 } from "@/components/ui/select";
 import { FACULTIES, STUDENT_STATUSES, YEAR_LEVELS } from "@/lib/constants";
 import { withReturnTo } from "@/lib/auth/paths";
-import { useUser } from "@/context/UserContext";
+import { useUser } from "@/lib/auth/user-context";
 import type {
   StudentStatus,
   UniversityYear,
   UserInfoRow,
-} from "@/types/models";
+} from "@/lib/supabase/models";
 import {
   saveMembershipProfileAction,
   type MembershipProfileInput,
@@ -34,7 +34,7 @@ import {
   isAsyncTimeoutError,
   withDeadline,
 } from "@/lib/async/deadline";
-import { useNavigationRecovery } from "@/lib/async/use-navigation-recovery";
+import { useNavigationRecovery } from "@/hooks/use-navigation-recovery";
 
 export function MembershipDetailsForm({
   audience,

@@ -6,7 +6,7 @@ import { ApplicationListCard } from "@/features/admin";
 import {
   type GroupedRegistration,
 } from "@/features/events";
-import type { ApplicationStatus } from "@/types/models";
+import type { ApplicationStatus } from "@/lib/supabase/models";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageContainer } from "@/components/shared/PageContainer";

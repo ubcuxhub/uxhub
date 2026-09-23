@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { DM_Sans, Inter, Lora } from "next/font/google";
-import { UserProvider } from "@/context/UserContext";
+import { UserProvider } from "@/lib/auth/user-context";
 import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
 

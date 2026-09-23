@@ -38,7 +38,7 @@ import {
   formatEventTime,
   formatTimestamp,
 } from "@/lib/date";
-import type { EventRow, EventStatus } from "@/types/models";
+import type { EventRow, EventStatus } from "@/lib/supabase/models";
 
 export interface AdminEventTableRow {
   event: EventRow;

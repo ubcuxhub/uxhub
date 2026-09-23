@@ -7,10 +7,10 @@ import {
 import type {
   EventRegistrationRow,
   EventRegistrationUpdate,
-} from "@/types/models";
+} from "@/lib/supabase/models";
 import type { GroupedRegistration } from "@/features/events/types/applicationTypes";
 import { formatUserName } from "@/lib/user-name";
-import type { ApplicationStatus } from "@/types/models";
+import type { ApplicationStatus } from "@/lib/supabase/models";
 
 export async function fetchEventRegistrationById(
   supabase: DbClient,

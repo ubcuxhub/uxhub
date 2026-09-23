@@ -18,7 +18,7 @@ import type {
   UniversityYear,
   UserInfoRow,
   UserType,
-} from "@/types/models";
+} from "@/lib/supabase/models";
 
 export type ProfileFormData = {
   first_name: string;

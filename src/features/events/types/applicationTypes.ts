@@ -1,4 +1,4 @@
-import type { ApplicationStatus } from "@/types/models";
+import type { ApplicationStatus } from "@/lib/supabase/models";
 
 export interface GroupedRegistration {
   user_id: string;
