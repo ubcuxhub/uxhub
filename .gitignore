@@ -45,3 +45,6 @@ coverage/
 
 # Supabase CLI scratch state (version caches, local link)
 supabase/.temp/
+
+# Claude Code local state (agent worktrees, session files)
+.claude/
