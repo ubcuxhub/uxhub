@@ -609,6 +609,36 @@ begin
 end;
 $$;
 
+do $$
+declare
+  role_name text;
+  function_signature text;
+begin
+  foreach role_name in array array['anon', 'authenticated'] loop
+    foreach function_signature in array array[
+      'public.reserve_paid_event_ticket(uuid, uuid, uuid)',
+      'public.release_paid_event_ticket_reservation(uuid)'
+    ] loop
+      if has_function_privilege(role_name, function_signature, 'execute') then
+        raise exception '% can execute %', role_name, function_signature;
+      end if;
+    end loop;
+  end loop;
+
+  if not has_function_privilege(
+    'service_role',
+    'public.reserve_paid_event_ticket(uuid, uuid, uuid)',
+    'execute'
+  ) or not has_function_privilege(
+    'service_role',
+    'public.release_paid_event_ticket_reservation(uuid)',
+    'execute'
+  ) then
+    raise exception 'service_role lost execute on the ticket reservation functions';
+  end if;
+end;
+$$;
+
 \o /dev/null
 select set_config('request.jwt.claims', '{}', true);
 \o
