@@ -113,7 +113,8 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
 - Student-facing event and checkout routes use slugs. Admin event routes use
   event IDs.
 - Settings are a hash-driven dialog (`#settings/<tab>`), not standalone portal
-  pages. Use `openSettings(tab)` from `src/features/settings`.
+  pages. Use `openSettings(tab)` from
+  `src/features/settings/components/SettingsDialog`.
 - Email markup lives in `src/lib/email`. `layout.ts` holds the shared chrome;
   `templates.ts` renders purchase receipts at request time; `auth-templates.ts`
   is the source for the Supabase auth emails. The auth templates are generated

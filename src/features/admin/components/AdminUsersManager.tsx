@@ -5,14 +5,16 @@ import { useMemo, useState } from "react";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { useUser } from "@/lib/auth/user-context";
+import { UserDetailsPanel } from "@/features/admin/components/UserDetailsPanel";
 import {
-  UserDetailsPanel,
   UserDirectoryPanel,
+} from "@/features/admin/components/UserDirectoryPanel";
+import {
   type MembershipTypeOption,
   type SearchOption,
   type SortOption,
   type UserRecord,
-} from "@/features/admin";
+} from "@/features/admin/types";
 import {
   updateManagerUserAction,
   updateUserRoleAction,

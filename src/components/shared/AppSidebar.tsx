@@ -16,7 +16,10 @@ import {
 import { useUser } from "@/lib/auth/user-context";
 import { FLAGS } from "@/lib/flags";
 import { hasAdminAccess, hasManagerAccess } from "@/lib/auth/roles";
-import { SettingsDialog, openSettings } from "@/features/settings";
+import {
+  SettingsDialog,
+  openSettings,
+} from "@/features/settings/components/SettingsDialog";
 import {
   Sidebar,
   SidebarContent,

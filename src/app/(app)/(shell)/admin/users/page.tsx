@@ -1,5 +1,5 @@
 import { AdminUsersManager } from "@/features/admin/components/AdminUsersManager";
-import type { UserRecord } from "@/features/admin";
+import type { UserRecord } from "@/features/admin/types";
 import { requireAdmin } from "@/lib/auth/guards";
 import { hasManagerAccess } from "@/lib/auth/roles";
 import { createClient } from "@/lib/supabase/server";

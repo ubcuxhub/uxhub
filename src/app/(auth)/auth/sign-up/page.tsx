@@ -1,4 +1,4 @@
-import { SignUpForm } from "@/features/auth";
+import { SignUpForm } from "@/features/auth/components/SignUpForm";
 import { redirectIfAuthenticated } from "@/lib/auth/guards";
 import { getSafeInternalPath } from "@/lib/auth/paths";
 

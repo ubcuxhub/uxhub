@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 
-import { UpdatePasswordForm } from "@/features/auth";
+import {
+  UpdatePasswordForm,
+} from "@/features/auth/components/UpdatePasswordForm";
 import { withDeadline } from "@/lib/async/deadline";
 import { createClient } from "@/lib/supabase/server";
 

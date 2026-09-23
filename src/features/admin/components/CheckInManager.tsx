@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { CheckInTable } from "@/features/admin/components/CheckInTable";
 import {
-  CheckInTable,
   type AttendingRegistration,
   type CheckInSession,
-} from "@/features/admin";
+} from "@/features/admin/types";
 import type { EventRow } from "@/lib/supabase/models";
 import { createClient } from "@/lib/supabase/client";
 import { TABLES } from "@/lib/supabase-helpers/tables";
