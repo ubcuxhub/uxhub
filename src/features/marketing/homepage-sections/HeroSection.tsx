@@ -48,7 +48,7 @@ export default function Hero() {
                   <div className="absolute -top-[70px] left-[-80px] md:left-[-95px] lg:left-[-120px] hidden md:block transition-transform duration-300 ease-in-out hover:scale-110">
                     <div className="relative aspect-[274/122] w-[80px] md:w-[110px] lg:w-[140px]">
                       <Image
-                        src="/and largest.png"
+                        src="/and-largest.png"
                         alt="and largest!"
                         fill
                         className="object-contain"

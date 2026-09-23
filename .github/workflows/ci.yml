@@ -1,8 +1,11 @@
 name: CI
 
+# Branch commits are covered by pull_request; push only runs for main, so a PR
+# commit does not start two identical runs.
 on:
   pull_request:
   push:
+    branches: [main]
 
 jobs:
   verify:
@@ -32,27 +35,27 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-      - uses: supabase/setup-cli@v1
-        with:
-          version: latest
+      # Installs the Supabase CLI too, at the version the lockfile pins, so CI
+      # starts the same containers as a local `pnpm exec supabase start`.
+      - run: pnpm install --frozen-lockfile
 
       # Applies every migration in supabase/migrations to a throwaway database,
       # so a schema change that the app code does not match fails here rather
-      # than in a deploy. Nothing remote is touched.
+      # than in a deploy. Nothing remote is touched. Only db, auth, kong, rest,
+      # and storage are started: the RLS suite and the build need nothing else,
+      # and every excluded image is one fewer pull from a rate-limited registry.
       - name: Start Supabase
-        run: supabase start
+        run: pnpm exec supabase start -x studio,meta,edge-runtime,imgproxy,analytics,vector,realtime,inbucket
 
       - name: Export Supabase env
         run: |
-          status="$(supabase status -o json)"
+          status="$(pnpm exec supabase status -o json)"
           {
             echo "NEXT_PUBLIC_SUPABASE_URL=$(jq -r .API_URL <<<"$status")"
             echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$(jq -r .ANON_KEY <<<"$status")"
             echo "SUPABASE_SECRET_KEY=$(jq -r .SERVICE_ROLE_KEY <<<"$status")"
             echo "SUPABASE_DB_URL=$(jq -r .DB_URL <<<"$status")"
           } >> "$GITHUB_ENV"
-
-      - run: pnpm install --frozen-lockfile
 
       # The RLS policies are the only thing standing between one member and
       # another member's data, and nothing else in CI exercises them. The

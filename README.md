@@ -5,7 +5,7 @@ Single Next.js app for UBC UX Hub's public marketing site, student portal, admin
 ## Routes
 
 - `/` - public homepage
-- `/under-construction` - temporary marketing placeholder route
+- `/events/*` - public event pages
 - `/portal/*` - authenticated student portal
 - `/admin/*` - admin portal
 - `/auth/*` - login, signup, password reset, and auth callback pages
@@ -13,18 +13,21 @@ Single Next.js app for UBC UX Hub's public marketing site, student portal, admin
 
 ## Getting Started
 
-**Prerequisites:** Node.js 18+ and pnpm 10.6.2+
+**Prerequisites:** Node.js 22.18+ (the scripts run TypeScript directly) and pnpm 10.6.2+
 
 ```bash
 pnpm install
 pnpm dev
 ```
 
-Duplicate the `.env.example`, rename it to `.env.local`, and populate the values (which can be found here: https://www.notion.so/Env-36a2f9f09f188041a555c36b7a1b2bd1?v=35e2f9f09f18818e8a4a000c8317ade4&source=copy_link)
+Duplicate `.env.local.example`, rename it to `.env.local`, and populate the values (which can be found here: https://www.notion.so/Env-36a2f9f09f188041a555c36b7a1b2bd1?v=35e2f9f09f18818e8a4a000c8317ade4&source=copy_link)
 
 The app runs at `http://localhost:3000` by default.
 
-### Local Webhook Setup with ngrok (mendatory for payment related functionalities)
+To run against a local Supabase instead of the hosted project, follow
+[`supabase/README.md`](supabase/README.md#rebuild-the-local-database).
+
+### Local Webhook Setup with ngrok (mandatory for payment-related functionality)
 
 To receive Square webhook notifications during local development, you need to expose your local server:
 
@@ -50,26 +53,27 @@ pnpm dev      # Start the Next.js dev server
 pnpm build    # Build for production
 pnpm start    # Start the production server
 pnpm lint     # Run ESLint
-pnpm seed     # Fill the local database with sample data (safe to re-run)
+pnpm test     # Run the Vitest suite
+pnpm seed     # Reconcile the local database to the seed data (safe to re-run)
 pnpm types:supabase # Regenerate Supabase TypeScript types
 ```
 
 ### Seeding local data
 
 `supabase db reset` leaves an empty database — no migration inserts rows — so run `pnpm seed`
-after a reset to get four membership tiers and two seasons of events with their check-in
-sessions and application questions. The script is idempotent: it matches rows on their natural
-key, so editing `scripts/seed/data/*.ts` and re-running syncs your change rather than
-duplicating it.
+after a reset. The script is idempotent: it matches rows on their natural key, so editing
+`scripts/seed/data/*.ts` and re-running syncs your change rather than duplicating it. On the
+default `local` target it also deletes seed-owned rows the data no longer describes.
 
 ```bash
-pnpm seed -- --dry-run            # Show what would change, write nothing
-pnpm seed -- --only=memberships   # memberships | events
-pnpm seed -- --prune              # Also delete rows no longer in the data files
+pnpm seed --dry-run          # Show what would change, write nothing
+pnpm seed --no-prune         # Sync without deleting anything
+pnpm seed --only=events      # storage | memberships | events | users
 ```
 
-It refuses to touch a non-local Supabase (it uses the service-role key, which bypasses RLS);
-pass `--allow-remote` if you genuinely mean to.
+Each target checks that its URL really is the environment it claims to be, so a stale
+`.env.local` can't redirect a run. See [`scripts/seed/README.md`](scripts/seed/README.md) for
+the `prod` target and the fixture login accounts.
 
 ## Supabase Migrations
 
@@ -93,5 +97,3 @@ Guidelines:
 - Use descriptive migration names.
 - Avoid mixing `db pull` and `db push` in the same workflow.
 - **Regenerate types:** after any schema change, run `pnpm types:supabase`, then `pnpm exec tsc --noEmit`, and commit the updated `src/lib/supabase/database.types.ts`.
-
-test
