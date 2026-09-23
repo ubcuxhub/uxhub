@@ -135,15 +135,6 @@ export function validateUserFixtures(
   const normalizedEmails = users.map((user) => user.email.trim().toLowerCase());
 
   assertUnique(normalizedEmails, "user email");
-  // Enforced by idx_user_info_student_number; catching it here names the
-  // fixture instead of failing on a unique-violation mid-run.
-  assertUnique(
-    users
-      .map((user) => user.profile.student_number)
-      .filter((value): value is number => value != null)
-      .map(String),
-    "student number"
-  );
   assertUnique(
     users.flatMap((user) => user.purchases.map((purchase) => purchase.idempotencyKey)),
     "purchase idempotency key"

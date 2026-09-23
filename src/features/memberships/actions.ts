@@ -14,10 +14,6 @@ import type {
 } from "@/types/models";
 import { validateFacultyEmail, validateStudentNumber } from "./lib/validation";
 import {
-  DUPLICATE_STUDENT_NUMBER_MESSAGE,
-  isDuplicateStudentNumberError,
-} from "./lib/errors";
-import {
   buildEligibilityUpdate,
   canEditMembershipClassification,
 } from "./lib/policy";
@@ -67,22 +63,15 @@ export async function updateEligibilityProfileAction(
     facultyEmail = normalized;
   }
 
-  try {
-    await adminUpdateUserInfoById(
-      user.id,
-      buildEligibilityUpdate({
-        userType: input.userType,
-        studentNumber,
-        faculty: input.faculty,
-        facultyEmail,
-      }),
-    );
-  } catch (error) {
-    if (isDuplicateStudentNumberError(error)) {
-      throw new Error(DUPLICATE_STUDENT_NUMBER_MESSAGE);
-    }
-    throw error;
-  }
+  await adminUpdateUserInfoById(
+    user.id,
+    buildEligibilityUpdate({
+      userType: input.userType,
+      studentNumber,
+      faculty: input.faculty,
+      facultyEmail,
+    }),
+  );
 }
 
 export type MembershipProfileInput =
@@ -210,9 +199,6 @@ export async function saveMembershipProfileAction(
     revalidatePath("/portal/membership");
     return { ok: true };
   } catch (error) {
-    if (isDuplicateStudentNumberError(error)) {
-      return { ok: false, error: DUPLICATE_STUDENT_NUMBER_MESSAGE };
-    }
     log.error("membership.profile_save_failed", errorFields(error));
     return {
       ok: false,
