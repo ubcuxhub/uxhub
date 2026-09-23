@@ -18,6 +18,7 @@ import {
 import { useNavigationRecovery } from "@/hooks/use-navigation-recovery";
 import { createClient } from "@/lib/supabase/client";
 
+import { completeProfileAction } from "../actions";
 import {
   AUTH_ACTION_ERRORS,
   getAuthActionErrorMessage,
@@ -125,29 +126,19 @@ export function SignUpForm({
       if (!user) throw new Error("User not returned from Supabase");
 
       // When email confirmation is disabled, signUp returns a session and the
-      // authenticated route can create the profile immediately. Otherwise the
-      // confirmation callback creates it once the session exists.
+      // profile can be created immediately. Otherwise the confirmation
+      // callback creates it once the session exists.
       if (authData.session) {
-        const { response, result } = await withDeadline(
-          async (signal) => {
-            const response = await fetch("/api/auth/complete-profile", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                firstName: formData.firstName.trim(),
-                lastName: formData.lastName.trim(),
-              }),
-              signal,
-            });
-            const result = (await response.json()) as { error?: string };
-            return { response, result };
-          },
+        const result = await withDeadline(
+          () =>
+            completeProfileAction({
+              firstName: formData.firstName.trim(),
+              lastName: formData.lastName.trim(),
+            }),
           { operation: "Profile creation" },
         );
 
-        if (!response.ok) {
-          throw new Error(result.error || AUTH_ACTION_ERRORS.profile);
-        }
+        if (!result.ok) throw new Error(result.error);
       }
 
       // Handed to the confirmation screen out of band so the address stays out

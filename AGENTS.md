@@ -66,7 +66,7 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
     - `(shell)` - sidebar-backed student and admin pages
     - `(confirmation)` - sidebar-free, full-viewport post-purchase pages
   - `@flow` - parallel slot holding intercepted `(.)portal/*` routes
-  - `api` - Square webhook, profile-completion, and event-image upload handlers
+  - `api` - Square webhook and event-image upload handlers
 - `src/features` - domain UI and behavior
   - `admin`, `auth`, `events`, `marketing`, `memberships`, `payments`, and
     `settings`
