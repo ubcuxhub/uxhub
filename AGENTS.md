@@ -142,10 +142,6 @@ Read `supabase/README.md` before changing the schema.
   deploy fails until the migrations land. `db push` is forward-only; correct a
   bad migration with a new one.
 
-## Plans
-
-Read `docs/designs/README.md` before drafting or implementing an in-repo plan.
-
 ## Environment
 
 Local values belong in the git-ignored `.env.local`.

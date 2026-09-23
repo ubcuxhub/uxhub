@@ -10,7 +10,7 @@ export const TEAM_MEMBERS: TeamMember[] = [
   {
     name: "Elisabeth Lau",
     role: "Co-President",
-    image: "/people/Elisabeth.png",
+    image: "/people/elisabeth.jpg",
     roleEmoji: "⭐",
   },
   {
@@ -28,31 +28,31 @@ export const TEAM_MEMBERS: TeamMember[] = [
   {
     name: "Taro Ren",
     role: "VP Internal",
-    image: "/people/taro.jpeg",
+    image: "/people/taro.jpg",
     roleEmoji: "🎉",
   },
   {
     name: "Brian Yang",
     role: "Co-Treasurer",
-    image: "/people/brian.png",
+    image: "/people/brian.jpg",
     roleEmoji: "💵",
   },
   {
     name: "Carys Fong",
     role: "Co-VP Logistics",
-    image: "/people/carys.png",
+    image: "/people/carys.jpg",
     roleEmoji: "💡",
   },
   {
     name: "Eric Yan",
     role: "Co-VP Logistics",
-    image: "/people/eric.png",
+    image: "/people/eric.jpg",
     roleEmoji: "💡",
   },
   {
     name: "Jessie Megan",
     role: "Co-VP Partnerships",
-    image: "/people/jessie.png",
+    image: "/people/jessie.jpg",
     roleEmoji: "🤝",
   },
   {
@@ -70,7 +70,7 @@ export const TEAM_MEMBERS: TeamMember[] = [
   {
     name: "Erin Chiu",
     role: "Advisor",
-    image: "/people/erin.png",
+    image: "/people/erin.jpg",
     roleEmoji: "💭",
   },
   {
@@ -154,7 +154,7 @@ export const TEAM_MEMBERS: TeamMember[] = [
   {
     name: "David Theopine",
     role: "Partnerships Director",
-    image: "/people/david.png",
+    image: "/people/david.jpg",
     roleEmoji: "🤝",
   },
   {
@@ -178,7 +178,7 @@ export const TEAM_MEMBERS: TeamMember[] = [
   {
     name: "Johnny Dong",
     role: "Developer",
-    image: "/people/johnny.png",
+    image: "/people/johnny.jpg",
     roleEmoji: "💻",
   },
 ];
