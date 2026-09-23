@@ -13,9 +13,9 @@ pnpm seed --only=events    # storage | memberships | events | users
 
 ## Targets
 
-The target is always explicit, and each one checks its URL really is the
-environment it claims to be — a mispaste fails instead of hitting the wrong
-project.
+The target defaults to `local`; `prod` has to be asked for with `--target=prod`.
+Each target checks that its URL really is the environment it claims to be — a
+mispaste fails instead of hitting the wrong project.
 
 |                        | `local` (default)             | `prod`                          |
 | ---------------------- | ----------------------------- | ------------------------------- |
@@ -38,7 +38,7 @@ hides every page that renders it. Drafts are invisible to that policy and fully
 visible to admins, which is who the prod demo data is for. Flip one to active by
 hand when you want to check the public view.
 
-Prod also expects its migrations to be applied already (`npx supabase db push`)
+Prod also expects its migrations to be applied already (`pnpm exec supabase db push`)
 — the run fails with that instruction if the storage bucket is missing.
 
 ## What gets deleted (local only)

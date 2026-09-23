@@ -20,19 +20,19 @@ the API URL is `http://127.0.0.1:15431`.
 From the repository root, agents and developers can run:
 
 ```bash
-./supabase/reset-local.sh
+pnpm supabase:local
 ```
 
-The script starts Supabase, destroys existing local database data, applies
-every migration in `supabase/migrations`, and runs the idempotent TypeScript
-seed reconciler. It never targets the linked remote database.
+This runs [`reset-local.sh`](reset-local.sh), which starts Supabase, destroys
+existing local database data, applies every migration in `supabase/migrations`,
+and runs the idempotent TypeScript seed reconciler. It never targets the linked remote database.
 
 The seed data lives under `scripts/seed/data/` and includes memberships, past,
 ongoing, and upcoming events, purchases, registrations, check-ins, and these
 eleven local login fixtures (all use password `123456`). Ten cover every
 membership state crossed with admin and non-admin, and one is the dedicated
 manager. The grid is listed in
-[`scripts/seed/README.md`](../scripts/seed/README.md); the three most useful are:
+[`scripts/seed/README.md`](../scripts/seed/README.md); the most useful are:
 
 - `admin-explorer@example.com` — administrator with an Explorer membership
 - `manager-no-membership@example.com` — manager without a membership
@@ -51,16 +51,17 @@ purchase and registration are gone, so the event is buyable again.
 
 Deletion is scoped by ownership, not by table:
 
-| Owned by the seed (prunable)                            | Never touched                            |
-| ------------------------------------------------------- | ---------------------------------------- |
-| Events and membership tiers matched by slug              | Events created through the admin UI\*    |
-| Mentors, sponsors, check-in sessions, application questions | Auth users and profiles created by hand |
-| Purchases and registrations belonging to the three fixture accounts | Purchases and registrations belonging to any other account |
-| Cover images under the `seed/covers/` storage prefix     | Covers uploaded through the admin UI (`covers/`) |
+| Prunable                                                  | Never touched                                          |
+| --------------------------------------------------------- | ------------------------------------------------------ |
+| Events and membership tiers whose slug is not in the data\* | Auth users and profiles created by hand                |
+| Mentors, sponsors, check-in sessions, application questions | Purchases and registrations belonging to any other account |
+| Purchases and registrations belonging to the fixture accounts | Covers uploaded through the admin UI (`covers/`)       |
+| Cover images under the `seed/covers/` storage prefix       |                                                        |
 
-\* An extra event is deleted unless a non-fixture purchase points at it —
-`purchases.event_id` is `on delete restrict`, so somebody else's ticket keeps the
-event alive and the run says so instead of forcing it.
+\* This includes events created through the admin UI. Such an event survives
+only if a non-fixture purchase points at it — `purchases.event_id` is
+`on delete restrict`, so somebody else's ticket keeps the event alive and the run
+says so instead of forcing it.
 
 Pass `--no-prune` to sync without deleting anything. The `prod` target never
 deletes at all.
@@ -76,27 +77,43 @@ Do these steps in order:
 1. **Write a focused migration.**
 
    ```bash
-   supabase migration new <describe_change>
+   pnpm exec supabase migration new <describe_change>
    ```
 
    Keep it small and single-purpose. Never edit a migration that has already
    been applied — add a new one.
 
-2. **Apply it.**
+2. **Try it locally.**
 
    ```bash
-   supabase db push
+   pnpm supabase:local
+   pnpm test:rls
    ```
 
-3. **Regenerate the TypeScript types.**
+   This rebuilds the local database from every migration, so a broken one
+   fails here instead of on the hosted project.
+
+3. **Push it to the hosted project.**
+
+   ```bash
+   pnpm exec supabase db push
+   ```
+
+   Nothing applies migrations automatically, and `db push` is forward-only. The
+   hosted schema now runs ahead of the deployed code, so the migration must not
+   break the code already in production (see the compatibility path under
+   "Migration guidelines").
+
+4. **Regenerate the TypeScript types.**
 
    ```bash
    pnpm types:supabase
    ```
 
-   This overwrites `src/lib/supabase/database.types.ts`. Commit the result.
+   This reads the hosted project, which is why it comes after the push, and
+   overwrites `src/lib/supabase/database.types.ts`. Commit the result.
 
-4. **Update the data-access layer** (`src/lib/supabase-helpers/`):
+5. **Update the data-access layer** (`src/lib/supabase-helpers/`):
    - Update the relevant helper's `select(...)` list, insert/update payloads,
      and return types.
    - If a table was renamed/added/removed, update
@@ -104,7 +121,7 @@ Do these steps in order:
    - If a column used in a realtime `filter` or an embedded foreign-key hint
      join changed, update those strings too (see "type-safety gaps" below).
 
-5. **Validate.**
+6. **Validate.**
 
    ```bash
    pnpm exec tsc --noEmit
@@ -129,6 +146,9 @@ helper file, and fix it in one place.
 | `sponsors` / `event_sponsors` | `src/lib/supabase-helpers/event-people.ts`        |
 | `user_info`                   | `src/lib/supabase-helpers/users.ts`               |
 | `membership_types`            | `src/lib/supabase-helpers/memberships.ts`         |
+| `purchases`                   | `src/lib/supabase-helpers/purchases.ts`           |
+| `square_webhook_events`       | `src/lib/supabase-helpers/purchases.ts`           |
+| `app_settings`                | `src/lib/supabase-helpers/app-settings.ts`        |
 | `user_info` (service-role)    | `src/lib/supabase-helpers/admin-server.ts`        |
 | `event-images` (storage)      | `src/lib/supabase-helpers/admin-server.ts`        |
 
@@ -139,8 +159,10 @@ Supporting files:
   the server client, and in tests.
 - `src/lib/supabase-helpers/tables.ts` — the `TABLES` name map.
 - `src/lib/supabase/admin.ts` — the service-role client. Server-only; bypasses
-  Row Level Security. Only `admin-server.ts` and privileged route handlers
-  import it.
+  Row Level Security. Import it only from server-side code that checks
+  authorization itself: today `admin-server.ts`, the admin server actions, and
+  the payment customer and fulfillment modules.
+  `grep -rln 'supabase/admin"' src` lists every importer.
 
 ## Storage
 
@@ -158,7 +180,7 @@ The bucket is provisioned in two places, and they are not redundant:
 
 | Environment          | Mechanism                                          |
 | -------------------- | -------------------------------------------------- |
-| Remote / production  | the migration, applied with `supabase db push`      |
+| Remote / production  | the migration, applied with `pnpm exec supabase db push` |
 | Local                | `pnpm seed` (`--only=storage` to run just this)     |
 
 Seeding provisions the bucket locally so a fresh database is usable straight
@@ -227,5 +249,3 @@ strings the compiler cannot validate. A rename here breaks silently at runtime:
   `20260907120000_simplify_membership_benefits.sql` set the descriptions
   because no other path reached the production rows; it is the last of its kind.
   `name` and `slug` are not editable, so they stay migration-owned.
-
-test

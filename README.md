@@ -54,13 +54,17 @@ pnpm build    # Build for production
 pnpm start    # Start the production server
 pnpm lint     # Run ESLint
 pnpm test     # Run the Vitest suite
+pnpm test:rls # Run the RLS policy suite against the local database
 pnpm seed     # Reconcile the local database to the seed data (safe to re-run)
-pnpm types:supabase # Regenerate Supabase TypeScript types
+pnpm supabase:local  # Rebuild the local database from scratch and seed it
+pnpm types:supabase  # Regenerate Supabase TypeScript types from the hosted project
+pnpm email:templates # Regenerate supabase/templates/*.html from src/lib/email
+pnpm payment-smoke   # Manage the production payment smoke test (see scripts/seed/README.md)
 ```
 
 ### Seeding local data
 
-`supabase db reset` leaves an empty database — no migration inserts rows — so run `pnpm seed`
+`pnpm exec supabase db reset` leaves an empty database — no migration inserts rows — so run `pnpm seed`
 after a reset. The script is idempotent: it matches rows on their natural key, so editing
 `scripts/seed/data/*.ts` and re-running syncs your change rather than duplicating it. On the
 default `local` target it also deletes seed-owned rows the data no longer describes.
@@ -77,23 +81,13 @@ the `prod` target and the fixture login accounts.
 
 ## Supabase Migrations
 
-```bash
-supabase login
-supabase link
-supabase db pull
-```
-
-Typical workflow:
+Link the CLI to the hosted project once:
 
 ```bash
-supabase migration new add_user_profiles
-supabase db push
+pnpm exec supabase login
+pnpm exec supabase link
 ```
 
-Guidelines:
-
-- Create new migrations instead of editing applied migrations.
-- Keep migrations small and focused.
-- Use descriptive migration names.
-- Avoid mixing `db pull` and `db push` in the same workflow.
-- **Regenerate types:** after any schema change, run `pnpm types:supabase`, then `pnpm exec tsc --noEmit`, and commit the updated `src/lib/supabase/database.types.ts`.
+Then follow [`supabase/README.md`](supabase/README.md#when-you-change-the-schema) for
+every schema change. It covers writing the migration, trying it locally, pushing it, and
+regenerating types.

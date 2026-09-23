@@ -160,8 +160,8 @@ pnpm test:rls
 ```
 
 It runs in a transaction it rolls back, so it is safe and repeatable against a
-seeded database. **CI runs it on every push and pull request** against a
-throwaway database with every migration applied.
+seeded database. **CI runs it on every pull request and every push to `main`**
+against a throwaway database with every migration applied.
 
 ## Checklist before you merge
 
