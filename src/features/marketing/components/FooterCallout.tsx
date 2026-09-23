@@ -5,7 +5,7 @@ import Image from "next/image";
 import Button from "./Button";
 import MembershipCta from "./MembershipCta";
 import { useUser } from "@/lib/auth/user-context";
-import { hasActiveMembership } from "@/lib/membership";
+import { hasActiveMembership } from "@/features/memberships/lib/expiry";
 
 export default function FooterCallout() {
   const { user, membershipTermEndsAt, loading } = useUser();

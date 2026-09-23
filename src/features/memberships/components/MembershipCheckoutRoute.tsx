@@ -8,7 +8,7 @@ import {
   fetchMembershipTypes,
 } from "@/lib/supabase-helpers/memberships";
 import { withReturnTo } from "@/lib/auth/paths";
-import { getMembershipTermEndsAt } from "@/lib/app-settings";
+import { getMembershipTermEndsAt } from "@/features/memberships/lib/term";
 import {
   resolveMembershipExpiry,
   termEndsBeforeFullYear,

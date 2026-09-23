@@ -4,8 +4,10 @@ import type {
   UserInfoUpdate,
   UserType,
 } from "@/lib/supabase/models";
-import { hasActiveMembership } from "@/lib/membership";
-import { isMembershipTermClosed } from "@/features/memberships/lib/expiry";
+import {
+  hasActiveMembership,
+  isMembershipTermClosed,
+} from "@/features/memberships/lib/expiry";
 import {
   validateFacultyEmail,
   validateStudentNumber,

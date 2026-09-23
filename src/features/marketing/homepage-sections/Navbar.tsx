@@ -5,7 +5,7 @@ import Image from "next/image";
 import Button from "@/features/marketing/components/Button";
 import { useUser } from "@/lib/auth/user-context";
 import { FLAGS } from "@/lib/flags";
-import { hasActiveMembership } from "@/lib/membership";
+import { hasActiveMembership } from "@/features/memberships/lib/expiry";
 
 const navLink =
   "text-black no-underline font-sans font-medium leading-normal whitespace-nowrap decoration-transparent transition-all duration-200 hover:text-gray-600";
