@@ -3,7 +3,7 @@ import "server-only";
 import { after } from "next/server";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Payment, PaymentUpdatedEvent } from "square";
-import type { PurchaseRow, UserInfoRow } from "@/types/models";
+import type { PurchaseRow, UserInfoRow } from "@/lib/supabase/models";
 import type { CheckoutActionResult, CheckoutRequestInput } from "./types";
 import type { Database, Json } from "@/lib/supabase/database.types";
 import { fetchEventBySlug } from "@/lib/supabase-helpers/events";

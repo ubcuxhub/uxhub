@@ -3,7 +3,7 @@
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ForgotPasswordForm } from "./forgot-password-form";
+import { ForgotPasswordForm } from "./ForgotPasswordForm";
 
 const authMocks = vi.hoisted(() => ({
   resetPasswordForEmail: vi.fn(),

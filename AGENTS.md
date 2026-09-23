@@ -82,8 +82,10 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
     `settings`
 - `src/components/ui` - shared shadcn-style primitives
 - `src/components/shared` - shared application composites
-- `src/lib/auth` - server-side authorization guards
-- `src/lib/supabase` - browser, server, service-role clients, and generated types
+- `src/hooks` - shared client hooks
+- `src/lib/auth` - server-side authorization guards and the client `UserProvider`
+- `src/lib/supabase` - browser, server, service-role clients, generated types, and row aliases
+  (`models.ts`)
 - `src/lib/supabase-helpers` - typed domain data-access helpers
 - `src/lib/square` - server-only Square configuration and client
 - `src/proxy.ts` - Supabase session refresh for matched requests
@@ -121,7 +123,8 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
 - Student-facing event and checkout routes use slugs. Admin event routes use
   event IDs.
 - Settings are a hash-driven dialog (`#settings/<tab>`), not standalone portal
-  pages. Use `openSettings(tab)` from `src/features/settings`.
+  pages. Use `openSettings(tab)` from
+  `src/features/settings/components/SettingsDialog`.
 - Email markup lives in `src/lib/email`. `layout.ts` holds the shared chrome;
   `templates.ts` renders purchase receipts at request time; `auth-templates.ts`
   is the source for the Supabase auth emails. The auth templates are generated

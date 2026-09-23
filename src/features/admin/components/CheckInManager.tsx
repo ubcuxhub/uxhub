@@ -1,15 +1,15 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import { CheckInTable } from "@/features/admin/components/CheckInTable";
 import {
-  CheckInTable,
   type AttendingRegistration,
   type CheckInSession,
-} from "@/features/admin";
-import type { EventRow } from "@/types/models";
+} from "@/features/admin/types";
+import type { EventRow } from "@/lib/supabase/models";
 import { createClient } from "@/lib/supabase/client";
 import { TABLES } from "@/lib/supabase-helpers/tables";
-import type { EventRegistrationRow } from "@/types/models";
+import type { EventRegistrationRow } from "@/lib/supabase/models";
 import {
   fetchAdminCheckInSnapshotAction,
   toggleCheckInAction,

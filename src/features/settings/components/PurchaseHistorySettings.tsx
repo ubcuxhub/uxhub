@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-import { useUser } from "@/context/UserContext";
+import { useUser } from "@/lib/auth/user-context";
 import { createClient } from "@/lib/supabase/client";
 import {
   fetchPurchasesForUser,

@@ -11,7 +11,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { setPendingEmail } from "../pending-email";
-import { SignUpSuccessMessage } from "./sign-up-success-message";
+import { SignUpSuccessMessage } from "./SignUpSuccessMessage";
 
 const authMocks = vi.hoisted(() => ({
   getSession: vi.fn(),

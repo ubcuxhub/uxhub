@@ -2,11 +2,11 @@
 
 import { useState, useMemo } from "react";
 import { useSearchParams } from "next/navigation";
-import { ApplicationListCard } from "@/features/admin";
 import {
-  type GroupedRegistration,
-} from "@/features/events";
-import type { ApplicationStatus } from "@/types/models";
+  ApplicationListCard,
+} from "@/features/admin/components/ApplicationListCard";
+import { type GroupedRegistration } from "@/features/events/types";
+import type { ApplicationStatus } from "@/lib/supabase/models";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageContainer } from "@/components/shared/PageContainer";

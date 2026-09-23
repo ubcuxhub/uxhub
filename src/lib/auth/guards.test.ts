@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { RoleAccess, UserInfoRow } from "@/types/models";
+import type { RoleAccess, UserInfoRow } from "@/lib/supabase/models";
 import {
   redirectIfAuthenticated,
   requireAdmin,

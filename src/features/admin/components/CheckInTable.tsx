@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import type {
   AttendingRegistration,
   CheckInSession,
-} from "../types/checkInTypes";
+} from "../types";
 import { CheckInTableHeader } from "./CheckInTableHeader";
 import { CheckInTableRow } from "./CheckInTableRow";
 

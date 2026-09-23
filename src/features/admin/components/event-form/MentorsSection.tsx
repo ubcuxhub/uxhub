@@ -29,7 +29,7 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { saveAdminMentorAction } from "@/features/admin/actions";
-import type { MentorRow } from "@/types/models";
+import type { MentorRow } from "@/lib/supabase/models";
 import type { MentorDraft } from "./event-form-schema";
 
 interface MentorsSectionProps {

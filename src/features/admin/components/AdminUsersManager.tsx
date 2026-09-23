@@ -4,21 +4,23 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { useUser } from "@/context/UserContext";
+import { useUser } from "@/lib/auth/user-context";
+import { UserDetailsPanel } from "@/features/admin/components/UserDetailsPanel";
 import {
-  UserDetailsPanel,
   UserDirectoryPanel,
+} from "@/features/admin/components/UserDirectoryPanel";
+import {
   type MembershipTypeOption,
   type SearchOption,
   type SortOption,
   type UserRecord,
-} from "@/features/admin";
+} from "@/features/admin/types";
 import {
   updateManagerUserAction,
   updateUserRoleAction,
 } from "@/features/admin/actions";
 import { formatUserName } from "@/lib/user-name";
-import type { RoleAccess } from "@/types/models";
+import type { RoleAccess } from "@/lib/supabase/models";
 
 interface AdminUsersManagerProps {
   initialUsers: UserRecord[];

@@ -3,7 +3,7 @@ import { TABLES } from "./tables";
 import type {
   EventApplicationQuestionInsert,
   EventApplicationQuestionRow,
-} from "@/types/models";
+} from "@/lib/supabase/models";
 
 export interface ApplicationResponseWithQuestion {
   id: string;

@@ -7,7 +7,7 @@ import { Check, CircleAlert, LoaderCircle } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import type { PurchaseWithDetails } from "@/lib/supabase-helpers/purchases";
-import { useUser } from "@/context/UserContext";
+import { useUser } from "@/lib/auth/user-context";
 import { useConfirmationPolling } from "@/features/payments/use-confirmation-polling";
 
 export function MembershipConfirmation({

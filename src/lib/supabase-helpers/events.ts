@@ -5,7 +5,7 @@ import type {
   EventRow,
   EventStatus,
   EventUpdate,
-} from "@/types/models";
+} from "@/lib/supabase/models";
 
 export type EventOrderBy = "start_date" | "created_at";
 

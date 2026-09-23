@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { ApplicationStatus } from "@/types/models";
+import type { ApplicationStatus } from "@/lib/supabase/models";
 import { Clock, X, Check } from "lucide-react";
 import { formatTimestamp } from "@/lib/date";
 

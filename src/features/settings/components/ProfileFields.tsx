@@ -11,14 +11,14 @@ import {
 } from "@/components/ui/select";
 import { FACULTIES, STUDENT_STATUSES, YEAR_LEVELS } from "@/lib/constants";
 import { formatEventDate } from "@/lib/date";
-import { getEffectiveMembershipExpiry } from "@/lib/membership";
+import { getEffectiveMembershipExpiry } from "@/features/memberships/lib/expiry";
 import { cn } from "@/lib/utils";
 import type {
   StudentStatus,
   UniversityYear,
   UserInfoRow,
   UserType,
-} from "@/types/models";
+} from "@/lib/supabase/models";
 
 export type ProfileFormData = {
   first_name: string;

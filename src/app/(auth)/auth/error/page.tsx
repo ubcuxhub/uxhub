@@ -1,4 +1,4 @@
-import { AuthMessage } from "@/features/auth/components/auth-message";
+import { AuthMessage } from "@/features/auth/components/AuthMessage";
 import { getSafeInternalPath } from "@/lib/auth/paths";
 
 export default async function Page({

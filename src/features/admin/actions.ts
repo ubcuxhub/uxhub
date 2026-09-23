@@ -48,8 +48,8 @@ import type {
   MentorRow,
   SponsorRow,
   UserInfoUpdate,
-} from "@/types/models";
-import type { ApplicationStatus, RoleAccess } from "@/types/models";
+} from "@/lib/supabase/models";
+import type { ApplicationStatus, RoleAccess } from "@/lib/supabase/models";
 
 const MANAGER_USER_FIELDS = new Set([
   "first_name",

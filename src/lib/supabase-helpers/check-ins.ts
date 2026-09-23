@@ -3,11 +3,11 @@ import { TABLES } from "./tables";
 import type {
   CheckInSessionInsert,
   EventRegistrationRow,
-} from "@/types/models";
+} from "@/lib/supabase/models";
 import type {
   AttendingRegistration,
   CheckInSession,
-} from "@/features/admin/types/checkInTypes";
+} from "@/features/admin/types";
 import { formatUserName } from "@/lib/user-name";
 
 type AttendingRegistrationQueryRow = Pick<

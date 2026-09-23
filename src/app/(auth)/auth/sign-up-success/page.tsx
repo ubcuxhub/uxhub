@@ -1,4 +1,4 @@
-import { SignUpSuccessMessage } from "@/features/auth/components/sign-up-success-message";
+import { SignUpSuccessMessage } from "@/features/auth/components/SignUpSuccessMessage";
 import { getSafeInternalPath } from "@/lib/auth/paths";
 import { redirectIfAuthenticated } from "@/lib/auth/guards";
 

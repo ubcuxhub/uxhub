@@ -5,7 +5,7 @@ import { FlowLink } from "@/components/shared/FlowLink";
 import { Button } from "@/components/ui/button";
 import { formatEventDate } from "@/lib/date";
 import { formatMembershipTypeName } from "@/features/memberships/lib/display";
-import type { MembershipTypeRow } from "@/types/models";
+import type { MembershipTypeRow } from "@/lib/supabase/models";
 
 /**
  * The member-facing membership card on the portal home page.

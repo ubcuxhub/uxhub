@@ -9,11 +9,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { RoleAccess } from "@/types/models";
+import type { RoleAccess } from "@/lib/supabase/models";
 import type {
   MembershipTypeOption,
   UserRecord,
-} from "../types/userManagementTypes";
+} from "../types";
 import { EditableUserField } from "./EditableUserField";
 import { MembershipTypeField } from "./MembershipTypeField";
 

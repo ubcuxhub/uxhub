@@ -3,10 +3,14 @@
 import { useState } from "react";
 import {
   ApplicantInfoCard,
+} from "@/features/admin/components/ApplicantInfoCard";
+import {
   ApplicationResponseCard,
+} from "@/features/admin/components/ApplicationResponseCard";
+import {
   StatusUpdateSection,
-} from "@/features/admin";
-import type { ApplicationStatus, EventRow } from "@/types/models";
+} from "@/features/admin/components/StatusUpdateSection";
+import type { ApplicationStatus, EventRow } from "@/lib/supabase/models";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { SuccessOverlay } from "@/components/shared/SuccessOverlay";

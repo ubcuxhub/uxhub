@@ -6,14 +6,14 @@ import type {
   EventRow,
   MentorRow,
   SponsorRow,
-} from "@/types/models";
+} from "@/lib/supabase/models";
 import { Button } from "@/components/ui/button";
 import {
   Field,
   FieldDescription,
   FieldError,
 } from "@/components/ui/field";
-import { useEventForm } from "@/features/admin/hooks/useEventForm";
+import { useEventForm } from "@/features/admin/hooks/use-event-form";
 import { PrimaryDetailsSection } from "./event-form/PrimaryDetailsSection";
 import { CheckInEventsSection } from "./event-form/CheckInEventsSection";
 import { MentorsSection } from "./event-form/MentorsSection";

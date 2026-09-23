@@ -3,7 +3,7 @@ import { MembershipTermSettings } from "@/features/admin/components/MembershipTe
 import { MembershipTypeSettings } from "@/features/admin/components/MembershipTypeSettings";
 import { requireManager } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
-import { getMembershipTermEndsAt } from "@/lib/app-settings";
+import { getMembershipTermEndsAt } from "@/features/memberships/lib/term";
 import { fetchMembershipTypes } from "@/lib/supabase-helpers/memberships";
 
 export default async function AdminSettingsPage() {

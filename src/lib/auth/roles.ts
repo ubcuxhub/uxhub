@@ -1,4 +1,4 @@
-import type { RoleAccess } from "@/types/models";
+import type { RoleAccess } from "@/lib/supabase/models";
 
 export function hasAdminAccess(
   role: RoleAccess | null | undefined

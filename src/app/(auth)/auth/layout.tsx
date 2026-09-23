@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import { AuthLightMode } from "@/features/auth/components/auth-light-mode";
+import { AuthLightMode } from "@/features/auth/components/AuthLightMode";
 
 const authLightModeScript = `
 (function(){

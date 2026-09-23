@@ -10,7 +10,7 @@ import {
 import {
   ResponseType,
   type ApplicationQuestionTemplate,
-} from "@/features/events/types/eventTypes";
+} from "@/features/events/types";
 import { EVENT_IMAGE_ERRORS } from "@/lib/event-image";
 import type {
   CheckInSessionRow,
@@ -19,8 +19,8 @@ import type {
   EventUpdate,
   MentorRow,
   SponsorRow,
-} from "@/types/models";
-import type { CheckInSessionDraft } from "@/features/admin/types/checkInTypes";
+} from "@/lib/supabase/models";
+import type { CheckInSessionDraft } from "@/features/admin/types";
 import {
   createFormSnapshot,
   EMPTY_CHECK_IN_SESSION,
@@ -34,9 +34,9 @@ import {
   datetimeLocalToTimestamptz,
   timestamptzToDatetimeLocal,
 } from "@/lib/date";
-import { useApplicationQuestions } from "./useApplicationQuestions";
-import { useEventFormDraft } from "./useEventFormDraft";
-import { useUnsavedChangesGuard } from "./useUnsavedChangesGuard";
+import { useApplicationQuestions } from "./use-application-questions";
+import { useEventFormDraft } from "./use-event-form-draft";
+import { useUnsavedChangesGuard } from "./use-unsaved-changes-guard";
 
 interface UseEventFormOptions {
   eventId?: string;

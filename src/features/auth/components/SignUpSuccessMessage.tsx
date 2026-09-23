@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 import { withDeadline } from "@/lib/async/deadline";
 import { createClient } from "@/lib/supabase/client";
 
-import { AuthMessage } from "./auth-message";
-import { ResendEmailButton } from "./resend-email-button";
+import { AuthMessage } from "./AuthMessage";
+import { ResendEmailButton } from "./ResendEmailButton";
 import {
   clearPendingEmail,
   getPendingEmailServerSnapshot,

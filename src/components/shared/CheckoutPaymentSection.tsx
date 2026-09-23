@@ -6,8 +6,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { SquareCheckoutForm } from "@/features/payments";
-import type { PurchaseKind } from "@/features/payments";
+import {
+  SquareCheckoutForm,
+} from "@/features/payments/components/SquareCheckoutForm";
+import type { PurchaseKind } from "@/features/payments/types";
 
 interface CheckoutPaymentSectionProps {
   amount: string;

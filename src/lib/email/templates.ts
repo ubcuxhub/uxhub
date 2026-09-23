@@ -1,5 +1,5 @@
 import { formatEventDate, formatEventTime } from "@/lib/date";
-import type { EventRow, MembershipTypeRow, PurchaseRow } from "@/types/models";
+import type { EventRow, MembershipTypeRow, PurchaseRow } from "@/lib/supabase/models";
 
 import { escapeHtml, renderEmailLayout } from "./layout";
 

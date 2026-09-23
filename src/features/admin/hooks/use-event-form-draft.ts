@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, type Dispatch, type SetStateAction } from "react";
-import type { ApplicationQuestionTemplate } from "@/features/events/types/eventTypes";
-import type { CheckInSessionDraft } from "@/features/admin/types/checkInTypes";
+import type { ApplicationQuestionTemplate } from "@/features/events/types";
+import type { CheckInSessionDraft } from "@/features/admin/types";
 import {
   getInitialFormState,
   type EventFormState,

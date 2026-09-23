@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { EventRow } from "@/types/models";
+import type { EventRow } from "@/lib/supabase/models";
 
 export interface EventCardProps {
   event: EventRow;

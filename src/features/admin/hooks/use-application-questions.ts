@@ -4,7 +4,7 @@ import { useState } from "react";
 import {
   ResponseType,
   type ApplicationQuestionTemplate,
-} from "@/features/events/types/eventTypes";
+} from "@/features/events/types";
 
 const isChoiceType = (response: ResponseType) =>
   response === ResponseType.checkbox ||

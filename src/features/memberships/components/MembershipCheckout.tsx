@@ -9,7 +9,7 @@ import { useFlowDialog } from "@/components/shared/FlowDialog";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { UserInfoRow, MembershipTypeRow } from "@/types/models";
+import type { UserInfoRow, MembershipTypeRow } from "@/lib/supabase/models";
 import { withReturnTo } from "@/lib/auth/paths";
 import { formatEventDate } from "@/lib/date";
 import { cn } from "@/lib/utils";

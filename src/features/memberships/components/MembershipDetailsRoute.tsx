@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { MembershipDetailsForm } from "./MembershipDetailsForm";
 import { requireAuth } from "@/lib/auth/guards";
 import { withReturnTo } from "@/lib/auth/paths";
-import { getMembershipTermEndsAt } from "@/lib/app-settings";
+import { getMembershipTermEndsAt } from "@/features/memberships/lib/term";
 import { isMembershipTermClosed } from "@/features/memberships/lib/expiry";
 import {
   hasActiveOrPendingMembership,

@@ -1,6 +1,6 @@
-import { UserProvider } from "@/context/UserContext";
+import { UserProvider } from "@/lib/auth/user-context";
 import { requireAuth } from "@/lib/auth/guards";
-import { getMembershipTermEndsAt } from "@/lib/app-settings";
+import { getMembershipTermEndsAt } from "@/features/memberships/lib/term";
 import { headers } from "next/headers";
 
 // Shared authenticated boundary for portal and admin routes. The proxy records

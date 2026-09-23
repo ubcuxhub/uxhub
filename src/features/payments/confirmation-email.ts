@@ -16,7 +16,7 @@ import {
   fetchUserMembershipExpiryById,
 } from "@/lib/supabase-helpers/users";
 import { fetchMembershipTermEndsAt } from "@/lib/supabase-helpers/app-settings";
-import { getEffectiveMembershipExpiry } from "@/lib/membership";
+import { getEffectiveMembershipExpiry } from "@/features/memberships/lib/expiry";
 import { sendEmail } from "@/lib/email/client";
 import {
   renderEventConfirmationEmail,

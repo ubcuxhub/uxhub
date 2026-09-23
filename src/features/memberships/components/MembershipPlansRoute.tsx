@@ -4,7 +4,7 @@ import { MembershipPlans } from "./MembershipPlans";
 import { requireAuth } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchMembershipTypes } from "@/lib/supabase-helpers/memberships";
-import { getMembershipTermEndsAt } from "@/lib/app-settings";
+import { getMembershipTermEndsAt } from "@/features/memberships/lib/term";
 import { withReturnTo } from "@/lib/auth/paths";
 import {
   isMembershipTermClosed,

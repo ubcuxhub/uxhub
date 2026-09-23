@@ -3,7 +3,7 @@ import { requireAuth } from "@/lib/auth/guards";
 import {
   getEffectiveMembershipExpiry,
   hasActiveMembership,
-} from "@/lib/membership";
+} from "@/features/memberships/lib/expiry";
 import { isMembershipTermClosed } from "@/features/memberships/lib/expiry";
 import {
   MembershipCard,
@@ -11,7 +11,7 @@ import {
 } from "@/features/memberships/components/MembershipCard";
 import { formatUserName } from "@/lib/user-name";
 import { createClient } from "@/lib/supabase/server";
-import { getMembershipTermEndsAt } from "@/lib/app-settings";
+import { getMembershipTermEndsAt } from "@/features/memberships/lib/term";
 import { fetchMembershipTypeById } from "@/lib/supabase-helpers/memberships";
 
 export default async function PortalHome() {

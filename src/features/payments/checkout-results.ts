@@ -1,4 +1,4 @@
-import type { PurchaseRow } from "@/types/models";
+import type { PurchaseRow } from "@/lib/supabase/models";
 import type { CheckoutActionResult } from "./types";
 import { getPurchaseRedirectPath } from "./fulfillment-rules";
 

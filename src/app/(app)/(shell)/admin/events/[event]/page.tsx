@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 
 import { PageContainer } from "@/components/shared/PageContainer";
-import { EventCreateModify } from "@/features/admin";
+import {
+  EventCreateModify,
+} from "@/features/admin/components/EventCreateModify";
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchApplicationQuestions } from "@/lib/supabase-helpers/event-applications";

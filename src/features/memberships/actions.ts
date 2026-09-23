@@ -11,7 +11,7 @@ import type {
   StudentStatus,
   UniversityYear,
   UserType,
-} from "@/types/models";
+} from "@/lib/supabase/models";
 import { validateFacultyEmail, validateStudentNumber } from "./lib/validation";
 import {
   buildEligibilityUpdate,

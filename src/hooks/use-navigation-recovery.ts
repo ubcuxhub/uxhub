@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef } from "react";
 
-import { ASYNC_DEADLINES } from "./deadline";
+import { ASYNC_DEADLINES } from "@/lib/async/deadline";
 
 /**
  * Keeps a successful mutation locked while navigation starts, but restores

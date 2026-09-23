@@ -7,7 +7,7 @@ import type {
   PurchaseRow,
   PurchaseUpdate,
   SquareWebhookEventInsert,
-} from "@/types/models";
+} from "@/lib/supabase/models";
 
 export interface PurchaseWithDetails extends PurchaseRow {
   events: Pick<EventRow, "id" | "name" | "slug" | "start_date"> | null;

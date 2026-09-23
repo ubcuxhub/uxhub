@@ -14,7 +14,7 @@ import {
 } from "@/components/ui/card";
 import { withReturnTo } from "@/lib/auth/paths";
 import { cn } from "@/lib/utils";
-import type { EventRow, UserInfoRow } from "@/types/models";
+import type { EventRow, UserInfoRow } from "@/lib/supabase/models";
 
 interface EventCheckoutProps {
   disabledMessage: string | null;

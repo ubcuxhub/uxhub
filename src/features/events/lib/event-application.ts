@@ -1,7 +1,7 @@
 import type {
   EventApplicationQuestionRow,
   EventApplicationResponseInsert,
-} from "@/types/models";
+} from "@/lib/supabase/models";
 
 /**
  * Prepares response data for upsert into event_application_responses

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { withDeadline } from "@/lib/async/deadline";
-import { useNavigationRecovery } from "@/lib/async/use-navigation-recovery";
+import { useNavigationRecovery } from "@/hooks/use-navigation-recovery";
 
 import {
   AUTH_ACTION_ERRORS,
