@@ -14,8 +14,6 @@ export const AUTH_ACTION_ERRORS = {
     "Unable to send a reset link. Check your connection and try again.",
   passwordUpdate:
     "Unable to update your password. Check your connection and try again.",
-  profile:
-    "Unable to finish creating your profile. Check your connection and try again.",
 } as const;
 
 export function getAuthActionErrorMessage(
