@@ -17,7 +17,7 @@
  * makes an event ticket bought through the UI reversible — the next run drops
  * the purchase and the event is buyable again. Ownership is narrow and is
  * defined in `lib/prune.ts`: seed events and membership tiers by slug, and
- * purchases/registrations only when they belong to one of the three fixture
+ * purchases/registrations only when they belong to one of the fixture
  * accounts. Rows created by an account somebody made by hand are never touched.
  *
  * `--target=prod` exists to give admins demo events to work with while the
@@ -160,7 +160,7 @@ async function reconcileBuckets(
     if (!existing) {
       throw new Error(
         `The "${spec.id}" bucket is missing from the deployed project.\n` +
-          "  Apply the migrations first: npx supabase db push"
+          "  Apply the migrations first: pnpm exec supabase db push"
       );
     }
     return "Storage buckets: verified";

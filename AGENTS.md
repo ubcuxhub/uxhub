@@ -26,25 +26,35 @@ pnpm exec tsc --noEmit
 pnpm test
 pnpm build
 pnpm start
+pnpm test:rls
 pnpm seed
+pnpm supabase:local
 pnpm types:supabase
 pnpm email:templates
+pnpm payment-smoke
 ```
+
+`pnpm supabase:local` rebuilds the local database from scratch and seeds it (see
+`supabase/README.md`). `pnpm payment-smoke` manages the production payment
+smoke-test tier (see `scripts/seed/README.md`).
 
 `pnpm test` runs the Vitest suite once (`pnpm test:watch` for watch mode). Tests are
 colocated with the code they cover (e.g. `src/lib/slug.test.ts`,
 `src/features/payments/schemas.test.ts`). Run a single file with
 `pnpm test src/lib/slug.test.ts`, or filter by name with
 `pnpm test -- -t "test name"`. CI (`.github/workflows/ci.yml`) runs `pnpm lint`,
-`pnpm exec tsc --noEmit`, and `pnpm test` on every push and pull request.
+`pnpm exec tsc --noEmit`, and `pnpm test` on every pull request and every push
+to `main`.
 
 `pnpm seed` reconciles a database to the seed data. Read `scripts/seed/README.md`
 before changing it. It is idempotent, and on the default `local` target it also
 deletes seed-owned rows the data no longer describes, so a ticket bought through
 the UI is undone by re-running it. Pass `--no-prune` to keep those rows,
-`--dry-run` to preview. Pruning only ever touches seed events, seed membership
-tiers, and rows owned by the three fixture accounts — never anything belonging
-to an account created by hand.
+`--dry-run` to preview. Pruning deletes any event or membership tier whose slug
+is not in the seed data, including one created through the admin UI, unless a
+row owned by a hand-made account (a purchase, say) still references it.
+Purchases and registrations are pruned only when they belong to one of the
+fixture accounts, never to an account created by hand.
 
 The eleven fixture accounts all sign in with password `123456`; see
 `scripts/seed/README.md` for the membership x role grid.
@@ -132,15 +142,18 @@ Read `supabase/README.md` before changing the schema.
 
 - Add a new focused migration; do not edit a migration that has been applied.
 - Update the matching helper and `src/lib/supabase-helpers/tables.ts`.
-- Run `pnpm types:supabase` after schema changes and commit the regenerated
+- Try the migration locally first with `pnpm supabase:local`.
+- Apply migrations to the hosted project with `pnpm exec supabase db push`.
+  Nothing applies them automatically. `pnpm types:supabase` generates types from
+  the hosted project, and `/events/[slug]` is prerendered against the database
+  at build time, so the push has to come before regenerating types and before
+  deploying. The hosted schema then runs ahead of the deployed code, so keep
+  migrations backward-compatible with the code already in production. `db push`
+  is forward-only; correct a bad migration with a new one.
+- Run `pnpm types:supabase` after the push and commit the regenerated
   `src/lib/supabase/database.types.ts`.
 - Validate schema changes with `pnpm exec tsc --noEmit`, `pnpm lint`, and
   `pnpm build`.
-- Apply migrations to the hosted project with `npx supabase db push` before
-  deploying a branch that adds them. Nothing applies them automatically, and
-  `/events/[slug]` is prerendered against the database at build time, so a
-  deploy fails until the migrations land. `db push` is forward-only; correct a
-  bad migration with a new one.
 
 ## Environment
 
@@ -156,12 +169,18 @@ Local values belong in the git-ignored `.env.local`.
   list one `<url>|<signature key>` pair per subscription in
   `SQUARE_WEBHOOK_ENDPOINTS`, comma-separated: Square signs each delivery with
   that subscription's own key over its own registered URL
+- Email: server-only `RESEND_API_KEY`, and `EMAIL_FROM`
+- Feature flags: `NEXT_PUBLIC_FEATURE_STUDENT_EVENTS` and
+  `NEXT_PUBLIC_FEATURE_DARK_MODE` force a flag on or off; unset, both are on
+  locally and on preview deploys and off in production (`src/lib/flags.ts`)
+- Seed `prod` target: `SEED_PROD_SUPABASE_URL` and
+  `SEED_PROD_SUPABASE_SECRET_KEY`
 
 `SQUARE_ENV` is optional and defaults to the sandbox; set it to `production`
 only for production credentials.
 
-Never expose the Supabase secret key, Square access token, or webhook signature
-key to client components.
+Never expose the Supabase secret keys, Square access token, webhook signature
+key, or Resend API key to client components.
 
 ## Quality
 

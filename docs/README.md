@@ -1,3 +1,3 @@
 # Docs
 
-- [`event-media-storage.md`](./event-media-storage.md) — how event media and application file uploads are meant to be stored
+- [`event-media-storage.md`](./event-media-storage.md) — how event covers are stored today, and the plan for mentor photos, sponsor logos, and applicant files
