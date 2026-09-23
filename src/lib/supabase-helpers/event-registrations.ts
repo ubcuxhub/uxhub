@@ -8,7 +8,7 @@ import type {
   EventRegistrationRow,
   EventRegistrationUpdate,
 } from "@/lib/supabase/models";
-import type { GroupedRegistration } from "@/features/events/types/applicationTypes";
+import type { GroupedRegistration } from "@/features/events/types";
 import { formatUserName } from "@/lib/user-name";
 import type { ApplicationStatus } from "@/lib/supabase/models";
 

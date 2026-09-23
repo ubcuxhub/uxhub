@@ -10,10 +10,10 @@ export type {
   CheckInSession,
   CheckInSessionDraft,
   AttendingRegistration,
-} from "./types/checkInTypes";
+} from "./types";
 export type {
   MembershipTypeOption,
   SearchOption,
   SortOption,
   UserRecord,
-} from "./types/userManagementTypes";
+} from "./types";

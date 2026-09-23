@@ -13,7 +13,7 @@ import type { RoleAccess } from "@/lib/supabase/models";
 import type {
   MembershipTypeOption,
   UserRecord,
-} from "../types/userManagementTypes";
+} from "../types";
 import { EditableUserField } from "./EditableUserField";
 import { MembershipTypeField } from "./MembershipTypeField";
 

@@ -7,8 +7,8 @@
  * `{{ . }}` placeholders when it sends.
  *
  * Only the two emails this app actually triggers live here: signup
- * confirmation (`sign-up-form.tsx`) and password recovery
- * (`forgot-password-form.tsx`).
+ * confirmation (`SignUpForm.tsx`) and password recovery
+ * (`ForgotPasswordForm.tsx`).
  *
  * Imports must stay relative — the generator runs under plain Node, which does
  * not resolve the `@/*` alias.

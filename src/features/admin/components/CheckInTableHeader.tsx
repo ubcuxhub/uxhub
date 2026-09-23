@@ -1,6 +1,6 @@
 "use client";
 
-import type { CheckInSession } from "../types/checkInTypes";
+import type { CheckInSession } from "../types";
 
 interface CheckInTableHeaderProps {
   sessions: CheckInSession[];

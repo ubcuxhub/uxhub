@@ -228,8 +228,8 @@ otp_expiry = 3600
 # sender_name = "UX Hub"
 
 # Branded templates for the two auth emails this app triggers: signup
-# confirmation (sign-up-form.tsx) and password recovery
-# (forgot-password-form.tsx). Upload the same HTML in the hosted project so
+# confirmation (SignUpForm.tsx) and password recovery
+# (ForgotPasswordForm.tsx). Upload the same HTML in the hosted project so
 # production matches.
 [auth.email.template.confirmation]
 subject = "Confirm your UX Hub account"

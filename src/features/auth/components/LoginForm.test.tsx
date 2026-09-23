@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ASYNC_DEADLINES } from "@/lib/async/deadline";
 
-import { LoginForm } from "./login-form";
+import { LoginForm } from "./LoginForm";
 
 const authMocks = vi.hoisted(() => ({
   signInWithPassword: vi.fn(),

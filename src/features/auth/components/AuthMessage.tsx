@@ -1,7 +1,7 @@
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import Link from "next/link";
 
-import { AuthPanel } from "./auth-panel";
+import { AuthPanel } from "./AuthPanel";
 
 interface AuthMessageProps
   extends Omit<ComponentPropsWithoutRef<typeof AuthPanel>, "title" | "children"> {

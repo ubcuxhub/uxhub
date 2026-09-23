@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { prepareResponseData } from "./eventApplication";
+import { prepareResponseData } from "./event-application";
 
 describe("prepareResponseData", () => {
   it("maps text and multi-select answers to database rows", () => {

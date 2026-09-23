@@ -21,7 +21,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import type { CheckInSessionDraft } from "../../types/checkInTypes";
+import type { CheckInSessionDraft } from "../../types";
 
 interface CheckInEventsSectionProps {
   checkInEvents: CheckInSessionDraft[];

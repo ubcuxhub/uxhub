@@ -35,7 +35,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   ResponseType,
   type ApplicationQuestionTemplate,
-} from "@/features/events/types/eventTypes";
+} from "@/features/events/types";
 
 interface ApplicationQuestionsSectionProps {
   enabled: boolean;

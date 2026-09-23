@@ -9,7 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { MembershipTypeOption } from "../types/userManagementTypes";
+import type { MembershipTypeOption } from "../types";
 
 interface MembershipTypeFieldProps {
   value: string | null | undefined;

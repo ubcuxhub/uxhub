@@ -8,7 +8,7 @@ import type {
   SearchOption,
   SortOption,
   UserRecord,
-} from "../types/userManagementTypes";
+} from "../types";
 import { formatUserName } from "@/lib/user-name";
 
 interface UserDirectoryPanelProps {

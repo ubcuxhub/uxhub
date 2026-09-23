@@ -6,10 +6,7 @@ import { useRef, useState } from "react";
 
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  isAsyncTimeoutError,
-  withDeadline,
-} from "@/lib/async/deadline";
+import { withDeadline } from "@/lib/async/deadline";
 import { useNavigationRecovery } from "@/hooks/use-navigation-recovery";
 import { createClient } from "@/lib/supabase/client";
 
@@ -17,16 +14,18 @@ import {
   AUTH_ACTION_ERRORS,
   getAuthActionErrorMessage,
 } from "../auth-errors";
-import { setPendingEmail } from "../pending-email";
-import { AuthPanel } from "./auth-panel";
+import { AuthPanel } from "./AuthPanel";
 import { authInputClassName } from "./auth-styles";
-import { AuthSubmitButton } from "./auth-submit-button";
+import { AuthSubmitButton } from "./AuthSubmitButton";
+import { GoogleOAuthButton } from "./GoogleOAuthButton";
 
-export function ForgotPasswordForm({
+export function LoginForm({
   className,
+  nextPath = "/portal",
   ...props
-}: React.ComponentPropsWithoutRef<"div">) {
+}: React.ComponentPropsWithoutRef<"div"> & { nextPath?: string }) {
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const submittingRef = useRef(false);
@@ -34,12 +33,10 @@ export function ForgotPasswordForm({
   const recoverStalledNavigation = useNavigationRecovery(() => {
     submittingRef.current = false;
     setIsLoading(false);
-    setError(
-      "The reset email was requested, but the next page did not load. Check your inbox before trying again.",
-    );
+    setError("You are signed in, but the next page did not load. Try again.");
   });
 
-  const handleForgotPassword = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (submittingRef.current) return;
 
@@ -52,30 +49,22 @@ export function ForgotPasswordForm({
     try {
       const normalizedEmail = email.trim().toLowerCase();
 
-      // The url which will be included in the email. This URL needs to be configured in your redirect URLs in the Supabase dashboard at https://supabase.com/dashboard/project/_/auth/url-configuration
       const { error } = await withDeadline(
         () =>
-          supabase.auth.resetPasswordForEmail(normalizedEmail, {
-            redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent("/auth/update-password")}`,
+          supabase.auth.signInWithPassword({
+            email: normalizedEmail,
+            password,
           }),
-        { operation: "Password reset email" },
+        { operation: "Sign in" },
       );
 
       if (error) throw error;
 
-      // Handed to the confirmation screen out of band so the address stays out
-      // of the URL, and with it browser history and referrers.
-      setPendingEmail(normalizedEmail);
-
-      router.push("/auth/check-email");
+      router.replace(nextPath);
       navigationStarted = true;
       recoverStalledNavigation();
     } catch (error: unknown) {
-      setError(
-        isAsyncTimeoutError(error)
-          ? "We could not confirm whether the reset email was sent. Check your inbox before requesting another."
-          : getAuthActionErrorMessage(error, AUTH_ACTION_ERRORS.passwordReset),
-      );
+      setError(getAuthActionErrorMessage(error, AUTH_ACTION_ERRORS.signIn));
     } finally {
       if (!navigationStarted) {
         submittingRef.current = false;
@@ -86,13 +75,15 @@ export function ForgotPasswordForm({
 
   return (
     <AuthPanel
-      title="Forgot password"
-      description="Enter the email linked to your UBC UX Hub account and we’ll send you a password reset link."
+      title="Sign in"
+      description="Continue to the UBC UX Hub Portal with:"
       className={className}
       {...props}
     >
-      <form onSubmit={handleForgotPassword} className="space-y-6">
-        <Field className="gap-2">
+      <GoogleOAuthButton nextPath={nextPath} />
+
+      <form onSubmit={handleLogin} className="space-y-6">
+        <Field>
           <FieldLabel htmlFor="email" className="text-body text-foreground">
             Email
           </FieldLabel>
@@ -107,19 +98,43 @@ export function ForgotPasswordForm({
           />
         </Field>
 
+        <Field>
+          <div className="flex items-center justify-between gap-4">
+            <FieldLabel htmlFor="password" className="text-body text-foreground">
+              Password
+            </FieldLabel>
+            <Link
+              href="/auth/forgot-password"
+              className="text-body text-foreground underline-offset-4 hover:underline"
+            >
+              Forgot password?
+            </Link>
+          </div>
+
+          <Input
+            id="password"
+            type="password"
+            placeholder="Enter your password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className={authInputClassName}
+          />
+        </Field>
+
         {error ? <FieldError>{error}</FieldError> : null}
 
         <AuthSubmitButton type="submit" disabled={isLoading}>
-          {isLoading ? "Sending..." : "Send reset link"}
+          {isLoading ? "Signing in..." : "Sign in"}
         </AuthSubmitButton>
 
         <p className="text-center text-body text-muted-foreground">
-          Remember your account?{" "}
+          Don&apos;t have an account?{" "}
           <Link
-            href="/auth/login"
+            href={`/auth/sign-up?next=${encodeURIComponent(nextPath)}`}
             className="font-medium text-foreground underline underline-offset-4"
           >
-            Back to log in
+            Sign up
           </Link>
         </p>
       </form>

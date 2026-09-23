@@ -23,10 +23,10 @@ import {
   getAuthActionErrorMessage,
 } from "../auth-errors";
 import { setPendingEmail } from "../pending-email";
-import { AuthPanel } from "./auth-panel";
+import { AuthPanel } from "./AuthPanel";
 import { authInputClassName } from "./auth-styles";
-import { AuthSubmitButton } from "./auth-submit-button";
-import { GoogleOAuthButton } from "./google-oauth-button";
+import { AuthSubmitButton } from "./AuthSubmitButton";
+import { GoogleOAuthButton } from "./GoogleOAuthButton";
 
 const MIN_PASSWORD_LENGTH = 8;
 

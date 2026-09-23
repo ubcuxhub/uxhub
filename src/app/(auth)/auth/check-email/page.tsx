@@ -1,4 +1,4 @@
-import { CheckEmailMessage } from "@/features/auth/components/check-email-message";
+import { CheckEmailMessage } from "@/features/auth/components/CheckEmailMessage";
 import { redirectIfAuthenticated } from "@/lib/auth/guards";
 
 export default async function Page() {

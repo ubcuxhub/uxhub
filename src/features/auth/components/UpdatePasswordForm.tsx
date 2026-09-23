@@ -13,9 +13,9 @@ import {
   AUTH_ACTION_ERRORS,
   getAuthActionErrorMessage,
 } from "../auth-errors";
-import { AuthPanel } from "./auth-panel";
+import { AuthPanel } from "./AuthPanel";
 import { authInputClassName } from "./auth-styles";
-import { AuthSubmitButton } from "./auth-submit-button";
+import { AuthSubmitButton } from "./AuthSubmitButton";
 
 export function UpdatePasswordForm({
   className,

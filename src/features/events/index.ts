@@ -1,6 +1,6 @@
 export type {
   ApplicationQuestionTemplate,
-} from "./types/eventTypes";
+} from "./types";
 export type {
   GroupedRegistration,
-} from "./types/applicationTypes";
+} from "./types";
