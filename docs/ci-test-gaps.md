@@ -183,6 +183,15 @@ payment-smoke service do.
 ## Suggested order
 
 1. Items 1 and 2: the paths that take money and fulfill it.
-2. Item 3, starting with the revoke migration and its assertion.
+2. Item 3, the behavior of the seat-reservation and atomic functions.
 3. Item 4, starting with `assertManagerUserUpdate`.
 4. Item 5, alongside any future RLS change.
+
+## Suggested split
+
+The work divides cleanly by test type, so two people can take one plan each
+without touching the same files:
+
+- [`ci-test-gaps-unit.md`](ci-test-gaps-unit.md): gaps 1, 2, 4, 7, and 9.
+- [`ci-test-gaps-integration.md`](ci-test-gaps-integration.md): gaps 3, 5, and
+  6, plus the harness they need.
