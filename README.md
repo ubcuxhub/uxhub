@@ -20,7 +20,7 @@ pnpm install
 pnpm dev
 ```
 
-Duplicate `.env.local.example`, rename it to `.env.local`, and populate the values (which can be found here: https://www.notion.so/Env-36a2f9f09f188041a555c36b7a1b2bd1?v=35e2f9f09f18818e8a4a000c8317ade4&source=copy_link)
+Duplicate `.env.local.example`, rename it to `.env.local`, and populate the values (which can be found here: https://app.notion.com/p/All-Secrets-and-Credentials-3c32f9f09f18802ea6cbe0c1156e8c25?source=copy_link)
 
 The app runs at `http://localhost:3000` by default.
 
