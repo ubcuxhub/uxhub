@@ -26,8 +26,8 @@ import {
   ArrowLeft,
   ExternalLink,
   DollarSign,
-  Linkedin,
 } from "lucide-react";
+import { FaLinkedin } from "react-icons/fa6";
 import type { Json } from "@/lib/supabase/database.types";
 
 /* ─── types for JSONB fields ─── */
@@ -301,7 +301,7 @@ export default async function EventDetailPage({
                           rel="noopener noreferrer"
                             className="shrink-0 text-primary hover:text-action-hover"
                         >
-                          <Linkedin />
+                          <FaLinkedin />
                         </a>
                       )}
                     </div>
