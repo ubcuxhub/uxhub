@@ -301,7 +301,7 @@ export default async function EventDetailPage({
                           rel="noopener noreferrer"
                             className="shrink-0 text-primary hover:text-action-hover"
                         >
-                          <FaLinkedin />
+                          <FaLinkedin size={24} />
                         </a>
                       )}
                     </div>

@@ -5,12 +5,17 @@ import { POST } from "./route";
 
 const processMocks = vi.hoisted(() => ({
   processSquarePaymentEvent: vi.fn(),
+  getSquareWebhookEndpoints: vi.fn(),
 }));
 
 vi.mock("server-only", () => ({}));
 
 vi.mock("@/features/payments/fulfillment", () => ({
   processSquarePaymentEvent: processMocks.processSquarePaymentEvent,
+}));
+
+vi.mock("@/lib/square/client", () => ({
+  getSquareWebhookEndpoints: processMocks.getSquareWebhookEndpoints,
 }));
 
 const url = "https://request.example/api/square/webhook";
@@ -52,9 +57,9 @@ let consoleError: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  vi.stubEnv("SQUARE_WEBHOOK_SIGNATURE_KEY", signatureKey);
-  vi.stubEnv("SQUARE_WEBHOOK_NOTIFICATION_URL", url);
-  vi.stubEnv("SQUARE_WEBHOOK_ENDPOINTS", undefined);
+  processMocks.getSquareWebhookEndpoints.mockReturnValue([
+    { notificationUrl: url, signatureKey },
+  ]);
   processMocks.processSquarePaymentEvent.mockResolvedValue(undefined);
   consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
 });
@@ -83,12 +88,10 @@ describe("POST /api/square/webhook", () => {
   });
 
   it("accepts a signature matching any one of several configured endpoints", async () => {
-    vi.stubEnv("SQUARE_WEBHOOK_SIGNATURE_KEY", undefined);
-    vi.stubEnv("SQUARE_WEBHOOK_NOTIFICATION_URL", undefined);
-    vi.stubEnv(
-      "SQUARE_WEBHOOK_ENDPOINTS",
-      `https://a.example/webhook|key-a,${url}|${signatureKey}`
-    );
+    processMocks.getSquareWebhookEndpoints.mockReturnValue([
+      { notificationUrl: "https://a.example/webhook", signatureKey: "key-a" },
+      { notificationUrl: url, signatureKey },
+    ]);
 
     const body = JSON.stringify(paymentUpdatedPayload);
     const response = await post(body, sign(url, body, signatureKey));
