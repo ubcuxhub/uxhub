@@ -83,7 +83,7 @@ describe("Square environment selection", () => {
 
     expect(options).toMatchObject({
       token: "token-abc",
-      version: "2025-10-16",
+      version: "2026-09-16",
     });
   });
 });

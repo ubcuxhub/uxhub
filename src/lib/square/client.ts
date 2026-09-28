@@ -38,5 +38,5 @@ function getSquareEnvironment() {
 export const squareClient = new SquareClient({
   token: requiredEnv("SQUARE_ACCESS_TOKEN"),
   environment: getSquareEnvironment(),
-  version: "2025-10-16",
+  version: "2026-09-16",
 });
