@@ -157,7 +157,7 @@ export async function reconcileChildren<Row extends Record<string, unknown>>(
 
       const { error } = await supabase
         .from(table)
-        .update(row)
+        .update(row as never)
         .eq("id", existingId);
 
       if (error) {
@@ -169,7 +169,7 @@ export async function reconcileChildren<Row extends Record<string, unknown>>(
 
       const { error } = await supabase
         .from(table)
-        .insert({ ...row, [parentColumn]: parentId });
+        .insert({ ...row, [parentColumn]: parentId } as never);
 
       if (error) {
         throw new Error(`Inserting ${table} "${key}" failed: ${error.message}`);
