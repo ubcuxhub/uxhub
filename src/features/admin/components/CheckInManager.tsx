@@ -80,9 +80,6 @@ export function CheckInManager({
   const [attendingRegistrations, setAttendingRegistrations] = useState<
     AttendingRegistration[]
   >(initialAttendingRegistrations);
-  const [filteredRegistrations, setFilteredRegistrations] = useState<
-    AttendingRegistration[]
-  >([]);
   const [checkInStatuses, setCheckInStatuses] = useState<
     Map<string, string | null>
   >(new Map(initialCheckInStatuses));
@@ -156,21 +153,14 @@ export function CheckInManager({
   }, [eventId, supabase]);
 
   // Filter registrations based on search
-  useEffect(() => {
-    let filtered = [...attendingRegistrations];
-
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter((reg) => {
-        return (
+  const query = searchQuery.trim().toLowerCase();
+  const filteredRegistrations = query
+    ? attendingRegistrations.filter(
+        (reg) =>
           reg.user_name.toLowerCase().includes(query) ||
           reg.user_email.toLowerCase().includes(query)
-        );
-      });
-    }
-
-    setFilteredRegistrations(filtered);
-  }, [attendingRegistrations, searchQuery]);
+      )
+    : attendingRegistrations;
 
   const handleCheckInToggle = async (
     registrationId: string,

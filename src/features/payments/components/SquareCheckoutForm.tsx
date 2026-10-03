@@ -13,6 +13,7 @@ import {
   useEffect,
   useId,
   useMemo,
+  useRef,
   useState,
   useSyncExternalStore,
   useTransition,
@@ -31,6 +32,7 @@ import {
 } from "@/lib/async/deadline";
 import { useNavigationRecovery } from "@/hooks/use-navigation-recovery";
 import {
+  type CheckoutAttemptScope,
   clearCheckoutAttemptKey,
   getOrCreateCheckoutAttemptKey,
   rotateCheckoutAttemptKey,
@@ -167,7 +169,12 @@ export function SquareCheckoutForm({
   const [billingPostalCode, setBillingPostalCode] = useState("");
   const [card, setCard] = useState<Card | null>(null);
   const [squarePayments, setSquarePayments] = useState<Payments | null>(null);
-  const [initializing, setInitializing] = useState(true);
+  const squareConfigured = Boolean(
+    process.env.NEXT_PUBLIC_SQUARE_APP_ID &&
+      process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID,
+  );
+  const [loadingCard, setLoadingCard] = useState(true);
+  const initializing = !disabled && squareConfigured && loadingCard;
   const [submitting, setSubmitting] = useState(false);
   /**
    * The redirect to the confirmation page is a transition, so it stays pending
@@ -178,6 +185,11 @@ export function SquareCheckoutForm({
   const [redirectTimedOut, setRedirectTimedOut] = useState(false);
   const busy = submitting || (redirecting && !redirectTimedOut);
   const [message, setMessage] = useState(disabledMessage ?? "");
+  const shownMessage =
+    message ||
+    (!disabled && !squareConfigured
+      ? "Square is not configured yet for this environment."
+      : "");
   const recoverStalledNavigation = useNavigationRecovery(() => {
     setRedirectTimedOut(true);
     setMessage(
@@ -188,30 +200,33 @@ export function SquareCheckoutForm({
     () => ({ kind, slug, userId }),
     [kind, slug, userId],
   );
-  const [idempotencyKey, setIdempotencyKey] = useState("");
+  // Stands in for sessionStorage when it is unavailable, so a retry within
+  // this page still reuses the attempt's key.
+  const fallbackAttempt = useRef<{
+    scope: CheckoutAttemptScope;
+    key: string;
+  } | null>(null);
 
-  useEffect(() => {
+  // Read at submit, not on mount: the key matters only once a charge is sent.
+  const getIdempotencyKey = () => {
     try {
-      setIdempotencyKey(
-        getOrCreateCheckoutAttemptKey(sessionStorage, checkoutScope),
-      );
+      return getOrCreateCheckoutAttemptKey(sessionStorage, checkoutScope);
     } catch {
-      setIdempotencyKey(crypto.randomUUID());
+      if (fallbackAttempt.current?.scope !== checkoutScope) {
+        fallbackAttempt.current = {
+          scope: checkoutScope,
+          key: crypto.randomUUID(),
+        };
+      }
+      return fallbackAttempt.current.key;
     }
-  }, [checkoutScope]);
+  };
 
   useEffect(() => {
-    if (disabled) {
-      setInitializing(false);
-      return;
-    }
-
     const applicationId = process.env.NEXT_PUBLIC_SQUARE_APP_ID;
     const locationId = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID;
 
-    if (!applicationId || !locationId) {
-      setMessage("Square is not configured yet for this environment.");
-      setInitializing(false);
+    if (disabled || !applicationId || !locationId) {
       return;
     }
 
@@ -278,7 +293,7 @@ export function SquareCheckoutForm({
         }
       } finally {
         if (mounted) {
-          setInitializing(false);
+          setLoadingCard(false);
         }
       }
     };
@@ -312,11 +327,12 @@ export function SquareCheckoutForm({
       disabled ||
       !card ||
       !squarePayments ||
-      !idempotencyKey ||
       busy
     ) {
       return;
     }
+
+    const idempotencyKey = getIdempotencyKey();
 
     setSubmitting(true);
     setRedirectTimedOut(false);
@@ -412,11 +428,9 @@ export function SquareCheckoutForm({
         setMessage(result.error);
         if (result.terminal) {
           try {
-            setIdempotencyKey(
-              rotateCheckoutAttemptKey(sessionStorage, checkoutScope),
-            );
+            rotateCheckoutAttemptKey(sessionStorage, checkoutScope);
           } catch {
-            setIdempotencyKey(crypto.randomUUID());
+            fallbackAttempt.current = null;
           }
         }
         return;
@@ -529,8 +543,8 @@ export function SquareCheckoutForm({
         className="min-h-24"
       />
 
-      {message ? (
-        <p className="text-small text-destructive">{message}</p>
+      {shownMessage ? (
+        <p className="text-small text-destructive">{shownMessage}</p>
       ) : showSecurityMessage ? (
         <p className="text-small text-muted-foreground">
           Your card details are tokenized by Square. Prices and eligibility are
@@ -545,8 +559,7 @@ export function SquareCheckoutForm({
           initializing ||
           busy ||
           !card ||
-          !squarePayments ||
-          !idempotencyKey
+          !squarePayments
         }
         type="submit"
       >
