@@ -159,7 +159,7 @@ export function useEventForm({
     initialEvent?.image_url ?? null
   );
   const bypassUnsavedChangesWarning = useRef(false);
-  const cleanSnapshot = useRef(
+  const [cleanSnapshot, setCleanSnapshot] = useState(() =>
     createFormSnapshot(
       startingFormState,
       startingCheckIns,
@@ -198,7 +198,7 @@ export function useEventForm({
       sponsors,
       questions.applicationTemplate,
       pendingImageFile
-    ) !== cleanSnapshot.current;
+    ) !== cleanSnapshot;
   useUnsavedChangesGuard(hasUnsavedChanges, bypassUnsavedChangesWarning);
 
   const handleFieldChange = <K extends keyof EventFormState>(
@@ -404,12 +404,14 @@ export function useEventForm({
       persistedImageUrl.current = imageUrl || null;
       setFormState(savedFormState);
       setPendingImageFile(null);
-      cleanSnapshot.current = createFormSnapshot(
-        savedFormState,
-        checkInEvents,
-        mentors,
-        sponsors,
-        questions.applicationTemplate
+      setCleanSnapshot(
+        createFormSnapshot(
+          savedFormState,
+          checkInEvents,
+          mentors,
+          sponsors,
+          questions.applicationTemplate
+        )
       );
       setSuccessMessage(
         eventId ? "Event updated successfully." : "Event created successfully."
@@ -425,12 +427,8 @@ export function useEventForm({
         setMentors([]);
         setSponsors([]);
         questions.setApplicationTemplate([]);
-        cleanSnapshot.current = createFormSnapshot(
-          resetFormState,
-          resetCheckIns,
-          [],
-          [],
-          []
+        setCleanSnapshot(
+          createFormSnapshot(resetFormState, resetCheckIns, [], [], [])
         );
       }
       if (onSuccess) {

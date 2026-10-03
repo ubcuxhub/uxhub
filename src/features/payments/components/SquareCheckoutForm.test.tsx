@@ -128,10 +128,10 @@ describe("SquareCheckoutForm deadlines", () => {
       slug: "student",
       userId: "user-1",
     });
-    const attemptKey = sessionStorage.getItem(storageKey);
-
     fireEvent.submit(screen.getByRole("button", { name: "Pay now" }));
     expect(onSubmittingChange).toHaveBeenLastCalledWith(true);
+    const attemptKey = sessionStorage.getItem(storageKey);
+    expect(attemptKey).toBeTruthy();
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(ASYNC_DEADLINES.checkout);

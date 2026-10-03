@@ -8,6 +8,26 @@ import type { UserInfoRow } from "@/lib/supabase/models";
 
 const supabase = createClient();
 
+/** The signed-in user's row, or null when signed out or unreadable. */
+async function fetchCurrentUser(authUserId?: string) {
+  let userId = authUserId;
+
+  if (!userId) {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    userId = session?.user.id;
+  }
+
+  if (!userId) return null;
+
+  try {
+    return await fetchUserInfoByAuthId(supabase, userId);
+  } catch {
+    return null;
+  }
+}
+
 interface UserContextType {
   user: UserInfoRow | null;
   /**
@@ -48,28 +68,9 @@ export function UserProvider({
 
   const loadUser = useCallback(async (authUserId?: string) => {
     setLoading(true);
-    let userId = authUserId;
-
-    if (!userId) {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      userId = session?.user.id;
-    }
-
-    if (!userId) {
-      setUser(null);
-      setLoading(false);
-      return;
-    }
-
-    try {
-      setUser(await fetchUserInfoByAuthId(supabase, userId));
-    } catch {
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
+    const nextUser = await fetchCurrentUser(authUserId);
+    setUser(nextUser);
+    setLoading(false);
   }, []);
 
   // The term end gates signed-out copy too — the marketing calls to action hide
@@ -93,8 +94,12 @@ export function UserProvider({
   }, [initialTermEndsAt]);
 
   useEffect(() => {
+    // `loading` already starts true here, so this skips loadUser's reset.
     if (!initialUser) {
-      void loadUser();
+      void fetchCurrentUser().then((nextUser) => {
+        setUser(nextUser);
+        setLoading(false);
+      });
     }
 
     const {

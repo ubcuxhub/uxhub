@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect, DragEvent, ChangeEvent } from "react";
+import { useState, useRef, DragEvent, ChangeEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
@@ -47,17 +47,18 @@ export const ImageUpload = ({
   const [isDragging, setIsDragging] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(() =>
+    value ? resolveImagePreviewSrc(value) : null
+  );
+  const [previewedValue, setPreviewedValue] = useState(value);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Update preview when value changes (for existing images)
-  useEffect(() => {
-    if (value) {
-      setPreview(resolveImagePreviewSrc(value));
-    } else {
-      setPreview(null);
-    }
-  }, [value]);
+  // A new stored image (after a save, or a form reset) replaces whatever
+  // preview is showing, including one read from a picked file.
+  if (value !== previewedValue) {
+    setPreviewedValue(value);
+    setPreview(value ? resolveImagePreviewSrc(value) : null);
+  }
 
   const handleDragEnter = (e: DragEvent<HTMLDivElement>) => {
     e.preventDefault();
