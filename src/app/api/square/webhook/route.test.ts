@@ -3,6 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { POST } from "./route";
 
+// route.ts imports the Square client, which reads its token at module load.
+vi.hoisted(() => {
+  process.env.SQUARE_ACCESS_TOKEN ??= "test-token";
+});
+
 const processMocks = vi.hoisted(() => ({
   processSquarePaymentEvent: vi.fn(),
   getSquareWebhookEndpoints: vi.fn(),
