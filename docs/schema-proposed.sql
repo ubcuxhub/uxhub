@@ -13,7 +13,7 @@ CREATE TYPE role_access_enum   AS ENUM ('basic', 'admin', 'manager');
 CREATE TYPE user_type          AS ENUM ('ubcStudent', 'faculty', 'nonUbc');
 CREATE TYPE student_status     AS ENUM ('undergraduate', 'graduate', 'other');
 CREATE TYPE uni_year           AS ENUM ('1', '2', '3', '4', '5+');
-CREATE TYPE event_status       AS ENUM ('draft', 'active', 'archived');
+CREATE TYPE event_status       AS ENUM ('draft', 'active');
 CREATE TYPE event_type         AS ENUM ('regular', 'flagship');
 CREATE TYPE response_type      AS ENUM ('short_text', 'long_text', 'checkbox',
                                         'multiple_choice', 'dropdown', 'file_upload');
@@ -73,6 +73,8 @@ CREATE TABLE app_settings (
 
 -- Events
 
+-- draft is hidden from students, active is visible. Past vs upcoming comes
+-- from ends_at, not from status.
 CREATE TABLE events (
   id                      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   slug                    text NOT NULL UNIQUE,
