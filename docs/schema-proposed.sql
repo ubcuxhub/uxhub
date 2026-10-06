@@ -17,9 +17,7 @@ CREATE TYPE event_status       AS ENUM ('draft', 'active');
 CREATE TYPE event_type         AS ENUM ('regular', 'flagship');
 CREATE TYPE response_type      AS ENUM ('short_text', 'long_text', 'checkbox',
                                         'multiple_choice', 'dropdown', 'file_upload');
-CREATE TYPE application_status AS ENUM ('submitted', 'accepted', 'rejected',
-                                        'waitlisted', 'withdrawn');
-CREATE TYPE check_in_method    AS ENUM ('scan', 'manual');
+CREATE TYPE application_status AS ENUM ('submitted', 'accepted', 'rejected', 'waitlisted');
 CREATE TYPE audit_source       AS ENUM ('trigger', 'app');
 
 
@@ -87,8 +85,8 @@ CREATE TABLE events (
   status                  event_status NOT NULL DEFAULT 'draft',
   starts_at               timestamptz,
   ends_at                 timestamptz,
-  registration_start_time timestamptz,
-  registration_end_time   timestamptz,
+  registration_opens_at   timestamptz,
+  registration_closes_at  timestamptz,
   location_building       text,
   location_room           text,
   location_address_url    text,
@@ -101,7 +99,7 @@ CREATE TABLE events (
   created_at              timestamptz NOT NULL DEFAULT now(),
   updated_at              timestamptz NOT NULL DEFAULT now(),
   CHECK (ends_at IS NULL OR starts_at IS NULL OR ends_at >= starts_at),
-  CHECK (registration_end_time >= registration_start_time)
+  CHECK (registration_closes_at >= registration_opens_at)
 );
 
 CREATE TABLE mentors (
@@ -209,16 +207,14 @@ CREATE INDEX memberships_user_id_expires_at_idx ON memberships (user_id, expires
 -- Applications
 
 -- An offer has expired when it is accepted, past offer_expires_at, and has no
--- ticket. Waitlisted applicants are moved to accepted by an admin.
+-- ticket. Waitlisted applicants are moved to accepted by an admin. Withdrawing
+-- deletes the application. Who decided and when lives in audit_events.
 CREATE TABLE event_applications (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   event_id         uuid NOT NULL REFERENCES events (id) ON DELETE CASCADE,
   user_id          uuid NOT NULL REFERENCES user_info (id),
   status           application_status NOT NULL DEFAULT 'submitted',
   offer_expires_at timestamptz,
-  decided_by       uuid REFERENCES user_info (id),
-  decided_at       timestamptz,
-  submitted_at     timestamptz NOT NULL DEFAULT now(),
   created_at       timestamptz NOT NULL DEFAULT now(),
   updated_at       timestamptz NOT NULL DEFAULT now(),
   UNIQUE (event_id, user_id)
@@ -276,15 +272,13 @@ CREATE TABLE check_in_sessions (
   CHECK (end_time IS NULL OR start_time IS NULL OR end_time >= start_time)
 );
 
+-- Never edited. A mistaken check-in is deleted so the person can be scanned again.
 CREATE TABLE check_ins (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   check_in_session_id uuid NOT NULL REFERENCES check_in_sessions (id) ON DELETE CASCADE,
   ticket_id           uuid NOT NULL REFERENCES event_tickets (id) ON DELETE CASCADE,
   checked_in_at       timestamptz NOT NULL DEFAULT now(),
   checked_in_by       uuid REFERENCES user_info (id),
-  method              check_in_method NOT NULL DEFAULT 'scan',
-  created_at          timestamptz NOT NULL DEFAULT now(),
-  updated_at          timestamptz NOT NULL DEFAULT now(),
   UNIQUE (ticket_id, check_in_session_id)
 );
 
@@ -328,7 +322,7 @@ CREATE INDEX audit_events_source_idx ON audit_events (source, occurred_at DESC);
 -- reserve_event_ticket(p_event_id uuid, p_user_id uuid, p_purchase_id uuid DEFAULT NULL)
 --   RETURNS TABLE (ticket_id uuid, failure_reason text)
 -- release_event_ticket(p_ticket_id uuid) RETURNS void
--- check_in_by_token(p_qr_token text, p_session_id uuid, p_method check_in_method)
+-- check_in_by_token(p_qr_token text, p_session_id uuid)
 --   RETURNS TABLE (ticket_id uuid, attendee_name text, already_checked_in_at timestamptz)
 -- audit_row_change() RETURNS trigger
 
