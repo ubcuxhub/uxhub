@@ -19,7 +19,6 @@ CREATE TYPE response_type      AS ENUM ('short_text', 'long_text', 'checkbox',
                                         'multiple_choice', 'dropdown', 'file_upload');
 CREATE TYPE application_status AS ENUM ('submitted', 'accepted', 'rejected',
                                         'waitlisted', 'withdrawn');
-CREATE TYPE ticket_status      AS ENUM ('active', 'released');
 CREATE TYPE check_in_method    AS ENUM ('scan', 'manual');
 CREATE TYPE audit_source       AS ENUM ('trigger', 'app');
 
@@ -250,15 +249,15 @@ CREATE INDEX application_notes_application_id_idx ON application_notes (applicat
 
 -- Tickets and check-in
 
--- Replaces event_registrations. Releasing a ticket keeps the row and its
--- purchase_id, so re-registering reactivates it without a new charge.
+-- Replaces event_registrations. A ticket is active while released_at is null.
+-- Releasing sets released_at and keeps the row and its purchase_id, so
+-- re-registering clears it again without a new charge.
 -- Seats taken = active tickets + accepted, unexpired applications without a ticket.
 CREATE TABLE event_tickets (
   id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   event_id    uuid NOT NULL REFERENCES events (id) ON DELETE CASCADE,
   user_id     uuid NOT NULL REFERENCES user_info (id),
   purchase_id uuid UNIQUE REFERENCES purchases (id) ON DELETE SET NULL,
-  status      ticket_status NOT NULL DEFAULT 'active',
   qr_token    text NOT NULL UNIQUE DEFAULT encode(gen_random_bytes(16), 'hex'),
   released_at timestamptz,
   created_at  timestamptz NOT NULL DEFAULT now(),
