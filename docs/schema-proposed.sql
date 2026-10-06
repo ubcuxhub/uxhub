@@ -70,8 +70,8 @@ CREATE TABLE app_settings (
 
 -- Events
 
--- draft is hidden from students, active is visible. Past vs upcoming comes
--- from ends_at, not from status.
+-- draft is hidden from students. active is visible once publish_at is null or
+-- has passed, so scheduling needs no job. Past vs upcoming comes from ends_at.
 CREATE TABLE events (
   id                      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   slug                    text NOT NULL UNIQUE,
@@ -83,6 +83,7 @@ CREATE TABLE events (
   agenda                  jsonb,
   event_type              event_type NOT NULL DEFAULT 'regular',
   status                  event_status NOT NULL DEFAULT 'draft',
+  publish_at              timestamptz,
   starts_at               timestamptz,
   ends_at                 timestamptz,
   registration_opens_at   timestamptz,
