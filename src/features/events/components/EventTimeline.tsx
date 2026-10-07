@@ -44,7 +44,7 @@ export function EventTimeline({
         <div className="mb-8">
           {displayedGroups.map((group) => (
             <div key={group.key}>
-              <h2 className="mt-2 mb-5 text-h2">{group.label}</h2>
+              <h2 className="mt-4 mb-5 text-h2">{group.label}</h2>
               {group.events.map((event) => (
                 <EventTimelineItem key={event.id} event={event} />
               ))}
@@ -71,7 +71,7 @@ function EventTimelineItem({ event }: { event: EventRow }) {
     .join(" ");
 
   return (
-    <div className="flex gap-3 pb-4 sm:gap-8">
+    <div className="flex gap-3 sm:gap-8 sm:min-h-72">
       <div className="flex justify-end gap-4">
         <p className="hidden min-w-28 text-end sm:block">
           {formatEventDate(event.start_date, { year: undefined, month: "short" })}
@@ -82,7 +82,7 @@ function EventTimelineItem({ event }: { event: EventRow }) {
         </div>
       </div>
 
-      <div className="flex w-full min-w-0 items-center justify-between gap-6 rounded-xl border p-4 sm:min-h-52 sm:px-5">
+      <div className="flex w-full min-w-0 self-start items-center justify-between gap-6 rounded-xl border p-4 sm:min-h-52 sm:px-5">
         <div className="flex min-w-0 flex-col gap-5">
           <div className="flex flex-col gap-3">
             <h3 className="text-h3">{event.name}</h3>
