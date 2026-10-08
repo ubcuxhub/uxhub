@@ -27,6 +27,7 @@ pnpm test
 pnpm build
 pnpm start
 pnpm test:rls
+pnpm test:integration
 pnpm seed
 pnpm supabase:local
 pnpm types:supabase
@@ -37,6 +38,13 @@ pnpm payment-smoke
 `pnpm supabase:local` rebuilds the local database from scratch and seeds it (see
 `supabase/README.md`). `pnpm payment-smoke` manages the production payment
 smoke-test tier (see `scripts/seed/README.md`).
+
+`pnpm test:integration` runs the Vitest integration suite
+(`*.integration.test.ts`) against the local Supabase, reading its credentials
+from `supabase status`. It refuses any host that is not local, because it writes
+and deletes with the service-role key. Each test tags its fixtures and removes
+them afterwards, so it is safe and repeatable on a seeded database. Helpers live
+in `src/test/integration.ts`. The default `pnpm test` excludes these.
 
 `pnpm test` runs the Vitest suite once (`pnpm test:watch` for watch mode). Tests are
 colocated with the code they cover (e.g. `src/lib/slug.test.ts`,
@@ -190,6 +198,8 @@ key, or Resend API key to client components.
 - Run `pnpm lint`, `pnpm exec tsc --noEmit`, and `pnpm test` after code changes.
 - Also run `pnpm build` after route, dependency, configuration, schema, or
   shared-style changes.
+- Run `pnpm test:integration` after changing a migration, a database function,
+  or a Supabase helper. CI runs it in the `build` job, after the RLS suite.
 - Supabase RLS checks live in `supabase/tests/rls.sql` (separate from the
   Vitest suite). Run them with `pnpm test:rls`, which targets the local
   database unless `SUPABASE_DB_URL` says otherwise. The whole script runs in a

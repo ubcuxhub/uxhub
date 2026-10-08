@@ -6,11 +6,12 @@ separate plan covers the unit gaps in [`ci-test-gaps-unit.md`](ci-test-gaps-unit
 
 ## Background
 
-CI's `build` job starts a throwaway Supabase with every migration applied and
-runs [`supabase/tests/rls.sql`](../supabase/tests/rls.sql). That script is the
-only test that touches a real database, and it checks access control only. No
-Vitest test runs the app's code against a database, and the only database
-function anything calls is `set_user_role`.
+CI's `build` job starts a throwaway Supabase with every migration applied, runs
+[`supabase/tests/rls.sql`](../supabase/tests/rls.sql), then runs
+`pnpm test:integration` against the same database. The harness is in place
+(`vitest.integration.config.ts` and [`src/test/integration.ts`](../src/test/integration.ts));
+what is still missing is coverage. `rls.sql` checks access control only, and the
+only database function anything calls is `set_user_role`.
 
 ## Scope
 
@@ -20,18 +21,7 @@ TypeScript against the local Supabase. This plan owns `vitest.config.ts`,
 
 ## Suggested order
 
-### 1. Harness
-
-A first PR that adds:
-
-- a separate Vitest project, run with something like `pnpm test:integration`,
-  pointed at the local Supabase;
-- a CI step in the `build` job after `Verify RLS policies`, since that job
-  already starts the database;
-- isolation like `rls.sql`'s: roll back each test's transaction, or scope it
-  to its own fixtures, so it is safe on a seeded database.
-
-### 2. Database functions
+### 1. Database functions
 
 - `reserve_paid_event_ticket`: each failure reason (`EVENT_NOT_FOUND`,
   `EVENT_NOT_ACTIVE`, `APPLICATION_REQUIRED`, `REGISTRATION_NOT_OPEN`,
@@ -44,7 +34,7 @@ A first PR that adds:
 
 Their execute grants are already asserted in `rls.sql`.
 
-### 3. RLS assertions
+### 2. RLS assertions
 
 Add to `rls.sql`:
 
@@ -59,7 +49,7 @@ Add to `rls.sql`:
   [Storage](../supabase/README.md#storage)), so this guards against one being
   added.
 
-### 4. Supabase helpers
+### 3. Supabase helpers
 
 Only `memberships.ts` in `src/lib/supabase-helpers` has tests, and those use a
 fake client. Start with the confirmation-email claim and release in
@@ -67,7 +57,7 @@ fake client. Start with the confirmation-email claim and release in
 `recordSquareWebhookEvent`. Then `check-ins.ts`, and
 `adminDeleteEventImageByUrl` ignoring URLs outside the bucket.
 
-### 5. Fulfillment against the database
+### 4. Fulfillment against the database
 
 With only Square mocked, add a few cases to
 [`fulfillment.ts`](../src/features/payments/fulfillment.ts), such as buying the
