@@ -16,14 +16,23 @@ export interface AttendingRegistration {
 }
 
 export type UserRecord = UserInfoRow & {
-  id?: string;
   membership_type_name?: string | null;
   order_date?: string | null;
 };
 
-export type SortOption = "name" | "email";
+export interface UserPurchaseSummary {
+  id: string;
+  title: string;
+  kind: string;
+  amount_cents: number;
+  currency: string;
+  status: string;
+  created_at: string | null;
+}
 
-export type SearchOption = "name" | "email";
+export type SortOption = "name" | "created_at";
+
+export type SortDirection = "ascending" | "descending";
 
 export interface MembershipTypeOption {
   id: string;

@@ -1,11 +1,6 @@
 "use client";
 
-import {
-  useMemo,
-  useState,
-  type KeyboardEvent,
-  type ReactNode,
-} from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   Archive,
@@ -13,19 +8,10 @@ import {
   ArrowUp,
   Check,
   FilePen,
-  ListFilter,
-  Search,
 } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   Sheet,
   SheetContent,
@@ -39,6 +25,15 @@ import {
   formatTimestamp,
 } from "@/lib/date";
 import type { EventRow, EventStatus } from "@/lib/supabase/models";
+import { toggleSetValue } from "../lib/directory";
+import { AdminDirectoryLayout } from "./AdminDirectoryLayout";
+import { AdminDirectoryToolbar } from "./AdminDirectoryToolbar";
+import {
+  AdminDirectoryTable,
+  type AdminDirectoryColumn,
+} from "./AdminDirectoryTable";
+import { AdminDirectoryButton } from "./AdminDirectoryControls";
+import { AdminDirectoryFilters } from "./AdminDirectoryFilters";
 
 export interface AdminEventTableRow {
   event: EventRow;
@@ -113,18 +108,6 @@ function getRegistrationStatus(
   }
 
   return row.registrationOpen ? "open" : "closed";
-}
-
-function toggleSetValue<T>(values: Set<T>, value: T) {
-  const next = new Set(values);
-
-  if (next.has(value)) {
-    next.delete(value);
-  } else {
-    next.add(value);
-  }
-
-  return next;
 }
 
 function DetailItem({
@@ -269,6 +252,58 @@ function EventDetails({
   );
 }
 
+const eventColumns: AdminDirectoryColumn<AdminEventTableRow>[] = [
+  {
+    id: "status",
+    header: "Status",
+    render: (row) => <EventStatusBadge status={row.event.status} />,
+  },
+  {
+    id: "name",
+    header: "Name",
+    cellClassName: "font-medium",
+    render: (row) => row.event.name,
+  },
+  {
+    id: "date",
+    header: "Date",
+    headerClassName: "whitespace-nowrap",
+    cellClassName: "whitespace-nowrap text-muted-foreground",
+    render: (row) =>
+      formatEventDate(row.event.start_date, { month: "short" }) ?? "—",
+  },
+  {
+    id: "registered",
+    header: "Registered",
+    render: (row) => (
+      <>
+        {row.registrationCount}{" "}
+        <span className="text-muted-foreground">/ {row.event.max_capacity}</span>
+      </>
+    ),
+  },
+  {
+    id: "registration-status",
+    header: "Registration Status",
+    render: (row) => (
+      <Badge
+        variant={row.event.status === "draft" ? "destructive" : "secondary"}
+        className={
+          row.event.status !== "draft" && row.registrationOpen
+            ? "bg-success-bg text-success"
+            : undefined
+        }
+      >
+        {row.event.status === "draft"
+          ? "N/A"
+          : row.registrationOpen
+            ? "Open"
+            : "Closed"}
+      </Badge>
+    ),
+  },
+];
+
 export function AdminEventsTable({
   rows,
 }: {
@@ -325,236 +360,79 @@ export function AdminEventsTable({
     sortDirection,
   ]);
 
-  const activeFilterCount = eventStatuses.size + registrationStatuses.size;
-
   const selectRow = (row: AdminEventTableRow) => {
     setSelectedRow(row);
     setOpen(true);
   };
 
-  const handleRowKeyDown = (
-    event: KeyboardEvent<HTMLTableRowElement>,
-    row: AdminEventTableRow
-  ) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      selectRow(row);
-    }
-  };
-
   return (
     <>
-      <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center">
-        <div className="relative min-w-0 flex-1">
-          <Search
-            className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-            aria-hidden="true"
-          />
-          <Input
-            type="search"
-            value={searchQuery}
-            onChange={(event) => setSearchQuery(event.target.value)}
-            placeholder="Search events by name..."
-            aria-label="Search events by name"
-            className="pl-9"
-          />
-        </div>
-
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() =>
-            setSortDirection((current) =>
-              current === "descending" ? "ascending" : "descending"
-            )
-          }
-          aria-label={`Sort by date ${
-            sortDirection === "descending" ? "ascending" : "descending"
-          }`}
-          className="justify-between sm:justify-center"
+      <AdminDirectoryLayout>
+        <AdminDirectoryToolbar
+          searchQuery={searchQuery}
+          onSearchQueryChange={setSearchQuery}
+          placeholder="Search events by name..."
+          searchLabel="Search events by name"
         >
-          Sort by date
-          {sortDirection === "descending" ? (
-            <ArrowDown aria-hidden="true" />
-          ) : (
-            <ArrowUp aria-hidden="true" />
-          )}
-        </Button>
-
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              type="button"
-              variant="outline"
-              className="justify-between sm:justify-center"
-            >
-              <ListFilter aria-hidden="true" />
-              Filters
-              {activeFilterCount > 0 && (
-                <Badge
-                  variant="secondary"
-                  className="min-w-5 justify-center px-1.5"
-                >
-                  {activeFilterCount}
-                </Badge>
-              )}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-64 p-0">
-            <div
-              role="group"
-              aria-labelledby="event-status-filter-heading"
-              className="p-4 pt-5"
-            >
-              <h3
-                id="event-status-filter-heading"
-                className="mb-3 text-sm font-medium"
-              >
-                Status
-              </h3>
-              <div className="space-y-2">
-                {eventStatusOptions.map((option) => (
-                  <label
-                    key={option.value}
-                    className="flex cursor-pointer items-center gap-2 text-sm"
-                  >
-                    <Checkbox
-                      checked={eventStatuses.has(option.value)}
-                      onCheckedChange={() =>
-                        setEventStatuses((current) =>
-                          toggleSetValue(current, option.value)
-                        )
-                      }
-                    />
-                    {option.label}
-                  </label>
-                ))}
-              </div>
-            </div>
-            <div
-              role="group"
-              aria-labelledby="registration-status-filter-heading"
-              className="border-t p-4 pt-5"
-            >
-              <h3
-                id="registration-status-filter-heading"
-                className="mb-3 text-sm font-medium"
-              >
-                Registration status
-              </h3>
-              <div className="space-y-2">
-                {registrationStatusOptions.map((option) => (
-                  <label
-                    key={option.value}
-                    className="flex cursor-pointer items-center gap-2 text-sm"
-                  >
-                    <Checkbox
-                      checked={registrationStatuses.has(option.value)}
-                      onCheckedChange={() =>
-                        setRegistrationStatuses((current) =>
-                          toggleSetValue(current, option.value)
-                        )
-                      }
-                    />
-                    {option.label}
-                  </label>
-                ))}
-              </div>
-            </div>
-            {activeFilterCount > 0 && (
-              <div className="border-t p-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className="w-full"
-                  onClick={() => {
-                    setEventStatuses(new Set());
-                    setRegistrationStatuses(new Set());
-                  }}
-                >
-                  Clear filters
-                </Button>
-              </div>
+          <AdminDirectoryButton
+            type="button"
+            onClick={() =>
+              setSortDirection((current) =>
+                current === "descending" ? "ascending" : "descending"
+              )
+            }
+            aria-label={`Sort by date ${
+              sortDirection === "descending" ? "ascending" : "descending"
+            }`}
+          >
+            Sort by date
+            {sortDirection === "descending" ? (
+              <ArrowDown aria-hidden="true" />
+            ) : (
+              <ArrowUp aria-hidden="true" />
             )}
-          </PopoverContent>
-        </Popover>
-      </div>
+          </AdminDirectoryButton>
 
-      <div className="overflow-x-auto rounded-lg border">
-        <table className="w-full min-w-max text-sm">
-          <thead>
-            <tr className="border-b bg-muted/50">
-              <th className="px-4 py-3 text-left font-medium">Status</th>
-              <th className="px-4 py-3 text-left font-medium">Name</th>
-              <th className="whitespace-nowrap px-4 py-3 text-left font-medium">
-                Date
-              </th>
-              <th className="px-4 py-3 text-left font-medium">Registered</th>
-              <th className="px-4 py-3 text-left font-medium">
-                Registration Status
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {filteredRows.map((row) => (
-              <tr
-                key={row.event.id}
-                role="button"
-                tabIndex={0}
-                aria-label={`View details for ${row.event.name}`}
-                className="cursor-pointer border-b transition-colors last:border-b-0 hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none"
-                onClick={() => selectRow(row)}
-                onKeyDown={(event) => handleRowKeyDown(event, row)}
-              >
-                <td className="px-4 py-3">
-                  <EventStatusBadge status={row.event.status} />
-                </td>
-                <td className="px-4 py-3 font-medium">{row.event.name}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-muted-foreground">
-                  {formatEventDate(row.event.start_date, { month: "short" }) ??
-                    "—"}
-                </td>
-                <td className="px-4 py-3">
-                  {row.registrationCount}{" "}
-                  <span className="text-muted-foreground">
-                    / {row.event.max_capacity}
-                  </span>
-                </td>
-                <td className="px-4 py-3">
-                  <Badge
-                    variant={
-                      row.event.status === "draft"
-                        ? "destructive"
-                        : "secondary"
-                    }
-                    className={
-                      row.event.status !== "draft" && row.registrationOpen
-                        ? "bg-success-bg text-success"
-                        : undefined
-                    }
-                  >
-                    {row.event.status === "draft"
-                      ? "N/A"
-                      : row.registrationOpen
-                        ? "Open"
-                        : "Closed"}
-                  </Badge>
-                </td>
-              </tr>
-            ))}
-            {filteredRows.length === 0 && (
-              <tr>
-                <td
-                  colSpan={5}
-                  className="px-4 py-10 text-center text-muted-foreground"
-                >
-                  No events match your search and filters.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+          <AdminDirectoryFilters
+            groups={[
+              {
+                id: "event-status-filter-heading",
+                label: "Status",
+                options: eventStatusOptions,
+                selectedValues: eventStatuses,
+                onToggle: (value) =>
+                  setEventStatuses((current) =>
+                    toggleSetValue(current, value as EventStatus)
+                  ),
+              },
+              {
+                id: "registration-status-filter-heading",
+                label: "Registration status",
+                options: registrationStatusOptions,
+                selectedValues: registrationStatuses,
+                onToggle: (value) =>
+                  setRegistrationStatuses((current) =>
+                    toggleSetValue(current, value as RegistrationStatus)
+                  ),
+              },
+            ]}
+            onClear={() => {
+              setEventStatuses(new Set());
+              setRegistrationStatuses(new Set());
+            }}
+          />
+        </AdminDirectoryToolbar>
+
+        <AdminDirectoryTable
+          columns={eventColumns}
+          rows={filteredRows}
+          getRowKey={(row) => row.event.id}
+          getRowLabel={(row) => `View details for ${row.event.name}`}
+          onActivate={selectRow}
+          emptyMessage="No events match your search and filters."
+        />
+
+      </AdminDirectoryLayout>
 
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
