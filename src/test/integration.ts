@@ -71,8 +71,11 @@ export function createIntegrationClient(): IntegrationClient {
 /**
  * Tracks what a test created so it can be removed again.
  *
- * Rows are deleted newest first, so a child inserted after its parent goes
- * first and foreign keys stay satisfied.
+ * Purchases and registrations that point at a fixture event or user are
+ * deleted first, whoever created them. The tracked rows then go newest first,
+ * so a child inserted after its parent goes first and foreign keys stay
+ * satisfied. Anything else a test causes to be written must be passed to
+ * `track`.
  */
 export class Fixtures {
   readonly supabase: IntegrationClient;
@@ -149,8 +152,42 @@ export class Fixtures {
     return data;
   }
 
+  /**
+   * Deletes the rows the app's code and database functions write on a
+   * fixture's behalf, which a test never tracks: the purchase and registration
+   * behind a ticket. They pin their parents from both sides, as
+   * `purchases.event_id` restricts deleting the event and
+   * `event_registrations.user_id` blocks deleting the user, so no order of the
+   * tracked deletes alone could clear them.
+   */
+  private async deleteDependents(failures: unknown[]) {
+    const idsOf = (table: TableName) =>
+      this.rows.filter((row) => row.table === table).map((row) => row.id);
+    const eventIds = idsOf("events");
+    const userIds = idsOf("user_info");
+
+    for (const table of ["event_registrations", "purchases"] as const) {
+      if (eventIds.length > 0) {
+        const { error } = await this.supabase
+          .from(table)
+          .delete()
+          .in("event_id", eventIds);
+        if (error) failures.push(error);
+      }
+      if (userIds.length > 0) {
+        const { error } = await this.supabase
+          .from(table)
+          .delete()
+          .in("user_id", userIds);
+        if (error) failures.push(error);
+      }
+    }
+  }
+
   async cleanup() {
     const failures: unknown[] = [];
+
+    await this.deleteDependents(failures);
 
     for (const { table, id } of [...this.rows].reverse()) {
       // `from` is typed per table, so a union of tables leaves the column names
@@ -175,13 +212,19 @@ export class Fixtures {
     if (failures.length > 0) {
       throw new Error(
         `Fixture cleanup failed: ${failures
-          .map((failure) =>
-            failure instanceof Error ? failure.message : String(failure)
-          )
+          .map(describeFailure)
           .join("; ")}`
       );
     }
   }
+}
+
+/** PostgREST errors are plain objects, so `String()` alone prints nothing. */
+function describeFailure(failure: unknown): string {
+  if (failure && typeof failure === "object" && "message" in failure) {
+    return String(failure.message);
+  }
+  return String(failure);
 }
 
 /** Runs `fn` with a fresh fixture set and clears it up afterwards. */
