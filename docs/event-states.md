@@ -4,7 +4,7 @@ What admins and students see for an event, and where each state comes from.
 Columns refer to [schema-proposed.sql](schema-proposed.sql).
 
 Once someone registers, they stay registered: there is no cancelling or
-releasing a spot, and no withdrawn state.
+releasing a spot.
 
 ## Admin: event
 
@@ -22,17 +22,23 @@ stays Published and members keep their history.
 
 Only for events with `requires_application`.
 
-| State | Meaning | Next |
-| --- | --- | --- |
-| Submitted | Waiting for review | Accepted, Waitlisted, Rejected |
-| Waitlisted | Not yet; may be accepted later | Accepted, Rejected |
-| Accepted | Offered a spot until `offer_expires_at` | Registered, Offer expired, Rejected |
-| Rejected | Final | |
-| Registered | Accepted and has a ticket | |
-| Offer expired | Accepted, deadline passed, no ticket | Accepted again with a new deadline |
+`event_applications.status` has exactly four values:
 
-Submitted, Waitlisted, Accepted and Rejected are stored in `status`. Registered
-and Offer expired are worked out from the ticket and the deadline.
+| `status` | Meaning | Next |
+| --- | --- | --- |
+| `submitted` | Waiting for review | `accepted`, `waitlisted`, `rejected` |
+| `waitlisted` | Not yet; may be accepted later | `accepted`, `rejected` |
+| `accepted` | Offered a spot until `offer_expires_at` | `rejected` |
+| `rejected` | Final | |
+
+An `accepted` application is shown to admins as one of three states. These are
+not `status` values; they're worked out from the deadline and the ticket:
+
+| Shown as | When |
+| --- | --- |
+| Accepted | Before `offer_expires_at`, no ticket yet |
+| Registered | Has a ticket |
+| Offer expired | `offer_expires_at` has passed, no ticket |
 
 - Every accepted application has a deadline; the database rejects one without.
 - Waitlisted applicants are only moved to Accepted by an admin, never
@@ -43,28 +49,47 @@ and Offer expired are worked out from the ticket and the deadline.
 
 ## Students: event badge
 
-Each event shows one badge. Check these in order and use the first that applies.
+Every event card shows exactly one badge: the student's own badge if they have
+one, otherwise the event's availability badge. Once an event has ended, it shows
+"Checked in" or "Past" either way.
 
-1. **Event has ended:** "Checked in" if they attended, otherwise "Past".
-2. **Has a ticket:** "Checked in" once scanned, otherwise "Going".
-3. **Has an application:**
-   - Submitted → "Under review"
-   - Waitlisted → "Waitlisted"
-   - Accepted → "Register by Oct 20" (the offer deadline)
-   - Offer expired → "Offer expired"
-   - Rejected → "Not selected"
-4. **Otherwise, the event's availability:**
-   - Before `registration_opens_at` → "Opens Oct 12"
-   - After `registration_closes_at` → "Registration closed"
-   - No seats left → "Full"
-   - Otherwise → "Registration open"
+### The student's own badge
 
-| Color | Meaning | Badges |
-| --- | --- | --- |
-| Green | You're in, or you can act | Registration open, Going, Checked in |
-| Amber | Waiting on the club | Under review, Waitlisted |
-| Blue | Waiting on you | Register by Oct 20 |
-| Gray | Nothing to do | Opens Oct 12, Full, Registration closed, Past, Offer expired, Not selected |
+Shown once they've applied or registered.
+
+| Badge | Shown when |
+| --- | --- |
+| Under review | Their application is `submitted` |
+| Waitlisted | Their application is `waitlisted` |
+| Register by Oct 20 | Accepted, before the offer deadline, no ticket yet |
+| Offer expired | Accepted, but the deadline passed without registering |
+| Not selected | Their application is `rejected` |
+| Going | They have a ticket |
+| Checked in | Their ticket has been scanned |
+
+### Event availability badge
+
+Shown when they haven't applied or registered.
+
+| Badge | Shown when |
+| --- | --- |
+| Opens Oct 12 | Before `registration_opens_at` |
+| Registration open | Registration is open and seats are left |
+| Full | No seats left; can reopen if an offer expires |
+| Registration closed | After `registration_closes_at` |
+| Past | After `ends_at` |
+
+### When more than one applies
+
+Use the first rule that matches:
+
+1. The event has ended: "Checked in" if they attended, otherwise "Past".
+2. They have a ticket: "Checked in" or "Going".
+3. They have an application: its badge.
+4. Otherwise: the availability badge.
+
+So a student who's going to an event that has since filled up still sees
+"Going", not "Full".
 
 ## Seats
 
