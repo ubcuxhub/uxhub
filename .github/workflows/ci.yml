@@ -64,6 +64,13 @@ jobs:
       - name: Verify RLS policies
         run: pnpm test:rls
 
+      # Vitest against the same throwaway database. Lives here rather than in
+      # `verify` because that job starts no database. Each test tags its
+      # fixtures and deletes them afterwards, so this is safe to run after the
+      # RLS suite and would be safe on a seeded database too.
+      - name: Integration tests
+        run: pnpm test:integration
+
       # Square credentials are never exercised by the build; these placeholders
       # only satisfy the module-scope checks in src/lib/square/client.ts.
       - name: Build
