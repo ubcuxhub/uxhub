@@ -10,19 +10,20 @@ Tickets live in the Notion **Tickets** database on the Engineering page.
 - Data source: `collection://e4040300-2612-487e-b0d6-120641882a32`
 - Default template: `3bd2f9f0-9f18-80f7-9a46-dd79f7d02a41` (adds `## Acceptance Criteria` and `## Notes`)
 - Status options: `Backlog`, `Draft`, `Ready`, `Assigned`, `Completed`. Default to `Ready`.
-- Don't set `Assignee` or `Date assigned` unless asked (automation sets `Date assigned`).
 - Deadline: always the Wednesday of the week after the one the ticket is created in (weeks start
   Monday), e.g. created Fri Oct 9 or Mon Oct 5 → Wed Oct 14. Use another date only if the user gives one.
+- Assignee: set it when the user says who the ticket is for (find their ID with `notion-search`,
+  `query_type: "user"`), and set `Status` to `Assigned`. Never set `Date assigned` (automation does).
 
 ## Steps
 
 1. Search Notion for a ticket covering the same work; if one exists, mention it.
 2. `notion-create-pages` with parent `data_source_id`, `template_id`, `allow_async: false`, and properties:
-   `Name`, `Status`, `date:Deadline:start` (`YYYY-MM-DD`), `date:Deadline:is_datetime: 0`.
-   Pass `effort: "Small"` only if asked.
+   `Name`, `Status`, `date:Deadline:start` (`YYYY-MM-DD`), `date:Deadline:is_datetime: 0`, and
+   `Assignee` if known. Pass `effort: "Small"` only if asked.
 3. Fetch the page, then fill both sections with `notion-update-page` `update_content`, matching the
    template's existing text (e.g. `## Acceptance Criteria\n<empty-block/>\n## Notes`).
-4. Reply with the ticket ID (`UX-n`), link, status, and deadline.
+4. Reply with the ticket ID (`UX-n`), link, status, assignee, and deadline.
 
 ## Writing
 
