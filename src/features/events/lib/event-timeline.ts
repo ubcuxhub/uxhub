@@ -1,6 +1,6 @@
 import type { EventGroup } from "@/features/events/types";
-import type { EventRow } from "@/lib/supabase/models";
 import { formatEventDate } from "@/lib/date";
+import type { EventRow } from "@/lib/supabase/models";
 
 export function groupEventsByMonth(events: EventRow[]): EventGroup[] {
   const groups = new Map<string, EventGroup>();

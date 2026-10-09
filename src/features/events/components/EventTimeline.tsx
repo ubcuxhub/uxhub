@@ -1,6 +1,7 @@
 "use client";
 
 import { Calendar } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 
 import { Label } from "@/components/ui/label";
@@ -38,7 +39,6 @@ export function EventTimeline({
       </div>
 
       {displayedGroups.length === 0 ? (
-        // TODO: make empty state
         <p className="text-muted-foreground my-8">{emptyMessage}</p>
       ) : (
         <div className="mb-8">
@@ -82,14 +82,16 @@ function EventTimelineItem({ event }: { event: EventRow }) {
         </div>
       </div>
 
-      <div className="flex w-full min-w-0 self-start items-center justify-between gap-6 rounded-xl border p-4 sm:min-h-52 sm:px-5">
+      <Link
+        href={`/portal/events/${event.slug}`}
+        className="flex w-full min-w-0 self-start items-center justify-between gap-6 rounded-xl border p-4 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-52 sm:px-5"
+      >
         <div className="flex min-w-0 flex-col gap-5">
           <div className="flex flex-col gap-3">
             <h3 className="text-h3">{event.name}</h3>
             {location && <p>{location}</p>}
             {dateTime && <p>{dateTime}</p>}
           </div>
-          {/* TODO: status tag */}
         </div>
         <div className="size-20 shrink-0 overflow-hidden rounded-3xl bg-muted sm:size-40">
           {event.image_url ? (
@@ -105,7 +107,7 @@ function EventTimelineItem({ event }: { event: EventRow }) {
             </div>
           )}
         </div>
-      </div>
+      </Link>
     </div>
   );
 }

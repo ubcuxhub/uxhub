@@ -4,8 +4,8 @@ import type { EventRow } from "@/lib/supabase/models";
 
 import { groupEventsByMonth, splitEventsByDate } from "./event-timeline";
 
-const event = (id: string, start_date: string | null) => 
-({ id, start_date }) as EventRow;
+const event = (id: string, start_date: string | null) =>
+  ({ id, start_date }) as EventRow;
 
 describe("splitEventsByDate", () => {
   it("counts an event happening today as upcoming", () => {
