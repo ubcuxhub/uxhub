@@ -208,3 +208,7 @@ key, or Resend API key to client components.
 Reuse `src/components/ui` primitives and `src/components/shared` composites
 before adding new primitives. Follow the existing shadcn conventions and use
 design tokens from `src/app/globals.css` instead of duplicating one-off styles.
+
+## Epics, responsiblity, and timeline
+
+@docs/epics.md
