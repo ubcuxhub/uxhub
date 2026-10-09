@@ -1,120 +1,124 @@
 "use client";
 
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Spinner } from "@/components/ui/spinner";
-import type {
-  SearchOption,
-  SortOption,
-  UserRecord,
-} from "../types";
+import { ArrowDown, ArrowUp } from "lucide-react";
+
+import {
+  Select,
+  SelectItem,
+  SelectValue,
+} from "@/components/ui/select";
+import type { RoleAccess } from "@/lib/supabase/models";
 import { formatUserName } from "@/lib/user-name";
+import type { MembershipTypeOption, SortDirection, SortOption, UserRecord } from "../types";
+import { AdminDirectoryButton, AdminDirectorySelectTrigger, AdminDirectorySelectContent } from "./AdminDirectoryControls";
+import { AdminDirectoryFilters } from "./AdminDirectoryFilters";
+import { AdminDirectoryTable, type AdminDirectoryColumn } from "./AdminDirectoryTable";
+import { AdminDirectoryToolbar } from "./AdminDirectoryToolbar";
+import { AdminDirectoryLayout } from "./AdminDirectoryLayout";
+import { formatDirectoryFilterLabel } from "../lib/directory";
 
 interface UserDirectoryPanelProps {
   users: UserRecord[];
-  selectedUser: UserRecord | null;
-  isLoading: boolean;
-  error: string | null;
+  membershipTypes: MembershipTypeOption[];
   searchQuery: string;
-  searchOption: SearchOption;
   sortOption: SortOption;
+  sortDirection: SortDirection;
+  onSortDirectionToggle: () => void;
+  membershipFilter: Set<string>;
+  roleFilter: Set<RoleAccess>;
   onSearchQueryChange: (value: string) => void;
-  onSearchOptionChange: (value: SearchOption) => void;
   onSortOptionChange: (value: SortOption) => void;
-  onUserSelect: (user: UserRecord) => void;
+  onMembershipFilterToggle: (value: string) => void;
+  onRoleFilterToggle: (value: RoleAccess) => void;
+  onClearFilters: () => void;
+  onUserSelect: (user: UserRecord, element: HTMLTableRowElement) => void;
 }
+
+const userColumns: AdminDirectoryColumn<UserRecord>[] = [
+  { id: "first-name", header: "First Name", cellClassName: "font-medium", render: (user) => user.first_name },
+  { id: "last-name", header: "Last Name", cellClassName: "font-medium", render: (user) => user.last_name },
+  { id: "email", header: "Email", render: (user) => user.email },
+  { id: "tier", header: "Tier", render: (user) => user.membership_type_name ?? "No membership" },
+  { id: "role", header: "Role Access", cellClassName: "capitalize", render: (user) => user.role_access },
+  { id: "major", header: "Major", cellClassName: "max-w-64 whitespace-normal", render: (user) => user.major ?? "—" },
+];
 
 export function UserDirectoryPanel({
   users,
-  selectedUser,
-  isLoading,
-  error,
+  membershipTypes,
   searchQuery,
-  searchOption,
   sortOption,
+  sortDirection,
+  onSortDirectionToggle,
+  membershipFilter,
+  roleFilter,
   onSearchQueryChange,
-  onSearchOptionChange,
   onSortOptionChange,
+  onMembershipFilterToggle,
+  onRoleFilterToggle,
+  onClearFilters,
   onUserSelect,
 }: UserDirectoryPanelProps) {
   return (
-    <div className="w-1/2 border-r overflow-y-auto p-6">
-      <div className="space-y-4">
-        <div>
-          <h1 className="mb-2 text-h1 tracking-tight">
-            User Directory
-          </h1>
-          <p className="text-muted-foreground">
-            Search and manage all users
-          </p>
-        </div>
-
-        <div className="space-y-2">
-          <div className="flex gap-2">
-            <Input
-              placeholder={`Search by ${searchOption}...`}
-              value={searchQuery}
-              onChange={(e) => onSearchQueryChange(e.target.value)}
-              className="flex-1"
-            />
-            <select
-              value={searchOption}
-              onChange={(e) => onSearchOptionChange(e.target.value as SearchOption)}
-              className="rounded-md border border-input bg-background px-3 py-2 text-small"
-            >
-              <option value="name">Name</option>
-              <option value="email">Email</option>
-            </select>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <Label>Sort by:</Label>
-          <select
-            value={sortOption}
-            onChange={(e) => onSortOptionChange(e.target.value as SortOption)}
-            className="rounded-md border border-input bg-background px-3 py-2 text-small"
-          >
-            <option value="name">Name</option>
-            <option value="email">Email</option>
-          </select>
-        </div>
-
-        {isLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Spinner size="lg" />
-          </div>
-        ) : error ? (
-          <div className="text-center text-small text-destructive py-8">{error}</div>
-        ) : users.length === 0 ? (
-          <div className="text-center text-small text-muted-foreground py-8">
-            No users found
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {users.map((user) => (
-              <Card
-                key={user.email}
-                className={`cursor-pointer transition-colors ${
-                  selectedUser?.email === user.email
-                    ? "border-primary bg-muted"
-                    : "hover:bg-muted/50"
-                }`}
-                onClick={() => onUserSelect(user)}
-              >
-                <CardContent className="p-4">
-                  <div className="font-semibold">{formatUserName(user)}</div>
-                  <div className="text-small text-muted-foreground">{user.email}</div>
-                  {user.phone && (
-                    <div className="text-small text-muted-foreground">{user.phone}</div>
-                  )}
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+    <AdminDirectoryLayout>
+      <AdminDirectoryToolbar
+        searchQuery={searchQuery}
+        onSearchQueryChange={onSearchQueryChange}
+        placeholder="Search users by name or email..."
+        searchLabel="Search users by name or email"
+      >
+        <Select value={sortOption} onValueChange={(value) => onSortOptionChange(value as SortOption)}>
+          <AdminDirectorySelectTrigger aria-label="Sort by" className="sm:w-52">
+            <span className="flex gap-1">Sort by <SelectValue /></span>
+          </AdminDirectorySelectTrigger>
+          <AdminDirectorySelectContent>
+            <SelectItem value="name">Name</SelectItem>
+            <SelectItem value="created_at">Date created</SelectItem>
+          </AdminDirectorySelectContent>
+        </Select>
+        <AdminDirectoryButton
+          type="button"
+          onClick={onSortDirectionToggle}
+          aria-label={`Sort by ${sortOption === "name" ? "name" : "date created"} ${sortDirection === "ascending" ? "descending" : "ascending"}`}
+        >
+          {sortDirection === "ascending" ? "Ascending" : "Descending"}
+          {sortDirection === "ascending" ? <ArrowUp aria-hidden="true" /> : <ArrowDown aria-hidden="true" />}
+        </AdminDirectoryButton>
+        <AdminDirectoryFilters
+          groups={[
+            {
+              id: "user-membership-filter-heading",
+              label: "Membership Tier",
+              options: [
+                { value: "__none__", label: "No Membership" },
+                ...membershipTypes.map((membership) => ({ value: membership.id, label: formatDirectoryFilterLabel(membership.name) })),
+              ],
+              selectedValues: membershipFilter,
+              onToggle: onMembershipFilterToggle,
+            },
+            {
+              id: "user-role-filter-heading",
+              label: "Role Access",
+              options: [
+                { value: "basic", label: "Basic" },
+                { value: "admin", label: "Admin" },
+                { value: "manager", label: "Manager" },
+              ],
+              selectedValues: roleFilter,
+              onToggle: (value) => onRoleFilterToggle(value as RoleAccess),
+            },
+          ]}
+          onClear={onClearFilters}
+        />
+      </AdminDirectoryToolbar>
+      <AdminDirectoryTable
+        columns={userColumns}
+        rows={users}
+        getRowKey={(user) => user.id}
+        getRowLabel={(user) => `View details for ${formatUserName(user)}`}
+        onActivate={onUserSelect}
+        emptyMessage="No users match your search and filters."
+      />
+    </AdminDirectoryLayout>
   );
 }

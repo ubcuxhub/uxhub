@@ -148,9 +148,10 @@ export async function releasePurchaseConfirmationEmailClaim(
 
 export async function fetchPurchasesForUser(
   supabase: DbClient,
-  userId: string
+  userId: string,
+  limit?: number
 ): Promise<PurchaseWithDetails[]> {
-  const { data, error } = await supabase
+  let query = supabase
     .from(TABLES.purchases)
     .select(
       `
@@ -161,6 +162,9 @@ export async function fetchPurchasesForUser(
     )
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
+
+  if (limit !== undefined) query = query.limit(limit);
+  const { data, error } = await query;
 
   if (error) throw error;
   return (data ?? []) as PurchaseWithDetails[];

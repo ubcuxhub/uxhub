@@ -1,9 +1,17 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
+import { PageContainer } from "@/components/shared/PageContainer";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { useUser } from "@/lib/auth/user-context";
 import { UserDetailsPanel } from "@/features/admin/components/UserDetailsPanel";
 import {
@@ -11,7 +19,7 @@ import {
 } from "@/features/admin/components/UserDirectoryPanel";
 import {
   type MembershipTypeOption,
-  type SearchOption,
+  type SortDirection,
   type SortOption,
   type UserRecord,
 } from "@/features/admin/types";
@@ -21,6 +29,7 @@ import {
 } from "@/features/admin/actions";
 import { formatUserName } from "@/lib/user-name";
 import type { RoleAccess } from "@/lib/supabase/models";
+import { toggleSetValue } from "../lib/directory";
 
 interface AdminUsersManagerProps {
   initialUsers: UserRecord[];
@@ -37,42 +46,75 @@ export function AdminUsersManager({
   const { refreshUser } = useUser();
   const [users, setUsers] = useState<UserRecord[]>(initialUsers);
   const [selectedUser, setSelectedUser] = useState<UserRecord | null>(null);
+  const [open, setOpen] = useState(false);
+  const activatingRow = useRef<HTMLTableRowElement | null>(null);
+  const heading = useRef<HTMLHeadingElement | null>(null);
+  const [membershipFilter, setMembershipFilter] = useState<Set<string>>(new Set());
+  const [roleFilter, setRoleFilter] = useState<Set<RoleAccess>>(new Set());
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchOption, setSearchOption] = useState<SearchOption>("name");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("ascending");
   const [sortOption, setSortOption] = useState<SortOption>("name");
   const [editingField, setEditingField] = useState<string | null>(null);
   const [editValue, setEditValue] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
   const [pendingRole, setPendingRole] = useState<RoleAccess | null>(null);
   const [roleError, setRoleError] = useState<string | null>(null);
+  const directoryMembershipTypes = useMemo(() => {
+    // Editing offers active tiers only; filtering also includes historical tiers.
+    const options = new Map(membershipTypes.map((tier) => [tier.id, tier]));
+    for (const user of users) {
+      if (
+        user.membership_type_id &&
+        user.membership_type_name &&
+        !options.has(user.membership_type_id)
+      ) {
+        options.set(user.membership_type_id, {
+          id: user.membership_type_id,
+          name: user.membership_type_name,
+        });
+      }
+    }
+    return [...options.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [membershipTypes, users]);
   const filteredUsers = useMemo(() => {
-    let filtered = [...users];
+    let filtered = users.filter(
+      (user) =>
+        (membershipFilter.size === 0 ||
+          membershipFilter.has(user.membership_type_id ?? "__none__")) &&
+        (roleFilter.size === 0 || roleFilter.has(user.role_access))
+    );
 
     if (searchQuery.trim()) {
       filtered = filtered.filter((user) => {
-        const query = searchQuery.toLowerCase();
-        if (searchOption === "name") {
-          return formatUserName(user).toLowerCase().includes(query);
-        }
-        return user.email.toLowerCase().includes(query);
+        const query = searchQuery.trim().toLowerCase();
+        return (
+          formatUserName(user).toLowerCase().includes(query) ||
+          user.email.toLowerCase().includes(query)
+        );
       });
     }
 
     filtered.sort((a, b) => {
-      if (sortOption === "name") {
-        return (
-          a.last_name.localeCompare(b.last_name) ||
-          a.first_name.localeCompare(b.first_name)
-        );
+      const nameComparison =
+        a.last_name.localeCompare(b.last_name) ||
+        a.first_name.localeCompare(b.first_name);
+      let comparison = nameComparison;
+      if (sortOption === "created_at") {
+        if (!a.created_at && !b.created_at) return nameComparison;
+        if (!a.created_at) return 1;
+        if (!b.created_at) return -1;
+        comparison = Date.parse(a.created_at) - Date.parse(b.created_at);
       }
-      return a.email.localeCompare(b.email);
+      return sortDirection === "ascending" ? comparison : -comparison;
     });
 
     return filtered;
-  }, [users, searchQuery, searchOption, sortOption]);
+  }, [users, searchQuery, sortDirection, sortOption, membershipFilter, roleFilter]);
 
-  const handleUserSelect = (user: UserRecord) => {
+  const handleUserSelect = (user: UserRecord, element: HTMLTableRowElement) => {
+    activatingRow.current = element;
     setSelectedUser(user);
+    setOpen(true);
     setEditingField(null);
     setEditValue("");
   };
@@ -81,7 +123,7 @@ export function AdminUsersManager({
     field: string,
     currentValue: string | number | boolean | null
   ) => {
-    if (!canManageUsers) return;
+    if (!canManageUsers || isSaving) return;
     setEditingField(field);
     if (field === "membership_type_id") {
       setEditValue(currentValue?.toString() || "__none__");
@@ -96,7 +138,7 @@ export function AdminUsersManager({
   };
 
   const handleEditSave = async (field: string) => {
-    if (!selectedUser) return;
+    if (!selectedUser || !canManageUsers || isSaving) return;
 
     setIsSaving(true);
 
@@ -177,7 +219,10 @@ export function AdminUsersManager({
   };
 
   const handleRoleChangeRequest = (role: RoleAccess) => {
-    if (!canManageUsers || !selectedUser || role === selectedUser.role_access) {
+    if (
+      !canManageUsers || !selectedUser || isSaving ||
+      role === selectedUser.role_access
+    ) {
       return;
     }
 
@@ -214,33 +259,93 @@ export function AdminUsersManager({
   };
 
   return (
-    <div className="flex min-h-full overflow-hidden">
+    <PageContainer className="flex flex-col gap-8">
+      <header>
+        <h1
+          ref={heading}
+          tabIndex={-1}
+          className="mb-2 text-h1 tracking-tight"
+        >
+          User Directory
+        </h1>
+        <p className="text-muted-foreground">Search and manage all users</p>
+      </header>
       <UserDirectoryPanel
         users={filteredUsers}
-        selectedUser={selectedUser}
-        isLoading={false}
-        error={null}
+        membershipTypes={directoryMembershipTypes}
         searchQuery={searchQuery}
-        searchOption={searchOption}
         sortOption={sortOption}
+        sortDirection={sortDirection}
+        membershipFilter={membershipFilter}
+        roleFilter={roleFilter}
         onSearchQueryChange={setSearchQuery}
-        onSearchOptionChange={setSearchOption}
         onSortOptionChange={setSortOption}
+        onSortDirectionToggle={() =>
+          setSortDirection((current) => current === "ascending" ? "descending" : "ascending")
+        }
+        onMembershipFilterToggle={(value) =>
+          setMembershipFilter((current) => toggleSetValue(current, value))
+        }
+        onRoleFilterToggle={(value) =>
+          setRoleFilter((current) => toggleSetValue(current, value))
+        }
+        onClearFilters={() => {
+          setMembershipFilter(new Set());
+          setRoleFilter(new Set());
+        }}
         onUserSelect={handleUserSelect}
       />
-      <UserDetailsPanel
-        selectedUser={selectedUser}
-        editingField={editingField}
-        editValue={editValue}
-        isSaving={isSaving}
-        membershipTypes={membershipTypes}
-        canManageUsers={canManageUsers}
-        onEditStart={handleEditStart}
-        onEditCancel={handleEditCancel}
-        onEditSave={handleEditSave}
-        onValueChange={setEditValue}
-        onRoleChangeRequest={handleRoleChangeRequest}
-      />
+      <Dialog
+        open={open}
+        onOpenChange={(next) => {
+          if (isSaving || pendingRole !== null) return;
+          setOpen(next);
+          if (!next) handleEditCancel();
+        }}
+      >
+        <DialogContent
+          mobileFullscreen
+          closeDisabled={isSaving || pendingRole !== null}
+          className="flex flex-col sm:max-h-[90dvh] sm:max-w-2xl"
+          onEscapeKeyDown={(event) => {
+            if (isSaving || pendingRole !== null) event.preventDefault();
+          }}
+          onInteractOutside={(event) => {
+            if (isSaving || pendingRole !== null) event.preventDefault();
+          }}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            if (activatingRow.current?.isConnected) activatingRow.current.focus();
+            else heading.current?.focus();
+          }}
+        >
+          <DialogHeader className="shrink-0 border-b pb-5 pl-5 pr-16 pt-16 text-left sm:border-0 sm:p-0 sm:pr-10">
+            <DialogTitle>View User Info</DialogTitle>
+            <DialogDescription>
+              {canManageUsers
+                ? "View and edit user information"
+                : "View user information"}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 sm:px-0 sm:pb-0">
+            {open && selectedUser && (
+              <UserDetailsPanel
+                selectedUser={selectedUser}
+                editingField={editingField}
+                editValue={editValue}
+                isSaving={isSaving}
+                membershipTypes={membershipTypes}
+                canManageUsers={canManageUsers}
+                onEditStart={handleEditStart}
+                onEditCancel={handleEditCancel}
+                onEditSave={handleEditSave}
+                onValueChange={setEditValue}
+                onRoleChangeRequest={handleRoleChangeRequest}
+              />
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
       <ConfirmDialog
         open={pendingRole !== null}
         onOpenChange={(open) => {
@@ -262,6 +367,6 @@ export function AdminUsersManager({
         pending={isSaving}
         onConfirm={() => void handleRoleChangeConfirm()}
       />
-    </div>
+    </PageContainer>
   );
 }
