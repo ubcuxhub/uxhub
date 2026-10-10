@@ -1,6 +1,7 @@
 import {
   ResponseType,
   type ApplicationStatus,
+  type EventRow,
   type ResponseType as ResponseTypeValue,
 } from "@/lib/supabase/models";
 
@@ -25,4 +26,10 @@ export interface GroupedRegistration {
   applicationDate: string;
   status: ApplicationStatus;
   registrationId: string;
+}
+
+export interface EventGroup {
+  key: string;
+  label: string;
+  events: EventRow[];
 }

@@ -1,30 +1,32 @@
-import { ArrowUpRight } from "lucide-react";
-
 import { PageContainer } from "@/components/shared/PageContainer";
-import { Button } from "@/components/ui/button";
-import { LINKTREE_URL } from "@/lib/constants";
+import { EventTimeline } from "@/features/events/components/EventTimeline";
+import { EventsComingSoon } from "@/features/events/components/EventsComingSoon";
+import { groupEventsByMonth, splitEventsByDate } from "@/features/events/lib/event-timeline";
+import { getPacificStartDefaults } from "@/lib/date";
+import { FLAGS } from "@/lib/flags";
+import { createClient } from "@/lib/supabase/server";
+import { fetchEvents } from "@/lib/supabase-helpers/events";
 
-export default function PortalEvents() {
+export default async function PortalEvents() {
+  if (!FLAGS.studentEvents) return <EventsComingSoon />;
+
+  const supabase = await createClient();
+  const events = await fetchEvents(supabase, { orderBy: "start_date", status: "active" });
+
+  const today = getPacificStartDefaults().start_date;
+  const { upcomingEvents, pastEvents } = splitEventsByDate(events, today);
+
+  const upcomingEventGroups = groupEventsByMonth(upcomingEvents);
+  const pastEventGroups = groupEventsByMonth(pastEvents);
+
   return (
-    <PageContainer className="flex flex-1 flex-col items-center justify-center">
-      <div className="flex flex-col items-center gap-8 text-center">
-        <div className="flex flex-col gap-3">
-          <h1 className="text-h1 tracking-tight">
-            Events coming soon to the portal
-          </h1>
-          <p className="text-muted-foreground">
-            In the meantime, check out and register for our current events
-            through our Linktree.
-          </p>
-        </div>
+    <PageContainer>
+      <h1 className="mb-3 text-h1 tracking-tight">Events</h1>
 
-        <Button asChild>
-          <a href={LINKTREE_URL} target="_blank" rel="noopener noreferrer">
-            Go to our Linktree
-            <ArrowUpRight />
-          </a>
-        </Button>
-      </div>
+      <EventTimeline
+        upcomingEventGroups={upcomingEventGroups}
+        pastEventGroups={pastEventGroups}
+      />
     </PageContainer>
   );
 }
