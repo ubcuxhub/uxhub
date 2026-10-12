@@ -189,6 +189,8 @@ Local values belong in the git-ignored `.env.local`.
 - Sentry: `NEXT_PUBLIC_SENTRY_DSN` enables error reporting; leave it unset
   locally. Build-time `SENTRY_ORG`, `SENTRY_PROJECT`, and secret
   `SENTRY_AUTH_TOKEN` upload source maps on Vercel builds
+- Check-in: server-only `CHECK_IN_TOKEN_SECRET` signs ticket QR codes
+ (`src/lib/check-in-token.ts`); rotating it invalidates every issued ticket
 - Feature flags: `NEXT_PUBLIC_FEATURE_STUDENT_EVENTS` and
   `NEXT_PUBLIC_FEATURE_DARK_MODE` force a flag on or off; unset, both are on
   locally and on preview deploys and off in production (`src/lib/flags.ts`)
@@ -199,7 +201,7 @@ Local values belong in the git-ignored `.env.local`.
 only for production credentials.
 
 Never expose the Supabase secret keys, Square access token, webhook signature
-key, Resend API key, or Sentry auth token to client components.
+key, Resend API key, Sentry auth token, or check-in token secret to client components.
 
 ## Quality
 
