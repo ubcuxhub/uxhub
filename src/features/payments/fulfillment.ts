@@ -345,10 +345,17 @@ async function createSquarePaymentForMembership(
         updatedPurchase.status === "completed" ? "completed" : "processing",
     } as const;
   } catch (error) {
-    log.error("payment.membership_charge_failed", {
+    const chargeFields = {
       purchaseId: purchase.id,
       diagnostic: getSquareErrorDiagnostic(error),
-    });
+    };
+
+    // A decline is the buyer's card, not a bug, so it stays out of Sentry.
+    if (isDefinitiveSquareFailure(error)) {
+      log.warn("payment.membership_charge_declined", chargeFields);
+    } else {
+      log.error("payment.membership_charge_failed", chargeFields);
+    }
 
     if (isDefinitiveSquareFailure(error)) {
       await updatePurchase(adminDb, purchase.id, {
@@ -489,10 +496,17 @@ async function createSquarePaymentForEventTicket(
         updatedPurchase.status === "completed" ? "completed" : "processing",
     } as const;
   } catch (error) {
-    log.error("payment.ticket_charge_failed", {
+    const chargeFields = {
       purchaseId: purchase.id,
       diagnostic: getSquareErrorDiagnostic(error),
-    });
+    };
+
+    // A decline is the buyer's card, not a bug, so it stays out of Sentry.
+    if (isDefinitiveSquareFailure(error)) {
+      log.warn("payment.ticket_charge_declined", chargeFields);
+    } else {
+      log.error("payment.ticket_charge_failed", chargeFields);
+    }
 
     const purchaseRecord = await fetchPurchaseById(adminDb, purchase.id);
     const paymentId = purchaseRecord?.square_payment_id ?? null;
