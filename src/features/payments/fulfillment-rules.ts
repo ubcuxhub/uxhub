@@ -187,12 +187,13 @@ export function isDefinitiveSquareFailure(error: unknown) {
 
 /**
  * The buyer-facing message is stored on the purchase, so keep the raw Square
- * codes for the server log.
+ * codes for the server log. Free text (Square's `detail`, an error message) is
+ * left out: logs also reach Sentry, and a message can quote request or row data.
  */
 export function getSquareErrorDiagnostic(error: unknown) {
   if (error instanceof SquareError) {
     const codes = error.errors
-      .map((entry) => `${entry.code} (${entry.category}): ${entry.detail ?? ""}`)
+      .map((entry) => `${entry.code} (${entry.category})`)
       .join("; ");
     const cvv = readCardDetail(error.body, "cvv_status");
     const avs = readCardDetail(error.body, "avs_status");
@@ -201,12 +202,18 @@ export function getSquareErrorDiagnostic(error: unknown) {
       avs ? `avs=${avs}` : null,
     ].filter(Boolean);
 
-    return [codes || error.message, verification.join(" ")]
+    return [codes || error.name, verification.join(" ")]
       .filter(Boolean)
       .join(" | ");
   }
 
-  return error instanceof Error ? error.message : String(error);
+  if (error instanceof Error) {
+    const code = (error as Error & { code?: unknown }).code;
+
+    return typeof code === "string" ? `${error.name} ${code}` : error.name;
+  }
+
+  return typeof error;
 }
 
 export function formatReservationFailure(reason: string | null | undefined) {

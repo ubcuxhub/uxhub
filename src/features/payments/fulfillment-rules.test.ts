@@ -149,8 +149,19 @@ describe("payment fulfillment rules", () => {
     });
 
     expect(getSquareErrorDiagnostic(error)).toBe(
-      "GENERIC_DECLINE (PAYMENT_METHOD_ERROR): Authorization error: 'GENERIC_DECLINE' | cvv=CVV_REJECTED avs=AVS_ACCEPTED"
+      "GENERIC_DECLINE (PAYMENT_METHOD_ERROR) | cvv=CVV_REJECTED avs=AVS_ACCEPTED"
     );
+  });
+
+  it("leaves error messages out of the diagnostic", () => {
+    const networkError = Object.assign(new TypeError("fetch failed: pur_1"), {
+      code: "ECONNRESET",
+    });
+
+    expect(getSquareErrorDiagnostic(squareError([]))).toBe("SquareError");
+    expect(getSquareErrorDiagnostic(networkError)).toBe("TypeError ECONNRESET");
+    expect(getSquareErrorDiagnostic(new Error("row data"))).toBe("Error");
+    expect(getSquareErrorDiagnostic("boom")).toBe("string");
   });
 
   it("uses ordinary error messages and falls back for unknown values", () => {

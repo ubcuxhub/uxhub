@@ -1,5 +1,7 @@
 import "server-only";
 
+import * as Sentry from "@sentry/nextjs";
+
 /**
  * Structured server-side logging.
  *
@@ -10,6 +12,9 @@ import "server-only";
  * database response object is a type error, which forces every call site to
  * decide what is safe to record. Use `errorFields` to include an error, and
  * identify records by id — never by email, name, or student number.
+ *
+ * `error` also reports to Sentry, which alerts on it. Log expected failures,
+ * such as card declines, at `warn`.
  */
 
 type Fields = Record<string, string | number | boolean | null>;
@@ -28,6 +33,16 @@ function emit(level: Level, event: string, fields?: Fields) {
       ? JSON.stringify(line)
       : `${level} ${event} ${fields ? JSON.stringify(fields) : ""}`.trimEnd()
   );
+
+  if (level === "error") {
+    // One issue per event name, taggable by alert rules (`event:payment.*`).
+    Sentry.captureMessage(event, {
+      level: "error",
+      fingerprint: [event],
+      tags: { event },
+      extra: fields,
+    });
+  }
 }
 
 export const log = {
