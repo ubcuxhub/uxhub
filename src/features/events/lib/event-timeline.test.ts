@@ -4,8 +4,8 @@ import type { EventRow } from "@/lib/supabase/models";
 
 import { groupEventsByMonth, splitEventsByDate } from "./event-timeline";
 
-const event = (id: string, start_date: string | null) =>
-  ({ id, start_date }) as EventRow;
+const event = (id: string, start_date: string | null, end_date: string | null = null) =>
+  ({ id, start_date, end_date }) as EventRow;
 
 describe("splitEventsByDate", () => {
   it("counts an event happening today as upcoming", () => {
@@ -22,6 +22,20 @@ describe("splitEventsByDate", () => {
   it("skips events without a date", () => {
     const { upcomingEvents, pastEvents } = splitEventsByDate([event("a", null)], "2026-10-06");
     expect([...upcomingEvents, ...pastEvents]).toEqual([]);
+  });
+
+  it("counts a multi-day even currently happening as upcoming", () => {
+    const events = [event("multi-day", "2026-10-01", "2026-10-03")];
+    const { upcomingEvents, pastEvents } = splitEventsByDate(events, "2026-10-02");
+    expect(upcomingEvents.map((e) => e.id)).toEqual(["multi-day"]);
+    expect(pastEvents).toEqual([]);
+  });
+
+  it("considers an event's end date when determining if it is past or upcoming", () => {
+    const events = [event("multi-day", "2026-10-01", "2026-10-03")];
+    const { upcomingEvents, pastEvents } = splitEventsByDate(events, "2026-10-04");
+    expect(upcomingEvents).toEqual([]);
+    expect(pastEvents.map((e) => e.id)).toEqual(["multi-day"]);
   });
 });
 

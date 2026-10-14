@@ -27,7 +27,7 @@ export function groupEventsByMonth(events: EventRow[]): EventGroup[] {
 
 export function splitEventsByDate(events: EventRow[], today: string) {
   return {
-    upcomingEvents: events.filter((e) => e.start_date && e.start_date >= today),
-    pastEvents: events.filter((e) => e.start_date && e.start_date < today).reverse(),
+    upcomingEvents: events.filter((e) => e.start_date && (e.end_date ?? e.start_date) >= today),
+    pastEvents: events.filter((e) => e.start_date && (e.end_date ?? e.start_date) < today).reverse(),
   };
 }
