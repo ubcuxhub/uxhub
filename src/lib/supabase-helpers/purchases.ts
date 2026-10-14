@@ -210,3 +210,19 @@ export async function recordSquareWebhookEvent(
 
   throw error;
 }
+
+/**
+ * Undoes `recordSquareWebhookEvent` after processing fails, so Square's retry
+ * of the same event is processed instead of discarded as a duplicate.
+ */
+export async function forgetSquareWebhookEvent(
+  supabase: DbClient,
+  eventId: string
+): Promise<void> {
+  const { error } = await supabase
+    .from(TABLES.squareWebhookEvents)
+    .delete()
+    .eq("event_id", eventId);
+
+  if (error) throw error;
+}
