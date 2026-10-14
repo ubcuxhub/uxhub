@@ -146,6 +146,11 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
   identify records by id, and pass errors through `errorFields` so a message can
   never carry row data. An eslint rule keeps `console` out of `src/**/*.ts`;
   client components use `console` directly.
+- `log.error` also reports to Sentry, which alerts on it, so log expected
+  failures (card declines, validation) at `warn`. Sentry setup lives in
+  `src/lib/sentry.ts`, and both runtimes scrub events before sending: the
+  server drops exception messages, since a rethrown Supabase error can quote row
+  data, and both drop query strings, request bodies, and cookies.
 
 ## Database Changes
 
@@ -181,6 +186,9 @@ Local values belong in the git-ignored `.env.local`.
   `SQUARE_WEBHOOK_ENDPOINTS`, comma-separated: Square signs each delivery with
   that subscription's own key over its own registered URL
 - Email: server-only `RESEND_API_KEY`, and `EMAIL_FROM`
+- Sentry: `NEXT_PUBLIC_SENTRY_DSN` enables error reporting; leave it unset
+  locally. Build-time `SENTRY_ORG`, `SENTRY_PROJECT`, and secret
+  `SENTRY_AUTH_TOKEN` upload source maps on Vercel builds
 - Feature flags: `NEXT_PUBLIC_FEATURE_STUDENT_EVENTS` and
   `NEXT_PUBLIC_FEATURE_DARK_MODE` force a flag on or off; unset, both are on
   locally and on preview deploys and off in production (`src/lib/flags.ts`)
@@ -191,7 +199,7 @@ Local values belong in the git-ignored `.env.local`.
 only for production credentials.
 
 Never expose the Supabase secret keys, Square access token, webhook signature
-key, or Resend API key to client components.
+key, Resend API key, or Sentry auth token to client components.
 
 ## Quality
 

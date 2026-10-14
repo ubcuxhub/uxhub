@@ -1,5 +1,6 @@
 "use client";
 
+import * as Sentry from "@sentry/nextjs";
 import { useEffect } from "react";
 
 import { PageContainer } from "@/components/shared/PageContainer";
@@ -9,6 +10,9 @@ import { Button } from "@/components/ui/button";
 // exists, a throw inside it would otherwise escape to the framework default.
 // redirect() and notFound() are re-thrown past this (NEXT_REDIRECT /
 // NEXT_NOT_FOUND), so the guards in src/lib/auth/guards.ts still work.
+//
+// A server error arrives here as a digest only, already reported (scrubbed) by
+// `onRequestError` in src/instrumentation.ts; this reports client-side crashes.
 export default function ShellError({
   error,
   reset,
@@ -17,7 +21,7 @@ export default function ShellError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error(error);
+    Sentry.captureException(error);
   }, [error]);
 
   return (

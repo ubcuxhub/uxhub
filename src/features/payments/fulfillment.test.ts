@@ -93,6 +93,13 @@ const revalidationMocks = vi.hoisted(() => ({
 }));
 vi.mock("./revalidation", () => revalidationMocks);
 
+const logMocks = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+}));
+vi.mock("@/lib/log", () => ({ log: logMocks }));
+
 // fulfillment-rules is left real: it is what actually parses Square's error
 // shape, and a mock here would hide the exact regression a Square SDK bump
 // would introduce.
@@ -269,6 +276,12 @@ describe("event ticket checkout", () => {
       "purchase-1",
       expect.objectContaining({ status: "failed" })
     );
+    // A decline is expected, so it is a warning and never reaches Sentry.
+    expect(logMocks.warn).toHaveBeenCalledWith("payment.ticket_charge_declined", {
+      purchaseId: "purchase-1",
+      diagnostic: "CARD_DECLINED (PAYMENT_METHOD_ERROR)",
+    });
+    expect(logMocks.error).not.toHaveBeenCalled();
   });
 
   it("leaves an ambiguous failure as processing without canceling or releasing the seat", async () => {
@@ -289,6 +302,11 @@ describe("event ticket checkout", () => {
       "release_paid_event_ticket_reservation",
       expect.anything()
     );
+    // The money state is unclear, so this one alerts.
+    expect(logMocks.error).toHaveBeenCalledWith("payment.ticket_charge_failed", {
+      purchaseId: "purchase-1",
+      diagnostic: "GATEWAY_TIMEOUT (API_ERROR)",
+    });
   });
 
   it("charges members the member price", async () => {
@@ -358,6 +376,21 @@ describe("idempotent retries", () => {
 });
 
 describe("membership fulfillment", () => {
+  it("logs a declined membership charge as a warning, not an error", async () => {
+    squareMocks.create.mockRejectedValue(
+      squareError([{ category: "PAYMENT_METHOD_ERROR", code: "CVV_FAILURE" }])
+    );
+
+    const result = await executeCheckoutForUser(user, membershipInput);
+
+    expect(result).toMatchObject({ ok: false, terminal: true });
+    expect(logMocks.warn).toHaveBeenCalledWith(
+      "payment.membership_charge_declined",
+      { purchaseId: "purchase-1", diagnostic: "CVV_FAILURE (PAYMENT_METHOD_ERROR)" }
+    );
+    expect(logMocks.error).not.toHaveBeenCalled();
+  });
+
   it("stamps the expiry and clears the pre-order on a completed membership purchase", async () => {
     squareMocks.create.mockResolvedValue({
       payment: { id: "payment-1", customerId: "customer-1", status: "COMPLETED" },
