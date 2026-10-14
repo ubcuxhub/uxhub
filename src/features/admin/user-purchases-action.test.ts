@@ -41,7 +41,7 @@ describe("fetchAdminUserPurchasesAction", () => {
     mocks.requireAdmin.mockResolvedValue({ role_access });
     mocks.fetchPurchasesForUser.mockResolvedValue([
       {
-        id: "purchase-1", kind: "membership", membership_types: { name: "Innovator" },
+        id: "purchase-1", kind: "membership", membership_types: { name: "nonUbc" },
         amount_cents: 1500, currency: "CAD", status: "completed", created_at: "2026-10-01",
         square_payment_id: "private-payment-id", square_customer_id: "private-customer-id", failure_reason: "private-error",
       },
@@ -51,7 +51,7 @@ describe("fetchAdminUserPurchasesAction", () => {
       },
     ]);
     await expect(fetchAdminUserPurchasesAction("user-1")).resolves.toEqual([
-      { id: "purchase-1", title: "Innovator", kind: "membership", amount_cents: 1500, currency: "CAD", status: "completed", created_at: "2026-10-01" },
+      { id: "purchase-1", title: "Non UBC", kind: "membership", amount_cents: 1500, currency: "CAD", status: "completed", created_at: "2026-10-01" },
       { id: "purchase-2", title: "Event ticket", kind: "event_ticket", amount_cents: 500, currency: "CAD", status: "failed", created_at: null },
     ]);
     expect(mocks.fetchPurchasesForUser).toHaveBeenCalledWith(client, "user-1", 5);

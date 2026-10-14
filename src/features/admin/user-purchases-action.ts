@@ -1,5 +1,6 @@
 "use server";
 
+import { formatMembershipTypeName } from "@/features/memberships/lib/display";
 import { requireAdmin } from "@/lib/auth/guards";
 import { errorFields, log } from "@/lib/log";
 import { createClient } from "@/lib/supabase/server";
@@ -19,7 +20,9 @@ export async function fetchAdminUserPurchasesAction(
       id: purchase.id,
       title:
         purchase.kind === "membership"
-          ? purchase.membership_types?.name || "Membership purchase"
+          ? purchase.membership_types?.name
+            ? formatMembershipTypeName(purchase.membership_types.name)
+            : "Membership purchase"
           : purchase.events?.name || "Event ticket",
       kind: purchase.kind,
       amount_cents: purchase.amount_cents,

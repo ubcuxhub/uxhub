@@ -125,7 +125,7 @@ describe("AdminUsersManager", () => {
     expect(rowNames()).toEqual(["View details for Iris Chan", "View details for Dora Hu"]);
   });
 
-  it("title-cases membership filter labels without changing their values", () => {
+  it("formats membership tier and filter labels without changing their values", () => {
     render(
       <AdminUsersManager
         initialUsers={[user({ membership_type_id: "non-ubc", membership_type_name: "nonUbc" })]}
@@ -135,7 +135,8 @@ describe("AdminUsersManager", () => {
     );
     fireEvent.click(screen.getByRole("button", { name: "Filters" }));
     expect(screen.getByRole("checkbox", { name: "Explorer" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("checkbox", { name: "Non Ubc" }));
+    expect(screen.getByRole("cell", { name: "Non UBC" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("checkbox", { name: "Non UBC" }));
     expect(rowNames()).toEqual(["View details for Dora Hu"]);
     expect(screen.getByRole("button", { name: "Filters 1" })).toBeTruthy();
   });

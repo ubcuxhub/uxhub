@@ -328,7 +328,7 @@ export function AdminUsersManager({
             </DialogDescription>
           </DialogHeader>
           <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 sm:px-0 sm:pb-0">
-            {open && selectedUser && (
+            {selectedUser && (
               <UserDetailsPanel
                 selectedUser={selectedUser}
                 editingField={editingField}

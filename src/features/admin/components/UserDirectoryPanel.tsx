@@ -15,7 +15,7 @@ import { AdminDirectoryFilters } from "./AdminDirectoryFilters";
 import { AdminDirectoryTable, type AdminDirectoryColumn } from "./AdminDirectoryTable";
 import { AdminDirectoryToolbar } from "./AdminDirectoryToolbar";
 import { AdminDirectoryLayout } from "./AdminDirectoryLayout";
-import { formatDirectoryFilterLabel } from "../lib/directory";
+import { formatMembershipTypeName } from "@/features/memberships/lib/display";
 
 interface UserDirectoryPanelProps {
   users: UserRecord[];
@@ -38,7 +38,7 @@ const userColumns: AdminDirectoryColumn<UserRecord>[] = [
   { id: "first-name", header: "First Name", cellClassName: "font-medium", render: (user) => user.first_name },
   { id: "last-name", header: "Last Name", cellClassName: "font-medium", render: (user) => user.last_name },
   { id: "email", header: "Email", render: (user) => user.email },
-  { id: "tier", header: "Tier", render: (user) => user.membership_type_name ?? "No membership" },
+  { id: "tier", header: "Tier", render: (user) => user.membership_type_name != null ? formatMembershipTypeName(user.membership_type_name) : "No membership" },
   { id: "role", header: "Role Access", cellClassName: "capitalize", render: (user) => user.role_access },
   { id: "major", header: "Major", cellClassName: "max-w-64 whitespace-normal", render: (user) => user.major ?? "—" },
 ];
@@ -91,7 +91,7 @@ export function UserDirectoryPanel({
               label: "Membership Tier",
               options: [
                 { value: "__none__", label: "No Membership" },
-                ...membershipTypes.map((membership) => ({ value: membership.id, label: formatDirectoryFilterLabel(membership.name) })),
+                ...membershipTypes.map((membership) => ({ value: membership.id, label: formatMembershipTypeName(membership.name) })),
               ],
               selectedValues: membershipFilter,
               onToggle: onMembershipFilterToggle,
