@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { formatMembershipTypeName } from "@/features/memberships/lib/display";
 import type { MembershipTypeOption } from "../types";
 
 interface MembershipTypeFieldProps {
@@ -51,7 +52,7 @@ export function MembershipTypeField({
               <SelectItem value="__none__">None</SelectItem>
               {membershipTypes.map((membershipType) => (
                 <SelectItem key={membershipType.id} value={membershipType.id}>
-                  {membershipType.name}
+                  {formatMembershipTypeName(membershipType.name)}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -68,7 +69,7 @@ export function MembershipTypeField({
         </div>
       ) : (
         <div className="flex items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-small">
-          <span className={!value ? "text-muted-foreground" : ""}>{value || "None"}</span>
+          <span className={!value ? "text-muted-foreground" : ""}>{value ? formatMembershipTypeName(value) : "None"}</span>
           {canEdit && (
             <Button
               variant="ghost"
