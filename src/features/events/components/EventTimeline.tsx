@@ -9,7 +9,7 @@ import { Switch } from "@/components/ui/switch";
 import { formatEventDate, formatEventTime } from "@/lib/date";
 import { resolveImagePreviewSrc } from "@/lib/event-image";
 import type { EventRow } from "@/lib/supabase/models";
-import { groupEventsByMonth } from "@/features/events/lib/event-timeline";
+import { groupEventsByMonth, normalizeString } from "@/features/events/lib/event-timeline";
 import { Input } from "@/components/ui/input";
 
 interface EventTimelineProps {
@@ -26,10 +26,6 @@ export function EventTimeline({
 
   const displayedEvents = showPastEvents ? pastEvents : upcomingEvents;
   const emptyMessage = showPastEvents ? "No past events." : "No events scheduled yet.";
-  
-  const normalizeString = (str: string | undefined) => {
-    return (str ? str.trim().toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "") : "");
-  }
 
   // filter events based on search query
   const query = normalizeString(searchQuery);
