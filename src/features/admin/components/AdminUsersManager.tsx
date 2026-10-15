@@ -2,13 +2,14 @@
 
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
+import { Check, Pencil } from "lucide-react";
 
+import { Button } from "@/components/ui/button";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -48,6 +49,7 @@ export function AdminUsersManager({
   const [users, setUsers] = useState<UserRecord[]>(initialUsers);
   const [selectedUser, setSelectedUser] = useState<UserRecord | null>(null);
   const [open, setOpen] = useState(false);
+  const [editMode, setEditMode] = useState(false);
   const activatingRow = useRef<HTMLTableRowElement | null>(null);
   const heading = useRef<HTMLHeadingElement | null>(null);
   const [membershipFilter, setMembershipFilter] = useState<Set<string>>(new Set());
@@ -121,6 +123,7 @@ export function AdminUsersManager({
     activatingRow.current = element;
     setSelectedUser(user);
     setOpen(true);
+    setEditMode(false);
     setEditingField(null);
     setEditValue("");
   };
@@ -314,6 +317,7 @@ export function AdminUsersManager({
         }}
       >
         <DialogContent
+          aria-describedby={undefined}
           mobileFullscreen
           closeDisabled={isSaving || pendingRole !== null}
           className="flex flex-col sm:max-h-[90dvh] sm:max-w-2xl"
@@ -329,13 +333,10 @@ export function AdminUsersManager({
             else heading.current?.focus();
           }}
         >
-          <DialogHeader className="shrink-0 border-b pb-5 pl-5 pr-16 pt-16 text-left sm:border-0 sm:p-0 sm:pr-10">
-            <DialogTitle>View User Info</DialogTitle>
-            <DialogDescription>
-              {canManageUsers
-                ? "View and edit user information"
-                : "View user information"}
-            </DialogDescription>
+          <DialogHeader className="shrink-0 space-y-0 border-b pb-5 pl-5 pr-16 pt-16 text-left sm:border-0 sm:p-0 sm:pr-10">
+            <DialogTitle asChild className="text-h1">
+              <h1>User Information</h1>
+            </DialogTitle>
           </DialogHeader>
           <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 sm:px-0 sm:pb-0">
             {selectedUser && (
@@ -350,6 +351,25 @@ export function AdminUsersManager({
                 isSaving={isSaving}
                 membershipTypes={membershipTypes}
                 canManageUsers={canManageUsers}
+                editMode={editMode}
+                headerAction={canManageUsers ? (
+                  <Button
+                    type="button"
+                    variant={editMode ? "secondary" : "outline"}
+                    size="icon"
+                    className="rounded-full"
+                    aria-label={editMode ? "Done editing" : "Edit User"}
+                    title={editMode ? "Done editing" : "Edit User"}
+                    aria-pressed={editMode}
+                    disabled={isSaving || pendingRole !== null}
+                    onClick={() => {
+                      handleEditCancel();
+                      setEditMode((current) => !current);
+                    }}
+                  >
+                    {editMode ? <Check className="text-success" aria-hidden="true" /> : <Pencil aria-hidden="true" />}
+                  </Button>
+                ) : undefined}
                 onEditStart={handleEditStart}
                 onEditCancel={handleEditCancel}
                 onEditSave={handleEditSave}

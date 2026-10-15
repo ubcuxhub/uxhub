@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { UserRound, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
@@ -33,7 +34,15 @@ export function UserProfileSection({ section, user, verifierName, canEdit, busy,
   const [error, setError] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [previousCanEdit, setPreviousCanEdit] = useState(canEdit);
   const fileInput = useRef<HTMLInputElement>(null);
+  if (previousCanEdit !== canEdit) {
+    setPreviousCanEdit(canEdit);
+    setEditing(false);
+    setFile(null);
+    setPreview(null);
+    setError(null);
+  }
   useEffect(() => {
     return () => { if (preview) URL.revokeObjectURL(preview); };
   }, [preview]);
@@ -129,7 +138,15 @@ export function UserProfileSection({ section, user, verifierName, canEdit, busy,
       <h3 className="text-small font-medium">{section === "birthday" ? "Birthday" : "Interests"}</h3>
       {editing ? <>
         {section === "birthday" ? <Input aria-label="Birthday" type="date" value={draft} max={new Date().toISOString().slice(0, 10)} disabled={busy} onChange={(event) => setDraft(event.target.value)} /> : <>
-          <div className="flex flex-wrap gap-2">{tags.map((tag) => <Button key={tag} variant="outline" disabled={busy} aria-label={`Remove interest ${tag}`} onClick={() => setTags(tags.filter((item) => item !== tag))}>{tag}<X className="size-3" /></Button>)}</div>
+          <div className="flex flex-wrap gap-3">{tags.map((tag) => (
+            <InterestTag key={tag} tag={tag}>
+              <button type="button" disabled={busy} aria-label={`Remove interest ${tag}`}
+                className="rounded-sm p-1 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+                onClick={() => setTags(tags.filter((item) => item !== tag))}>
+                <X className="size-3" aria-hidden="true" />
+              </button>
+            </InterestTag>
+          ))}</div>
           <div className="flex gap-2">
             <Input aria-label="New interest" value={draft} maxLength={50} disabled={busy} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => {
               if (event.key === "Enter") { event.preventDefault(); try { addTag(); setError(null); } catch (cause) { setError((cause as Error).message); } }
@@ -139,14 +156,27 @@ export function UserProfileSection({ section, user, verifierName, canEdit, busy,
           <p className="text-small text-muted-foreground">Up to 20 tags, 50 characters each.</p>
         </>}
         {controls(async () => section === "birthday" ? saveUserBirthDateAction(user.id, draft || null) : saveUserInterestsAction(user.id, addTag()))}
-      </> : <div className="flex items-center justify-between gap-2 rounded-md border border-input px-3 py-2 text-small">
-        <span>{section === "birthday" ? user.birth_date || "—" : user.interests.join(", ") || "—"}</span>
+      </> : <div className={section === "interests" ? "flex items-start justify-between gap-3 text-small" : "flex items-center justify-between gap-2 rounded-md border border-input px-3 py-2 text-small"}>
+        {section === "interests" ? (
+          <div className="flex min-w-0 flex-wrap gap-3">
+            {user.interests.length ? user.interests.map((tag) => <InterestTag key={tag} tag={tag} />) : <span className="text-muted-foreground">—</span>}
+          </div>
+        ) : <span>{user.birth_date || "—"}</span>}
         {canEdit && <Button variant="ghost" className="h-6 px-2" disabled={busy} onClick={() => {
           setDraft(section === "birthday" ? user.birth_date ?? "" : ""); setTags(user.interests); setError(null); setEditing(true);
         }}>Edit</Button>}
       </div>}
       {errorMessage}
     </section>
+  );
+}
+
+function InterestTag({ tag, children }: { tag: string; children?: ReactNode }) {
+  return (
+    <Badge variant="outline" className="min-h-8 max-w-full gap-1 rounded-lg bg-muted px-4 py-1.5 text-muted-foreground">
+      <span className="min-w-0 break-words">{tag}</span>
+      {children}
+    </Badge>
   );
 }
 

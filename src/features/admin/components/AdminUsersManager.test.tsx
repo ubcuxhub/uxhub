@@ -72,16 +72,21 @@ function chooseSelect(label: string, option: string) {
   fireEvent.keyDown(screen.getByRole("combobox", { name: label }), { key: "Enter" });
   fireEvent.click(screen.getByRole("option", { name: option }));
 }
-function modal() { return screen.getByRole("dialog", { name: "View User Info" }); }
+function modal() { return screen.getByRole("dialog", { name: "User Information" }); }
 function field(label: string) {
   return within(modal()).getByText(label).parentElement!;
 }
+function enableEditing() {
+  const button = within(modal()).queryByRole("button", { name: "Edit User" });
+  if (button) fireEvent.click(button);
+}
 function startEdit(label: string) {
+  enableEditing();
   fireEvent.click(within(field(label)).getByRole("button", { name: "Edit" }));
 }
 async function closeModal() {
   fireEvent.click(within(modal()).getByRole("button", { name: "Close" }));
-  await waitFor(() => expect(screen.queryByRole("dialog", { name: "View User Info" })).toBeNull());
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "User Information" })).toBeNull());
 }
 
 describe("AdminUsersManager", () => {
@@ -183,6 +188,7 @@ describe("AdminUsersManager", () => {
     expect(within(modal()).queryByText("Under Construction")).toBeNull();
     expect(within(modal()).queryByRole("button", { name: "Verify student" })).toBeNull();
     expect(within(modal()).queryByRole("button", { name: "Edit" })).toBeNull();
+    expect(within(modal()).queryByRole("button", { name: "Edit User" })).toBeNull();
     await closeModal();
     await waitFor(() => expect(document.activeElement).toBe(row));
   });
@@ -221,6 +227,7 @@ describe("AdminUsersManager", () => {
   it("requires role confirmation and keeps the user modal open after updating", async () => {
     renderManager(true);
     fireEvent.click(screen.getByRole("button", { name: "View details for Iris Chan" }));
+    enableEditing();
     chooseSelect("Role Access", "Manager");
     const confirmation = screen.getByRole("dialog", { name: "Change role access?" });
     expect(within(confirmation).getByText("Change Iris Chan from admin to manager?")).toBeTruthy();
@@ -240,6 +247,7 @@ describe("AdminUsersManager", () => {
     renderManager(true);
     fireEvent.click(screen.getByRole("button", { name: "View details for Iris Chan" }));
     const userDialog = modal();
+    enableEditing();
     chooseSelect("Role Access", "Manager");
     const confirmation = screen.getByRole("dialog", { name: "Change role access?" });
     expect((userDialog.querySelector('button[aria-label="Close"]') as HTMLButtonElement).disabled).toBe(true);
@@ -279,6 +287,45 @@ describe("AdminUsersManager", () => {
 
 
 describe("admin user profile controls", () => {
+  it("starts in view mode, gates editing, and discards drafts when editing ends", async () => {
+    renderManager(true);
+    fireEvent.click(screen.getByRole("button", { name: "View details for Dora Hu" }));
+    expect(within(modal()).getByRole("heading", { name: "User Information", level: 1 })).toBeTruthy();
+    expect(within(modal()).queryAllByRole("button", { name: "Edit" })).toHaveLength(0);
+    expect(within(modal()).queryByRole("combobox", { name: "Role Access" })).toBeNull();
+    expect(within(modal()).queryByRole("button", { name: "Verify student" })).toBeNull();
+    expect(within(modal()).queryByLabelText("Profile photo", { selector: "input" })).toBeNull();
+
+    const editButton = within(modal()).getByRole("button", { name: "Edit User" });
+    editButton.focus();
+    enableEditing();
+    expect(document.activeElement).toBe(within(modal()).getByRole("button", { name: "Done editing" }));
+    startEdit("First Name");
+    fireEvent.change(within(field("First Name")).getByRole("textbox"), { target: { value: "Unsaved" } });
+    startEdit("Birthday");
+    fireEvent.change(screen.getByLabelText("Birthday", { selector: "input" }), { target: { value: "2000-02-29" } });
+    fireEvent.click(within(modal()).getByRole("button", { name: "Done editing" }));
+    expect(within(modal()).queryAllByRole("textbox")).toHaveLength(0);
+    enableEditing();
+    expect(within(field("First Name")).getByText("Dora")).toBeTruthy();
+    expect(within(field("Birthday")).queryByRole("button", { name: "Save" })).toBeNull();
+    expect(mocks.updateManagerUserAction).not.toHaveBeenCalled();
+    expect(mocks.saveBirthDate).not.toHaveBeenCalled();
+    await closeModal();
+    fireEvent.click(screen.getByRole("button", { name: "View details for Iris Chan" }));
+    expect(within(modal()).getByRole("button", { name: "Edit User" })).toBeTruthy();
+  });
+
+  it("displays interests as individual tags in view mode", () => {
+    render(<AdminUsersManager initialUsers={[user({ interests: ["UX/UI Design", "Product Design", "Tech"] })]} membershipTypes={membershipTypes} canManageUsers={true} />);
+    fireEvent.click(screen.getByRole("button", { name: "View details for Dora Hu" }));
+    const interests = within(screen.getByRole("region", { name: "Interests" }));
+    for (const tag of ["UX/UI Design", "Product Design", "Tech"]) {
+      expect(interests.getByText(tag)).toBeTruthy();
+    }
+    expect(interests.queryAllByRole("button")).toHaveLength(0);
+  });
+
   it("saves and clears a birthday, while cancellation leaves the saved value unchanged", async () => {
     renderManager(true);
     fireEvent.click(screen.getByRole("button", { name: "View details for Dora Hu" }));
@@ -327,6 +374,7 @@ describe("admin user profile controls", () => {
   it("verifies and clears verification with verifier details", async () => {
     renderManager(true);
     fireEvent.click(screen.getByRole("button", { name: "View details for Dora Hu" }));
+    enableEditing();
     fireEvent.click(screen.getByRole("button", { name: "Verify student" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Clear verification" })).toBeTruthy());
     expect(within(screen.getByRole("region", { name: "Student Verification" })).getByText(/Iris Chan/)).toBeTruthy();
@@ -343,6 +391,7 @@ describe("admin user profile controls", () => {
     try {
       renderManager(true);
       fireEvent.click(screen.getByRole("button", { name: "View details for Dora Hu" }));
+      enableEditing();
       const file = new File(["image"], "photo.png", { type: "image/png" });
       fireEvent.change(screen.getByLabelText("Profile photo", { selector: "input" }), { target: { files: [file] } });
       expect(screen.getByRole("img").getAttribute("src")).toBe("blob:photo");

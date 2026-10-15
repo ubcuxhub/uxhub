@@ -1,6 +1,7 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { ReactNode } from "react";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -28,6 +29,8 @@ interface UserDetailsPanelProps {
   isSaving: boolean;
   membershipTypes: MembershipTypeOption[];
   canManageUsers: boolean;
+  editMode: boolean;
+  headerAction?: ReactNode;
   onEditStart: (field: string, currentValue: string | number | boolean | null) => void;
   onEditCancel: () => void;
   onEditSave: (field: string) => void;
@@ -56,13 +59,16 @@ export function UserDetailsPanel({
   isSaving,
   membershipTypes,
   canManageUsers,
+  editMode,
+  headerAction,
   onEditStart,
   onEditCancel,
   onEditSave,
   onValueChange,
   onRoleChangeRequest,
 }: UserDetailsPanelProps) {
-  const profileProps = { user: selectedUser, verifierName, canEdit: canManageUsers, busy: isSaving, onBusy, onUpdate: onProfileUpdate };
+  const canEdit = canManageUsers && editMode;
+  const profileProps = { user: selectedUser, verifierName, canEdit, busy: isSaving, onBusy, onUpdate: onProfileUpdate };
   const fieldProps = {
     editValue,
     isSaving,
@@ -70,7 +76,7 @@ export function UserDetailsPanel({
     onEditCancel,
     onEditSave,
     onValueChange,
-    canEdit: canManageUsers,
+    canEdit,
   };
 
   return (
@@ -84,6 +90,7 @@ export function UserDetailsPanel({
               <p className="text-small text-muted-foreground">User since {formatTimestamp(selectedUser.created_at) ?? "—"}</p>
             </div>
           </UserProfileSection>
+          {headerAction && <CardAction>{headerAction}</CardAction>}
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -134,7 +141,7 @@ export function UserDetailsPanel({
           ))}
           <div className="space-y-2">
             <Label>Role Access</Label>
-            {canManageUsers ? (
+            {canEdit ? (
               <Select value={selectedUser.role_access}
                 onValueChange={(role) => onRoleChangeRequest(role as RoleAccess)} disabled={isSaving}>
                 <SelectTrigger aria-label="Role Access"><SelectValue /></SelectTrigger>
