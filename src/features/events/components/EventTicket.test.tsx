@@ -23,30 +23,30 @@ describe("EventTicket", () => {
     expect(screen.getByText("November 4, 2026"));
     expect(screen.getByText("ICICS, X150"));
     expect(screen.getByText("Ada Lovelace"));
-    expect(screen.getByText("Admit one"));
+    expect(screen.getByText("Going"));
     expect(screen.getByRole("img", { name: "QR code placeholder" }));
   });
 
-  it("keeps the code scannable after check-in and shows when", () => {
+  it("keeps the code after check-in", () => {
+    render(<EventTicket event={event} holder={holder} badge="checked_in" />);
+
+    expect(screen.getByText("Checked in"));
+    expect(screen.getByRole("img", { name: "QR code placeholder" }));
+  });
+
+  it("uses the student-facing badge and hides the code when they have no ticket", () => {
     render(
       <EventTicket
         event={event}
         holder={holder}
-        status="checked_in"
-        checkedInAt="2026-07-15T17:02:00Z"
+        badge="register_by"
+        registerBy="Oct 20"
       />
     );
 
-    expect(screen.getByText("Checked in 10:02 a.m."));
-    expect(screen.getByRole("img", { name: "QR code placeholder" }));
-  });
-
-  it("hides the code once the ticket is cancelled", () => {
-    render(<EventTicket event={event} holder={holder} status="cancelled" />);
-
-    expect(screen.getByText("Cancelled"));
-    expect(screen.getByText("This ticket is no longer valid."));
+    expect(screen.getByText("Register by Oct 20"));
     expect(screen.queryByRole("img", { name: "QR code placeholder" })).toBeNull();
+    expect(screen.queryByText("Cancelled")).toBeNull();
   });
 
   it("falls back to TBD for unscheduled details", () => {

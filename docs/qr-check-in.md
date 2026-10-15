@@ -11,8 +11,9 @@ won't scan. Target: Nov 12, 2026.
   The signature is an HMAC made with `CHECK_IN_TOKEN_SECRET`, which never
   leaves the server.
 - **Ticket:** [`EventTicket`](../src/features/events/components/EventTicket.tsx)
-  shows the event, the holder, and a placeholder QR in three states (`valid`,
-  `checked_in`, `cancelled`). Build its `event` prop with
+  shows the event, the holder, and a placeholder QR. Its badge is one of the
+  student-facing badges in `docs/event-states.md`. A code shows for Going and
+  Checked in. Build its `event` prop with
   [`toTicketEvent`](../src/features/events/lib/ticket.ts).
 - **Check-in data:** `check_in_sessions` (one or more per event) and
   `check_ins` (one row per registration per session, unique on that pair).
@@ -38,8 +39,8 @@ registration ID.
 ## Who gets a ticket
 
 A registration with `attending = true`, the same set the check-in table lists.
-Paid fulfillment sets this along with `status = 'accepted'`. Released or refunded
-registrations show the `cancelled` ticket with no code.
+Paid fulfillment sets this along with `status = 'accepted'`. The states doc
+says a registered person stays registered, so the ticket has no cancelled state.
 
 ## Build steps
 
@@ -108,7 +109,7 @@ because the admin is already authorized.
   returns the first timestamp, and a non-admin can't call it.
 - **By hand, on real phones:** iOS Safari and Android Chrome scanning a live
   ticket, a screenshot, and a ticket on a dim screen; double scan; wrong event;
-  cancelled ticket; manual lookup.
+  manual lookup.
 
 ## Open questions
 

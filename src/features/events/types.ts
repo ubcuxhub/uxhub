@@ -32,10 +32,17 @@ export interface TicketHolder {
 }
 
 /**
- * `valid` shows a scannable code, `checked_in` keeps it scannable for later
- * sessions, and `cancelled` (refunded or released) hides it.
+ * The student-facing event badge from docs/event-states.md. A code is shown
+ * for `going` and `checked_in`. There is no cancelled state.
  */
-export type TicketStatus = "valid" | "checked_in" | "cancelled";
+export type TicketBadge =
+  | "under_review"
+  | "waitlisted"
+  | "register_by"
+  | "offer_expired"
+  | "not_selected"
+  | "going"
+  | "checked_in";
 
 export interface GroupedRegistration {
   user_id: string;

@@ -2,31 +2,31 @@ import type { ReactNode } from "react";
 import { Calendar, Clock, MapPin, QrCode } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { formatEventTime } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import type {
+  TicketBadge,
   TicketEvent,
   TicketHolder,
-  TicketStatus,
 } from "@/features/events/types";
 
 export interface EventTicketProps {
   event: TicketEvent;
   holder: TicketHolder;
-  status?: TicketStatus;
-  /** Most recent check-in, shown when `status` is `checked_in`. */
-  checkedInAt?: string | null;
+  /** Student-facing event badge. Defaults to `going`. */
+  badge?: TicketBadge;
+  /** Date in the "Register by Oct 20" badge, such as "Oct 20". */
+  registerBy?: string | null;
   className?: string;
 }
 
 export function EventTicket({
   event,
   holder,
-  status = "valid",
-  checkedInAt,
+  badge = "going",
+  registerBy,
   className,
 }: EventTicketProps) {
-  const cancelled = status === "cancelled";
+  const hasCode = badge === "going" || badge === "checked_in";
 
   return (
     <article
@@ -36,10 +36,10 @@ export function EventTicket({
         className
       )}
     >
-      <div className={cn("space-y-4 p-5", cancelled && "opacity-60")}>
+      <div className="space-y-4 p-5">
         <div className="flex items-start justify-between gap-3">
           <h2 className="text-h3">{event.name}</h2>
-          <TicketStatusBadge status={status} checkedInAt={checkedInAt} />
+          <TicketStatusBadge badge={badge} registerBy={registerBy} />
         </div>
         <dl className="space-y-2 text-small">
           <TicketDetail icon={<Calendar />} label="Date">
@@ -59,7 +59,7 @@ export function EventTicket({
       <TicketPerforation />
 
       <div className="space-y-4 p-5">
-        <div className={cn("min-w-0", cancelled && "opacity-60")}>
+        <div className="min-w-0">
           <p className="text-label text-muted-foreground">Ticket holder</p>
           <p className="truncate font-medium">{holder.name}</p>
           {holder.email && (
@@ -68,48 +68,44 @@ export function EventTicket({
             </p>
           )}
         </div>
-        {cancelled ? (
-          <p className="rounded-lg bg-muted p-4 text-center text-small text-muted-foreground">
-            This ticket is no longer valid.
-          </p>
-        ) : (
-          <QrPlaceholder />
-        )}
+        {hasCode && <QrPlaceholder />}
       </div>
     </article>
   );
 }
 
-function TicketStatusBadge({
-  status,
-  checkedInAt,
-}: {
-  status: TicketStatus;
-  checkedInAt?: string | null;
-}) {
-  if (status === "checked_in") {
-    const time = formatEventTime(checkedInAt);
-    return (
-      <Badge
-        variant="outline"
-        className="shrink-0 border-transparent bg-success-bg text-success"
-      >
-        {time ? `Checked in ${time}` : "Checked in"}
-      </Badge>
-    );
-  }
+const BADGE_LABEL: Record<TicketBadge, string> = {
+  under_review: "Under review",
+  waitlisted: "Waitlisted",
+  register_by: "Register by",
+  offer_expired: "Offer expired",
+  not_selected: "Not selected",
+  going: "Going",
+  checked_in: "Checked in",
+};
 
-  if (status === "cancelled") {
-    return (
-      <Badge variant="secondary" className="shrink-0">
-        Cancelled
-      </Badge>
-    );
-  }
+function TicketStatusBadge({
+  badge,
+  registerBy,
+}: {
+  badge: TicketBadge;
+  registerBy?: string | null;
+}) {
+  const label =
+    badge === "register_by" && registerBy
+      ? `Register by ${registerBy}`
+      : BADGE_LABEL[badge];
+  const highlighted = badge === "going" || badge === "checked_in";
 
   return (
-    <Badge variant="outline" className="shrink-0">
-      Admit one
+    <Badge
+      variant="outline"
+      className={cn(
+        "shrink-0",
+        highlighted && "border-transparent bg-success-bg text-success"
+      )}
+    >
+      {label}
     </Badge>
   );
 }
