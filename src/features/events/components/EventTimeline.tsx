@@ -10,6 +10,7 @@ import type { EventGroup } from "@/features/events/types";
 import { formatEventDate, formatEventTime } from "@/lib/date";
 import { resolveImagePreviewSrc } from "@/lib/event-image";
 import type { EventRow } from "@/lib/supabase/models";
+import { Input } from "@/components/ui/input";
 
 interface EventTimelineProps {
   upcomingEventGroups: EventGroup[];
@@ -21,22 +22,34 @@ export function EventTimeline({
   pastEventGroups,
 }: EventTimelineProps) {
   const [showPastEvents, setShowPastEvents] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   const displayedGroups = showPastEvents ? pastEventGroups : upcomingEventGroups;
   const emptyMessage = showPastEvents ? "No past events." : "No events scheduled yet.";
 
   return (
     <>
-      <div className="mb-4 flex items-center text-primary">
-        <Label htmlFor="show-past-events" className="mr-2">
-          Show Past Events
-        </Label>
-        <Switch
-          id="show-past-events"
-          checked={showPastEvents}
-          onCheckedChange={setShowPastEvents}
+    <div>
+      <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-8 mb-20">
+        <Input
+          placeholder="Search events..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          type="search"
+          className="w-full"
         />
+        <div className="w-fit flex items-center text-primary">
+          <Label htmlFor="show-past-events" className="mr-2">
+            Show Past Events
+          </Label>
+          <Switch
+            id="show-past-events"
+            checked={showPastEvents}
+            onCheckedChange={setShowPastEvents}
+          />
+        </div>
       </div>
+    </div>
 
       {displayedGroups.length === 0 ? (
         <p className="text-muted-foreground my-8">{emptyMessage}</p>

@@ -21,7 +21,7 @@ export default async function PortalEvents() {
 
   return (
     <PageContainer>
-      <h1 className="mb-3 text-h1 tracking-tight">Events</h1>
+      <h1 className="mb-6 text-h1 tracking-tight">Events</h1>
 
       <EventTimeline
         upcomingEventGroups={upcomingEventGroups}
