@@ -16,9 +16,6 @@ export default async function PortalEvents() {
   const today = getPacificStartDefaults().start_date;
   const { upcomingEvents, pastEvents } = splitEventsByDate(events, today);
 
-  // const upcomingEventGroups = groupEventsByMonth(upcomingEvents);
-  // const pastEventGroups = groupEventsByMonth(pastEvents);
-
   return (
     <PageContainer>
       <h1 className="mb-6 text-h1 tracking-tight">Events</h1>

@@ -6,7 +6,6 @@ import { useState } from "react";
 
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import type { EventGroup } from "@/features/events/types";
 import { formatEventDate, formatEventTime } from "@/lib/date";
 import { resolveImagePreviewSrc } from "@/lib/event-image";
 import type { EventRow } from "@/lib/supabase/models";
@@ -40,7 +39,6 @@ export function EventTimeline({
 
   // group events by month
   const filteredGroups = groupEventsByMonth(filteredEvents);
-
 
   return (
     <>
