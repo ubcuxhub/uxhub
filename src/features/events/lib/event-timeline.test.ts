@@ -24,7 +24,7 @@ describe("splitEventsByDate", () => {
     expect([...upcomingEvents, ...pastEvents]).toEqual([]);
   });
 
-  it("counts a multi-day even currently happening as upcoming", () => {
+  it("counts a multi-day event currently happening as upcoming", () => {
     const events = [event("multi-day", "2026-10-01", "2026-10-03")];
     const { upcomingEvents, pastEvents } = splitEventsByDate(events, "2026-10-02");
     expect(upcomingEvents.map((e) => e.id)).toEqual(["multi-day"]);

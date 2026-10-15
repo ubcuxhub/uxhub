@@ -60,20 +60,21 @@ function EventTimelineItem({ event }: { event: EventRow }) {
   const location = [event.location_building, event.location_room]
     .filter(Boolean)
     .join(" ");
-  const startDateTime = [formatEventDate(event.start_date, { month: "short", weekday: "short" }),
-    formatEventTime(event.start_time)]
-    .filter(Boolean)
-    .join(" ");
-  const endDateTime = [(event.end_date !== event.start_date) && formatEventDate(event.end_date, { month: "short", weekday: "short" }),
-    formatEventTime(event.end_time)]
-    .filter(Boolean)
-    .join(" ");
-  const dateTime = [
-    startDateTime,
-    endDateTime
+  const dateOptions = { month: "short", weekday: "short" } as const;
+  const endDate =
+    event.end_date !== event.start_date
+      ? formatEventDate(event.end_date, dateOptions)
+      : null;
+  const startDateTime = [
+    formatEventDate(event.start_date, dateOptions),
+    formatEventTime(event.start_time),
   ]
     .filter(Boolean)
-    .join(" - ");
+    .join(" ");
+  const endDateTime = [endDate, formatEventTime(event.end_time)]
+    .filter(Boolean)
+    .join(" ");
+  const dateTime = [startDateTime, endDateTime].filter(Boolean).join(" – ");
 
   return (
     <div className="flex gap-3 sm:gap-8 sm:min-h-72">
