@@ -54,17 +54,21 @@ export function getUserFixtureTotals(users: SeedUser[]): UserFixtureTotals {
  * `completeMembershipProfile` in src/features/memberships/actions.ts nulls the
  * other two sets whenever somebody picks a classification, so a real account
  * never carries, say, both a student number and a faculty email. A fixture that
- * does would be testing a state the app cannot produce.
+ * does would be testing a state the app cannot produce. The admin directory
+ * fixtures additionally allow UBC as the school for students and faculty.
  */
 function assertProfileMatchesUserType(user: SeedUser): void {
   const { profile, email } = user;
   const userType = profile.user_type ?? "ubcStudent";
+  const schoolOutsideUbc = profile.school_institution === "University of British Columbia"
+    ? null
+    : profile.school_institution;
 
   const forbidden: Record<string, unknown> =
     userType === "ubcStudent"
       ? {
           faculty_email: profile.faculty_email,
-          school_institution: profile.school_institution,
+          school_institution: schoolOutsideUbc,
           student_status: profile.student_status,
         }
       : userType === "faculty"
@@ -72,7 +76,7 @@ function assertProfileMatchesUserType(user: SeedUser): void {
             student_number: profile.student_number,
             major: profile.major,
             year: profile.year,
-            school_institution: profile.school_institution,
+            school_institution: schoolOutsideUbc,
             student_status: profile.student_status,
           }
         : {

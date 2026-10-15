@@ -7,10 +7,10 @@ separate plan covers the unit gaps in [`ci-test-gaps-unit.md`](ci-test-gaps-unit
 ## Background
 
 CI's `build` job starts a throwaway Supabase with every migration applied and
-runs [`supabase/tests/rls.sql`](../supabase/tests/rls.sql). That script is the
-only test that touches a real database, and it checks access control only. No
-Vitest test runs the app's code against a database, and the only database
-function anything calls is `set_user_role`.
+runs [`supabase/tests/rls.sql`](../supabase/tests/rls.sql) and
+`pnpm test:integration`. Admin user profile integration tests now run app actions
+and helpers against local Supabase and Storage, including account deletion.
+The remaining domain integration gaps are listed below.
 
 ## Scope
 
@@ -20,16 +20,12 @@ TypeScript against the local Supabase. This plan owns `vitest.config.ts`,
 
 ## Suggested order
 
-### 1. Harness
+### 1. Harness — complete
 
-A first PR that adds:
-
-- a separate Vitest project, run with something like `pnpm test:integration`,
-  pointed at the local Supabase;
-- a CI step in the `build` job after `Verify RLS policies`, since that job
-  already starts the database;
-- isolation like `rls.sql`'s: roll back each test's transaction, or scope it
-  to its own fixtures, so it is safe on a seeded database.
+`pnpm test:integration` uses a separate Vitest configuration, reads credentials
+from the local CLI, rejects non-local targets, and runs in CI after RLS checks.
+Tests create disposable fixtures and clean up their own database rows, auth
+users, and storage objects. Ordinary `pnpm test` excludes this suite.
 
 ### 2. Database functions
 
@@ -40,7 +36,8 @@ A first PR that adds:
 - `release_paid_event_ticket_reservation` frees only the seat it reserved.
 - `save_admin_event_atomically` and `delete_event_atomically` are
   all-or-nothing, and respect the cover-image guard.
-- `delete_account` and `event_registration_counts`.
+- `event_registration_counts`. Account deletion is covered by the admin profile
+  integration suite, including anonymization and profile photo cleanup.
 
 Their execute grants are already asserted in `rls.sql`.
 

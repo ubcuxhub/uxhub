@@ -647,6 +647,7 @@ export type Database = {
       user_info: {
         Row: {
           auth_user_id: string | null
+          birth_date: string | null
           created_at: string | null
           deleted_at: string | null
           dietary_restrictions: string | null
@@ -655,6 +656,7 @@ export type Database = {
           faculty_email: string | null
           first_name: string
           id: string
+          interests: string[]
           last_name: string
           major: string | null
           membership_expires_at: string | null
@@ -664,17 +666,21 @@ export type Database = {
           order_date_deprecated: string | null
           phone: string | null
           preferred_pronouns: string | null
+          profile_photo_path: string | null
           role_access: Database["public"]["Enums"]["role_access_enum"]
           school_institution: string | null
           square_customer_id: string | null
           student_number: number | null
           student_status: Database["public"]["Enums"]["student_status"] | null
+          student_verified_at: string | null
+          student_verified_by: string | null
           updated_at: string | null
           user_type: Database["public"]["Enums"]["user_type"]
           year: Database["public"]["Enums"]["uni_year"] | null
         }
         Insert: {
           auth_user_id?: string | null
+          birth_date?: string | null
           created_at?: string | null
           deleted_at?: string | null
           dietary_restrictions?: string | null
@@ -683,6 +689,7 @@ export type Database = {
           faculty_email?: string | null
           first_name: string
           id?: string
+          interests?: string[]
           last_name: string
           major?: string | null
           membership_expires_at?: string | null
@@ -692,17 +699,21 @@ export type Database = {
           order_date_deprecated?: string | null
           phone?: string | null
           preferred_pronouns?: string | null
+          profile_photo_path?: string | null
           role_access: Database["public"]["Enums"]["role_access_enum"]
           school_institution?: string | null
           square_customer_id?: string | null
           student_number?: number | null
           student_status?: Database["public"]["Enums"]["student_status"] | null
+          student_verified_at?: string | null
+          student_verified_by?: string | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"]
           year?: Database["public"]["Enums"]["uni_year"] | null
         }
         Update: {
           auth_user_id?: string | null
+          birth_date?: string | null
           created_at?: string | null
           deleted_at?: string | null
           dietary_restrictions?: string | null
@@ -711,6 +722,7 @@ export type Database = {
           faculty_email?: string | null
           first_name?: string
           id?: string
+          interests?: string[]
           last_name?: string
           major?: string | null
           membership_expires_at?: string | null
@@ -720,11 +732,14 @@ export type Database = {
           order_date_deprecated?: string | null
           phone?: string | null
           preferred_pronouns?: string | null
+          profile_photo_path?: string | null
           role_access?: Database["public"]["Enums"]["role_access_enum"]
           school_institution?: string | null
           square_customer_id?: string | null
           student_number?: number | null
           student_status?: Database["public"]["Enums"]["student_status"] | null
+          student_verified_at?: string | null
+          student_verified_by?: string | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"]
           year?: Database["public"]["Enums"]["uni_year"] | null
@@ -742,6 +757,13 @@ export type Database = {
             columns: ["membership_type_id"]
             isOneToOne: false
             referencedRelation: "membership_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_info_student_verified_by_fkey"
+            columns: ["student_verified_by"]
+            isOneToOne: false
+            referencedRelation: "user_info"
             referencedColumns: ["id"]
           },
         ]
@@ -799,6 +821,7 @@ export type Database = {
         }
         Returns: Database["public"]["Enums"]["role_access_enum"]
       }
+      valid_user_interests: { Args: { tags: string[] }; Returns: boolean }
     }
     Enums: {
       application_status: "pending" | "declined" | "accepted"

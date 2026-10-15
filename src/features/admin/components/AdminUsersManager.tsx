@@ -28,6 +28,7 @@ import {
   updateUserRoleAction,
 } from "@/features/admin/actions";
 import { formatUserName } from "@/lib/user-name";
+import type { UserInfoRow } from "@/lib/supabase/models";
 import type { RoleAccess } from "@/lib/supabase/models";
 import { toggleSetValue } from "../lib/directory";
 
@@ -111,6 +112,11 @@ export function AdminUsersManager({
     return filtered;
   }, [users, searchQuery, sortDirection, sortOption, membershipFilter, roleFilter]);
 
+  const handleProfileUpdate = (saved: UserInfoRow) => {
+    setSelectedUser((current) => current ? { ...current, ...saved } : current);
+    setUsers((current) => current.map((user) => user.id === saved.id ? { ...user, ...saved } : user));
+  };
+
   const handleUserSelect = (user: UserRecord, element: HTMLTableRowElement) => {
     activatingRow.current = element;
     setSelectedUser(user);
@@ -181,6 +187,8 @@ export function AdminUsersManager({
       let updatedUser: UserRecord = {
         ...selectedUser,
         [field]: updateData[field],
+        ...((field === "student_number" && selectedUser.student_number !== updateData[field])
+          ? { student_verified_at: null, student_verified_by: null } : {}),
       };
 
       if (field === "membership_type_id") {
@@ -258,6 +266,8 @@ export function AdminUsersManager({
     }
   };
 
+  const verifier = users.find((user) => user.id === selectedUser?.student_verified_by);
+
   return (
     <PageContainer className="flex flex-col gap-8">
       <header>
@@ -330,7 +340,11 @@ export function AdminUsersManager({
           <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 sm:px-0 sm:pb-0">
             {selectedUser && (
               <UserDetailsPanel
+                key={selectedUser.id}
                 selectedUser={selectedUser}
+                verifierName={verifier ? formatUserName(verifier) : undefined}
+                onProfileUpdate={handleProfileUpdate}
+                onBusy={setIsSaving}
                 editingField={editingField}
                 editValue={editValue}
                 isSaving={isSaving}

@@ -648,4 +648,21 @@ set membership_expires_at = now()
 where id = :'user_a_id';
 reset role;
 
+-- Admin-only profile additions must remain unavailable to direct client writes.
+do $$
+declare column_name text;
+begin
+  foreach column_name in array array['birth_date', 'interests', 'profile_photo_path', 'student_verified_at', 'student_verified_by'] loop
+    if has_column_privilege('authenticated', 'public.user_info', column_name, 'UPDATE')
+       or has_column_privilege('anon', 'public.user_info', column_name, 'UPDATE') then
+      raise exception 'Client UPDATE unexpectedly granted on %', column_name;
+    end if;
+  end loop;
+  if not exists (select 1 from storage.buckets where id = 'profile-photos' and public
+      and file_size_limit = 4194304 and allowed_mime_types = array['image/jpeg', 'image/png']) then
+    raise exception 'Profile photo bucket settings do not match upload restrictions';
+  end if;
+end;
+$$;
+
 rollback;

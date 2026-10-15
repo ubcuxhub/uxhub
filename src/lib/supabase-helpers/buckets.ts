@@ -10,6 +10,7 @@
  */
 export const BUCKETS = {
   eventImages: "event-images",
+  profilePhotos: "profile-photos",
 } as const;
 
 export type BucketName = (typeof BUCKETS)[keyof typeof BUCKETS];

@@ -111,11 +111,14 @@ function afterTimestamp(value: string, minutes: number): string {
  * The three types own mutually exclusive field sets, and
  * `completeMembershipProfile` in src/features/memberships/actions.ts nulls the
  * other two sets whenever a classification is chosen. These mirror that exactly
- * so a fixture looks like an account somebody actually signed up for, rather
+ * except that UBC students and faculty explicitly name UBC as their school
+ * for the admin directory. Otherwise a fixture looks like a signed-up account rather
  * than a row with a plausible-looking mix of student and faculty fields.
  */
 interface CommonProfileInput {
   firstName: string;
+  birthDate: string;
+  interests: string[];
   lastName: string;
   phone: string;
   pronouns: string;
@@ -128,6 +131,8 @@ interface CommonProfileInput {
 function baseProfile(input: CommonProfileInput) {
   return {
     first_name: input.firstName,
+    birth_date: input.birthDate,
+    interests: input.interests,
     last_name: input.lastName,
     phone: input.phone,
     preferred_pronouns: input.pronouns,
@@ -154,7 +159,7 @@ function studentProfile(
     major: input.major,
     year: input.year,
     faculty_email: null,
-    school_institution: null,
+    school_institution: "University of British Columbia",
     student_status: null,
   };
 }
@@ -173,7 +178,7 @@ function facultyProfile(
     student_number: null,
     major: null,
     year: null,
-    school_institution: null,
+    school_institution: "University of British Columbia",
     student_status: null,
   };
 }
@@ -287,6 +292,8 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
     fullEventHistory: true,
     profile: studentProfile({
       firstName: "Riley",
+      birthDate: "2003-03-14",
+      interests: ["UX research", "Interaction design", "Accessibility"],
       lastName: "Chen",
       phone: "6045550101",
       pronouns: "they/them",
@@ -417,6 +424,8 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
     fullEventHistory: true,
     profile: studentProfile({
       firstName: "Maya",
+      birthDate: "2005-07-22",
+      interests: ["Visual design", "Illustration", "Photography"],
       lastName: "Patel",
       phone: "6045550102",
       pronouns: "she/her",
@@ -530,6 +539,8 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
     fullEventHistory: true,
     profile: studentProfile({
       firstName: "Daniel",
+      birthDate: "2002-11-08",
+      interests: ["Prototyping", "Design systems", "Creative coding"],
       lastName: "Kim",
       phone: "6045550103",
       pronouns: "he/him",
@@ -627,6 +638,8 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
     fullEventHistory: false,
     profile: studentProfile({
       firstName: "Sofia",
+      birthDate: "2006-02-17",
+      interests: ["Psychology", "UX research", "Inclusive design"],
       lastName: "Martinez",
       phone: "6045550104",
       pronouns: "she/her",
@@ -647,6 +660,8 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
     fullEventHistory: false,
     profile: facultyProfile({
       firstName: "Avery",
+      birthDate: "1988-09-25",
+      interests: ["Learning design", "Accessibility", "Mentorship"],
       lastName: "Okafor",
       phone: "6045550105",
       pronouns: "they/them",
@@ -665,6 +680,8 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
     fullEventHistory: false,
     profile: nonUbcProfile({
       firstName: "Mateo",
+      birthDate: "2004-06-12",
+      interests: ["Animation", "Visual storytelling", "Typography"],
       lastName: "Nguyen",
       phone: "6045550106",
       pronouns: "he/him",
@@ -684,6 +701,8 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
     fullEventHistory: false,
     profile: studentProfile({
       firstName: "Priya",
+      birthDate: "2002-12-03",
+      interests: ["Product strategy", "Design systems", "Entrepreneurship"],
       lastName: "Shah",
       phone: "6045550107",
       pronouns: "she/her",
@@ -706,6 +725,8 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
     fullEventHistory: false,
     profile: facultyProfile({
       firstName: "Nadia",
+      birthDate: "1985-04-19",
+      interests: ["Data visualization", "Science communication", "Mentorship"],
       lastName: "Rahman",
       phone: "6045550108",
       pronouns: "she/her",
@@ -725,6 +746,8 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
     fullEventHistory: false,
     profile: nonUbcProfile({
       firstName: "Jordan",
+      birthDate: "1999-08-30",
+      interests: ["Human-computer interaction", "Service design", "Sustainability"],
       lastName: "Dubois",
       phone: "6045550109",
       pronouns: "they/them",
@@ -744,6 +767,8 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
     fullEventHistory: false,
     profile: studentProfile({
       firstName: "Lucas",
+      birthDate: "2005-01-11",
+      interests: ["Sustainable design", "Urban planning", "Photography"],
       lastName: "Wong",
       phone: "6045550110",
       pronouns: "he/him",
@@ -763,6 +788,8 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
     fullEventHistory: false,
     profile: studentProfile({
       firstName: "Morgan",
+      birthDate: "2002-05-26",
+      interests: ["Community building", "Interaction design", "Workshop facilitation"],
       lastName: "Lee",
       phone: "6045550111",
       pronouns: "they/them",

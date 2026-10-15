@@ -64,6 +64,9 @@ jobs:
       - name: Verify RLS policies
         run: pnpm test:rls
 
+      - name: Verify admin profile integration
+        run: pnpm test:integration
+
       # Square credentials are never exercised by the build; these placeholders
       # only satisfy the module-scope checks in src/lib/square/client.ts.
       - name: Build

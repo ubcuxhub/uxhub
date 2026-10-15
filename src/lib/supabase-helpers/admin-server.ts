@@ -2,6 +2,7 @@ import "server-only";
 
 import { parseEventImageObjectKey } from "@/lib/event-image";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { cleanupAccountProfilePhotos } from "./admin-user-profile";
 import { BUCKETS } from "./buckets";
 import { TABLES } from "./tables";
 
@@ -58,11 +59,15 @@ export async function adminUpdateUserInfoById(
  * deletion would strand the member with a live login and a scrubbed profile.
  */
 export async function adminDeleteAccount(authUserId: string): Promise<void> {
+  const { data: profile, error: lookupError } = await supabaseAdmin.from(TABLES.userInfo)
+    .select("id").eq("auth_user_id", authUserId).single();
+  if (lookupError) throw lookupError;
   const { error } = await supabaseAdmin.rpc("delete_account", {
     p_auth_user_id: authUserId,
   });
 
   if (error) throw error;
+  await cleanupAccountProfilePhotos(supabaseAdmin, profile.id);
 }
 
 /**
