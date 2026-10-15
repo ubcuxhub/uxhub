@@ -26,16 +26,21 @@ export function EventTimeline({
 
   const displayedEvents = showPastEvents ? pastEvents : upcomingEvents;
   const emptyMessage = showPastEvents ? "No past events." : "No events scheduled yet.";
+  
+  const normalizeString = (str: string | undefined) => {
+    return (str ? str.trim().toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "") : "");
+  }
 
   // filter events based on search query
-  const query = searchQuery.trim().toLowerCase();
+  const query = normalizeString(searchQuery);
   const filteredEvents = (query) ? displayedEvents.filter((event) => {
     return (
-      event.name.toLowerCase().includes(query) ||
-      event.location_building?.toLowerCase().includes(query) ||
-      event.location_room?.toLowerCase().includes(query)
+      normalizeString(event.name).includes(query) ||
+      (event.location_building && normalizeString(event.location_building).includes(query)) ||
+      (event.location_room && normalizeString(event.location_room).includes(query))
     )
   }) : displayedEvents;
+
 
   // group events by month
   const filteredGroups = groupEventsByMonth(filteredEvents);
