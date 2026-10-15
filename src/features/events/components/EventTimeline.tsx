@@ -10,22 +10,37 @@ import type { EventGroup } from "@/features/events/types";
 import { formatEventDate, formatEventTime } from "@/lib/date";
 import { resolveImagePreviewSrc } from "@/lib/event-image";
 import type { EventRow } from "@/lib/supabase/models";
+import { groupEventsByMonth } from "@/features/events/lib/event-timeline";
 import { Input } from "@/components/ui/input";
 
 interface EventTimelineProps {
-  upcomingEventGroups: EventGroup[];
-  pastEventGroups: EventGroup[];
+  upcomingEvents: EventRow[];
+  pastEvents: EventRow[];
 }
 
 export function EventTimeline({
-  upcomingEventGroups,
-  pastEventGroups,
+  upcomingEvents,
+  pastEvents,
 }: EventTimelineProps) {
   const [showPastEvents, setShowPastEvents] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const displayedGroups = showPastEvents ? pastEventGroups : upcomingEventGroups;
+  const displayedEvents = showPastEvents ? pastEvents : upcomingEvents;
   const emptyMessage = showPastEvents ? "No past events." : "No events scheduled yet.";
+
+  // filter events based on search query
+  const query = searchQuery.trim().toLowerCase();
+  const filteredEvents = (query) ? displayedEvents.filter((event) => {
+    return (
+      event.name.toLowerCase().includes(query) ||
+      event.location_building?.toLowerCase().includes(query) ||
+      event.location_room?.toLowerCase().includes(query)
+    )
+  }) : displayedEvents;
+
+  // group events by month
+  const filteredGroups = groupEventsByMonth(filteredEvents);
+
 
   return (
     <>
@@ -34,7 +49,7 @@ export function EventTimeline({
         <Input
           placeholder="Search events..."
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
+          onChange={(e) => {setSearchQuery(e.target.value); console.log(filteredEvents)}}
           type="search"
           className="w-full"
         />
@@ -51,11 +66,11 @@ export function EventTimeline({
       </div>
     </div>
 
-      {displayedGroups.length === 0 ? (
+      {filteredGroups.length === 0 ? (
         <p className="text-muted-foreground my-8">{emptyMessage}</p>
       ) : (
         <div className="mb-8">
-          {displayedGroups.map((group) => (
+          {filteredGroups.map((group) => (
             <div key={group.key}>
               <h2 className="mt-4 mb-5 text-h2">{group.label}</h2>
               {group.events.map((event) => (
