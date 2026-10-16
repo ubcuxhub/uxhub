@@ -45,3 +45,13 @@ describe("groupEventsByMonth", () => {
     expect(group.label).toBe("October 2026");
   });
 });
+
+describe("normalizeString", () => {
+  it("normalizes strings by trimming whitespace, lowercasing, and removing diacritics", async () => {
+    const { normalizeString } = await import("./event-timeline");
+    expect(normalizeString("  Café  ")).toBe("cafe");
+    expect(normalizeString("Résumé")).toBe("resume");
+    expect(normalizeString("naïve")).toBe("naive");
+    expect(normalizeString(undefined)).toBe("");
+  });
+});
