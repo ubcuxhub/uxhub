@@ -52,6 +52,12 @@ export interface SeedUser {
    * `validateUserFixtures` only holds the deep ones to phase coverage.
    */
   fullEventHistory: boolean;
+  /**
+   * Marks a UBC student as manually verified by the named manager fixture.
+   * Written after every profile exists, since `student_verified_by` points at
+   * the manager's row, which a fresh database has not created yet.
+   */
+  studentVerification?: { verifiedByEmail: string; verifiedAt: string };
 }
 
 /** Every fixture account signs in with this. Local only — see `lib/targets.ts`. */
@@ -116,8 +122,8 @@ function afterTimestamp(value: string, minutes: number): string {
  */
 interface CommonProfileInput {
   firstName: string;
-  birthDate: string;
-  interests: string[];
+  birthDate?: string;
+  interests?: string[];
   lastName: string;
   phone: string;
   pronouns: string;
@@ -130,8 +136,14 @@ interface CommonProfileInput {
 function baseProfile(input: CommonProfileInput) {
   return {
     first_name: input.firstName,
-    birth_date: input.birthDate,
-    interests: input.interests,
+    birth_date: input.birthDate ?? null,
+    interests: input.interests ?? [],
+    // Only managers set these, through the admin dialog. Writing them on every
+    // run is what undoes a verification or photo added through the UI; the
+    // fixtures that should start verified get it in a later pass.
+    profile_photo_path: null,
+    student_verified_at: null,
+    student_verified_by: null,
     last_name: input.lastName,
     phone: input.phone,
     preferred_pronouns: input.pronouns,
@@ -651,6 +663,10 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
       membershipPurchase("student-explorer", "explorer", gridPurchaseTime),
     ],
     registrations: [],
+    studentVerification: {
+      verifiedByEmail: "manager-no-membership@example.com",
+      verifiedAt: afterTimestamp(gridPurchaseTime, 24 * 60),
+    },
   },
   {
     email: "faculty-member@ubc.ca",
@@ -765,9 +781,9 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
     membershipSlug: null,
     fullEventHistory: false,
     profile: studentProfile({
+      // No birthday or interests, so the admin dialog's empty state is
+      // reachable without clearing them by hand.
       firstName: "Lucas",
-      birthDate: "2005-01-11",
-      interests: ["Sustainable design", "Urban planning", "Photography"],
       lastName: "Wong",
       phone: "6045550110",
       pronouns: "he/him",

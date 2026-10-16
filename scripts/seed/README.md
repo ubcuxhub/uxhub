@@ -81,7 +81,12 @@ Ten cover every membership state crossed with the basic and admin roles:
 | Non-UBC    | `non-ubc@example.com`           | `admin-non-ubc@example.com`       |
 | None       | `no-membership@example.com`     | `admin-no-membership@example.com` |
 
-Every fixture includes a birthday and interest tags for the admin user directory.
+Every fixture but `admin-no-membership@example.com` has a birthday and interest
+tags for the admin user directory; that one is left empty so the dialog's empty
+state is visible. `student-explorer@example.com` is a verified student, verified
+by `manager-no-membership@example.com`; everyone else is unverified. Each run
+resets verification and profile photos to that, undoing changes made through
+the admin dialog.
 
 `manager-no-membership@example.com` is the dedicated manager fixture. It can
 edit users and roles and is the only fixture that can access Club Settings.
