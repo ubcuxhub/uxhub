@@ -15,6 +15,7 @@ import { UserProfileSection } from "./UserProfileSection";
 import type { RoleAccess, UserInfoRow } from "@/lib/supabase/models";
 import { formatUserName } from "@/lib/user-name";
 import type { MembershipTypeOption, UserRecord } from "../types";
+import { displaySchool } from "../lib/directory";
 import { EditableUserField } from "./EditableUserField";
 import { MembershipTypeField } from "./MembershipTypeField";
 import { UserRecentTransactions } from "./UserRecentTransactions";
@@ -119,7 +120,7 @@ export function UserDetailsPanel({
             isEditing={editingField === "membership_type_id"}
             membershipTypes={membershipTypes}
           />
-          <ReadOnlyField label="School" value={selectedUser.school_institution} />
+          <ReadOnlyField label="School" value={displaySchool(selectedUser)} />
           <EditableUserField {...fieldProps} field="major" label="Area of Study"
             value={selectedUser.major} isEditing={editingField === "major"} />
           <UserProfileSection section="birthday" {...profileProps} />

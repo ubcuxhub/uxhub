@@ -49,7 +49,7 @@ function user(overrides: Partial<UserRecord>): UserRecord {
     dietary_restrictions: null, faculty: "Arts", faculty_email: null, major: "English",
     membership_type_id: "innovator", membership_type_name: "Innovator", membership_expires_at: null,
     membership_pre_ordered_type_id: null, newsletter: true, order_date_deprecated: null,
-    order_date: null, role_access: "manager", school_institution: "University of British Columbia",
+    order_date: null, role_access: "manager", school_institution: null,
     square_customer_id: null, student_number: 12345, student_status: "undergraduate", user_type: "ubcStudent", year: "2",
     ...overrides,
   };

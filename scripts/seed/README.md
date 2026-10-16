@@ -82,8 +82,6 @@ Ten cover every membership state crossed with the basic and admin roles:
 | None       | `no-membership@example.com`     | `admin-no-membership@example.com` |
 
 Every fixture includes a birthday and interest tags for the admin user directory.
-UBC students and faculty have `University of British Columbia` as their school;
-Non-UBC fixtures retain their own institutions.
 
 `manager-no-membership@example.com` is the dedicated manager fixture. It can
 edit users and roles and is the only fixture that can access Club Settings.

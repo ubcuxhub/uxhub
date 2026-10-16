@@ -111,8 +111,7 @@ function afterTimestamp(value: string, minutes: number): string {
  * The three types own mutually exclusive field sets, and
  * `completeMembershipProfile` in src/features/memberships/actions.ts nulls the
  * other two sets whenever a classification is chosen. These mirror that exactly
- * except that UBC students and faculty explicitly name UBC as their school
- * for the admin directory. Otherwise a fixture looks like a signed-up account rather
+ * so a fixture looks like an account somebody actually signed up for, rather
  * than a row with a plausible-looking mix of student and faculty fields.
  */
 interface CommonProfileInput {
@@ -159,7 +158,7 @@ function studentProfile(
     major: input.major,
     year: input.year,
     faculty_email: null,
-    school_institution: "University of British Columbia",
+    school_institution: null,
     student_status: null,
   };
 }
@@ -178,7 +177,7 @@ function facultyProfile(
     student_number: null,
     major: null,
     year: null,
-    school_institution: "University of British Columbia",
+    school_institution: null,
     student_status: null,
   };
 }
