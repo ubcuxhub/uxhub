@@ -159,15 +159,17 @@ Read `supabase/README.md` before changing the schema.
 - Add a new focused migration; do not edit a migration that has been applied.
 - Update the matching helper and `src/lib/supabase-helpers/tables.ts`.
 - Try the migration locally first with `pnpm supabase:local`.
-- Apply migrations to the hosted project with `pnpm exec supabase db push`.
-  Nothing applies them automatically. `pnpm types:supabase` generates types from
-  the hosted project, and `/events/[slug]` is prerendered against the database
-  at build time, so the push has to come before regenerating types and before
-  deploying. The hosted schema then runs ahead of the deployed code, so keep
-  migrations backward-compatible with the code already in production. `db push`
-  is forward-only; correct a bad migration with a new one.
-- Run `pnpm types:supabase` after the push and commit the regenerated
-  `src/lib/supabase/database.types.ts`.
+- Run `pnpm types:supabase` and commit the regenerated
+  `src/lib/supabase/database.types.ts`. It reads the local database, so the
+  types come from the migrations; CI regenerates them and fails on any
+  difference.
+- Apply migrations to the hosted project with `pnpm exec supabase db push`
+  before merging. Nothing applies them automatically, and the deploy that
+  follows a merge expects the new schema; `/events/[slug]` is also prerendered
+  against the database at build time. The hosted schema then runs ahead of the
+  deployed code, so keep migrations backward-compatible with the code already
+  in production. `db push` is forward-only; correct a bad migration with a new
+  one.
 - Validate schema changes with `pnpm exec tsc --noEmit`, `pnpm lint`, and
   `pnpm build`.
 

@@ -57,7 +57,7 @@ pnpm test     # Run the Vitest suite
 pnpm test:rls # Run the RLS policy suite against the local database
 pnpm seed     # Reconcile the local database to the seed data (safe to re-run)
 pnpm supabase:local  # Rebuild the local database from scratch and seed it
-pnpm types:supabase  # Regenerate Supabase TypeScript types from the hosted project
+pnpm types:supabase  # Regenerate Supabase TypeScript types from the local database
 pnpm email:templates # Regenerate supabase/templates/*.html from src/lib/email
 pnpm payment-smoke   # Manage the production payment smoke test (see scripts/seed/README.md)
 ```
