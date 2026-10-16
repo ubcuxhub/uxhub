@@ -10,6 +10,6 @@ export default defineConfig({
   test: {
     // Integration tests need a local Supabase, which CI's `verify` job does not
     // start. They have their own project in `vitest.integration.config.ts`.
-    exclude: [...configDefaults.exclude, "**/*.integration.test.ts", "tests/integration/**"],
+    exclude: [...configDefaults.exclude, "**/*.integration.test.ts"],
   },
 });

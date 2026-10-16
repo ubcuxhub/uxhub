@@ -1,80 +1,50 @@
-import { createHmac, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/supabase/database.types";
+import { NextRequest } from "next/server";
+import { describe, expect, it, vi } from "vitest";
+
 import type { UserInfoRow } from "@/lib/supabase/models";
+import { clientAs, createIntegrationClient, withFixtures, type Fixtures } from "@/test/integration";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
 const guard = vi.hoisted(() => ({ requireManager: vi.fn() }));
 vi.mock("@/lib/auth/guards", () => guard);
 
-import { saveUserBirthDateAction, saveUserInterestsAction, setStudentVerificationAction, removeUserProfilePhotoAction } from "@/features/admin/user-profile-actions";
-import { fetchActiveProfile, replaceProfilePhoto, saveAdminProfile } from "@/lib/supabase-helpers/admin-user-profile";
-import { adminDeleteAccount } from "@/lib/supabase-helpers/admin-server";
-import { parseProfilePhoto } from "@/features/admin/lib/user-profile";
 import { POST } from "@/app/api/admin/users/[userId]/photo/route";
-import { NextRequest } from "next/server";
+import { parseProfilePhoto } from "@/features/admin/lib/user-profile";
+import {
+  removeUserProfilePhotoAction, saveUserBirthDateAction,
+  saveUserInterestsAction, setStudentVerificationAction,
+} from "@/features/admin/user-profile-actions";
+import { adminDeleteAccount } from "@/lib/supabase-helpers/admin-server";
+import { fetchActiveProfile, replaceProfilePhoto, saveAdminProfile } from "@/lib/supabase-helpers/admin-user-profile";
 
+const db = createIntegrationClient();
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-if (!url || !["localhost", "127.0.0.1"].includes(new URL(url).hostname)) throw new Error("Only local Supabase is allowed.");
-const db = createClient<Database>(url, process.env.SUPABASE_SECRET_KEY!, { auth: { persistSession: false, autoRefreshToken: false } });
 const png = readFileSync("scripts/seed/data/images/1.png");
 const photo = { body: png, ...parseProfilePhoto(png, "image/png") };
-let user: UserInfoRow;
-let manager: UserInfoRow;
-let admin: UserInfoRow;
-const authIds: string[] = [];
-const profileIds: string[] = [];
 
-async function fixture(role: "basic" | "admin" | "manager") {
-  const email = `profile-integration-${randomUUID()}@example.test`;
-  const auth = await db.auth.admin.createUser({ email, email_confirm: true });
-  if (auth.error) throw auth.error;
-  const authId = auth.data.user.id;
-  authIds.push(authId);
-  const result = await db.from("user_info").insert({ auth_user_id: authId, email, first_name: "Integration", last_name: "Profile", role_access: role }).select().single();
-  if (result.error) throw result.error;
-  profileIds.push(result.data.id);
-  return result.data;
-}
+interface Profiles { user: UserInfoRow; manager: UserInfoRow; admin: UserInfoRow }
 
-// Exercise PostgREST/Storage as real authenticated roles without signing in.
-function clientFor(profile: UserInfoRow | null) {
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-  if (!profile) return createClient<Database>(url, key, { auth: { persistSession: false } });
-  const header = Buffer.from(JSON.stringify({ alg: "HS256", typ: "JWT" })).toString("base64url");
-  const payload = Buffer.from(JSON.stringify({ sub: profile.auth_user_id, role: "authenticated", aud: "authenticated", exp: Math.floor(Date.now() / 1000) + 600 })).toString("base64url");
-  const signature = createHmac("sha256", process.env.SUPABASE_TEST_JWT_SECRET!).update(`${header}.${payload}`).digest("base64url");
-  return createClient<Database>(url, key, { auth: { persistSession: false }, global: { headers: { Authorization: `Bearer ${header}.${payload}.${signature}` } } });
-}
-
-beforeEach(async () => {
-  user = await fixture("basic"); manager = await fixture("manager"); admin = await fixture("admin");
-  guard.requireManager.mockReset().mockResolvedValue(manager);
-});
-afterEach(async () => {
-  for (const id of profileIds) {
-    const files = await db.storage.from("profile-photos").list(`profiles/${id}`);
-    if (files.data?.length) {
-      const removed = await db.storage.from("profile-photos").remove(files.data.map((file) => `profiles/${id}/${file.name}`));
-      if (removed.error) throw removed.error;
+/** A basic member, a manager the guard resolves to, and an admin, all removed afterwards. */
+function withProfiles(fn: (profiles: Profiles, fixtures: Fixtures) => Promise<void>) {
+  return withFixtures(async (fixtures) => {
+    const profiles = {
+      user: await fixtures.createUser(),
+      manager: await fixtures.createUser({ role_access: "manager" }),
+      admin: await fixtures.createUser({ role_access: "admin" }),
+    };
+    for (const profile of Object.values(profiles)) {
+      fixtures.trackStorage("profile-photos", `profiles/${profile.id}`);
     }
-  }
-  if (profileIds.length) {
-    const removed = await db.from("user_info").delete().in("id", profileIds);
-    if (removed.error) throw removed.error;
-  }
-  for (const id of authIds) {
-    const removed = await db.auth.admin.deleteUser(id);
-    if (removed.error && removed.error.status !== 404) throw removed.error;
-  }
-  authIds.length = 0; profileIds.length = 0;
-});
+    guard.requireManager.mockReset().mockResolvedValue(profiles.manager);
+    await fn(profiles, fixtures);
+  });
+}
 
 describe("admin profile persistence against local Supabase", () => {
-  it("saves, reads and clears birth dates and normalized tags through actions", async () => {
+  it("saves, reads and clears birth dates and normalized tags through actions", () => withProfiles(async ({ user }) => {
     await saveUserBirthDateAction(user.id, "2000-02-29");
     await saveUserInterestsAction(user.id, [" Design ", "design", "Research"]);
     const saved = await fetchActiveProfile(db, user.id);
@@ -88,9 +58,9 @@ describe("admin profile persistence against local Supabase", () => {
     expect((await db.from("user_info").update({ interests: ["Design", "design"] }).eq("id", user.id)).error).toBeTruthy();
     await saveUserBirthDateAction(user.id, null); await saveUserInterestsAction(user.id, []);
     expect(await fetchActiveProfile(db, user.id)).toMatchObject({ birth_date: null, interests: [] });
-  });
+  }));
 
-  it("records the manager, clears verification on eligibility edits and allows manual clearing", async () => {
+  it("records the manager, clears verification on eligibility edits and allows manual clearing", () => withProfiles(async ({ user, manager }) => {
     const verified = await setStudentVerificationAction(user.id, true);
     expect(verified.student_verified_by).toBe(manager.id);
     expect(verified.student_verified_at).toBeTruthy();
@@ -101,24 +71,24 @@ describe("admin profile persistence against local Supabase", () => {
     expect((await fetchActiveProfile(db, user.id)).student_verified_at).toBeNull();
     await setStudentVerificationAction(user.id, true);
     expect((await setStudentVerificationAction(user.id, false)).student_verified_at).toBeNull();
-  });
+  }));
 
-  it("enforces own-row column restrictions and preserves admin directory reads", async () => {
+  it("enforces own-row column restrictions and preserves admin directory reads", () => withProfiles(async ({ user, manager, admin }) => {
     for (const profile of [user, admin, manager]) {
-      const client = clientFor(profile);
+      const client = clientAs(profile);
       for (const patch of [{ birth_date: "2000-01-01" }, { interests: ["Design"] }, { profile_photo_path: null }, { student_verified_at: new Date().toISOString(), student_verified_by: manager.id }]) {
         expect((await client.from("user_info").update(patch).eq("id", user.id)).error).toBeTruthy();
       }
     }
-    const own = await clientFor(user).from("user_info").select("id").eq("id", user.id);
+    const own = await clientAs(user).from("user_info").select("id").eq("id", user.id);
     expect(own.error).toBeNull(); expect(own.data).toHaveLength(1);
-    const visible = await clientFor(admin).from("user_info").select("id").eq("id", user.id);
+    const visible = await clientAs(admin).from("user_info").select("id").eq("id", user.id);
     expect(visible.error).toBeNull(); expect(visible.data).toHaveLength(1);
-    const hidden = await clientFor(null).from("user_info").select("id").eq("id", user.id);
+    const hidden = await clientAs(null).from("user_info").select("id").eq("id", user.id);
     expect(hidden.data ?? []).toHaveLength(0);
-  });
+  }));
 
-  it("uploads publicly, replaces and removes photos; stale saves clean up their upload", async () => {
+  it("uploads publicly, replaces and removes photos; stale saves clean up their upload", () => withProfiles(async ({ user }) => {
     const first = await replaceProfilePhoto(db, user.id, null, photo);
     expect(first.profile_photo_path).toContain(`profiles/${user.id}/`);
     const publicUrl = db.storage.from("profile-photos").getPublicUrl(first.profile_photo_path!).data.publicUrl;
@@ -132,18 +102,18 @@ describe("admin profile persistence against local Supabase", () => {
     await removeUserProfilePhotoAction(user.id, second.profile_photo_path);
     expect((await fetchActiveProfile(db, user.id)).profile_photo_path).toBeNull();
     expect((await db.storage.from("profile-photos").list(`profiles/${user.id}`)).data).toHaveLength(0);
-  });
+  }));
 
-  it("allows only one of two concurrent replacements", async () => {
+  it("allows only one of two concurrent replacements", () => withProfiles(async ({ user }) => {
     const results = await Promise.allSettled([replaceProfilePhoto(db, user.id, null, photo), replaceProfilePhoto(db, user.id, null, photo)]);
     expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
     expect((await db.storage.from("profile-photos").list(`profiles/${user.id}`)).data).toHaveLength(1);
-  });
+  }));
 
-  it("denies client storage writes/deletes and enforces bucket MIME and size limits", async () => {
+  it("denies client storage writes/deletes and enforces bucket MIME and size limits", () => withProfiles(async ({ user, manager, admin }) => {
     const saved = await replaceProfilePhoto(db, user.id, null, photo);
     for (const profile of [null, user, admin, manager]) {
-      const storage = clientFor(profile).storage.from("profile-photos");
+      const storage = clientAs(profile).storage.from("profile-photos");
       expect((await storage.upload(`profiles/${user.id}/${randomUUID()}.png`, png, { contentType: "image/png" })).error).toBeTruthy();
       await storage.remove([saved.profile_photo_path!]);
       expect((await db.storage.from("profile-photos").download(saved.profile_photo_path!)).error).toBeNull();
@@ -151,18 +121,20 @@ describe("admin profile persistence against local Supabase", () => {
     const storage = db.storage.from("profile-photos");
     expect((await storage.upload(`profiles/${user.id}/${randomUUID()}.txt`, Buffer.from("text"), { contentType: "text/plain" })).error).toBeTruthy();
     expect((await storage.upload(`profiles/${user.id}/${randomUUID()}.png`, Buffer.alloc(4194305), { contentType: "image/png" })).error).toBeTruthy();
-  });
+  }));
 
-  it("handles upload route validation and persists accepted photos", async () => {
+  it("handles upload route validation and persists accepted photos", () => withProfiles(async ({ user }) => {
     const form = new FormData(); form.set("expectedPath", ""); form.set("file", new File([png], "photo.png", { type: "image/png" }));
     const response = await POST(new NextRequest(`${url}/api/admin/users/${user.id}/photo`, { method: "POST", body: form }), { params: Promise.resolve({ userId: user.id }) });
     expect(response.status).toBe(200);
     expect((await response.json()).user.profile_photo_path).toBeTruthy();
     const invalid = new FormData(); invalid.set("expectedPath", ""); invalid.set("file", new File(["invalid"], "photo.png", { type: "image/png" }));
     expect((await POST(new NextRequest(`${url}/test`, { method: "POST", body: invalid }), { params: Promise.resolve({ userId: user.id }) })).status).toBe(400);
-  });
+    const stale = new FormData(); stale.set("expectedPath", ""); stale.set("file", new File([png], "photo.png", { type: "image/png" }));
+    expect((await POST(new NextRequest(`${url}/test`, { method: "POST", body: stale }), { params: Promise.resolve({ userId: user.id }) })).status).toBe(409);
+  }));
 
-  it("requires manager authorization for every action and upload route", async () => {
+  it("requires manager authorization for every action and upload route", () => withProfiles(async ({ user }) => {
     guard.requireManager.mockRejectedValue(new Error("Manager required"));
     await expect(saveUserBirthDateAction(user.id, "2000-01-01")).rejects.toThrow("Manager required");
     await expect(saveUserInterestsAction(user.id, ["Design"])).rejects.toThrow("Manager required");
@@ -170,9 +142,9 @@ describe("admin profile persistence against local Supabase", () => {
     await expect(removeUserProfilePhotoAction(user.id, null)).rejects.toThrow("Manager required");
     await expect(POST(new NextRequest(`${url}/test`, { method: "POST" }), { params: Promise.resolve({ userId: user.id }) })).rejects.toThrow("Manager required");
     expect(await fetchActiveProfile(db, user.id)).toMatchObject({ birth_date: null, interests: [], student_verified_at: null });
-  });
+  }));
 
-  it("anonymizes all new fields, removes the photo and rejects later writes", async () => {
+  it("anonymizes all new fields, removes the photo and rejects later writes", () => withProfiles(async ({ user }) => {
     await saveUserBirthDateAction(user.id, "2000-01-01"); await saveUserInterestsAction(user.id, ["Design"]); await setStudentVerificationAction(user.id, true);
     const saved = await replaceProfilePhoto(db, user.id, null, photo);
     const stalePath = `profiles/${user.id}/${randomUUID()}.png`;
@@ -186,5 +158,5 @@ describe("admin profile persistence against local Supabase", () => {
     expect((await db.storage.from("profile-photos").list(`profiles/${user.id}`)).data).toHaveLength(0);
     await expect(saveUserBirthDateAction(user.id, "2000-01-01")).rejects.toThrow();
     await expect(replaceProfilePhoto(db, user.id, null, photo)).rejects.toThrow();
-  });
+  }));
 });

@@ -54,6 +54,7 @@ jobs:
             echo "NEXT_PUBLIC_SUPABASE_URL=$(jq -r .API_URL <<<"$status")"
             echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$(jq -r .ANON_KEY <<<"$status")"
             echo "SUPABASE_SECRET_KEY=$(jq -r .SERVICE_ROLE_KEY <<<"$status")"
+            echo "SUPABASE_JWT_SECRET=$(jq -r .JWT_SECRET <<<"$status")"
             echo "SUPABASE_DB_URL=$(jq -r .DB_URL <<<"$status")"
           } >> "$GITHUB_ENV"
 

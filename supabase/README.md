@@ -186,11 +186,12 @@ editing is deferred. Anonymization triggers clear all four additions during
 the existing `delete_account` transaction; changes to student number or user
 type invalidate manual verification.
 
-Run `pnpm test:integration` with local Supabase running to exercise these actions,
-database constraints, access controls, and Storage. The runner reads local CLI
-credentials, rejects non-local URLs, and cleans up only its disposable fixtures.
-It does not sign in through the app or require the seed accounts. CI runs it
-after the RLS suite; ordinary `pnpm test` excludes integration tests.
+[`user-profile.integration.test.ts`](../src/features/admin/user-profile.integration.test.ts)
+exercises these actions, database constraints, access controls, and Storage
+through `pnpm test:integration`. It uses the shared fixtures in
+[`src/test/integration.ts`](../src/test/integration.ts), which also remove the
+photos a test uploads, and acts as a member by signing a local JWT rather than
+signing in.
 
 Event cover images live in the public `event-images` bucket. Bucket names are
 centralized in [`buckets.ts`](../src/lib/supabase-helpers/buckets.ts), the same
