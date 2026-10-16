@@ -21,6 +21,7 @@ export type Database = {
           updated_at: string
           updated_by: string | null
         }
+        ComputedFields: never
         Insert: {
           id?: boolean
           membership_term_ends_at?: string | null
@@ -53,6 +54,7 @@ export type Database = {
           start_time: string | null
           updated_at: string | null
         }
+        ComputedFields: never
         Insert: {
           created_at?: string | null
           end_time?: string | null
@@ -90,6 +92,7 @@ export type Database = {
           id: string
           updated_at: string | null
         }
+        ComputedFields: never
         Insert: {
           check_in_session_id: string
           checked_in_at?: string | null
@@ -140,6 +143,7 @@ export type Database = {
           sort_order: number
           updated_at: string | null
         }
+        ComputedFields: never
         Insert: {
           allowed_file_types?: string[] | null
           created_at?: string | null
@@ -191,6 +195,7 @@ export type Database = {
           response: string | null
           updated_at: string | null
         }
+        ComputedFields: never
         Insert: {
           created_at?: string | null
           event_application_question_id: string
@@ -230,6 +235,7 @@ export type Database = {
           mentor_id: string
           sort_order: number
         }
+        ComputedFields: never
         Insert: {
           event_id: string
           mentor_id: string
@@ -269,6 +275,7 @@ export type Database = {
           updated_at: string | null
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           attending?: boolean | null
           created_at?: string | null
@@ -328,6 +335,7 @@ export type Database = {
           sort_order: number
           sponsor_id: string
         }
+        ComputedFields: never
         Insert: {
           event_id: string
           sort_order?: number
@@ -385,6 +393,7 @@ export type Database = {
           status: Database["public"]["Enums"]["event_status"]
           updated_at: string | null
         }
+        ComputedFields: never
         Insert: {
           agenda?: Json | null
           applications_enabled?: boolean
@@ -457,6 +466,7 @@ export type Database = {
           slug: string
           updated_at: string | null
         }
+        ComputedFields: never
         Insert: {
           active?: boolean
           created_at?: string | null
@@ -492,6 +502,7 @@ export type Database = {
           profile_image_path: string | null
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           description?: string | null
@@ -534,6 +545,7 @@ export type Database = {
           updated_at: string | null
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           amount_cents: number
           confirmation_email_attempted_at?: string | null
@@ -604,6 +616,7 @@ export type Database = {
           name: string
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           brand_logo_path?: string | null
           created_at?: string
@@ -625,21 +638,22 @@ export type Database = {
           created_at: string | null
           event_id: string
           event_type: string
-          payload: Json
+          payload: NonNullable<Json>
           processed_at: string | null
         }
+        ComputedFields: never
         Insert: {
           created_at?: string | null
           event_id: string
           event_type: string
-          payload: Json
+          payload: NonNullable<Json>
           processed_at?: string | null
         }
         Update: {
           created_at?: string | null
           event_id?: string
           event_type?: string
-          payload?: Json
+          payload?: NonNullable<Json>
           processed_at?: string | null
         }
         Relationships: []
@@ -678,6 +692,7 @@ export type Database = {
           user_type: Database["public"]["Enums"]["user_type"]
           year: Database["public"]["Enums"]["uni_year"] | null
         }
+        ComputedFields: never
         Insert: {
           auth_user_id?: string | null
           birth_date?: string | null
@@ -773,7 +788,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      current_user_info_id: { Args: never; Returns: string }
+      current_user_info_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       delete_account: { Args: { p_auth_user_id: string }; Returns: undefined }
       delete_event_atomically: {
         Args: { target_event_id: string }
@@ -786,10 +804,10 @@ export type Database = {
           registration_count: number
         }[]
       }
-      get_user_info_id: { Args: never; Returns: string }
-      is_admin: { Args: never; Returns: boolean }
-      is_authenticated: { Args: never; Returns: boolean }
-      is_manager: { Args: never; Returns: boolean }
+      get_user_info_id: { Args: Record<PropertyKey, never>; Returns: string }
+      is_admin: { Args: Record<PropertyKey, never>; Returns: boolean }
+      is_authenticated: { Args: Record<PropertyKey, never>; Returns: boolean }
+      is_manager: { Args: Record<PropertyKey, never>; Returns: boolean }
       release_paid_event_ticket_reservation: {
         Args: { p_purchase_id: string }
         Returns: undefined

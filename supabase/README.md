@@ -93,25 +93,31 @@ Do these steps in order:
    This rebuilds the local database from every migration, so a broken one
    fails here instead of on the hosted project.
 
-3. **Push it to the hosted project.**
+3. **Regenerate the TypeScript types.**
+
+   ```bash
+   pnpm types:supabase
+   ```
+
+   This reads the local database you just rebuilt, through its `postgres-meta`
+   service, and overwrites `src/lib/supabase/database.types.ts`. Commit the
+   result. CI runs the same command against a database built from every
+   migration and fails if the committed file differs, so the types always
+   match the migrations. The output depends on the `postgres-meta` version, so
+   the command refuses to run against a stack started by an older CLI; restart
+   it with `pnpm exec supabase stop && pnpm exec supabase start`.
+
+4. **Push it to the hosted project before merging.**
 
    ```bash
    pnpm exec supabase db push
    ```
 
    Nothing applies migrations automatically, and `db push` is forward-only. The
-   hosted schema now runs ahead of the deployed code, so the migration must not
+   deploy that follows a merge expects the new schema, so push first. The
+   hosted schema then runs ahead of the deployed code, so the migration must not
    break the code already in production (see the compatibility path under
    "Migration guidelines").
-
-4. **Regenerate the TypeScript types.**
-
-   ```bash
-   pnpm types:supabase
-   ```
-
-   This reads the hosted project, which is why it comes after the push, and
-   overwrites `src/lib/supabase/database.types.ts`. Commit the result.
 
 5. **Update the data-access layer** (`src/lib/supabase-helpers/`):
    - Update the relevant helper's `select(...)` list, insert/update payloads,
@@ -243,9 +249,10 @@ strings the compiler cannot validate. A rename here breaks silently at runtime:
 
 ## Debugging checklist when something breaks
 
-- **Stale types?** Re-run `pnpm types:supabase` and `pnpm exec tsc --noEmit`.
-  A mismatch between `database.types.ts` and the live schema is the most common
-  cause.
+- **Stale types?** Rebuild with `pnpm supabase:local`, re-run
+  `pnpm types:supabase`, and run `pnpm exec tsc --noEmit`. If the types are
+  right but production misbehaves, check that every migration was pushed:
+  `pnpm exec supabase migration list`.
 - **Renamed table/column not reflected in a helper?** Check the helper file
   from the table map above and the `TABLES` map.
 - **Realtime not updating / errors?** Check `postgres_changes` `table`/`filter`

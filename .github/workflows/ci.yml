@@ -42,10 +42,18 @@ jobs:
       # Applies every migration in supabase/migrations to a throwaway database,
       # so a schema change that the app code does not match fails here rather
       # than in a deploy. Nothing remote is touched. Only db, auth, kong, rest,
-      # and storage are started: the RLS suite and the build need nothing else,
-      # and every excluded image is one fewer pull from a rate-limited registry.
+      # meta, and storage are started: the RLS suite, the type check, and the
+      # build need nothing else, and every excluded image is one fewer pull from
+      # a rate-limited registry.
       - name: Start Supabase
-        run: pnpm exec supabase start -x studio,meta,edge-runtime,imgproxy,analytics,vector,realtime,inbucket
+        run: pnpm exec supabase start -x studio,edge-runtime,imgproxy,analytics,vector,realtime,inbucket
+
+      # Types come from the migrations, so a migration committed without its
+      # regenerated types, or types edited by hand, fails here.
+      - name: Check generated types
+        run: |
+          pnpm types:supabase
+          git diff --exit-code -- src/lib/supabase/database.types.ts
 
       - name: Export Supabase env
         run: |
