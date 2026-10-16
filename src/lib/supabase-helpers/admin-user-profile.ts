@@ -7,6 +7,18 @@ import { errorFields, log } from "@/lib/log";
 import { BUCKETS } from "./buckets";
 import { TABLES } from "./tables";
 
+/**
+ * The user was deleted, or another save replaced the photo first. Expected
+ * under concurrent edits, so callers report it to the manager rather than
+ * alerting on it.
+ */
+export class ProfilePhotoConflictError extends Error {
+  constructor() {
+    super("The profile photo changed or the user is unavailable. Reload and try again.");
+    this.name = "ProfilePhotoConflictError";
+  }
+}
+
 export async function fetchActiveProfile(db: SupabaseClient<Database>, userId: string) {
   const { data, error } = await db.from(TABLES.userInfo).select("*").eq("id", userId).is("deleted_at", null).single();
   if (error || !data) throw new Error("Active user not found.");
@@ -51,7 +63,10 @@ export async function replaceProfilePhoto(
   db: SupabaseClient<Database>, userId: string, expectedPath: string | null,
   photo: { body: Buffer; contentType: string; extension: string } | null,
 ) {
-  await fetchActiveProfile(db, userId);
+  const { data: active, error: lookupError } = await db.from(TABLES.userInfo)
+    .select("id").eq("id", userId).is("deleted_at", null).maybeSingle();
+  if (lookupError) throw lookupError;
+  if (!active) throw new ProfilePhotoConflictError();
   const nextPath = photo ? `profiles/${userId}/${crypto.randomUUID()}.${photo.extension}` : null;
   if (photo && nextPath) {
     const { error } = await db.storage.from(BUCKETS.profilePhotos).upload(nextPath, photo.body, {
@@ -64,7 +79,8 @@ export async function replaceProfilePhoto(
   const { data, error } = await query.select("*").maybeSingle();
   if (error || !data) {
     await cleanupProfilePhoto(db, nextPath);
-    throw new Error("The profile photo changed or the user is unavailable. Reload and try again.");
+    if (error) throw error;
+    throw new ProfilePhotoConflictError();
   }
   await cleanupProfilePhoto(db, expectedPath);
   return data;

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { requireManager } from "@/lib/auth/guards";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { replaceProfilePhoto } from "@/lib/supabase-helpers/admin-user-profile";
+import { ProfilePhotoConflictError, replaceProfilePhoto } from "@/lib/supabase-helpers/admin-user-profile";
 import { parseProfilePhoto, PROFILE_PHOTO_MAX_BYTES } from "@/features/admin/lib/user-profile";
 import { errorFields, log } from "@/lib/log";
 
@@ -28,7 +28,11 @@ export async function POST(req: NextRequest, context: { params: Promise<{ userId
     revalidatePath("/admin/users");
     return NextResponse.json({ user });
   } catch (error) {
+    if (error instanceof ProfilePhotoConflictError) {
+      log.warn("admin.profile_photo_save_conflict", { userId });
+      return NextResponse.json({ error: error.message }, { status: 409 });
+    }
     log.error("admin.profile_photo_save_failed", { userId, ...errorFields(error) });
-    return NextResponse.json({ error: "Unable to save photo. Reload the user details and try again." }, { status: 409 });
+    return NextResponse.json({ error: "Unable to save photo. Try again." }, { status: 500 });
   }
 }
