@@ -62,7 +62,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    await processSquarePaymentEvent(event, rawPayload as Json);
+    await processSquarePaymentEvent(event, rawPayload as NonNullable<Json>);
 
     return NextResponse.json({ ok: true });
   } catch (error) {

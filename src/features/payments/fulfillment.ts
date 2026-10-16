@@ -604,7 +604,7 @@ export async function executeCheckoutForUser(
 
 export async function processSquarePaymentEvent(
   event: PaymentUpdatedEvent,
-  rawPayload: Json = event as Json
+  rawPayload: NonNullable<Json> = event as NonNullable<Json>
 ) {
   const eventId = event.eventId;
   const eventType = event.type;

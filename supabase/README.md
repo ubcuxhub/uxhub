@@ -103,7 +103,9 @@ Do these steps in order:
    service, and overwrites `src/lib/supabase/database.types.ts`. Commit the
    result. CI runs the same command against a database built from every
    migration and fails if the committed file differs, so the types always
-   match the migrations.
+   match the migrations. The output depends on the `postgres-meta` version, so
+   the command refuses to run against a stack started by an older CLI; restart
+   it with `pnpm exec supabase stop && pnpm exec supabase start`.
 
 4. **Push it to the hosted project before merging.**
 

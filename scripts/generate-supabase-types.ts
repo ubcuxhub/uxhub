@@ -8,9 +8,15 @@
  * project uses, rather than `supabase gen types --local`: the CLI's built-in
  * generator emits unformatted output with a different `Json` type and no
  * `__InternalSupabase` block, which does not type-check against this codebase.
+ *
+ * The output depends on the postgres-meta version, so it refuses to run against
+ * a stack whose postgres-meta differs from the one the lockfile's CLI pins,
+ * which is the version CI runs. `supabase start` leaves an already running
+ * stack on whatever images it was started with, so an old stack would
+ * otherwise produce a file CI rejects.
  */
 import { spawnSync } from "node:child_process";
-import { writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync } from "node:fs";
 
 const OUTPUT = "src/lib/supabase/database.types.ts";
 
@@ -22,9 +28,11 @@ const OUTPUT = "src/lib/supabase/database.types.ts";
  */
 const POSTGREST_VERSION = "14.5";
 
-const result = spawnSync("pnpm", ["exec", "supabase", "status", "-o", "json"], {
-  encoding: "utf8",
-});
+function run(command: string, args: string[]) {
+  return spawnSync(command, args, { encoding: "utf8" });
+}
+
+const result = run("pnpm", ["exec", "supabase", "status", "-o", "json"]);
 if (result.status !== 0) {
   throw new Error(
     "Could not read the local Supabase status. Start it with " +
@@ -48,6 +56,30 @@ const host = new URL(status.API_URL).hostname;
 if (host !== "127.0.0.1" && host !== "localhost" && host !== "[::1]") {
   throw new Error(
     `Refusing to generate types from ${status.API_URL}: only a local Supabase is allowed.`
+  );
+}
+
+const services = run("pnpm", ["exec", "supabase", "services", "-o", "json"]);
+const pinnedMeta = services.status === 0
+  ? (JSON.parse(services.stdout) as { name: string; local: string }[]).find(
+      (service) => service.name === "supabase/postgres-meta"
+    )?.local
+  : undefined;
+const projectId = /^project_id\s*=\s*"([^"]+)"/m.exec(
+  readFileSync("supabase/config.toml", "utf8")
+)?.[1];
+const runningImage = run("docker", [
+  "inspect",
+  `supabase_pg_meta_${projectId}`,
+  "--format",
+  "{{.Config.Image}}",
+]).stdout.trim();
+if (!pinnedMeta || !runningImage.endsWith(`:${pinnedMeta}`)) {
+  throw new Error(
+    `The local postgres-meta (${runningImage || "not running"}) is not the ` +
+      `version the Supabase CLI pins (${pinnedMeta ?? "unknown"}), so the ` +
+      "types would not match CI's. Restart the stack to pick it up: " +
+      "`pnpm exec supabase stop && pnpm exec supabase start`."
   );
 }
 
