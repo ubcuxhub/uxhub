@@ -7,7 +7,7 @@ import type { PurchaseRow, UserInfoRow } from "@/lib/supabase/models";
 import type { CheckoutActionResult, CheckoutRequestInput } from "./types";
 import type { Database, Json } from "@/lib/supabase/database.types";
 import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
-import { log } from "@/lib/log";
+import { errorFields, log } from "@/lib/log";
 import { fetchApplicationQuestions } from "@/lib/supabase-helpers/event-applications";
 import {
   fetchEventRegistrationByPurchaseId,
@@ -21,6 +21,7 @@ import {
   fetchPurchaseById,
   fetchPurchaseByIdempotencyKey,
   fetchPurchaseBySquarePaymentId,
+  forgetSquareWebhookEvent,
   recordSquareWebhookEvent,
   updatePurchase,
 } from "@/lib/supabase-helpers/purchases";
@@ -49,6 +50,16 @@ import { revalidatePurchasePaths } from "./revalidation";
 import { getExistingCheckoutResult } from "./checkout-results";
 
 const adminDb = supabaseAdmin as unknown as SupabaseClient<Database>;
+
+/**
+ * How long Square holds an event-ticket authorization before voiding it on its
+ * own. Checkout captures within seconds, so this only matters when that
+ * capture never happens (a lost response, a crashed request). Square's default
+ * for card-not-present holds is seven days, which left the buyer stuck on
+ * "processing" and the seat taken for a week; a short hold voids it quickly,
+ * and the resulting CANCELED webhook releases the seat.
+ */
+const EVENT_TICKET_HOLD_DURATION = "PT10M";
 
 async function cancelSquarePaymentIfPossible(paymentId: string) {
   try {
@@ -203,6 +214,18 @@ async function applyPaymentStateToPurchase(purchaseId: string, payment: Payment)
     await fulfillCompletedPurchase(updatedPurchase.id);
   }
 
+  // A ticket whose hold was voided or failed after its seat was reserved would
+  // otherwise keep counting toward capacity and block the buyer from trying
+  // again. The release only removes an unconfirmed reservation, so it is a
+  // no-op when checkout already released it or never reserved one.
+  if (
+    updatedPurchase.kind === "event_ticket" &&
+    (updatedPurchase.status === "canceled" ||
+      updatedPurchase.status === "failed")
+  ) {
+    await releaseEventTicketSeatReservation(updatedPurchase.id);
+  }
+
   return updatedPurchase;
 }
 
@@ -345,10 +368,17 @@ async function createSquarePaymentForMembership(
         updatedPurchase.status === "completed" ? "completed" : "processing",
     } as const;
   } catch (error) {
-    log.error("payment.membership_charge_failed", {
+    const chargeFields = {
       purchaseId: purchase.id,
       diagnostic: getSquareErrorDiagnostic(error),
-    });
+    };
+
+    // A decline is the buyer's card, not a bug, so it stays out of Sentry.
+    if (isDefinitiveSquareFailure(error)) {
+      log.warn("payment.membership_charge_declined", chargeFields);
+    } else {
+      log.error("payment.membership_charge_failed", chargeFields);
+    }
 
     if (isDefinitiveSquareFailure(error)) {
       await updatePurchase(adminDb, purchase.id, {
@@ -434,6 +464,8 @@ async function createSquarePaymentForEventTicket(
       autocomplete: false,
       buyerEmailAddress: input.buyerEmail,
       customerId,
+      delayAction: "CANCEL",
+      delayDuration: EVENT_TICKET_HOLD_DURATION,
       idempotencyKey: purchase.idempotency_key,
       locationId: getSquareLocationId(),
       note: `UX Hub event ticket: ${event.name}`,
@@ -489,10 +521,17 @@ async function createSquarePaymentForEventTicket(
         updatedPurchase.status === "completed" ? "completed" : "processing",
     } as const;
   } catch (error) {
-    log.error("payment.ticket_charge_failed", {
+    const chargeFields = {
       purchaseId: purchase.id,
       diagnostic: getSquareErrorDiagnostic(error),
-    });
+    };
+
+    // A decline is the buyer's card, not a bug, so it stays out of Sentry.
+    if (isDefinitiveSquareFailure(error)) {
+      log.warn("payment.ticket_charge_declined", chargeFields);
+    } else {
+      log.error("payment.ticket_charge_failed", chargeFields);
+    }
 
     const purchaseRecord = await fetchPurchaseById(adminDb, purchase.id);
     const paymentId = purchaseRecord?.square_payment_id ?? null;
@@ -585,7 +624,24 @@ export async function processSquarePaymentEvent(
     return;
   }
 
-  let purchase = await fetchPurchaseBySquarePaymentId(adminDb, payment.id);
+  try {
+    await applySquarePayment(payment.id, payment);
+  } catch (error) {
+    // The event was recorded before processing so concurrent deliveries are
+    // handled once. Forget it again on failure, or Square's retry would be
+    // dropped as a duplicate and the purchase would never settle.
+    await forgetSquareWebhookEvent(adminDb, eventId).catch((forgetError) => {
+      log.error("webhook.square_event_forget_failed", {
+        eventId,
+        ...errorFields(forgetError),
+      });
+    });
+    throw error;
+  }
+}
+
+async function applySquarePayment(paymentId: string, payment: Payment) {
+  let purchase = await fetchPurchaseBySquarePaymentId(adminDb, paymentId);
 
   // A create-payment response can be lost after Square accepts the charge but
   // before we persist its payment ID. Square echoes our purchase ID as the

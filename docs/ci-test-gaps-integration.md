@@ -6,11 +6,12 @@ separate plan covers the unit gaps in [`ci-test-gaps-unit.md`](ci-test-gaps-unit
 
 ## Background
 
-CI's `build` job starts a throwaway Supabase with every migration applied and
-runs [`supabase/tests/rls.sql`](../supabase/tests/rls.sql) and
-`pnpm test:integration`. Admin user profile integration tests now run app actions
-and helpers against local Supabase and Storage, including account deletion.
-The remaining domain integration gaps are listed below.
+CI's `build` job starts a throwaway Supabase with every migration applied, runs
+[`supabase/tests/rls.sql`](../supabase/tests/rls.sql), then runs
+`pnpm test:integration` against the same database. The harness is in place
+(`vitest.integration.config.ts` and [`src/test/integration.ts`](../src/test/integration.ts));
+what is still missing is coverage. `rls.sql` checks access control only, and the
+only database function anything calls is `set_user_role`.
 
 ## Scope
 
@@ -20,14 +21,7 @@ TypeScript against the local Supabase. This plan owns `vitest.config.ts`,
 
 ## Suggested order
 
-### 1. Harness — complete
-
-`pnpm test:integration` uses a separate Vitest configuration, reads credentials
-from the local CLI, rejects non-local targets, and runs in CI after RLS checks.
-Tests create disposable fixtures and clean up their own database rows, auth
-users, and storage objects. Ordinary `pnpm test` excludes this suite.
-
-### 2. Database functions
+### 1. Database functions
 
 - `reserve_paid_event_ticket`: each failure reason (`EVENT_NOT_FOUND`,
   `EVENT_NOT_ACTIVE`, `APPLICATION_REQUIRED`, `REGISTRATION_NOT_OPEN`,
@@ -36,12 +30,11 @@ users, and storage objects. Ordinary `pnpm test` excludes this suite.
 - `release_paid_event_ticket_reservation` frees only the seat it reserved.
 - `save_admin_event_atomically` and `delete_event_atomically` are
   all-or-nothing, and respect the cover-image guard.
-- `event_registration_counts`. Account deletion is covered by the admin profile
-  integration suite, including anonymization and profile photo cleanup.
+- `delete_account` and `event_registration_counts`.
 
 Their execute grants are already asserted in `rls.sql`.
 
-### 3. RLS assertions
+### 2. RLS assertions
 
 Add to `rls.sql`:
 
@@ -56,7 +49,7 @@ Add to `rls.sql`:
   [Storage](../supabase/README.md#storage)), so this guards against one being
   added.
 
-### 4. Supabase helpers
+### 3. Supabase helpers
 
 Only `memberships.ts` in `src/lib/supabase-helpers` has tests, and those use a
 fake client. Start with the confirmation-email claim and release in
@@ -64,7 +57,7 @@ fake client. Start with the confirmation-email claim and release in
 `recordSquareWebhookEvent`. Then `check-ins.ts`, and
 `adminDeleteEventImageByUrl` ignoring URLs outside the bucket.
 
-### 5. Fulfillment against the database
+### 4. Fulfillment against the database
 
 With only Square mocked, add a few cases to
 [`fulfillment.ts`](../src/features/payments/fulfillment.ts), such as buying the

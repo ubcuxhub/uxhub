@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { DM_Sans, Inter, Lora } from "next/font/google";
 import { UserProvider } from "@/lib/auth/user-context";
 import { themeInitScript } from "@/lib/theme";
@@ -61,6 +62,7 @@ export default function RootLayout({
           {flow}
         </UserProvider>
         <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

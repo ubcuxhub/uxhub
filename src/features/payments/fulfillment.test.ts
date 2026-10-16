@@ -61,6 +61,7 @@ const purchasesMocks = vi.hoisted(() => ({
   fetchPurchaseById: vi.fn(),
   fetchPurchaseByIdempotencyKey: vi.fn(),
   fetchPurchaseBySquarePaymentId: vi.fn(),
+  forgetSquareWebhookEvent: vi.fn(),
   recordSquareWebhookEvent: vi.fn(),
   updatePurchase: vi.fn(),
 }));
@@ -92,6 +93,16 @@ const revalidationMocks = vi.hoisted(() => ({
   revalidatePurchasePaths: vi.fn(),
 }));
 vi.mock("./revalidation", () => revalidationMocks);
+
+const logMocks = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+}));
+vi.mock("@/lib/log", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/log")>()),
+  log: logMocks,
+}));
 
 // fulfillment-rules is left real: it is what actually parses Square's error
 // shape, and a mock here would hide the exact regression a Square SDK bump
@@ -167,6 +178,7 @@ beforeEach(() => {
   );
   purchasesMocks.fetchPurchaseById.mockResolvedValue(purchase());
   purchasesMocks.recordSquareWebhookEvent.mockResolvedValue(true);
+  purchasesMocks.forgetSquareWebhookEvent.mockResolvedValue(undefined);
 
   registrationsMocks.fetchUserRegistration.mockResolvedValue(null);
   registrationsMocks.fetchEventRegistrationByPurchaseId.mockResolvedValue({
@@ -269,6 +281,12 @@ describe("event ticket checkout", () => {
       "purchase-1",
       expect.objectContaining({ status: "failed" })
     );
+    // A decline is expected, so it is a warning and never reaches Sentry.
+    expect(logMocks.warn).toHaveBeenCalledWith("payment.ticket_charge_declined", {
+      purchaseId: "purchase-1",
+      diagnostic: "CARD_DECLINED (PAYMENT_METHOD_ERROR)",
+    });
+    expect(logMocks.error).not.toHaveBeenCalled();
   });
 
   it("leaves an ambiguous failure as processing without canceling or releasing the seat", async () => {
@@ -288,6 +306,23 @@ describe("event ticket checkout", () => {
     expect(adminDb.rpc).not.toHaveBeenCalledWith(
       "release_paid_event_ticket_reservation",
       expect.anything()
+    );
+    // The money state is unclear, so this one alerts.
+    expect(logMocks.error).toHaveBeenCalledWith("payment.ticket_charge_failed", {
+      purchaseId: "purchase-1",
+      diagnostic: "GATEWAY_TIMEOUT (API_ERROR)",
+    });
+  });
+
+  it("asks Square to void the hold soon if it is never captured", async () => {
+    await executeCheckoutForUser(user, ticketInput);
+
+    expect(squareMocks.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        autocomplete: false,
+        delayAction: "CANCEL",
+        delayDuration: "PT10M",
+      })
     );
   });
 
@@ -358,6 +393,21 @@ describe("idempotent retries", () => {
 });
 
 describe("membership fulfillment", () => {
+  it("logs a declined membership charge as a warning, not an error", async () => {
+    squareMocks.create.mockRejectedValue(
+      squareError([{ category: "PAYMENT_METHOD_ERROR", code: "CVV_FAILURE" }])
+    );
+
+    const result = await executeCheckoutForUser(user, membershipInput);
+
+    expect(result).toMatchObject({ ok: false, terminal: true });
+    expect(logMocks.warn).toHaveBeenCalledWith(
+      "payment.membership_charge_declined",
+      { purchaseId: "purchase-1", diagnostic: "CVV_FAILURE (PAYMENT_METHOD_ERROR)" }
+    );
+    expect(logMocks.error).not.toHaveBeenCalled();
+  });
+
   it("stamps the expiry and clears the pre-order on a completed membership purchase", async () => {
     squareMocks.create.mockResolvedValue({
       payment: { id: "payment-1", customerId: "customer-1", status: "COMPLETED" },
@@ -437,6 +487,79 @@ describe("webhook-driven reconciliation", () => {
       "purchase-1",
       expect.objectContaining({ status: "completed" })
     );
+  });
+
+  it("releases the seat when Square voids an uncaptured ticket hold", async () => {
+    purchasesMocks.fetchPurchaseBySquarePaymentId.mockResolvedValue(
+      purchase({ event_id: "event-1", square_payment_id: "payment-1", status: "authorized" })
+    );
+
+    await processSquarePaymentEvent({
+      ...event,
+      data: { object: { payment: { id: "payment-1", status: "CANCELED" } } },
+    });
+
+    expect(purchasesMocks.updatePurchase).toHaveBeenCalledWith(
+      adminDb,
+      "purchase-1",
+      expect.objectContaining({ status: "canceled" })
+    );
+    expect(adminDb.rpc).toHaveBeenCalledWith(
+      "release_paid_event_ticket_reservation",
+      { p_purchase_id: "purchase-1" }
+    );
+  });
+
+  it("leaves seats alone when a membership payment is canceled", async () => {
+    purchasesMocks.fetchPurchaseBySquarePaymentId.mockResolvedValue(
+      purchase({ kind: "membership", square_payment_id: "payment-1" })
+    );
+    purchasesMocks.updatePurchase.mockImplementation(
+      async (_db: unknown, id: string, payload: Partial<PurchaseRow>) =>
+        purchase({ id, kind: "membership", ...payload })
+    );
+
+    await processSquarePaymentEvent({
+      ...event,
+      data: { object: { payment: { id: "payment-1", status: "CANCELED" } } },
+    });
+
+    expect(adminDb.rpc).not.toHaveBeenCalled();
+  });
+
+  it("forgets the event when processing fails so Square's retry is processed", async () => {
+    const failure = new Error("database unavailable");
+    purchasesMocks.fetchPurchaseBySquarePaymentId.mockRejectedValue(failure);
+
+    await expect(processSquarePaymentEvent(event)).rejects.toBe(failure);
+
+    expect(purchasesMocks.forgetSquareWebhookEvent).toHaveBeenCalledWith(
+      adminDb,
+      "event-1"
+    );
+  });
+
+  it("still reports the processing failure when forgetting the event fails", async () => {
+    const failure = new Error("database unavailable");
+    purchasesMocks.fetchPurchaseBySquarePaymentId.mockRejectedValue(failure);
+    purchasesMocks.forgetSquareWebhookEvent.mockRejectedValue(
+      new Error("delete failed")
+    );
+
+    await expect(processSquarePaymentEvent(event)).rejects.toBe(failure);
+  });
+
+  it("keeps the event recorded when processing succeeds", async () => {
+    purchasesMocks.fetchPurchaseBySquarePaymentId.mockResolvedValue(
+      purchase({ event_id: "event-1", square_payment_id: "payment-1" })
+    );
+    purchasesMocks.fetchPurchaseById.mockResolvedValue(
+      purchase({ event_id: "event-1", square_payment_id: "payment-1" })
+    );
+
+    await processSquarePaymentEvent(event);
+
+    expect(purchasesMocks.forgetSquareWebhookEvent).not.toHaveBeenCalled();
   });
 
   it("does nothing on a duplicate webhook delivery", async () => {

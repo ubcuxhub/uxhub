@@ -27,6 +27,7 @@ pnpm test
 pnpm build
 pnpm start
 pnpm test:rls
+pnpm test:integration
 pnpm seed
 pnpm supabase:local
 pnpm types:supabase
@@ -37,6 +38,13 @@ pnpm payment-smoke
 `pnpm supabase:local` rebuilds the local database from scratch and seeds it (see
 `supabase/README.md`). `pnpm payment-smoke` manages the production payment
 smoke-test tier (see `scripts/seed/README.md`).
+
+`pnpm test:integration` runs the Vitest integration suite
+(`*.integration.test.ts`) against the local Supabase, reading its credentials
+from `supabase status`. It refuses any host that is not local, because it writes
+and deletes with the service-role key. Each test tags its fixtures and removes
+them afterwards, so it is safe and repeatable on a seeded database. Helpers live
+in `src/test/integration.ts`. The default `pnpm test` excludes these.
 
 `pnpm test` runs the Vitest suite once (`pnpm test:watch` for watch mode). Tests are
 colocated with the code they cover (e.g. `src/lib/slug.test.ts`,
@@ -138,6 +146,11 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
   identify records by id, and pass errors through `errorFields` so a message can
   never carry row data. An eslint rule keeps `console` out of `src/**/*.ts`;
   client components use `console` directly.
+- `log.error` also reports to Sentry, which alerts on it, so log expected
+  failures (card declines, validation) at `warn`. Sentry setup lives in
+  `src/lib/sentry.ts`, and both runtimes scrub events before sending: the
+  server drops exception messages, since a rethrown Supabase error can quote row
+  data, and both drop query strings, request bodies, and cookies.
 
 ## Database Changes
 
@@ -173,6 +186,9 @@ Local values belong in the git-ignored `.env.local`.
   `SQUARE_WEBHOOK_ENDPOINTS`, comma-separated: Square signs each delivery with
   that subscription's own key over its own registered URL
 - Email: server-only `RESEND_API_KEY`, and `EMAIL_FROM`
+- Sentry: `NEXT_PUBLIC_SENTRY_DSN` enables error reporting; leave it unset
+  locally. Build-time `SENTRY_ORG`, `SENTRY_PROJECT`, and secret
+  `SENTRY_AUTH_TOKEN` upload source maps on Vercel builds
 - Feature flags: `NEXT_PUBLIC_FEATURE_STUDENT_EVENTS` and
   `NEXT_PUBLIC_FEATURE_DARK_MODE` force a flag on or off; unset, both are on
   locally and on preview deploys and off in production (`src/lib/flags.ts`)
@@ -183,13 +199,15 @@ Local values belong in the git-ignored `.env.local`.
 only for production credentials.
 
 Never expose the Supabase secret keys, Square access token, webhook signature
-key, or Resend API key to client components.
+key, Resend API key, or Sentry auth token to client components.
 
 ## Quality
 
 - Run `pnpm lint`, `pnpm exec tsc --noEmit`, and `pnpm test` after code changes.
 - Also run `pnpm build` after route, dependency, configuration, schema, or
   shared-style changes.
+- Run `pnpm test:integration` after changing a migration, a database function,
+  or a Supabase helper. CI runs it in the `build` job, after the RLS suite.
 - Supabase RLS checks live in `supabase/tests/rls.sql` (separate from the
   Vitest suite). Run them with `pnpm test:rls`, which targets the local
   database unless `SUPABASE_DB_URL` says otherwise. The whole script runs in a
@@ -208,3 +226,7 @@ key, or Resend API key to client components.
 Reuse `src/components/ui` primitives and `src/components/shared` composites
 before adding new primitives. Follow the existing shadcn conventions and use
 design tokens from `src/app/globals.css` instead of duplicating one-off styles.
+
+## Epics, responsiblity, and timeline
+
+@docs/epics.md

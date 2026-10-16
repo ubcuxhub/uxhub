@@ -1,11 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+const sentryMocks = vi.hoisted(() => ({ captureMessage: vi.fn() }));
+
 vi.mock("server-only", () => ({}));
+vi.mock("@sentry/nextjs", () => sentryMocks);
 
 import { errorFields, log } from "./log";
 
 afterEach(() => {
   vi.restoreAllMocks();
+  sentryMocks.captureMessage.mockReset();
   vi.unstubAllEnvs();
 });
 
@@ -95,5 +99,30 @@ describe("log", () => {
     log.error("checkout.submit_failed");
 
     expect(spy).toHaveBeenCalledWith("error checkout.submit_failed");
+  });
+
+  it("reports errors to Sentry, one issue per event name", () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
+
+    log.error("payment.ticket_charge_failed", { purchaseId: "pur_1" });
+
+    expect(sentryMocks.captureMessage).toHaveBeenCalledWith(
+      "payment.ticket_charge_failed",
+      {
+        level: "error",
+        fingerprint: ["payment.ticket_charge_failed"],
+        tags: { event: "payment.ticket_charge_failed" },
+        extra: { purchaseId: "pur_1" },
+      }
+    );
+  });
+
+  it("keeps info and warn out of Sentry", () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+
+    log.info("email.skipped_no_api_key");
+    log.warn("payment.ticket_charge_declined", { purchaseId: "pur_1" });
+
+    expect(sentryMocks.captureMessage).not.toHaveBeenCalled();
   });
 });
