@@ -1,8 +1,9 @@
 import type { ReactNode } from "react";
-import { Calendar, Clock, MapPin, QrCode } from "lucide-react";
+import { Calendar, Clock, MapPin } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { toQrSvg } from "@/features/events/lib/qr-code";
 import type {
   TicketBadge,
   TicketEvent,
@@ -16,6 +17,11 @@ export interface EventTicketProps {
   badge?: TicketBadge;
   /** Date in the "Register by Oct 20" badge, such as "Oct 20". */
   registerBy?: string | null;
+  /**
+   * Check-in token from `createCheckInToken`, drawn as the QR code. Shown only
+   * for `going` and `checked_in`.
+   */
+  qrToken?: string | null;
   className?: string;
 }
 
@@ -24,6 +30,7 @@ export function EventTicket({
   holder,
   badge = "going",
   registerBy,
+  qrToken,
   className,
 }: EventTicketProps) {
   const hasCode = badge === "going" || badge === "checked_in";
@@ -68,7 +75,7 @@ export function EventTicket({
             </p>
           )}
         </div>
-        {hasCode && <QrPlaceholder />}
+        {hasCode && qrToken && <TicketQrCode token={qrToken} />}
       </div>
     </article>
   );
@@ -140,15 +147,20 @@ function TicketPerforation() {
   );
 }
 
-function QrPlaceholder() {
+// Stays black on white in dark mode, since many scanners cannot read an
+// inverted code.
+function TicketQrCode({ token }: { token: string }) {
+  const { size, path } = toQrSvg(token);
+
   return (
-    <div
+    <svg
       role="img"
-      aria-label="QR code placeholder"
-      className="mx-auto flex size-48 flex-col items-center justify-center gap-2 rounded-lg border border-dashed bg-muted text-muted-foreground"
+      aria-label="Check-in QR code"
+      viewBox={`0 0 ${size} ${size}`}
+      shapeRendering="crispEdges"
+      className="mx-auto size-48 rounded-lg bg-white text-black"
     >
-      <QrCode className="size-12" />
-      <span className="text-label">QR code coming soon</span>
-    </div>
+      <path d={path} fill="currentColor" />
+    </svg>
   );
 }

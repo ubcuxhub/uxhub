@@ -11,9 +11,9 @@ won't scan. Target: Nov 12, 2026.
   The signature is an HMAC made with `CHECK_IN_TOKEN_SECRET`, which never
   leaves the server.
 - **Ticket:** [`EventTicket`](../src/features/events/components/EventTicket.tsx)
-  shows the event, the holder, and a placeholder QR. Its badge is one of the
-  student-facing badges in `docs/event-states.md`. A code shows for Going and
-  Checked in. Build its `event` prop with
+  shows the event, the holder, and the check-in QR code. Its badge is one of
+  the student-facing badges in `docs/event-states.md`. The code shows for Going
+  and Checked in, drawn from the `qrToken` prop. Build its `event` prop with
   [`toTicketEvent`](../src/features/events/lib/ticket.ts).
 - **Check-in data:** `check_in_sessions` (one or more per event) and
   `check_ins` (one row per registration per session, unique on that pair).
@@ -29,12 +29,10 @@ The token never expires or changes, so a screenshot scans as well as the live
 page. Reuse is stopped at the door: the second scan finds the existing
 `check_ins` row and shows "Already checked in at 10:02".
 
-**Open:** [`schema-proposed.sql`](./schema-proposed.sql) gives the planned
-`event_tickets` table a random `qr_token` column instead. Both work. If that
-migration lands this term, pick one with the schema owner: either keep the
-signature (and drop `qr_token`) or use `qr_token` (and delete
-`check-in-token.ts`). Signing over a ticket ID works the same as over a
-registration ID.
+[`schema-proposed.sql`](./schema-proposed.sql) gives the planned
+`event_tickets` table a random `qr_token` column instead. We use the signed
+token, so that column isn't needed. If `event_tickets` lands, sign the ticket
+ID instead of the registration ID; nothing else changes.
 
 ## Who gets a ticket
 
@@ -44,15 +42,17 @@ says a registered person stays registered, so the ticket has no cancelled state.
 
 ## Build steps
 
-### 1. Real QR on the ticket
+### 1. Real QR on the ticket (done)
 
-- The portal event page (server component) loads the viewer's registration,
-  calls `createCheckInToken(registration.id)`, and passes the token to
-  `EventTicket` as a new `qrToken` prop. The token is fine to send to the
-  browser; only the secret is not.
-- Render the QR as an SVG on the server with the `qrcode` package, so no QR
-  library ships to the client. Use error correction level M and a quiet zone,
-  and keep it at least 192 px so it scans off a dim screen.
+- `EventTicket` draws `qrToken` as an SVG with
+  [`toQrSvg`](../src/features/events/lib/qr-code.ts): error correction level
+  M, a four-module quiet zone, 192 px, black on white in both themes.
+- The page that places the ticket loads the viewer's registration in a server
+  component, calls `createCheckInToken(registration.id)`, and passes the result
+  as `qrToken`. The token is fine to send to the browser; only the secret is
+  not.
+- Render `EventTicket` from a server component where possible, so the `qrcode`
+  package stays off the client.
 - Show the ticket only to its owner; the page already runs `requireAuth()`.
 
 ### 2. Check-in by token
@@ -103,8 +103,9 @@ because the admin is already authorized.
 
 ## Testing
 
-- **Unit:** token round-trip and tampering (done); the action's result for each
-  outcome with Supabase mocked; result-card copy.
+- **Unit:** token round-trip and tampering (done); the rendered QR scans back to
+  the token (done); the action's result for each outcome with Supabase mocked;
+  result-card copy.
 - **SQL:** the check-in function in `supabase/tests/rls.sql`: a second call
   returns the first timestamp, and a non-admin can't call it.
 - **By hand, on real phones:** iOS Safari and Android Chrome scanning a live
@@ -113,7 +114,6 @@ because the admin is already authorized.
 
 ## Open questions
 
-- `qr_token` column or signed token (see above).
 - Should managers, not just admins, be able to scan?
 - Free events: do they create an attending registration today, so every attendee
   has a code? (Proposed schema assumption 3.)
