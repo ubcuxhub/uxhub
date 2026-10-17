@@ -26,6 +26,18 @@ where status = 'archived';
 
 -- ── 2. Recreate event_status without 'archived' ───────────────────────────
 
+-- Policies and the column default reference events.status, and Postgres
+-- refuses to change a column's type while any of them depend on it. Drop them
+-- here and recreate them below.
+drop policy if exists "public can view mentors for active events"      on public.mentors;
+drop policy if exists "public can view sponsors for active events"     on public.sponsors;
+drop policy if exists "public can view mentor links for active events"  on public.event_mentors;
+drop policy if exists "public can view sponsor links for active events" on public.event_sponsors;
+drop policy if exists "everyone can view active events" on public.events;
+drop policy if exists "admin_select_all_events"          on public.events;
+
+alter table public.events alter column status drop default;
+
 alter type public.event_status rename to event_status_old;
 
 create type public.event_status as enum ('draft', 'active');
@@ -50,9 +62,6 @@ drop type public.event_status_old;
 -- is unchanged in its logic (is_admin() sees all), but we drop and recreate
 -- it so its comment stays accurate.
 
-drop policy if exists "everyone can view active events" on public.events;
-drop policy if exists "admin_select_all_events"          on public.events;
-
 -- Non-admin users (authenticated and anon) see only events that are active
 -- AND whose scheduled publish time has arrived (or has no schedule).
 create policy "everyone can view active events"
@@ -74,3 +83,60 @@ create policy "admin_select_all_events"
 comment on policy "admin_select_all_events" on public.events is
   'Admins and managers may view draft and scheduled events; everyone else only '
   'sees active, published events through the public select policy.';
+
+
+-- ── 4. Recreate the policies on tables that join events.status ────────────
+
+create policy "public can view mentors for active events"
+on public.mentors
+for select
+to anon, authenticated
+using (
+  exists (
+    select 1
+    from public.event_mentors event_mentor
+    join public.events event on event.id = event_mentor.event_id
+    where event_mentor.mentor_id = mentors.id
+      and event.status = 'active'::public.event_status
+  )
+);
+
+create policy "public can view sponsors for active events"
+on public.sponsors
+for select
+to anon, authenticated
+using (
+  exists (
+    select 1
+    from public.event_sponsors event_sponsor
+    join public.events event on event.id = event_sponsor.event_id
+    where event_sponsor.sponsor_id = sponsors.id
+      and event.status = 'active'::public.event_status
+  )
+);
+
+create policy "public can view mentor links for active events"
+on public.event_mentors
+for select
+to anon, authenticated
+using (
+  exists (
+    select 1
+    from public.events event
+    where event.id = event_mentors.event_id
+      and event.status = 'active'::public.event_status
+  )
+);
+
+create policy "public can view sponsor links for active events"
+on public.event_sponsors
+for select
+to anon, authenticated
+using (
+  exists (
+    select 1
+    from public.events event
+    where event.id = event_sponsors.event_id
+      and event.status = 'active'::public.event_status
+  )
+);

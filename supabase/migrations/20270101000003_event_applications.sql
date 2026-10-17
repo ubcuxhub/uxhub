@@ -33,8 +33,15 @@ set search_path = '';
 -- Step 1a: update the column to TEXT so the old type can be dropped.
 -- Step 1b: rename old type, create new type, alter column, drop old type.
 
+-- The default and the insert policy depend on the column's current type, which
+-- blocks the ALTER. Drop both here; the policy is recreated below.
+drop policy if exists "registrations: insert own pending" on public.event_registrations;
+
 alter table public.event_registrations
-  alter column status type text;
+  alter column status drop default;
+
+alter table public.event_registrations
+  alter column status type text using status::text;
 
 alter type public.application_status rename to application_status_old;
 
@@ -64,8 +71,6 @@ alter table public.event_registrations
 -- Also update the INSERT policy that hard-codes the old 'pending' literal so
 -- it stays valid.  The policy was last set by
 -- 20260727030000_harden_registration_rls.sql.
-drop policy if exists "registrations: insert own pending" on public.event_registrations;
-
 create policy "registrations: insert own pending"
   on public.event_registrations
   for insert
