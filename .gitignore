@@ -49,3 +49,5 @@ supabase/.temp/
 # Claude Code local state (agent worktrees, session files); skills are shared
 .claude/*
 !.claude/skills/
+
+.kiro
