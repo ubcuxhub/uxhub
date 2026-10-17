@@ -1,4 +1,4 @@
--- UX Hub database: current schema (public), as of 2026-10-03.
+-- UX Hub database: current schema (public), as of 2026-10-17.
 -- Condensed from supabase/migrations, which stay the source of truth.
 -- RLS is enabled on every table; policies are omitted here.
 
@@ -11,6 +11,7 @@ CREATE TYPE event_type         AS ENUM ('regular', 'flagship');
 CREATE TYPE application_status AS ENUM ('pending', 'declined', 'accepted');
 CREATE TYPE response_type      AS ENUM ('short_text', 'long_text', 'checkbox',
                                         'multiple_choice', 'dropdown', 'file_upload');
+CREATE TYPE audit_event_source AS ENUM ('admin_change', 'user_activity');
 
 
 -- Users and memberships
@@ -231,6 +232,27 @@ CREATE TABLE check_ins (
 );
 
 
+-- Audit log
+--
+-- One table, two views: admin_change rows come from the log_admin_change
+-- trigger on user_info, events, and membership_types; user_activity rows are
+-- written by app code. Only admins can read it, and nothing writes through
+-- PostgREST.
+
+CREATE TABLE audit_events (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  source        audit_event_source NOT NULL,
+  action        text NOT NULL CHECK (action <> ''),
+  actor_id      uuid REFERENCES user_info (id) ON DELETE SET NULL,
+  subject_table text,
+  subject_id    uuid,
+  changes       jsonb,
+  context       jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  CHECK ((subject_table IS NULL) = (subject_id IS NULL))
+);
+
+
 -- Functions (bodies omitted)
 --
 -- is_admin() RETURNS boolean
@@ -249,6 +271,9 @@ CREATE TABLE check_ins (
 -- reserve_paid_event_ticket(p_event_id uuid, p_user_id uuid, p_purchase_id uuid)
 --   RETURNS TABLE (registration_id uuid, failure_reason text)
 -- release_paid_event_ticket_reservation(p_purchase_id uuid) RETURNS void
+-- audit_ignored_columns() RETURNS text[]
+-- log_admin_change() RETURNS trigger
+-- scrub_audit_events_for_deleted_user() RETURNS trigger
 
 
 -- Storage

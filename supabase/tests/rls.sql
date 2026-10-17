@@ -665,4 +665,99 @@ begin
 end;
 $$;
 
+
+-- Audit log: admins read it, nobody else does, and nothing writes to it
+-- through PostgREST. The trigger has already filled it in by this point --
+-- promoting user A to admin above was itself an update on user_info.
+
+do $$
+declare
+  action_name text;
+begin
+  if not has_table_privilege('authenticated', 'public.audit_events', 'SELECT') then
+    raise exception 'admins cannot read audit_events';
+  end if;
+
+  -- An audit log a client can write is not one.
+  foreach action_name in array array['INSERT', 'UPDATE', 'DELETE'] loop
+    if has_table_privilege('authenticated', 'public.audit_events', action_name)
+       or has_table_privilege('anon', 'public.audit_events', action_name) then
+      raise exception 'client % unexpectedly granted on audit_events', action_name;
+    end if;
+  end loop;
+end;
+$$;
+
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+set local role anon;
+do $$
+declare
+  visible_count integer;
+begin
+  select count(*) into visible_count from public.audit_events;
+  if visible_count <> 0 then
+    raise exception 'anon can read audit_events, saw %', visible_count;
+  end if;
+end;
+$$;
+reset role;
+
+-- Signed in, but not an admin. User B has no auth account, so this uses the
+-- unprofiled one, for which is_admin() is likewise false.
+\o /dev/null
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'unprofiled_auth_user_id',
+    'email', :'unprofiled_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+\o
+set local role authenticated;
+do $$
+declare
+  visible_count integer;
+begin
+  select count(*) into visible_count from public.audit_events;
+  if visible_count <> 0 then
+    raise exception 'a signed-in non-admin can read audit_events, saw %', visible_count;
+  end if;
+end;
+$$;
+reset role;
+
+-- user A was promoted to admin earlier in this file.
+\o /dev/null
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'user_a_auth_user_id',
+    'email', :'user_a_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+\o
+set local role authenticated;
+do $$
+declare
+  visible_count integer;
+begin
+  select count(*) into visible_count from public.audit_events
+  where source = 'admin_change';
+  if visible_count = 0 then
+    raise exception 'an admin sees no audit_events, so the trigger wrote none';
+  end if;
+end;
+$$;
+reset role;
+
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+
 rollback;
