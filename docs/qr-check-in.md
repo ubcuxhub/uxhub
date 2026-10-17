@@ -111,6 +111,28 @@ because the admin is already authorized.
   ticket, a screenshot, and a ticket on a dim screen; double scan; wrong event;
   manual lookup.
 
+### Trial with real people
+
+Run it on a preview deploy, using a draft event (see "Drafts for admins" in
+[`event-states.md`](event-states.md)). Only admins and managers can see a draft,
+so testers need one of those roles. Execs work, or give testers the manager role
+for the trial and remove it afterwards.
+
+Before the trial:
+
+- Preview shares the production database, so push any migration the scanner
+  needs (e.g. `check_in_registration`) with `pnpm exec supabase db push` first.
+- Check which Square credentials Preview uses. If they're production, every
+  registration is a real charge. Every ticket goes through Square today, and
+  there is no free-registration path yet.
+- Set `CHECK_IN_TOKEN_SECRET` for Preview. Issue and scan tickets on the same
+  deployment, because a ticket signed with one secret won't verify with another.
+- Give testers the branch's alias URL, so everyone stays on one build across
+  pushes. Turn off Vercel Deployment Protection for the trial, or share a
+  bypass link, so testers don't need Vercel access.
+
+Afterwards, leave the event in Draft, or delete it and its registrations.
+
 ## Open questions
 
 - `qr_token` column or signed token (see above).
