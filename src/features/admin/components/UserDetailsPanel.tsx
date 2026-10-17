@@ -1,8 +1,7 @@
 "use client";
 
-import { UserRound } from "lucide-react";
-
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { ReactNode } from "react";
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -12,20 +11,27 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { formatTimestamp } from "@/lib/date";
-import type { RoleAccess } from "@/lib/supabase/models";
+import { UserProfileSection } from "./UserProfileSection";
+import type { RoleAccess, UserInfoRow } from "@/lib/supabase/models";
 import { formatUserName } from "@/lib/user-name";
 import type { MembershipTypeOption, UserRecord } from "../types";
+import { displaySchool } from "../lib/directory";
 import { EditableUserField } from "./EditableUserField";
 import { MembershipTypeField } from "./MembershipTypeField";
 import { UserRecentTransactions } from "./UserRecentTransactions";
 
 interface UserDetailsPanelProps {
   selectedUser: UserRecord;
+  verifierName?: string;
+  onProfileUpdate: (user: UserInfoRow) => void;
+  onBusy: (busy: boolean) => void;
   editingField: string | null;
   editValue: string;
   isSaving: boolean;
   membershipTypes: MembershipTypeOption[];
   canManageUsers: boolean;
+  editMode: boolean;
+  headerAction?: ReactNode;
   onEditStart: (field: string, currentValue: string | number | boolean | null) => void;
   onEditCancel: () => void;
   onEditSave: (field: string) => void;
@@ -44,28 +50,26 @@ function ReadOnlyField({ label, value }: { label: string; value: string | null |
   );
 }
 
-function UnderConstruction({ label }: { label: string }) {
-  return (
-    <section className="space-y-2" aria-label={label}>
-      <h3 className="text-small font-medium">{label}</h3>
-      <p className="text-small text-muted-foreground">Under Construction</p>
-    </section>
-  );
-}
-
 export function UserDetailsPanel({
   selectedUser,
+  verifierName,
+  onProfileUpdate,
+  onBusy,
   editingField,
   editValue,
   isSaving,
   membershipTypes,
   canManageUsers,
+  editMode,
+  headerAction,
   onEditStart,
   onEditCancel,
   onEditSave,
   onValueChange,
   onRoleChangeRequest,
 }: UserDetailsPanelProps) {
+  const canEdit = canManageUsers && editMode;
+  const profileProps = { user: selectedUser, verifierName, canEdit, busy: isSaving, onBusy, onUpdate: onProfileUpdate };
   const fieldProps = {
     editValue,
     isSaving,
@@ -73,24 +77,21 @@ export function UserDetailsPanel({
     onEditCancel,
     onEditSave,
     onValueChange,
-    canEdit: canManageUsers,
+    canEdit,
   };
 
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <div className="flex items-start gap-4">
-            <div className="flex size-16 shrink-0 items-center justify-center rounded-full bg-muted" aria-hidden="true">
-              <UserRound className="size-8 text-muted-foreground" />
-            </div>
+          <UserProfileSection section="photo" {...profileProps}>
             <div className="min-w-0 space-y-1">
               <CardTitle className="break-words">{formatUserName(selectedUser)}</CardTitle>
               <p className="text-small text-muted-foreground">{selectedUser.preferred_pronouns || "—"}</p>
               <p className="text-small text-muted-foreground">User since {formatTimestamp(selectedUser.created_at) ?? "—"}</p>
-              <p className="text-small text-muted-foreground">Profile photo: Under Construction</p>
             </div>
-          </div>
+          </UserProfileSection>
+          {headerAction && <CardAction>{headerAction}</CardAction>}
         </CardHeader>
         <CardContent className="space-y-5">
           <div className="grid gap-4 sm:grid-cols-2">
@@ -109,7 +110,7 @@ export function UserDetailsPanel({
             <EditableUserField key={field} {...fieldProps} field={field} label={label}
               value={selectedUser[field]} isEditing={editingField === field} />
           ))}
-          <UnderConstruction label="Student Verification" />
+          <UserProfileSection section="verification" {...profileProps} />
           <EditableUserField {...fieldProps} field="newsletter" label="Newsletter Opt-In"
             value={selectedUser.newsletter} isEditing={editingField === "newsletter"} />
           <MembershipTypeField
@@ -119,12 +120,12 @@ export function UserDetailsPanel({
             isEditing={editingField === "membership_type_id"}
             membershipTypes={membershipTypes}
           />
-          <ReadOnlyField label="School" value={selectedUser.school_institution} />
+          <ReadOnlyField label="School" value={displaySchool(selectedUser)} />
           <EditableUserField {...fieldProps} field="major" label="Area of Study"
             value={selectedUser.major} isEditing={editingField === "major"} />
-          <UnderConstruction label="Birthday" />
+          <UserProfileSection section="birthday" {...profileProps} />
           <UserRecentTransactions key={selectedUser.id} userId={selectedUser.id} />
-          <UnderConstruction label="Interests" />
+          <UserProfileSection section="interests" {...profileProps} />
         </CardContent>
       </Card>
       <Card>
@@ -141,7 +142,7 @@ export function UserDetailsPanel({
           ))}
           <div className="space-y-2">
             <Label>Role Access</Label>
-            {canManageUsers ? (
+            {canEdit ? (
               <Select value={selectedUser.role_access}
                 onValueChange={(role) => onRoleChangeRequest(role as RoleAccess)} disabled={isSaving}>
                 <SelectTrigger aria-label="Role Access"><SelectValue /></SelectTrigger>

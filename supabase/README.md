@@ -172,6 +172,33 @@ Supporting files:
 
 ## Storage
 
+Admin user photos use a separate public `profile-photos` bucket (JPEG/PNG,
+4 MiB maximum). Managers upload through `/api/admin/users/[userId]/photo`;
+the server validates the image and writes with the service-role client.
+There are no direct client write policies. Anyone holding a public photo URL
+can view it.
+
+`user_info.profile_photo_path` stores an object key shaped as
+`profiles/<user-id>/<uuid>.<ext>`, and the UI derives its public URL. Replacements
+compare the previous path before saving, then delete the old object. Failed
+saves clean up the newly uploaded object. Account deletion clears the database
+reference and attempts storage cleanup after anonymization. Cleanup failures
+are logged and do not undo a successful database change.
+
+The four admin-profile migrations also add manual student verification,
+`birth_date`, and `interests`. New columns deliberately have no authenticated
+UPDATE grants: managers edit through authorized server endpoints. User-facing
+editing is deferred. Anonymization triggers clear all four additions during
+the existing `delete_account` transaction; changes to student number or user
+type invalidate manual verification.
+
+[`user-profile.integration.test.ts`](../src/features/admin/user-profile.integration.test.ts)
+exercises these actions, database constraints, access controls, and Storage
+through `pnpm test:integration`. It uses the shared fixtures in
+[`src/test/integration.ts`](../src/test/integration.ts), which also remove the
+photos a test uploads, and acts as a member by signing a local JWT rather than
+signing in.
+
 Event cover images live in the public `event-images` bucket. Bucket names are
 centralized in [`buckets.ts`](../src/lib/supabase-helpers/buckets.ts), the same
 way table names are in `tables.ts`.

@@ -30,7 +30,9 @@ TypeScript against the local Supabase. This plan owns `vitest.config.ts`,
 - `release_paid_event_ticket_reservation` frees only the seat it reserved.
 - `save_admin_event_atomically` and `delete_event_atomically` are
   all-or-nothing, and respect the cover-image guard.
-- `delete_account` and `event_registration_counts`.
+- `event_registration_counts`. `delete_account` is covered by
+  [`user-profile.integration.test.ts`](../src/features/admin/user-profile.integration.test.ts),
+  including anonymization and profile photo cleanup.
 
 Their execute grants are already asserted in `rls.sql`.
 

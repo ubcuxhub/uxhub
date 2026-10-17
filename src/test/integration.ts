@@ -13,7 +13,7 @@
  * hosted project, and nothing here may ever reach it.
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
 
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -69,13 +69,57 @@ export function createIntegrationClient(): IntegrationClient {
 }
 
 /**
+ * A client acting as `user` through PostgREST and Storage, or as an anonymous
+ * visitor when `user` is null, so a test can check what RLS and column grants
+ * allow without signing in. It signs its own JWT with the local stack's secret,
+ * which `pnpm test:integration` passes as `SUPABASE_JWT_SECRET`.
+ */
+export function clientAs(
+  user: { auth_user_id: string | null } | null
+): IntegrationClient {
+  const { url } = resolveTarget();
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
+  if (!anonKey) {
+    throw new Error(`Integration tests need the local anon key. ${SETUP_HINT}`);
+  }
+  const options = { auth: { persistSession: false, autoRefreshToken: false } };
+  if (!user) return createClient<Database>(url, anonKey, options);
+
+  const jwtSecret = process.env.SUPABASE_JWT_SECRET?.trim();
+  if (!jwtSecret || !user.auth_user_id) {
+    throw new Error(
+      `Acting as a member needs the local JWT secret and an auth user. ${SETUP_HINT}`
+    );
+  }
+  const encode = (value: object) =>
+    Buffer.from(JSON.stringify(value)).toString("base64url");
+  const header = encode({ alg: "HS256", typ: "JWT" });
+  const payload = encode({
+    sub: user.auth_user_id,
+    role: "authenticated",
+    aud: "authenticated",
+    exp: Math.floor(Date.now() / 1000) + 600,
+  });
+  const signature = createHmac("sha256", jwtSecret)
+    .update(`${header}.${payload}`)
+    .digest("base64url");
+
+  return createClient<Database>(url, anonKey, {
+    ...options,
+    global: {
+      headers: { Authorization: `Bearer ${header}.${payload}.${signature}` },
+    },
+  });
+}
+
+/**
  * Tracks what a test created so it can be removed again.
  *
  * Purchases and registrations that point at a fixture event or user are
  * deleted first, whoever created them. The tracked rows then go newest first,
  * so a child inserted after its parent goes first and foreign keys stay
  * satisfied. Anything else a test causes to be written must be passed to
- * `track`.
+ * `track`, or to `trackStorage` for objects in a bucket.
  */
 export class Fixtures {
   readonly supabase: IntegrationClient;
@@ -84,6 +128,7 @@ export class Fixtures {
 
   private readonly rows: { table: TableName; id: string }[] = [];
   private readonly authUserIds: string[] = [];
+  private readonly storagePrefixes: { bucket: string; prefix: string }[] = [];
 
   constructor(supabase: IntegrationClient, tag = `it-${randomUUID().slice(0, 8)}`) {
     this.supabase = supabase;
@@ -93,6 +138,11 @@ export class Fixtures {
   track(table: TableName, id: string) {
     this.rows.push({ table, id });
     return id;
+  }
+
+  /** Removes every object under `prefix` in `bucket` during cleanup. */
+  trackStorage(bucket: string, prefix: string) {
+    this.storagePrefixes.push({ bucket, prefix });
   }
 
   async createEvent(
@@ -184,10 +234,27 @@ export class Fixtures {
     }
   }
 
+  private async deleteStorage(failures: unknown[]) {
+    for (const { bucket, prefix } of this.storagePrefixes) {
+      const storage = this.supabase.storage.from(bucket);
+      const { data, error } = await storage.list(prefix, { limit: 1000 });
+      if (error) {
+        failures.push(error);
+        continue;
+      }
+      if (!data.length) continue;
+      const removed = await storage.remove(
+        data.map((file) => `${prefix}/${file.name}`)
+      );
+      if (removed.error) failures.push(removed.error);
+    }
+  }
+
   async cleanup() {
     const failures: unknown[] = [];
 
     await this.deleteDependents(failures);
+    await this.deleteStorage(failures);
 
     for (const { table, id } of [...this.rows].reverse()) {
       // `from` is typed per table, so a union of tables leaves the column names
@@ -201,11 +268,14 @@ export class Fixtures {
     }
     for (const id of this.authUserIds) {
       const { error } = await this.supabase.auth.admin.deleteUser(id);
-      if (error) failures.push(error);
+      // `delete_account` removes the auth user itself, so a test that deletes
+      // an account leaves nothing here to remove.
+      if (error && error.status !== 404) failures.push(error);
     }
 
     this.rows.length = 0;
     this.authUserIds.length = 0;
+    this.storagePrefixes.length = 0;
 
     // Leftovers would leak into the next run, so a failed cleanup fails the
     // test rather than going unnoticed.

@@ -7,12 +7,15 @@ import type { UserRecord } from "../types";
 import { AdminUsersManager } from "./AdminUsersManager";
 
 const mocks = vi.hoisted(() => ({
+  saveBirthDate: vi.fn(), saveInterests: vi.fn(), verifyStudent: vi.fn(), removePhoto: vi.fn(),
   updateManagerUserAction: vi.fn(),
   updateUserRoleAction: vi.fn(),
   fetchPurchases: vi.fn(),
   refreshUser: vi.fn(),
   refreshRouter: vi.fn(),
 }));
+vi.mock("../user-profile-actions", () => ({ saveUserBirthDateAction: mocks.saveBirthDate, saveUserInterestsAction: mocks.saveInterests, setStudentVerificationAction: mocks.verifyStudent, removeUserProfilePhotoAction: mocks.removePhoto }));
+vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({ storage: { from: () => ({ getPublicUrl: (path: string) => ({ data: { publicUrl: `http://localhost/${path}` } }) }) } }) }));
 vi.mock("../actions", () => ({ updateManagerUserAction: mocks.updateManagerUserAction, updateUserRoleAction: mocks.updateUserRoleAction }));
 vi.mock("../user-purchases-action", () => ({ fetchAdminUserPurchasesAction: mocks.fetchPurchases }));
 vi.mock("@/lib/auth/user-context", () => ({ useUser: () => ({ refreshUser: mocks.refreshUser }) }));
@@ -30,18 +33,23 @@ beforeEach(() => {
   mocks.updateManagerUserAction.mockResolvedValue(undefined);
   mocks.updateUserRoleAction.mockResolvedValue("manager");
   mocks.fetchPurchases.mockResolvedValue([]);
+  mocks.saveBirthDate.mockImplementation(async (_id, birth_date) => user({ birth_date }));
+  mocks.saveInterests.mockImplementation(async (_id, interests) => user({ interests }));
+  mocks.verifyStudent.mockImplementation(async (_id, verified) => user({ student_verified_at: verified ? "2026-10-14T12:00:00Z" : null, student_verified_by: verified ? "iris" : null }));
+  mocks.removePhoto.mockImplementation(async () => user({ profile_photo_path: null }));
   mocks.refreshUser.mockResolvedValue(undefined);
 });
 
 function user(overrides: Partial<UserRecord>): UserRecord {
   return {
+    birth_date: null, interests: [], profile_photo_path: null, student_verified_at: null, student_verified_by: null,
     id: "dora", auth_user_id: "auth-dora", first_name: "Dora", last_name: "Hu",
     email: "z@example.com", phone: "604-555-0100", preferred_pronouns: "She/Her",
     created_at: "2026-07-21T12:00:00Z", updated_at: null, deleted_at: null,
     dietary_restrictions: null, faculty: "Arts", faculty_email: null, major: "English",
     membership_type_id: "innovator", membership_type_name: "Innovator", membership_expires_at: null,
     membership_pre_ordered_type_id: null, newsletter: true, order_date_deprecated: null,
-    order_date: null, role_access: "manager", school_institution: "University of British Columbia",
+    order_date: null, role_access: "manager", school_institution: null,
     square_customer_id: null, student_number: 12345, student_status: "undergraduate", user_type: "ubcStudent", year: "2",
     ...overrides,
   };
@@ -64,16 +72,21 @@ function chooseSelect(label: string, option: string) {
   fireEvent.keyDown(screen.getByRole("combobox", { name: label }), { key: "Enter" });
   fireEvent.click(screen.getByRole("option", { name: option }));
 }
-function modal() { return screen.getByRole("dialog", { name: "View User Info" }); }
+function modal() { return screen.getByRole("dialog", { name: "User Information" }); }
 function field(label: string) {
   return within(modal()).getByText(label).parentElement!;
 }
+function enableEditing() {
+  const button = within(modal()).queryByRole("button", { name: "Edit User" });
+  if (button) fireEvent.click(button);
+}
 function startEdit(label: string) {
+  enableEditing();
   fireEvent.click(within(field(label)).getByRole("button", { name: "Edit" }));
 }
 async function closeModal() {
   fireEvent.click(within(modal()).getByRole("button", { name: "Close" }));
-  await waitFor(() => expect(screen.queryByRole("dialog", { name: "View User Info" })).toBeNull());
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "User Information" })).toBeNull());
 }
 
 describe("AdminUsersManager", () => {
@@ -171,11 +184,11 @@ describe("AdminUsersManager", () => {
     expect(within(modal()).getByText("She/Her")).toBeTruthy();
     expect(within(modal()).getByText("University of British Columbia")).toBeTruthy();
     expect(mocks.fetchPurchases).toHaveBeenCalledWith("dora");
-    for (const label of ["Student Verification", "Birthday", "Interests"]) {
-      expect(within(within(modal()).getByRole("region", { name: label })).getByText("Under Construction")).toBeTruthy();
-    }
-    expect(within(modal()).getByText("Profile photo: Under Construction")).toBeTruthy();
+    expect(within(modal()).getByText("Unverified")).toBeTruthy();
+    expect(within(modal()).queryByText("Under Construction")).toBeNull();
+    expect(within(modal()).queryByRole("button", { name: "Verify student" })).toBeNull();
     expect(within(modal()).queryByRole("button", { name: "Edit" })).toBeNull();
+    expect(within(modal()).queryByRole("button", { name: "Edit User" })).toBeNull();
     await closeModal();
     await waitFor(() => expect(document.activeElement).toBe(row));
   });
@@ -214,6 +227,7 @@ describe("AdminUsersManager", () => {
   it("requires role confirmation and keeps the user modal open after updating", async () => {
     renderManager(true);
     fireEvent.click(screen.getByRole("button", { name: "View details for Iris Chan" }));
+    enableEditing();
     chooseSelect("Role Access", "Manager");
     const confirmation = screen.getByRole("dialog", { name: "Change role access?" });
     expect(within(confirmation).getByText("Change Iris Chan from admin to manager?")).toBeTruthy();
@@ -233,6 +247,7 @@ describe("AdminUsersManager", () => {
     renderManager(true);
     fireEvent.click(screen.getByRole("button", { name: "View details for Iris Chan" }));
     const userDialog = modal();
+    enableEditing();
     chooseSelect("Role Access", "Manager");
     const confirmation = screen.getByRole("dialog", { name: "Change role access?" });
     expect((userDialog.querySelector('button[aria-label="Close"]') as HTMLButtonElement).disabled).toBe(true);
@@ -267,5 +282,128 @@ describe("AdminUsersManager", () => {
     await closeModal();
     expect(screen.getByText("No users match your search and filters.")).toBeTruthy();
     await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: "User Directory" })));
+  });
+});
+
+
+describe("admin user profile controls", () => {
+  it("starts in view mode, gates editing, and discards drafts when editing ends", async () => {
+    renderManager(true);
+    fireEvent.click(screen.getByRole("button", { name: "View details for Dora Hu" }));
+    expect(within(modal()).getByRole("heading", { name: "User Information", level: 1 })).toBeTruthy();
+    expect(within(modal()).queryAllByRole("button", { name: "Edit" })).toHaveLength(0);
+    expect(within(modal()).queryByRole("combobox", { name: "Role Access" })).toBeNull();
+    expect(within(modal()).queryByRole("button", { name: "Verify student" })).toBeNull();
+    expect(within(modal()).queryByLabelText("Profile photo", { selector: "input" })).toBeNull();
+
+    const editButton = within(modal()).getByRole("button", { name: "Edit User" });
+    editButton.focus();
+    enableEditing();
+    expect(document.activeElement).toBe(within(modal()).getByRole("button", { name: "Done editing" }));
+    startEdit("First Name");
+    fireEvent.change(within(field("First Name")).getByRole("textbox"), { target: { value: "Unsaved" } });
+    startEdit("Birthday");
+    fireEvent.change(screen.getByLabelText("Birthday", { selector: "input" }), { target: { value: "2000-02-29" } });
+    fireEvent.click(within(modal()).getByRole("button", { name: "Done editing" }));
+    expect(within(modal()).queryAllByRole("textbox")).toHaveLength(0);
+    enableEditing();
+    expect(within(field("First Name")).getByText("Dora")).toBeTruthy();
+    expect(within(field("Birthday")).queryByRole("button", { name: "Save" })).toBeNull();
+    expect(mocks.updateManagerUserAction).not.toHaveBeenCalled();
+    expect(mocks.saveBirthDate).not.toHaveBeenCalled();
+    await closeModal();
+    fireEvent.click(screen.getByRole("button", { name: "View details for Iris Chan" }));
+    expect(within(modal()).getByRole("button", { name: "Edit User" })).toBeTruthy();
+  });
+
+  it("displays interests as individual tags in view mode", () => {
+    render(<AdminUsersManager initialUsers={[user({ interests: ["UX/UI Design", "Product Design", "Tech"] })]} membershipTypes={membershipTypes} canManageUsers={true} />);
+    fireEvent.click(screen.getByRole("button", { name: "View details for Dora Hu" }));
+    const interests = within(screen.getByRole("region", { name: "Interests" }));
+    for (const tag of ["UX/UI Design", "Product Design", "Tech"]) {
+      expect(interests.getByText(tag)).toBeTruthy();
+    }
+    expect(interests.queryAllByRole("button")).toHaveLength(0);
+  });
+
+  it("saves and clears a birthday, while cancellation leaves the saved value unchanged", async () => {
+    renderManager(true);
+    fireEvent.click(screen.getByRole("button", { name: "View details for Dora Hu" }));
+    startEdit("Birthday");
+    fireEvent.change(screen.getByLabelText("Birthday", { selector: "input" }), { target: { value: "2000-02-29" } });
+    fireEvent.click(within(field("Birthday")).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(within(field("Birthday")).getByText("2000-02-29")).toBeTruthy());
+    expect(mocks.saveBirthDate).toHaveBeenCalledWith("dora", "2000-02-29");
+    startEdit("Birthday");
+    fireEvent.change(screen.getByLabelText("Birthday", { selector: "input" }), { target: { value: "2001-01-01" } });
+    fireEvent.click(within(field("Birthday")).getByRole("button", { name: "Cancel" }));
+    expect(within(field("Birthday")).getByText("2000-02-29")).toBeTruthy();
+    startEdit("Birthday");
+    fireEvent.change(screen.getByLabelText("Birthday", { selector: "input" }), { target: { value: "" } });
+    fireEvent.click(within(field("Birthday")).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(mocks.saveBirthDate).toHaveBeenLastCalledWith("dora", null));
+    await waitFor(() => expect(within(field("Birthday")).queryByRole("button", { name: "Save" })).toBeNull());
+  });
+
+  it("adds, deduplicates and removes freeform interests", async () => {
+    renderManager(true);
+    fireEvent.click(screen.getByRole("button", { name: "View details for Dora Hu" }));
+    startEdit("Interests");
+    for (const value of [" Design ", "design", "Research"]) {
+      fireEvent.change(screen.getByLabelText("New interest"), { target: { value } });
+      fireEvent.click(screen.getByRole("button", { name: "Add tag" }));
+    }
+    expect(screen.getAllByRole("button", { name: /^Remove interest/ })).toHaveLength(2);
+    fireEvent.click(screen.getByRole("button", { name: "Remove interest Research" }));
+    fireEvent.click(within(field("Interests")).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(mocks.saveInterests).toHaveBeenCalledWith("dora", ["Design"]));
+    await waitFor(() => expect(within(field("Interests")).getByText("Design")).toBeTruthy());
+  });
+
+  it("shows save errors without discarding the draft", async () => {
+    mocks.saveBirthDate.mockRejectedValue(new Error("Birth date cannot be in the future."));
+    renderManager(true);
+    fireEvent.click(screen.getByRole("button", { name: "View details for Dora Hu" }));
+    startEdit("Birthday");
+    fireEvent.change(screen.getByLabelText("Birthday", { selector: "input" }), { target: { value: "2999-01-01" } });
+    fireEvent.click(within(field("Birthday")).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("future"));
+    expect((screen.getByLabelText("Birthday", { selector: "input" }) as HTMLInputElement).value).toBe("2999-01-01");
+  });
+
+  it("verifies and clears verification with verifier details", async () => {
+    renderManager(true);
+    fireEvent.click(screen.getByRole("button", { name: "View details for Dora Hu" }));
+    enableEditing();
+    fireEvent.click(screen.getByRole("button", { name: "Verify student" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Clear verification" })).toBeTruthy());
+    expect(within(screen.getByRole("region", { name: "Student Verification" })).getByText(/Iris Chan/)).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Clear verification" }));
+    await waitFor(() => expect(screen.getByText("Unverified")).toBeTruthy());
+    expect(mocks.verifyStudent).toHaveBeenLastCalledWith("dora", false);
+  });
+
+  it("uploads a selected photo, shows a fallback for a broken image and removes the photo", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, json: async () => ({ user: user({ profile_photo_path: "profiles/dora/photo.png" }) }) });
+    vi.stubGlobal("fetch", fetchMock);
+    URL.createObjectURL = vi.fn(() => "blob:photo");
+    URL.revokeObjectURL = vi.fn();
+    try {
+      renderManager(true);
+      fireEvent.click(screen.getByRole("button", { name: "View details for Dora Hu" }));
+      enableEditing();
+      const file = new File(["image"], "photo.png", { type: "image/png" });
+      fireEvent.change(screen.getByLabelText("Profile photo", { selector: "input" }), { target: { files: [file] } });
+      expect(screen.getByRole("img").getAttribute("src")).toBe("blob:photo");
+      fireEvent.click(screen.getByRole("button", { name: "Save photo" }));
+      await waitFor(() => expect(screen.getByRole("button", { name: "Remove photo" })).toBeTruthy());
+      expect(fetchMock).toHaveBeenCalledWith("/api/admin/users/dora/photo", expect.objectContaining({ method: "POST" }));
+      fireEvent.error(screen.getByRole("img"));
+      expect(screen.queryByRole("img")).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Remove photo" }));
+      await waitFor(() => expect(screen.queryByRole("button", { name: "Remove photo" })).toBeNull());
+      expect(mocks.removePhoto).toHaveBeenCalledWith("dora", "profiles/dora/photo.png");
+      expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:photo");
+    } finally { vi.unstubAllGlobals(); }
   });
 });

@@ -395,6 +395,34 @@ async function reconcileIdentities(
   return { authUsers, profiles, profileIds };
 }
 
+/**
+ * Applies `studentVerification` once every profile exists. The identity pass
+ * has already cleared verification on every fixture, so this leaves exactly the
+ * verified accounts `users.ts` describes.
+ */
+async function reconcileStudentVerification(
+  supabase: SupabaseClient,
+  fixtures: SeedUser[],
+  profileIds: Map<string, string>
+): Promise<void> {
+  for (const fixture of fixtures) {
+    if (!fixture.studentVerification) continue;
+    const { verifiedByEmail, verifiedAt } = fixture.studentVerification;
+    const verifierId = profileIds.get(verifiedByEmail);
+    if (!verifierId) {
+      throw new Error(`No verifier profile found for "${verifiedByEmail}"`);
+    }
+
+    const { error } = await supabase
+      .from(TABLE.userInfo)
+      .update({ student_verified_at: verifiedAt, student_verified_by: verifierId })
+      .eq("id", profileIds.get(fixture.email));
+    if (error) {
+      throw new Error(`Verifying "${fixture.email}" failed: ${error.message}`);
+    }
+  }
+}
+
 async function reconcilePurchases(
   supabase: SupabaseClient,
   fixtures: SeedUser[],
@@ -862,6 +890,7 @@ export async function reconcileUserFixtures(
     dependencies,
     identityState
   );
+  await reconcileStudentVerification(supabase, fixtures, identity.profileIds);
   const purchases = await reconcilePurchases(
     supabase,
     fixtures,
