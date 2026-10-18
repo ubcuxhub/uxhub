@@ -1,42 +1,22 @@
--- event_applications from docs/schema-proposed.sql, and
--- event_application_responses.application_id.
+-- Corrects event_applications from 20270101000003.
 --
--- Additive only. The existing application_status enum stays as it is, since
--- event_registrations and the deployed code still use pending/declined/accepted.
--- Applications get their own enum, event_application_status, under a name that
--- never has to change; application_status is dropped with event_registrations.
+-- Its backfill turned every registration into an application, including
+-- ticket purchases on events that take no applications, and gave accepted
+-- ones an arbitrary now() + 30 days deadline. Nothing has written applications
+-- since (the deployed code still uses event_registrations), so every row is a
+-- backfilled copy: clear them, and 20270101000010 copies the right ones back.
+-- event_application_responses.application_id cascades, so unlink responses
+-- first or deleting an application deletes the member's answers.
+--
+-- Also adds what it left out: the allowed status moves, an insert policy that
+-- checks the event, column grants in place of grant all to anon, and response
+-- policies by application. 20270101000005 moved status to its own enum,
+-- event_application_status.
 
-create type public.event_application_status as enum (
-  'submitted',
-  'accepted',
-  'rejected',
-  'waitlisted'
-);
-
-create table public.event_applications (
-  id               uuid        not null default gen_random_uuid(),
-  event_id         uuid        not null,
-  user_id          uuid        not null,
-  status           public.event_application_status not null default 'submitted',
-  offer_expires_at timestamptz,
-  created_at       timestamptz not null default now(),
-  updated_at       timestamptz not null default now(),
-
-  constraint event_applications_pkey primary key (id),
-  constraint event_applications_event_id_fkey
-    foreign key (event_id) references public.events (id) on delete cascade,
-  constraint event_applications_user_id_fkey
-    foreign key (user_id) references public.user_info (id),
-  constraint event_applications_event_id_user_id_key unique (event_id, user_id),
-  constraint event_applications_accepted_requires_deadline
-    check (status <> 'accepted' or offer_expires_at is not null)
-);
-
-create index event_applications_user_id_idx on public.event_applications (user_id);
-
-create trigger update_event_applications_updated_at
-before update on public.event_applications
-for each row execute function public.update_updated_at_column();
+update public.event_application_responses
+set application_id = null
+where application_id is not null;
+delete from public.event_applications;
 
 -- The moves docs/event-states.md allows. Re-offering keeps accepted with a new
 -- deadline; an offer can be taken back only before the person registers.
@@ -89,19 +69,8 @@ create trigger check_event_application_transition
 before update on public.event_applications
 for each row execute function public.check_event_application_transition();
 
-alter table public.event_applications enable row level security;
-
-create policy "applications: read own"
-on public.event_applications
-for select
-to authenticated
-using (user_id = public.current_user_info_id());
-
-create policy "applications: admins read all"
-on public.event_applications
-for select
-to authenticated
-using (public.is_admin());
+-- "applications: read own", "admins read all" and "admins update" from
+-- 20270101000003 stand as they are. 20270101000005 dropped the insert policy.
 
 -- A member applies for themself, to an event that takes applications, while
 -- its registration is open. Drafts and scheduled events take applications only
@@ -125,13 +94,6 @@ with check (
   )
 );
 
-create policy "applications: admins update"
-on public.event_applications
-for update
-to authenticated
-using (public.is_admin())
-with check (public.is_admin());
-
 -- Members choose only the event; admins only decide.
 revoke all on table public.event_applications from anon, authenticated;
 grant select on table public.event_applications to authenticated;
@@ -139,12 +101,9 @@ grant insert (event_id, user_id) on table public.event_applications to authentic
 grant update (status, offer_expires_at) on table public.event_applications to authenticated;
 grant all on table public.event_applications to service_role;
 
--- Filled for responses of backfilled applications. event_registration_id
--- stays required until the code writes responses by application.
-alter table public.event_application_responses
-  add column application_id uuid references public.event_applications (id) on delete cascade,
-  add constraint event_application_responses_question_id_application_id_key
-    unique (event_application_question_id, application_id);
+-- event_application_responses.application_id and its unique index come from
+-- 20270101000003; event_registration_id stays required until the code writes
+-- responses by application.
 
 create policy "application responses: read own application"
 on public.event_application_responses

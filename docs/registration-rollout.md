@@ -7,25 +7,44 @@ How `event_registrations` and the legacy event columns become the schema in
 Migrations reach the hosted database before their code is deployed, so each step's
 migration has to work with the code that is live when it is pushed.
 
-## 1. Add (done, `20261018120000`–`20261018120400`)
+## 0. What happened on 2026-10-17
 
-Only adds, so the deployed code keeps working unchanged.
+The first version of this work (`20270101000001`–`04`) renamed
+`applications_enabled`, removed `archived` from `event_status`, replaced the
+`application_status` values and rewrote the reservation and save functions. It
+was pushed to the hosted project before any code used it, so the deployed code
+stopped working against it: reading `applications_enabled`, archiving an event,
+submitting or declining an application, reserving and releasing a paid ticket,
+and saving an event in admin all fail.
+
+Those four files stay in the repo because the hosted history has them, and
+`db push` is forward-only. `20270101000005` puts back what the deployed code
+needs, exactly as main had it. Archived events were turned into drafts, and
+which ones they were is not recorded, so re-archive them by hand.
+
+Every new migration has to sort after `20270101000010`, the newest version in
+the hosted history, or `db push` refuses it as out of order.
+
+## 1. Add (`20270101000005`–`20270101000010`)
+
+Only adds to what main had, so the deployed code keeps working.
 
 - `events` gains `publish_at`, `starts_at`, `ends_at`, `registration_opens_at`,
   `registration_closes_at` and `requires_application`. The
   `sync_legacy_event_columns` trigger copies each legacy write into them.
 - `event_is_public(status, publish_at)` decides what members see; the events,
   mentor and sponsor read policies use it, so scheduled events stay hidden.
-- `event_tickets`, `event_applications` (enum `event_application_status`, with
-  the allowed moves enforced by a trigger), `check_ins.ticket_id` and
-  `event_application_responses.application_id`.
+- `event_tickets`, `event_applications` (moved to its own enum,
+  `event_application_status`, with the allowed moves enforced by a trigger),
+  `check_ins.ticket_id` and `event_application_responses.application_id`. The
+  rows `20270101000003`–`04` backfilled are replaced.
 - `event_seat_counts`, `event_seat_counts_unfiltered` and
   `reserve_event_ticket`.
 - `backfill_event_tickets_and_applications()` copies registrations across:
   attending registrations become tickets, and registrations on
   `applications_enabled` events become applications. It is safe to repeat.
 
-The legacy tables, columns, enum values and functions are untouched. A local
+The legacy tables, columns, enum values and functions are as main had them. A local
 database rebuilt with `pnpm supabase:local` starts with empty ticket and
 application tables, since the seed writes registrations only.
 

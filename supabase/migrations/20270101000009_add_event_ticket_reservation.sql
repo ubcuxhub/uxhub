@@ -1,7 +1,10 @@
 -- Seat counts and ticket reservation over event_tickets and event_applications.
 --
--- New functions beside reserve_paid_event_ticket and event_registration_counts,
--- which the deployed code keeps calling until it moves over.
+-- Replaces the versions from 20270101000004 that 20270101000005 dropped: seat
+-- counts now reach every row for members, and reservation follows
+-- docs/event-states.md. They sit beside reserve_paid_event_ticket and
+-- event_registration_counts, which the deployed code keeps calling until it
+-- moves over.
 
 -- Seats taken = tickets + accepted offers that haven't expired and have no
 -- ticket yet (docs/event-states.md). Unfiltered, for service_role and the

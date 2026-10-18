@@ -1,19 +1,16 @@
--- Event columns from docs/schema-proposed.sql, added beside the legacy ones.
+-- Keeps the new event columns in step with the legacy ones the deployed code
+-- writes, and hides scheduled events with their people.
 --
--- Additive only, so it is safe with the code already in production. The
--- deployed code keeps writing start_date/start_time/end_date/end_time,
--- registration_start_time/registration_end_time and applications_enabled; a
--- trigger copies each change into the new columns until the code moves over.
--- The legacy columns, their helpers and the trigger are dropped once nothing
--- reads them (see docs/registration-rollout.md).
+-- 20270101000001 added publish_at, starts_at, ends_at, registration_opens_at
+-- and registration_closes_at with a one-off backfill, so they went stale on
+-- the next legacy write, and left ends_at empty without an end time.
+-- requires_application, renamed back in 20270101000005, returns as its own
+-- column. A trigger copies each legacy write into the new columns until the
+-- code moves over; the legacy columns, their helpers and the trigger are
+-- dropped once nothing reads them (see docs/registration-rollout.md).
 
 alter table public.events
-  add column publish_at             timestamptz,
-  add column starts_at              timestamptz,
-  add column ends_at                timestamptz,
-  add column registration_opens_at  timestamptz,
-  add column registration_closes_at timestamptz,
-  add column requires_application   boolean not null default false;
+  add column requires_application boolean not null default false;
 
 -- Legacy dates and times are Vancouver wall-clock values.
 create function public.legacy_event_starts_at(p_start_date date, p_start_time time)
@@ -95,7 +92,7 @@ create trigger sync_legacy_event_columns
 before insert or update on public.events
 for each row execute function public.sync_legacy_event_columns();
 
--- Backfill without bumping updated_at.
+-- Re-derive every row, without bumping updated_at.
 alter table public.events disable trigger update_events_updated_at;
 
 update public.events
@@ -108,15 +105,8 @@ set
 
 alter table public.events enable trigger update_events_updated_at;
 
-alter table public.events
-  add constraint events_ends_at_after_starts_at
-    check (ends_at is null or starts_at is null or ends_at >= starts_at),
-  add constraint events_registration_closes_after_opens
-    check (
-      registration_closes_at is null
-      or registration_opens_at is null
-      or registration_closes_at >= registration_opens_at
-    );
+-- 20270101000001's events_ends_at_gte_starts_at and
+-- events_registration_closes_at_gte_opens_at already guard the new columns.
 
 -- What members see: active, and either unscheduled or past its publish time
 -- (docs/event-states.md). Admins and managers keep seeing every event through
