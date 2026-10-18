@@ -10,7 +10,8 @@ export const TABLES = {
   events: "events",
   userInfo: "user_info",
   eventRegistrations: "event_registrations",
-  // New table replacing event_registrations (kept above for backward compat)
+  // Replace event_registrations once the code moves over
+  // (docs/registration-rollout.md).
   eventTickets: "event_tickets",
   eventApplications: "event_applications",
   eventApplicationQuestions: "event_application_questions",

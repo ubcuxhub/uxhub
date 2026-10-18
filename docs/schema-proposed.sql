@@ -17,7 +17,7 @@ CREATE TYPE event_status       AS ENUM ('draft', 'active');
 CREATE TYPE event_type         AS ENUM ('regular', 'flagship');
 CREATE TYPE response_type      AS ENUM ('short_text', 'long_text', 'checkbox',
                                         'multiple_choice', 'dropdown', 'file_upload');
-CREATE TYPE application_status AS ENUM ('submitted', 'accepted', 'rejected', 'waitlisted');
+CREATE TYPE event_application_status AS ENUM ('submitted', 'accepted', 'rejected', 'waitlisted');
 CREATE TYPE audit_source       AS ENUM ('trigger', 'app');
 
 
@@ -214,7 +214,7 @@ CREATE TABLE event_applications (
   id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   event_id         uuid NOT NULL REFERENCES events (id) ON DELETE CASCADE,
   user_id          uuid NOT NULL REFERENCES user_info (id),
-  status           application_status NOT NULL DEFAULT 'submitted',
+  status           event_application_status NOT NULL DEFAULT 'submitted',
   offer_expires_at timestamptz,
   created_at       timestamptz NOT NULL DEFAULT now(),
   updated_at       timestamptz NOT NULL DEFAULT now(),
