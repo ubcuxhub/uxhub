@@ -35,9 +35,9 @@ a separate "test" state.
   a draft.
 - **Enforced on the server:** fulfillment reads events with the service-role
   client, which bypasses RLS. It has to check the buyer's role itself before it
-  sells a draft ticket.
-- **Archived** stays hidden from the portal and checkout for everyone,
-  admins included.
+  sells a draft ticket. `reserve_event_ticket` does this: it looks up the
+  buyer's role and lets only admins and managers register for a draft or
+  scheduled event.
 
 Preview deploys share the production database (the free plan has no branching),
 so registrations and check-ins made on a test draft are real production rows.
@@ -45,13 +45,15 @@ Keep the event in Draft afterwards, or delete it along with its registrations.
 
 **Not built yet:** today the portal event page and fulfillment
 (`createSquarePaymentForEventTicket`) both require `status = active`, even for
-admins.
+admins. They move to `reserve_event_ticket` with the rest of the code
+(see [registration-rollout.md](registration-rollout.md)).
 
 ## Admin: application
 
 Only for events with `requires_application`.
 
-`event_applications.status` has exactly four values:
+`event_applications.status` (enum `event_application_status`) has exactly four
+values. The database enforces the moves below:
 
 | `status` | Meaning | Next |
 | --- | --- | --- |
