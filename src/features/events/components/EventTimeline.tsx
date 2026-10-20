@@ -23,10 +23,9 @@ export function EventTimeline({
 }: EventTimelineProps) {
   const [showPastEvents, setShowPastEvents] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-
+  
   const displayedEvents = showPastEvents ? pastEvents : upcomingEvents;
-  const emptyMessage = showPastEvents ? "No past events." : "No events scheduled yet.";
-
+  
   // filter events based on search query
   const query = normalizeString(searchQuery);
   const filteredEvents = (query) ? displayedEvents.filter((event) => {
@@ -36,7 +35,8 @@ export function EventTimeline({
       (event.location_room && normalizeString(event.location_room).includes(query))
     )
   }) : displayedEvents;
-
+  
+  const emptyMessage = query ? `No events match "${searchQuery}".` : showPastEvents ? "No past events." : "No events scheduled yet.";
 
   // group events by month
   const filteredGroups = groupEventsByMonth(filteredEvents);
@@ -47,8 +47,9 @@ export function EventTimeline({
       <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-8 mb-20">
         <Input
           placeholder="Search events..."
+          aria-label="Search events"
           value={searchQuery}
-          onChange={(e) => {setSearchQuery(e.target.value); console.log(filteredEvents)}}
+          onChange={(e) => {setSearchQuery(e.target.value)}}
           type="search"
           className="w-full"
         />

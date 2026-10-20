@@ -1,7 +1,7 @@
 import { PageContainer } from "@/components/shared/PageContainer";
 import { EventTimeline } from "@/features/events/components/EventTimeline";
 import { EventsComingSoon } from "@/features/events/components/EventsComingSoon";
-import { groupEventsByMonth, splitEventsByDate } from "@/features/events/lib/event-timeline";
+import { splitEventsByDate } from "@/features/events/lib/event-timeline";
 import { getPacificStartDefaults } from "@/lib/date";
 import { FLAGS } from "@/lib/flags";
 import { createClient } from "@/lib/supabase/server";
