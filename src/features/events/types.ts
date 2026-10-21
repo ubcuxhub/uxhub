@@ -28,6 +28,19 @@ export interface GroupedRegistration {
   registrationId: string;
 }
 
+/** One entry in the `events.agenda` JSONB column. */
+export interface AgendaItem {
+  /** Display time, e.g. "10:00 AM". The next item's time is this item's end. */
+  time: string;
+  title: string;
+  description?: string;
+  /** Building, e.g. "Innovation Center". */
+  location?: string;
+  room?: string;
+  /** YYYY-MM-DD day this item belongs to, for multi-day agendas (not stored yet). */
+  date?: string;
+}
+
 export interface EventGroup {
   key: string;
   label: string;
