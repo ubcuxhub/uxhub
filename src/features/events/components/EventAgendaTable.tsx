@@ -4,19 +4,23 @@ import type { EventAgendaDay } from "@/lib/supabase-helpers/event-agenda";
 import { formatEventDate } from "@/lib/date";
 
 interface EventAgendaTableProps {
+  eventName: string;
   agenda: EventAgendaDay[];
 }
 
-export function EventAgendaTable({ agenda }: EventAgendaTableProps) {
+export function EventAgendaTable({ eventName, agenda }: EventAgendaTableProps) {
   const formattedDate = (date: string): string =>
     formatEventDate(date, { weekday: "short", month: "short", year: undefined }) ?? "";
 
   return (
     <>
+      <div className="border-border-subtle rounded-md border flex flex-col gap-6 p-6">
+        <h3 className="text-h3">{eventName} Agenda</h3>
+        <hr className="w-full border-border-subtle" />
         {agenda.length > 0 && (
           agenda.map((day) => (
-            <div className="overflow-x-auto rounded-lg border">
-                <table key={day.id} className="w-full min-w-max">
+            <div key={day.id} className="overflow-x-auto rounded-lg border">
+                <table className="w-full min-w-max">
                   <thead>
                     <tr className="border-b bg-muted/50">
                       <th colSpan={4} className="px-4 py-3 text-left font-normal">
@@ -61,7 +65,8 @@ export function EventAgendaTable({ agenda }: EventAgendaTableProps) {
                 </table>
               </div>
             ))
-        )}
+          )}
+        </div>
     </>
   );
 }

@@ -116,13 +116,7 @@ export default async function PortalEventPage({
         </div>
       </div>
 
-      <div className="border-border-subtle rounded-md border flex flex-col gap-6 p-6">
-        <h3 className="text-h3">{event.name} Agenda</h3>
-        <hr className="w-full border-border-subtle" />
-        <EventAgendaTable
-          agenda={agenda}
-        />
-      </div>
+      <EventAgendaTable eventName={event.name} agenda={agenda} />
 
       <EventMentorsTable mentors={mentors} />
     </PageContainer>
