@@ -2,13 +2,13 @@ import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { EventAgendaTable } from "@/features/events/components/EventAgendaTable";
-import type { AgendaItem } from "@/features/events/types";
 import { Button } from "@/components/ui/button";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { requireAuth } from "@/lib/auth/guards";
 import { FLAGS } from "@/lib/flags";
 import { createClient } from "@/lib/supabase/server";
 import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
+import { fetchEventAgenda } from "@/lib/supabase-helpers/event-agenda";
 import { Calendar, Link2, MapPin } from "lucide-react";
 import { formatEventDate, formatEventTime } from "@/lib/date";
 import { resolveImagePreviewSrc } from "@/lib/event-image";
@@ -26,11 +26,12 @@ export default async function PortalEventPage({
   await requireAuth();
   const supabase = await createClient();
   const event = await fetchEventBySlug(supabase, slug, { status: "active" });
-
+  
   if (!event) {
     notFound();
   }
-
+  
+  const agenda = await fetchEventAgenda(supabase, event.id);
   const startTime = formatEventTime(event.start_time);
   const endTime = formatEventTime(event.end_time);
   const location = [event.location_building, event.location_room]
@@ -119,10 +120,7 @@ export default async function PortalEventPage({
         <hr className="w-full border-border-subtle" />
 
         <EventAgendaTable
-          date={event.start_date}
-          title={event.name}
-          items={(event.agenda ?? []) as unknown as AgendaItem[]}
-          endTime="6:30 PM"
+          agenda={agenda}
         />
       </div>
 

@@ -1,67 +1,68 @@
 import { Clock } from "lucide-react";
 
-import type { AgendaItem } from "@/features/events/types";
+import type { EventAgendaDay } from "@/lib/supabase-helpers/event-agenda";
 import { formatEventDate } from "@/lib/date";
 
 interface EventAgendaTableProps {
-  /** YYYY-MM-DD day shown in the header. For multi-day events, the day this table covers. */
-  date?: string | null;
-  title: string;
-  items: AgendaItem[];
-  /** End time of the last item, which has no next item to end at, e.g. "6:30 PM". */
-  endTime?: string | null;
+  agenda: EventAgendaDay[];
 }
 
-export function EventAgendaTable({ date, title, items, endTime }: EventAgendaTableProps) {
-  const formattedDate = formatEventDate(date, { weekday: "short", month: "short", year: undefined });
+export function EventAgendaTable({ agenda }: EventAgendaTableProps) {
+  const formattedDate = (date: string): string =>
+    formatEventDate(date, { weekday: "short", month: "short", year: undefined }) ?? "";
 
   return (
-    <div className="overflow-x-auto rounded-lg border">
-      <table className="w-full min-w-max">
-        <thead>
-          <tr className="border-b bg-muted/50">
-            <th colSpan={4} className="px-4 py-3 text-left font-normal">
-              <div className="flex items-center gap-4">
-                <span className="size-2 shrink-0 rounded-full bg-border" aria-hidden />
-                <span>
-                  {formattedDate && <span className="font-medium bold">{formattedDate}: </span>}
-                  {title}
-                </span>
+    <>
+        {agenda.length > 0 && (
+          agenda.map((day) => (
+            <div className="overflow-x-auto rounded-lg border">
+                <table key={day.id} className="w-full min-w-max">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th colSpan={4} className="px-4 py-3 text-left font-normal">
+                        <div className="flex items-center gap-4">
+                          <span className="size-2 shrink-0 rounded-full bg-border" aria-hidden />
+                          <span>
+                            {formattedDate(day.date) && <span className="font-medium bold">{formattedDate(day.date)}: </span>}
+                            {day.title}
+                          </span>
+                        </div>
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {day.items.map((item) => {
+                      const timeRange = [item.start_time, item.end_time].filter(Boolean).join(" - ");
+          
+                      return (
+                        <tr key={item.id} className="border-b last:border-b-0 ">
+                          <td className="w-px p-4">
+                            <div className="flex items-center gap-4 whitespace-nowrap">
+                              {/* TODO: make the dot on each row hidden, and only show it when the 
+                              current time is within the item's time range. (this requires a migration) */}
+                              <span className="size-2 shrink-0 rounded-full bg-border" aria-hidden />
+                              <div className="flex items-center gap-2">
+                                <AgendaClock time={item.start_time} />
+                                {timeRange}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-4 pr-4">{item.title}</td>
+                          <td className="w-px py-4 pr-4 whitespace-nowrap text-center text-small">
+                            {item.building}
+                          </td>
+                          <td className="w-px py-4 pr-4 whitespace-nowrap text-center text-small">
+                            {item.room}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item, i) => {
-            const itemEndTime = items[i + 1]?.time ?? endTime;
-            const timeRange = [item.time, itemEndTime].filter(Boolean).join(" - ");
-
-            return (
-              <tr key={`${item.time}-${item.title}`} className="border-b last:border-b-0 ">
-                <td className="w-px p-4">
-                  <div className="flex items-center gap-4 whitespace-nowrap">
-                    {/* TODO: make the dot on each row hidden, and only show it when the 
-                    current time is within the item's time range. (this requires a migration) */}
-                    <span className="size-2 shrink-0 rounded-full bg-border" aria-hidden />
-                    <div className="flex items-center gap-2">
-                      <AgendaClock time={item.time} />
-                      {timeRange}
-                    </div>
-                  </div>
-                </td>
-                <td className="py-4 pr-4">{item.title}</td>
-                <td className="w-px py-4 pr-4 whitespace-nowrap text-center text-small">
-                  {item.location}
-                </td>
-                <td className="w-px py-4 pr-4 whitespace-nowrap text-center text-small">
-                  {item.room}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+            ))
+        )}
+    </>
   );
 }
 
