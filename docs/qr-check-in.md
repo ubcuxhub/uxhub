@@ -29,10 +29,12 @@ The token never expires or changes, so a screenshot scans as well as the live
 page. Reuse is stopped at the door: the second scan finds the existing
 `check_ins` row and shows "Already checked in at 10:02".
 
-[`schema-proposed.sql`](./schema-proposed.sql) gives the planned
-`event_tickets` table a random `qr_token` column instead. We use the signed
-token, so that column isn't needed. If `event_tickets` lands, sign the ticket
-ID instead of the registration ID; nothing else changes.
+**Open:** `event_tickets` has landed (see
+[registration-rollout.md](registration-rollout.md)) with a unique random
+`qr_token` on every ticket, and check-in moves from registrations to tickets.
+Pick one before wiring check-in: keep the signed token over the ticket ID (and
+drop `qr_token`), or use `qr_token` (and delete `check-in-token.ts`).
+`EventTicket` draws whichever string it gets, so neither choice changes it.
 
 ## Who gets a ticket
 
@@ -47,10 +49,11 @@ says a registered person stays registered, so the ticket has no cancelled state.
 - `EventTicket` draws `qrToken` as an SVG with
   [`toQrSvg`](../src/features/events/lib/qr-code.ts): error correction level
   M, a four-module quiet zone, 192 px, black on white in both themes.
-- The page that places the ticket loads the viewer's registration in a server
-  component, calls `createCheckInToken(registration.id)`, and passes the result
-  as `qrToken`. The token is fine to send to the browser; only the secret is
-  not.
+- The page that places the ticket loads the viewer's ticket in a server
+  component and passes its token as `qrToken`. The token is fine to send to the
+  browser; only a signing secret would not be. This waits on step 2 of
+  [registration-rollout.md](registration-rollout.md), since until then nothing
+  writes `event_tickets`.
 - Render `EventTicket` from a server component where possible, so the `qrcode`
   package stays off the client.
 - Show the ticket only to its owner; the page already runs `requireAuth()`.
@@ -114,6 +117,7 @@ because the admin is already authorized.
 
 ## Open questions
 
+- Signed token or `qr_token` (see above).
 - Should managers, not just admins, be able to scan?
 - Free events: do they create an attending registration today, so every attendee
   has a code? (Proposed schema assumption 3.)
