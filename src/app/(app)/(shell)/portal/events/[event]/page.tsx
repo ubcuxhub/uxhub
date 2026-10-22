@@ -12,6 +12,8 @@ import { fetchEventAgenda } from "@/lib/supabase-helpers/event-agenda";
 import { Calendar, Link2, MapPin } from "lucide-react";
 import { formatEventDate, formatEventTime } from "@/lib/date";
 import { resolveImagePreviewSrc } from "@/lib/event-image";
+import { fetchEventMentors, fetchEventSponsors } from "@/lib/supabase-helpers/event-people";
+import { EventMentorsTable } from "@/features/events/components/EventMentorsTable";
 
 interface PortalEventPageProps {
   params: Promise<{ event: string }>;
@@ -32,11 +34,10 @@ export default async function PortalEventPage({
   }
   
   const agenda = await fetchEventAgenda(supabase, event.id);
+  const mentors = await fetchEventMentors(supabase, event.id);
+  const sponsors = await fetchEventSponsors(supabase, event.id);
   const startTime = formatEventTime(event.start_time);
   const endTime = formatEventTime(event.end_time);
-  const location = [event.location_building, event.location_room]
-    .filter(Boolean)
-    .join(", ");
 
   return (
     <PageContainer backHref="/portal/events" backLabel="Back to Events" className="space-y-4">
@@ -118,26 +119,12 @@ export default async function PortalEventPage({
       <div className="border-border-subtle rounded-md border flex flex-col gap-6 p-6">
         <h3 className="text-h3">{event.name} Agenda</h3>
         <hr className="w-full border-border-subtle" />
-
         <EventAgendaTable
           agenda={agenda}
         />
       </div>
 
-      <div className="border-border-subtle rounded-md border flex flex-col gap-6 p-6">
-        <div className="flex flex-col gap-3">
-          <h3 className="text-h3">Speakers</h3>
-          <p className="text-muted-foreground">Displaying # mentors</p>
-        </div>
-        
-        <hr className="w-full border-border-subtle" />
-
-        <div className="flex flex-col gap-5">
-          <div>
-            
-          </div>
-        </div>
-      </div>
+      <EventMentorsTable mentors={mentors} />
     </PageContainer>
   );
 }
