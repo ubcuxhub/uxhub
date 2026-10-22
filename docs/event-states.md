@@ -18,11 +18,42 @@ Draft is the only way to hide an event. Whether an event is upcoming or past
 comes from `starts_at` and `ends_at`, not from its status, so a finished event
 stays Published and members keep their history.
 
+### Drafts for admins
+
+A draft is visible only to admins and managers, and they can use it the way a
+member would. This is how we test an event, such as a QR check-in trial, without
+a separate "test" state.
+
+- **Who sees it:** RLS already returns drafts only to `is_admin()`, which covers
+  admins and managers. Everyone else gets a 404, as if the event didn't exist.
+- **Portal event page and checkout:** admins and managers can open a draft's
+  `/portal/events/[slug]` page, register through its checkout, and get a ticket.
+  The page shows a "Draft: only admins can see this" banner.
+- **Not listed anywhere:** the portal timeline and the public `/events` pages
+  stay active-only. Share a draft by its direct portal link. The public
+  `/events/[slug]` page is cached and uses the anon client, so it never shows
+  a draft.
+- **Enforced on the server:** fulfillment reads events with the service-role
+  client, which bypasses RLS. It has to check the buyer's role itself before it
+  sells a draft ticket. `reserve_event_ticket` does this: it looks up the
+  buyer's role and lets only admins and managers register for a draft or
+  scheduled event.
+
+Preview deploys share the production database (the free plan has no branching),
+so registrations and check-ins made on a test draft are real production rows.
+Keep the event in Draft afterwards, or delete it along with its registrations.
+
+**Not built yet:** today the portal event page and fulfillment
+(`createSquarePaymentForEventTicket`) both require `status = active`, even for
+admins. They move to `reserve_event_ticket` with the rest of the code
+(see [registration-rollout.md](registration-rollout.md)).
+
 ## Admin: application
 
 Only for events with `requires_application`.
 
-`event_applications.status` has exactly four values:
+`event_applications.status` (enum `event_application_status`) has exactly four
+values. The database enforces the moves below:
 
 | `status` | Meaning | Next |
 | --- | --- | --- |

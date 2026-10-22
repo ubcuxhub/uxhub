@@ -74,6 +74,10 @@ import {
  * it, which keeps a fresh database usable without a migration run.
  */
 const BUCKET = {
+  profilePhotos: {
+    id: "profile-photos", public: true, fileSizeLimit: 4194304,
+    allowedMimeTypes: ["image/jpeg", "image/png"],
+  },
   eventImages: {
     id: "event-images",
     public: true,
@@ -151,40 +155,46 @@ async function reconcileBuckets(
   supabase: SupabaseClient,
   options: Options
 ): Promise<string> {
-  const spec = BUCKET.eventImages;
-  const { data: existing } = await supabase.storage.getBucket(spec.id);
+  const results: string[] = [];
+  for (const spec of Object.values(BUCKET)) {
+    const { data: existing } = await supabase.storage.getBucket(spec.id);
 
-  // Prod gets its bucket from the migration, not from here. Creating it as a
-  // side effect of seeding would paper over a deploy that never ran.
-  if (options.target === "prod") {
-    if (!existing) {
-      throw new Error(
-        `The "${spec.id}" bucket is missing from the deployed project.\n` +
-          "  Apply the migrations first: pnpm exec supabase db push"
-      );
+    // Prod gets its bucket from the migration, not from here. Creating it as a
+    // side effect of seeding would paper over a deploy that never ran.
+    if (options.target === "prod") {
+      if (!existing) {
+        throw new Error(
+          `The "${spec.id}" bucket is missing from the deployed project.\n` +
+            "  Apply the migrations first: pnpm exec supabase db push"
+        );
+      }
+      results.push("Storage buckets: verified");
+      continue;
     }
-    return "Storage buckets: verified";
-  }
 
-  if (options.dryRun) {
-    return `Storage buckets: ${existing ? "0 created, 1 updated" : "1 created, 0 updated"}`;
-  }
+    if (options.dryRun) {
+      results.push(`Storage buckets: ${existing ? "0 created, 1 updated" : "1 created, 0 updated"}`);
+      continue;
+    }
 
-  const settings = {
-    public: spec.public,
-    fileSizeLimit: spec.fileSizeLimit,
-    allowedMimeTypes: [...spec.allowedMimeTypes],
-  };
+    const settings = {
+      public: spec.public,
+      fileSizeLimit: spec.fileSizeLimit,
+      allowedMimeTypes: [...spec.allowedMimeTypes],
+    };
 
-  if (existing) {
-    const { error } = await supabase.storage.updateBucket(spec.id, settings);
+    if (existing) {
+      const { error } = await supabase.storage.updateBucket(spec.id, settings);
+      if (error) throw error;
+      results.push("Storage buckets: 0 created, 1 updated");
+      continue;
+    }
+
+    const { error } = await supabase.storage.createBucket(spec.id, settings);
     if (error) throw error;
-    return "Storage buckets: 0 created, 1 updated";
+    results.push("Storage buckets: 1 created, 0 updated");
   }
-
-  const { error } = await supabase.storage.createBucket(spec.id, settings);
-  if (error) throw error;
-  return "Storage buckets: 1 created, 0 updated";
+  return results.join("; ");
 }
 
 /**

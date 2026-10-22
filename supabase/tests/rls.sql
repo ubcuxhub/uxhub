@@ -648,4 +648,72 @@ set membership_expires_at = now()
 where id = :'user_a_id';
 reset role;
 
+-- Admin-only profile additions must remain unavailable to direct client writes.
+do $$
+declare column_name text;
+begin
+  foreach column_name in array array['birth_date', 'interests', 'profile_photo_path', 'student_verified_at', 'student_verified_by'] loop
+    if has_column_privilege('authenticated', 'public.user_info', column_name, 'UPDATE')
+       or has_column_privilege('anon', 'public.user_info', column_name, 'UPDATE') then
+      raise exception 'Client UPDATE unexpectedly granted on %', column_name;
+    end if;
+  end loop;
+  if not exists (select 1 from storage.buckets where id = 'profile-photos' and public
+      and file_size_limit = 4194304 and allowed_mime_types = array['image/jpeg', 'image/png']) then
+    raise exception 'Profile photo bucket settings do not match upload restrictions';
+  end if;
+end;
+$$;
+
+-- Tickets and application decisions are only written on the server.
+do $$
+declare
+  role_name text;
+  fn text;
+begin
+  foreach role_name in array array['anon', 'authenticated'] loop
+    foreach fn in array array[
+      'public.reserve_event_ticket(uuid, uuid, uuid)',
+      'public.event_seat_counts_unfiltered(uuid[])',
+      'public.backfill_event_tickets_and_applications()'
+    ] loop
+      if has_function_privilege(role_name, fn, 'execute') then
+        raise exception '% can execute %', role_name, fn;
+      end if;
+    end loop;
+    if has_table_privilege(role_name, 'public.event_tickets', 'INSERT')
+       or has_table_privilege(role_name, 'public.event_tickets', 'UPDATE') then
+      raise exception '% can write event_tickets', role_name;
+    end if;
+  end loop;
+
+  if has_table_privilege('anon', 'public.event_tickets', 'SELECT')
+     or has_table_privilege('anon', 'public.event_applications', 'SELECT') then
+    raise exception 'anon can read tickets or applications';
+  end if;
+  if has_column_privilege('authenticated', 'public.event_applications', 'status', 'INSERT')
+     or has_column_privilege('authenticated', 'public.event_applications', 'offer_expires_at', 'INSERT') then
+    raise exception 'members can choose their own application decision';
+  end if;
+  if not has_function_privilege('anon', 'public.event_seat_counts(uuid[])', 'execute') then
+    raise exception 'anon lost execute on event_seat_counts';
+  end if;
+end;
+$$;
+
+-- Scheduled events stay hidden, with their mentors, until publish_at passes.
+update public.events set publish_at = now() + interval '1 day' where id = :'event_id';
+set local role anon;
+do $$
+begin
+  if exists (select 1 from public.events where slug = 'rls-event') then
+    raise exception 'anon can see a scheduled event';
+  end if;
+  if exists (select 1 from public.mentors where full_name = 'RLS Mentor') then
+    raise exception 'anon can see a scheduled event''s mentor';
+  end if;
+end;
+$$;
+reset role;
+
 rollback;

@@ -139,4 +139,46 @@ describe("user seed fixtures", () => {
       validateUserFixtures(wrongTicket, seedEvents, membershipTypes, fixedNow)
     ).toThrow("invalid purchase link");
   });
+
+  it("covers verified, unverified, and empty admin profile states", () => {
+    const verified = seedUsers.filter((user) => user.studentVerification);
+    expect(verified.map((user) => user.email)).toEqual(["student-explorer@example.com"]);
+    expect(seedUsers.some((user) => !user.studentVerification)).toBe(true);
+    expect(
+      seedUsers.filter(
+        (user) => user.profile.birth_date === null && user.profile.interests?.length === 0
+      ).map((user) => user.email)
+    ).toEqual(["admin-no-membership@example.com"]);
+    // Written on every run so changes made through the admin dialog are undone.
+    for (const user of seedUsers) {
+      expect(user.profile).toMatchObject({
+        profile_photo_path: null,
+        student_verified_at: null,
+        student_verified_by: null,
+      });
+    }
+  });
+
+  it("rejects a verification no manager could have made", () => {
+    const index = seedUsers.findIndex((user) => user.studentVerification);
+
+    const byAdmin = structuredClone(seedUsers);
+    byAdmin[index].studentVerification!.verifiedByEmail = "admin-explorer@example.com";
+    expect(() =>
+      validateUserFixtures(byAdmin, seedEvents, membershipTypes, fixedNow)
+    ).toThrow("must be verified by a manager fixture");
+
+    const ofFaculty = structuredClone(seedUsers);
+    const faculty = ofFaculty.find((user) => user.profile.user_type === "faculty")!;
+    faculty.studentVerification = ofFaculty[index].studentVerification;
+    expect(() =>
+      validateUserFixtures(ofFaculty, seedEvents, membershipTypes, fixedNow)
+    ).toThrow("Only a UBC student can be verified");
+
+    const inFuture = structuredClone(seedUsers);
+    inFuture[index].studentVerification!.verifiedAt = "2999-01-01T00:00:00.000Z";
+    expect(() =>
+      validateUserFixtures(inFuture, seedEvents, membershipTypes, fixedNow)
+    ).toThrow("cannot be verified in the future");
+  });
 });

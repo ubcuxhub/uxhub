@@ -21,6 +21,7 @@ export type Database = {
           updated_at: string
           updated_by: string | null
         }
+        ComputedFields: never
         Insert: {
           id?: boolean
           membership_term_ends_at?: string | null
@@ -53,6 +54,7 @@ export type Database = {
           start_time: string | null
           updated_at: string | null
         }
+        ComputedFields: never
         Insert: {
           created_at?: string | null
           end_time?: string | null
@@ -88,14 +90,17 @@ export type Database = {
           created_at: string | null
           event_registration_id: string
           id: string
+          ticket_id: string | null
           updated_at: string | null
         }
+        ComputedFields: never
         Insert: {
           check_in_session_id: string
           checked_in_at?: string | null
           created_at?: string | null
           event_registration_id: string
           id?: string
+          ticket_id?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -104,6 +109,7 @@ export type Database = {
           created_at?: string | null
           event_registration_id?: string
           id?: string
+          ticket_id?: string | null
           updated_at?: string | null
         }
         Relationships: [
@@ -119,6 +125,13 @@ export type Database = {
             columns: ["event_registration_id"]
             isOneToOne: false
             referencedRelation: "event_registrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "check_ins_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "event_tickets"
             referencedColumns: ["id"]
           },
         ]
@@ -140,6 +153,7 @@ export type Database = {
           sort_order: number
           updated_at: string | null
         }
+        ComputedFields: never
         Insert: {
           allowed_file_types?: string[] | null
           created_at?: string | null
@@ -184,6 +198,7 @@ export type Database = {
       }
       event_application_responses: {
         Row: {
+          application_id: string | null
           created_at: string | null
           event_application_question_id: string
           event_registration_id: string
@@ -191,7 +206,9 @@ export type Database = {
           response: string | null
           updated_at: string | null
         }
+        ComputedFields: never
         Insert: {
+          application_id?: string | null
           created_at?: string | null
           event_application_question_id: string
           event_registration_id: string
@@ -200,6 +217,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          application_id?: string | null
           created_at?: string | null
           event_application_question_id?: string
           event_registration_id?: string
@@ -208,6 +226,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "event_application_responses_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "event_applications"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "event_application_responses_event_application_question_id_fkey"
             columns: ["event_application_question_id"]
@@ -224,12 +249,59 @@ export type Database = {
           },
         ]
       }
+      event_applications: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          offer_expires_at: string | null
+          status: Database["public"]["Enums"]["event_application_status"]
+          updated_at: string
+          user_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          offer_expires_at?: string | null
+          status?: Database["public"]["Enums"]["event_application_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          offer_expires_at?: string | null
+          status?: Database["public"]["Enums"]["event_application_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_applications_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_applications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_info"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_mentors: {
         Row: {
           event_id: string
           mentor_id: string
           sort_order: number
         }
+        ComputedFields: never
         Insert: {
           event_id: string
           mentor_id: string
@@ -269,6 +341,7 @@ export type Database = {
           updated_at: string | null
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           attending?: boolean | null
           created_at?: string | null
@@ -328,6 +401,7 @@ export type Database = {
           sort_order: number
           sponsor_id: string
         }
+        ComputedFields: never
         Insert: {
           event_id: string
           sort_order?: number
@@ -355,6 +429,59 @@ export type Database = {
           },
         ]
       }
+      event_tickets: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          purchase_id: string | null
+          qr_token: string
+          updated_at: string
+          user_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          purchase_id?: string | null
+          qr_token?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          purchase_id?: string | null
+          qr_token?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_tickets_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_tickets_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: true
+            referencedRelation: "purchases"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_tickets_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_info"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           agenda: Json | null
@@ -364,6 +491,7 @@ export type Database = {
           description_images: string[] | null
           end_date: string | null
           end_time: string | null
+          ends_at: string | null
           event_type: Database["public"]["Enums"]["event_type"]
           id: string
           image_url: string | null
@@ -374,17 +502,23 @@ export type Database = {
           member_price: number
           mentors_enabled: boolean
           name: string
+          publish_at: string | null
+          registration_closes_at: string | null
           registration_end_time: string | null
+          registration_opens_at: string | null
           registration_start_time: string | null
           regular_price: number
+          requires_application: boolean
           short_description: string | null
           slug: string
           sponsors_enabled: boolean
           start_date: string | null
           start_time: string | null
+          starts_at: string | null
           status: Database["public"]["Enums"]["event_status"]
           updated_at: string | null
         }
+        ComputedFields: never
         Insert: {
           agenda?: Json | null
           applications_enabled?: boolean
@@ -393,6 +527,7 @@ export type Database = {
           description_images?: string[] | null
           end_date?: string | null
           end_time?: string | null
+          ends_at?: string | null
           event_type?: Database["public"]["Enums"]["event_type"]
           id?: string
           image_url?: string | null
@@ -403,14 +538,19 @@ export type Database = {
           member_price?: number
           mentors_enabled?: boolean
           name: string
+          publish_at?: string | null
+          registration_closes_at?: string | null
           registration_end_time?: string | null
+          registration_opens_at?: string | null
           registration_start_time?: string | null
           regular_price: number
+          requires_application?: boolean
           short_description?: string | null
           slug: string
           sponsors_enabled?: boolean
           start_date?: string | null
           start_time?: string | null
+          starts_at?: string | null
           status?: Database["public"]["Enums"]["event_status"]
           updated_at?: string | null
         }
@@ -422,6 +562,7 @@ export type Database = {
           description_images?: string[] | null
           end_date?: string | null
           end_time?: string | null
+          ends_at?: string | null
           event_type?: Database["public"]["Enums"]["event_type"]
           id?: string
           image_url?: string | null
@@ -432,14 +573,19 @@ export type Database = {
           member_price?: number
           mentors_enabled?: boolean
           name?: string
+          publish_at?: string | null
+          registration_closes_at?: string | null
           registration_end_time?: string | null
+          registration_opens_at?: string | null
           registration_start_time?: string | null
           regular_price?: number
+          requires_application?: boolean
           short_description?: string | null
           slug?: string
           sponsors_enabled?: boolean
           start_date?: string | null
           start_time?: string | null
+          starts_at?: string | null
           status?: Database["public"]["Enums"]["event_status"]
           updated_at?: string | null
         }
@@ -457,6 +603,7 @@ export type Database = {
           slug: string
           updated_at: string | null
         }
+        ComputedFields: never
         Insert: {
           active?: boolean
           created_at?: string | null
@@ -492,6 +639,7 @@ export type Database = {
           profile_image_path: string | null
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           created_at?: string
           description?: string | null
@@ -534,6 +682,7 @@ export type Database = {
           updated_at: string | null
           user_id: string
         }
+        ComputedFields: never
         Insert: {
           amount_cents: number
           confirmation_email_attempted_at?: string | null
@@ -604,6 +753,7 @@ export type Database = {
           name: string
           updated_at: string
         }
+        ComputedFields: never
         Insert: {
           brand_logo_path?: string | null
           created_at?: string
@@ -625,21 +775,22 @@ export type Database = {
           created_at: string | null
           event_id: string
           event_type: string
-          payload: Json
+          payload: NonNullable<Json>
           processed_at: string | null
         }
+        ComputedFields: never
         Insert: {
           created_at?: string | null
           event_id: string
           event_type: string
-          payload: Json
+          payload: NonNullable<Json>
           processed_at?: string | null
         }
         Update: {
           created_at?: string | null
           event_id?: string
           event_type?: string
-          payload?: Json
+          payload?: NonNullable<Json>
           processed_at?: string | null
         }
         Relationships: []
@@ -647,6 +798,7 @@ export type Database = {
       user_info: {
         Row: {
           auth_user_id: string | null
+          birth_date: string | null
           created_at: string | null
           deleted_at: string | null
           dietary_restrictions: string | null
@@ -655,6 +807,7 @@ export type Database = {
           faculty_email: string | null
           first_name: string
           id: string
+          interests: string[]
           last_name: string
           major: string | null
           membership_expires_at: string | null
@@ -664,17 +817,22 @@ export type Database = {
           order_date_deprecated: string | null
           phone: string | null
           preferred_pronouns: string | null
+          profile_photo_path: string | null
           role_access: Database["public"]["Enums"]["role_access_enum"]
           school_institution: string | null
           square_customer_id: string | null
           student_number: number | null
           student_status: Database["public"]["Enums"]["student_status"] | null
+          student_verified_at: string | null
+          student_verified_by: string | null
           updated_at: string | null
           user_type: Database["public"]["Enums"]["user_type"]
           year: Database["public"]["Enums"]["uni_year"] | null
         }
+        ComputedFields: never
         Insert: {
           auth_user_id?: string | null
+          birth_date?: string | null
           created_at?: string | null
           deleted_at?: string | null
           dietary_restrictions?: string | null
@@ -683,6 +841,7 @@ export type Database = {
           faculty_email?: string | null
           first_name: string
           id?: string
+          interests?: string[]
           last_name: string
           major?: string | null
           membership_expires_at?: string | null
@@ -692,17 +851,21 @@ export type Database = {
           order_date_deprecated?: string | null
           phone?: string | null
           preferred_pronouns?: string | null
+          profile_photo_path?: string | null
           role_access: Database["public"]["Enums"]["role_access_enum"]
           school_institution?: string | null
           square_customer_id?: string | null
           student_number?: number | null
           student_status?: Database["public"]["Enums"]["student_status"] | null
+          student_verified_at?: string | null
+          student_verified_by?: string | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"]
           year?: Database["public"]["Enums"]["uni_year"] | null
         }
         Update: {
           auth_user_id?: string | null
+          birth_date?: string | null
           created_at?: string | null
           deleted_at?: string | null
           dietary_restrictions?: string | null
@@ -711,6 +874,7 @@ export type Database = {
           faculty_email?: string | null
           first_name?: string
           id?: string
+          interests?: string[]
           last_name?: string
           major?: string | null
           membership_expires_at?: string | null
@@ -720,11 +884,14 @@ export type Database = {
           order_date_deprecated?: string | null
           phone?: string | null
           preferred_pronouns?: string | null
+          profile_photo_path?: string | null
           role_access?: Database["public"]["Enums"]["role_access_enum"]
           school_institution?: string | null
           square_customer_id?: string | null
           student_number?: number | null
           student_status?: Database["public"]["Enums"]["student_status"] | null
+          student_verified_at?: string | null
+          student_verified_by?: string | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"]
           year?: Database["public"]["Enums"]["uni_year"] | null
@@ -744,6 +911,13 @@ export type Database = {
             referencedRelation: "membership_types"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "user_info_student_verified_by_fkey"
+            columns: ["student_verified_by"]
+            isOneToOne: false
+            referencedRelation: "user_info"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
@@ -751,11 +925,25 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      current_user_info_id: { Args: never; Returns: string }
+      backfill_event_tickets_and_applications: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      current_user_info_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       delete_account: { Args: { p_auth_user_id: string }; Returns: undefined }
       delete_event_atomically: {
         Args: { target_event_id: string }
         Returns: undefined
+      }
+      event_is_public: {
+        Args: {
+          p_publish_at: string
+          p_status: Database["public"]["Enums"]["event_status"]
+        }
+        Returns: boolean
       }
       event_registration_counts: {
         Args: { p_event_ids: string[] }
@@ -764,13 +952,51 @@ export type Database = {
           registration_count: number
         }[]
       }
-      get_user_info_id: { Args: never; Returns: string }
-      is_admin: { Args: never; Returns: boolean }
-      is_authenticated: { Args: never; Returns: boolean }
-      is_manager: { Args: never; Returns: boolean }
+      event_seat_counts: {
+        Args: { p_event_ids: string[] }
+        Returns: {
+          event_id: string
+          held_offers: number
+          seats_left: number
+          tickets: number
+        }[]
+      }
+      event_seat_counts_unfiltered: {
+        Args: { p_event_ids: string[] }
+        Returns: {
+          event_id: string
+          held_offers: number
+          seats_left: number
+          tickets: number
+        }[]
+      }
+      get_user_info_id: { Args: Record<PropertyKey, never>; Returns: string }
+      is_admin: { Args: Record<PropertyKey, never>; Returns: boolean }
+      is_authenticated: { Args: Record<PropertyKey, never>; Returns: boolean }
+      is_manager: { Args: Record<PropertyKey, never>; Returns: boolean }
+      legacy_event_ends_at: {
+        Args: {
+          p_end_date: string
+          p_end_time: string
+          p_start_date: string
+          p_start_time: string
+        }
+        Returns: string
+      }
+      legacy_event_starts_at: {
+        Args: { p_start_date: string; p_start_time: string }
+        Returns: string
+      }
       release_paid_event_ticket_reservation: {
         Args: { p_purchase_id: string }
         Returns: undefined
+      }
+      reserve_event_ticket: {
+        Args: { p_event_id: string; p_purchase_id?: string; p_user_id: string }
+        Returns: {
+          failure_reason: string
+          ticket_id: string
+        }[]
       }
       reserve_paid_event_ticket: {
         Args: { p_event_id: string; p_purchase_id: string; p_user_id: string }
@@ -799,9 +1025,15 @@ export type Database = {
         }
         Returns: Database["public"]["Enums"]["role_access_enum"]
       }
+      valid_user_interests: { Args: { tags: string[] }; Returns: boolean }
     }
     Enums: {
       application_status: "pending" | "declined" | "accepted"
+      event_application_status:
+        | "submitted"
+        | "accepted"
+        | "rejected"
+        | "waitlisted"
       event_status: "draft" | "active" | "archived"
       event_type: "regular" | "flagship"
       response_type:
@@ -943,6 +1175,12 @@ export const Constants = {
   public: {
     Enums: {
       application_status: ["pending", "declined", "accepted"],
+      event_application_status: [
+        "submitted",
+        "accepted",
+        "rejected",
+        "waitlisted",
+      ],
       event_status: ["draft", "active", "archived"],
       event_type: ["regular", "flagship"],
       response_type: [

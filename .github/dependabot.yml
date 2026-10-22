@@ -3,7 +3,7 @@ updates:
   - package-ecosystem: "npm"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
     ignore:
       # Node's types follow the runtime major (22, as in CI), not the newest
       # Node release. Raise both together.
