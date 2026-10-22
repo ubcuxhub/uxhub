@@ -14,59 +14,59 @@ export function EventAgendaTable({ eventName, agenda }: EventAgendaTableProps) {
 
   return (
     <>
-      <div className="border-border-subtle rounded-md border flex flex-col gap-6 p-6">
-        <h3 className="text-h3">{eventName} Agenda</h3>
-        <hr className="w-full border-border-subtle" />
-        {agenda.length > 0 && (
-          agenda.map((day) => (
+      {agenda.length > 0 && (
+        <div className="border-border-subtle rounded-md border flex flex-col gap-6 p-6">
+          <h3 className="text-h3">{eventName} Agenda</h3>
+          <hr className="w-full border-border-subtle" />
+          {agenda.map((day) => (
             <div key={day.id} className="overflow-x-auto rounded-lg border">
-                <table className="w-full min-w-max">
-                  <thead>
-                    <tr className="border-b bg-muted/50">
-                      <th colSpan={4} className="px-4 py-3 text-left font-normal">
-                        <div className="flex items-center gap-4">
-                          <span className="size-2 shrink-0 rounded-full bg-border" aria-hidden />
-                          <span>
-                            {formattedDate(day.date) && <span className="font-medium bold">{formattedDate(day.date)}: </span>}
-                            {day.title}
-                          </span>
-                        </div>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {day.items.map((item) => {
-                      const timeRange = [item.start_time, item.end_time].filter(Boolean).join(" - ");
-          
-                      return (
-                        <tr key={item.id} className="border-b last:border-b-0 ">
-                          <td className="w-px p-4">
-                            <div className="flex items-center gap-4 whitespace-nowrap">
-                              {/* TODO: make the dot on each row hidden, and only show it when the 
-                              current time is within the item's time range. (this requires a migration) */}
-                              <span className="size-2 shrink-0 rounded-full bg-border" aria-hidden />
-                              <div className="flex items-center gap-2">
-                                <AgendaClock time={item.start_time} />
-                                {timeRange}
-                              </div>
+              <table className="w-full min-w-max">
+                <thead>
+                  <tr className="border-b bg-muted/50">
+                    <th colSpan={4} className="px-4 py-3 text-left font-normal">
+                      <div className="flex items-center gap-4">
+                        <span className="size-2 shrink-0 rounded-full bg-border" aria-hidden />
+                        <span>
+                          {formattedDate(day.date) && <span className="font-medium bold">{formattedDate(day.date)}: </span>}
+                          {day.title}
+                        </span>
+                      </div>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {day.items.map((item) => {
+                    const timeRange = [item.start_time, item.end_time].filter(Boolean).join(" - ");
+        
+                    return (
+                      <tr key={item.id} className="border-b last:border-b-0 ">
+                        <td className="w-px p-4">
+                          <div className="flex items-center gap-4 whitespace-nowrap">
+                            {/* TODO: make the dot on each row hidden, and only show it when the 
+                            current time is within the item's time range. (this requires a migration) */}
+                            <span className="size-2 shrink-0 rounded-full bg-border" aria-hidden />
+                            <div className="flex items-center gap-2">
+                              <AgendaClock time={item.start_time} />
+                              {timeRange}
                             </div>
-                          </td>
-                          <td className="py-4 pr-4">{item.title}</td>
-                          <td className="w-px py-4 pr-4 whitespace-nowrap text-center text-small">
-                            {item.building}
-                          </td>
-                          <td className="w-px py-4 pr-4 whitespace-nowrap text-center text-small">
-                            {item.room}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ))
-          )}
+                          </div>
+                        </td>
+                        <td className="py-4 pr-4">{item.title}</td>
+                        <td className="w-px py-4 pr-4 whitespace-nowrap text-center text-small">
+                          {item.building}
+                        </td>
+                        <td className="w-px py-4 pr-4 whitespace-nowrap text-center text-small">
+                          {item.room}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ))}
         </div>
+      )}
     </>
   );
 }
