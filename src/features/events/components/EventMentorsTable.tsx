@@ -1,8 +1,10 @@
 import { Separator } from "@/components/ui/separator";
 import type { MentorRow } from "@/lib/supabase/models";
+import type { SponsorRow } from "@/lib/supabase/models";
 
 interface EventMentorsTableProps {
-  mentors: MentorRow[];
+  mentors?: MentorRow[];
+  sponsors?: SponsorRow[];
 }
 
 /** The mentors card on the portal event page. Renders nothing for an event without mentors. */

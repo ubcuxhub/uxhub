@@ -121,6 +121,7 @@
   /* Status — bg-success-bg text-success, etc. */
   --color-success: var(--status-success-text);
   --color-success-bg: var(--status-success-bg);
+  --color-success-active: var(--status-success-active);
   --color-warning: var(--status-warning-text);
   --color-warning-bg: var(--status-warning-bg);
   --color-error: var(--status-error-text);
@@ -189,6 +190,7 @@
   /* Status */
   --status-success-text: #166534;
   --status-success-bg: #dcfce7;
+  --status-success-active: #00a33e;
   --status-warning-text: #92400e;
   --status-warning-bg: #fef3c7;
   --status-error-text: #b42318;

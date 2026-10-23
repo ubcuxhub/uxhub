@@ -1,97 +1,105 @@
-import { Clock } from "lucide-react";
+"use client";
 
+import { Separator } from "@/components/ui/separator";
+import { isAgendaDayToday, isAgendaItemHappening } from "@/features/events/lib/event-agenda";
+import { usePacificNow } from "@/hooks/use-pacific-now";
+import { formatEventDate, formatEventTime } from "@/lib/date";
 import type { EventAgendaDay } from "@/lib/supabase-helpers/event-agenda";
-import { formatEventDate } from "@/lib/date";
+import { cn } from "@/lib/utils";
 
 interface EventAgendaTableProps {
   eventName: string;
   agenda: EventAgendaDay[];
 }
 
+/**
+ * The agenda card on the portal event page: one table per day. Today's day dot
+ * turns blue and the running item gets a green dot, both in Vancouver time.
+ * Renders nothing for an event without an agenda.
+ */
 export function EventAgendaTable({ eventName, agenda }: EventAgendaTableProps) {
-  const formattedDate = (date: string): string =>
-    formatEventDate(date, { weekday: "short", month: "short", year: undefined }) ?? "";
+  const now = usePacificNow();
+
+  if (agenda.length === 0) return null;
 
   return (
-    <>
-      {agenda.length > 0 && (
-        <div className="border-border-subtle rounded-md border flex flex-col gap-6 p-6">
-          <h3 className="text-h3">{eventName} Agenda</h3>
-          <hr className="w-full border-border-subtle" />
-          {agenda.map((day) => (
-            <div key={day.id} className="overflow-x-auto rounded-lg border">
-              <table className="w-full min-w-max">
-                <thead>
-                  <tr className="border-b bg-muted/50">
-                    <th colSpan={4} className="px-4 py-3 text-left font-normal">
-                      <div className="flex items-center gap-4">
-                        <span className="size-2 shrink-0 rounded-full bg-border" aria-hidden />
-                        <span>
-                          {formattedDate(day.date) && <span className="font-medium bold">{formattedDate(day.date)}: </span>}
-                          {day.title}
-                        </span>
-                      </div>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {day.items.map((item) => {
-                    const timeRange = [item.start_time, item.end_time].filter(Boolean).join(" - ");
-        
-                    return (
-                      <tr key={item.id} className="border-b last:border-b-0 ">
-                        <td className="w-px p-4">
-                          <div className="flex items-center gap-4 whitespace-nowrap">
-                            {/* TODO: make the dot on each row hidden, and only show it when the 
-                            current time is within the item's time range. (this requires a migration) */}
-                            <span className="size-2 shrink-0 rounded-full bg-border" aria-hidden />
-                            <div className="flex items-center gap-2">
-                              <AgendaClock time={item.start_time} />
-                              {timeRange}
-                            </div>
+    <section className="flex flex-col gap-6 rounded-md border border-border-subtle p-6">
+      <h3 className="text-h3">{eventName} Agenda</h3>
+      <Separator />
+
+      {agenda.map((day) => {
+        const date = formatEventDate(day.date, { weekday: "short", month: "short", year: undefined });
+        const isToday = isAgendaDayToday(day.date, now);
+
+        return (
+          <div key={day.id} className="overflow-x-auto rounded-lg border">
+            <table className="w-full min-w-max">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th colSpan={4} className="px-4 py-3 text-left font-normal">
+                    <div className="flex items-center gap-4">
+                      <span
+                        className={cn("size-2 shrink-0 rounded-full", isToday ? "bg-action" : "bg-border")}
+                        aria-hidden
+                      />
+                      <span>
+                        {date && <span className="font-medium">{date}: </span>}
+                        {day.title}
+                        {isToday && <span className="sr-only"> (today)</span>}
+                      </span>
+                    </div>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {day.items.map((item) => {
+                  const isHappening = isAgendaItemHappening(day.date, item, now);
+
+                  return (
+                    <tr key={item.id} className="border-b last:border-b-0">
+                      <td className="w-px p-4">
+                        <div className="flex items-center gap-4 whitespace-nowrap">
+                          {/* `invisible` keeps the dot's space, so rows stay aligned when it appears. */}
+                          <span
+                            className={cn(
+                              "size-2 shrink-0 rounded-full bg-success-active",
+                              !isHappening && "invisible"
+                            )}
+                            aria-hidden
+                          />
+                          <div className="flex w-52 items-center gap-2">
+                            <AgendaClock time={item.start_time} />
+                            {formatEventTime(item.start_time)} - {formatEventTime(item.end_time)}
                           </div>
-                        </td>
-                        <td className="py-4 pr-4">{item.title}</td>
-                        <td className="w-px py-4 pr-4 whitespace-nowrap text-center text-small">
-                          {item.building}
-                        </td>
-                        <td className="w-px py-4 pr-4 whitespace-nowrap text-center text-small">
-                          {item.room}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          ))}
-        </div>
-      )}
-    </>
+                        </div>
+                      </td>
+                      <td className="py-4 pr-4">
+                        {item.title}
+                        {isHappening && <span className="sr-only"> (happening now)</span>}
+                      </td>
+                      <td className="w-px py-4 pr-4 whitespace-nowrap text-right text-small">
+                        {item.building}
+                      </td>
+                      <td className="w-32 py-4 pr-4 whitespace-nowrap text-right text-small">
+                        {item.room}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        );
+      })}
+    </section>
   );
 }
 
-/** Reads "8:00 AM", "8:00 a.m." or "20:00" as 24-hour hours and minutes. */
-function parseClockTime(time: string): { hours: number; minutes: number } | null {
-  const match = /^(\d{1,2}):(\d{2})\s*([ap])?/i.exec(time.trim());
-  if (!match) return null;
-
-  const hour = Number(match[1]);
-  const minutes = Number(match[2]);
-  const meridiem = match[3]?.toLowerCase();
-  if (hour > 23 || minutes > 59 || (meridiem && hour > 12)) return null;
-
-  const hours = meridiem ? (hour % 12) + (meridiem === "p" ? 12 : 0) : hour;
-  return { hours, minutes };
-}
-
-/** A clock icon whose hands show `time`; falls back to the plain icon when it can't be read. */
+/** A clock icon whose hands show `time`, a Postgres `time` string like "09:30:00". */
 function AgendaClock({ time }: { time: string }) {
-  const parsed = parseClockTime(time);
-  if (!parsed) return <Clock className="size-5 shrink-0 text-muted-foreground" aria-hidden />;
-
-  const minuteAngle = parsed.minutes * 6;
-  const hourAngle = ((parsed.hours % 12) + parsed.minutes / 60) * 30;
+  const [hours, minutes] = time.split(":").map(Number);
+  const minuteAngle = minutes * 6;
+  const hourAngle = ((hours % 12) + minutes / 60) * 30;
 
   // Hand tip for an angle measured clockwise from 12 o'clock, in Lucide's 24x24 grid.
   const handEnd = (angle: number, length: number) => {
