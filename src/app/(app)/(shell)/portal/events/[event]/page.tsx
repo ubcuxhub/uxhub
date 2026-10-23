@@ -106,17 +106,6 @@ export default async function PortalEventPage({
         </div>
       </div>
 
-      <div className="border-border-subtle rounded-md border flex flex-col gap-6 p-6">
-        <h3 className="text-h3">Registration</h3>
-        
-        <hr className="w-full border-border-subtle" />
-        
-        <div className="flex flex-col gap-2">
-          <p className="text-subheading">You're RSVP'd to {event.name}!</p>
-          <p>Don't forget to read the participant package before the event.</p>
-        </div>
-      </div>
-
       <EventAgendaTable eventName={event.name} agenda={agenda} />
 
       <EventPeopleCard type="mentors" people={mentors} />
