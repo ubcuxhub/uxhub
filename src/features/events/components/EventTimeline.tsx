@@ -6,43 +6,71 @@ import { useState } from "react";
 
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import type { EventGroup } from "@/features/events/types";
 import { formatEventDate, formatEventTime } from "@/lib/date";
 import { resolveImagePreviewSrc } from "@/lib/event-image";
 import type { EventRow } from "@/lib/supabase/models";
+import { groupEventsByMonth, normalizeString } from "@/features/events/lib/event-timeline";
+import { Input } from "@/components/ui/input";
 
 interface EventTimelineProps {
-  upcomingEventGroups: EventGroup[];
-  pastEventGroups: EventGroup[];
+  upcomingEvents: EventRow[];
+  pastEvents: EventRow[];
 }
 
 export function EventTimeline({
-  upcomingEventGroups,
-  pastEventGroups,
+  upcomingEvents,
+  pastEvents,
 }: EventTimelineProps) {
   const [showPastEvents, setShowPastEvents] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  
+  const displayedEvents = showPastEvents ? pastEvents : upcomingEvents;
+  
+  // filter events based on search query
+  const query = normalizeString(searchQuery);
+  const filteredEvents = (query) ? displayedEvents.filter((event) => {
+    return (
+      normalizeString(event.name).includes(query) ||
+      (event.location_building && normalizeString(event.location_building).includes(query)) ||
+      (event.location_room && normalizeString(event.location_room).includes(query))
+    )
+  }) : displayedEvents;
+  
+  const emptyMessage = query ? `No events match "${searchQuery}".` : showPastEvents ? "No past events." : "No events scheduled yet.";
 
-  const displayedGroups = showPastEvents ? pastEventGroups : upcomingEventGroups;
-  const emptyMessage = showPastEvents ? "No past events." : "No events scheduled yet.";
+  // group events by month
+  const filteredGroups = groupEventsByMonth(filteredEvents);
 
   return (
     <>
-      <div className="mb-4 flex items-center text-primary">
-        <Label htmlFor="show-past-events" className="mr-2">
-          Show Past Events
-        </Label>
-        <Switch
-          id="show-past-events"
-          checked={showPastEvents}
-          onCheckedChange={setShowPastEvents}
+    <div>
+      <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-8 mb-20">
+        <Input
+          placeholder="Search events..."
+          aria-label="Search events"
+          value={searchQuery}
+          onChange={(e) => {setSearchQuery(e.target.value)}}
+          type="search"
+          className="w-full"
         />
+        <div className="w-fit flex items-center text-primary">
+          <Label htmlFor="show-past-events" className="mr-2">
+            Show Past Events
+          </Label>
+          <Switch
+            id="show-past-events"
+            checked={showPastEvents}
+            onCheckedChange={setShowPastEvents}
+          />
+        </div>
       </div>
+    </div>
 
-      {displayedGroups.length === 0 ? (
+      {filteredGroups.length === 0 ? (
         <p className="text-muted-foreground my-8">{emptyMessage}</p>
       ) : (
         <div className="mb-8">
-          {displayedGroups.map((group) => (
+          {filteredGroups.map((group) => (
             <div key={group.key}>
               <h2 className="mt-4 mb-5 text-h2">{group.label}</h2>
               {group.events.map((event) => (

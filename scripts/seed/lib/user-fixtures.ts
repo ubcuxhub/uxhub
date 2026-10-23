@@ -140,6 +140,8 @@ export function validateUserFixtures(
     "purchase idempotency key"
   );
 
+  const userByEmail = new Map(users.map((user) => [user.email, user]));
+
   for (const user of users) {
     if (user.email !== user.email.trim().toLowerCase()) {
       throw new Error(`Seed user email must be normalized: "${user.email}"`);
@@ -157,6 +159,24 @@ export function validateUserFixtures(
     }
 
     assertProfileMatchesUserType(user);
+
+    // Mirrors `setStudentVerificationAction`: only a manager verifies, and
+    // only a UBC student has a student number to verify.
+    if (user.studentVerification) {
+      const { verifiedByEmail, verifiedAt } = user.studentVerification;
+      const verifier = userByEmail.get(verifiedByEmail);
+      if (verifier?.profile.role_access !== "manager") {
+        throw new Error(
+          `"${user.email}" must be verified by a manager fixture, not "${verifiedByEmail}"`
+        );
+      }
+      if ((user.profile.user_type ?? "ubcStudent") !== "ubcStudent") {
+        throw new Error(`Only a UBC student can be verified, not "${user.email}"`);
+      }
+      if (new Date(verifiedAt) > now) {
+        throw new Error(`"${user.email}" cannot be verified in the future`);
+      }
+    }
 
     // `isEligibleForMembership` in src/features/memberships/lib/policy.ts gates
     // on `eligible_user_types.includes(user_type)`, so a tier the fixture's own

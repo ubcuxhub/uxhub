@@ -31,3 +31,7 @@ export function splitEventsByDate(events: EventRow[], today: string) {
     pastEvents: events.filter((e) => e.start_date && (e.end_date ?? e.start_date) < today).reverse(),
   };
 }
+
+export function normalizeString(str: string | undefined) { 
+  return (str ? str.trim().toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "") : "");
+}

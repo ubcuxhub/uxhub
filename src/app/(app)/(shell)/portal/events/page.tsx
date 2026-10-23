@@ -1,7 +1,7 @@
 import { PageContainer } from "@/components/shared/PageContainer";
 import { EventTimeline } from "@/features/events/components/EventTimeline";
 import { EventsComingSoon } from "@/features/events/components/EventsComingSoon";
-import { groupEventsByMonth, splitEventsByDate } from "@/features/events/lib/event-timeline";
+import { splitEventsByDate } from "@/features/events/lib/event-timeline";
 import { getPacificStartDefaults } from "@/lib/date";
 import { FLAGS } from "@/lib/flags";
 import { createClient } from "@/lib/supabase/server";
@@ -16,16 +16,13 @@ export default async function PortalEvents() {
   const today = getPacificStartDefaults().start_date;
   const { upcomingEvents, pastEvents } = splitEventsByDate(events, today);
 
-  const upcomingEventGroups = groupEventsByMonth(upcomingEvents);
-  const pastEventGroups = groupEventsByMonth(pastEvents);
-
   return (
     <PageContainer>
-      <h1 className="mb-3 text-h1 tracking-tight">Events</h1>
+      <h1 className="mb-6 text-h1 tracking-tight">Events</h1>
 
       <EventTimeline
-        upcomingEventGroups={upcomingEventGroups}
-        pastEventGroups={pastEventGroups}
+        upcomingEvents={upcomingEvents}
+        pastEvents={pastEvents}
       />
     </PageContainer>
   );

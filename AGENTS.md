@@ -159,15 +159,17 @@ Read `supabase/README.md` before changing the schema.
 - Add a new focused migration; do not edit a migration that has been applied.
 - Update the matching helper and `src/lib/supabase-helpers/tables.ts`.
 - Try the migration locally first with `pnpm supabase:local`.
-- Apply migrations to the hosted project with `pnpm exec supabase db push`.
-  Nothing applies them automatically. `pnpm types:supabase` generates types from
-  the hosted project, and `/events/[slug]` is prerendered against the database
-  at build time, so the push has to come before regenerating types and before
-  deploying. The hosted schema then runs ahead of the deployed code, so keep
-  migrations backward-compatible with the code already in production. `db push`
-  is forward-only; correct a bad migration with a new one.
-- Run `pnpm types:supabase` after the push and commit the regenerated
-  `src/lib/supabase/database.types.ts`.
+- Run `pnpm types:supabase` and commit the regenerated
+  `src/lib/supabase/database.types.ts`. It reads the local database, so the
+  types come from the migrations; CI regenerates them and fails on any
+  difference.
+- Apply migrations to the hosted project with `pnpm exec supabase db push`
+  before merging. Nothing applies them automatically, and the deploy that
+  follows a merge expects the new schema; `/events/[slug]` is also prerendered
+  against the database at build time. The hosted schema then runs ahead of the
+  deployed code, so keep migrations backward-compatible with the code already
+  in production. `db push` is forward-only; correct a bad migration with a new
+  one.
 - Validate schema changes with `pnpm exec tsc --noEmit`, `pnpm lint`, and
   `pnpm build`.
 
@@ -189,6 +191,8 @@ Local values belong in the git-ignored `.env.local`.
 - Sentry: `NEXT_PUBLIC_SENTRY_DSN` enables error reporting; leave it unset
   locally. Build-time `SENTRY_ORG`, `SENTRY_PROJECT`, and secret
   `SENTRY_AUTH_TOKEN` upload source maps on Vercel builds
+- Check-in: server-only `CHECK_IN_TOKEN_SECRET` signs ticket QR codes
+ (`src/lib/check-in-token.ts`); rotating it invalidates every issued ticket
 - Feature flags: `NEXT_PUBLIC_FEATURE_STUDENT_EVENTS` and
   `NEXT_PUBLIC_FEATURE_DARK_MODE` force a flag on or off; unset, both are on
   locally and on preview deploys and off in production (`src/lib/flags.ts`)
@@ -199,7 +203,7 @@ Local values belong in the git-ignored `.env.local`.
 only for production credentials.
 
 Never expose the Supabase secret keys, Square access token, webhook signature
-key, Resend API key, or Sentry auth token to client components.
+key, Resend API key, Sentry auth token, or check-in token secret to client components.
 
 ## Quality
 

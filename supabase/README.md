@@ -93,25 +93,31 @@ Do these steps in order:
    This rebuilds the local database from every migration, so a broken one
    fails here instead of on the hosted project.
 
-3. **Push it to the hosted project.**
+3. **Regenerate the TypeScript types.**
+
+   ```bash
+   pnpm types:supabase
+   ```
+
+   This reads the local database you just rebuilt, through its `postgres-meta`
+   service, and overwrites `src/lib/supabase/database.types.ts`. Commit the
+   result. CI runs the same command against a database built from every
+   migration and fails if the committed file differs, so the types always
+   match the migrations. The output depends on the `postgres-meta` version, so
+   the command refuses to run against a stack started by an older CLI; restart
+   it with `pnpm exec supabase stop && pnpm exec supabase start`.
+
+4. **Push it to the hosted project before merging.**
 
    ```bash
    pnpm exec supabase db push
    ```
 
    Nothing applies migrations automatically, and `db push` is forward-only. The
-   hosted schema now runs ahead of the deployed code, so the migration must not
+   deploy that follows a merge expects the new schema, so push first. The
+   hosted schema then runs ahead of the deployed code, so the migration must not
    break the code already in production (see the compatibility path under
    "Migration guidelines").
-
-4. **Regenerate the TypeScript types.**
-
-   ```bash
-   pnpm types:supabase
-   ```
-
-   This reads the hosted project, which is why it comes after the push, and
-   overwrites `src/lib/supabase/database.types.ts`. Commit the result.
 
 5. **Update the data-access layer** (`src/lib/supabase-helpers/`):
    - Update the relevant helper's `select(...)` list, insert/update payloads,
@@ -168,6 +174,33 @@ Supporting files:
 
 ## Storage
 
+Admin user photos use a separate public `profile-photos` bucket (JPEG/PNG,
+4 MiB maximum). Managers upload through `/api/admin/users/[userId]/photo`;
+the server validates the image and writes with the service-role client.
+There are no direct client write policies. Anyone holding a public photo URL
+can view it.
+
+`user_info.profile_photo_path` stores an object key shaped as
+`profiles/<user-id>/<uuid>.<ext>`, and the UI derives its public URL. Replacements
+compare the previous path before saving, then delete the old object. Failed
+saves clean up the newly uploaded object. Account deletion clears the database
+reference and attempts storage cleanup after anonymization. Cleanup failures
+are logged and do not undo a successful database change.
+
+The four admin-profile migrations also add manual student verification,
+`birth_date`, and `interests`. New columns deliberately have no authenticated
+UPDATE grants: managers edit through authorized server endpoints. User-facing
+editing is deferred. Anonymization triggers clear all four additions during
+the existing `delete_account` transaction; changes to student number or user
+type invalidate manual verification.
+
+[`user-profile.integration.test.ts`](../src/features/admin/user-profile.integration.test.ts)
+exercises these actions, database constraints, access controls, and Storage
+through `pnpm test:integration`. It uses the shared fixtures in
+[`src/test/integration.ts`](../src/test/integration.ts), which also remove the
+photos a test uploads, and acts as a member by signing a local JWT rather than
+signing in.
+
 Event cover images live in the public `event-images` bucket. Bucket names are
 centralized in [`buckets.ts`](../src/lib/supabase-helpers/buckets.ts), the same
 way table names are in `tables.ts`.
@@ -218,9 +251,10 @@ strings the compiler cannot validate. A rename here breaks silently at runtime:
 
 ## Debugging checklist when something breaks
 
-- **Stale types?** Re-run `pnpm types:supabase` and `pnpm exec tsc --noEmit`.
-  A mismatch between `database.types.ts` and the live schema is the most common
-  cause.
+- **Stale types?** Rebuild with `pnpm supabase:local`, re-run
+  `pnpm types:supabase`, and run `pnpm exec tsc --noEmit`. If the types are
+  right but production misbehaves, check that every migration was pushed:
+  `pnpm exec supabase migration list`.
 - **Renamed table/column not reflected in a helper?** Check the helper file
   from the table map above and the `TABLES` map.
 - **Realtime not updating / errors?** Check `postgres_changes` `table`/`filter`
