@@ -13,7 +13,7 @@ import { Calendar, Link2, MapPin } from "lucide-react";
 import { formatEventDate, formatEventTime } from "@/lib/date";
 import { resolveImagePreviewSrc } from "@/lib/event-image";
 import { fetchEventMentors, fetchEventSponsors } from "@/lib/supabase-helpers/event-people";
-import { EventMentorsTable } from "@/features/events/components/EventMentorsTable";
+import { EventPeopleCard } from "@/features/events/components/EventPeopleCard";
 
 interface PortalEventPageProps {
   params: Promise<{ event: string }>;
@@ -34,8 +34,9 @@ export default async function PortalEventPage({
   }
   
   const agenda = await fetchEventAgenda(supabase, event.id);
-  const mentors = await fetchEventMentors(supabase, event.id);
-  const sponsors = await fetchEventSponsors(supabase, event.id);
+  // Admins switch these sections off per event, as the public event page does.
+  const mentors = event.mentors_enabled ? await fetchEventMentors(supabase, event.id) : [];
+  const sponsors = event.sponsors_enabled ? await fetchEventSponsors(supabase, event.id) : [];
   const startTime = formatEventTime(event.start_time);
   const endTime = formatEventTime(event.end_time);
 
@@ -118,7 +119,8 @@ export default async function PortalEventPage({
 
       <EventAgendaTable eventName={event.name} agenda={agenda} />
 
-      <EventMentorsTable mentors={mentors} />
+      <EventPeopleCard type="mentors" people={mentors} />
+      <EventPeopleCard type="sponsors" people={sponsors} />
     </PageContainer>
   );
 }
