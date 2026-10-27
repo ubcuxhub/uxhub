@@ -992,6 +992,10 @@ export type Database = {
         Args: { p_purchase_id: string }
         Returns: undefined
       }
+      reschedule_event_publication: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       reserve_event_ticket: {
         Args: { p_event_id: string; p_purchase_id?: string; p_user_id: string }
         Returns: {

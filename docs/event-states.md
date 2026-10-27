@@ -26,11 +26,25 @@ change from Draft to Active. Leave it empty to keep the event in Draft.
 Clearing it cancels publication; manually activating or archiving an event also
 clears its schedule.
 
-A database cron job checks every ten seconds and changes due drafts to Active,
-clearing `publish_at`. It runs even when nobody has the app open. Public
-visibility depends only on Active status. The admin list reflects the stored
-status when refreshed. Public marketing pages use their existing five-minute
-cache revalidation, so they may show the event after that cache refreshes.
+Saving, changing, clearing, deleting, or manually publishing a scheduled draft
+recalculates one shared database job for the earliest pending `publish_at`.
+It runs at that minute (rounded up for timestamps containing seconds), activates
+all due drafts, clears their dates, and schedules the next run. It runs even
+when nobody has the app open. Concurrent edits and publication are serialized
+before acquiring event row locks.
+
+When no schedules remain, both the publication job and recovery job are removed.
+While schedules exist, an hourly recovery check at minute 17 catches missed
+runs after database downtime. Failed updates leave the events unchanged and
+schedule a retry every minute until a successful run restores the normal
+schedule. Run history for these jobs is pruned to seven days during scheduling;
+there is no separate cleanup timer. Cron has no year field, so the timestamp
+predicate prevents an event scheduled more than a year away from publishing
+early if its calendar schedule fires in an earlier year.
+
+Public visibility depends only on Active status. The admin list reflects the
+stored status when refreshed. Public marketing pages retain their existing
+five-minute cache revalidation.
 
 ### Drafts for admins
 

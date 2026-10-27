@@ -737,14 +737,6 @@ end;
 $$;
 reset role;
 
-do $$
-begin
-  if not exists (select 1 from cron.job where jobname = 'publish-due-events'
-    and active and schedule = '10 seconds'
-    and command = 'select public.publish_due_events()') then
-    raise exception 'event publishing job is not scheduled';
-  end if;
-end;
-$$;
+\ir event-publication.sql
 
 rollback;
