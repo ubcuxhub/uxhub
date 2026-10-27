@@ -7,8 +7,8 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({}) }));
 vi.mock("@/features/memberships/lib/term", () => ({ getMembershipTermEndsAt: async () => null }));
 vi.mock("@/lib/log", () => ({ log: { error: vi.fn(), info: vi.fn() }, errorFields: () => ({}) }));
 const reads = vi.hoisted(() => ({
-  fetchActiveMemberCount: vi.fn(), fetchUpcomingEventCount: vi.fn(),
-  fetchUpcomingRegistrationCount: vi.fn(), fetchNextDashboardEvent: vi.fn(),
+  fetchMembershipAnalytics: vi.fn(), fetchEventAnalytics: vi.fn(),
+  fetchNextDashboardEvent: vi.fn(),
   fetchConfirmedEventRegistrationCount: vi.fn(),
 }));
 vi.mock("@/lib/supabase-helpers/admin-dashboard", () => reads);
@@ -22,14 +22,13 @@ afterEach(cleanup);
 beforeEach(() => vi.resetAllMocks());
 
 describe("dashboard states", () => {
-  it("keeps successful metrics visible and distinguishes unavailable from zero", async () => {
-    reads.fetchActiveMemberCount.mockResolvedValue(0);
-    reads.fetchUpcomingEventCount.mockRejectedValue(new Error("Database unavailable"));
-    reads.fetchUpcomingRegistrationCount.mockResolvedValue(12);
+  it("keeps the membership slide available when event statistics fail", async () => {
+    reads.fetchMembershipAnalytics.mockResolvedValue({ activeMembers: 0, buyersLast30Days: 12, tiers: [] });
+    reads.fetchEventAnalytics.mockRejectedValue(new Error("Database unavailable"));
     render(await DashboardStats({ now: "2026-10-26T12:00:00Z" }));
-    expect(screen.getByText("0")).toBeTruthy();
+    expect(screen.getByText("No active members")).toBeTruthy();
     expect(screen.getByText("12")).toBeTruthy();
-    expect(screen.getByText("Unavailable")).toBeTruthy();
+    expect(screen.getByText(/Event statistics unavailable/)).toBeTruthy();
   });
 
   it("distinguishes no upcoming event from a failed event query", async () => {
@@ -54,10 +53,19 @@ describe("dashboard states", () => {
     expect(screen.getByText("RSVPs unavailable")).toBeTruthy();
   });
 
-  it("renders disabled quick links, the activity slot, and an accessible loading state", () => {
+  it("renders external quick links, a disabled Drive placeholder, and activity and loading states", () => {
     render(<><DashboardQuickLinks /><DashboardActivityPlaceholder /><DashboardStatsSkeleton /></>);
-    for (const button of screen.getAllByRole("button")) expect((button as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getAllByRole("button")).toHaveLength(4);
+    const links = screen.getAllByRole("link");
+    expect(links.map((link) => link.getAttribute("href"))).toEqual([
+      "https://www.ubcuxhub.ca/",
+      "https://app.notion.com/p/3342f9f09f1880038056d20a8cb5f772?v=3342f9f09f1881b68878000c67901a56&source=copy_link",
+      "https://uxhub2627.slack.com/archives/C0ARSMVRV1D",
+    ]);
+    for (const link of links) {
+      expect(link.getAttribute("target")).toBe("_blank");
+      expect(link.getAttribute("rel")).toBe("noopener noreferrer");
+    }
+    expect((screen.getByRole("button", { name: "Drive: link coming soon" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText("User activity will appear here.")).toBeTruthy();
     expect(screen.getByRole("status", { name: "Loading statistics" })).toBeTruthy();
   });

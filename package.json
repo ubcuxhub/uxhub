@@ -37,6 +37,7 @@
     "react-day-picker": "^10.0.2",
     "react-dom": "19.3.0",
     "react-icons": "^5.7.0",
+    "recharts": "^3.8.0",
     "resend": "^6.32.1",
     "square": "^46.0.0",
     "tailwind-merge": "^3.7.0"

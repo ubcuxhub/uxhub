@@ -1,14 +1,12 @@
-import { CalendarDays, Ticket, Users } from "lucide-react";
-import { getMembershipTermEndsAt } from "@/features/memberships/lib/term";
 import { createClient } from "@/lib/supabase/server";
 import { errorFields, log } from "@/lib/log";
 import { FLAGS } from "@/lib/flags";
 import {
-  fetchActiveMemberCount, fetchConfirmedEventRegistrationCount,
-  fetchNextDashboardEvent, fetchUpcomingEventCount, fetchUpcomingRegistrationCount,
-  type AdminDashboardStats,
+  fetchConfirmedEventRegistrationCount, fetchNextDashboardEvent,
+  fetchMembershipAnalytics, fetchEventAnalytics,
 } from "@/lib/supabase-helpers/admin-dashboard";
-import { DashboardStatCard } from "./DashboardStatCard";
+import { Skeleton } from "@/components/ui/skeleton";
+import { DashboardStatsCarousel } from "./DashboardStatsCarousel";
 import { DashboardUpcomingEvent } from "./DashboardUpcomingEvent";
 import { DashboardPanel } from "./DashboardPanel";
 
@@ -24,25 +22,17 @@ async function readDashboardData<T>(metric: string, read: () => Promise<T>): Pro
   }
 }
 
-const metrics = [
-  { key: "activeMembers", label: "Active members", icon: Users },
-  { key: "upcomingEvents", label: "Upcoming events", icon: CalendarDays },
-  { key: "upcomingRegistrations", label: "Upcoming registrations", icon: Ticket },
-] as const;
-
 export function DashboardStatsSkeleton() {
-  return <div role="status" aria-label="Loading statistics" className="space-y-4">{metrics.map(({ key, ...metric }) => <DashboardStatCard key={key} {...metric} loading />)}</div>;
+  return <div role="status" aria-label="Loading statistics"><DashboardPanel className="min-h-[480px] gap-6"><Skeleton className="h-7 w-28" /><Skeleton className="mx-auto size-52 rounded-full" /><Skeleton className="h-16 w-full" /></DashboardPanel></div>;
 }
 
 export async function DashboardStats({ now }: { now: string }) {
   const db = await createClient();
-  const [activeMembers, upcomingEvents, upcomingRegistrations] = await Promise.all([
-    readDashboardData("active_members", async () => fetchActiveMemberCount(db, now, await getMembershipTermEndsAt())),
-    readDashboardData("upcoming_events", () => fetchUpcomingEventCount(db, now)),
-    readDashboardData("upcoming_registrations", () => fetchUpcomingRegistrationCount(db, now)),
+  const [members, events] = await Promise.all([
+    readDashboardData("membership_analytics", () => fetchMembershipAnalytics(db, now)),
+    readDashboardData("event_analytics", () => fetchEventAnalytics(db, now)),
   ]);
-  const stats: { [K in keyof AdminDashboardStats]: number | null } = { activeMembers, upcomingEvents, upcomingRegistrations };
-  return <div className="space-y-4">{metrics.map(({ key, ...metric }) => <DashboardStatCard key={key} {...metric} value={stats[key]} />)}</div>;
+  return <DashboardStatsCarousel members={members} events={events} />;
 }
 
 export async function DashboardEventData({ now }: { now: string }) {

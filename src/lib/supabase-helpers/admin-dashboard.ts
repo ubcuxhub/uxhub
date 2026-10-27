@@ -2,49 +2,44 @@ import type { DbClient } from "./types";
 import { TABLES } from "./tables";
 import type { EventRow } from "@/lib/supabase/models";
 
-export interface AdminDashboardStats {
+export interface MembershipAnalytics {
   activeMembers: number;
-  upcomingEvents: number;
-  upcomingRegistrations: number;
+  buyersLast30Days: number;
+  tiers: { id: string; name: string; count: number }[];
+}
+
+export interface EventAnalyticsRow {
+  id: string;
+  name: string;
+  startsAt: string;
+  registrations: number;
+  attendees: number;
+}
+
+export interface EventAnalytics {
+  events: EventAnalyticsRow[];
+  currentEvent: { id: string; name: string; registrations: number } | null;
+  schoolYearLabel: string;
+  uniqueParticipants: number;
+}
+
+export async function fetchMembershipAnalytics(db: DbClient, now: string): Promise<MembershipAnalytics> {
+  const { data, error } = await db.rpc("admin_membership_analytics", { p_now: now });
+  if (error) throw error;
+  // These JSON contracts are owned by the matching migration and exercised
+  // against Postgres in the integration suite. RPC Json cannot express them.
+  return data as unknown as MembershipAnalytics;
+}
+
+export async function fetchEventAnalytics(db: DbClient, now: string): Promise<EventAnalytics> {
+  const { data, error } = await db.rpc("admin_event_analytics", { p_now: now });
+  if (error) throw error;
+  return data as unknown as EventAnalytics;
 }
 
 export type DashboardEvent = Pick<EventRow,
   "id" | "name" | "slug" | "image_url" | "short_description"
 >;
-
-export async function fetchActiveMemberCount(
-  db: DbClient, now: string, termEndsAt: string | null,
-): Promise<number> {
-  // Match hasActiveMembership: a null individual expiry means no ceiling.
-  if (termEndsAt && new Date(termEndsAt) <= new Date(now)) return 0;
-  const { count, error } = await db.from(TABLES.userInfo)
-    .select("id", { count: "exact", head: true })
-    .is("deleted_at", null)
-    .not("membership_type_id", "is", null)
-    .or(`membership_expires_at.is.null,membership_expires_at.gt.${now}`);
-  if (error) throw error;
-  return count ?? 0;
-}
-
-export async function fetchUpcomingEventCount(db: DbClient, now: string): Promise<number> {
-  const { count, error } = await db.from(TABLES.events)
-    .select("id", { count: "exact", head: true })
-    .eq("status", "active").gt("starts_at", now)
-    .or(`publish_at.is.null,publish_at.lte.${now}`);
-  if (error) throw error;
-  return count ?? 0;
-}
-
-export async function fetchUpcomingRegistrationCount(db: DbClient, now: string): Promise<number> {
-  // Count in Postgres without transferring an unbounded list of event IDs.
-  const { count, error } = await db.from(TABLES.eventRegistrations)
-    .select("id, events!inner(id)", { count: "exact", head: true })
-    .eq("attending", true).eq("events.status", "active")
-    .gt("events.starts_at", now)
-    .or(`publish_at.is.null,publish_at.lte.${now}`, { referencedTable: "events" });
-  if (error) throw error;
-  return count ?? 0;
-}
 
 export async function fetchNextDashboardEvent(db: DbClient, now: string): Promise<DashboardEvent | null> {
   const { data, error } = await db.from(TABLES.events)

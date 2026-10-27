@@ -716,4 +716,56 @@ end;
 $$;
 reset role;
 
+-- Dashboard summaries are privileged even though they expose aggregates only.
+do $$
+begin
+  if has_function_privilege('anon', 'public.admin_membership_analytics(timestamptz)', 'execute')
+     or has_function_privilege('anon', 'public.admin_event_analytics(timestamptz)', 'execute') then
+    raise exception 'anonymous users can execute dashboard analytics';
+  end if;
+end;
+$$;
+
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+update public.user_info set role_access = 'basic' where id = :'user_a_id';
+\o /dev/null
+select set_config('request.jwt.claims', json_build_object('sub', :'user_a_auth_user_id', 'role', 'authenticated')::text, true);
+\o
+set local role authenticated;
+do $$
+begin
+  begin
+    perform public.admin_membership_analytics();
+    raise exception 'ordinary member can read membership analytics';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform public.admin_event_analytics();
+    raise exception 'ordinary member can read event analytics';
+  exception when insufficient_privilege then null;
+  end;
+end;
+$$;
+reset role;
+
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+update public.user_info set role_access = 'manager' where id = :'user_a_id';
+\o /dev/null
+select set_config('request.jwt.claims', json_build_object('sub', :'user_a_auth_user_id', 'role', 'authenticated')::text, true);
+\o
+set local role authenticated;
+do $$
+begin
+  if jsonb_typeof(public.admin_membership_analytics()) <> 'object'
+     or jsonb_typeof(public.admin_event_analytics()) <> 'object' then
+    raise exception 'manager cannot read dashboard analytics';
+  end if;
+end;
+$$;
+reset role;
+
 rollback;
