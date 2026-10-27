@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState } from "react";
-import { Check, Pencil } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Check, Pencil, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { PageContainer } from "@/components/shared/PageContainer";
@@ -25,13 +25,15 @@ import {
   type UserRecord,
 } from "@/features/admin/types";
 import {
-  updateManagerUserAction,
+  saveManagerUserDetailsAction,
   updateUserRoleAction,
 } from "@/features/admin/actions";
 import { formatUserName } from "@/lib/user-name";
 import type { UserInfoRow } from "@/lib/supabase/models";
 import type { RoleAccess } from "@/lib/supabase/models";
 import { toggleSetValue } from "../lib/directory";
+import { createUserEditDraft, hasUserEdits, userEditChanges, type UserEditDraft } from "../lib/user-edit";
+import { removeUserProfilePhotoAction, setStudentVerificationAction } from "../user-profile-actions";
 
 interface AdminUsersManagerProps {
   initialUsers: UserRecord[];
@@ -49,7 +51,11 @@ export function AdminUsersManager({
   const [users, setUsers] = useState<UserRecord[]>(initialUsers);
   const [selectedUser, setSelectedUser] = useState<UserRecord | null>(null);
   const [open, setOpen] = useState(false);
-  const [editMode, setEditMode] = useState(false);
+  const [draft, setDraft] = useState<UserEditDraft | null>(null);
+  const editMode = draft !== null;
+  const [discardTarget, setDiscardTarget] = useState<"edit" | "close" | null>(null);
+  const photoPreview = draft?.photo?.preview;
+  useEffect(() => () => { if (photoPreview) URL.revokeObjectURL(photoPreview); }, [photoPreview]);
   const activatingRow = useRef<HTMLTableRowElement | null>(null);
   const heading = useRef<HTMLHeadingElement | null>(null);
   const [membershipFilter, setMembershipFilter] = useState<Set<string>>(new Set());
@@ -57,11 +63,9 @@ export function AdminUsersManager({
   const [searchQuery, setSearchQuery] = useState("");
   const [sortDirection, setSortDirection] = useState<SortDirection>("ascending");
   const [sortOption, setSortOption] = useState<SortOption>("name");
-  const [editingField, setEditingField] = useState<string | null>(null);
-  const [editValue, setEditValue] = useState<string>("");
   const [isSaving, setIsSaving] = useState(false);
   const [pendingRole, setPendingRole] = useState<RoleAccess | null>(null);
-  const [roleError, setRoleError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const directoryMembershipTypes = useMemo(() => {
     // Editing offers active tiers only; filtering also includes historical tiers.
     const options = new Map(membershipTypes.map((tier) => [tier.id, tier]));
@@ -114,158 +118,109 @@ export function AdminUsersManager({
     return filtered;
   }, [users, searchQuery, sortDirection, sortOption, membershipFilter, roleFilter]);
 
-  const handleProfileUpdate = (saved: UserInfoRow) => {
-    setSelectedUser((current) => current ? { ...current, ...saved } : current);
-    setUsers((current) => current.map((user) => user.id === saved.id ? { ...user, ...saved } : user));
+  const commitUser = (saved: UserRecord) => {
+    setSelectedUser(saved);
+    setUsers((current) => current.map((user) => user.id === saved.id ? saved : user));
   };
 
   const handleUserSelect = (user: UserRecord, element: HTMLTableRowElement) => {
     activatingRow.current = element;
     setSelectedUser(user);
     setOpen(true);
-    setEditMode(false);
-    setEditingField(null);
-    setEditValue("");
+    setDraft(null);
+    setSaveError(null);
   };
 
-  const handleEditStart = (
-    field: string,
-    currentValue: string | number | boolean | null
-  ) => {
-    if (!canManageUsers || isSaving) return;
-    setEditingField(field);
-    if (field === "membership_type_id") {
-      setEditValue(currentValue?.toString() || "__none__");
-      return;
+  const updateDraft = (changes: Partial<UserEditDraft>) => {
+    if (isSaving || !canManageUsers) return;
+    setDraft((current) => current ? { ...current, ...changes } : current);
+    setSaveError(null);
+  };
+
+  const requestClose = () => {
+    if (isSaving || pendingRole !== null || discardTarget !== null) return;
+    if (selectedUser && draft && hasUserEdits(selectedUser, draft)) {
+      setDiscardTarget("close");
+    } else {
+      setDraft(null);
+      setSaveError(null);
+      setOpen(false);
     }
-    setEditValue(currentValue?.toString() ?? "");
   };
 
-  const handleEditCancel = () => {
-    setEditingField(null);
-    setEditValue("");
-  };
-
-  const handleEditSave = async (field: string) => {
-    if (!selectedUser || !canManageUsers || isSaving) return;
-
+  const saveEdits = async () => {
+    if (!selectedUser || !draft || !canManageUsers || isSaving) return;
     setIsSaving(true);
-
+    setSaveError(null);
+    let updated = selectedUser;
+    let savedAny = false;
     try {
-      const normalizedEditValue =
-        field === "first_name" || field === "last_name"
-          ? editValue.trim()
-          : editValue;
-      const updateData: Record<string, string | number | boolean | null> = {
-        [field]: normalizedEditValue,
-      };
-
-      if (field === "newsletter") {
-        updateData[field] = editValue === "true";
+      const changes = userEditChanges(updated, draft, membershipTypes);
+      if (Object.keys(changes).length) {
+        const saved = await saveManagerUserDetailsAction(updated.id, changes);
+        updated = {
+          ...updated, ...saved,
+          order_date: saved.order_date_deprecated,
+          membership_type_name: saved.membership_type_id === updated.membership_type_id
+            ? updated.membership_type_name
+            : membershipTypes.find((tier) => tier.id === saved.membership_type_id)?.name ?? null,
+        };
+        commitUser(updated);
+        savedAny = true;
+        const savedDraft = createUserEditDraft(updated);
+        setDraft((current) => current ? { ...current, fields: savedDraft.fields, birthDate: savedDraft.birthDate, interests: savedDraft.interests, newInterest: "" } : current);
       }
-
-      if (field === "student_number" && editValue) {
-        updateData[field] = parseInt(editValue, 10) || null;
+      if (draft.verified !== !!updated.student_verified_at) {
+        updated = { ...updated, ...await setStudentVerificationAction(updated.id, draft.verified) };
+        commitUser(updated);
+        savedAny = true;
       }
-
-      if (field === "membership_type_id") {
-        if (editValue === "__none__" || editValue === "") {
-          updateData.membership_type_id = null;
-        } else {
-          const membershipType = membershipTypes.find(
-            (membership) => membership.id === editValue
-          );
-          if (membershipType) {
-            updateData.membership_type_id = editValue;
-          }
-        }
+      if (draft.photo !== undefined) {
+        let saved: UserInfoRow;
+        if (draft.photo) {
+          const form = new FormData();
+          form.set("file", draft.photo.file);
+          form.set("expectedPath", updated.profile_photo_path ?? "");
+          const response = await fetch(`/api/admin/users/${updated.id}/photo`, { method: "POST", body: form });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.error || "Unable to upload photo.");
+          saved = data.user;
+        } else if (updated.profile_photo_path) {
+          saved = await removeUserProfilePhotoAction(updated.id, updated.profile_photo_path);
+        } else saved = updated;
+        updated = { ...updated, ...saved };
+        commitUser(updated);
+        savedAny = true;
+        setDraft((current) => current ? { ...current, photo: undefined } : current);
       }
-
-      if (!selectedUser.id) {
-        throw new Error("The selected user has no id.");
+      // Run role changes last so a manager editing their own role keeps access until saving finishes.
+      if (draft.role !== updated.role_access) {
+        const role = await updateUserRoleAction(updated.id, draft.role);
+        updated = { ...updated, role_access: role };
+        commitUser(updated);
+        savedAny = true;
+        await refreshUser();
+        router.refresh();
       }
-
-      await updateManagerUserAction(selectedUser.id, field, updateData[field]);
-
-      let updatedUser: UserRecord = {
-        ...selectedUser,
-        [field]: updateData[field],
-        ...((field === "student_number" && selectedUser.student_number !== updateData[field])
-          ? { student_verified_at: null, student_verified_by: null } : {}),
-      };
-
-      if (field === "membership_type_id") {
-        if (editValue === "__none__" || editValue === "") {
-          updatedUser = {
-            ...updatedUser,
-            membership_type_id: null,
-            membership_type_name: null,
-          };
-        } else {
-          const membershipType = membershipTypes.find(
-            (membership) => membership.id === editValue
-          );
-          updatedUser = {
-            ...updatedUser,
-            membership_type_id: editValue || null,
-            membership_type_name: membershipType?.name || null,
-          };
-        }
-      }
-
-      setSelectedUser(updatedUser);
-      setUsers((prevUsers) =>
-        prevUsers.map((user) =>
-          user.id === updatedUser.id ? updatedUser : user
-        )
-      );
-      setEditingField(null);
-      setEditValue("");
-    } catch (err) {
-      console.error("Error updating user:", err);
-      alert("Failed to update user. Please try again.");
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleRoleChangeRequest = (role: RoleAccess) => {
-    if (
-      !canManageUsers || !selectedUser || isSaving ||
-      role === selectedUser.role_access
-    ) {
-      return;
-    }
-
-    setRoleError(null);
-    setPendingRole(role);
-  };
-
-  const handleRoleChangeConfirm = async () => {
-    if (!selectedUser?.id || !pendingRole) return;
-
-    setIsSaving(true);
-    setRoleError(null);
-
-    try {
-      const role = await updateUserRoleAction(selectedUser.id, pendingRole);
-      const updatedUser = { ...selectedUser, role_access: role };
-
-      setSelectedUser(updatedUser);
-      setUsers((current) =>
-        current.map((user) =>
-          user.id === updatedUser.id ? updatedUser : user
-        )
-      );
+      setDraft(null);
       setPendingRole(null);
-      await refreshUser();
-      router.refresh();
     } catch (error) {
-      setRoleError(
-        error instanceof Error ? error.message : "Failed to update the role."
-      );
+      const message = error instanceof Error ? error.message : "Unable to save changes. Try again.";
+      setSaveError(savedAny ? `Some changes were saved. ${message} Your remaining edits are still here; retry saving to finish.` : message);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const requestSave = () => {
+    if (!selectedUser || !draft || isSaving || !canManageUsers) return;
+    try {
+      userEditChanges(selectedUser, draft, membershipTypes);
+      setSaveError(null);
+      if (draft.role !== selectedUser.role_access) setPendingRole(draft.role);
+      else void saveEdits();
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Check the form and try again.");
     }
   };
 
@@ -311,21 +266,19 @@ export function AdminUsersManager({
       <Dialog
         open={open}
         onOpenChange={(next) => {
-          if (isSaving || pendingRole !== null) return;
-          setOpen(next);
-          if (!next) handleEditCancel();
+          if (!next) requestClose();
         }}
       >
         <DialogContent
           aria-describedby={undefined}
           mobileFullscreen
-          closeDisabled={isSaving || pendingRole !== null}
+          closeDisabled={isSaving || pendingRole !== null || discardTarget !== null}
           className="flex flex-col sm:max-h-[90dvh] sm:max-w-2xl"
           onEscapeKeyDown={(event) => {
-            if (isSaving || pendingRole !== null) event.preventDefault();
+            if (isSaving || pendingRole !== null || discardTarget !== null) event.preventDefault();
           }}
           onInteractOutside={(event) => {
-            if (isSaving || pendingRole !== null) event.preventDefault();
+            if (isSaving || pendingRole !== null || discardTarget !== null) event.preventDefault();
           }}
           onCloseAutoFocus={(event) => {
             event.preventDefault();
@@ -339,42 +292,36 @@ export function AdminUsersManager({
             </DialogTitle>
           </DialogHeader>
           <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 sm:px-0 sm:pb-0">
+            {saveError && pendingRole === null && <p role="alert" className="mb-4 text-small text-destructive">{saveError}</p>}
             {selectedUser && (
               <UserDetailsPanel
                 key={selectedUser.id}
                 selectedUser={selectedUser}
                 verifierName={verifier ? formatUserName(verifier) : undefined}
-                onProfileUpdate={handleProfileUpdate}
-                onBusy={setIsSaving}
-                editingField={editingField}
-                editValue={editValue}
+                draft={draft}
+                onDraftChange={updateDraft}
                 isSaving={isSaving}
                 membershipTypes={membershipTypes}
                 canManageUsers={canManageUsers}
                 editMode={editMode}
                 headerAction={canManageUsers ? (
-                  <Button
-                    type="button"
-                    variant={editMode ? "secondary" : "outline"}
-                    size="icon"
-                    className="rounded-full"
-                    aria-label={editMode ? "Done editing" : "Edit User"}
-                    title={editMode ? "Done editing" : "Edit User"}
-                    aria-pressed={editMode}
-                    disabled={isSaving || pendingRole !== null}
-                    onClick={() => {
-                      handleEditCancel();
-                      setEditMode((current) => !current);
-                    }}
-                  >
-                    {editMode ? <Check className="text-success" aria-hidden="true" /> : <Pencil aria-hidden="true" />}
-                  </Button>
+                  <div className="flex gap-2">
+                    {editMode && <Button type="button" variant="outline" size="icon" className="rounded-full"
+                      aria-label="Discard changes" title="Discard changes" disabled={isSaving || pendingRole !== null || discardTarget !== null}
+                      onClick={() => setDiscardTarget("edit")}>
+                      <X aria-hidden="true" />
+                    </Button>}
+                    <Button type="button" variant={editMode ? "secondary" : "outline"} size="icon" className="rounded-full"
+                      aria-label={editMode ? "Save changes" : "Edit User"} title={editMode ? "Save changes" : "Edit User"}
+                      aria-pressed={editMode} disabled={isSaving || pendingRole !== null || discardTarget !== null}
+                      onClick={() => {
+                        if (editMode) requestSave();
+                        else { setSaveError(null); setDraft(createUserEditDraft(selectedUser)); }
+                      }}>
+                      {editMode ? <Check className="text-success" aria-hidden="true" /> : <Pencil aria-hidden="true" />}
+                    </Button>
+                  </div>
                 ) : undefined}
-                onEditStart={handleEditStart}
-                onEditCancel={handleEditCancel}
-                onEditSave={handleEditSave}
-                onValueChange={setEditValue}
-                onRoleChangeRequest={handleRoleChangeRequest}
               />
             )}
           </div>
@@ -385,7 +332,7 @@ export function AdminUsersManager({
         onOpenChange={(open) => {
           if (!open) {
             setPendingRole(null);
-            setRoleError(null);
+            setSaveError(null);
           }
         }}
         title="Change role access?"
@@ -397,9 +344,19 @@ export function AdminUsersManager({
         confirmLabel="Change role"
         pendingLabel="Changing role..."
         confirmVariant={pendingRole === "basic" ? "destructive" : "default"}
-        error={roleError}
+        error={saveError}
         pending={isSaving}
-        onConfirm={() => void handleRoleChangeConfirm()}
+        onConfirm={() => void saveEdits()}
+      />
+      <ConfirmDialog open={discardTarget !== null} onOpenChange={(next) => { if (!next) setDiscardTarget(null); }}
+        title="do you want to discard all changes?" description="Your unsaved changes will be discarded."
+        confirmLabel="Yes" cancelLabel="No" pending={isSaving}
+        onConfirm={() => {
+          if (discardTarget === "close") setOpen(false);
+          setDraft(null);
+          setSaveError(null);
+          setDiscardTarget(null);
+        }}
       />
     </PageContainer>
   );

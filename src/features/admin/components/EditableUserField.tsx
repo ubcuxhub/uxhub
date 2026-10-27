@@ -1,70 +1,39 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
+import { useId } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
+import type { UserEditField } from "../lib/user-edit";
 
 interface EditableUserFieldProps {
   label: string;
-  field: string;
+  field: UserEditField;
   value: string | number | boolean | null | undefined;
-  isEditing: boolean;
-  editValue: string;
+  editValue?: string;
   isSaving: boolean;
-  onEditStart: (field: string, currentValue: string | number | boolean | null) => void;
-  onEditCancel: () => void;
-  onEditSave: (field: string) => void;
-  onValueChange: (value: string) => void;
-  canEdit?: boolean;
+  onValueChange: (field: UserEditField, value: string) => void;
+  canEdit: boolean;
 }
 
-export function EditableUserField({
-  label,
-  field,
-  value,
-  isEditing,
-  editValue,
-  isSaving,
-  onEditStart,
-  onEditCancel,
-  onEditSave,
-  onValueChange,
-  canEdit = true,
-}: EditableUserFieldProps) {
-  const displayValue = value === null || value === undefined ? "—" : String(value);
-
+export function EditableUserField({ label, field, value, editValue, isSaving, onValueChange, canEdit }: EditableUserFieldProps) {
+  const id = useId();
   return (
-    <div className="space-y-2">
-      <Label>{label}</Label>
-      {isEditing ? (
-        <div className="flex gap-2">
-          <Input
-            value={editValue}
-            onChange={(e) => onValueChange(e.target.value)}
-            className="flex-1"
-            autoFocus
-          />
-          <Button onClick={() => onEditSave(field)} disabled={isSaving}>
-            Save
-          </Button>
-          <Button variant="outline" onClick={onEditCancel} disabled={isSaving}>
-            Cancel
-          </Button>
-        </div>
-      ) : (
-        <div className="flex items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-small">
-          <span className={!value ? "text-muted-foreground" : ""}>{displayValue}</span>
-          {canEdit && (
-            <Button
-              variant="ghost"
-              onClick={() => onEditStart(field, value ?? null)}
-              className="h-6 px-2"
-            >
-              Edit
-            </Button>
-          )}
-        </div>
-      )}
+    <div className="flex flex-col gap-2">
+      {typeof value === "boolean" ? (
+        <Label htmlFor={id} className="flex items-center gap-2 text-small font-normal">
+          <Checkbox id={id} checked={canEdit ? editValue === "true" : value} disabled={!canEdit || isSaving}
+            onCheckedChange={(checked) => onValueChange(field, String(checked))} />
+          {label}
+        </Label>
+      ) : <>
+        <Label htmlFor={canEdit ? id : undefined} className="text-body font-medium">{label}</Label>
+        {canEdit ? (
+          <Input id={id} className="text-small" value={editValue ?? ""} disabled={isSaving} onChange={(event) => onValueChange(field, event.target.value)} />
+        ) : <div className="rounded-md border border-input bg-background px-3 py-2 text-small">
+          <span className={value == null || value === "" ? "text-muted-foreground" : ""}>{value == null || value === "" ? "—" : String(value)}</span>
+        </div>}
+      </>}
     </div>
   );
 }

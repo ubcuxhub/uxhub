@@ -1,6 +1,9 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
+import { Input } from "@/components/ui/input";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { canEditUserSchool, type UserEditDraft, type UserEditField } from "../lib/user-edit";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import {
@@ -12,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { formatTimestamp } from "@/lib/date";
 import { UserProfileSection } from "./UserProfileSection";
-import type { RoleAccess, UserInfoRow } from "@/lib/supabase/models";
+import type { RoleAccess } from "@/lib/supabase/models";
 import { formatUserName } from "@/lib/user-name";
 import type { MembershipTypeOption, UserRecord } from "../types";
 import { displaySchool } from "../lib/directory";
@@ -23,29 +26,33 @@ import { UserRecentTransactions } from "./UserRecentTransactions";
 interface UserDetailsPanelProps {
   selectedUser: UserRecord;
   verifierName?: string;
-  onProfileUpdate: (user: UserInfoRow) => void;
-  onBusy: (busy: boolean) => void;
-  editingField: string | null;
-  editValue: string;
+  draft: UserEditDraft | null;
+  onDraftChange: (changes: Partial<UserEditDraft>) => void;
   isSaving: boolean;
   membershipTypes: MembershipTypeOption[];
   canManageUsers: boolean;
   editMode: boolean;
   headerAction?: ReactNode;
-  onEditStart: (field: string, currentValue: string | number | boolean | null) => void;
-  onEditCancel: () => void;
-  onEditSave: (field: string) => void;
-  onValueChange: (value: string) => void;
-  onRoleChangeRequest: (role: RoleAccess) => void;
 }
 
-function ReadOnlyField({ label, value }: { label: string; value: string | null | undefined }) {
+function ReadOnlyField({ label, value, lockedReason }: { label: string; value: string | null | undefined; lockedReason?: string }) {
+  const id = useId();
   return (
-    <div className="space-y-2">
-      <Label>{label}</Label>
-      <div className="rounded-md border border-input bg-background px-3 py-2 text-small">
+    <div className="flex flex-col gap-2">
+      <Label htmlFor={lockedReason ? id : undefined} className="text-body font-medium">{label}</Label>
+      {lockedReason ? (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Input id={id} readOnly aria-disabled="true" value={value || "—"}
+                className="cursor-not-allowed bg-surface-subtle text-small text-fg-secondary" />
+            </TooltipTrigger>
+            <TooltipContent className="max-w-xs" side="top">{lockedReason}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ) : <div className="rounded-md border border-input bg-background px-3 py-2 text-small">
         {value || <span className="text-muted-foreground">—</span>}
-      </div>
+      </div>}
     </div>
   );
 }
@@ -53,38 +60,28 @@ function ReadOnlyField({ label, value }: { label: string; value: string | null |
 export function UserDetailsPanel({
   selectedUser,
   verifierName,
-  onProfileUpdate,
-  onBusy,
-  editingField,
-  editValue,
+  draft,
+  onDraftChange,
   isSaving,
   membershipTypes,
   canManageUsers,
   editMode,
   headerAction,
-  onEditStart,
-  onEditCancel,
-  onEditSave,
-  onValueChange,
-  onRoleChangeRequest,
 }: UserDetailsPanelProps) {
   const canEdit = canManageUsers && editMode;
-  const profileProps = { user: selectedUser, verifierName, canEdit, busy: isSaving, onBusy, onUpdate: onProfileUpdate };
-  const fieldProps = {
-    editValue,
-    isSaving,
-    onEditStart,
-    onEditCancel,
-    onEditSave,
-    onValueChange,
-    canEdit,
+  const schoolEditable = canEditUserSchool(selectedUser, canEdit && draft ? draft.fields.membership_type_id : selectedUser.membership_type_id, membershipTypes);
+  const profileProps = { user: selectedUser, verifierName, canEdit, busy: isSaving, draft, onDraftChange };
+  const onValueChange = (field: UserEditField, value: string) => {
+    if (!draft) return;
+    onDraftChange({ fields: { ...draft.fields, [field]: value }, ...(field === "student_number" ? { verified: false } : {}) });
   };
+  const fieldProps = { isSaving, onValueChange, canEdit };
 
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <UserProfileSection section="photo" {...profileProps}>
+          <UserProfileSection key={`photo-${canEdit}`} section="photo" {...profileProps}>
             <div className="min-w-0 space-y-1">
               <CardTitle className="break-words">{formatUserName(selectedUser)}</CardTitle>
               <p className="text-small text-muted-foreground">{selectedUser.preferred_pronouns || "—"}</p>
@@ -100,7 +97,7 @@ export function UserDetailsPanel({
               ["last_name", "Last Name"],
             ] as const).map(([field, label]) => (
               <EditableUserField key={field} {...fieldProps} field={field} label={label}
-                value={selectedUser[field]} isEditing={editingField === field} />
+                value={selectedUser[field]} editValue={draft?.fields[field]} />
             ))}
           </div>
           {([
@@ -108,44 +105,44 @@ export function UserDetailsPanel({
             ["phone", "Phone Number"],
           ] as const).map(([field, label]) => (
             <EditableUserField key={field} {...fieldProps} field={field} label={label}
-              value={selectedUser[field]} isEditing={editingField === field} />
+              value={selectedUser[field]} editValue={draft?.fields[field]} />
           ))}
-          <UserProfileSection section="verification" {...profileProps} />
+          <UserProfileSection key={`verification-${canEdit}`} section="verification" {...profileProps} />
           <EditableUserField {...fieldProps} field="newsletter" label="Newsletter Opt-In"
-            value={selectedUser.newsletter} isEditing={editingField === "newsletter"} />
+            value={selectedUser.newsletter} editValue={draft?.fields.newsletter} />
           <MembershipTypeField
-            {...fieldProps}
+            isSaving={isSaving}
+            canEdit={canEdit}
+            editValue={draft?.fields.membership_type_id}
+            onValueChange={(value) => onValueChange("membership_type_id", value)}
             value={selectedUser.membership_type_name}
             selectedMembershipTypeId={selectedUser.membership_type_id}
-            isEditing={editingField === "membership_type_id"}
             membershipTypes={membershipTypes}
           />
-          <ReadOnlyField label="School" value={displaySchool(selectedUser)} />
+          {schoolEditable ? (
+            <EditableUserField {...fieldProps} field="school_institution" label="School"
+              value={selectedUser.school_institution} editValue={draft?.fields.school_institution} />
+          ) : <ReadOnlyField label="School" value={displaySchool(selectedUser, null)}
+            lockedReason={canEdit ? "Only Non-UBC members can change their school. Select a Non-UBC membership to edit this field." : undefined} />}
           <EditableUserField {...fieldProps} field="major" label="Area of Study"
-            value={selectedUser.major} isEditing={editingField === "major"} />
-          <UserProfileSection section="birthday" {...profileProps} />
+            value={selectedUser.major} editValue={draft?.fields.major} />
+          <UserProfileSection key={`birthday-${canEdit}`} section="birthday" {...profileProps} />
           <UserRecentTransactions key={selectedUser.id} userId={selectedUser.id} />
-          <UserProfileSection section="interests" {...profileProps} />
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader><CardTitle>Additional Information</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
+          <UserProfileSection key={`interests-${canEdit}`} section="interests" {...profileProps} />
           {([
             ["student_number", "Student Number"],
             ["faculty", "Faculty"],
             ["year", "Year"],
-            ["order_date", "Order Date"],
           ] as const).map(([field, label]) => (
             <EditableUserField key={field} {...fieldProps} field={field} label={label}
-              value={selectedUser[field]} isEditing={editingField === field} />
+              value={selectedUser[field]} editValue={draft?.fields[field]} />
           ))}
-          <div className="space-y-2">
-            <Label>Role Access</Label>
+          <div className="flex flex-col gap-2">
+            <Label className="text-body font-medium">Role Access</Label>
             {canEdit ? (
-              <Select value={selectedUser.role_access}
-                onValueChange={(role) => onRoleChangeRequest(role as RoleAccess)} disabled={isSaving}>
-                <SelectTrigger aria-label="Role Access"><SelectValue /></SelectTrigger>
+              <Select value={draft?.role ?? selectedUser.role_access}
+                onValueChange={(role) => onDraftChange({ role: role as RoleAccess })} disabled={isSaving}>
+                <SelectTrigger aria-label="Role Access" className="text-small"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="basic">Basic</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
@@ -158,7 +155,8 @@ export function UserDetailsPanel({
               </div>
             )}
           </div>
-          <ReadOnlyField label="Auth User ID" value={selectedUser.auth_user_id} />
+          <ReadOnlyField label="Auth User ID" value={selectedUser.auth_user_id}
+            lockedReason={canEdit ? "Auth User ID is assigned automatically and cannot be edited." : undefined} />
         </CardContent>
       </Card>
     </div>
