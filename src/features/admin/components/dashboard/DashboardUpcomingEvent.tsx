@@ -11,12 +11,25 @@ import { DashboardPanel } from "./DashboardPanel";
 
 const actionClassName = "h-auto min-h-16 w-full min-w-0 justify-start whitespace-normal rounded-md px-4 py-3 text-left text-small sm:h-auto";
 
+function formatPrice(price: number) {
+  return price === 0 ? "Free" : `$${price.toFixed(2)}`;
+}
+
 export function DashboardEventSkeleton() {
-  return <div role="status" aria-label="Loading upcoming event"><DashboardPanel className="min-h-64 justify-center gap-4"><Skeleton className="h-8 w-2/3" /><Skeleton className="h-28 w-full" /></DashboardPanel></div>;
+  return (
+    <div role="status" aria-label="Loading upcoming event">
+      <DashboardPanel className="min-h-64 justify-center gap-4">
+        <Skeleton className="h-8 w-2/3" />
+        <Skeleton className="h-28 w-full" />
+      </DashboardPanel>
+    </div>
+  );
 }
 
 export function DashboardUpcomingEvent({ event, rsvpCount, showStudentLink }: {
-  event: DashboardEvent | null; rsvpCount: number | null; showStudentLink: boolean;
+  event: DashboardEvent | null;
+  rsvpCount: number | null;
+  showStudentLink: boolean;
 }) {
   if (!event) return (
     <DashboardPanel className="min-h-64 items-center justify-center gap-3 text-center">
@@ -26,7 +39,6 @@ export function DashboardUpcomingEvent({ event, rsvpCount, showStudentLink }: {
     </DashboardPanel>
   );
   const location = [event.location_building, event.location_room].filter(Boolean).join(", ");
-  const price = Number(event.regular_price) === 0 ? "Free" : `$${Number(event.regular_price).toFixed(2)}`;
   const hasMemberPrice = event.member_price != null && Number(event.member_price) !== Number(event.regular_price);
   return (
     <DashboardPanel className="p-6 xl:p-10">
@@ -44,11 +56,17 @@ export function DashboardUpcomingEvent({ event, rsvpCount, showStudentLink }: {
       <Separator className="my-6" />
       <dl aria-label="Event details" className="flex flex-col gap-4 text-small">
         <div className="flex items-center gap-3">
-          <dt className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted"><CalendarDays aria-hidden="true" className="size-4 text-fg-secondary" /><span className="sr-only">Date</span></dt>
+          <dt className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
+            <CalendarDays aria-hidden="true" className="size-4 text-fg-secondary" />
+            <span className="sr-only">Date</span>
+          </dt>
           <dd>{formatEventDate(event.start_date, { weekday: "long" }) || "TBD"}</dd>
         </div>
         <div className="flex items-center gap-3">
-          <dt className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted"><MapPin aria-hidden="true" className="size-4 text-fg-secondary" /><span className="sr-only">Location</span></dt>
+          <dt className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
+            <MapPin aria-hidden="true" className="size-4 text-fg-secondary" />
+            <span className="sr-only">Location</span>
+          </dt>
           <dd className="min-w-0 break-words">
             {location && event.location_address_url ? (
               <a href={event.location_address_url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4 hover:text-primary">
@@ -58,10 +76,17 @@ export function DashboardUpcomingEvent({ event, rsvpCount, showStudentLink }: {
           </dd>
         </div>
         <div className="flex items-center gap-3">
-          <dt className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted"><DollarSign aria-hidden="true" className="size-4 text-fg-secondary" /><span className="sr-only">Price</span></dt>
+          <dt className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
+            <DollarSign aria-hidden="true" className="size-4 text-fg-secondary" />
+            <span className="sr-only">Price</span>
+          </dt>
           <dd className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span>{price}</span>
-            {hasMemberPrice && <span className="text-fg-secondary">Members: <span className="text-success">{Number(event.member_price) === 0 ? "Free" : `$${Number(event.member_price).toFixed(2)}`}</span></span>}
+            <span>{formatPrice(Number(event.regular_price))}</span>
+            {hasMemberPrice && (
+              <span className="text-fg-secondary">
+                Members: <span className="text-success">{formatPrice(Number(event.member_price))}</span>
+              </span>
+            )}
           </dd>
         </div>
       </dl>
@@ -69,18 +94,41 @@ export function DashboardUpcomingEvent({ event, rsvpCount, showStudentLink }: {
       <section aria-label="Quick Actions" className="w-full space-y-4">
         <h4 className="text-small font-semibold">Quick Actions</h4>
         <div className="grid w-full grid-cols-2 gap-4">
-          <Button asChild className={actionClassName}><Link href={`/admin/events/${event.id}/check-in`}><ScanLine aria-hidden="true" /><span className="min-w-0">Check-in Participants</span></Link></Button>
-          <Button asChild className={actionClassName}><Link href={`/admin/events/${event.id}/review-applications`}><ClipboardList aria-hidden="true" /><span className="min-w-0">Review Applications</span></Link></Button>
-          <Button asChild className={actionClassName}><Link href={`/admin/events/${event.id}`}><Pencil aria-hidden="true" /><span className="min-w-0">Edit Event Details</span></Link></Button>
+          <Button asChild className={actionClassName}>
+            <Link href={`/admin/events/${event.id}/check-in`}>
+              <ScanLine aria-hidden="true" />
+              <span className="min-w-0">Check-in Participants</span>
+            </Link>
+          </Button>
+          <Button asChild className={actionClassName}>
+            <Link href={`/admin/events/${event.id}/review-applications`}>
+              <ClipboardList aria-hidden="true" />
+              <span className="min-w-0">Review Applications</span>
+            </Link>
+          </Button>
+          <Button asChild className={actionClassName}>
+            <Link href={`/admin/events/${event.id}`}>
+              <Pencil aria-hidden="true" />
+              <span className="min-w-0">Edit Event Details</span>
+            </Link>
+          </Button>
           {showStudentLink && (
             <Popover>
               <PopoverTrigger asChild>
-                <Button className={actionClassName}><ExternalLink aria-hidden="true" /><span className="min-w-0">View Event Page</span><ChevronDown aria-hidden="true" className="ml-auto" /></Button>
+                <Button className={actionClassName}>
+                  <ExternalLink aria-hidden="true" />
+                  <span className="min-w-0">View Event Page</span>
+                  <ChevronDown aria-hidden="true" className="ml-auto" />
+                </Button>
               </PopoverTrigger>
               <PopoverContent align="start" aria-label="View Event Page" className="w-48 p-1">
                 <nav aria-label="Event pages" className="flex flex-col">
-                  <Button asChild variant="ghost" className="justify-start"><Link href={`/events/${event.slug}`}>Marketing Page</Link></Button>
-                  <Button asChild variant="ghost" className="justify-start"><Link href={`/portal/events/${event.slug}`}>Sign-up Page</Link></Button>
+                  <Button asChild variant="ghost" className="justify-start">
+                    <Link href={`/events/${event.slug}`}>Marketing Page</Link>
+                  </Button>
+                  <Button asChild variant="ghost" className="justify-start">
+                    <Link href={`/portal/events/${event.slug}`}>Sign-up Page</Link>
+                  </Button>
                 </nav>
               </PopoverContent>
             </Popover>

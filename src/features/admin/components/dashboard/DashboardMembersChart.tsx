@@ -7,10 +7,17 @@ import { formatMembershipTypeName } from "@/features/memberships/lib/display";
 
 export function DashboardMembersChart({ data }: { data: MembershipAnalytics | null }) {
   if (!data) return <p role="status" className="py-24 text-center text-small text-fg-secondary">Membership statistics unavailable. Please try again later.</p>;
-  const config: ChartConfig = Object.fromEntries(data.tiers.map((tier, index) => [
-    `tier${index}`, { label: formatMembershipTypeName(tier.name), color: `var(--chart-${index % 5 + 1})` },
-  ]));
-  const tiers = data.tiers.map((tier, index) => ({ ...tier, name: formatMembershipTypeName(tier.name), key: `tier${index}`, fill: `var(--color-tier${index})` }));
+  const tiers = data.tiers.map((tier, index) => ({
+    ...tier,
+    name: formatMembershipTypeName(tier.name),
+    key: `tier${index}`,
+    color: `var(--chart-${index % 5 + 1})`,
+    fill: `var(--color-tier${index})`,
+  }));
+  const config: ChartConfig = Object.fromEntries(
+    tiers.map((tier) => [tier.key, { label: tier.name, color: tier.color }]),
+  );
+  const populatedTiers = tiers.filter((tier) => tier.count > 0);
 
   return (
     <div className="space-y-5">
@@ -21,8 +28,8 @@ export function DashboardMembersChart({ data }: { data: MembershipAnalytics | nu
             <ChartTooltip content={<ChartTooltipContent nameKey="key" hideLabel formatter={(value, _name, item) => (
               <span>{item.payload.name}: {Number(value).toLocaleString("en-CA")} ({Math.round(Number(value) / data.activeMembers * 100)}%)</span>
             )} />} />
-            <Pie data={tiers.filter((tier) => tier.count > 0)} dataKey="count" nameKey="key" innerRadius="65%" outerRadius="90%" strokeWidth={3} isAnimationActive={false}>
-              {tiers.filter((tier) => tier.count > 0).map((tier) => <Cell key={tier.id} fill={tier.fill} />)}
+            <Pie data={populatedTiers} dataKey="count" nameKey="key" innerRadius="65%" outerRadius="90%" strokeWidth={3} isAnimationActive={false}>
+              {populatedTiers.map((tier) => <Cell key={tier.id} fill={tier.fill} />)}
               <Label content={({ viewBox }) => {
                 if (!viewBox || !("cx" in viewBox) || !("cy" in viewBox)) return null;
                 return <text x={viewBox.cx} y={viewBox.cy} textAnchor="middle" dominantBaseline="middle">
@@ -35,8 +42,8 @@ export function DashboardMembersChart({ data }: { data: MembershipAnalytics | nu
         </ChartContainer>
       ) : <div className="flex min-h-64 flex-col items-center justify-center gap-2"><p className="text-h1">0</p><p className="text-small text-fg-secondary">No active members</p></div>}
       <ul aria-label="Membership distribution" className="space-y-2 text-small">
-        {tiers.map((tier, index) => <li key={tier.id} className="flex items-center justify-between gap-3">
-          <span className="flex min-w-0 items-center gap-2"><span aria-hidden="true" className="size-2.5 shrink-0 rounded-sm" style={{ backgroundColor: `var(--chart-${index % 5 + 1})` }} />{tier.name}</span>
+        {tiers.map((tier) => <li key={tier.id} className="flex items-center justify-between gap-3">
+          <span className="flex min-w-0 items-center gap-2"><span aria-hidden="true" className="size-2.5 shrink-0 rounded-sm" style={{ backgroundColor: tier.color }} />{tier.name}</span>
           <span className="shrink-0 tabular-nums">{tier.count.toLocaleString("en-CA")} <span className="text-fg-secondary">({data.activeMembers ? Math.round(tier.count / data.activeMembers * 100) : 0}%)</span></span>
         </li>)}
       </ul>

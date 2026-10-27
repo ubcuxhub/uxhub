@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, createEvent, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { DashboardStatsCarousel } from "./DashboardStatsCarousel";
 import type { EventAnalytics, MembershipAnalytics } from "@/lib/supabase-helpers/admin-dashboard";
@@ -65,5 +65,63 @@ describe("statistics carousel and event chart", () => {
     render(<DashboardStatsCarousel members={null} events={null} />);
     expect(screen.getByText(/Membership statistics unavailable/)).toBeTruthy();
     expect(screen.queryByText("No active members")).toBeNull();
+  });
+
+  it("allows page scrolling at either zoom limit and still zooms in the other direction", () => {
+    render(<DashboardStatsCarousel members={members} events={events} />);
+    fireEvent.click(screen.getByRole("button", { name: "Show events statistics" }));
+    const chart = screen.getByRole("group", { name: "Event registration and attendance chart" });
+    vi.spyOn(performance, "now").mockReturnValue(1000);
+
+    for (let i = 0; i < events.events.length; i++) {
+      fireEvent.click(screen.getByRole("button", { name: "Zoom out" }));
+    }
+    const atMaximum = createEvent.wheel(chart, { deltaY: 100, cancelable: true });
+    fireEvent(chart, atMaximum);
+    expect(atMaximum.defaultPrevented).toBe(false);
+    expect(screen.getByText("Events 1–8 of 8")).toBeTruthy();
+
+    const zoomIn = createEvent.wheel(chart, { deltaY: -100, cancelable: true });
+    fireEvent(chart, zoomIn);
+    expect(zoomIn.defaultPrevented).toBe(true);
+    expect(screen.getByText("Events 2–8 of 8")).toBeTruthy();
+
+    for (let i = 0; i < events.events.length; i++) {
+      fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+    }
+    // A limit must release scrolling even while the zoom throttle is active.
+    const atMinimum = createEvent.wheel(chart, { deltaY: -100, cancelable: true });
+    fireEvent(chart, atMinimum);
+    expect(atMinimum.defaultPrevented).toBe(false);
+
+    vi.spyOn(performance, "now").mockReturnValue(1100);
+    const zoomOut = createEvent.wheel(chart, { deltaY: 100, cancelable: true });
+    fireEvent(chart, zoomOut);
+    expect(zoomOut.defaultPrevented).toBe(true);
+    expect((screen.getByRole("button", { name: "Zoom in" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("never captures wheel scrolling for a single event", () => {
+    render(<DashboardStatsCarousel members={members} events={{ ...events, events: events.events.slice(0, 1) }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Show events statistics" }));
+    const chart = screen.getByRole("group", { name: "Event registration and attendance chart" });
+    for (const deltaY of [-100, 100]) {
+      const wheel = createEvent.wheel(chart, { deltaY, cancelable: true });
+      fireEvent(chart, wheel);
+      expect(wheel.defaultPrevented).toBe(false);
+    }
+    expect(screen.getByText("Events 1–1 of 1")).toBeTruthy();
+  });
+
+  it("leaves browser zoom and horizontal wheel input untouched", () => {
+    render(<DashboardStatsCarousel members={members} events={events} />);
+    fireEvent.click(screen.getByRole("button", { name: "Show events statistics" }));
+    const chart = screen.getByRole("group", { name: "Event registration and attendance chart" });
+    for (const input of [{ deltaY: -100, ctrlKey: true }, { deltaY: 100, metaKey: true }, { deltaY: 0, deltaX: 100 }]) {
+      const wheel = createEvent.wheel(chart, { ...input, cancelable: true });
+      fireEvent(chart, wheel);
+      expect(wheel.defaultPrevented).toBe(false);
+    }
+    expect(screen.getByText("Events 3–8 of 8")).toBeTruthy();
   });
 });
