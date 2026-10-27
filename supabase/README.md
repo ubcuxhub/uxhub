@@ -81,7 +81,9 @@ Do these steps in order:
    ```
 
    Keep it small and single-purpose. Never edit a migration that has already
-   been applied — add a new one.
+   been applied — add a new one. Keep the timestamp the CLI generates: a
+   hand-picked future one makes every migration created after it sort before
+   it, and `db push` refuses those as out of order.
 
 2. **Try it locally.**
 

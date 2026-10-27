@@ -9,12 +9,15 @@ must work with the code that is live when it is pushed.
 
 | Step | Change | Status |
 | --- | --- | --- |
-| [1. Add](#1-add) | New schema beside the old | Done (`20270101000005`–`10`) |
+| [1. Add](#1-add) | New schema beside the old | Done (`20261015000005`–`10`) |
 | [2. Move the code](#2-move-the-code) | Code uses only the new schema | Next |
 | [3. Remove](#3-remove) | Drop the legacy schema | After step 2 is live |
 
-New migrations must sort after `20270101000010`, the newest in the hosted
-history, or `db push` refuses them as out of order.
+These migrations were first numbered `20270101000001`–`10`, a future date,
+so every migration made with `supabase migration new` sorted before them and
+`db push` refused it. They were renamed to `20261015000001`–`10` with their
+contents unchanged, and the hosted history repaired to match. Comments inside
+them still cite the old numbers; the suffix is the same.
 
 ## 1. Add
 
@@ -78,7 +81,7 @@ Push once step 2's code is live.
 
 ## Background: the 2026-10-17 break
 
-The first attempt, `20270101000001`–`04`, renamed `applications_enabled`,
+The first attempt, `20261015000001`–`04`, renamed `applications_enabled`,
 removed `archived` from `event_status`, replaced the `application_status`
 values, and rewrote the reservation and save functions. It was pushed before
 any code used it, which broke the deployed code: reading
@@ -88,7 +91,7 @@ admin.
 
 - The four files stay in the repo: the hosted history has them, and `db push`
   is forward-only.
-- `20270101000005` restores what the deployed code needs, exactly as main had
+- `20261015000005` restores what the deployed code needs, exactly as main had
   it. Step 1 also replaces the rows `03`–`04` backfilled.
 - **To do:** `02` turned archived events into drafts without recording which,
   so re-archive them by hand.
