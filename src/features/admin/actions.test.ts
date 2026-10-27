@@ -337,6 +337,34 @@ const saveInput = {
 };
 
 describe("saveAdminEventAction", () => {
+  it.each(["2099-08-01T18:00:00.000Z", null])("saves the publish schedule %s", async (publish_at) => {
+    await saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, status: "draft", publish_at } });
+    expect(adminRpc.mock.calls[0][1].p_event.publish_at).toBe(publish_at);
+    expect(revalidatePath).toHaveBeenCalledWith("/events", "layout");
+  });
+
+  it.each(["invalid", "2027-08-01T18:00", ""])("rejects invalid publish timestamps: %s", async (publish_at) => {
+    await expect(saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, status: "draft", publish_at } }))
+      .rejects.toThrow("Publish date must be a valid timestamp with a timezone.");
+    expect(adminRpc).not.toHaveBeenCalled();
+  });
+
+  it.each(["active", "archived"] as const)("rejects scheduling a %s event", async (status) => {
+    await expect(saveAdminEventAction({
+      ...saveInput,
+      event: { ...saveInput.event, status, publish_at: "2099-08-01T18:00:00Z" },
+    })).rejects.toThrow("Only draft events can have a publish date.");
+    expect(adminRpc).not.toHaveBeenCalled();
+  });
+
+  it("rejects scheduling in the past", async () => {
+    await expect(saveAdminEventAction({
+      ...saveInput,
+      event: { ...saveInput.event, status: "draft", publish_at: "2020-01-01T18:00:00Z" },
+    })).rejects.toThrow("Publish date must be in the future.");
+    expect(adminRpc).not.toHaveBeenCalled();
+  });
+
   it("generates a slug when creating and omits one when updating", async () => {
     await saveAdminEventAction(saveInput);
     expect(adminRpc.mock.calls[0][1]).toMatchObject({

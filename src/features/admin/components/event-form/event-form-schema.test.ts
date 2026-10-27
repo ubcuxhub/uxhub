@@ -9,6 +9,26 @@ import {
 } from "./event-form-schema";
 
 describe("event form schema", () => {
+  it.each([
+    ["", null],
+    ["2099-08-01T10:00", null],
+    ["2020-08-01T10:00", "Publish date must be in the future."],
+    ["invalid", "Publish date must be a valid date and time in Pacific time."],
+    ["2024-03-10T02:30", "Publish date must be a valid date and time in Pacific time."],
+  ])("validates the Pacific publish time %s", (publish_at, expected) => {
+    const result = validateEventForm({
+      ...defaultFormState,
+      name: "Event",
+      short_description: "Preview",
+      description: "Description",
+      regular_price: "0",
+      member_price: "0",
+      max_capacity: "10",
+      publish_at,
+    }, [], []);
+    expect(result.error).toBe(expected);
+  });
+
   it("detects invalid time ranges", () => {
     expect(isDateTimeRangeInvalid("2026-08-01T10:00", "2026-08-01T09:00")).toBe(
       true

@@ -175,6 +175,7 @@ describe("reserve_event_ticket", () => {
       const draft = await openEvent(fixtures, { slug: `draft-${fixtures.tag}`, status: "draft" });
       const scheduled = await openEvent(fixtures, {
         slug: `scheduled-${fixtures.tag}`,
+        status: "draft",
         publish_at: at(hour),
       });
 

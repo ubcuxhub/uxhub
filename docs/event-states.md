@@ -11,12 +11,26 @@ releasing a spot.
 | State | Members see it? | Comes from |
 | --- | --- | --- |
 | Draft | No | `status = draft` |
-| Scheduled | Not yet | `status = active`, `publish_at` in the future |
-| Published | Yes | `status = active`, `publish_at` empty or passed |
+| Scheduled | No | `status = draft`, `publish_at` set |
+| Published | Yes | `status = active` |
 
-Draft is the only way to hide an event. Whether an event is upcoming or past
+Draft and Archived events are hidden. Whether an event is upcoming or past
 comes from `starts_at` and `ends_at`, not from its status, so a finished event
 stays Published and members keep their history.
+
+### Scheduling publication
+
+The admin create/edit form has an optional **Publish Date & Time (Pacific)**
+field, available only for Draft events. Choose a future date to schedule the
+change from Draft to Active. Leave it empty to keep the event in Draft.
+Clearing it cancels publication; manually activating or archiving an event also
+clears its schedule.
+
+A database cron job checks every ten seconds and changes due drafts to Active,
+clearing `publish_at`. It runs even when nobody has the app open. Public
+visibility depends only on Active status. The admin list reflects the stored
+status when refreshed. Public marketing pages use their existing five-minute
+cache revalidation, so they may show the event after that cache refreshes.
 
 ### Drafts for admins
 

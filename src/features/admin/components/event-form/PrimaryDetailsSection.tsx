@@ -4,6 +4,7 @@ import { ImageUpload } from "@/components/shared/ImageUpload";
 import {
   Field,
   FieldGroup,
+  FieldDescription,
   FieldLabel,
   FieldLegend,
   FieldSet,
@@ -82,6 +83,21 @@ export function PrimaryDetailsSection({
                 </SelectGroup>
               </SelectContent>
             </Select>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="publish_at">Publish Date &amp; Time (Pacific)</FieldLabel>
+            <Input
+              id="publish_at"
+              type="datetime-local"
+              value={formState.publish_at}
+              onChange={(event) => onFieldChange("publish_at", event.target.value)}
+              aria-describedby="publish_at_description"
+              disabled={isSubmitting || formState.status !== "draft"}
+            />
+            <FieldDescription id="publish_at_description">
+              Only Draft events can be scheduled. The event will automatically
+              become Active at this time. Leave empty to keep it in Draft.
+            </FieldDescription>
           </Field>
           <Field>
             <FieldLabel htmlFor="event_type">Event Type</FieldLabel>

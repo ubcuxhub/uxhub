@@ -5,13 +5,18 @@ import {
 } from "@/lib/supabase/models";
 import type { ApplicationQuestionTemplate } from "@/features/events/types";
 import type { CheckInSessionDraft } from "@/features/admin/types";
-import { getPacificStartDefaults } from "@/lib/date";
+import {
+  datetimeLocalToTimestamptz,
+  getPacificStartDefaults,
+  timestamptzToDatetimeLocal,
+} from "@/lib/date";
 
 export interface EventFormState {
   name: string;
   short_description: string;
   description: string;
   status: EventStatus;
+  publish_at: string;
   event_type: EventType;
   regular_price: string;
   member_price: string;
@@ -60,6 +65,7 @@ export const defaultFormState: EventFormState = {
   short_description: "",
   description: "",
   status: "draft",
+  publish_at: "",
   event_type: "regular",
   regular_price: "",
   member_price: "",
@@ -158,6 +164,19 @@ export function validateEventForm(
     error = "Every mentor requires a full name.";
   else if (invalidSections.sponsors)
     error = "Every sponsor requires a name.";
+  else if (formState.publish_at && formState.status !== "draft")
+    error = "Only draft events can have a publish date.";
+  else if (
+    formState.publish_at &&
+    timestamptzToDatetimeLocal(datetimeLocalToTimestamptz(formState.publish_at)) !==
+      formState.publish_at
+  )
+    error = "Publish date must be a valid date and time in Pacific time.";
+  else if (
+    formState.publish_at &&
+    Date.parse(datetimeLocalToTimestamptz(formState.publish_at)!) <= Date.now()
+  )
+    error = "Publish date must be in the future.";
   else if (isEventScheduleRangeInvalid(formState))
     error = "Event end time must be after the start time.";
   else if (
