@@ -3,13 +3,14 @@
 import { Cell, Label, Pie, PieChart } from "recharts";
 import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from "@/components/ui/chart";
 import type { MembershipAnalytics } from "@/lib/supabase-helpers/admin-dashboard";
+import { formatMembershipTypeName } from "@/features/memberships/lib/display";
 
 export function DashboardMembersChart({ data }: { data: MembershipAnalytics | null }) {
   if (!data) return <p role="status" className="py-24 text-center text-small text-fg-secondary">Membership statistics unavailable. Please try again later.</p>;
   const config: ChartConfig = Object.fromEntries(data.tiers.map((tier, index) => [
-    `tier${index}`, { label: tier.name, color: `var(--chart-${index % 5 + 1})` },
+    `tier${index}`, { label: formatMembershipTypeName(tier.name), color: `var(--chart-${index % 5 + 1})` },
   ]));
-  const tiers = data.tiers.map((tier, index) => ({ ...tier, key: `tier${index}`, fill: `var(--color-tier${index})` }));
+  const tiers = data.tiers.map((tier, index) => ({ ...tier, name: formatMembershipTypeName(tier.name), key: `tier${index}`, fill: `var(--color-tier${index})` }));
 
   return (
     <div className="space-y-5">
