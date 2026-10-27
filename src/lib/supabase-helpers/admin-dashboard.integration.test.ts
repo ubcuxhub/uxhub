@@ -67,7 +67,7 @@ describe("admin dashboard analytics", () => {
     const people = [await fixtures.createUser(), await fixtures.createUser(), await fixtures.createUser()];
     const variants: Parameters<typeof fixtures.createEvent>[0][] = [
       { status: "active", starts_at: "2200-09-01T07:00:00Z" }, // Inclusive Vancouver boundary.
-      { status: "active", starts_at: future },
+      { status: "active", starts_at: future, start_date: "2200-11-01", location_building: "AMS Nest", location_room: "101", location_address_url: "https://maps.google.com/?q=AMS+Nest", regular_price: 12, member_price: 5 },
       { status: "active", starts_at: "2201-05-01T07:00:00Z" }, // Exclusive end boundary.
       { status: "draft", starts_at: future },
       { status: "archived", starts_at: future },
@@ -100,7 +100,10 @@ describe("admin dashboard analytics", () => {
     expect(result.events.find((event) => event.id === events[1].id)).toMatchObject({ registrations: 2, attendees: 2 });
     expect(result.events.find((event) => event.id === events[8].id)).toMatchObject({ registrations: 0, attendees: 0 });
     expect(result.currentEvent?.id).toBe(events[1].id);
-    expect((await fetchNextDashboardEvent(clientAs(admin), now))?.id).toBe(result.currentEvent?.id);
+    expect(await fetchNextDashboardEvent(clientAs(admin), now)).toMatchObject({
+      id: result.currentEvent?.id, start_date: "2200-11-01", location_building: "AMS Nest",
+      location_room: "101", location_address_url: "https://maps.google.com/?q=AMS+Nest", regular_price: 12, member_price: 5,
+    });
     expect(result.uniqueParticipants).toBe(2);
     expect(result.schoolYearLabel).toBe("2200–2201");
     expect(await fetchEventAnalytics(clientAs(manager), now)).toEqual(result);

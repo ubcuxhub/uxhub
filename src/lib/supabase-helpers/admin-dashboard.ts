@@ -38,12 +38,13 @@ export async function fetchEventAnalytics(db: DbClient, now: string): Promise<Ev
 }
 
 export type DashboardEvent = Pick<EventRow,
-  "id" | "name" | "slug" | "image_url" | "short_description"
+  "id" | "name" | "slug" | "image_url" | "short_description" |
+  "start_date" | "location_building" | "location_room" | "location_address_url" | "regular_price" | "member_price"
 >;
 
 export async function fetchNextDashboardEvent(db: DbClient, now: string): Promise<DashboardEvent | null> {
   const { data, error } = await db.from(TABLES.events)
-    .select("id, name, slug, image_url, short_description")
+    .select("id, name, slug, image_url, short_description, start_date, location_building, location_room, location_address_url, regular_price, member_price")
     .eq("status", "active").gt("starts_at", now)
     .or(`publish_at.is.null,publish_at.lte.${now}`)
     .order("starts_at").order("id").limit(1).maybeSingle();
