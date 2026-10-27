@@ -300,7 +300,7 @@ describe("AdminUsersManager", () => {
     expect(school.readOnly).toBe(false);
     fireEvent.change(school, { target: { value: "SFU" } });
     fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
-    fireEvent.click(within(screen.getByRole("dialog", { name: "do you want to discard all changes?" })).getByRole("button", { name: "Yes" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Do you want to discard all changes?" })).getByRole("button", { name: "Yes" }));
     enableEditing();
     school = screen.getByRole("textbox", { name: "School" }) as HTMLInputElement;
     expect(school.value).toBe("Emily Carr");
@@ -324,12 +324,12 @@ describe("AdminUsersManager", () => {
     fireEvent.click(screen.getByRole("button", { name: "Add tag" }));
     chooseSelect("Role Access", "Basic");
     fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
-    let confirmation = screen.getByRole("dialog", { name: "do you want to discard all changes?" });
+    let confirmation = screen.getByRole("dialog", { name: "Do you want to discard all changes?" });
     fireEvent.click(within(confirmation).getByRole("button", { name: "No" }));
     expect((screen.getByRole("textbox", { name: "First Name" }) as HTMLInputElement).value).toBe("Unsaved");
     expect(screen.getByRole("button", { name: "Remove interest Research" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
-    confirmation = screen.getByRole("dialog", { name: "do you want to discard all changes?" });
+    confirmation = screen.getByRole("dialog", { name: "Do you want to discard all changes?" });
     fireEvent.click(within(confirmation).getByRole("button", { name: "Yes" }));
     expect(screen.getByRole("button", { name: "Edit User" })).toBeTruthy();
     enableEditing();
@@ -350,7 +350,7 @@ describe("AdminUsersManager", () => {
     enableEditing();
     fireEvent.change(screen.getByRole("textbox", { name: "First Name" }), { target: { value: "Unsaved" } });
     fireEvent.keyDown(modal(), { key: "Escape" });
-    const confirmation = screen.getByRole("dialog", { name: "do you want to discard all changes?" });
+    const confirmation = screen.getByRole("dialog", { name: "Do you want to discard all changes?" });
     fireEvent.click(within(confirmation).getByRole("button", { name: "Yes" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     fireEvent.click(screen.getByRole("button", { name: "View details for Dora Hu" }));
@@ -476,7 +476,7 @@ describe("user photo drafts", () => {
     expect(screen.getByRole("img").getAttribute("src")).toBe("blob:photo");
     expect(fetchMock).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
-    fireEvent.click(within(screen.getByRole("dialog", { name: "do you want to discard all changes?" })).getByRole("button", { name: "Yes" }));
+    fireEvent.click(within(screen.getByRole("dialog", { name: "Do you want to discard all changes?" })).getByRole("button", { name: "Yes" }));
     expect(screen.queryByRole("img")).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
     expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:photo");

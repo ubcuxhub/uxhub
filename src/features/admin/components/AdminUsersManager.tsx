@@ -349,7 +349,7 @@ export function AdminUsersManager({
         onConfirm={() => void saveEdits()}
       />
       <ConfirmDialog open={discardTarget !== null} onOpenChange={(next) => { if (!next) setDiscardTarget(null); }}
-        title="do you want to discard all changes?" description="Your unsaved changes will be discarded."
+        title="Do you want to discard all changes?" description="Your unsaved changes will be discarded."
         confirmLabel="Yes" cancelLabel="No" pending={isSaving}
         onConfirm={() => {
           if (discardTarget === "close") setOpen(false);
