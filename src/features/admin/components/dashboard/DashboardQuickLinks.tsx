@@ -33,14 +33,15 @@ export function DashboardQuickLinks() {
               {content}
             </a>
           ) : (
-            <button key={name} disabled title="Link coming soon" aria-label={`${name}: link coming soon`}
-              className={`${tileClassName} disabled:cursor-not-allowed`}>
-              {content}
-            </button>
+            <span key={name} title="Google Drive link coming soon" className="min-w-0 cursor-not-allowed">
+              <button disabled aria-label={name}
+                className={`${tileClassName} h-full w-full disabled:pointer-events-none disabled:opacity-50`}>
+                {content}
+              </button>
+            </span>
           );
         })}
       </div>
-      <p className="text-label text-fg-muted">Google Drive link coming soon.</p>
     </section>
   );
 }

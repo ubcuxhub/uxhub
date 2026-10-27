@@ -99,7 +99,7 @@ describe("dashboard states", () => {
       expect(link.getAttribute("target")).toBe("_blank");
       expect(link.getAttribute("rel")).toBe("noopener noreferrer");
     }
-    expect((screen.getByRole("button", { name: "Drive: link coming soon" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Drive" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText("User activity will appear here.")).toBeTruthy();
     expect(screen.getByRole("status", { name: "Loading statistics" })).toBeTruthy();
   });

@@ -24,10 +24,13 @@ export default async function AdminDashboard() {
         </div>
       </header>
       <div className="grid items-start gap-[30px] lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
-        <section aria-labelledby="upcoming-event-heading" className="space-y-5">
-          <h2 id="upcoming-event-heading" className="text-h2">Upcoming Event</h2>
-          <Suspense fallback={<DashboardEventSkeleton />}><DashboardEventData now={now} /></Suspense>
-        </section>
+        <div className="space-y-7">
+          <section aria-labelledby="upcoming-event-heading" className="space-y-5">
+            <h2 id="upcoming-event-heading" className="text-h2">Upcoming Event</h2>
+            <Suspense fallback={<DashboardEventSkeleton />}><DashboardEventData now={now} /></Suspense>
+          </section>
+          <DashboardActivityPlaceholder />
+        </div>
         <div className="space-y-7">
           <DashboardQuickLinks />
           <section aria-labelledby="statistics-heading" className="space-y-5">
@@ -36,7 +39,6 @@ export default async function AdminDashboard() {
           </section>
         </div>
       </div>
-      <DashboardActivityPlaceholder />
     </PageContainer>
   );
 }
