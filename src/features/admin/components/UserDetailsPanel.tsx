@@ -5,7 +5,6 @@ import { Input } from "@/components/ui/input";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { canEditUserSchool, type UserEditDraft, type UserEditField } from "../lib/user-edit";
 import { Card, CardAction, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -22,6 +21,7 @@ import { displaySchool } from "../lib/directory";
 import { EditableUserField } from "./EditableUserField";
 import { MembershipTypeField } from "./MembershipTypeField";
 import { UserRecentTransactions } from "./UserRecentTransactions";
+import { UserDetailField, UserDetailValue } from "./UserDetailField";
 
 interface UserDetailsPanelProps {
   selectedUser: UserRecord;
@@ -38,8 +38,7 @@ interface UserDetailsPanelProps {
 function ReadOnlyField({ label, value, lockedReason }: { label: string; value: string | null | undefined; lockedReason?: string }) {
   const id = useId();
   return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={lockedReason ? id : undefined} className="text-body font-medium">{label}</Label>
+    <UserDetailField label={label} htmlFor={lockedReason ? id : undefined}>
       {lockedReason ? (
         <TooltipProvider>
           <Tooltip>
@@ -50,10 +49,10 @@ function ReadOnlyField({ label, value, lockedReason }: { label: string; value: s
             <TooltipContent className="max-w-xs" side="top">{lockedReason}</TooltipContent>
           </Tooltip>
         </TooltipProvider>
-      ) : <div className="rounded-md border border-input bg-background px-3 py-2 text-small">
+      ) : <UserDetailValue>
         {value || <span className="text-muted-foreground">—</span>}
-      </div>}
-    </div>
+      </UserDetailValue>}
+    </UserDetailField>
   );
 }
 
@@ -137,8 +136,7 @@ export function UserDetailsPanel({
             <EditableUserField key={field} {...fieldProps} field={field} label={label}
               value={selectedUser[field]} editValue={draft?.fields[field]} />
           ))}
-          <div className="flex flex-col gap-2">
-            <Label className="text-body font-medium">Role Access</Label>
+          <UserDetailField label="Role Access">
             {canEdit ? (
               <Select value={draft?.role ?? selectedUser.role_access}
                 onValueChange={(role) => onDraftChange({ role: role as RoleAccess })} disabled={isSaving}>
@@ -150,11 +148,11 @@ export function UserDetailsPanel({
                 </SelectContent>
               </Select>
             ) : (
-              <div className="rounded-md border border-input bg-background px-3 py-2 text-small capitalize">
+              <UserDetailValue className="capitalize">
                 {selectedUser.role_access}
-              </div>
+              </UserDetailValue>
             )}
-          </div>
+          </UserDetailField>
           <ReadOnlyField label="Auth User ID" value={selectedUser.auth_user_id}
             lockedReason={canEdit ? "Auth User ID is assigned automatically and cannot be edited." : undefined} />
         </CardContent>

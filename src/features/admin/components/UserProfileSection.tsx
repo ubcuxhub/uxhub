@@ -37,7 +37,7 @@ export function UserProfileSection({ section, user, verifierName, canEdit, busy,
       onDraftChange({ interests: normalizeInterests([...draft.interests, draft.newInterest]), newInterest: "" });
       setError(null);
     } catch (cause) {
-      setError((cause as Error).message);
+      setError(cause instanceof Error ? cause.message : "Unable to add interest.");
     }
   }
 
