@@ -6,7 +6,8 @@ export interface UserFixtureTotals {
   authUsers: number;
   profiles: number;
   purchases: number;
-  registrations: number;
+  tickets: number;
+  applications: number;
   responses: number;
   checkIns: number;
 }
@@ -28,7 +29,8 @@ export function getUserFixtureTotals(users: SeedUser[]): UserFixtureTotals {
       totals.authUsers += 1;
       totals.profiles += 1;
       totals.purchases += user.purchases.length;
-      totals.registrations += user.registrations.length;
+      totals.tickets += user.registrations.filter((r) => r.ticket).length;
+      totals.applications += user.registrations.filter((r) => r.application).length;
 
       for (const registration of user.registrations) {
         totals.responses += Object.keys(registration.responses ?? {}).length;
@@ -41,7 +43,8 @@ export function getUserFixtureTotals(users: SeedUser[]): UserFixtureTotals {
       authUsers: 0,
       profiles: 0,
       purchases: 0,
-      registrations: 0,
+      tickets: 0,
+      applications: 0,
       responses: 0,
       checkIns: 0,
     }
@@ -268,6 +271,46 @@ export function validateUserFixtures(
         );
       }
 
+      if (registration.purchaseKey && !registration.ticket) {
+        throw new Error(
+          `Registration for "${registration.eventSlug}" links a purchase but has no ticket`
+        );
+      }
+      if (registration.checkIns && !registration.ticket) {
+        throw new Error(
+          `Registration for "${registration.eventSlug}" has check-ins but no ticket`
+        );
+      }
+
+      // Applications exist only for events that take them, which the seed
+      // marks by giving the event questions (see seedEvents in index.ts).
+      const takesApplications = event.applicationQuestions.length > 0;
+      if (takesApplications !== Boolean(registration.application)) {
+        throw new Error(
+          takesApplications
+            ? `Registration for "${registration.eventSlug}" needs an application`
+            : `Registration for "${registration.eventSlug}" has an application on an event that takes none`
+        );
+      }
+      if (
+        registration.application &&
+        (registration.application.status === "accepted") !==
+          Boolean(registration.application.offerExpiresAt)
+      ) {
+        throw new Error(
+          `Application for "${registration.eventSlug}" needs an offer deadline exactly when accepted`
+        );
+      }
+      if (
+        registration.ticket &&
+        registration.application &&
+        registration.application.status !== "accepted"
+      ) {
+        throw new Error(
+          `Registration for "${registration.eventSlug}" has a ticket without an accepted application`
+        );
+      }
+
       if (registration.purchaseKey) {
         const purchase = purchaseByKey.get(registration.purchaseKey);
         if (
@@ -338,7 +381,7 @@ export function validateUserFixtures(
 
     const purchasedPhases = new Set<SeedEventPhase>();
     for (const registration of user.registrations) {
-      if (registration.status !== "accepted" || !registration.purchaseKey) continue;
+      if (!registration.ticket || !registration.purchaseKey) continue;
       const purchase = purchaseByKey.get(registration.purchaseKey);
       const event = eventBySlug.get(registration.eventSlug);
       if (purchase?.status === "completed" && event) {

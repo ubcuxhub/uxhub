@@ -94,10 +94,11 @@ Preview deploys share the production database (the free plan has no branching),
 so registrations and check-ins made on a test draft are real production rows.
 Keep the event in Draft afterwards, or delete it along with its registrations.
 
-**Not built yet:** today the portal event page and fulfillment
-(`createSquarePaymentForEventTicket`) both require `status = active`, even for
-admins. They move to `reserve_event_ticket` with the rest of the code
-(see [registration-rollout.md](registration-rollout.md)).
+The portal event page and checkout read the event under the viewer's RLS, so
+staff reach drafts and members get a 404. Fulfillment
+(`createSquarePaymentForEventTicket`) uses the service role, so it drops the
+`status = active` filter only for admins and managers, and
+`reserve_event_ticket` checks the role again.
 
 ## Admin: application
 

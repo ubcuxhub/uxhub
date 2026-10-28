@@ -88,7 +88,7 @@ export type Database = {
           check_in_session_id: string
           checked_in_at: string | null
           created_at: string | null
-          event_registration_id: string
+          event_registration_id: string | null
           id: string
           ticket_id: string | null
           updated_at: string | null
@@ -98,7 +98,7 @@ export type Database = {
           check_in_session_id: string
           checked_in_at?: string | null
           created_at?: string | null
-          event_registration_id: string
+          event_registration_id?: string | null
           id?: string
           ticket_id?: string | null
           updated_at?: string | null
@@ -107,7 +107,7 @@ export type Database = {
           check_in_session_id?: string
           checked_in_at?: string | null
           created_at?: string | null
-          event_registration_id?: string
+          event_registration_id?: string | null
           id?: string
           ticket_id?: string | null
           updated_at?: string | null
@@ -201,7 +201,7 @@ export type Database = {
           application_id: string | null
           created_at: string | null
           event_application_question_id: string
-          event_registration_id: string
+          event_registration_id: string | null
           id: string
           response: string | null
           updated_at: string | null
@@ -211,7 +211,7 @@ export type Database = {
           application_id?: string | null
           created_at?: string | null
           event_application_question_id: string
-          event_registration_id: string
+          event_registration_id?: string | null
           id?: string
           response?: string | null
           updated_at?: string | null
@@ -220,7 +220,7 @@ export type Database = {
           application_id?: string | null
           created_at?: string | null
           event_application_question_id?: string
-          event_registration_id?: string
+          event_registration_id?: string | null
           id?: string
           response?: string | null
           updated_at?: string | null
@@ -988,6 +988,10 @@ export type Database = {
         Returns: string
       }
       publish_due_events: { Args: Record<PropertyKey, never>; Returns: number }
+      release_event_ticket: {
+        Args: { p_purchase_id: string }
+        Returns: undefined
+      }
       release_paid_event_ticket_reservation: {
         Args: { p_purchase_id: string }
         Returns: undefined

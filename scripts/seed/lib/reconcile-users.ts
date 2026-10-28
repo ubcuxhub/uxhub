@@ -1,6 +1,6 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 
-import type { SeedUser } from "../data/users.ts";
+import type { SeedRegistration, SeedUser } from "../data/users.ts";
 import { emptyCounts, type Counts } from "./reconcile.ts";
 import { planPrune, pruneKey } from "./prune.ts";
 import { getUserFixtureTotals } from "./user-fixtures.ts";
@@ -11,7 +11,11 @@ const TABLE = {
   checkIns: "check_ins",
   eventApplicationQuestions: "event_application_questions",
   eventApplicationResponses: "event_application_responses",
+  eventApplications: "event_applications",
+  // Legacy, until step 3 of docs/registration-rollout.md drops it. The seed
+  // no longer writes it, and prunes what fixture accounts still hold there.
   eventRegistrations: "event_registrations",
+  eventTickets: "event_tickets",
   events: "events",
   membershipTypes: "membership_types",
   purchases: "purchases",
@@ -27,7 +31,8 @@ export interface UserSeedSummary {
   authUsers: Counts;
   profiles: Counts;
   purchases: Counts;
-  registrations: Counts;
+  tickets: Counts;
+  applications: Counts;
   responses: Counts;
   checkIns: Counts;
   /** Fixture email -> `user_info.id`, for the prune pass in `index.ts`. */
@@ -71,7 +76,8 @@ function emptySummary(): UserSeedSummary {
     authUsers: emptyCounts(),
     profiles: emptyCounts(),
     purchases: emptyCounts(),
-    registrations: emptyCounts(),
+    tickets: emptyCounts(),
+    applications: emptyCounts(),
     responses: emptyCounts(),
     checkIns: emptyCounts(),
     profileIds: new Map(),
@@ -491,130 +497,234 @@ async function reconcilePurchases(
   return { counts: countsFor(rows.length, existingByKey.size), purchaseIds };
 }
 
-async function reconcileRegistrations(
+interface EventUserRow {
+  event_id: string;
+  id: string;
+  user_id: string;
+}
+
+/** Maps rows keyed by event and user to `key(email, eventSlug)` -> id. */
+function idsByFixtureKey(
+  rows: EventUserRow[],
+  profileIds: Map<string, string>,
+  eventIds: Map<string, string>
+): Map<string, string> {
+  const eventSlugById = new Map([...eventIds.entries()].map(([slug, id]) => [id, slug]));
+  const emailByProfileId = new Map(
+    [...profileIds.entries()].map(([email, id]) => [id, email])
+  );
+  const ids = new Map<string, string>();
+  for (const row of rows) {
+    const email = emailByProfileId.get(row.user_id);
+    const eventSlug = eventSlugById.get(row.event_id);
+    if (email && eventSlug) ids.set(key(email, eventSlug), row.id);
+  }
+  return ids;
+}
+
+async function readFixtureRows(
+  supabase: SupabaseClient,
+  table: typeof TABLE.eventTickets | typeof TABLE.eventApplications,
+  userIds: string[],
+  eventIds: string[],
+  columns = "id, event_id, user_id"
+) {
+  if (userIds.length === 0 || eventIds.length === 0) return [];
+  const { data, error } = await supabase
+    .from(table)
+    .select(columns)
+    .in("user_id", userIds)
+    .in("event_id", eventIds);
+  if (error) throw new Error(`Reading ${table} failed: ${error.message}`);
+  return (data ?? []) as unknown as (EventUserRow & Record<string, unknown>)[];
+}
+
+function fixtureRows<T>(
+  fixtures: SeedUser[],
+  profileIds: Map<string, string>,
+  dependencies: DependencyReferences,
+  build: (
+    registration: SeedRegistration,
+    ids: { eventId: string; userId: string }
+  ) => T | null
+): T[] {
+  return fixtures.flatMap((fixture) => {
+    const userId = profileIds.get(fixture.email);
+    if (!userId) throw new Error(`No profile ID found for "${fixture.email}"`);
+
+    return fixture.registrations.flatMap((registration) => {
+      const eventId = dependencies.eventIds.get(registration.eventSlug);
+      if (!eventId) throw new Error(`No event ID found for "${registration.eventSlug}"`);
+      const row = build(registration, { eventId, userId });
+      return row ? [row] : [];
+    });
+  });
+}
+
+async function reconcileTickets(
   supabase: SupabaseClient,
   fixtures: SeedUser[],
   profileIds: Map<string, string>,
   purchaseIds: Map<string, string>,
   dependencies: DependencyReferences
-): Promise<{ counts: Counts; registrationIds: Map<string, string> }> {
-  const userIds = [...profileIds.values()];
-  const eventIds = [...dependencies.eventIds.values()];
-  const { data: existing, error: readError } = await supabase
-    .from(TABLE.eventRegistrations)
-    .select("id, event_id, user_id")
-    .in("user_id", userIds)
-    .in("event_id", eventIds);
-  if (readError) {
-    throw new Error(`Reading event registrations failed: ${readError.message}`);
-  }
-
-  const existingKeys = new Set(
-    ((existing ?? []) as { event_id: string; user_id: string }[]).map((row) =>
-      key(row.user_id, row.event_id)
-    )
+): Promise<{ counts: Counts; ticketIds: Map<string, string> }> {
+  const existing = await readFixtureRows(
+    supabase,
+    TABLE.eventTickets,
+    [...profileIds.values()],
+    [...dependencies.eventIds.values()]
   );
-  const rows = fixtures.flatMap((fixture) => {
-    const userId = profileIds.get(fixture.email);
-    if (!userId) throw new Error(`No profile ID found for "${fixture.email}"`);
+  const existingKeys = new Set(existing.map((row) => key(row.user_id, row.event_id)));
 
-    return fixture.registrations.map((registration) => {
-      const eventId = dependencies.eventIds.get(registration.eventSlug);
-      if (!eventId) throw new Error(`No event ID found for "${registration.eventSlug}"`);
+  const rows = fixtureRows(fixtures, profileIds, dependencies, (registration, ids) => {
+    if (!registration.ticket) return null;
 
-      const purchaseId = registration.purchaseKey
-        ? purchaseIds.get(registration.purchaseKey)
-        : null;
-      if (registration.purchaseKey && !purchaseId) {
-        throw new Error(`No purchase ID found for "${registration.purchaseKey}"`);
-      }
+    const purchaseId = registration.purchaseKey
+      ? purchaseIds.get(registration.purchaseKey)
+      : null;
+    if (registration.purchaseKey && !purchaseId) {
+      throw new Error(`No purchase ID found for "${registration.purchaseKey}"`);
+    }
 
-      const reviewerId = registration.reviewerEmail
-        ? profileIds.get(registration.reviewerEmail)
-        : null;
-      if (registration.reviewerEmail && !reviewerId) {
-        throw new Error(`No reviewer profile found for "${registration.reviewerEmail}"`);
-      }
-
-      return {
-        attending: registration.attending,
-        event_id: eventId,
-        purchase_id: purchaseId,
-        reviewer_id: reviewerId,
-        status: registration.status,
-        user_id: userId,
-      };
-    });
+    return { event_id: ids.eventId, purchase_id: purchaseId, user_id: ids.userId };
   });
 
+  if (rows.length === 0) return { counts: emptyCounts(), ticketIds: new Map() };
+
   const { data, error } = await supabase
-    .from(TABLE.eventRegistrations)
+    .from(TABLE.eventTickets)
     .upsert(rows, { onConflict: "event_id,user_id" })
     .select("id, event_id, user_id");
-  if (error) throw new Error(`Upserting event registrations failed: ${error.message}`);
-
-  const eventSlugById = new Map(
-    [...dependencies.eventIds.entries()].map(([slug, id]) => [id, slug])
-  );
-  const emailByProfileId = new Map(
-    [...profileIds.entries()].map(([email, id]) => [id, email])
-  );
-  const registrationIds = new Map<string, string>();
-  for (const row of (data ?? []) as { event_id: string; id: string; user_id: string }[]) {
-    const email = emailByProfileId.get(row.user_id);
-    const eventSlug = eventSlugById.get(row.event_id);
-    if (email && eventSlug) registrationIds.set(key(email, eventSlug), row.id);
-  }
+  if (error) throw new Error(`Upserting event tickets failed: ${error.message}`);
 
   return {
-    counts: countsFor(rows.length, existingKeys.size),
-    registrationIds,
+    counts: countsFor(
+      rows.length,
+      rows.filter((row) => existingKeys.has(key(row.user_id, row.event_id))).length
+    ),
+    ticketIds: idsByFixtureKey(
+      (data ?? []) as EventUserRow[],
+      profileIds,
+      dependencies.eventIds
+    ),
+  };
+}
+
+async function reconcileApplications(
+  supabase: SupabaseClient,
+  fixtures: SeedUser[],
+  profileIds: Map<string, string>,
+  dependencies: DependencyReferences
+): Promise<{ counts: Counts; applicationIds: Map<string, string> }> {
+  const rows = fixtureRows(fixtures, profileIds, dependencies, (registration, ids) =>
+    registration.application
+      ? {
+          event_id: ids.eventId,
+          offer_expires_at: registration.application.offerExpiresAt ?? null,
+          status: registration.application.status,
+          user_id: ids.userId,
+        }
+      : null
+  );
+
+  if (rows.length === 0) return { counts: emptyCounts(), applicationIds: new Map() };
+
+  const existing = await readFixtureRows(
+    supabase,
+    TABLE.eventApplications,
+    [...profileIds.values()],
+    [...dependencies.eventIds.values()],
+    "id, event_id, user_id, status"
+  );
+  const statusByKey = new Map(
+    existing.map((row) => [key(row.user_id, row.event_id), row.status as string])
+  );
+
+  // The database allows an application only the moves of a review
+  // (docs/event-states.md), so one a run has to move backwards, such as an
+  // acceptance made through the UI, is recreated. Its responses cascade and
+  // are written again below.
+  const moved = existing.filter((row) => {
+    const desired = rows.find(
+      (candidate) =>
+        candidate.user_id === row.user_id && candidate.event_id === row.event_id
+    );
+    return desired && desired.status !== row.status;
+  });
+  if (moved.length > 0) {
+    const { error } = await supabase
+      .from(TABLE.eventApplications)
+      .delete()
+      .in(
+        "id",
+        moved.map((row) => row.id)
+      );
+    if (error) throw new Error(`Resetting event applications failed: ${error.message}`);
+  }
+
+  const { data, error } = await supabase
+    .from(TABLE.eventApplications)
+    .upsert(rows, { onConflict: "event_id,user_id" })
+    .select("id, event_id, user_id");
+  if (error) throw new Error(`Upserting event applications failed: ${error.message}`);
+
+  return {
+    counts: countsFor(
+      rows.length,
+      rows.filter((row) => statusByKey.has(key(row.user_id, row.event_id))).length
+    ),
+    applicationIds: idsByFixtureKey(
+      (data ?? []) as EventUserRow[],
+      profileIds,
+      dependencies.eventIds
+    ),
   };
 }
 
 async function reconcileResponses(
   supabase: SupabaseClient,
   fixtures: SeedUser[],
-  registrationIds: Map<string, string>,
+  applicationIds: Map<string, string>,
   dependencies: DependencyReferences
 ): Promise<Counts> {
   const rows = fixtures.flatMap((fixture) =>
     fixture.registrations.flatMap((registration) => {
-      const registrationId = registrationIds.get(
+      const responses = Object.entries(registration.responses ?? {});
+      if (responses.length === 0) return [];
+
+      const applicationId = applicationIds.get(
         key(fixture.email, registration.eventSlug)
       );
-      if (!registrationId) {
+      if (!applicationId) {
         throw new Error(
-          `No registration ID found for "${fixture.email}" and "${registration.eventSlug}"`
+          `No application ID found for "${fixture.email}" and "${registration.eventSlug}"`
         );
       }
 
-      return Object.entries(registration.responses ?? {}).map(
-        ([question, response]) => {
-          const questionId = dependencies.questionIds.get(
-            key(registration.eventSlug, question)
+      return responses.map(([question, response]) => {
+        const questionId = dependencies.questionIds.get(
+          key(registration.eventSlug, question)
+        );
+        if (!questionId) {
+          throw new Error(
+            `No question ID found for "${registration.eventSlug}" and "${question}"`
           );
-          if (!questionId) {
-            throw new Error(
-              `No question ID found for "${registration.eventSlug}" and "${question}"`
-            );
-          }
-          return {
-            event_application_question_id: questionId,
-            event_registration_id: registrationId,
-            response,
-          };
         }
-      );
+        return {
+          application_id: applicationId,
+          event_application_question_id: questionId,
+          response,
+        };
+      });
     })
   );
 
   if (rows.length === 0) return emptyCounts();
-  const registrationIdValues = [...new Set(rows.map((row) => row.event_registration_id))];
+  const applicationIdValues = [...new Set(rows.map((row) => row.application_id))];
   const { data: existing, error: readError } = await supabase
     .from(TABLE.eventApplicationResponses)
-    .select("event_application_question_id, event_registration_id")
-    .in("event_registration_id", registrationIdValues);
+    .select("event_application_question_id, application_id")
+    .in("application_id", applicationIdValues);
   if (readError) {
     throw new Error(`Reading application responses failed: ${readError.message}`);
   }
@@ -622,19 +732,15 @@ async function reconcileResponses(
   const existingKeys = new Set(
     ((existing ?? []) as {
       event_application_question_id: string;
-      event_registration_id: string;
-    }[]).map((row) =>
-      key(row.event_application_question_id, row.event_registration_id)
-    )
+      application_id: string;
+    }[]).map((row) => key(row.event_application_question_id, row.application_id))
   );
   const existingDesiredCount = rows.filter((row) =>
-    existingKeys.has(
-      key(row.event_application_question_id, row.event_registration_id)
-    )
+    existingKeys.has(key(row.event_application_question_id, row.application_id))
   ).length;
 
   const { error } = await supabase.from(TABLE.eventApplicationResponses).upsert(rows, {
-    onConflict: "event_application_question_id,event_registration_id",
+    onConflict: "event_application_question_id,application_id",
   });
   if (error) throw new Error(`Upserting application responses failed: ${error.message}`);
 
@@ -644,60 +750,59 @@ async function reconcileResponses(
 async function reconcileCheckIns(
   supabase: SupabaseClient,
   fixtures: SeedUser[],
-  registrationIds: Map<string, string>,
+  ticketIds: Map<string, string>,
   dependencies: DependencyReferences
 ): Promise<Counts> {
   const rows = fixtures.flatMap((fixture) =>
     fixture.registrations.flatMap((registration) => {
-      const registrationId = registrationIds.get(
-        key(fixture.email, registration.eventSlug)
-      );
-      if (!registrationId) {
+      const checkIns = Object.entries(registration.checkIns ?? {});
+      if (checkIns.length === 0) return [];
+
+      const ticketId = ticketIds.get(key(fixture.email, registration.eventSlug));
+      if (!ticketId) {
         throw new Error(
-          `No registration ID found for "${fixture.email}" and "${registration.eventSlug}"`
+          `No ticket ID found for "${fixture.email}" and "${registration.eventSlug}"`
         );
       }
 
-      return Object.entries(registration.checkIns ?? {}).map(
-        ([sessionName, checkedInAt]) => {
-          const sessionId = dependencies.sessionIds.get(
-            key(registration.eventSlug, sessionName)
+      return checkIns.map(([sessionName, checkedInAt]) => {
+        const sessionId = dependencies.sessionIds.get(
+          key(registration.eventSlug, sessionName)
+        );
+        if (!sessionId) {
+          throw new Error(
+            `No session ID found for "${registration.eventSlug}" and "${sessionName}"`
           );
-          if (!sessionId) {
-            throw new Error(
-              `No session ID found for "${registration.eventSlug}" and "${sessionName}"`
-            );
-          }
-          return {
-            check_in_session_id: sessionId,
-            checked_in_at: checkedInAt,
-            event_registration_id: registrationId,
-          };
         }
-      );
+        return {
+          check_in_session_id: sessionId,
+          checked_in_at: checkedInAt,
+          ticket_id: ticketId,
+        };
+      });
     })
   );
 
   if (rows.length === 0) return emptyCounts();
-  const registrationIdValues = [...new Set(rows.map((row) => row.event_registration_id))];
+  const ticketIdValues = [...new Set(rows.map((row) => row.ticket_id))];
   const { data: existing, error: readError } = await supabase
     .from(TABLE.checkIns)
-    .select("check_in_session_id, event_registration_id")
-    .in("event_registration_id", registrationIdValues);
+    .select("check_in_session_id, ticket_id")
+    .in("ticket_id", ticketIdValues);
   if (readError) throw new Error(`Reading check-ins failed: ${readError.message}`);
 
   const existingKeys = new Set(
     ((existing ?? []) as {
       check_in_session_id: string;
-      event_registration_id: string;
-    }[]).map((row) => key(row.check_in_session_id, row.event_registration_id))
+      ticket_id: string;
+    }[]).map((row) => key(row.check_in_session_id, row.ticket_id))
   );
   const existingDesiredCount = rows.filter((row) =>
-    existingKeys.has(key(row.check_in_session_id, row.event_registration_id))
+    existingKeys.has(key(row.check_in_session_id, row.ticket_id))
   ).length;
 
   const { error } = await supabase.from(TABLE.checkIns).upsert(rows, {
-    onConflict: "event_registration_id,check_in_session_id",
+    onConflict: "ticket_id,check_in_session_id",
   });
   if (error) throw new Error(`Upserting check-ins failed: ${error.message}`);
 
@@ -724,17 +829,14 @@ async function planDryRun(
 
   if (!dependencies.complete) {
     summary.purchases = createdCounts(totals.purchases);
-    summary.registrations = createdCounts(totals.registrations);
+    summary.tickets = createdCounts(totals.tickets);
+    summary.applications = createdCounts(totals.applications);
     summary.responses = createdCounts(totals.responses);
     summary.checkIns = createdCounts(totals.checkIns);
     return summary;
   }
 
-  const profileIds = new Map<string, string>();
-  for (const fixture of fixtures) {
-    const profile = state.profileByEmail.get(fixture.email);
-    if (profile) profileIds.set(fixture.email, profile.id);
-  }
+  const profileIds = summary.profileIds;
 
   const purchaseKeys = fixtures.flatMap((fixture) =>
     fixture.purchases.map((purchase) => purchase.idempotencyKey)
@@ -751,66 +853,50 @@ async function planDryRun(
     (purchaseResult.data ?? []).length
   );
 
-  const existingRegistrationByKey = new Map<string, string>();
-  if (profileIds.size > 0) {
-    const registrationResult = await supabase
-      .from(TABLE.eventRegistrations)
-      .select("id, event_id, user_id")
-      .in("user_id", [...profileIds.values()])
-      .in("event_id", [...dependencies.eventIds.values()]);
-    if (registrationResult.error) {
-      throw new Error(
-        `Reading event registrations failed: ${registrationResult.error.message}`
-      );
-    }
-    const emailByProfileId = new Map(
-      [...profileIds.entries()].map(([email, id]) => [id, email])
-    );
-    const eventSlugById = new Map(
-      [...dependencies.eventIds.entries()].map(([slug, id]) => [id, slug])
-    );
-    for (const row of (registrationResult.data ?? []) as {
-      event_id: string;
-      id: string;
-      user_id: string;
-    }[]) {
-      const email = emailByProfileId.get(row.user_id);
-      const eventSlug = eventSlugById.get(row.event_id);
-      if (email && eventSlug) {
-        existingRegistrationByKey.set(key(email, eventSlug), row.id);
-      }
-    }
-  }
-
-  const desiredRegistrationKeys = fixtures.flatMap((fixture) =>
-    fixture.registrations.map((registration) =>
-      key(fixture.email, registration.eventSlug)
-    )
-  );
-  const existingRegistrationCount = desiredRegistrationKeys.filter((value) =>
-    existingRegistrationByKey.has(value)
-  ).length;
-  summary.registrations = countsFor(
-    totals.registrations,
-    existingRegistrationCount
+  const userIds = [...profileIds.values()];
+  const eventIds = [...dependencies.eventIds.values()];
+  const [ticketRows, applicationRows] = await Promise.all([
+    readFixtureRows(supabase, TABLE.eventTickets, userIds, eventIds),
+    readFixtureRows(supabase, TABLE.eventApplications, userIds, eventIds),
+  ]);
+  const ticketIds = idsByFixtureKey(ticketRows, profileIds, dependencies.eventIds);
+  const applicationIds = idsByFixtureKey(
+    applicationRows,
+    profileIds,
+    dependencies.eventIds
   );
 
-  const existingRegistrationIds = [...existingRegistrationByKey.values()];
-  if (existingRegistrationIds.length === 0) {
-    summary.responses = createdCounts(totals.responses);
-    summary.checkIns = createdCounts(totals.checkIns);
-    return summary;
-  }
+  const desired = (has: (registration: SeedRegistration) => boolean) =>
+    fixtures.flatMap((fixture) =>
+      fixture.registrations
+        .filter(has)
+        .map((registration) => key(fixture.email, registration.eventSlug))
+    );
+  summary.tickets = countsFor(
+    totals.tickets,
+    desired((registration) => registration.ticket).filter((value) => ticketIds.has(value))
+      .length
+  );
+  summary.applications = countsFor(
+    totals.applications,
+    desired((registration) => Boolean(registration.application)).filter((value) =>
+      applicationIds.has(value)
+    ).length
+  );
 
   const [responseResult, checkInResult] = await Promise.all([
-    supabase
-      .from(TABLE.eventApplicationResponses)
-      .select("event_application_question_id, event_registration_id")
-      .in("event_registration_id", existingRegistrationIds),
-    supabase
-      .from(TABLE.checkIns)
-      .select("check_in_session_id, event_registration_id")
-      .in("event_registration_id", existingRegistrationIds),
+    applicationIds.size > 0
+      ? supabase
+          .from(TABLE.eventApplicationResponses)
+          .select("event_application_question_id, application_id")
+          .in("application_id", [...applicationIds.values()])
+      : Promise.resolve({ data: [], error: null }),
+    ticketIds.size > 0
+      ? supabase
+          .from(TABLE.checkIns)
+          .select("check_in_session_id, ticket_id")
+          .in("ticket_id", [...ticketIds.values()])
+      : Promise.resolve({ data: [], error: null }),
   ]);
   if (responseResult.error) {
     throw new Error(`Reading application responses failed: ${responseResult.error.message}`);
@@ -822,32 +908,29 @@ async function planDryRun(
   const responseKeys = new Set(
     ((responseResult.data ?? []) as {
       event_application_question_id: string;
-      event_registration_id: string;
-    }[]).map((row) =>
-      key(row.event_application_question_id, row.event_registration_id)
-    )
+      application_id: string;
+    }[]).map((row) => key(row.event_application_question_id, row.application_id))
   );
   const checkInKeys = new Set(
     ((checkInResult.data ?? []) as {
       check_in_session_id: string;
-      event_registration_id: string;
-    }[]).map((row) => key(row.check_in_session_id, row.event_registration_id))
+      ticket_id: string;
+    }[]).map((row) => key(row.check_in_session_id, row.ticket_id))
   );
 
   let existingResponses = 0;
   let existingCheckIns = 0;
   for (const fixture of fixtures) {
     for (const registration of fixture.registrations) {
-      const registrationId = existingRegistrationByKey.get(
-        key(fixture.email, registration.eventSlug)
-      );
-      if (!registrationId) continue;
+      const fixtureKey = key(fixture.email, registration.eventSlug);
+      const applicationId = applicationIds.get(fixtureKey);
+      const ticketId = ticketIds.get(fixtureKey);
 
       for (const question of Object.keys(registration.responses ?? {})) {
         const questionId = dependencies.questionIds.get(
           key(registration.eventSlug, question)
         );
-        if (questionId && responseKeys.has(key(questionId, registrationId))) {
+        if (questionId && applicationId && responseKeys.has(key(questionId, applicationId))) {
           existingResponses += 1;
         }
       }
@@ -855,7 +938,7 @@ async function planDryRun(
         const sessionId = dependencies.sessionIds.get(
           key(registration.eventSlug, session)
         );
-        if (sessionId && checkInKeys.has(key(sessionId, registrationId))) {
+        if (sessionId && ticketId && checkInKeys.has(key(sessionId, ticketId))) {
           existingCheckIns += 1;
         }
       }
@@ -897,23 +980,29 @@ export async function reconcileUserFixtures(
     identity.profileIds,
     dependencies
   );
-  const registrations = await reconcileRegistrations(
+  const tickets = await reconcileTickets(
     supabase,
     fixtures,
     identity.profileIds,
     purchases.purchaseIds,
     dependencies
   );
+  const applications = await reconcileApplications(
+    supabase,
+    fixtures,
+    identity.profileIds,
+    dependencies
+  );
   const responses = await reconcileResponses(
     supabase,
     fixtures,
-    registrations.registrationIds,
+    applications.applicationIds,
     dependencies
   );
   const checkIns = await reconcileCheckIns(
     supabase,
     fixtures,
-    registrations.registrationIds,
+    tickets.ticketIds,
     dependencies
   );
 
@@ -921,7 +1010,8 @@ export async function reconcileUserFixtures(
     authUsers: identity.authUsers,
     profiles: identity.profiles,
     purchases: purchases.counts,
-    registrations: registrations.counts,
+    tickets: tickets.counts,
+    applications: applications.counts,
     responses,
     checkIns,
     profileIds: identity.profileIds,
@@ -930,31 +1020,52 @@ export async function reconcileUserFixtures(
 
 export interface UserPruneSummary {
   purchases: number;
-  registrations: number;
+  tickets: number;
+  applications: number;
+  legacyRegistrations: number;
   responses: number;
   checkIns: number;
 }
 
 function emptyPruneSummary(): UserPruneSummary {
-  return { purchases: 0, registrations: 0, responses: 0, checkIns: 0 };
+  return {
+    purchases: 0,
+    tickets: 0,
+    applications: 0,
+    legacyRegistrations: 0,
+    responses: 0,
+    checkIns: 0,
+  };
+}
+
+async function deleteByIds(
+  supabase: SupabaseClient,
+  table: string,
+  ids: string[],
+  label: string
+) {
+  if (ids.length === 0) return;
+  const { error } = await supabase.from(table).delete().in("id", ids);
+  if (error) throw new Error(`Deleting stale ${label} failed: ${error.message}`);
 }
 
 /**
  * Deletes fixture-owned rows the seed data no longer describes.
  *
  * This is what makes a purchase reversible. Buy a ticket as one of the seed
- * accounts and the row it writes is owned by a fixture profile but absent from
- * `users.ts`, so the next `pnpm seed` removes it and the event is buyable
- * again.
+ * accounts and the rows it writes are owned by a fixture profile but absent
+ * from `users.ts`, so the next `pnpm seed` removes them and the event is
+ * buyable again.
  *
  * Everything here is filtered by `user_id in (fixture profiles)`. A row written
  * by an account somebody created by hand is never a candidate, even when it
  * points at a seed event.
  *
- * Order matters. Registrations go first so their responses and check-ins
- * cascade; purchases follow, because `event_registrations.purchase_id` is
- * `on delete set null` and a surviving registration would otherwise silently
- * lose its link.
+ * Order matters. Tickets and applications go first so their check-ins and
+ * responses cascade; purchases follow, because `event_tickets.purchase_id` is
+ * `on delete set null` and a surviving ticket would otherwise silently lose its
+ * link. Fixture accounts' legacy `event_registrations` all go: the seed no
+ * longer writes them.
  */
 export async function pruneUserFixtures(
   supabase: SupabaseClient,
@@ -967,7 +1078,6 @@ export async function pruneUserFixtures(
   if (userIds.length === 0) return summary;
 
   const eventIdBySlug = new Map<string, string>();
-  const eventSlugById = new Map<string, string>();
   const slugs = [
     ...new Set(
       fixtures.flatMap((fixture) =>
@@ -982,56 +1092,71 @@ export async function pruneUserFixtures(
       .in("slug", slugs);
     if (error) throw new Error(`Reading events failed: ${error.message}`);
     for (const row of (data ?? []) as { id: string; slug: string | null }[]) {
-      if (!row.slug) continue;
-      eventIdBySlug.set(row.slug, row.id);
-      eventSlugById.set(row.id, row.slug);
+      if (row.slug) eventIdBySlug.set(row.slug, row.id);
     }
   }
 
-  /* ── Registrations ── */
-  const desiredRegistrations = new Set(
-    fixtures.flatMap((fixture) => {
-      const userId = profileIds.get(fixture.email);
-      if (!userId) return [];
-      return fixture.registrations.flatMap((registration) => {
-        const eventId = eventIdBySlug.get(registration.eventSlug);
-        return eventId ? [pruneKey(userId, eventId)] : [];
-      });
-    })
-  );
+  const desiredKeys = (has: (registration: SeedRegistration) => boolean) =>
+    new Set(
+      fixtures.flatMap((fixture) => {
+        const userId = profileIds.get(fixture.email);
+        if (!userId) return [];
+        return fixture.registrations.filter(has).flatMap((registration) => {
+          const eventId = eventIdBySlug.get(registration.eventSlug);
+          return eventId ? [pruneKey(userId, eventId)] : [];
+        });
+      })
+    );
 
-  const { data: registrationRows, error: registrationError } = await supabase
-    .from(TABLE.eventRegistrations)
-    .select("id, event_id, user_id")
-    .in("user_id", userIds);
-  if (registrationError) {
-    throw new Error(`Reading event registrations failed: ${registrationError.message}`);
-  }
+  const readOwned = async (table: string) => {
+    const { data, error } = await supabase
+      .from(table)
+      .select("id, event_id, user_id")
+      .in("user_id", userIds);
+    if (error) throw new Error(`Reading ${table} failed: ${error.message}`);
+    return (data ?? []) as EventUserRow[];
+  };
 
-  const registrations = (registrationRows ?? []) as {
-    event_id: string;
-    id: string;
-    user_id: string;
-  }[];
-  const registrationPlan = planPrune(
-    registrations,
+  /* ── Tickets, applications, and legacy registrations ── */
+  const [ticketRows, applicationRows, legacyRows] = await Promise.all([
+    readOwned(TABLE.eventTickets),
+    readOwned(TABLE.eventApplications),
+    readOwned(TABLE.eventRegistrations),
+  ]);
+  const ticketPlan = planPrune(
+    ticketRows,
     (row) => pruneKey(row.user_id, row.event_id),
-    desiredRegistrations
+    desiredKeys((registration) => registration.ticket)
+  );
+  const applicationPlan = planPrune(
+    applicationRows,
+    (row) => pruneKey(row.user_id, row.event_id),
+    desiredKeys((registration) => Boolean(registration.application))
   );
 
-  summary.registrations = registrationPlan.remove.length;
+  summary.tickets = ticketPlan.remove.length;
+  summary.applications = applicationPlan.remove.length;
+  summary.legacyRegistrations = legacyRows.length;
 
-  if (!options.dryRun && registrationPlan.remove.length > 0) {
-    const { error } = await supabase
-      .from(TABLE.eventRegistrations)
-      .delete()
-      .in(
-        "id",
-        registrationPlan.remove.map((entry) => entry.row.id)
-      );
-    if (error) {
-      throw new Error(`Deleting stale event registrations failed: ${error.message}`);
-    }
+  if (!options.dryRun) {
+    await deleteByIds(
+      supabase,
+      TABLE.eventTickets,
+      ticketPlan.remove.map((entry) => entry.row.id),
+      "event tickets"
+    );
+    await deleteByIds(
+      supabase,
+      TABLE.eventApplications,
+      applicationPlan.remove.map((entry) => entry.row.id),
+      "event applications"
+    );
+    await deleteByIds(
+      supabase,
+      TABLE.eventRegistrations,
+      legacyRows.map((row) => row.id),
+      "event registrations"
+    );
   }
 
   /* ── Purchases ── */
@@ -1057,60 +1182,72 @@ export async function pruneUserFixtures(
 
   summary.purchases = purchasePlan.remove.length;
 
-  if (!options.dryRun && purchasePlan.remove.length > 0) {
-    const { error } = await supabase
-      .from(TABLE.purchases)
-      .delete()
-      .in(
-        "id",
-        purchasePlan.remove.map((entry) => entry.row.id)
-      );
-    if (error) {
-      throw new Error(`Deleting stale purchases failed: ${error.message}`);
-    }
+  if (!options.dryRun) {
+    await deleteByIds(
+      supabase,
+      TABLE.purchases,
+      purchasePlan.remove.map((entry) => entry.row.id),
+      "purchases"
+    );
   }
 
-  /* ── Responses and check-ins on registrations we kept ── */
-  const keptRegistrationIdByKey = new Map<string, string>();
-  for (const row of registrationPlan.keep) {
-    const slug = eventSlugById.get(row.event_id);
-    if (slug) keptRegistrationIdByKey.set(pruneKey(row.user_id, slug), row.id);
-  }
-  const keptIds = [...keptRegistrationIdByKey.values()];
-  if (keptIds.length === 0) return summary;
+  /* ── Responses and check-ins on the applications and tickets we kept ── */
+  const emailByUserId = new Map(
+    [...profileIds.entries()].map(([email, id]) => [id, email])
+  );
+  const slugByEventId = new Map(
+    [...eventIdBySlug.entries()].map(([slug, id]) => [id, slug])
+  );
+  const fixtureKeyOf = (row: EventUserRow) => {
+    const email = emailByUserId.get(row.user_id);
+    const slug = slugByEventId.get(row.event_id);
+    return email && slug ? key(email, slug) : null;
+  };
 
   const desiredResponses = new Set<string>();
   const desiredCheckIns = new Set<string>();
+  const keptApplicationIds = new Map(
+    applicationPlan.keep.flatMap((row) => {
+      const fixtureKey = fixtureKeyOf(row);
+      return fixtureKey ? [[fixtureKey, row.id] as const] : [];
+    })
+  );
+  const keptTicketIds = new Map(
+    ticketPlan.keep.flatMap((row) => {
+      const fixtureKey = fixtureKeyOf(row);
+      return fixtureKey ? [[fixtureKey, row.id] as const] : [];
+    })
+  );
   for (const fixture of fixtures) {
-    const userId = profileIds.get(fixture.email);
-    if (!userId) continue;
-
     for (const registration of fixture.registrations) {
-      const registrationId = keptRegistrationIdByKey.get(
-        pruneKey(userId, registration.eventSlug)
-      );
-      if (!registrationId) continue;
+      const fixtureKey = key(fixture.email, registration.eventSlug);
+      const applicationId = keptApplicationIds.get(fixtureKey);
+      const ticketId = keptTicketIds.get(fixtureKey);
 
       for (const question of Object.keys(registration.responses ?? {})) {
-        desiredResponses.add(pruneKey(registrationId, question));
+        if (applicationId) desiredResponses.add(pruneKey(applicationId, question));
       }
       for (const session of Object.keys(registration.checkIns ?? {})) {
-        desiredCheckIns.add(pruneKey(registrationId, session));
+        if (ticketId) desiredCheckIns.add(pruneKey(ticketId, session));
       }
     }
   }
 
+  const applicationIds = applicationPlan.keep.map((row) => row.id);
+  const ticketIds = ticketPlan.keep.map((row) => row.id);
   const [responseResult, checkInResult] = await Promise.all([
-    supabase
-      .from(TABLE.eventApplicationResponses)
-      .select(
-        "id, event_registration_id, event_application_questions(question)"
-      )
-      .in("event_registration_id", keptIds),
-    supabase
-      .from(TABLE.checkIns)
-      .select("id, event_registration_id, check_in_sessions(name)")
-      .in("event_registration_id", keptIds),
+    applicationIds.length > 0
+      ? supabase
+          .from(TABLE.eventApplicationResponses)
+          .select("id, application_id, event_application_questions(question)")
+          .in("application_id", applicationIds)
+      : Promise.resolve({ data: [], error: null }),
+    ticketIds.length > 0
+      ? supabase
+          .from(TABLE.checkIns)
+          .select("id, ticket_id, check_in_sessions(name)")
+          .in("ticket_id", ticketIds)
+      : Promise.resolve({ data: [], error: null }),
   ]);
   if (responseResult.error) {
     throw new Error(`Reading application responses failed: ${responseResult.error.message}`);
@@ -1123,12 +1260,12 @@ export async function pruneUserFixtures(
   // shapes are asserted here rather than inferred.
   const responseRows = (responseResult.data ?? []) as unknown as {
     id: string;
-    event_registration_id: string;
+    application_id: string;
     event_application_questions: { question: string } | null;
   }[];
   const checkInRows = (checkInResult.data ?? []) as unknown as {
     id: string;
-    event_registration_id: string;
+    ticket_id: string;
     check_in_sessions: { name: string } | null;
   }[];
 
@@ -1136,7 +1273,7 @@ export async function pruneUserFixtures(
     responseRows,
     (row) =>
       row.event_application_questions
-        ? pruneKey(row.event_registration_id, row.event_application_questions.question)
+        ? pruneKey(row.application_id, row.event_application_questions.question)
         : null,
     desiredResponses
   );
@@ -1144,7 +1281,7 @@ export async function pruneUserFixtures(
     checkInRows,
     (row) =>
       row.check_in_sessions
-        ? pruneKey(row.event_registration_id, row.check_in_sessions.name)
+        ? pruneKey(row.ticket_id, row.check_in_sessions.name)
         : null,
     desiredCheckIns
   );
@@ -1154,31 +1291,18 @@ export async function pruneUserFixtures(
 
   if (options.dryRun) return summary;
 
-  if (responsePlan.remove.length > 0) {
-    const { error } = await supabase
-      .from(TABLE.eventApplicationResponses)
-      .delete()
-      .in(
-        "id",
-        responsePlan.remove.map((entry) => entry.row.id)
-      );
-    if (error) {
-      throw new Error(`Deleting stale application responses failed: ${error.message}`);
-    }
-  }
-
-  if (checkInPlan.remove.length > 0) {
-    const { error } = await supabase
-      .from(TABLE.checkIns)
-      .delete()
-      .in(
-        "id",
-        checkInPlan.remove.map((entry) => entry.row.id)
-      );
-    if (error) {
-      throw new Error(`Deleting stale check-ins failed: ${error.message}`);
-    }
-  }
+  await deleteByIds(
+    supabase,
+    TABLE.eventApplicationResponses,
+    responsePlan.remove.map((entry) => entry.row.id),
+    "application responses"
+  );
+  await deleteByIds(
+    supabase,
+    TABLE.checkIns,
+    checkInPlan.remove.map((entry) => entry.row.id),
+    "check-ins"
+  );
 
   return summary;
 }
@@ -1192,9 +1316,10 @@ export async function pruneUserFixtures(
  * key between users. Leaving them would fail the run, not just leave clutter.
  *
  * Deletion order follows the foreign keys, all of which are `no action` rather
- * than cascade: registrations (as attendee and as reviewer) must go before the
- * profile, and the profile before the auth user, whose `auth_user_id` reference
- * would otherwise hold it. Purchases cascade off the profile on their own.
+ * than cascade: tickets, applications and legacy registrations (as attendee and
+ * as reviewer) must go before the profile, and the profile before the auth
+ * user, whose `auth_user_id` reference would otherwise hold it. Purchases
+ * cascade off the profile on their own.
  *
  * This is not `delete_account`: that anonymizes and keeps the row so real
  * receipts keep a referent. These are fixtures, and they should leave nothing.
@@ -1236,14 +1361,19 @@ export async function removeRetiredFixtures(
   const profileIds = profiles.map((profile) => profile.id);
 
   if (profileIds.length > 0) {
-    for (const column of ["user_id", "reviewer_id"] as const) {
+    for (const [table, column] of [
+      [TABLE.eventTickets, "user_id"],
+      [TABLE.eventApplications, "user_id"],
+      [TABLE.eventRegistrations, "user_id"],
+      [TABLE.eventRegistrations, "reviewer_id"],
+    ] as const) {
       const { error: registrationError } = await supabase
-        .from(TABLE.eventRegistrations)
+        .from(table)
         .delete()
         .in(column, profileIds);
       if (registrationError) {
         throw new Error(
-          `Deleting retired fixture registrations failed: ${registrationError.message}`
+          `Deleting retired fixture ${table} failed: ${registrationError.message}`
         );
       }
     }

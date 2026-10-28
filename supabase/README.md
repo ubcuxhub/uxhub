@@ -28,7 +28,7 @@ existing local database data, applies every migration in `supabase/migrations`,
 and runs the idempotent TypeScript seed reconciler. It never targets the linked remote database.
 
 The seed data lives under `scripts/seed/data/` and includes memberships, past,
-ongoing, and upcoming events, purchases, registrations, check-ins, and these
+ongoing, and upcoming events, purchases, tickets, applications, check-ins, and these
 eleven local login fixtures (all use password `123456`). Ten cover every
 membership state crossed with admin and non-admin, and one is the dedicated
 manager. The grid is listed in
@@ -47,15 +47,15 @@ To sync seed changes without destroying local data, run `pnpm seed`. Use
 The seed reconciles *to* its data, so by default it also removes seed-owned rows
 the data no longer describes. That is what makes event checkout re-testable:
 buy a ticket as one of the fixture accounts, re-run `pnpm seed`, and the
-purchase and registration are gone, so the event is buyable again.
+purchase and ticket are gone, so the event is buyable again.
 
 Deletion is scoped by ownership, not by table:
 
 | Prunable                                                  | Never touched                                          |
 | --------------------------------------------------------- | ------------------------------------------------------ |
 | Events and membership tiers whose slug is not in the data\* | Auth users and profiles created by hand                |
-| Mentors, sponsors, check-in sessions, application questions | Purchases and registrations belonging to any other account |
-| Purchases and registrations belonging to the fixture accounts | Covers uploaded through the admin UI (`covers/`)       |
+| Mentors, sponsors, check-in sessions, application questions | Purchases, tickets and applications belonging to any other account |
+| Purchases, tickets and applications belonging to the fixture accounts | Covers uploaded through the admin UI (`covers/`)       |
 | Cover images under the `seed/covers/` storage prefix       |                                                        |
 
 \* This includes events created through the admin UI. Such an event survives
@@ -145,7 +145,8 @@ helper file, and fix it in one place.
 | Table                         | Helper file                                       |
 | ----------------------------- | ------------------------------------------------- |
 | `events`                      | `src/lib/supabase-helpers/events.ts`              |
-| `event_registrations`         | `src/lib/supabase-helpers/event-registrations.ts` |
+| `event_tickets`               | `src/lib/supabase-helpers/event-tickets.ts`       |
+| `event_applications`          | `src/lib/supabase-helpers/event-applications.ts`  |
 | `event_application_questions` | `src/lib/supabase-helpers/event-applications.ts`  |
 | `event_application_responses` | `src/lib/supabase-helpers/event-applications.ts`  |
 | `check_in_sessions`           | `src/lib/supabase-helpers/check-ins.ts`           |
@@ -246,7 +247,7 @@ strings the compiler cannot validate. A rename here breaks silently at runtime:
 - **Embedded foreign-key hint joins** — e.g.
   `membership_types!membership_type_id(name)` in `fetchAdminUserRecords` and
   `user_info!user_id(first_name, last_name, email)` in
-  `fetchAttendingRegistrations`. These
+  `fetchCheckInAttendees`. These
   embed relationship/FK names that change with schema edits.
 
 ## Debugging checklist when something breaks
