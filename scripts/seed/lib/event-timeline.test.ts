@@ -44,7 +44,7 @@ describe("relative event seed timeline", () => {
   it("places each declared phase where it belongs on the timeline", () => {
     for (const slug of EVENT_PHASES.past) {
       expect(classifySeedEvent(seedEvent(slug), fixedNow)).toBe("past");
-      expect(seedEvent(slug).event.status).toBe("archived");
+      expect(seedEvent(slug).event.status).toBe("active");
     }
 
     for (const slug of EVENT_PHASES.ongoing) {

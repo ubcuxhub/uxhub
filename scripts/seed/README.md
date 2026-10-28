@@ -54,7 +54,6 @@ Deletion is scoped by ownership, not by table:
 | Events and membership tiers matched by slug                | Auth users and profiles created by hand              |
 | Mentors, sponsors, check-in sessions, application questions| Purchases, tickets and applications owned by any other account |
 | Purchases, tickets and applications owned by the fixture accounts | Covers uploaded through the admin UI (`covers/`)     |
-| Every legacy `event_registrations` row a fixture account holds |                                                      |
 | Cover images under the `seed/covers/` storage prefix       |                                                      |
 
 An extra event survives if a non-fixture purchase points at it —
@@ -68,8 +67,8 @@ which are `restrict` from their link tables.
 each one is for. The biggest group is **purchasable**: upcoming, active,
 registration open, and left unbought by every fixture account so event checkout
 can be run repeatedly. A test fails if a fixture purchase ever lands on one.
-The rest cover archived history, a closed registration window, a not-yet-open
-one, and a draft.
+The rest cover past events, still active so members keep their history, a
+closed registration window, a not-yet-open one, and a draft.
 
 `data/users.ts` — eleven local accounts. **Password is `123456` for all of them.**
 Ten cover every membership state crossed with the basic and admin roles:

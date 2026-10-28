@@ -81,14 +81,6 @@ export function PrimaryDetailsSection({
                 <SelectGroup>
                   <SelectItem value="draft">Draft</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
-                  {/* Archiving is going away (docs/registration-rollout.md).
-                      An event archived before then still shows its status,
-                      but nothing else can be moved to it. */}
-                  {formState.status === "archived" && (
-                    <SelectItem value="archived" disabled>
-                      Archived
-                    </SelectItem>
-                  )}
                 </SelectGroup>
               </SelectContent>
             </Select>

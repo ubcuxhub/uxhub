@@ -1,7 +1,6 @@
 /**
  * The event_tickets / event_applications schema against the local database:
- * the legacy column sync, reserve_event_ticket, seat counts, application
- * transitions and their RLS. See docs/event-states.md for the rules.
+ * reserve_event_ticket, seat counts, application transitions and their RLS. See docs/event-states.md for the rules.
  */
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
@@ -64,50 +63,6 @@ async function apply(
   if (updated.error) throw updated.error;
   return updated.data;
 }
-
-// Step 3 of docs/registration-rollout.md drops this test with the trigger and
-// the legacy columns. Until then the trigger keeps the deployed code's writes
-// visible to code that reads only the new columns.
-describe("legacy event column sync", () => {
-  it("derives the new columns from the legacy ones the deployed code writes", () =>
-    withFixtures(async (fixtures) => {
-      const event = await fixtures.createEvent({
-        start_date: "2026-07-02",
-        start_time: "18:00:00",
-        end_date: null,
-        end_time: null,
-        registration_start_time: "2026-06-20T07:00:00.000Z",
-        registration_end_time: "2026-07-01T07:00:00.000Z",
-        applications_enabled: true,
-      });
-
-      // 18:00 and end of day in Vancouver (PDT, UTC-7).
-      expect(new Date(event.starts_at!).toISOString()).toBe("2026-07-03T01:00:00.000Z");
-      expect(new Date(event.ends_at!).toISOString()).toBe("2026-07-03T06:59:59.000Z");
-      expect(new Date(event.registration_opens_at!).toISOString()).toBe("2026-06-20T07:00:00.000Z");
-      expect(new Date(event.registration_closes_at!).toISOString()).toBe("2026-07-01T07:00:00.000Z");
-      expect(event.requires_application).toBe(true);
-
-      const { data: moved } = await db
-        .from("events")
-        .update({ start_time: "10:00:00", end_time: "12:00:00", applications_enabled: false })
-        .eq("id", event.id)
-        .select()
-        .single();
-      expect(new Date(moved!.starts_at!).toISOString()).toBe("2026-07-02T17:00:00.000Z");
-      expect(new Date(moved!.ends_at!).toISOString()).toBe("2026-07-02T19:00:00.000Z");
-      expect(moved!.requires_application).toBe(false);
-
-      // A writer of the new columns wins over the unchanged legacy ones.
-      const { data: direct } = await db
-        .from("events")
-        .update({ starts_at: "2026-07-05T17:00:00.000Z", ends_at: "2026-07-05T19:00:00.000Z" })
-        .eq("id", event.id)
-        .select()
-        .single();
-      expect(new Date(direct!.starts_at!).toISOString()).toBe("2026-07-05T17:00:00.000Z");
-    }));
-});
 
 describe("reserve_event_ticket", () => {
   it("issues one ticket per person and returns the same one for a retried purchase", () =>

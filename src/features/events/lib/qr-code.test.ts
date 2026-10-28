@@ -7,8 +7,8 @@ import { type QrSvg, toQrSvg } from "./qr-code";
 
 vi.mock("server-only", () => ({}));
 
-const REGISTRATION_ID = "3f1c9a52-8d4e-4b7a-9c61-2e5f0d8b7a14";
-const OTHER_REGISTRATION_ID = "a7e2b310-5c9d-4f68-8b23-91d4c6e0f257";
+const TICKET_ID = "3f1c9a52-8d4e-4b7a-9c61-2e5f0d8b7a14";
+const OTHER_TICKET_ID = "a7e2b310-5c9d-4f68-8b23-91d4c6e0f257";
 const MODULE = /M(\d+) (\d+)h1v1h-1z/g;
 const PIXELS_PER_MODULE = 4;
 
@@ -41,30 +41,30 @@ function scan({ size, path }: QrSvg): string | undefined {
 
 describe("toQrSvg", () => {
   it("scans back to a check-in token for the same registration", () => {
-    const token = createCheckInToken(REGISTRATION_ID);
+    const token = createCheckInToken(TICKET_ID);
 
     const scanned = scan(toQrSvg(token));
 
     expect(scanned).toBe(token);
-    expect(verifyCheckInToken(scanned ?? "")).toBe(REGISTRATION_ID);
+    expect(verifyCheckInToken(scanned ?? "")).toBe(TICKET_ID);
   });
 
   it("draws the same code every time, so a screenshot keeps working", () => {
-    const first = toQrSvg(createCheckInToken(REGISTRATION_ID));
-    const second = toQrSvg(createCheckInToken(REGISTRATION_ID));
+    const first = toQrSvg(createCheckInToken(TICKET_ID));
+    const second = toQrSvg(createCheckInToken(TICKET_ID));
 
     expect(second).toEqual(first);
   });
 
   it("draws a different code for a different registration", () => {
-    const first = toQrSvg(createCheckInToken(REGISTRATION_ID));
-    const other = toQrSvg(createCheckInToken(OTHER_REGISTRATION_ID));
+    const first = toQrSvg(createCheckInToken(TICKET_ID));
+    const other = toQrSvg(createCheckInToken(OTHER_TICKET_ID));
 
     expect(other.path).not.toBe(first.path);
   });
 
   it("leaves a four-module quiet zone around the code", () => {
-    const { size, path } = toQrSvg(createCheckInToken(REGISTRATION_ID));
+    const { size, path } = toQrSvg(createCheckInToken(TICKET_ID));
     const coordinates = [...path.matchAll(MODULE)].flatMap(([, x, y]) => [
       Number(x),
       Number(y),

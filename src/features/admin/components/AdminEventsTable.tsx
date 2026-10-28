@@ -3,7 +3,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
-  Archive,
   ArrowDown,
   ArrowUp,
   Check,
@@ -49,11 +48,6 @@ const statusConfig = {
     className: "bg-success-bg text-success",
     icon: Check,
     label: "Active",
-  },
-  archived: {
-    className: "",
-    icon: Archive,
-    label: "Archived",
   },
   draft: {
     className: "bg-warning-bg text-warning",

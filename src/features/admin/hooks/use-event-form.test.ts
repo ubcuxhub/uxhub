@@ -52,10 +52,10 @@ const event = {
 // These dates use historical Pacific offsets so timezone rule updates cannot
 // change the expected values for a future year.
 describe("event form publishing schedule", () => {
-  it.each(["active", "archived"] as const)("cancels scheduling when changing to %s", (status) => {
+  it("cancels scheduling when changing to active", () => {
     const { result } = renderHook(() => useEventForm({ eventId: event.id, initialEvent: event }));
-    act(() => result.current.handleFieldChange("status", status));
-    expect(result.current.formState.status).toBe(status);
+    act(() => result.current.handleFieldChange("status", "active"));
+    expect(result.current.formState.status).toBe("active");
     expect(result.current.formState.publish_at).toBe("");
   });
 
@@ -127,8 +127,8 @@ describe("event form publishing schedule", () => {
       registration_closes_at: "2024-07-01T06:59:00.000Z",
       requires_application: true,
     });
-    // Every key is a column save_admin_event_atomically writes, so none of
-    // the legacy schedule columns step 3 drops can sneak back in.
+    // save_admin_event_atomically writes every events column the payload
+    // names, so this is exactly what a save can change.
     expect(Object.keys(payload).sort()).toEqual([
       "created_at", "description", "ends_at", "event_type", "image_url",
       "location_address_url", "location_building", "location_room",

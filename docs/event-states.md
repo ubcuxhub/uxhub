@@ -14,17 +14,17 @@ releasing a spot.
 | Scheduled | No | `status = draft`, `publish_at` set |
 | Published | Yes | `status = active` |
 
-Draft and Archived events are hidden. Whether an event is upcoming or past
-comes from `starts_at` and `ends_at`, not from its status, so a finished event
-stays Published and members keep their history.
+Draft events are hidden. Whether an event is upcoming or past comes from
+`starts_at` and `ends_at`, not from its status, so a finished event stays
+Published and members keep their history.
 
 ### Scheduling publication
 
 The admin create/edit form has an optional **Publish Date & Time (Pacific)**
 field, available only for Draft events. Choose a future date to schedule the
 change from Draft to Active. Leave it empty to keep the event in Draft.
-Clearing it cancels publication; manually activating or archiving an event also
-clears its schedule.
+Clearing it cancels publication; manually activating an event also clears its
+schedule.
 
 Saving, changing, clearing, deleting, or manually publishing a scheduled draft
 recalculates one shared database job for the earliest pending `publish_at`.
