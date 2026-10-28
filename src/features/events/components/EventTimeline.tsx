@@ -6,7 +6,7 @@ import { useState } from "react";
 
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { formatEventDate, formatEventTime } from "@/lib/date";
+import { formatEventDate, formatEventTime, pacificDate } from "@/lib/date";
 import { resolveImagePreviewSrc } from "@/lib/event-image";
 import type { EventRow } from "@/lib/supabase/models";
 import { groupEventsByMonth, normalizeString } from "@/features/events/lib/event-timeline";
@@ -90,16 +90,16 @@ function EventTimelineItem({ event }: { event: EventRow }) {
     .join(" ");
   const dateOptions = { month: "short", weekday: "short" } as const;
   const endDate =
-    event.end_date !== event.start_date
-      ? formatEventDate(event.end_date, dateOptions)
+    pacificDate(event.ends_at) !== pacificDate(event.starts_at)
+      ? formatEventDate(event.ends_at, dateOptions)
       : null;
   const startDateTime = [
-    formatEventDate(event.start_date, dateOptions),
-    formatEventTime(event.start_time),
+    formatEventDate(event.starts_at, dateOptions),
+    formatEventTime(event.starts_at),
   ]
     .filter(Boolean)
     .join(" ");
-  const endDateTime = [endDate, formatEventTime(event.end_time)]
+  const endDateTime = [endDate, formatEventTime(event.ends_at)]
     .filter(Boolean)
     .join(" ");
   const dateTime = [startDateTime, endDateTime].filter(Boolean).join(" – ");
@@ -108,7 +108,7 @@ function EventTimelineItem({ event }: { event: EventRow }) {
     <div className="flex gap-3 sm:gap-8 sm:min-h-72">
       <div className="flex justify-end gap-4">
         <p className="hidden min-w-28 text-end sm:block">
-          {formatEventDate(event.start_date, { year: undefined, month: "short" })}
+          {formatEventDate(event.starts_at, { year: undefined, month: "short" })}
         </p>
         <div className="flex flex-col items-center self-stretch">
           <div className="mt-2 size-2 shrink-0 rounded-full bg-fg-secondary" />

@@ -1,15 +1,15 @@
 import type { EventGroup } from "@/features/events/types";
-import { formatEventDate } from "@/lib/date";
+import { formatEventDate, pacificDate } from "@/lib/date";
 import type { EventRow } from "@/lib/supabase/models";
 
 export function groupEventsByMonth(events: EventRow[]): EventGroup[] {
   const groups = new Map<string, EventGroup>();
 
   for (const event of events) {
-    if (!event.start_date) continue;
+    if (!event.starts_at) continue;
 
-    const key = event.start_date.slice(0, 7);
-    const label = formatEventDate(event.start_date, { day: undefined }) ?? key;
+    const key = pacificDate(event.starts_at).slice(0, 7);
+    const label = formatEventDate(event.starts_at, { day: undefined }) ?? key;
 
     if (!groups.has(key)) {
       groups.set(key, {
@@ -25,10 +25,13 @@ export function groupEventsByMonth(events: EventRow[]): EventGroup[] {
   return [...groups.values()];
 }
 
-export function splitEventsByDate(events: EventRow[], today: string) {
+/** An event is past once it ends, or once it starts if it has no end. */
+export function splitEventsByTime(events: EventRow[], now: Date) {
+  const isPast = (e: EventRow) => Date.parse(e.ends_at ?? e.starts_at!) < now.getTime();
+  const dated = events.filter((e) => e.starts_at);
   return {
-    upcomingEvents: events.filter((e) => e.start_date && (e.end_date ?? e.start_date) >= today),
-    pastEvents: events.filter((e) => e.start_date && (e.end_date ?? e.start_date) < today).reverse(),
+    upcomingEvents: dated.filter((e) => !isPast(e)),
+    pastEvents: dated.filter(isPast).reverse(),
   };
 }
 

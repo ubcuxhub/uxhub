@@ -30,7 +30,7 @@ function payload(fixtures: Fixtures, publish_at: string | null) {
     event_type: "regular" as const,
     mentors_enabled: false,
     sponsors_enabled: false,
-    applications_enabled: false,
+    requires_application: false,
     regular_price: 0,
     member_price: 0,
     max_capacity: 10,
@@ -64,6 +64,33 @@ describe("admin event publishing", () => {
       expect((await read())!.publish_at).toBeNull();
       expect((await read())!.status).toBe("draft");
       expect(await publicRead()).toBeNull();
+    }));
+
+  it("saves the schedule from the new columns alone", () =>
+    withFixtures(async (fixtures) => {
+      const schedule = {
+        starts_at: "2026-11-20T02:00:00.000Z",
+        ends_at: "2026-11-20T04:00:00.000Z",
+        registration_opens_at: null,
+        registration_closes_at: null,
+      };
+      const id = await save(fixtures, { ...payload(fixtures, null), ...schedule });
+      const read = async () => {
+        const event = (await fetchEventById(fixtures.supabase, id))!;
+        return {
+          starts_at: event.starts_at && new Date(event.starts_at).toISOString(),
+          ends_at: event.ends_at && new Date(event.ends_at).toISOString(),
+          registration_opens_at: event.registration_opens_at,
+          registration_closes_at: event.registration_closes_at,
+        };
+      };
+      // No registration window means always open, not a week from creation.
+      expect(await read()).toEqual(schedule);
+
+      const opensAt = "2026-11-01T16:00:00.000Z";
+      await save(fixtures, { ...payload(fixtures, null), ...schedule, registration_opens_at: opensAt }, id);
+      expect((await read()).registration_opens_at).not.toBeNull();
+      expect(new Date((await read()).registration_opens_at!).toISOString()).toBe(opensAt);
     }));
 
   it("activates only due drafts and clears their schedules", () =>

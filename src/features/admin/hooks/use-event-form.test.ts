@@ -39,14 +39,14 @@ const event = {
   regular_price: 0,
   member_price: 0,
   max_capacity: 10,
-  start_date: "2024-07-01",
-  start_time: "10:00",
-  end_date: "2024-07-01",
-  end_time: "11:00",
+  starts_at: "2024-07-01T17:00:00+00:00",
+  ends_at: "2024-07-01T18:00:00+00:00",
+  registration_opens_at: "2024-06-01T16:00:00+00:00",
+  registration_closes_at: null,
   publish_at: "2024-07-01T17:00:00Z",
   mentors_enabled: false,
   sponsors_enabled: false,
-  applications_enabled: false,
+  requires_application: false,
 } as EventRow;
 
 // These dates use historical Pacific offsets so timezone rule updates cannot
@@ -88,5 +88,54 @@ describe("event form publishing schedule", () => {
     expect(saveAdminEventAction).toHaveBeenCalledWith(expect.objectContaining({
       event: expect.objectContaining({ publish_at: expected }),
     }));
+  });
+
+  it("edits the schedule as Pacific wall-clock time and saves only the new columns", async () => {
+    const { result } = renderHook(() => useEventForm({
+      eventId: event.id,
+      initialEvent: event,
+      initialCheckInSessions: [{
+        id: "check-in-1",
+        created_at: null,
+        updated_at: null,
+        event_id: event.id,
+        name: "Doors",
+        start_time: "2024-07-01T17:00:00Z",
+        end_time: "2024-07-01T18:00:00Z",
+      }],
+    }));
+    expect(result.current.formState).toMatchObject({
+      starts_at: "2024-07-01T10:00",
+      ends_at: "2024-07-01T11:00",
+      registration_opens_at: "2024-06-01T09:00",
+      registration_closes_at: "",
+    });
+    act(() => {
+      result.current.handleFieldChange("ends_at", "2024-07-02T09:30");
+      result.current.handleFieldChange("registration_closes_at", "2024-06-30T23:59");
+      result.current.handleFieldChange("requires_application", true);
+    });
+    await act(async () => {
+      await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as FormEvent<HTMLFormElement>);
+    });
+    expect(result.current.error).toBeNull();
+    const payload = vi.mocked(saveAdminEventAction).mock.calls[0][0].event;
+    expect(payload).toMatchObject({
+      starts_at: "2024-07-01T17:00:00.000Z",
+      ends_at: "2024-07-02T16:30:00.000Z",
+      registration_opens_at: "2024-06-01T16:00:00.000Z",
+      registration_closes_at: "2024-07-01T06:59:00.000Z",
+      requires_application: true,
+    });
+    // Every key is a column save_admin_event_atomically writes, so none of
+    // the legacy schedule columns step 3 drops can sneak back in.
+    expect(Object.keys(payload).sort()).toEqual([
+      "created_at", "description", "ends_at", "event_type", "image_url",
+      "location_address_url", "location_building", "location_room",
+      "max_capacity", "member_price", "mentors_enabled", "name", "publish_at",
+      "registration_closes_at", "registration_opens_at", "regular_price",
+      "requires_application", "short_description", "sponsors_enabled",
+      "starts_at", "status",
+    ]);
   });
 });

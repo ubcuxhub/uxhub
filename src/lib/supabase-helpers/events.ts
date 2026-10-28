@@ -7,7 +7,7 @@ import type {
   EventUpdate,
 } from "@/lib/supabase/models";
 
-export type EventOrderBy = "start_date" | "created_at";
+export type EventOrderBy = "starts_at" | "created_at";
 
 interface FetchEventsOptions {
   orderBy?: EventOrderBy;
@@ -24,7 +24,7 @@ export async function fetchEvents(
   supabase: DbClient,
   options: FetchEventsOptions = {}
 ): Promise<EventRow[]> {
-  const { orderBy = "start_date", ascending = true, status } = options;
+  const { orderBy = "starts_at", ascending = true, status } = options;
 
   let query = supabase
     .from(TABLES.events)

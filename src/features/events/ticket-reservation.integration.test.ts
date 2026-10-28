@@ -19,8 +19,8 @@ const at = (offsetMs: number) => new Date(Date.now() + offsetMs).toISOString();
 function openEvent(fixtures: Fixtures, overrides: EventInsert = {}) {
   return fixtures.createEvent({
     status: "active",
-    registration_start_time: at(-hour),
-    registration_end_time: at(hour),
+    registration_opens_at: at(-hour),
+    registration_closes_at: at(hour),
     ...overrides,
   });
 }
@@ -65,6 +65,9 @@ async function apply(
   return updated.data;
 }
 
+// Step 3 of docs/registration-rollout.md drops this test with the trigger and
+// the legacy columns. Until then the trigger keeps the deployed code's writes
+// visible to code that reads only the new columns.
 describe("legacy event column sync", () => {
   it("derives the new columns from the legacy ones the deployed code writes", () =>
     withFixtures(async (fixtures) => {
@@ -149,15 +152,15 @@ describe("reserve_event_ticket", () => {
 
       const early = await openEvent(fixtures, {
         slug: `early-${fixtures.tag}`,
-        registration_start_time: at(hour),
-        registration_end_time: at(2 * hour),
+        registration_opens_at: at(hour),
+        registration_closes_at: at(2 * hour),
       });
       expect((await reserve(early.id, a.id)).failure_reason).toBe("REGISTRATION_NOT_OPEN");
 
       const late = await openEvent(fixtures, {
         slug: `late-${fixtures.tag}`,
-        registration_start_time: at(-2 * hour),
-        registration_end_time: at(-hour),
+        registration_opens_at: at(-2 * hour),
+        registration_closes_at: at(-hour),
       });
       expect((await reserve(late.id, a.id)).failure_reason).toBe("REGISTRATION_CLOSED");
 
@@ -188,7 +191,7 @@ describe("reserve_event_ticket", () => {
 
   it("requires an accepted, unexpired offer, whose seat is already held", () =>
     withFixtures(async (fixtures) => {
-      const event = await openEvent(fixtures, { applications_enabled: true, max_capacity: 1 });
+      const event = await openEvent(fixtures, { requires_application: true, max_capacity: 1 });
       const [none, waiting, offered, lapsed] = [
         await fixtures.createUser(),
         await fixtures.createUser(),
@@ -232,7 +235,7 @@ describe("event_seat_counts", () => {
 describe("event_applications", () => {
   it("allows only the moves in the event states doc", () =>
     withFixtures(async (fixtures) => {
-      const event = await openEvent(fixtures, { applications_enabled: true });
+      const event = await openEvent(fixtures, { requires_application: true });
       const [a, b, c] = [
         await fixtures.createUser(),
         await fixtures.createUser(),
@@ -261,13 +264,13 @@ describe("event_applications", () => {
   it("lets members apply only for themselves, to open application events", () =>
     withFixtures(async (fixtures) => {
       const [member, other] = [await fixtures.createUser(), await fixtures.createUser()];
-      const event = await openEvent(fixtures, { applications_enabled: true });
+      const event = await openEvent(fixtures, { requires_application: true });
       const plain = await openEvent(fixtures, { slug: `plain-${fixtures.tag}` });
       const closed = await openEvent(fixtures, {
         slug: `closed-${fixtures.tag}`,
-        applications_enabled: true,
-        registration_start_time: at(-2 * hour),
-        registration_end_time: at(-hour),
+        requires_application: true,
+        registration_opens_at: at(-2 * hour),
+        registration_closes_at: at(-hour),
       });
       const client = clientAs(member);
       const insert = (eventId: string, userId = member.id) =>

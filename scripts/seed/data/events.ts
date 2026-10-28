@@ -6,9 +6,11 @@
  *   the seed run so existing database rows update instead of duplicating. A
  *   series that appears twice is disambiguated by phase (`design-sprint-past`
  *   and `design-sprint-upcoming`), never by a year the name no longer matches.
- * - `start_time` / `end_time` are `time` columns: naive local wall-clock, no offset.
- * - `registration_*_time` and check-in sessions are generated as absolute UTC
- *   timestamps. Event `time` columns remain naive local wall-clock values.
+ * - `starts_at` / `ends_at` are written from a Vancouver wall-clock time on a
+ *   relative date (`pacificTimestamp`), so an evening event stays an evening
+ *   event whatever the offset.
+ * - `registration_opens_at` / `registration_closes_at` and check-in sessions
+ *   are generated as absolute UTC timestamps.
  * - `imageKey` names a file in `scripts/seed/data/images`. The seed uploads it
  *   and fills in `image_url`, so fixtures never hardcode a storage URL — see
  *   `scripts/seed/lib/images.ts`.
@@ -23,8 +25,8 @@ import type { TablesInsert } from "../../../src/lib/supabase/database.types.ts";
 import {
   addDays,
   addMonths,
-  dateString,
   eventYear,
+  pacificTimestamp,
   startOfUtcDay,
   timestamp,
 } from "../lib/relative-dates.ts";
@@ -464,32 +466,32 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
 
   /** Opened two months before the event and closed well before it ran. */
   const closedHistoricalRegistration = (eventDate: Date) => ({
-    registration_start_time: timestamp(addMonths(eventDate, -2)),
-    registration_end_time: timestamp(addDays(eventDate, -5), 23, 59),
+    registration_opens_at: timestamp(addMonths(eventDate, -2)),
+    registration_closes_at: timestamp(addDays(eventDate, -5), 23, 59),
   });
 
   /** Open right now: started a month ago, closes five days before the event. */
   const openRegistration = (eventDate: Date) => ({
-    registration_start_time: timestamp(addMonths(today, -1)),
-    registration_end_time: timestamp(addDays(eventDate, -5), 23, 59),
+    registration_opens_at: timestamp(addMonths(today, -1)),
+    registration_closes_at: timestamp(addDays(eventDate, -5), 23, 59),
   });
 
   /** Open right now, for an event that runs until `endDate`. */
   const openThroughout = (startDate: Date, endDate: Date) => ({
-    registration_start_time: timestamp(addMonths(startDate, -2)),
-    registration_end_time: timestamp(endDate, 23, 59),
+    registration_opens_at: timestamp(addMonths(startDate, -2)),
+    registration_closes_at: timestamp(endDate, 23, 59),
   });
 
   /** Already closed even though the event is still ahead of us. */
   const alreadyClosedRegistration = () => ({
-    registration_start_time: timestamp(addMonths(today, -3)),
-    registration_end_time: timestamp(addDays(today, -3), 23, 59),
+    registration_opens_at: timestamp(addMonths(today, -3)),
+    registration_closes_at: timestamp(addDays(today, -3), 23, 59),
   });
 
   /** Not open yet: the "Registration Opens Soon" state. */
   const notYetOpenRegistration = (eventDate: Date) => ({
-    registration_start_time: timestamp(addMonths(today, 6)),
-    registration_end_time: timestamp(addDays(eventDate, -5), 23, 59),
+    registration_opens_at: timestamp(addMonths(today, 6)),
+    registration_closes_at: timestamp(addDays(eventDate, -5), 23, 59),
   });
 
   const seeded: SeedEvent[] = [
@@ -506,10 +508,8 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       location_building: "AMS Nest",
       location_room: "Room 2314",
       location_address_url: "https://maps.app.goo.gl/9x8k2Qm4Zt6bXQ5s7",
-      start_date: dateString(schedule.getToKnow),
-      start_time: "17:30:00",
-      end_date: dateString(schedule.getToKnow),
-      end_time: "19:30:00",
+      starts_at: pacificTimestamp(schedule.getToKnow, "17:30"),
+      ends_at: pacificTimestamp(schedule.getToKnow, "19:30"),
       max_capacity: 120,
       ...closedHistoricalRegistration(schedule.getToKnow),
     },
@@ -535,10 +535,8 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       location_building: "Neville Scarfe Building",
       location_room: "Room 100",
       location_address_url: "https://maps.app.goo.gl/vNq7CkS3Wm2hZr4A9",
-      start_date: dateString(schedule.designSprintPast),
-      start_time: "10:00:00",
-      end_date: dateString(schedule.designSprintPast),
-      end_time: "17:00:00",
+      starts_at: pacificTimestamp(schedule.designSprintPast, "10:00"),
+      ends_at: pacificTimestamp(schedule.designSprintPast, "17:00"),
       max_capacity: 60,
       ...closedHistoricalRegistration(schedule.designSprintPast),
       agenda: designSprintAgenda,
@@ -574,10 +572,8 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       location_building: "ICICS/CS X-wing",
       location_room: "Room 100",
       location_address_url: "https://maps.app.goo.gl/6dK2sYqR8fV1nB7t5",
-      start_date: dateString(schedule.uxathonPast),
-      start_time: "09:00:00",
-      end_date: dateString(addDays(schedule.uxathonPast, 1)),
-      end_time: "17:00:00",
+      starts_at: pacificTimestamp(schedule.uxathonPast, "09:00"),
+      ends_at: pacificTimestamp(addDays(schedule.uxathonPast, 1), "17:00"),
       max_capacity: 80,
       ...closedHistoricalRegistration(schedule.uxathonPast),
       agenda: [...uxathonAgendaDayOne, ...uxathonAgendaDayTwo],
@@ -617,10 +613,8 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       location_building: "Henry Angus Building",
       location_room: "Room 098",
       location_address_url: "https://maps.app.goo.gl/Xk4mP2rT8wQ6nB3v1",
-      start_date: dateString(schedule.industryTalkPast),
-      start_time: "18:00:00",
-      end_date: dateString(schedule.industryTalkPast),
-      end_time: "19:30:00",
+      starts_at: pacificTimestamp(schedule.industryTalkPast, "18:00"),
+      ends_at: pacificTimestamp(schedule.industryTalkPast, "19:30"),
       max_capacity: 90,
       ...closedHistoricalRegistration(schedule.industryTalkPast),
     },
@@ -648,10 +642,8 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       location_building: "AMS Nest",
       location_room: "Room 2314",
       location_address_url: "https://maps.app.goo.gl/9x8k2Qm4Zt6bXQ5s7",
-      start_date: dateString(schedule.openStudioStart),
-      start_time: "17:30:00",
-      end_date: dateString(schedule.openStudioEnd),
-      end_time: "19:30:00",
+      starts_at: pacificTimestamp(schedule.openStudioStart, "17:30"),
+      ends_at: pacificTimestamp(schedule.openStudioEnd, "19:30"),
       max_capacity: 120,
       ...openThroughout(schedule.openStudioStart, schedule.openStudioEnd),
     },
@@ -677,10 +669,8 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       location_building: "AMS Nest",
       location_room: "Room 2306",
       location_address_url: "https://maps.app.goo.gl/9x8k2Qm4Zt6bXQ5s7",
-      start_date: dateString(schedule.coffeeSeriesStart),
-      start_time: "16:00:00",
-      end_date: dateString(schedule.coffeeSeriesEnd),
-      end_time: "18:00:00",
+      starts_at: pacificTimestamp(schedule.coffeeSeriesStart, "16:00"),
+      ends_at: pacificTimestamp(schedule.coffeeSeriesEnd, "18:00"),
       max_capacity: 40,
       ...openThroughout(schedule.coffeeSeriesStart, schedule.coffeeSeriesEnd),
     },
@@ -706,10 +696,8 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       location_building: "Life Sciences Centre",
       location_room: "Atrium",
       location_address_url: "https://maps.app.goo.gl/T4wR8bLp1Vz6Yn3H8",
-      start_date: dateString(schedule.mentorshipStart),
-      start_time: "18:00:00",
-      end_date: dateString(schedule.mentorshipEnd),
-      end_time: "20:00:00",
+      starts_at: pacificTimestamp(schedule.mentorshipStart, "18:00"),
+      ends_at: pacificTimestamp(schedule.mentorshipEnd, "20:00"),
       max_capacity: 100,
       ...openThroughout(schedule.mentorshipStart, schedule.mentorshipEnd),
       agenda: panelAgenda,
@@ -741,10 +729,8 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       location_building: "Thinkbox Studio",
       location_room: "Main Lobby",
       location_address_url: "https://maps.app.goo.gl/PLACEHOLDER-thinkbox",
-      start_date: dateString(schedule.thinkboxTour),
-      start_time: "14:00:00",
-      end_date: dateString(schedule.thinkboxTour),
-      end_time: "16:00:00",
+      starts_at: pacificTimestamp(schedule.thinkboxTour, "14:00"),
+      ends_at: pacificTimestamp(schedule.thinkboxTour, "16:00"),
       max_capacity: 25,
       ...openRegistration(schedule.thinkboxTour),
     },
@@ -776,10 +762,8 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       location_building: "ICICS/CS X-wing",
       location_room: "Room 100",
       location_address_url: "https://maps.app.goo.gl/6dK2sYqR8fV1nB7t5",
-      start_date: dateString(schedule.uxathonUpcoming),
-      start_time: "09:00:00",
-      end_date: dateString(addDays(schedule.uxathonUpcoming, 1)),
-      end_time: "17:00:00",
+      starts_at: pacificTimestamp(schedule.uxathonUpcoming, "09:00"),
+      ends_at: pacificTimestamp(addDays(schedule.uxathonUpcoming, 1), "17:00"),
       max_capacity: 80,
       ...openRegistration(schedule.uxathonUpcoming),
       agenda: [...uxathonAgendaDayOne, ...uxathonAgendaDayTwo],
@@ -819,10 +803,8 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       location_building: "AMS Nest",
       location_room: "Room 2306",
       location_address_url: "https://maps.app.goo.gl/9x8k2Qm4Zt6bXQ5s7",
-      start_date: dateString(schedule.portfolioReview),
-      start_time: "18:00:00",
-      end_date: dateString(schedule.portfolioReview),
-      end_time: "20:30:00",
+      starts_at: pacificTimestamp(schedule.portfolioReview, "18:00"),
+      ends_at: pacificTimestamp(schedule.portfolioReview, "20:30"),
       max_capacity: 45,
       ...openRegistration(schedule.portfolioReview),
       agenda: portfolioReviewAgenda,
@@ -849,10 +831,8 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       location_building: "Neville Scarfe Building",
       location_room: "Room 100",
       location_address_url: "https://maps.app.goo.gl/vNq7CkS3Wm2hZr4A9",
-      start_date: dateString(schedule.designSprintUpcoming),
-      start_time: "10:00:00",
-      end_date: dateString(schedule.designSprintUpcoming),
-      end_time: "17:00:00",
+      starts_at: pacificTimestamp(schedule.designSprintUpcoming, "10:00"),
+      ends_at: pacificTimestamp(schedule.designSprintUpcoming, "17:00"),
       max_capacity: 60,
       ...openRegistration(schedule.designSprintUpcoming),
       agenda: designSprintAgenda,
@@ -887,10 +867,8 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       location_building: "Life Sciences Centre",
       location_room: "Atrium",
       location_address_url: "https://maps.app.goo.gl/T4wR8bLp1Vz6Yn3H8",
-      start_date: dateString(schedule.studentPanel),
-      start_time: "18:00:00",
-      end_date: dateString(schedule.studentPanel),
-      end_time: "20:00:00",
+      starts_at: pacificTimestamp(schedule.studentPanel, "18:00"),
+      ends_at: pacificTimestamp(schedule.studentPanel, "20:00"),
       max_capacity: 100,
       ...openRegistration(schedule.studentPanel),
       agenda: panelAgenda,
@@ -921,10 +899,8 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       location_building: "Henry Angus Building",
       location_room: "Room 098",
       location_address_url: "https://maps.app.goo.gl/Xk4mP2rT8wQ6nB3v1",
-      start_date: dateString(schedule.industryTalkDesignSystems),
-      start_time: "18:00:00",
-      end_date: dateString(schedule.industryTalkDesignSystems),
-      end_time: "19:30:00",
+      starts_at: pacificTimestamp(schedule.industryTalkDesignSystems, "18:00"),
+      ends_at: pacificTimestamp(schedule.industryTalkDesignSystems, "19:30"),
       max_capacity: 90,
       ...alreadyClosedRegistration(),
     },
@@ -951,10 +927,8 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       location_building: "AMS Nest",
       location_room: "Great Hall",
       location_address_url: "https://maps.app.goo.gl/9x8k2Qm4Zt6bXQ5s7",
-      start_date: dateString(schedule.springShowcase),
-      start_time: "17:00:00",
-      end_date: dateString(schedule.springShowcase),
-      end_time: "21:00:00",
+      starts_at: pacificTimestamp(schedule.springShowcase, "17:00"),
+      ends_at: pacificTimestamp(schedule.springShowcase, "21:00"),
       max_capacity: 200,
       ...notYetOpenRegistration(schedule.springShowcase),
     },
@@ -982,10 +956,8 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       location_building: "Neville Scarfe Building",
       location_room: "Room 204",
       location_address_url: "https://maps.app.goo.gl/vNq7CkS3Wm2hZr4A9",
-      start_date: dateString(schedule.researchWorkshop),
-      start_time: "13:00:00",
-      end_date: dateString(schedule.researchWorkshop),
-      end_time: "17:00:00",
+      starts_at: pacificTimestamp(schedule.researchWorkshop, "13:00"),
+      ends_at: pacificTimestamp(schedule.researchWorkshop, "17:00"),
       max_capacity: 30,
       ...openRegistration(schedule.researchWorkshop),
     },

@@ -3,25 +3,24 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { EventStatus } from "@/lib/supabase/models";
+import type { EventRow, EventStatus } from "@/lib/supabase/models";
 import { AdminEventsTable, type AdminEventTableRow } from "./AdminEventsTable";
 
 afterEach(cleanup);
 
-function row(id: string, name: string, start_date: string | null, status: EventStatus, registrationOpen: boolean): AdminEventTableRow {
+function row(id: string, name: string, starts_at: string | null, status: EventStatus, registrationOpen: boolean): AdminEventTableRow {
   return {
+    // Cast because the legacy schedule columns are still in the generated
+    // types until step 3 of docs/registration-rollout.md drops them.
     event: {
-      id, name, start_date, status,
+      id, name, starts_at, status,
       max_capacity: 30,
       regular_price: 15,
       member_price: 5,
       agenda: null,
       description_images: [],
-      applications_enabled: false,
       created_at: null,
       description: "Event description",
-      end_date: null,
-      end_time: null,
       ends_at: null,
       event_type: "regular",
       image_url: null,
@@ -31,26 +30,22 @@ function row(id: string, name: string, start_date: string | null, status: EventS
       mentors_enabled: false,
       publish_at: null,
       registration_closes_at: null,
-      registration_end_time: null,
       registration_opens_at: null,
-      registration_start_time: null,
       requires_application: false,
       short_description: null,
       slug: id,
       sponsors_enabled: false,
-      start_time: null,
-      starts_at: null,
       updated_at: null,
-    },
+    } as Partial<EventRow> as EventRow,
     registrationCount: 7,
     registrationOpen,
   };
 }
 
 const rows = [
-  row("older", "Design Meetup", "2026-09-01", "active", false),
-  row("newer", "Design Workshop", "2026-11-01", "active", true),
-  row("draft", "Draft Workshop", "2026-12-01", "draft", true),
+  row("older", "Design Meetup", "2026-09-01T17:00:00+00:00", "active", false),
+  row("newer", "Design Workshop", "2026-11-01T17:00:00+00:00", "active", true),
+  row("draft", "Draft Workshop", "2026-12-01T18:00:00+00:00", "draft", true),
   row("undated", "Archived Meetup", null, "archived", false),
 ];
 
