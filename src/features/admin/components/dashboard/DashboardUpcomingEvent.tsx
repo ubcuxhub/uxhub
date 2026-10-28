@@ -123,10 +123,10 @@ export function DashboardUpcomingEvent({ event, rsvpCount, showStudentLink }: {
               </PopoverTrigger>
               <PopoverContent align="start" aria-label="View Event Page" className="w-48 p-1">
                 <nav aria-label="Event pages" className="flex flex-col">
-                  <Button asChild variant="ghost" className="justify-start">
+                  <Button asChild variant="ghost" className="justify-start text-small">
                     <Link href={`/events/${event.slug}`}>Marketing Page</Link>
                   </Button>
-                  <Button asChild variant="ghost" className="justify-start">
+                  <Button asChild variant="ghost" className="justify-start text-small">
                     <Link href={`/portal/events/${event.slug}`}>Sign-up Page</Link>
                   </Button>
                 </nav>

@@ -1,10 +1,10 @@
--- Live dashboard summaries. Explicitly authorize before reading as owner:
--- legacy check-in SELECT policies exclude managers even though they have
--- dashboard access. Return only aggregates, never source rows. A single JSON
--- object also avoids truncating totals at PostgREST's response row cap.
+-- Live dashboard summaries. Both functions explicitly authorize administrators
+-- and managers and return only aggregates. Membership analytics also retains
+-- the caller's RLS permissions. A single JSON object avoids truncating totals
+-- at PostgREST's response row cap.
 create function public.admin_membership_analytics(p_now timestamptz default now())
 returns jsonb
-language plpgsql stable security definer set search_path = ''
+language plpgsql stable security invoker set search_path = ''
 as $$
 declare result jsonb;
 begin
@@ -44,6 +44,10 @@ begin
 end;
 $$;
 
+-- Execute event reads as owner after the explicit admin guard: at 10,000
+-- registrations, repeating admin RLS checks per registration/check-in cost
+-- ~1.2s. The search path is fixed, there is no dynamic SQL, and only aggregate
+-- results are returned. Anonymous EXECUTE remains revoked below.
 create function public.admin_event_analytics(p_now timestamptz default now())
 returns jsonb
 language plpgsql stable security definer set search_path = ''
@@ -61,7 +65,7 @@ begin
   end if;
 
   with published as materialized (
-    select e.id, e.name, e.starts_at from public.events e
+    select e.id, e.name, e.starts_at, e.ends_at from public.events e
     where e.status = 'active' and e.starts_at is not null
       and (e.publish_at is null or e.publish_at <= p_now)
   ), registrations as (
@@ -89,7 +93,7 @@ begin
       'registrations', registrations, 'attendees', attendees
     ) order by starts_at, id) from summaries), '[]'::jsonb),
     'currentEvent', (select jsonb_build_object('id', id, 'name', name, 'registrations', registrations)
-      from summaries where starts_at > p_now order by starts_at, id limit 1),
+      from summaries where coalesce(ends_at, starts_at) > p_now order by starts_at, id limit 1),
     'schoolYearLabel', school_start_year::text || '–' || (school_start_year + 1)::text,
     'uniqueParticipants', (select count(distinct c.user_id)
       from checked_in c join published e on e.id = c.event_id

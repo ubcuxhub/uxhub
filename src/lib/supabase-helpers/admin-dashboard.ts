@@ -45,7 +45,8 @@ export type DashboardEvent = Pick<EventRow,
 export async function fetchNextDashboardEvent(db: DbClient, now: string): Promise<DashboardEvent | null> {
   const { data, error } = await db.from(TABLES.events)
     .select("id, name, slug, image_url, short_description, start_date, location_building, location_room, location_address_url, regular_price, member_price")
-    .eq("status", "active").gt("starts_at", now)
+    .eq("status", "active").not("starts_at", "is", null)
+    .or(`ends_at.gt.${now},and(ends_at.is.null,starts_at.gt.${now})`)
     .or(`publish_at.is.null,publish_at.lte.${now}`)
     .order("starts_at").order("id").limit(1).maybeSingle();
   if (error) throw error;

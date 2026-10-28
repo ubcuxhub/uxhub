@@ -33,7 +33,10 @@ confirmed registrations (`attending = true`) and distinct registered people
 with at least one non-null check-in timestamp in a session belonging to that
 event. Multiple check-in sessions never multiply a person's attendance.
 
-The current event is the next published event, matching the left-hand preview.
+The current event is the earliest-starting published event that has not ended,
+matching the left-hand preview. Events remain selected until their end timestamp;
+without one, the start timestamp is the cutoff. Selection advances at the exact
+cutoff when the dashboard next loads.
 The yearly total counts distinct checked-in people across events starting from
 September 1 (inclusive) through May 1 (exclusive) in `America/Vancouver`. From
 May through August the most recently completed school year remains selected.
@@ -51,7 +54,7 @@ on hover. Charts do not animate or auto-rotate.
 
 ## Deployment and verification
 
-Apply migrations through `20261027230344` to the hosted project before merging
+Apply migrations through `20261027230342` to the hosted project before merging
 or deploying this dashboard. Existing tables and checkout behavior are
 unchanged. No new table entries are needed in `TABLES`.
 

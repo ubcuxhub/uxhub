@@ -111,6 +111,72 @@ describe("admin dashboard analytics", () => {
     expect((await fetchEventAnalytics(clientAs(admin), "2201-09-01T07:00:00Z")).schoolYearLabel).toBe("2201–2202");
   }));
 
+  it("keeps ongoing events until their end and advances both selectors at the boundary", () => withFixtures(async (fixtures) => {
+    const admin = await fixtures.createUser({ role_access: "admin" });
+    const manager = await fixtures.createUser({ role_access: "manager" });
+    const start = "2300-10-01T12:00:00Z";
+    const end = "2300-10-01T14:00:00Z";
+    const overlapping = "2300-10-01T13:00:00Z";
+    const overlapEnd = "2300-10-01T15:00:00Z";
+    const nextStart = "2300-10-02T12:00:00Z";
+    const events = [];
+    for (const [i, variant] of [
+      { starts_at: start, ends_at: end },
+      { starts_at: overlapping, ends_at: overlapEnd },
+      { starts_at: nextStart, ends_at: null },
+    ].entries()) {
+      events.push(await fixtures.createEvent({ slug: `${fixtures.tag}-${i}`, status: "active", ...variant }));
+    }
+    const cases = [
+      ["2300-10-01T11:59:59Z", events[0].id],
+      [start, events[0].id],
+      [overlapping, events[0].id],
+      ["2300-10-01T13:59:59Z", events[0].id],
+      [end, events[1].id],
+      ["2300-10-01T14:30:00Z", events[1].id],
+      [overlapEnd, events[2].id],
+      ["2300-10-02T11:59:59Z", events[2].id],
+      [nextStart, null],
+      ["2300-10-02T13:00:00Z", null],
+    ] as const;
+    for (const user of [admin, manager]) {
+      const client = clientAs(user);
+      for (const [at, expectedId] of cases) {
+        expect((await fetchNextDashboardEvent(client, at))?.id ?? null).toBe(expectedId);
+        expect((await fetchEventAnalytics(client, at)).currentEvent?.id ?? null).toBe(expectedId);
+      }
+    }
+  }));
+
+  it("uses deterministic ordering and excludes ineligible ongoing events", () => withFixtures(async (fixtures) => {
+    const admin = await fixtures.createUser({ role_access: "admin" });
+    const client = clientAs(admin);
+    const at = "2300-10-01T13:00:00Z";
+    const starts_at = "2300-10-01T12:00:00Z";
+    const ends_at = "2300-10-01T14:00:00Z";
+    const ids: string[] = [];
+    const variants = [
+      { status: "active", publish_at: at },
+      { status: "active", publish_at: null },
+      { status: "draft" },
+      { status: "archived" },
+      { status: "active", publish_at: ends_at },
+      { status: "active", starts_at: null },
+    ] satisfies Parameters<typeof fixtures.createEvent>[0][];
+    for (const [i, variant] of variants.entries()) {
+      const event = await fixtures.createEvent({ slug: `${fixtures.tag}-${i}`, starts_at, ends_at, ...variant });
+      if (i < 2) ids.push(event.id);
+    }
+    ids.sort();
+    expect((await fetchNextDashboardEvent(client, at))?.id).toBe(ids[0]);
+    expect((await fetchEventAnalytics(client, at)).currentEvent?.id).toBe(ids[0]);
+    for (const id of ids) {
+      check((await fixtures.supabase.from("events").update({ status: "archived" }).eq("id", id)).error);
+    }
+    expect(await fetchNextDashboardEvent(client, at)).toBeNull();
+    expect((await fetchEventAnalytics(client, at)).currentEvent).toBeNull();
+  }));
+
   it("denies analytics to ordinary members and anonymous callers", () => withFixtures(async (fixtures) => {
     const member = await fixtures.createUser();
     for (const client of [clientAs(member), clientAs(null)]) {

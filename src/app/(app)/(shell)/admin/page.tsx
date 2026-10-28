@@ -1,7 +1,5 @@
 import { Suspense } from "react";
-import { Search } from "lucide-react";
 import { PageContainer } from "@/components/shared/PageContainer";
-import { Input } from "@/components/ui/input";
 import { requireAdmin } from "@/lib/auth/guards";
 import { DashboardQuickLinks } from "@/features/admin/components/dashboard/DashboardQuickLinks";
 import { DashboardActivityPlaceholder } from "@/features/admin/components/dashboard/DashboardActivityPlaceholder";
@@ -17,10 +15,6 @@ export default async function AdminDashboard() {
         <div className="space-y-2">
           <h1 className="text-h1">Dashboard</h1>
           <p className="text-fg-secondary">View events, users, and statistics at a glance.</p>
-        </div>
-        <div className="relative w-full lg:w-2/5">
-          <Search aria-hidden="true" className="absolute top-3 left-3 size-4 text-fg-muted" />
-          <Input disabled aria-label="Dashboard search (coming soon)" placeholder="What are you searching for?" title="Search coming soon" className="h-10 rounded-full pl-10 text-small" />
         </div>
       </header>
       <div className="grid items-start gap-[30px] lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
