@@ -925,6 +925,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_event_analytics: { Args: { p_now?: string }; Returns: Json }
+      admin_membership_analytics: { Args: { p_now?: string }; Returns: Json }
       backfill_event_tickets_and_applications: {
         Args: Record<PropertyKey, never>
         Returns: undefined
