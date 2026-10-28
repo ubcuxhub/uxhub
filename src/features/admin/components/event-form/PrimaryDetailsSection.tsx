@@ -4,7 +4,6 @@ import { ImageUpload } from "@/components/shared/ImageUpload";
 import {
   Field,
   FieldGroup,
-  FieldDescription,
   FieldLabel,
   FieldLegend,
   FieldSet,
@@ -20,6 +19,9 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { PublicationPicker } from "./PublicationPicker";
+import { EventSchedule } from "./EventSchedule";
+import { RegistrationTimes } from "./RegistrationTimes";
 import {
   isFreePricing,
   type EventFormState,
@@ -84,21 +86,11 @@ export function PrimaryDetailsSection({
               </SelectContent>
             </Select>
           </Field>
-          <Field>
-            <FieldLabel htmlFor="publish_at">Publish Date &amp; Time (Pacific)</FieldLabel>
-            <Input
-              id="publish_at"
-              type="datetime-local"
-              value={formState.publish_at}
-              onChange={(event) => onFieldChange("publish_at", event.target.value)}
-              aria-describedby="publish_at_description"
-              disabled={isSubmitting || formState.status !== "draft"}
-            />
-            <FieldDescription id="publish_at_description">
-              Only Draft events can be scheduled. The event will automatically
-              become Active at this time. Leave empty to keep it in Draft.
-            </FieldDescription>
-          </Field>
+          <PublicationPicker
+            value={formState.publish_at}
+            onChange={(value) => onFieldChange("publish_at", value)}
+            disabled={isSubmitting || formState.status !== "draft"}
+          />
           <Field>
             <FieldLabel htmlFor="event_type">Event Type</FieldLabel>
             <Select
@@ -181,56 +173,13 @@ export function PrimaryDetailsSection({
               required
             />
           </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field>
-              <FieldLabel htmlFor="start_date">Start Date {required}</FieldLabel>
-              <Input
-                id="start_date"
-                type="date"
-                value={formState.start_date}
-                onChange={(event) =>
-                  onFieldChange("start_date", event.target.value)
-                }
-                required
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="start_time">Start Time {required}</FieldLabel>
-              <Input
-                id="start_time"
-                type="time"
-                value={formState.start_time}
-                onChange={(event) =>
-                  onFieldChange("start_time", event.target.value)
-                }
-                required
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="end_date">End Date {required}</FieldLabel>
-              <Input
-                id="end_date"
-                type="date"
-                value={formState.end_date}
-                onChange={(event) =>
-                  onFieldChange("end_date", event.target.value)
-                }
-                required
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="end_time">End Time {required}</FieldLabel>
-              <Input
-                id="end_time"
-                type="time"
-                value={formState.end_time}
-                onChange={(event) =>
-                  onFieldChange("end_time", event.target.value)
-                }
-                required
-              />
-            </Field>
-          </div>
+          <EventSchedule
+            start_date={formState.start_date}
+            start_time={formState.start_time}
+            end_date={formState.end_date}
+            end_time={formState.end_time}
+            onFieldChange={onFieldChange}
+          />
           <div className="grid gap-4 sm:grid-cols-2">
             <Field>
               <FieldLabel htmlFor="location_building">Location Building</FieldLabel>
@@ -266,34 +215,11 @@ export function PrimaryDetailsSection({
               }
             />
           </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field>
-              <FieldLabel htmlFor="registration_start_time">
-                Registration Opens
-              </FieldLabel>
-              <Input
-                id="registration_start_time"
-                type="datetime-local"
-                value={formState.registration_start_time}
-                onChange={(event) =>
-                  onFieldChange("registration_start_time", event.target.value)
-                }
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="registration_end_time">
-                Registration Closes
-              </FieldLabel>
-              <Input
-                id="registration_end_time"
-                type="datetime-local"
-                value={formState.registration_end_time}
-                onChange={(event) =>
-                  onFieldChange("registration_end_time", event.target.value)
-                }
-              />
-            </Field>
-          </div>
+          <RegistrationTimes
+            registration_start_time={formState.registration_start_time}
+            registration_end_time={formState.registration_end_time}
+            onFieldChange={onFieldChange}
+          />
           <Field>
             <FieldLabel htmlFor="short_description">
               Short Description {required}

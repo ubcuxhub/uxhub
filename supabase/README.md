@@ -273,6 +273,58 @@ strings the compiler cannot validate. A rename here breaks silently at runtime:
 
 ## Migration guidelines
 
+### Publication watchdog
+
+The publication watchdog migration creates private state and a conditional
+`check-event-publication` job. No application role has access to this schema.
+Publication continues without notification configuration, but each health-check
+attempt records `configuration_missing` until configuration is supplied.
+
+Deploy the `/api/internal/event-publication` endpoint and configure a random,
+dedicated `EVENT_PUBLICATION_HEALTH_SECRET` in the server environment. In the
+hosted SQL editor, store the same value in Vault under
+`event_publication_health_secret`, and the full production HTTPS endpoint URL
+under `event_publication_health_url`. Use Vault's secret creation/update UI or
+parameterized SQL; do not commit values. Sentry's DSN must also be configured
+for alerts. Set these up before allowing a production monitoring window to run.
+Preview/local databases must never point to the production notification URL.
+
+Requests use a SHA-256 HMAC over `event-publication:<unix-seconds>`, passed in
+`x-publication-signature`, with the timestamp in `x-publication-timestamp`.
+The endpoint accepts signatures within five minutes of server time. This keeps
+the shared secret out of pg_net's database-readable request queue. See the
+[Supabase queue credential guidance](https://supabase.com/kb/troubleshooting/database-roles-can-read-request-headers-queued-by-pg_net).
+
+Before pushing, inspect `supabase_migrations.schema_migrations` and count legacy
+scheduled rows (`status = 'active' and publish_at > now()`). The unapplied
+activation migration preserves those rows as scheduled drafts. Apply migrations
+before merging; the watchdog has no dependency on the new endpoint until its
+notification secrets are configured.
+
+Inspect bounded attempts and HTTP delivery from a privileged SQL connection:
+
+```sql
+select w.event_id, w.publish_at, w.expected_run_at, w.attempts,
+       w.next_check_at, w.last_delivery_status, w.last_response_status,
+       request.id as request_id, r.status_code, r.timed_out
+from event_publication.watchdog w
+left join lateral unnest(w.request_ids) request(id) on true
+left join net._http_response r on r.id = request.id;
+```
+
+Three attempts with `next_check_at is null` means monitoring is exhausted.
+`last_delivery_status` captures configuration/enqueue outcomes and
+`last_response_status` captures responses observed by later checks; the final
+response is read using the query above. pg_net
+responses expire according to `pg_net.ttl` (six hours by default). Ordinary edits
+and publisher retries cannot restart exhausted windows. Correct the delivery
+configuration and deliberately change the event's publication date to rearm it.
+Use a non-sensitive test draft to verify an overdue alert reaches Sentry after
+deployment; local tests cover scheduling and authentication without sending
+external HTTP requests.
+
+### General rules
+
 - Create new migrations; never edit applied ones.
 - Keep migrations small and one-purpose with descriptive names.
 - For breaking changes, prefer a compatibility path: add the new column,

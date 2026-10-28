@@ -1,14 +1,18 @@
 -- Scheduling changes the stored status; public visibility depends only on active.
 create extension if not exists pg_cron with schema pg_catalog;
 
+-- Preserve schedules from the old visibility-based model before making all
+-- Active events public. This migration has not been applied to the hosted DB.
+update public.events set status = 'draft'
+  where status = 'active' and publish_at > now();
+
 create or replace function public.event_is_public(p_status public.event_status, p_publish_at timestamptz)
 returns boolean
 language sql stable set search_path = '' as $$
   select p_status = 'active'::public.event_status;
 $$;
 
--- Active events are public immediately, including any scheduled under the old
--- visibility-based behavior. Only drafts retain pending publishing schedules.
+-- Only drafts retain pending publishing schedules.
 update public.events set publish_at = null where status <> 'draft' and publish_at is not null;
 
 create function public.guard_event_publish_schedule()

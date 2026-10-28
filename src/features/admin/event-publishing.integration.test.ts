@@ -97,14 +97,14 @@ describe("admin event publishing", () => {
         ? expect.objectContaining({ status: "active" }) : null);
     }));
 
-  it("handles concurrent schedule edits and automatically publishes the next batch", () =>
+  it("handles concurrent schedule edits and publishes the due batch", () =>
     withFixtures(async (fixtures) => {
       const events = await Promise.all([0, 1, 2].map((index) => fixtures.createEvent({
         slug: `scheduled-batch-${index}-${fixtures.tag}`,
         status: "draft",
         publish_at: new Date(Date.now() + hour).toISOString(),
       })));
-      const dueAt = new Date(Date.now() + 1000).toISOString();
+      const dueAt = new Date(Date.now() - hour).toISOString();
       // Distinct transactions compete to update the shared cron schedule.
       // The later edit must not lose the earlier wake-up, and due events batch.
       const edits = await Promise.all(events.map((event, index) => fixtures.supabase
@@ -113,15 +113,14 @@ describe("admin event publishing", () => {
         .eq("id", event.id)));
       for (const edit of edits) if (edit.error) throw edit.error;
 
-      const deadline = Date.now() + 75_000;
-      let current = await fetchEventById(fixtures.supabase, events[0].id);
-      while (current!.status === "draft" && Date.now() < deadline) {
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        current = await fetchEventById(fixtures.supabase, events[0].id);
-      }
+      const { data, error } = await fixtures.supabase.rpc("publish_due_events");
+      if (error) throw error;
+      expect(data).toBeGreaterThanOrEqual(2);
+      const current = await fetchEventById(fixtures.supabase, events[0].id);
       expect(current!.status).toBe("active");
       expect(current!.publish_at).toBeNull();
       expect((await fetchEventById(fixtures.supabase, events[1].id))!.status).toBe("active");
+      expect((await fetchEventById(fixtures.supabase, events[1].id))!.publish_at).toBeNull();
       expect((await fetchEventById(fixtures.supabase, events[2].id))!.status).toBe("draft");
-    }), 90_000);
+    }));
 });

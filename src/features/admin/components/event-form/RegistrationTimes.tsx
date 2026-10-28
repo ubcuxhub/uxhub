@@ -121,6 +121,7 @@ const RegistrationDateTimeField = ({
             <Calendar
               mode="single"
               selected={selectedDate}
+              defaultMonth={selectedDate}
               disabled={minDate ? { before: minDate } : undefined}
               onSelect={(newDate) => {
                 if (!newDate) return;
@@ -143,6 +144,11 @@ const RegistrationDateTimeField = ({
           className="sm:w-32"
         />
       </div>
+      {value && (
+        <Button type="button" variant="ghost" className="w-fit" onClick={() => onChange("")}>
+          Clear {label.toLowerCase()}
+        </Button>
+      )}
     </Field>
   );
 };
@@ -169,13 +175,13 @@ export const RegistrationTimes = ({
     <FieldGroup className="grid gap-4 md:grid-cols-2">
       <RegistrationDateTimeField
         id="registration_start_time"
-        label="Registration Start Time"
+        label="Registration Opens"
         value={registration_start_time}
         onChange={(value) => onFieldChange("registration_start_time", value)}
       />
       <RegistrationDateTimeField
         id="registration_end_time"
-        label="Registration End Time"
+        label="Registration Closes"
         value={registration_end_time}
         minDate={startDate}
         minTime={minEndTime}

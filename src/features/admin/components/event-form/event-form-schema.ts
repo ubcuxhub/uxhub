@@ -177,8 +177,19 @@ export function validateEventForm(
     Date.parse(datetimeLocalToTimestamptz(formState.publish_at)!) <= Date.now()
   )
     error = "Publish date must be in the future.";
+  else if (
+    !formState.start_date || !formState.start_time ||
+    !formState.end_date || !formState.end_time
+  )
+    error = "Event start and end dates and times are required.";
   else if (isEventScheduleRangeInvalid(formState))
     error = "Event end time must be after the start time.";
+  else if (
+    [formState.registration_start_time, formState.registration_end_time].some(
+      (value) => value && !datetimeLocalToTimestamptz(value)
+    )
+  )
+    error = "Registration dates require both a date and time.";
   else if (
     isDateTimeRangeInvalid(
       formState.registration_start_time,

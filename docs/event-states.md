@@ -42,6 +42,29 @@ there is no separate cleanup timer. Cron has no year field, so the timestamp
 predicate prevents an event scheduled more than a year away from publishing
 early if its calendar schedule fires in an earlier year.
 
+Each pending schedule also arms a bounded health watchdog. One shared job wakes
+five minutes after the expected publication run, then at five-minute intervals
+for at most three notification attempts per event schedule. Publication success,
+cancellation, deletion or manual status changes remove its window. Changing the
+publication date starts a new window; ordinary edits and publication retries do
+not reset the budget. Exhaustion removes its pending checks but does not stop
+publication retries or recovery. No five-minute polling job runs while idle.
+
+The watchdog uses `pg_net` to POST a timestamp and HMAC signature to
+`/api/internal/event-publication`. This endpoint independently counts drafts
+overdue by at least five minutes and reports `event.publication_overdue` through
+the existing server logger to Sentry. Queued requests contain no shared secret
+or event data. HTTP delivery is asynchronous; later checks inspect previous
+responses. The final request remains inspectable through its recorded request
+ID and `net._http_response` (subject to pg_net response retention).
+
+Monitoring shares database availability: it cannot alert during a complete
+database outage. Missed checks resume after the database returns. An unavailable
+endpoint consumes the same three-attempt budget; exhausted windows remain in
+the private `event_publication.watchdog` table until resolved or rescheduled.
+See [watchdog setup](../supabase/README.md#publication-watchdog) before enabling
+notifications in production.
+
 Public visibility depends only on Active status. The admin list reflects the
 stored status when refreshed. Public marketing pages retain their existing
 five-minute cache revalidation.
