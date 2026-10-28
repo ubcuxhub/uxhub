@@ -5,10 +5,8 @@ import type { TicketEvent } from "@/features/events/types";
 type TicketEventSource = Pick<
   EventRow,
   | "name"
-  | "start_date"
-  | "end_date"
-  | "start_time"
-  | "end_time"
+  | "starts_at"
+  | "ends_at"
   | "location_building"
   | "location_room"
 >;
@@ -26,12 +24,12 @@ export function toTicketEvent(event: TicketEventSource): TicketEvent {
   return {
     name: event.name,
     date: range(
-      formatEventDate(event.start_date),
-      formatEventDate(event.end_date)
+      formatEventDate(event.starts_at),
+      formatEventDate(event.ends_at)
     ),
     time: range(
-      formatEventTime(event.start_time),
-      formatEventTime(event.end_time)
+      formatEventTime(event.starts_at),
+      formatEventTime(event.ends_at)
     ),
     location: location || null,
   };

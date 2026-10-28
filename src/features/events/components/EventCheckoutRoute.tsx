@@ -8,6 +8,7 @@ import { fetchUserEventApplication } from "@/lib/supabase-helpers/event-applicat
 import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
 import { fetchUserEventTicket } from "@/lib/supabase-helpers/event-tickets";
 import { withReturnTo } from "@/lib/auth/paths";
+import { formatEventDate } from "@/lib/date";
 import { formatReservationFailure } from "@/features/payments/fulfillment-rules";
 import type { EventApplicationRow } from "@/lib/supabase/models";
 
@@ -33,15 +34,6 @@ function getCheckoutBlock(
   return expiresAt > now ? null : formatReservationFailure("OFFER_EXPIRED");
 }
 
-function formatDate(date: string | null) {
-  return date
-    ? new Date(date).toLocaleDateString("en-CA", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      })
-    : null;
-}
 
 export async function EventCheckoutRoute({
   returnTo,
@@ -78,7 +70,7 @@ export async function EventCheckoutRoute({
     <EventCheckout
       disabledMessage={disabledMessage}
       event={event}
-      formattedDate={formatDate(event.start_date)}
+      formattedDate={formatEventDate(event.starts_at)}
       returnTo={returnTo}
       slug={event.slug ?? slug}
       user={user}

@@ -235,16 +235,10 @@ export function CheckInManager({
                           Date & Time
                         </p>
                         <p className="text-base">
-                          {formatEventDate(event.start_date, {
-                            month: "short",
-                          })
-                            ? `${formatEventDate(event.start_date, {
+                          {event.starts_at
+                            ? `${formatEventDate(event.starts_at, {
                                 month: "short",
-                              })}${
-                                event.start_time
-                                  ? ` at ${formatEventTime(event.start_time)}`
-                                  : ""
-                              }`
+                              })} at ${formatEventTime(event.starts_at)}`
                             : "TBD"}
                         </p>
                       </div>

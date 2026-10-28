@@ -27,11 +27,11 @@ export default async function AdminEventsPage() {
 
   const now = new Date();
   const rows: AdminEventTableRow[] = events.map((event) => {
-    const registrationStart = event.registration_start_time
-      ? new Date(event.registration_start_time)
+    const registrationStart = event.registration_opens_at
+      ? new Date(event.registration_opens_at)
       : null;
-    const registrationEnd = event.registration_end_time
-      ? new Date(event.registration_end_time)
+    const registrationEnd = event.registration_closes_at
+      ? new Date(event.registration_closes_at)
       : null;
 
     return {

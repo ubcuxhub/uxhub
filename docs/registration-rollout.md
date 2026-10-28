@@ -10,7 +10,7 @@ must work with the code that is live when it is pushed.
 | Step | Change | Status |
 | --- | --- | --- |
 | [1. Add](#1-add) | New schema beside the old | Done (`20261015000005`–`10`) |
-| [2. Move the code](#2-move-the-code) | Code uses only the new schema | In progress: PR A open, PR B next |
+| [2. Move the code](#2-move-the-code) | Code uses only the new schema | In progress: PR A and PR B open |
 | [3. Remove](#3-remove) | Drop the legacy schema | After step 2 is live |
 
 These migrations were first numbered `20270101000001`–`10`, a future date,
@@ -98,6 +98,41 @@ Registrations written by the old code between this migration's push and PR A's
 deploy are not backfilled; step 3 runs the backfill once more before dropping
 anything.
 
+### PR B: event dates, `requires_application`, Archived
+
+`20261028235900_drop_legacy_registration_defaults` runs first. It drops the
+`now()` and `now() + 7 days` defaults from `registration_start_time` and
+`registration_end_time`. On insert, `sync_legacy_event_columns` copies those
+into `registration_opens_at` and `registration_closes_at` when they're null,
+so without it an event created with no registration window (always open)
+would close a week after creation. PR A's form always sends both legacy keys,
+so the defaults never applied to it.
+
+Then the code:
+
+- **Admin event form** edits `starts_at`, `ends_at`, `registration_opens_at`
+  and `registration_closes_at` as Pacific wall-clock values and converts them
+  for storage. It sends `save_admin_event_atomically` only those keys,
+  `requires_application` and `publish_at`; the legacy columns keep whatever
+  they held. A create-form draft saved under the old field names drops them on
+  restore.
+- **Archived** is no longer offered. An already-archived event shows it,
+  disabled, until the admin picks another status.
+- **Readers** use the new columns: the portal timeline and event page, the
+  marketing `/events` pages, checkout, tickets, the receipt email, the admin
+  events table and check-in header, purchase history. Dates and times are
+  formatted in Pacific time. `fetchEvents` orders by `starts_at`.
+- **Timeline:** an event moves from upcoming to past once `ends_at` passes
+  (`starts_at` when there's no end), not at the end of its day.
+- **Seed** writes `starts_at` and `ends_at` from the same Vancouver
+  wall-clock times on the same relative dates, and the same registration
+  windows under their new names. Legacy columns stay null on seed rows.
+
+The legacy date columns, `applications_enabled` and the Archived status are
+still in the schema and the generated types until step 3. The only code left
+that names them is the `legacy event column sync` integration test, which
+covers the trigger PR A's deployed code depends on.
+
 ## 3. Remove
 
 Push once step 2's code is live.
@@ -105,6 +140,16 @@ Push once step 2's code is live.
 - **Backfill once more:** `backfill_event_tickets_and_applications()` picks up
   registrations the old code wrote before step 2 deployed. Run it before
   dropping anything.
+- **Policies on legacy columns:** "application questions: applicants read"
+  on `event_application_questions` still checks `registration_start_time`,
+  `registration_end_time` and `event_registrations`. After PR B those windows
+  are stale or null, but only admins read questions today. Rewrite it on
+  `registration_opens_at`, `registration_closes_at` and `event_applications`
+  before dropping the columns, or the drop fails (or `cascade` silently
+  removes it).
+- **Code:** delete the `legacy event column sync` test in
+  `ticket-reservation.integration.test.ts`, regenerate the types, and drop the
+  `as Partial<EventRow>` cast in `AdminEventsTable.test.tsx`.
 - **`event_status`:** archived events that have ended become `active` (keeping
   members' history), the rest `draft`. Then recreate the enum without
   `archived`.

@@ -532,7 +532,6 @@ async function main(): Promise<void> {
         image_url: seedImageUrl(supabase, BUCKET.eventImages.id, seed.imageKey),
         mentors_enabled: Boolean(seed.mentors?.length),
         sponsors_enabled: Boolean(seed.sponsors?.length),
-        applications_enabled: seed.applicationQuestions.length > 0,
         requires_application: seed.applicationQuestions.length > 0,
       })),
       options

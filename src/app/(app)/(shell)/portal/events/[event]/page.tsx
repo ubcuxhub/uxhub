@@ -9,7 +9,7 @@ import { FLAGS } from "@/lib/flags";
 import { createClient } from "@/lib/supabase/server";
 import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
 import { Calendar, MapPin } from "lucide-react";
-import { formatEventDate, formatEventTime } from "@/lib/date";
+import { formatEventDate, formatEventTime, pacificDate } from "@/lib/date";
 
 interface PortalEventPageProps {
   params: Promise<{ event: string }>;
@@ -31,8 +31,10 @@ export default async function PortalEventPage({
     notFound();
   }
 
-  const startTime = formatEventTime(event.start_time);
-  const endTime = formatEventTime(event.end_time);
+  const startTime = formatEventTime(event.starts_at);
+  const endTime = formatEventTime(event.ends_at);
+  const endsOnLaterDay =
+    event.ends_at && pacificDate(event.ends_at) !== pacificDate(event.starts_at);
   const location = [event.location_building, event.location_room]
     .filter(Boolean)
     .join(", ");
@@ -49,10 +51,8 @@ export default async function PortalEventPage({
         <Calendar className="mt-0.5 text-muted-foreground" />
         <div>
           <p className="font-medium">
-            {formatEventDate(event.start_date) ?? "TBD"}
-            {event.end_date && event.end_date !== event.start_date
-              ? ` – ${formatEventDate(event.end_date)}`
-              : ""}
+            {formatEventDate(event.starts_at) ?? "TBD"}
+            {endsOnLaterDay ? ` – ${formatEventDate(event.ends_at)}` : ""}
           </p>
           {startTime && (
             <p className="text-muted-foreground">

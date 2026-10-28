@@ -291,7 +291,7 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
   }
 
   const historicalPurchaseTime = (event: SeedEvent) => {
-    const registrationStart = event.event.registration_start_time;
+    const registrationStart = event.event.registration_opens_at;
     if (!registrationStart) throw new Error(`Event "${event.event.slug}" has no registration start`);
     return afterTimestamp(registrationStart, 24 * 60);
   };

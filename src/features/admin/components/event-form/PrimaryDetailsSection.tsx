@@ -81,7 +81,14 @@ export function PrimaryDetailsSection({
                 <SelectGroup>
                   <SelectItem value="draft">Draft</SelectItem>
                   <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="archived">Archived</SelectItem>
+                  {/* Archiving is going away (docs/registration-rollout.md).
+                      An event archived before then still shows its status,
+                      but nothing else can be moved to it. */}
+                  {formState.status === "archived" && (
+                    <SelectItem value="archived" disabled>
+                      Archived
+                    </SelectItem>
+                  )}
                 </SelectGroup>
               </SelectContent>
             </Select>
@@ -174,10 +181,8 @@ export function PrimaryDetailsSection({
             />
           </Field>
           <EventSchedule
-            start_date={formState.start_date}
-            start_time={formState.start_time}
-            end_date={formState.end_date}
-            end_time={formState.end_time}
+            starts_at={formState.starts_at}
+            ends_at={formState.ends_at}
             onFieldChange={onFieldChange}
           />
           <div className="grid gap-4 sm:grid-cols-2">
@@ -216,8 +221,8 @@ export function PrimaryDetailsSection({
             />
           </Field>
           <RegistrationTimes
-            registration_start_time={formState.registration_start_time}
-            registration_end_time={formState.registration_end_time}
+            registration_opens_at={formState.registration_opens_at}
+            registration_closes_at={formState.registration_closes_at}
             onFieldChange={onFieldChange}
           />
           <Field>

@@ -43,11 +43,11 @@ interface AgendaItem {
 
 function getRegistrationStatus(event: EventRow) {
   const now = new Date();
-  const regStart = event.registration_start_time
-    ? new Date(event.registration_start_time)
+  const regStart = event.registration_opens_at
+    ? new Date(event.registration_opens_at)
     : null;
-  const regEnd = event.registration_end_time
-    ? new Date(event.registration_end_time)
+  const regEnd = event.registration_closes_at
+    ? new Date(event.registration_closes_at)
     : null;
   if (regStart && now < regStart) return "upcoming";
   if (regEnd && now > regEnd) return "closed";
@@ -107,11 +107,11 @@ export default async function EventDetailPage({
     event.member_price !== undefined &&
     Number(event.member_price) !== Number(event.regular_price);
 
-  const startDateFormatted = formatEventDate(event.start_date, {
+  const startDateFormatted = formatEventDate(event.starts_at, {
     weekday: "long",
   });
-  const startTimeFormatted = formatEventTime(event.start_time);
-  const endTimeFormatted = formatEventTime(event.end_time);
+  const startTimeFormatted = formatEventTime(event.starts_at);
+  const endTimeFormatted = formatEventTime(event.ends_at);
   const locationDisplay = [event.location_building, event.location_room]
     .filter(Boolean)
     .join(", ");

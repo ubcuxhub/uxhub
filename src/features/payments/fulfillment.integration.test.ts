@@ -219,7 +219,7 @@ describe("event ticket checkout", () => {
 
   it("sells an application event only on an accepted, unexpired offer", () =>
     withFixtures(async (fixtures) => {
-      const event = await fixtures.createEvent({ status: "active", applications_enabled: true });
+      const event = await fixtures.createEvent({ status: "active", requires_application: true });
       const user = await buyer(fixtures);
 
       await expect(

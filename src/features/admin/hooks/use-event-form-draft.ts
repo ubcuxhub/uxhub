@@ -12,6 +12,17 @@ import {
 
 const EVENT_FORM_STORAGE_KEY = "event_create_form_draft";
 
+// A draft saved before a field was renamed still holds the old key; keep only
+// the fields this form has, so a stale one can't reach the save payload.
+function restoreFormState(saved: unknown): EventFormState {
+  const initial = getInitialFormState();
+  if (!saved || typeof saved !== "object") return initial;
+  const known = Object.fromEntries(
+    Object.entries(saved).filter(([key]) => key in initial)
+  );
+  return { ...initial, ...known };
+}
+
 interface UseEventFormDraftOptions {
   eventId?: string;
   formState: EventFormState;
@@ -55,10 +66,7 @@ export function useEventFormDraft({
       if (saved) {
         const parsed = JSON.parse(saved);
         queueMicrotask(() => {
-          setFormState({
-            ...getInitialFormState(),
-            ...parsed.formState,
-          });
+          setFormState(restoreFormState(parsed.formState));
           setCheckInEvents(
             parsed.checkInEvents ?? [
               { name: "", start_time: "", end_time: "" },

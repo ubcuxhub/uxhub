@@ -15,8 +15,8 @@ export interface UserFixtureTotals {
 export type SeedEventPhase = "past" | "ongoing" | "upcoming";
 
 export function classifySeedEvent(event: SeedEvent, now: Date): SeedEventPhase {
-  const start = new Date(`${event.event.start_date}T00:00:00.000Z`).getTime();
-  const end = new Date(`${event.event.end_date}T23:59:59.999Z`).getTime();
+  const start = new Date(event.event.starts_at!).getTime();
+  const end = new Date(event.event.ends_at!).getTime();
   const current = now.getTime();
 
   if (start <= current && current <= end) return "ongoing";
