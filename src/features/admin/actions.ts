@@ -235,6 +235,24 @@ export async function saveAdminEventAction(
 ): Promise<{ id: string }> {
   await requireAdmin();
 
+  if (
+    input.event.publish_at != null &&
+    (typeof input.event.publish_at !== "string" ||
+      !/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(input.event.publish_at) ||
+      !Number.isFinite(Date.parse(input.event.publish_at)))
+  ) {
+    throw new Error("Publish date must be a valid timestamp with a timezone.");
+  }
+
+  if (input.event.publish_at != null) {
+    if (input.event.status !== "draft") {
+      throw new Error("Only draft events can have a publish date.");
+    }
+    if (Date.parse(input.event.publish_at) <= Date.now()) {
+      throw new Error("Publish date must be in the future.");
+    }
+  }
+
   let slug: string | null = null;
 
   if (!input.eventId) {
@@ -283,6 +301,7 @@ export async function saveAdminEventAction(
 
   revalidatePath("/admin/events");
   revalidatePath(`/admin/events/${data.id}`);
+  revalidatePath("/events", "layout");
   return { id: data.id };
 }
 

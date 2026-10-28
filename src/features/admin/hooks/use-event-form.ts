@@ -54,6 +54,7 @@ function formStateFromEvent(event: EventRow): EventFormState {
     short_description: event.short_description ?? "",
     description: event.description ?? "",
     status: event.status,
+    publish_at: timestamptzToDatetimeLocal(event.publish_at),
     event_type: event.event_type,
     regular_price: String(event.regular_price ?? ""),
     member_price: String(event.member_price ?? ""),
@@ -207,7 +208,11 @@ export function useEventForm({
   ) => {
     resetSuccessMessage();
     questions.setQuestionErrors({});
-    setFormState((current) => ({ ...current, [field]: value }));
+    setFormState((current) => ({
+      ...current,
+      [field]: value,
+      ...(field === "status" && value !== "draft" ? { publish_at: "" } : {}),
+    }));
   };
 
   const updateCheckInEvent = (
@@ -327,6 +332,9 @@ export function useEventForm({
         short_description: formState.short_description || null,
         description: formState.description,
         status: formState.status,
+        publish_at: formState.status === "draft"
+          ? datetimeLocalToTimestamptz(formState.publish_at)
+          : null,
         event_type: formState.event_type,
         mentors_enabled: formState.mentors_enabled,
         sponsors_enabled: formState.sponsors_enabled,
