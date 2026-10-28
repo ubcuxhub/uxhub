@@ -28,7 +28,7 @@ const dateFormatter = new Intl.DateTimeFormat("en-CA", {
 
 export function DashboardEventsChart({ data }: { data: EventAnalytics | null }) {
   const total = data?.events.length ?? 0;
-  const { window, chartRef, onKeyDown, pan, zoom, reset } = useChartWindow(total);
+  const { window, onKeyDown, pan, zoom, reset } = useChartWindow(total);
 
   if (!data) {
     return (
@@ -59,7 +59,7 @@ export function DashboardEventsChart({ data }: { data: EventAnalytics | null }) 
         </div>
       </div>
       {total === 0 ? <p className="py-20 text-center text-small text-fg-secondary">No published events to show.</p> : <>
-        <div ref={chartRef} tabIndex={0} role="group" aria-label="Event registration and attendance chart" aria-describedby="event-chart-help"
+        <div tabIndex={0} role="group" aria-label="Event registration and attendance chart" aria-describedby="event-chart-help"
           className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           onKeyDown={onKeyDown}>
           <ChartContainer config={config} className="h-64 w-full aspect-auto">
@@ -104,7 +104,7 @@ export function DashboardEventsChart({ data }: { data: EventAnalytics | null }) 
           </div>
         </div>
         <p aria-live="polite" className="text-label text-fg-secondary">Events {window.start + 1}–{window.start + window.size} of {total}</p>
-        <p id="event-chart-help" className="text-label text-fg-secondary">Scroll over the chart to zoom. Focus the chart and use ← / → to explore events.</p>
+        <p id="event-chart-help" className="text-label text-fg-secondary">Use the buttons to zoom. Focus the chart and use ← / → to explore events.</p>
         <details className="text-small">
           <summary className="cursor-pointer text-fg-secondary">View chart data</summary>
           <ul className="mt-2 space-y-2">

@@ -43,11 +43,9 @@ May through August the most recently completed school year remains selected.
 Retained records belonging to deleted accounts remain in these historical
 totals.
 
-The chart starts on the latest six events. Wheel input over the chart changes
-the visible event count around the pointer; page scrolling resumes when that
-zoom direction reaches its limit. Ctrl/Meta-wheel remains available for browser
-zoom. Left/right keys pan only while the chart surface has focus.
-Visible controls provide equivalent zoom, pan and reset actions. Carousel
+The chart starts on the latest six events. Wheel input over the chart retains
+normal page scrolling and browser zoom. Left/right keys pan only while the
+chart surface has focus. Visible controls provide zoom, pan and reset actions. Carousel
 changes preserve the chart range, and chart navigation does not change slides.
 The expandable data list provides full names, dates and counts without relying
 on hover. Charts do not animate or auto-rotate.

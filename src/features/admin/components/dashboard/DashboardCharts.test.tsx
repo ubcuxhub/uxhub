@@ -39,12 +39,10 @@ describe("statistics carousel and event chart", () => {
     expect(screen.getByText("Events 3–8 of 8")).toBeTruthy();
   });
 
-  it("zooms with the wheel, scopes keyboard navigation, and bounds visible controls", () => {
+  it("zooms with buttons, scopes keyboard navigation, and bounds visible controls", () => {
     render(<DashboardStatsCarousel members={members} events={events} />);
     fireEvent.click(screen.getByRole("button", { name: "Show events statistics" }));
-    const chart = screen.getByRole("group", { name: "Event registration and attendance chart" });
-    vi.spyOn(performance, "now").mockReturnValue(1000);
-    fireEvent.wheel(chart, { deltaY: -100 });
+    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
     expect(screen.getByText("Events 4–8 of 8")).toBeTruthy();
     fireEvent.keyDown(screen.getByRole("region", { name: "Dashboard statistics" }), { key: "ArrowLeft" });
     expect(screen.getByText("Events 4–8 of 8")).toBeTruthy();
@@ -67,38 +65,30 @@ describe("statistics carousel and event chart", () => {
     expect(screen.queryByText("No active members")).toBeNull();
   });
 
-  it("allows page scrolling at either zoom limit and still zooms in the other direction", () => {
+  it("leaves wheel input untouched at the initial range, while zoomed, and at both limits", () => {
     render(<DashboardStatsCarousel members={members} events={events} />);
     fireEvent.click(screen.getByRole("button", { name: "Show events statistics" }));
     const chart = screen.getByRole("group", { name: "Event registration and attendance chart" });
-    vi.spyOn(performance, "now").mockReturnValue(1000);
-
-    for (let i = 0; i < events.events.length; i++) {
-      fireEvent.click(screen.getByRole("button", { name: "Zoom out" }));
-    }
-    const atMaximum = createEvent.wheel(chart, { deltaY: 100, cancelable: true });
-    fireEvent(chart, atMaximum);
-    expect(atMaximum.defaultPrevented).toBe(false);
-    expect(screen.getByText("Events 1–8 of 8")).toBeTruthy();
-
-    const zoomIn = createEvent.wheel(chart, { deltaY: -100, cancelable: true });
-    fireEvent(chart, zoomIn);
-    expect(zoomIn.defaultPrevented).toBe(true);
-    expect(screen.getByText("Events 2–8 of 8")).toBeTruthy();
-
+    const assertWheelUnchanged = (range: string) => {
+      for (const deltaY of [-100, -1, 1, 100]) {
+        const wheel = createEvent.wheel(chart, { deltaY, cancelable: true });
+        fireEvent(chart, wheel);
+        expect(wheel.defaultPrevented).toBe(false);
+        expect(screen.getByText(range)).toBeTruthy();
+      }
+    };
+    assertWheelUnchanged("Events 3–8 of 8");
+    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+    assertWheelUnchanged("Events 4–8 of 8");
     for (let i = 0; i < events.events.length; i++) {
       fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
     }
-    // A limit must release scrolling even while the zoom throttle is active.
-    const atMinimum = createEvent.wheel(chart, { deltaY: -100, cancelable: true });
-    fireEvent(chart, atMinimum);
-    expect(atMinimum.defaultPrevented).toBe(false);
-
-    vi.spyOn(performance, "now").mockReturnValue(1100);
-    const zoomOut = createEvent.wheel(chart, { deltaY: 100, cancelable: true });
-    fireEvent(chart, zoomOut);
-    expect(zoomOut.defaultPrevented).toBe(true);
-    expect((screen.getByRole("button", { name: "Zoom in" }) as HTMLButtonElement).disabled).toBe(false);
+    const minimumRange = screen.getByText(/Events \d+–\d+ of 8/).textContent!;
+    assertWheelUnchanged(minimumRange);
+    for (let i = 0; i < events.events.length; i++) {
+      fireEvent.click(screen.getByRole("button", { name: "Zoom out" }));
+    }
+    assertWheelUnchanged("Events 1–8 of 8");
   });
 
   it("never captures wheel scrolling for a single event", () => {
