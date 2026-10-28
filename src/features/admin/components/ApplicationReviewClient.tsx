@@ -10,20 +10,16 @@ import {
 import {
   StatusUpdateSection,
 } from "@/features/admin/components/StatusUpdateSection";
-import type { ApplicationStatus, EventRow } from "@/lib/supabase/models";
+import type { EventApplicationRow, EventRow } from "@/lib/supabase/models";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { SuccessOverlay } from "@/components/shared/SuccessOverlay";
-import { updateApplicationStatusAction } from "@/features/admin/actions";
+import { updateApplicationDecisionAction } from "@/features/admin/actions";
+import {
+  getApplicationReviewState,
+  type ApplicationDecision,
+} from "@/features/admin/lib/application-review";
 import { formatUserName } from "@/lib/user-name";
-
-export interface AdminApplicationRegistration {
-  id: string;
-  event_id: string;
-  user_id: string;
-  status: ApplicationStatus;
-  created_at: string;
-}
 
 export interface AdminApplicationUser {
   id: string;
@@ -34,7 +30,7 @@ export interface AdminApplicationUser {
 
 export interface AdminApplicationResponse {
   id: string;
-  event_registration_id: string;
+  application_id: string;
   event_application_question_id: string;
   response: string;
   created_at: string;
@@ -48,52 +44,51 @@ export interface AdminApplicationResponse {
 }
 
 interface ApplicationReviewClientProps {
-  registration: AdminApplicationRegistration;
+  application: EventApplicationRow;
+  hasTicket: boolean;
   userInfo: AdminApplicationUser;
   event: EventRow;
   responses: AdminApplicationResponse[];
 }
 
+const SUCCESS_MESSAGES: Record<ApplicationDecision, string> = {
+  accept: "Offer sent",
+  waitlist: "Application waitlisted",
+  reject: "Application rejected",
+};
+
 export function ApplicationReviewClient({
-  registration: initialRegistration,
+  application: initialApplication,
+  hasTicket,
   userInfo,
   event,
   responses,
 }: ApplicationReviewClientProps) {
-  const registrationId = initialRegistration.id;
-  const [registration, setRegistration] =
-    useState<AdminApplicationRegistration>(initialRegistration);
+  const [application, setApplication] =
+    useState<EventApplicationRow>(initialApplication);
   const [error, setError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const state = getApplicationReviewState(application, hasTicket);
 
-  const handleStatusUpdate = async (newStatus: ApplicationStatus) => {
+  const handleDecision = async (
+    decision: ApplicationDecision,
+    offerExpiresAt: string | null
+  ) => {
     if (isUpdating) return;
 
     setIsUpdating(true);
     setError(null);
 
     try {
-      await updateApplicationStatusAction(registrationId, newStatus);
-
-      // Update local state
-      setRegistration({ ...registration, status: newStatus });
-
-      // Show success message
-      let message = "";
-      switch (newStatus) {
-        case "accepted":
-          message = "Application accepted";
-          break;
-        case "declined":
-          message = "Application declined";
-          break;
-        case "pending":
-          message = "Application reopened for review";
-          break;
-      }
-
-      setSuccessMessage(message);
+      setApplication(
+        await updateApplicationDecisionAction(
+          application.id,
+          decision,
+          offerExpiresAt
+        )
+      );
+      setSuccessMessage(SUCCESS_MESSAGES[decision]);
     } catch (err) {
       console.error("Error updating status:", err);
       setError(
@@ -125,8 +120,9 @@ export function ApplicationReviewClient({
             <ApplicantInfoCard
               name={formatUserName(userInfo)}
               email={userInfo.email}
-              applicationDate={registration.created_at}
-              status={registration.status}
+              applicationDate={application.created_at}
+              state={state}
+              offerExpiresAt={application.offer_expires_at}
             />
 
             {/* Application Responses */}
@@ -167,9 +163,9 @@ export function ApplicationReviewClient({
 
             {/* Status Update Section */}
             <StatusUpdateSection
-              currentStatus={registration.status}
+              state={state}
               isUpdating={isUpdating}
-              onStatusUpdate={handleStatusUpdate}
+              onDecision={handleDecision}
               error={error}
             />
       </PageContainer>

@@ -4,15 +4,15 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Spinner } from "@/components/ui/spinner";
 
 interface CheckInTableCellProps {
-  registrationId: string;
+  ticketId: string;
   sessionId: string;
   checked: boolean;
-  onToggle: (registrationId: string, sessionId: string, currentlyChecked: boolean) => void;
+  onToggle: (ticketId: string, sessionId: string, currentlyChecked: boolean) => void;
   isUpdating: boolean;
 }
 
 export function CheckInTableCell({
-  registrationId,
+  ticketId,
   sessionId,
   checked,
   onToggle,
@@ -26,7 +26,7 @@ export function CheckInTableCell({
         ) : (
           <Checkbox
             checked={checked}
-            onCheckedChange={() => onToggle(registrationId, sessionId, checked)}
+            onCheckedChange={() => onToggle(ticketId, sessionId, checked)}
             disabled={isUpdating}
             className="rounded"
           />

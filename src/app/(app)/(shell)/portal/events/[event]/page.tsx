@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { FlowLink } from "@/components/shared/FlowLink";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { requireAuth } from "@/lib/auth/guards";
@@ -21,7 +23,9 @@ export default async function PortalEventPage({
   const { event: slug } = await params;
   await requireAuth();
   const supabase = await createClient();
-  const event = await fetchEventBySlug(supabase, slug, { status: "active" });
+  // No status filter: RLS returns drafts to admins and managers only, who
+  // can open one to test it (docs/event-states.md, "Drafts for admins").
+  const event = await fetchEventBySlug(supabase, slug);
 
   if (!event) {
     notFound();
@@ -35,6 +39,10 @@ export default async function PortalEventPage({
 
   return (
     <PageContainer backHref="/portal/events" backLabel="Back to Events" className="space-y-4">
+      {event.status !== "active" && (
+        <Alert>Draft: only admins can see this.</Alert>
+      )}
+
       <h1 className="text-h1">{event.name}</h1>
 
       <div className="flex items-start gap-3 text-small">
@@ -60,8 +68,13 @@ export default async function PortalEventPage({
         <p className="font-medium">{location || "TBD"}</p>
       </div>
 
+      {/* The public page shows active events only. */}
       <Button asChild>
-        <Link href={`/events/${event.slug}`}>View full event details</Link>
+        {event.status === "active" ? (
+          <Link href={`/events/${event.slug}`}>View full event details</Link>
+        ) : (
+          <FlowLink href={`/portal/events/${event.slug}/checkout`}>Register</FlowLink>
+        )}
       </Button>
     </PageContainer>
   );

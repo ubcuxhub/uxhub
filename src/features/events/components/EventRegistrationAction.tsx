@@ -5,7 +5,7 @@ import { FlowLink } from "@/components/shared/FlowLink";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
 import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";
-import { fetchUserRegistration } from "@/lib/supabase-helpers/event-registrations";
+import { fetchUserEventTicket } from "@/lib/supabase-helpers/event-tickets";
 
 interface EventRegistrationActionProps {
   eventId: string;
@@ -34,12 +34,8 @@ export function EventRegistrationAction({
 
       const user = await fetchUserInfoByAuthId(supabase, session.user.id);
       if (!user) return;
-      const registration = await fetchUserRegistration(
-        supabase,
-        eventId,
-        user.id
-      );
-      if (active) setAlreadyRegistered(Boolean(registration));
+      const ticket = await fetchUserEventTicket(supabase, eventId, user.id);
+      if (active) setAlreadyRegistered(Boolean(ticket));
     }
 
     void checkRegistration().catch(() => undefined);

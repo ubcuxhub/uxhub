@@ -15,14 +15,24 @@ export interface SeedPurchase {
   status: "pending" | "authorized" | "completed" | "canceled" | "failed";
 }
 
+export interface SeedApplication {
+  status: "submitted" | "waitlisted" | "accepted" | "rejected";
+  /** Required when accepted (docs/event-states.md). */
+  offerExpiresAt?: string;
+}
+
+/**
+ * One account's part in one event: a ticket, an application, or both. Applications
+ * exist only on events that take them; responses need one, check-ins a ticket.
+ */
 export interface SeedRegistration {
-  attending: boolean;
   checkIns?: Record<string, string>;
   eventSlug: string;
+  /** The completed purchase behind a paid ticket. */
   purchaseKey?: string;
   responses?: Record<string, string>;
-  reviewerEmail?: string;
-  status: "pending" | "declined" | "accepted";
+  ticket: boolean;
+  application?: SeedApplication;
 }
 
 export type SeedProfile = Omit<
@@ -358,8 +368,7 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
       {
         eventSlug: industryTalkPast.event.slug,
         purchaseKey: "seed:event:admin-explorer:industry-talk-ai-and-ux",
-        status: "accepted",
-        attending: true,
+        ticket: true,
         checkIns: {
           "Door Check-in": afterTimestamp(industryCheckIn, 8),
         },
@@ -367,19 +376,20 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
       {
         eventSlug: mentorshipOngoing.event.slug,
         purchaseKey: "seed:event:admin-explorer:mentorship-program",
-        status: "accepted",
-        attending: true,
+        ticket: true,
       },
       {
         eventSlug: industryTalkUpcoming.event.slug,
         purchaseKey: "seed:event:admin-explorer:industry-talk-design-systems",
-        status: "accepted",
-        attending: true,
+        ticket: true,
       },
       {
         eventSlug: designSprintPast.event.slug,
-        status: "accepted",
-        attending: true,
+        ticket: true,
+        application: {
+          status: "accepted",
+          offerExpiresAt: historicalPurchaseTime(designSprintPast),
+        },
         responses: {
           [designSprintQuestions.year]: "3",
           [designSprintQuestions.figma]: "Comfortable building screens",
@@ -400,8 +410,8 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
       },
       {
         eventSlug: uxathonPast.event.slug,
-        status: "declined",
-        attending: false,
+        ticket: false,
+        application: { status: "rejected" },
         responses: {
           [uxathonQuestions.year]: "3",
           [uxathonQuestions.contribution]: "User research, Prototyping",
@@ -415,8 +425,8 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
         // Pending application on the draft workshop: the admin review queue
         // needs something waiting in it.
         eventSlug: researchWorkshopDraft.event.slug,
-        status: "pending",
-        attending: false,
+        ticket: false,
+        application: { status: "submitted" },
         responses: {
           [designSprintQuestions.year]: "3",
           [designSprintQuestions.figma]:
@@ -495,8 +505,7 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
       {
         eventSlug: industryTalkPast.event.slug,
         purchaseKey: "seed:event:no-membership:industry-talk-ai-and-ux",
-        status: "accepted",
-        attending: true,
+        ticket: true,
         checkIns: {
           "Door Check-in": afterTimestamp(industryCheckIn, 8),
         },
@@ -504,21 +513,18 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
       {
         eventSlug: mentorshipOngoing.event.slug,
         purchaseKey: "seed:event:no-membership:mentorship-program",
-        status: "accepted",
-        attending: true,
+        ticket: true,
       },
       {
         eventSlug: industryTalkUpcoming.event.slug,
         purchaseKey:
           "seed:event:no-membership:industry-talk-design-systems:completed",
-        status: "accepted",
-        attending: true,
+        ticket: true,
       },
       {
         eventSlug: uxathonPast.event.slug,
-        reviewerEmail: "admin-explorer@example.com",
-        status: "declined",
-        attending: false,
+        ticket: false,
+        application: { status: "rejected" },
         responses: {
           [uxathonQuestions.year]: "2",
           [uxathonQuestions.contribution]:
@@ -530,9 +536,10 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
         },
       },
       {
+        // Waitlisted, so the review queue shows more than one state.
         eventSlug: researchWorkshopDraft.event.slug,
-        status: "pending",
-        attending: false,
+        ticket: false,
+        application: { status: "waitlisted" },
         responses: {
           [designSprintQuestions.year]: "2",
           [designSprintQuestions.figma]: "I can follow a tutorial",
@@ -606,8 +613,7 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
       {
         eventSlug: industryTalkPast.event.slug,
         purchaseKey: "seed:event:student-innovator:industry-talk-ai-and-ux",
-        status: "accepted",
-        attending: true,
+        ticket: true,
         checkIns: {
           "Door Check-in": afterTimestamp(industryCheckIn, 12),
         },
@@ -615,21 +621,18 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
       {
         eventSlug: mentorshipOngoing.event.slug,
         purchaseKey: "seed:event:student-innovator:mentorship-program",
-        status: "accepted",
-        attending: true,
+        ticket: true,
       },
       {
         eventSlug: industryTalkUpcoming.event.slug,
         purchaseKey:
           "seed:event:student-innovator:industry-talk-design-systems",
-        status: "accepted",
-        attending: true,
+        ticket: true,
       },
       {
         // A free past event attended without a purchase behind it.
         eventSlug: getToKnowPast.event.slug,
-        status: "accepted",
-        attending: true,
+        ticket: true,
         checkIns: {
           "Door Check-in": afterTimestamp(getToKnowCheckIn, 5),
         },

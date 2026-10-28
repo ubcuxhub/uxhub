@@ -20,16 +20,14 @@ const events = vi.hoisted(() => ({
   fetchEventSlugsByPrefix: vi.fn(),
 }));
 const checkIns = vi.hoisted(() => ({
-  fetchAttendingRegistrations: vi.fn(),
-  fetchCheckInId: vi.fn(),
+  deleteCheckIn: vi.fn(),
+  fetchCheckInAttendees: vi.fn(),
   fetchCheckInSessions: vi.fn(),
   fetchCheckInStatuses: vi.fn(),
-  insertCheckIn: vi.fn(),
-  updateCheckInTimestamp: vi.fn(),
+  upsertCheckIn: vi.fn(),
 }));
-const registrations = vi.hoisted(() => ({
-  fetchRegistrationsForEvent: vi.fn(),
-  updateEventRegistration: vi.fn(),
+const applications = vi.hoisted(() => ({
+  updateEventApplication: vi.fn(),
 }));
 const eventPeople = vi.hoisted(() => ({
   saveMentor: vi.fn(),
@@ -50,7 +48,7 @@ vi.mock("@/lib/auth/guards", () => guards);
 vi.mock("@/lib/supabase-helpers/admin-server", () => adminServer);
 vi.mock("@/lib/supabase-helpers/events", () => events);
 vi.mock("@/lib/supabase-helpers/check-ins", () => checkIns);
-vi.mock("@/lib/supabase-helpers/event-registrations", () => registrations);
+vi.mock("@/lib/supabase-helpers/event-applications", () => applications);
 vi.mock("@/lib/supabase-helpers/event-people", () => eventPeople);
 vi.mock("@/lib/supabase/admin", () => ({ supabaseAdmin: { rpc: adminRpc } }));
 vi.mock("@/lib/supabase/server", () => ({
@@ -69,7 +67,7 @@ import {
   saveAdminSponsorAction,
   setMembershipTermEndsAtAction,
   toggleCheckInAction,
-  updateApplicationStatusAction,
+  updateApplicationDecisionAction,
   updateManagerUserAction,
   saveManagerUserDetailsAction,
   updateMembershipTypeAction,
@@ -567,86 +565,58 @@ describe("deleteAdminEventAction", () => {
 // ---------------------------------------------------------------------------
 
 describe("toggleCheckInAction", () => {
-  it("inserts a check-in the first time someone is checked in", async () => {
-    checkIns.fetchCheckInId.mockResolvedValue(null);
-
-    const at = await toggleCheckInAction("reg-1", "session-1", true);
-
-    expect(checkIns.insertCheckIn).toHaveBeenCalledWith(expect.anything(), {
-      event_registration_id: "reg-1",
-      check_in_session_id: "session-1",
-      checked_in_at: at,
-    });
-    expect(checkIns.updateCheckInTimestamp).not.toHaveBeenCalled();
-    expect(at).toMatch(/^\d{4}-\d{2}-\d{2}T/);
-  });
-
-  it("clears the timestamp on an existing row when unchecking", async () => {
-    checkIns.fetchCheckInId.mockResolvedValue("check-in-1");
+  it("checks a ticket in and returns the stored time", async () => {
+    checkIns.upsertCheckIn.mockResolvedValue("2026-10-20T18:00:00.000Z");
 
     await expect(
-      toggleCheckInAction("reg-1", "session-1", false),
-    ).resolves.toBeNull();
+      toggleCheckInAction("ticket-1", "session-1", true),
+    ).resolves.toBe("2026-10-20T18:00:00.000Z");
 
-    expect(checkIns.updateCheckInTimestamp).toHaveBeenCalledWith(
+    expect(checkIns.upsertCheckIn).toHaveBeenCalledWith(
       expect.anything(),
-      "check-in-1",
-      null,
+      "ticket-1",
+      "session-1",
     );
-    expect(checkIns.insertCheckIn).not.toHaveBeenCalled();
+    expect(checkIns.deleteCheckIn).not.toHaveBeenCalled();
   });
 
-  it("re-stamps an existing row when checking in again", async () => {
-    checkIns.fetchCheckInId.mockResolvedValue("check-in-1");
-
-    const at = await toggleCheckInAction("reg-1", "session-1", true);
-
-    expect(checkIns.updateCheckInTimestamp).toHaveBeenCalledWith(
-      expect.anything(),
-      "check-in-1",
-      at,
-    );
-    expect(at).not.toBeNull();
-  });
-
-  it("writes nothing when unchecking someone who was never checked in", async () => {
-    checkIns.fetchCheckInId.mockResolvedValue(null);
-
+  it("deletes the check-in when unchecking", async () => {
     await expect(
-      toggleCheckInAction("reg-1", "session-1", false),
+      toggleCheckInAction("ticket-1", "session-1", false),
     ).resolves.toBeNull();
 
-    expect(checkIns.insertCheckIn).not.toHaveBeenCalled();
-    expect(checkIns.updateCheckInTimestamp).not.toHaveBeenCalled();
+    expect(checkIns.deleteCheckIn).toHaveBeenCalledWith(
+      expect.anything(),
+      "ticket-1",
+      "session-1",
+    );
+    expect(checkIns.upsertCheckIn).not.toHaveBeenCalled();
   });
 
   it("requires an admin", async () => {
     const redirect = new Error("NEXT_REDIRECT");
     guards.requireAdmin.mockRejectedValue(redirect);
 
-    await expect(toggleCheckInAction("reg-1", "session-1", true)).rejects.toBe(
+    await expect(toggleCheckInAction("ticket-1", "session-1", true)).rejects.toBe(
       redirect,
     );
-    expect(checkIns.insertCheckIn).not.toHaveBeenCalled();
+    expect(checkIns.upsertCheckIn).not.toHaveBeenCalled();
   });
 });
 
 describe("fetchAdminCheckInSnapshotAction", () => {
-  it("returns the four sources as one snapshot with statuses serialized", async () => {
+  it("returns the three sources as one snapshot with statuses serialized", async () => {
     checkIns.fetchCheckInSessions.mockResolvedValue([{ id: "session-1" }]);
-    checkIns.fetchAttendingRegistrations.mockResolvedValue([{ id: "reg-1" }]);
-    checkIns.fetchCheckInStatuses.mockResolvedValue(new Map([["reg-1", true]]));
-    registrations.fetchRegistrationsForEvent.mockResolvedValue([
-      { id: "reg-1" },
-      { id: "reg-2" },
-    ]);
+    checkIns.fetchCheckInAttendees.mockResolvedValue([{ id: "ticket-1" }]);
+    checkIns.fetchCheckInStatuses.mockResolvedValue(
+      new Map([["ticket-1_session-1", "2026-10-20T18:00:00.000Z"]]),
+    );
 
     await expect(fetchAdminCheckInSnapshotAction("event-1")).resolves.toEqual({
       sessions: [{ id: "session-1" }],
-      registrations: [{ id: "reg-1" }],
+      attendees: [{ id: "ticket-1" }],
       // A Map cannot cross the server-action boundary, so it ships as entries.
-      statuses: [["reg-1", true]],
-      allRegistrations: [{ id: "reg-1" }, { id: "reg-2" }],
+      statuses: [["ticket-1_session-1", "2026-10-20T18:00:00.000Z"]],
     });
   });
 });
@@ -655,25 +625,52 @@ describe("fetchAdminCheckInSnapshotAction", () => {
 // The rest of the file, so a rejection anywhere in it stops short of a write
 // ---------------------------------------------------------------------------
 
-describe("updateApplicationStatusAction", () => {
-  it.each(["pending", "accepted", "declined"] as const)(
-    "records the reviewer alongside the status %s",
-    async (status) => {
-      await updateApplicationStatusAction("reg-1", status);
+describe("updateApplicationDecisionAction", () => {
+  const tomorrow = () => new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
-      expect(registrations.updateEventRegistration).toHaveBeenCalledWith(
-        expect.anything(),
-        "reg-1",
-        { status, reviewer_id: admin.id },
-      );
-    },
-  );
+  it("accepts with the offer deadline", async () => {
+    const deadline = tomorrow();
+    await updateApplicationDecisionAction("application-1", "accept", deadline);
 
-  it("rejects a status outside the known set", async () => {
+    expect(applications.updateEventApplication).toHaveBeenCalledWith(
+      expect.anything(),
+      "application-1",
+      { status: "accepted", offer_expires_at: deadline },
+    );
+  });
+
+  it.each([
+    ["waitlist", "waitlisted"],
+    ["reject", "rejected"],
+  ] as const)("%s clears any deadline", async (decision, status) => {
+    await updateApplicationDecisionAction("application-1", decision, tomorrow());
+
+    expect(applications.updateEventApplication).toHaveBeenCalledWith(
+      expect.anything(),
+      "application-1",
+      { status, offer_expires_at: null },
+    );
+  });
+
+  it("refuses to accept without a future deadline", async () => {
     await expect(
-      updateApplicationStatusAction("reg-1", "approved" as "accepted"),
-    ).rejects.toThrow("Invalid application status.");
-    expect(registrations.updateEventRegistration).not.toHaveBeenCalled();
+      updateApplicationDecisionAction("application-1", "accept", null),
+    ).rejects.toThrow("Accepting an application needs an offer deadline.");
+    await expect(
+      updateApplicationDecisionAction(
+        "application-1",
+        "accept",
+        new Date(Date.now() - 1000).toISOString(),
+      ),
+    ).rejects.toThrow("The offer deadline must be in the future.");
+    expect(applications.updateEventApplication).not.toHaveBeenCalled();
+  });
+
+  it("rejects a decision outside the known set", async () => {
+    await expect(
+      updateApplicationDecisionAction("application-1", "approve" as "accept", null),
+    ).rejects.toThrow("Invalid application decision.");
+    expect(applications.updateEventApplication).not.toHaveBeenCalled();
   });
 });
 

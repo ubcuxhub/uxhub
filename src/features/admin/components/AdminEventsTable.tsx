@@ -202,7 +202,7 @@ function EventDetails({
         {event.description}
       </DetailItem>
       <DetailItem label="Applications enabled">
-        {event.applications_enabled ? "Yes" : "No"}
+        {event.requires_application ? "Yes" : "No"}
       </DetailItem>
       <DetailItem label="Mentors enabled">
         {event.mentors_enabled ? "Yes" : "No"}

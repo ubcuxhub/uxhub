@@ -8,37 +8,44 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { ApplicationStatus } from "@/lib/supabase/models";
-import { Clock, X, Check, User, Mail, Calendar } from "lucide-react";
+import {
+  APPLICATION_REVIEW_STATE_LABELS,
+  type ApplicationReviewState,
+} from "@/features/admin/lib/application-review";
+import { Clock, X, Check, User, Mail, Calendar, Ticket, Hourglass } from "lucide-react";
 import { formatTimestamp } from "@/lib/date";
 
 interface ApplicantInfoCardProps {
   name: string;
   email: string;
   applicationDate: string;
-  status: ApplicationStatus;
+  state: ApplicationReviewState;
+  offerExpiresAt: string | null;
 }
 
-function getStatusIcon(status: ApplicationStatus) {
-  switch (status) {
-    case "pending":
+export function ApplicationStateIcon({ state }: { state: ApplicationReviewState }) {
+  switch (state) {
+    case "submitted":
       return <Clock className="text-warning" />;
-    case "declined":
-      return <X className="text-destructive" />;
+    case "waitlisted":
+      return <Hourglass className="text-muted-foreground" />;
     case "accepted":
       return <Check className="text-success" />;
+    case "registered":
+      return <Ticket className="text-success" />;
+    case "offer_expired":
+      return <Clock className="text-destructive" />;
+    case "rejected":
+      return <X className="text-destructive" />;
   }
-}
-
-function getStatusText(status: ApplicationStatus) {
-  return status.charAt(0).toUpperCase() + status.slice(1);
 }
 
 export function ApplicantInfoCard({
   name,
   email,
   applicationDate,
-  status,
+  state,
+  offerExpiresAt,
 }: ApplicantInfoCardProps) {
   return (
     <Card>
@@ -55,18 +62,27 @@ export function ApplicantInfoCard({
             </CardDescription>
           </div>
           <div className="flex items-center gap-2">
-            {getStatusIcon(status)}
-            <Badge variant="outline" className="capitalize">
-              {getStatusText(status)}
+            <ApplicationStateIcon state={state} />
+            <Badge variant="outline">
+              {APPLICATION_REVIEW_STATE_LABELS[state]}
             </Badge>
           </div>
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-1">
         <div className="flex items-center gap-2 text-small text-muted-foreground">
           <Calendar />
           <span>Applied: {formatTimestamp(applicationDate)}</span>
         </div>
+        {(state === "accepted" || state === "offer_expired") && offerExpiresAt && (
+          <div className="flex items-center gap-2 text-small text-muted-foreground">
+            <Clock />
+            <span>
+              {state === "accepted" ? "Register by" : "Offer expired"}:{" "}
+              {formatTimestamp(offerExpiresAt)}
+            </span>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

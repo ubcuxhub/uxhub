@@ -13,8 +13,8 @@
  * that only ever adds drifts away from its own data. What keeps that safe is
  * scope, not restraint: only rows the seed owns are ever candidates. See
  * `prune.ts` for the ownership rules and `index.ts` for the order deletions run
- * in — `event_registrations`, `check_ins`, and `event_application_responses`
- * cascade off these tables.
+ * in — `event_tickets`, `event_applications`, `check_ins`, and
+ * `event_application_responses` cascade off these tables.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";

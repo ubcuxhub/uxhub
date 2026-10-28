@@ -61,8 +61,8 @@ the UI is undone by re-running it. Pass `--no-prune` to keep those rows,
 `--dry-run` to preview. Pruning deletes any event or membership tier whose slug
 is not in the seed data, including one created through the admin UI, unless a
 row owned by a hand-made account (a purchase, say) still references it.
-Purchases and registrations are pruned only when they belong to one of the
-fixture accounts, never to an account created by hand.
+Purchases, tickets and applications are pruned only when they belong to one of
+the fixture accounts, never to an account created by hand.
 
 The eleven fixture accounts all sign in with password `123456`; see
 `scripts/seed/README.md` for the membership x role grid.

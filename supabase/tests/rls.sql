@@ -674,6 +674,7 @@ begin
   foreach role_name in array array['anon', 'authenticated'] loop
     foreach fn in array array[
       'public.reserve_event_ticket(uuid, uuid, uuid)',
+      'public.release_event_ticket(uuid)',
       'public.event_seat_counts_unfiltered(uuid[])',
       'public.backfill_event_tickets_and_applications()'
     ] loop
@@ -700,6 +701,173 @@ begin
   end if;
 end;
 $$;
+
+-- Applications, responses and check-ins by application and ticket, without a
+-- registration (docs/registration-rollout.md step 2).
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+select role_access as user_a_saved_role from public.user_info where id = :'user_a_id' \gset
+update public.user_info set role_access = 'basic' where id = :'user_a_id';
+
+insert into public.events (
+  name, description, regular_price, member_price, max_capacity, slug,
+  registration_start_time, registration_end_time, status, applications_enabled
+)
+values (
+  'RLS Application Event', 'RLS application event', 0, 0, 10, 'rls-application-event',
+  now() - interval '1 hour', now() + interval '1 hour', 'active', true
+)
+returning id \gset application_event_
+
+insert into public.event_application_questions (event_id, question, response_type)
+values (:'application_event_id', 'Why apply?', 'long_text')
+returning id \gset application_question_
+
+insert into public.event_tickets (event_id, user_id)
+values (:'application_event_id', :'user_b_id')
+returning id \gset user_b_ticket_
+
+insert into public.check_in_sessions (event_id, name)
+values (:'application_event_id', 'RLS Application Session')
+returning id \gset application_session_
+
+\o /dev/null
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'user_a_auth_user_id',
+    'email', :'user_a_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+select set_config('rls.application_event_id', :'application_event_id', true);
+select set_config('rls.application_question_id', :'application_question_id', true);
+select set_config('rls.user_b_ticket_id', :'user_b_ticket_id', true);
+select set_config('rls.application_session_id', :'application_session_id', true);
+\o
+
+set local role authenticated;
+
+do $$
+declare
+  v_application_id uuid;
+  visible_count integer;
+  changed_count integer;
+begin
+  insert into public.event_applications (event_id, user_id)
+  values (current_setting('rls.application_event_id')::uuid, public.current_user_info_id())
+  returning id into v_application_id;
+
+  insert into public.event_application_responses (
+    application_id, event_application_question_id, response
+  )
+  values (v_application_id, current_setting('rls.application_question_id')::uuid, 'Because');
+
+  select count(*) into visible_count
+  from public.event_application_responses
+  where application_id = v_application_id;
+  if visible_count <> 1 then
+    raise exception 'user A should see their response by application, saw %', visible_count;
+  end if;
+
+  update public.event_applications
+  set status = 'accepted', offer_expires_at = now() + interval '1 day'
+  where id = v_application_id;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'user A accepted their own application';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_tickets
+  where event_id = current_setting('rls.application_event_id')::uuid;
+  if visible_count <> 0 then
+    raise exception 'user A can read user B ticket';
+  end if;
+
+  begin
+    insert into public.check_ins (ticket_id, check_in_session_id, checked_in_at)
+    values (
+      current_setting('rls.user_b_ticket_id')::uuid,
+      current_setting('rls.application_session_id')::uuid,
+      now()
+    );
+    raise exception 'user A checked user B in';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  if has_function_privilege('authenticated', 'public.release_event_ticket(uuid)', 'execute')
+     or has_function_privilege('anon', 'public.release_event_ticket(uuid)', 'execute') then
+    raise exception 'public roles can release tickets';
+  end if;
+end;
+$$;
+
+reset role;
+
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+update public.user_info set role_access = 'admin' where id = :'user_a_id';
+\o /dev/null
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'user_a_auth_user_id',
+    'email', :'user_a_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+\o
+
+set local role authenticated;
+
+do $$
+declare
+  visible_count integer;
+  changed_count integer;
+begin
+  select count(*) into visible_count
+  from public.event_tickets
+  where event_id = current_setting('rls.application_event_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'admin should see the ticket, saw %', visible_count;
+  end if;
+
+  update public.event_applications
+  set status = 'accepted', offer_expires_at = now() + interval '1 day'
+  where event_id = current_setting('rls.application_event_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 1 then
+    raise exception 'admin could not accept the application';
+  end if;
+
+  insert into public.check_ins (ticket_id, check_in_session_id, checked_in_at)
+  values (
+    current_setting('rls.user_b_ticket_id')::uuid,
+    current_setting('rls.application_session_id')::uuid,
+    now()
+  );
+
+  select count(*) into visible_count
+  from public.check_ins
+  where ticket_id = current_setting('rls.user_b_ticket_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'admin should see the check-in by ticket, saw %', visible_count;
+  end if;
+end;
+$$;
+
+reset role;
+
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+update public.user_info set role_access = :'user_a_saved_role' where id = :'user_a_id';
 
 -- Scheduled drafts stay hidden until the job actually changes their status.
 update public.events set status = 'draft', publish_at = now() + interval '1 day'

@@ -10,7 +10,7 @@ must work with the code that is live when it is pushed.
 | Step | Change | Status |
 | --- | --- | --- |
 | [1. Add](#1-add) | New schema beside the old | Done (`20261015000005`–`10`) |
-| [2. Move the code](#2-move-the-code) | Code uses only the new schema | Next |
+| [2. Move the code](#2-move-the-code) | Code uses only the new schema | In progress: PR A open, PR B next |
 | [3. Remove](#3-remove) | Drop the legacy schema | After step 2 is live |
 
 These migrations were first numbered `20270101000001`–`10`, a future date,
@@ -45,27 +45,66 @@ seed writes registrations only.
 
 ## 2. Move the code
 
-The migration runs first, while step 1's code is still live. It:
+Two PRs, one after the other. PR A moves tickets, applications and check-in;
+PR B moves the legacy date columns to `starts_at`, `ends_at`,
+`registration_opens_at` and `registration_closes_at`, and drops the Archived
+option from the event form.
+
+### PR A: tickets, applications, check-in
+
+`20261028223807_move_code_to_event_tickets` runs first, while step 1's code is
+still live. It:
 
 - re-runs `backfill_event_tickets_and_applications()` to pick up writes since
   step 1;
 - makes `check_ins.event_registration_id` and
   `event_application_responses.event_registration_id` nullable;
-- replaces `save_admin_event_atomically` with one that writes a column only
-  when the payload has its key, so the old and new admin forms both save.
+- turns the partial unique indexes on `(ticket_id, check_in_session_id)` and
+  `(event_application_question_id, application_id)` into plain unique
+  constraints, so the code can upsert on them;
+- adds `event_tickets` to the `supabase_realtime` publication for the
+  check-in page;
+- replaces `save_admin_event_atomically` with one that writes an `events`
+  column only when the payload has its key, so the old and new admin forms
+  both save, and keeps the publish scheduling of `20261027230345`;
+- adds `release_event_ticket(purchase_id)`, service role only. It deletes the
+  purchase's ticket unless the purchase is `completed` or the ticket has a
+  check-in.
 
-Then the code moves to the new schema:
+Then the code:
 
-- fulfillment calls `reserve_event_ticket`;
-- applications insert into `event_applications`;
-- check-in goes by ticket;
-- the event form drops the Archived option;
-- the seed writes tickets and applications.
+- **Fulfillment** reserves with `reserve_event_ticket`, releases with
+  `release_event_ticket`, and finds an existing ticket by purchase or user.
+  The database enforces applications and offers, so fulfillment no longer
+  checks questions. Admins and managers can buy a ticket for a draft or
+  scheduled event, from the portal event page, which shows a draft banner.
+- **Applications:** members insert into `event_applications` and responses go
+  by `application_id` (`insertEventApplication`, `upsertApplicationResponses`;
+  no student form calls them yet). Admin review uses
+  `event_application_status`, requires an offer deadline to accept, and shows
+  Accepted, Registered and Offer expired. The review route param is
+  `[applicationId]`; backfilled applications kept their registration's id, so
+  old links still resolve.
+- **Check-in** lists tickets and writes `check_ins` by `ticket_id` only.
+  Unchecking deletes the check-in.
+- **Counts** come from `event_seat_counts`: tickets on the admin events table,
+  seats left on the public event page.
+- **Seed** writes tickets and applications, and prunes every
+  `event_registrations` row a fixture account still holds.
+- `event-registrations.ts` and `TABLES.eventRegistrations` are gone.
+
+There is no free-ticket path: every ticket goes through Square, as before.
+Registrations written by the old code between this migration's push and PR A's
+deploy are not backfilled; step 3 runs the backfill once more before dropping
+anything.
 
 ## 3. Remove
 
 Push once step 2's code is live.
 
+- **Backfill once more:** `backfill_event_tickets_and_applications()` picks up
+  registrations the old code wrote before step 2 deployed. Run it before
+  dropping anything.
 - **`event_status`:** archived events that have ended become `active` (keeping
   members' history), the rest `draft`. Then recreate the enum without
   `archived`.

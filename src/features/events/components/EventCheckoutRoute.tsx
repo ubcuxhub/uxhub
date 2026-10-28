@@ -4,10 +4,34 @@ import { EventCheckout } from "@/features/events/components/EventCheckout";
 import { requireAuth } from "@/lib/auth/guards";
 import { FLAGS } from "@/lib/flags";
 import { createClient } from "@/lib/supabase/server";
-import { fetchApplicationQuestions } from "@/lib/supabase-helpers/event-applications";
+import { fetchUserEventApplication } from "@/lib/supabase-helpers/event-applications";
 import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
-import { fetchUserRegistration } from "@/lib/supabase-helpers/event-registrations";
+import { fetchUserEventTicket } from "@/lib/supabase-helpers/event-tickets";
 import { withReturnTo } from "@/lib/auth/paths";
+import { formatReservationFailure } from "@/features/payments/fulfillment-rules";
+import type { EventApplicationRow } from "@/lib/supabase/models";
+
+/**
+ * Why this person cannot buy a ticket yet, or null when they can. An event
+ * that requires an application sells only on an accepted, unexpired offer.
+ * reserve_event_ticket enforces the same at checkout.
+ */
+function getCheckoutBlock(
+  requiresApplication: boolean,
+  hasTicket: boolean,
+  application: EventApplicationRow | null,
+  now = Date.now(),
+) {
+  if (hasTicket) return formatReservationFailure("ALREADY_REGISTERED");
+  if (!requiresApplication) return null;
+  if (application?.status !== "accepted") {
+    return formatReservationFailure("APPLICATION_REQUIRED");
+  }
+  const expiresAt = application.offer_expires_at
+    ? Date.parse(application.offer_expires_at)
+    : Number.NaN;
+  return expiresAt > now ? null : formatReservationFailure("OFFER_EXPIRED");
+}
 
 function formatDate(date: string | null) {
   return date
@@ -32,30 +56,29 @@ export async function EventCheckoutRoute({
     withReturnTo(`/portal/events/${slug}/checkout`, returnTo),
   );
   const supabase = await createClient();
+  // No status filter: RLS shows drafts to admins and managers only, who may
+  // register for one to test it (docs/event-states.md, "Drafts for admins").
   const event = await fetchEventBySlug(supabase, slug);
 
   if (!event) notFound();
 
-  const [applicationQuestions, existingRegistration] = await Promise.all([
-    event.applications_enabled
-      ? fetchApplicationQuestions(supabase, event.id)
-      : Promise.resolve([]),
-    fetchUserRegistration(supabase, event.id, user.id),
+  const [ticket, application] = await Promise.all([
+    fetchUserEventTicket(supabase, event.id, user.id),
+    event.requires_application
+      ? fetchUserEventApplication(supabase, event.id, user.id)
+      : Promise.resolve(null),
   ]);
-  const isDirectPurchaseEvent = applicationQuestions.length === 0;
-  const disabledMessage = !isDirectPurchaseEvent
-    ? "This event uses an application flow and cannot be purchased directly."
-    : existingRegistration
-      ? "You already have a registration for this event."
-      : null;
+  const disabledMessage = getCheckoutBlock(
+    event.requires_application,
+    Boolean(ticket),
+    application,
+  );
 
   return (
     <EventCheckout
       disabledMessage={disabledMessage}
       event={event}
       formattedDate={formatDate(event.start_date)}
-      hasExistingRegistration={Boolean(existingRegistration)}
-      isDirectPurchaseEvent={isDirectPurchaseEvent}
       returnTo={returnTo}
       slug={event.slug ?? slug}
       user={user}

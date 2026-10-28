@@ -3,13 +3,12 @@
 import { useEffect, useState, useMemo } from "react";
 import { CheckInTable } from "@/features/admin/components/CheckInTable";
 import {
-  type AttendingRegistration,
+  type CheckInAttendee,
   type CheckInSession,
 } from "@/features/admin/types";
 import type { EventRow } from "@/lib/supabase/models";
 import { createClient } from "@/lib/supabase/client";
 import { TABLES } from "@/lib/supabase-helpers/tables";
-import type { EventRegistrationRow } from "@/lib/supabase/models";
 import {
   fetchAdminCheckInSnapshotAction,
   toggleCheckInAction,
@@ -59,35 +58,29 @@ interface CheckInManagerProps {
   eventId: string;
   event: EventRow;
   initialCheckInSessions: CheckInSession[];
-  initialAttendingRegistrations: AttendingRegistration[];
+  initialAttendees: CheckInAttendee[];
   initialCheckInStatuses: [string, string | null][];
-  initialAllRegistrations: EventRegistrationRow[];
 }
 
 export function CheckInManager({
   eventId,
   event,
   initialCheckInSessions,
-  initialAttendingRegistrations,
+  initialAttendees,
   initialCheckInStatuses,
-  initialAllRegistrations,
 }: CheckInManagerProps) {
   const supabase = useMemo(() => createClient(), []);
 
   const [checkInSessions, setCheckInSessions] = useState<CheckInSession[]>(
     initialCheckInSessions
   );
-  const [attendingRegistrations, setAttendingRegistrations] = useState<
-    AttendingRegistration[]
-  >(initialAttendingRegistrations);
+  const [attendees, setAttendees] =
+    useState<CheckInAttendee[]>(initialAttendees);
   const [checkInStatuses, setCheckInStatuses] = useState<
     Map<string, string | null>
   >(new Map(initialCheckInStatuses));
   const [searchQuery, setSearchQuery] = useState("");
   const [updatingCells, setUpdatingCells] = useState<Set<string>>(new Set());
-  const [allRegistrations, setAllRegistrations] = useState<
-    EventRegistrationRow[]
-  >(initialAllRegistrations);
 
   // Fetch all data
   useEffect(() => {
@@ -115,16 +108,15 @@ export function CheckInManager({
         {
           event: "*",
           schema: "public",
-          table: TABLES.eventRegistrations,
+          table: TABLES.eventTickets,
           filter: `event_id=eq.${eventId}`,
         },
         async () => {
           try {
             const snapshot = await fetchAdminCheckInSnapshotAction(eventId);
-            setAllRegistrations(snapshot.allRegistrations);
-            setAttendingRegistrations(snapshot.registrations);
+            setAttendees(snapshot.attendees);
           } catch (err) {
-            console.error("Error refetching registrations:", err);
+            console.error("Error refetching tickets:", err);
           }
         }
       )
@@ -152,29 +144,29 @@ export function CheckInManager({
     };
   }, [eventId, supabase]);
 
-  // Filter registrations based on search
+  // Filter attendees based on search
   const query = searchQuery.trim().toLowerCase();
-  const filteredRegistrations = query
-    ? attendingRegistrations.filter(
-        (reg) =>
-          reg.user_name.toLowerCase().includes(query) ||
-          reg.user_email.toLowerCase().includes(query)
+  const filteredAttendees = query
+    ? attendees.filter(
+        (attendee) =>
+          attendee.user_name.toLowerCase().includes(query) ||
+          attendee.user_email.toLowerCase().includes(query)
       )
-    : attendingRegistrations;
+    : attendees;
 
   const handleCheckInToggle = async (
-    registrationId: string,
+    ticketId: string,
     sessionId: string,
     currentlyChecked: boolean
   ) => {
-    const key = `${registrationId}_${sessionId}`;
+    const key = `${ticketId}_${sessionId}`;
     if (updatingCells.has(key)) return;
 
     setUpdatingCells((prev) => new Set(prev).add(key));
 
     try {
       const checkedInAt = await toggleCheckInAction(
-        registrationId,
+        ticketId,
         sessionId,
         !currentlyChecked
       );
@@ -198,24 +190,20 @@ export function CheckInManager({
 
   // Calculate statistics
   const stats = useMemo(() => {
-    const total = allRegistrations.length;
-    const accepted = allRegistrations.filter(
-      (reg) => reg.status === "accepted"
-    ).length;
-    const attending = allRegistrations.filter((reg) => reg.attending).length;
+    const total = attendees.length;
 
-    // Count checked in users (users with at least one check-in)
-    const checkedInUserIds = new Set<string>();
+    // Tickets with at least one check-in
+    const checkedInTicketIds = new Set<string>();
     checkInStatuses.forEach((checkedInAt, key) => {
       if (checkedInAt !== null) {
-        const [registrationId] = key.split("_");
-        checkedInUserIds.add(registrationId);
+        const [ticketId] = key.split("_");
+        checkedInTicketIds.add(ticketId);
       }
     });
-    const checkedIn = checkedInUserIds.size;
+    const checkedIn = checkedInTicketIds.size;
 
-    return { total, checkedIn, accepted, attending };
-  }, [allRegistrations, checkInStatuses]);
+    return { total, checkedIn };
+  }, [attendees, checkInStatuses]);
 
   return (
     <PageContainer
@@ -297,10 +285,8 @@ export function CheckInManager({
                 </Card>
 
                 {/* Statistics */}
-                <div className="grid gap-4 md:grid-cols-4">
-                  <StatCard title="Total Registered" value={stats.total} />
-                  <StatCard title="Accepted" value={stats.accepted} />
-                  <StatCard title="Attending" value={stats.attending} />
+                <div className="grid gap-4 md:grid-cols-2">
+                  <StatCard title="Registered" value={stats.total} />
                   <StatCard
                     title="Checked In"
                     value={stats.checkedIn}
@@ -326,8 +312,8 @@ export function CheckInManager({
                   <CardContent>
                     <CheckInTable
                       sessions={checkInSessions}
-                      registrations={attendingRegistrations}
-                      filteredRegistrations={filteredRegistrations}
+                      attendees={attendees}
+                      filteredAttendees={filteredAttendees}
                       checkInStatuses={checkInStatuses}
                       onToggle={handleCheckInToggle}
                       updatingCells={updatingCells}

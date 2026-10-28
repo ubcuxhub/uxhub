@@ -10,7 +10,7 @@ import {
   fetchEventBySlug,
   fetchEvents,
 } from "@/lib/supabase-helpers/events";
-import { fetchEventRegistrationCount } from "@/lib/supabase-helpers/event-registrations";
+import { fetchEventSeatCounts } from "@/lib/supabase-helpers/event-tickets";
 import {
   fetchEventMentors,
   fetchEventSponsors,
@@ -85,15 +85,16 @@ export default async function EventDetailPage({
   const supabase = createPublicClient();
   const event = await fetchEventBySlug(supabase, slug, { status: "active" });
   if (!event) notFound();
-  const [registrationCount, mentors, sponsors] = await Promise.all([
-    fetchEventRegistrationCount(supabase, event.id),
+  const [seatCounts, mentors, sponsors] = await Promise.all([
+    fetchEventSeatCounts(supabase, [event.id]),
     fetchEventMentors(supabase, event.id),
     fetchEventSponsors(supabase, event.id),
   ]);
 
   /* ── Derived data ── */
   const regStatus = getRegistrationStatus(event);
-  const spotsLeft = event.max_capacity - registrationCount;
+  // Held offers count as taken (docs/event-states.md, "Seats").
+  const spotsLeft = seatCounts.get(event.id)?.seatsLeft ?? event.max_capacity;
   const canRegister = regStatus === "open" && spotsLeft > 0;
   const registerLabel = regStatus === "upcoming"
       ? "Registration Opens Soon"
