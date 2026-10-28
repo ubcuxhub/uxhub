@@ -8,7 +8,52 @@ import {
   validateEventForm,
 } from "./event-form-schema";
 
+const validFormState = {
+  ...defaultFormState,
+  name: "Event",
+  short_description: "Preview",
+  description: "Description",
+  regular_price: "0",
+  member_price: "0",
+  max_capacity: "10",
+  start_date: "2099-08-01",
+  start_time: "10:00",
+  end_date: "2099-08-01",
+  end_time: "11:00",
+};
+
 describe("event form schema", () => {
+  it.each(["start_date", "start_time", "end_date", "end_time"])("requires %s", (field) => {
+    expect(validateEventForm({ ...validFormState, [field]: "" }, [], []).error)
+      .toBe("Event start and end dates and times are required.");
+  });
+
+  it.each(["2099-08-01T", "T10:00"])("rejects incomplete registration date/time %s", (value) => {
+    expect(validateEventForm({ ...validFormState, registration_start_time: value }, [], []).error)
+      .toBe("Registration dates require both a date and time.");
+  });
+  it.each([
+    ["", null],
+    ["2099-08-01T10:00", null],
+    ["2020-08-01T10:00", "Publish date must be in the future."],
+    ["invalid", "Publish date must be a valid date and time in Pacific time."],
+    ["2099-08-01T", "Publish date must be a valid date and time in Pacific time."],
+    ["T10:00", "Publish date must be a valid date and time in Pacific time."],
+    ["2024-03-10T02:30", "Publish date must be a valid date and time in Pacific time."],
+  ])("validates the Pacific publish time %s", (publish_at, expected) => {
+    const result = validateEventForm({
+      ...validFormState,
+      name: "Event",
+      short_description: "Preview",
+      description: "Description",
+      regular_price: "0",
+      member_price: "0",
+      max_capacity: "10",
+      publish_at,
+    }, [], []);
+    expect(result.error).toBe(expected);
+  });
+
   it("detects invalid time ranges", () => {
     expect(isDateTimeRangeInvalid("2026-08-01T10:00", "2026-08-01T09:00")).toBe(
       true
@@ -19,7 +64,7 @@ describe("event form schema", () => {
   it("detects invalid event schedules", () => {
     expect(
       isEventScheduleRangeInvalid({
-        ...defaultFormState,
+        ...validFormState,
         start_date: "2026-08-02",
         start_time: "10:00",
         end_date: "2026-08-01",
@@ -37,7 +82,7 @@ describe("event form schema", () => {
   it("returns question-specific validation errors", () => {
     const result = validateEventForm(
       {
-        ...defaultFormState,
+        ...validFormState,
         name: "Event",
         short_description: "Preview",
         description: "Description",

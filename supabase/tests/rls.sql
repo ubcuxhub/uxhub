@@ -701,21 +701,6 @@ begin
 end;
 $$;
 
--- Scheduled events stay hidden, with their mentors, until publish_at passes.
-update public.events set publish_at = now() + interval '1 day' where id = :'event_id';
-set local role anon;
-do $$
-begin
-  if exists (select 1 from public.events where slug = 'rls-event') then
-    raise exception 'anon can see a scheduled event';
-  end if;
-  if exists (select 1 from public.mentors where full_name = 'RLS Mentor') then
-    raise exception 'anon can see a scheduled event''s mentor';
-  end if;
-end;
-$$;
-reset role;
-
 -- Dashboard summaries are privileged even though they expose aggregates only.
 do $$
 begin
@@ -767,5 +752,43 @@ begin
 end;
 $$;
 reset role;
+
+-- Scheduled drafts stay hidden until the job actually changes their status.
+update public.events set status = 'draft', publish_at = now() + interval '1 day'
+where id = :'event_id';
+set local role anon;
+do $$
+begin
+  if exists (select 1 from public.events where slug = 'rls-event') then
+    raise exception 'anon can see a scheduled event';
+  end if;
+  if exists (select 1 from public.mentors where full_name = 'RLS Mentor') then
+    raise exception 'anon can see a scheduled event''s mentor';
+  end if;
+end;
+$$;
+reset role;
+
+-- Publishing is a write; all active events are visible regardless of dates.
+update public.events set publish_at = now() - interval '1 second' where id = :'event_id';
+select public.publish_due_events();
+set local role anon;
+do $$
+begin
+  if not exists (select 1 from public.events where slug = 'rls-event' and status = 'active') then
+    raise exception 'anon cannot see an automatically activated event';
+  end if;
+  if not public.event_is_public('active', now() + interval '1 day') then
+    raise exception 'public visibility still depends on publish_at';
+  end if;
+  if has_function_privilege('anon', 'public.publish_due_events()', 'execute')
+     or has_function_privilege('authenticated', 'public.publish_due_events()', 'execute') then
+    raise exception 'public roles can publish events';
+  end if;
+end;
+$$;
+reset role;
+
+\ir event-publication.sql
 
 rollback;

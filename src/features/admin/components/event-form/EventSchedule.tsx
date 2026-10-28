@@ -112,6 +112,7 @@ const DatePickerButton = ({
         <Calendar
           mode="single"
           selected={selectedDate}
+          defaultMonth={selectedDate}
           disabled={disabled}
           onSelect={(date) => {
             if (!date) return;
@@ -144,7 +145,7 @@ export const EventSchedule = ({
   return (
     <FieldGroup className="grid gap-4 md:grid-cols-2">
       <Field>
-        <FieldLabel htmlFor="start_date">Start Date</FieldLabel>
+        <FieldLabel htmlFor="start_date">Start Date <span className="text-destructive">*</span></FieldLabel>
         <DatePickerButton
           id="start_date"
           value={start_date}
@@ -153,16 +154,17 @@ export const EventSchedule = ({
         />
       </Field>
       <Field>
-        <FieldLabel htmlFor="start_time">Start Time</FieldLabel>
+        <FieldLabel htmlFor="start_time">Start Time <span className="text-destructive">*</span></FieldLabel>
         <Input
           id="start_time"
           type="time"
+          required
           value={start_time}
           onChange={(e) => onFieldChange("start_time", e.target.value)}
         />
       </Field>
       <Field>
-        <FieldLabel htmlFor="end_date">End Date</FieldLabel>
+        <FieldLabel htmlFor="end_date">End Date <span className="text-destructive">*</span></FieldLabel>
         <DatePickerButton
           id="end_date"
           value={end_date}
@@ -172,10 +174,11 @@ export const EventSchedule = ({
         />
       </Field>
       <Field>
-        <FieldLabel htmlFor="end_time">End Time</FieldLabel>
+        <FieldLabel htmlFor="end_time">End Time <span className="text-destructive">*</span></FieldLabel>
         <Input
           id="end_time"
           type="time"
+          required
           value={end_time}
           min={endTimeMin}
           onChange={(e) => onFieldChange("end_time", e.target.value)}

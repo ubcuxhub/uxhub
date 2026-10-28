@@ -50,6 +50,9 @@ import type {
   UserInfoUpdate,
 } from "@/lib/supabase/models";
 import type { ApplicationStatus, RoleAccess } from "@/lib/supabase/models";
+import { fetchActiveProfile, saveAdminProfile } from "@/lib/supabase-helpers/admin-user-profile";
+import { fetchMembershipTypeById } from "@/lib/supabase-helpers/memberships";
+import { normalizeInterests, validateBirthDate } from "./lib/user-profile";
 
 const MANAGER_USER_FIELDS = new Set([
   "first_name",
@@ -113,6 +116,37 @@ export async function updateManagerUserAction(
   const payload = assertManagerUserUpdate(field, value);
   await adminUpdateUserInfoById(userId, payload);
   revalidatePath("/admin/users");
+}
+
+/** Save the form's profile fields together; roles retain their separate RPC guard. */
+export async function saveManagerUserDetailsAction(userId: string, changes: Record<string, unknown>) {
+  await requireManager();
+  if (!userId) throw new Error("A user id is required.");
+  const patch: UserInfoUpdate = {};
+  for (const [field, value] of Object.entries(changes)) {
+    if (field === "birth_date") patch.birth_date = validateBirthDate(value);
+    else if (field === "interests") patch.interests = normalizeInterests(value);
+    else if (field === "school_institution") {
+      if (value !== null && typeof value !== "string") throw new Error("Enter a valid school or institution.");
+      const user = await fetchActiveProfile(supabaseAdmin, userId);
+      const school = typeof value === "string" ? value.trim() || null : null;
+      if (school === user.school_institution) continue;
+      // Validate against the resulting membership, including a tier changed in this save.
+      const membershipId = Object.hasOwn(changes, "membership_type_id") ? changes.membership_type_id : user.membership_type_id;
+      const membership = typeof membershipId === "string" && membershipId
+        ? await fetchMembershipTypeById(supabaseAdmin, membershipId) : null;
+      if (membership?.name !== "nonUbc") throw new Error("School can only be changed for Non-UBC members.");
+      patch.school_institution = school;
+    }
+    else {
+      if (value !== null && !["string", "number", "boolean"].includes(typeof value)) throw new Error("Invalid user field value.");
+      if (field === "newsletter" && typeof value !== "boolean") throw new Error("Choose a newsletter preference.");
+      Object.assign(patch, assertManagerUserUpdate(field, value as string | number | boolean | null));
+    }
+  }
+  const user = await saveAdminProfile(supabaseAdmin, userId, patch);
+  revalidatePath("/admin/users");
+  return user;
 }
 
 export async function updateUserRoleAction(
@@ -201,6 +235,24 @@ export async function saveAdminEventAction(
 ): Promise<{ id: string }> {
   await requireAdmin();
 
+  if (
+    input.event.publish_at != null &&
+    (typeof input.event.publish_at !== "string" ||
+      !/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(input.event.publish_at) ||
+      !Number.isFinite(Date.parse(input.event.publish_at)))
+  ) {
+    throw new Error("Publish date must be a valid timestamp with a timezone.");
+  }
+
+  if (input.event.publish_at != null) {
+    if (input.event.status !== "draft") {
+      throw new Error("Only draft events can have a publish date.");
+    }
+    if (Date.parse(input.event.publish_at) <= Date.now()) {
+      throw new Error("Publish date must be in the future.");
+    }
+  }
+
   let slug: string | null = null;
 
   if (!input.eventId) {
@@ -249,6 +301,7 @@ export async function saveAdminEventAction(
 
   revalidatePath("/admin/events");
   revalidatePath(`/admin/events/${data.id}`);
+  revalidatePath("/events", "layout");
   return { id: data.id };
 }
 

@@ -20,21 +20,30 @@ won't scan. Target: Nov 12, 2026.
   `/admin/events/[event]/check-in` already lists attending registrations with a
   search box and a per-session check-in toggle (`toggleCheckInAction`).
 
-## Why a signed token
+## Which token
 
-Registration IDs show up in admin URLs, so a QR code holding the bare ID would
-let anyone make a working ticket. The signature proves the server issued it.
+IDs show up in admin URLs, so a QR code holding a bare ID would let anyone make
+a working ticket. The code has to hold something only the server could issue.
 
 The token never expires or changes, so a screenshot scans as well as the live
 page. Reuse is stopped at the door: the second scan finds the existing
 `check_ins` row and shows "Already checked in at 10:02".
 
-**Open:** `event_tickets` has landed (see
-[registration-rollout.md](registration-rollout.md)) with a unique random
-`qr_token` on every ticket, and check-in moves from registrations to tickets.
-Pick one before wiring check-in: keep the signed token over the ticket ID (and
-drop `qr_token`), or use `qr_token` (and delete `check-in-token.ts`).
-`EventTicket` draws whichever string it gets, so neither choice changes it.
+**Decided (2026-10-23): use `qr_token`.** `event_tickets` (see
+[registration-rollout.md](registration-rollout.md)) gives every ticket a unique
+random `qr_token`, and check-in moves from registrations to tickets. The signed
+token is being replaced because:
+
+- it signs a registration ID, and `event_registrations` is being retired;
+- a per-ticket secret can be revoked by regenerating that one token, without
+  rotating `CHECK_IN_TOKEN_SECRET` and invalidating every ticket;
+- 32 hex characters make a smaller QR code than an ID plus a signature;
+- there is no secret to set per environment.
+
+A scan looks the token up together with the event being scanned, so a valid
+ticket for another event is rejected. Once check-in uses `qr_token`, delete
+`check-in-token.ts` and its tests and remove `CHECK_IN_TOKEN_SECRET`.
+`EventTicket` draws whichever string it gets, so it doesn't change.
 
 ## Who gets a ticket
 
@@ -63,9 +72,9 @@ says a registered person stays registered, so the ticket has no cancelled state.
 A server action, `checkInByTokenAction(eventId, sessionId, token)`:
 
 1. `requireAdmin()`.
-2. `verifyCheckInToken(token)` → registration ID, or "Not a UX Hub ticket".
-3. Load the registration and holder name. Reject if it belongs to another event
-   ("Ticket is for a different event") or is not attending ("Ticket cancelled").
+2. Look the ticket up by `qr_token`, with its holder's name, or reject with
+   "Not a UX Hub ticket".
+3. Reject a ticket for another event ("Ticket is for a different event").
 4. Record the check-in atomically, so two scanners on the same code can't both
    win. Do it in one Postgres function (`check_in_registration`, matching
    `check_in_by_token` in the proposed schema), as an insert on the unique
@@ -129,8 +138,6 @@ Before the trial:
 - Check which Square credentials Preview uses. If they're production, every
   registration is a real charge. Every ticket goes through Square today, and
   there is no free-registration path yet.
-- Set `CHECK_IN_TOKEN_SECRET` for Preview. Issue and scan tickets on the same
-  deployment, because a ticket signed with one secret won't verify with another.
 - Give testers the branch's alias URL, so everyone stays on one build across
   pushes. Turn off Vercel Deployment Protection for the trial, or share a
   bypass link, so testers don't need Vercel access.
@@ -139,7 +146,6 @@ Afterwards, leave the event in Draft, or delete it and its registrations.
 
 ## Open questions
 
-- Signed token or `qr_token` (see above).
 - Should managers, not just admins, be able to scan?
 - Free events: do they create an attending registration today, so every attendee
   has a code? (Proposed schema assumption 3.)
