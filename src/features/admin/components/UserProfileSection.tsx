@@ -1,20 +1,18 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { UserRound, X } from "lucide-react";
+import { useId, useRef, useState, type ReactNode } from "react";
+import { Pencil, UserRound, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { createClient } from "@/lib/supabase/client";
 import { BUCKETS } from "@/lib/supabase-helpers/buckets";
 import type { UserInfoRow } from "@/lib/supabase/models";
 import { formatTimestamp } from "@/lib/date";
-import { normalizeInterests } from "../lib/user-profile";
-import {
-  removeUserProfilePhotoAction, saveUserBirthDateAction,
-  saveUserInterestsAction, setStudentVerificationAction,
-} from "../user-profile-actions";
+import { normalizeInterests, PROFILE_PHOTO_MAX_BYTES } from "../lib/user-profile";
+import type { UserEditDraft } from "../lib/user-edit";
 
 interface Props {
   section: "photo" | "verification" | "birthday" | "interests";
@@ -22,97 +20,63 @@ interface Props {
   verifierName?: string;
   canEdit: boolean;
   busy: boolean;
-  onBusy: (busy: boolean) => void;
-  onUpdate: (user: UserInfoRow) => void;
+  draft: UserEditDraft | null;
+  onDraftChange: (changes: Partial<UserEditDraft>) => void;
   children?: ReactNode;
 }
 
-export function UserProfileSection({ section, user, verifierName, canEdit, busy, onBusy, onUpdate, children }: Props) {
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState("");
-  const [tags, setTags] = useState<string[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [file, setFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
-  const [previousCanEdit, setPreviousCanEdit] = useState(canEdit);
+export function UserProfileSection({ section, user, verifierName, canEdit, busy, draft, onDraftChange, children }: Props) {
+  const verificationId = useId();
   const fileInput = useRef<HTMLInputElement>(null);
-  if (previousCanEdit !== canEdit) {
-    setPreviousCanEdit(canEdit);
-    setEditing(false);
-    setFile(null);
-    setPreview(null);
-    setError(null);
-  }
-  useEffect(() => {
-    return () => { if (preview) URL.revokeObjectURL(preview); };
-  }, [preview]);
-
-  async function save(operation: () => Promise<UserInfoRow>) {
-    if (busy) return;
-    onBusy(true);
-    setError(null);
-    try {
-      onUpdate(await operation());
-      setEditing(false);
-      setFile(null);
-      setPreview(null);
-      if (fileInput.current) fileInput.current.value = "";
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Unable to save. Try again.");
-    } finally {
-      onBusy(false);
-    }
-  }
+  const [error, setError] = useState<string | null>(null);
+  const errorMessage = error ? <p role="alert" className="text-small text-destructive">{error}</p> : null;
 
   function addTag() {
-    if (!draft.trim()) return tags;
-    const next = normalizeInterests([...tags, draft]);
-    setTags(next);
-    setDraft("");
-    return next;
+    if (!draft?.newInterest.trim()) return;
+    try {
+      onDraftChange({ interests: normalizeInterests([...draft.interests, draft.newInterest]), newInterest: "" });
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Unable to add interest.");
+    }
   }
-
-  const errorMessage = error ? <p role="alert" className="text-small text-destructive">{error}</p> : null;
-  const controls = (operation: () => Promise<UserInfoRow>) => (
-    <div className="flex gap-2">
-      <Button disabled={busy} onClick={() => save(operation)}>{busy ? "Saving…" : "Save"}</Button>
-      <Button variant="outline" disabled={busy} onClick={() => { setEditing(false); setError(null); }}>Cancel</Button>
-    </div>
-  );
 
   if (section === "photo") {
     const photoUrl = user.profile_photo_path
       ? createClient().storage.from(BUCKETS.profilePhotos).getPublicUrl(user.profile_photo_path).data.publicUrl
       : null;
+    const preview = draft?.photo?.preview;
+    const displayedPhoto = draft?.photo === null ? null : preview || photoUrl;
     return (
       <section aria-label="Profile photo" className="space-y-2">
         <div className="flex items-start gap-4">
-          <ProfileAvatar key={preview || photoUrl || "empty"} src={preview || photoUrl} name={user.first_name} />
+          {canEdit ? <button type="button" aria-label="Change profile photo" title="Change profile photo" disabled={busy}
+            className="group relative shrink-0 cursor-pointer rounded-full bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-50"
+            onClick={() => fileInput.current?.click()}>
+            <div className="rounded-full transition-opacity group-enabled:group-hover:opacity-50 group-enabled:group-focus-visible:opacity-50 motion-reduce:transition-none">
+              <ProfileAvatar key={displayedPhoto || "empty"} src={displayedPhoto} name={user.first_name} />
+            </div>
+            <span className="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full text-foreground opacity-0 transition-opacity group-enabled:group-hover:opacity-100 group-enabled:group-focus-visible:opacity-100 motion-reduce:transition-none" aria-hidden="true">
+              <Pencil className="size-5" />
+            </span>
+          </button> : <ProfileAvatar key={photoUrl || "empty"} src={photoUrl} name={user.first_name} />}
           {children}
         </div>
         {canEdit && <div className="space-y-2">
-            <Label htmlFor={`photo-${user.id}`}>Profile photo</Label>
-            <Input ref={fileInput} id={`photo-${user.id}`} type="file" accept="image/jpeg,image/png" disabled={busy}
+            <input ref={fileInput} id={`photo-${user.id}`} aria-label="Profile photo" type="file" accept="image/jpeg,image/png" disabled={busy} className="sr-only" tabIndex={-1}
               onChange={(event) => {
-                const chosen = event.target.files?.[0] ?? null;
-                setFile(chosen); setPreview(chosen ? URL.createObjectURL(chosen) : null); setError(null);
+                const chosen = event.target.files?.[0];
+                if (!chosen || busy) return;
+                if (!["image/jpeg", "image/png"].includes(chosen.type) || chosen.size > PROFILE_PHOTO_MAX_BYTES) {
+                  setError("Choose a JPEG or PNG up to 4 MiB.");
+                } else {
+                  onDraftChange({ photo: { file: chosen, preview: URL.createObjectURL(chosen) } });
+                  setError(null);
+                }
+                event.target.value = "";
               }} />
-            <p className="text-small text-muted-foreground">JPEG or PNG, up to 4 MiB. Photos are public.</p>
-        </div>}
-        {canEdit && <div className="flex flex-wrap gap-2">
-          {file && <>
-            <Button disabled={busy} onClick={() => save(async () => {
-              const form = new FormData();
-              form.set("file", file);
-              form.set("expectedPath", user.profile_photo_path ?? "");
-              const response = await fetch(`/api/admin/users/${user.id}/photo`, { method: "POST", body: form });
-              const data = await response.json();
-              if (!response.ok) throw new Error(data.error || "Unable to upload photo.");
-              return data.user;
-            })}>{busy ? "Saving…" : "Save photo"}</Button>
-            <Button variant="outline" disabled={busy} onClick={() => { setFile(null); setPreview(null); setError(null); if (fileInput.current) fileInput.current.value = ""; }}>Cancel photo</Button>
-          </>}
-          {user.profile_photo_path && <Button variant="outline" disabled={busy} onClick={() => save(() => removeUserProfilePhotoAction(user.id, user.profile_photo_path))}>Remove photo</Button>}
+            <p className="text-small text-muted-foreground">{busy ? "Saving…" : "Click the photo to change it. JPEG or PNG, up to 4 MiB. Photos are public."}</p>
+            {displayedPhoto && <Button variant="outline" disabled={busy} onClick={() => { onDraftChange({ photo: null }); setError(null); }}>Remove photo</Button>}
         </div>}
         {errorMessage}
       </section>
@@ -121,50 +85,46 @@ export function UserProfileSection({ section, user, verifierName, canEdit, busy,
 
   if (section === "verification") return (
     <section aria-label="Student Verification" className="space-y-2">
-      <h3 className="text-small font-medium">Student Verification</h3>
-      <p className="text-small">{user.student_verified_at ? "Verified" : "Unverified"}</p>
-      {user.student_verified_at && <p className="text-small text-muted-foreground">
+      <Label htmlFor={verificationId} className="flex items-center gap-2 text-small font-normal">
+        <Checkbox id={verificationId} checked={canEdit && draft ? draft.verified : !!user.student_verified_at} disabled={!canEdit || busy}
+          onCheckedChange={(checked) => onDraftChange({ verified: checked })} />
+        Student Verification
+      </Label>
+      {user.student_verified_at && (!canEdit || draft?.verified) && <p className="text-small text-muted-foreground">
         {formatTimestamp(user.student_verified_at)} · {verifierName || "Former or unavailable manager"}
       </p>}
-      {canEdit && <Button variant="outline" disabled={busy} onClick={() => save(() => setStudentVerificationAction(user.id, !user.student_verified_at))}>
-        {user.student_verified_at ? "Clear verification" : "Verify student"}
-      </Button>}
       {errorMessage}
     </section>
   );
 
   return (
-    <section aria-label={section === "birthday" ? "Birthday" : "Interests"} className="space-y-2">
-      <h3 className="text-small font-medium">{section === "birthday" ? "Birthday" : "Interests"}</h3>
-      {editing ? <>
-        {section === "birthday" ? <Input aria-label="Birthday" type="date" value={draft} max={new Date().toISOString().slice(0, 10)} disabled={busy} onChange={(event) => setDraft(event.target.value)} /> : <>
-          <div className="flex flex-wrap gap-3">{tags.map((tag) => (
+    <section aria-label={section === "birthday" ? "Birthday" : "Interests"} className={section === "birthday" ? "flex flex-col gap-2" : "flex flex-col gap-4"}>
+      <h3 className="text-body font-medium">{section === "birthday" ? "Birthday" : "Interests"}</h3>
+      {canEdit ? <>
+        {section === "birthday" ? <Input className="text-small" aria-label="Birthday" type="date" value={draft?.birthDate ?? ""} max={new Date().toISOString().slice(0, 10)} disabled={busy} onChange={(event) => onDraftChange({ birthDate: event.target.value })} /> : <>
+          <div className="flex flex-wrap gap-4">{(draft?.interests ?? []).map((tag) => (
             <InterestTag key={tag} tag={tag}>
               <button type="button" disabled={busy} aria-label={`Remove interest ${tag}`}
-                className="rounded-sm p-1 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-                onClick={() => setTags(tags.filter((item) => item !== tag))}>
+                className="cursor-pointer rounded-sm p-1 hover:bg-info/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                onClick={() => onDraftChange({ interests: draft?.interests.filter((item) => item !== tag) })}>
                 <X className="size-3" aria-hidden="true" />
               </button>
             </InterestTag>
           ))}</div>
           <div className="flex gap-2">
-            <Input aria-label="New interest" value={draft} maxLength={50} disabled={busy} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => {
-              if (event.key === "Enter") { event.preventDefault(); try { addTag(); setError(null); } catch (cause) { setError((cause as Error).message); } }
+            <Input className="text-small" aria-label="New interest" value={draft?.newInterest ?? ""} maxLength={50} disabled={busy} onChange={(event) => onDraftChange({ newInterest: event.target.value })} onKeyDown={(event) => {
+              if (event.key === "Enter") { event.preventDefault(); addTag(); }
             }} />
-            <Button variant="outline" disabled={busy} onClick={() => { try { addTag(); setError(null); } catch (cause) { setError((cause as Error).message); } }}>Add tag</Button>
+            <Button variant="outline" disabled={busy} onClick={() => { addTag(); }}>Add tag</Button>
           </div>
           <p className="text-small text-muted-foreground">Up to 20 tags, 50 characters each.</p>
         </>}
-        {controls(async () => section === "birthday" ? saveUserBirthDateAction(user.id, draft || null) : saveUserInterestsAction(user.id, addTag()))}
       </> : <div className={section === "interests" ? "flex items-start justify-between gap-3 text-small" : "flex items-center justify-between gap-2 rounded-md border border-input px-3 py-2 text-small"}>
         {section === "interests" ? (
-          <div className="flex min-w-0 flex-wrap gap-3">
+          <div className="flex min-w-0 flex-wrap gap-4">
             {user.interests.length ? user.interests.map((tag) => <InterestTag key={tag} tag={tag} />) : <span className="text-muted-foreground">—</span>}
           </div>
         ) : <span>{user.birth_date || "—"}</span>}
-        {canEdit && <Button variant="ghost" className="h-6 px-2" disabled={busy} onClick={() => {
-          setDraft(section === "birthday" ? user.birth_date ?? "" : ""); setTags(user.interests); setError(null); setEditing(true);
-        }}>Edit</Button>}
       </div>}
       {errorMessage}
     </section>
@@ -173,7 +133,7 @@ export function UserProfileSection({ section, user, verifierName, canEdit, busy,
 
 function InterestTag({ tag, children }: { tag: string; children?: ReactNode }) {
   return (
-    <Badge variant="outline" className="min-h-8 max-w-full gap-1 rounded-lg bg-muted px-4 py-1.5 text-muted-foreground">
+    <Badge variant="outline" className="min-h-8 max-w-full gap-1 rounded-lg border-info bg-info-bg px-4 py-1.5 text-small text-info">
       <span className="min-w-0 break-words">{tag}</span>
       {children}
     </Badge>

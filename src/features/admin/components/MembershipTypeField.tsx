@@ -1,91 +1,39 @@
 "use client";
 
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { useId } from "react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatMembershipTypeName } from "@/features/memberships/lib/display";
 import type { MembershipTypeOption } from "../types";
+import { UserDetailField, UserDetailValue } from "./UserDetailField";
 
 interface MembershipTypeFieldProps {
   value: string | null | undefined;
   selectedMembershipTypeId: string | null | undefined;
-  isEditing: boolean;
-  editValue: string;
   membershipTypes: MembershipTypeOption[];
   isSaving: boolean;
-  onEditStart: (field: string, currentValue: string | number | boolean | null) => void;
-  onEditCancel: () => void;
-  onEditSave: (field: string) => void;
+  editValue?: string;
   onValueChange: (value: string) => void;
-  canEdit?: boolean;
+  canEdit: boolean;
 }
 
-export function MembershipTypeField({
-  value,
-  selectedMembershipTypeId,
-  isEditing,
-  editValue,
-  membershipTypes,
-  isSaving,
-  onEditStart,
-  onEditCancel,
-  onEditSave,
-  onValueChange,
-  canEdit = true,
-}: MembershipTypeFieldProps) {
+export function MembershipTypeField({ value, selectedMembershipTypeId, membershipTypes, isSaving, editValue, onValueChange, canEdit }: MembershipTypeFieldProps) {
+  const id = useId();
   return (
-    <div className="space-y-2">
-      <Label>Membership Type</Label>
-      {isEditing ? (
-        <div className="flex gap-2">
-          <Select value={editValue} onValueChange={onValueChange}>
-            <SelectTrigger className="flex-1">
-              <SelectValue placeholder="Select membership type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="__none__">None</SelectItem>
-              {membershipTypes.map((membershipType) => (
-                <SelectItem key={membershipType.id} value={membershipType.id}>
-                  {formatMembershipTypeName(membershipType.name)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button
-            onClick={() => onEditSave("membership_type_id")}
-            disabled={isSaving}
-          >
-            Save
-          </Button>
-          <Button variant="outline" onClick={onEditCancel} disabled={isSaving}>
-            Cancel
-          </Button>
-        </div>
-      ) : (
-        <div className="flex items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-small">
-          <span className={!value ? "text-muted-foreground" : ""}>{value ? formatMembershipTypeName(value) : "None"}</span>
-          {canEdit && (
-            <Button
-              variant="ghost"
-              onClick={() =>
-                onEditStart(
-                  "membership_type_id",
-                  selectedMembershipTypeId ?? null
-                )
-              }
-              className="h-6 px-2"
-            >
-              Edit
-            </Button>
-          )}
-        </div>
-      )}
-    </div>
+    <UserDetailField label="Membership Type" htmlFor={canEdit ? id : undefined}>
+      {canEdit ? <>
+        <Select value={editValue || "__none__"} onValueChange={(value) => onValueChange(value === "__none__" ? "" : value)} disabled={isSaving}>
+          <SelectTrigger id={id} className="text-small"><SelectValue placeholder="Select membership type" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">None</SelectItem>
+            {selectedMembershipTypeId && !membershipTypes.some((tier) => tier.id === selectedMembershipTypeId) && (
+              <SelectItem value={selectedMembershipTypeId} disabled>{value ? formatMembershipTypeName(value) : "Inactive membership"}</SelectItem>
+            )}
+            {membershipTypes.map((tier) => <SelectItem key={tier.id} value={tier.id}>{formatMembershipTypeName(tier.name)}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </> : <UserDetailValue>
+        <span className={!value ? "text-muted-foreground" : ""}>{value ? formatMembershipTypeName(value) : "None"}</span>
+      </UserDetailValue>}
+    </UserDetailField>
   );
 }

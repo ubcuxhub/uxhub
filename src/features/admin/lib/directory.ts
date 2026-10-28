@@ -1,4 +1,4 @@
-import type { UserInfoRow } from "@/lib/supabase/models";
+import type { UserRecord } from "../types";
 
 export function toggleSetValue<T>(values: Set<T>, value: T): Set<T> {
   const next = new Set(values);
@@ -10,16 +10,12 @@ export function toggleSetValue<T>(values: Set<T>, value: T): Set<T> {
   return next;
 }
 
-/**
- * The school the admin directory shows. Sign-up stores a school only for
- * non-UBC members and clears it for UBC students and faculty, whose school is
- * implied by their type, so it is derived for them rather than read.
- */
+/** Non-UBC memberships use the saved institution; all other selections imply UBC. */
 export function displaySchool(
-  user: Pick<UserInfoRow, "school_institution" | "user_type">
+  user: Pick<UserRecord, "school_institution" | "membership_type_name">,
+  membershipTypeName = user.membership_type_name,
 ): string | null {
-  if (user.school_institution) return user.school_institution;
-  return user.user_type === "ubcStudent" || user.user_type === "faculty"
-    ? "University of British Columbia"
-    : null;
+  return membershipTypeName === "nonUbc"
+    ? user.school_institution || null
+    : "University of British Columbia";
 }
