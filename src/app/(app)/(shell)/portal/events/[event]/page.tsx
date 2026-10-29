@@ -38,8 +38,8 @@ export default async function PortalEventPage({
     event.sponsors_enabled ? await fetchEventSponsors(supabase, event.id) : [],
   ]);
 
-  const startTime = formatEventTime(event.start_time);
-  const endTime = formatEventTime(event.end_time);
+  const startTime = formatEventTime(event.starts_at);
+  const endTime = formatEventTime(event.ends_at);
 
   return (
     <PageContainer backHref="/portal/events" backLabel="Back to Events" className="space-y-4">
@@ -66,9 +66,9 @@ export default async function PortalEventPage({
                 <Calendar className="p-3 h-fit w-fit text-muted-foreground border-[0.8px] rounded-md" />
                 <div className="flex flex-col gap-1">
                   <p className="font-medium">
-                    {formatEventDate(event.start_date, { year: "numeric", month: "short" }) ?? "TBD"}
-                    {event.end_date && event.end_date !== event.start_date
-                      ? ` – ${formatEventDate(event.end_date, { year: "numeric", month: "short" }) ?? "TBD"}`
+                    {formatEventDate(event.starts_at, { year: "numeric", month: "short" }) ?? "TBD"}
+                    {event.ends_at && event.ends_at !== event.ends_at
+                      ? ` – ${formatEventDate(event.ends_at, { year: "numeric", month: "short" }) ?? "TBD"}`
                       : ""}
                   </p>
                   {startTime && (

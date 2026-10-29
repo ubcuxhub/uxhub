@@ -1,6 +1,6 @@
 import * as React from "react"
 
-import { getPacificStartDefaults } from "@/lib/date"
+import { timestamptzToDatetimeLocal } from "@/lib/date"
 
 export interface PacificNow {
   /** "2026-10-22" */
@@ -18,8 +18,7 @@ function subscribe(onChange: () => void) {
 
 // One string at minute precision, so React only re-renders when the minute changes.
 function getSnapshot() {
-  const { start_date, start_time } = getPacificStartDefaults()
-  return `${start_date} ${start_time}`
+  return timestamptzToDatetimeLocal(new Date().toISOString())
 }
 
 function getServerSnapshot() {
@@ -35,6 +34,6 @@ export function usePacificNow(): PacificNow | null {
   const snapshot = React.useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot)
   if (!snapshot) return null
 
-  const [date, time] = snapshot.split(" ")
+  const [date, time] = snapshot.split("T")
   return { date, time }
 }
