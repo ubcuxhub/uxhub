@@ -143,6 +143,7 @@ export type Database = {
           id: string
           title: string | null
         }
+        ComputedFields: never
         Insert: {
           date: string
           event_id: string
@@ -175,6 +176,7 @@ export type Database = {
           start_time: string
           title: string
         }
+        ComputedFields: never
         Insert: {
           building?: string | null
           end_time: string

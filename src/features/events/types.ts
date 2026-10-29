@@ -54,8 +54,6 @@ export interface GroupedRegistration {
   registrationId: string;
 }
 
-
-
 export interface EventGroup {
   key: string;
   label: string;

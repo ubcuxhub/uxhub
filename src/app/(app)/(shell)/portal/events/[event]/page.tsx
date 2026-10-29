@@ -1,8 +1,6 @@
 import Link from "next/link";
-import Image from "next/image";
 import { notFound } from "next/navigation";
 import { EventAgendaTable } from "@/features/events/components/EventAgendaTable";
-import { Button } from "@/components/ui/button";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { requireAuth } from "@/lib/auth/guards";
 import { FLAGS } from "@/lib/flags";
@@ -33,10 +31,13 @@ export default async function PortalEventPage({
     notFound();
   }
   
-  const agenda = await fetchEventAgenda(supabase, event.id);
-  // Admins switch these sections off per event, as the public event page does.
-  const mentors = event.mentors_enabled ? await fetchEventMentors(supabase, event.id) : [];
-  const sponsors = event.sponsors_enabled ? await fetchEventSponsors(supabase, event.id) : [];
+  const [agenda, mentors, sponsors] = await Promise.all([
+    fetchEventAgenda(supabase, event.id),
+    // Admins switch these sections off per event, as the public event page does.
+    event.mentors_enabled ? await fetchEventMentors(supabase, event.id) : [],
+    event.sponsors_enabled ? await fetchEventSponsors(supabase, event.id) : [],
+  ]);
+
   const startTime = formatEventTime(event.start_time);
   const endTime = formatEventTime(event.end_time);
 
@@ -45,16 +46,13 @@ export default async function PortalEventPage({
       <div className="border-border-subtle rounded-md border">
         <div className="w-full h-51 bg-brand-blue-200 relative rounded-t-md">
           {/* cover image placeholder */}
-          {event.image_url ? (
+          {event.image_url && (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={resolveImagePreviewSrc(event.image_url)}
               alt=""
               className="size-24 rounded-xl object-cover absolute -bottom-4 left-12"
             />
-          ) : (
-            <div>
-            </div>
           )}          
         </div>
         <div className="px-6 pb-6">
@@ -102,7 +100,7 @@ export default async function PortalEventPage({
               </div>
             </div>
           </div>
-          <p>{event.description}</p>
+          <p className="whitespace-pre-wrap">{event.description}</p>
         </div>
       </div>
 

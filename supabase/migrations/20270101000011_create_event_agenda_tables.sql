@@ -42,6 +42,7 @@ using (
     from public.events event
     where event.id = event_agenda_days.event_id
       and event.status = 'active'::public.event_status
+      and (event.publish_at is null or event.publish_at <= now())
   )
 );
 
@@ -62,6 +63,7 @@ using (
     join public.events event on event.id = agenda_day.event_id
     where agenda_day.id = event_agenda_items.event_agenda_day_id
       and event.status = 'active'::public.event_status
+      and (event.publish_at is null or event.publish_at <= now())
   )
 );
 
