@@ -9,6 +9,7 @@ import {
   MembershipCard,
   MembershipCardEmptyState,
 } from "@/features/memberships/components/MembershipCard";
+import { DiscountCodes } from "@/features/memberships/components/DiscountCodes";
 import { formatUserName } from "@/lib/user-name";
 import { createClient } from "@/lib/supabase/server";
 import { getMembershipTermEndsAt } from "@/features/memberships/lib/term";
@@ -46,6 +47,8 @@ export default async function PortalHome() {
       ) : (
         canJoin && !isMember && <MembershipCardEmptyState />
       )}
+
+      {isMember && <DiscountCodes />}
     </PageContainer>
   );
 }
