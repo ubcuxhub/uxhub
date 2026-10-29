@@ -3,15 +3,13 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import type { EventRow, EventStatus } from "@/lib/supabase/models";
+import type { EventStatus } from "@/lib/supabase/models";
 import { AdminEventsTable, type AdminEventTableRow } from "./AdminEventsTable";
 
 afterEach(cleanup);
 
 function row(id: string, name: string, starts_at: string | null, status: EventStatus, registrationOpen: boolean): AdminEventTableRow {
   return {
-    // Cast because the legacy schedule columns are still in the generated
-    // types until step 3 of docs/registration-rollout.md drops them.
     event: {
       id, name, starts_at, status,
       max_capacity: 30,
@@ -36,7 +34,7 @@ function row(id: string, name: string, starts_at: string | null, status: EventSt
       slug: id,
       sponsors_enabled: false,
       updated_at: null,
-    } as Partial<EventRow> as EventRow,
+    },
     registrationCount: 7,
     registrationOpen,
   };
@@ -46,7 +44,7 @@ const rows = [
   row("older", "Design Meetup", "2026-09-01T17:00:00+00:00", "active", false),
   row("newer", "Design Workshop", "2026-11-01T17:00:00+00:00", "active", true),
   row("draft", "Draft Workshop", "2026-12-01T18:00:00+00:00", "draft", true),
-  row("undated", "Archived Meetup", null, "archived", false),
+  row("undated", "Undated Meetup", null, "active", false),
 ];
 
 function rowNames() {
@@ -56,9 +54,9 @@ function rowNames() {
 describe("AdminEventsTable regression", () => {
   it("retains date ordering and leaves undated events last in both directions", () => {
     render(<AdminEventsTable rows={rows} />);
-    expect(rowNames()).toEqual(["View details for Draft Workshop", "View details for Design Workshop", "View details for Design Meetup", "View details for Archived Meetup"]);
+    expect(rowNames()).toEqual(["View details for Draft Workshop", "View details for Design Workshop", "View details for Design Meetup", "View details for Undated Meetup"]);
     fireEvent.click(screen.getByRole("button", { name: "Sort by date ascending" }));
-    expect(rowNames()).toEqual(["View details for Design Meetup", "View details for Design Workshop", "View details for Draft Workshop", "View details for Archived Meetup"]);
+    expect(rowNames()).toEqual(["View details for Design Meetup", "View details for Design Workshop", "View details for Draft Workshop", "View details for Undated Meetup"]);
   });
 
   it("combines trimmed name search with status and registration filters, including draft N/A", () => {
@@ -82,9 +80,9 @@ describe("AdminEventsTable regression", () => {
     render(<AdminEventsTable rows={rows} />);
     fireEvent.click(screen.getByRole("button", { name: "Filters" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Active" }));
-    fireEvent.click(screen.getByRole("checkbox", { name: "Archived" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Draft" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Closed" }));
-    expect(rowNames()).toEqual(["View details for Design Meetup", "View details for Archived Meetup"]);
+    expect(rowNames()).toEqual(["View details for Design Meetup", "View details for Undated Meetup"]);
   });
 
   it.each(["click", "Enter", " "])("opens the existing sheet by %s with the same management links", (activation) => {

@@ -75,7 +75,7 @@ begin
 end;
 $$;
 update public.events set publish_at = now() + interval '2 days' where id = :'event_id';
-update public.events set status = 'archived' where id = :'event_id';
+update public.events set status = 'active' where id = :'event_id';
 select pg_temp.assert_publication_jobs();
 do $$
 begin
@@ -299,7 +299,6 @@ insert into public.events (name, description, regular_price, member_price, max_c
 values
  ('Legacy scheduled', 'Rollback fixture', 0, 0, 10, 'rls-legacy-scheduled', 'active', now() + interval '2 days'),
  ('Legacy published', 'Rollback fixture', 0, 0, 10, 'rls-legacy-published', 'active', now() - interval '2 days'),
- ('Legacy archived', 'Rollback fixture', 0, 0, 10, 'rls-legacy-archived', 'archived', now() + interval '2 days'),
  ('Legacy draft', 'Rollback fixture', 0, 0, 10, 'rls-legacy-draft', 'draft', now() + interval '2 days');
 \ir ../migrations/20261027230346_activate_scheduled_drafts.sql
 
@@ -312,10 +311,6 @@ begin
   if not exists (select 1 from public.events where slug = 'rls-legacy-published'
     and status = 'active' and publish_at is null) then
     raise exception 'migration changed an already published event';
-  end if;
-  if not exists (select 1 from public.events where slug = 'rls-legacy-archived'
-    and status = 'archived' and publish_at is null) then
-    raise exception 'migration retained an archived schedule';
   end if;
   if not exists (select 1 from public.events where slug = 'rls-legacy-draft'
     and status = 'draft' and publish_at = now() + interval '2 days') then

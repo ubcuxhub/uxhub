@@ -12,9 +12,6 @@ const TABLE = {
   eventApplicationQuestions: "event_application_questions",
   eventApplicationResponses: "event_application_responses",
   eventApplications: "event_applications",
-  // Legacy, until step 3 of docs/registration-rollout.md drops it. The seed
-  // no longer writes it, and prunes what fixture accounts still hold there.
-  eventRegistrations: "event_registrations",
   eventTickets: "event_tickets",
   events: "events",
   membershipTypes: "membership_types",
@@ -1022,7 +1019,6 @@ export interface UserPruneSummary {
   purchases: number;
   tickets: number;
   applications: number;
-  legacyRegistrations: number;
   responses: number;
   checkIns: number;
 }
@@ -1032,7 +1028,6 @@ function emptyPruneSummary(): UserPruneSummary {
     purchases: 0,
     tickets: 0,
     applications: 0,
-    legacyRegistrations: 0,
     responses: 0,
     checkIns: 0,
   };
@@ -1064,8 +1059,7 @@ async function deleteByIds(
  * Order matters. Tickets and applications go first so their check-ins and
  * responses cascade; purchases follow, because `event_tickets.purchase_id` is
  * `on delete set null` and a surviving ticket would otherwise silently lose its
- * link. Fixture accounts' legacy `event_registrations` all go: the seed no
- * longer writes them.
+ * link.
  */
 export async function pruneUserFixtures(
   supabase: SupabaseClient,
@@ -1117,11 +1111,10 @@ export async function pruneUserFixtures(
     return (data ?? []) as EventUserRow[];
   };
 
-  /* ── Tickets, applications, and legacy registrations ── */
-  const [ticketRows, applicationRows, legacyRows] = await Promise.all([
+  /* ── Tickets and applications ── */
+  const [ticketRows, applicationRows] = await Promise.all([
     readOwned(TABLE.eventTickets),
     readOwned(TABLE.eventApplications),
-    readOwned(TABLE.eventRegistrations),
   ]);
   const ticketPlan = planPrune(
     ticketRows,
@@ -1136,7 +1129,6 @@ export async function pruneUserFixtures(
 
   summary.tickets = ticketPlan.remove.length;
   summary.applications = applicationPlan.remove.length;
-  summary.legacyRegistrations = legacyRows.length;
 
   if (!options.dryRun) {
     await deleteByIds(
@@ -1150,12 +1142,6 @@ export async function pruneUserFixtures(
       TABLE.eventApplications,
       applicationPlan.remove.map((entry) => entry.row.id),
       "event applications"
-    );
-    await deleteByIds(
-      supabase,
-      TABLE.eventRegistrations,
-      legacyRows.map((row) => row.id),
-      "event registrations"
     );
   }
 
@@ -1316,8 +1302,8 @@ export async function pruneUserFixtures(
  * key between users. Leaving them would fail the run, not just leave clutter.
  *
  * Deletion order follows the foreign keys, all of which are `no action` rather
- * than cascade: tickets, applications and legacy registrations (as attendee and
- * as reviewer) must go before the profile, and the profile before the auth
+ * than cascade: tickets and applications must go before the profile, and the
+ * profile before the auth
  * user, whose `auth_user_id` reference would otherwise hold it. Purchases
  * cascade off the profile on their own.
  *
@@ -1364,8 +1350,6 @@ export async function removeRetiredFixtures(
     for (const [table, column] of [
       [TABLE.eventTickets, "user_id"],
       [TABLE.eventApplications, "user_id"],
-      [TABLE.eventRegistrations, "user_id"],
-      [TABLE.eventRegistrations, "reviewer_id"],
     ] as const) {
       const { error: registrationError } = await supabase
         .from(table)

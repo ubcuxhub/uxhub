@@ -40,17 +40,17 @@ returning id as auth_user_id, email
 
 insert into public.events (
   name, description, regular_price, member_price, max_capacity, slug,
-  registration_start_time, registration_end_time, status
+  registration_opens_at, registration_closes_at, status, requires_application
 )
 values (
   'RLS Event', 'RLS test event', 0, 0, 10, 'rls-event',
-  now() - interval '1 hour', now() + interval '1 hour', 'active'
+  now() - interval '1 hour', now() + interval '1 hour', 'active', true
 )
 returning id \gset event_
 
 insert into public.events (
   name, description, regular_price, member_price, max_capacity, slug,
-  registration_start_time, registration_end_time, status
+  registration_opens_at, registration_closes_at, status
 )
 values (
   'RLS Draft Event', 'RLS draft event', 0, 0, 10, 'rls-draft-event',
@@ -81,20 +81,24 @@ values (:'event_id', :'sponsor_id');
 insert into public.check_in_sessions (event_id, name, start_time, end_time)
 values (:'event_id', 'RLS Session', now(), now() + interval '1 hour');
 
-insert into public.event_registrations (event_id, user_id, status)
-values (:'event_id', :'user_b_id', 'pending')
-returning id \gset user_b_registration_
+insert into public.event_applications (event_id, user_id)
+values (:'event_id', :'user_b_id')
+returning id \gset user_b_application_
 
 insert into public.event_application_responses (
-  event_registration_id,
+  application_id,
   event_application_question_id,
   response
 )
 values (
-  :'user_b_registration_id',
+  :'user_b_application_id',
   :'question_id',
   'User B response'
 );
+
+-- Both hold a ticket, so user A can read the event's check-in sessions.
+insert into public.event_tickets (event_id, user_id)
+values (:'event_id', :'user_a_id'), (:'event_id', :'user_b_id');
 
 set local role anon;
 do $$
@@ -168,42 +172,42 @@ begin
   end;
 
   select count(*) into visible_count
-  from public.event_registrations
+  from public.event_applications
   where event_id = current_setting('rls.event_id')::uuid;
   if visible_count <> 0 then
-    raise exception 'user A can read user B registration';
+    raise exception 'user A can read user B application';
   end if;
 
   begin
-    insert into public.event_registrations (event_id, user_id, status)
+    insert into public.event_applications (event_id, user_id, status, offer_expires_at)
     values (
       current_setting('rls.event_id')::uuid,
       public.current_user_info_id(),
-      'accepted'
+      'accepted',
+      now() + interval '1 day'
     );
-    raise exception 'user A inserted a pre-approved registration';
+    raise exception 'user A inserted a pre-approved application';
   exception
     when insufficient_privilege or check_violation then
       null;
   end;
 
-  insert into public.event_registrations (event_id, user_id, status)
+  insert into public.event_applications (event_id, user_id)
   values (
     current_setting('rls.event_id')::uuid,
-    public.current_user_info_id(),
-    'pending'
+    public.current_user_info_id()
   );
 
-  update public.event_registrations
-  set status = 'accepted'
+  update public.event_applications
+  set status = 'rejected'
   where user_id = current_setting('rls.user_b_id')::uuid;
   get diagnostics changed_count = row_count;
   if changed_count <> 0 then
-    raise exception 'user A updated user B registration';
+    raise exception 'user A updated user B application';
   end if;
 
-  update public.event_registrations
-  set status = 'accepted'
+  update public.event_applications
+  set status = 'accepted', offer_expires_at = now() + interval '1 day'
   where user_id = public.current_user_info_id();
   get diagnostics changed_count = row_count;
   if changed_count <> 0 then
@@ -211,21 +215,26 @@ begin
   end if;
 
   insert into public.event_application_responses (
-    event_registration_id,
+    application_id,
     event_application_question_id,
     response
   )
   select id, current_setting('rls.question_id')::uuid, 'User A response'
-  from public.event_registrations
+  from public.event_applications
   where user_id = public.current_user_info_id();
 
   select count(*) into visible_count
-  from public.event_application_responses response
-  join public.event_registrations registration
-    on registration.id = response.event_registration_id
-  where registration.event_id = current_setting('rls.event_id')::uuid;
+  from public.event_application_responses
+  where event_application_question_id = current_setting('rls.question_id')::uuid;
   if visible_count <> 1 then
     raise exception 'user A should see one own response, saw %', visible_count;
+  end if;
+
+  select count(*) into visible_count
+  from public.event_tickets
+  where event_id = current_setting('rls.event_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'user A should see only their own ticket, saw %', visible_count;
   end if;
 
   select count(*) into visible_count
@@ -256,16 +265,14 @@ begin
     raise exception 'registered user cannot read active event sponsor';
   end if;
 
-  -- The admin dashboard reads registration totals through this function rather
-  -- than one head-count per event. It is security invoker, so a member must
-  -- only ever count their own row -- both user A and user B are registered for
-  -- this event, and user A may see exactly one of them.
-  select registration_count into visible_count
-  from public.event_registration_counts(
+  -- Seats left are public, so the count covers every ticket on the event,
+  -- not just the ones RLS shows the caller.
+  select tickets into visible_count
+  from public.event_seat_counts(
     array[current_setting('rls.event_id')::uuid]
   );
-  if visible_count <> 1 then
-    raise exception 'member counted other registrations, saw %', visible_count;
+  if visible_count <> 2 then
+    raise exception 'member seat count missed tickets, saw %', visible_count;
   end if;
 
   -- The membership term end has to be readable by members and anonymous
@@ -371,35 +378,31 @@ begin
   end if;
 
   select count(*) into visible_count
-  from public.event_registrations
+  from public.event_applications
   where event_id = current_setting('rls.event_id')::uuid;
   if visible_count <> 2 then
-    raise exception 'admin should see both registrations, saw %', visible_count;
-  end if;
-
-  -- Same function, admin context: the count must cover every registration on
-  -- the event, not just the caller's.
-  select registration_count into visible_count
-  from public.event_registration_counts(
-    array[current_setting('rls.event_id')::uuid]
-  );
-  if visible_count <> 2 then
-    raise exception 'admin undercounted registrations, saw %', visible_count;
-  end if;
-
-  update public.event_registrations
-  set status = 'accepted'
-  where user_id = current_setting('rls.user_b_id')::uuid;
-  get diagnostics changed_count = row_count;
-  if changed_count <> 1 then
-    raise exception 'admin could not update user B registration';
+    raise exception 'admin should see both applications, saw %', visible_count;
   end if;
 
   select count(*) into visible_count
-  from public.event_application_responses response
-  join public.event_registrations registration
-    on registration.id = response.event_registration_id
-  where registration.event_id = current_setting('rls.event_id')::uuid;
+  from public.event_tickets
+  where event_id = current_setting('rls.event_id')::uuid;
+  if visible_count <> 2 then
+    raise exception 'admin should see both tickets, saw %', visible_count;
+  end if;
+
+  update public.event_applications
+  set status = 'accepted', offer_expires_at = now() + interval '1 day'
+  where event_id = current_setting('rls.event_id')::uuid
+    and user_id = current_setting('rls.user_b_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 1 then
+    raise exception 'admin could not update user B application';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_application_responses
+  where event_application_question_id = current_setting('rls.question_id')::uuid;
   if visible_count <> 2 then
     raise exception 'admin should see both responses, saw %', visible_count;
   end if;
@@ -609,36 +612,6 @@ begin
 end;
 $$;
 
-do $$
-declare
-  role_name text;
-  function_signature text;
-begin
-  foreach role_name in array array['anon', 'authenticated'] loop
-    foreach function_signature in array array[
-      'public.reserve_paid_event_ticket(uuid, uuid, uuid)',
-      'public.release_paid_event_ticket_reservation(uuid)'
-    ] loop
-      if has_function_privilege(role_name, function_signature, 'execute') then
-        raise exception '% can execute %', role_name, function_signature;
-      end if;
-    end loop;
-  end loop;
-
-  if not has_function_privilege(
-    'service_role',
-    'public.reserve_paid_event_ticket(uuid, uuid, uuid)',
-    'execute'
-  ) or not has_function_privilege(
-    'service_role',
-    'public.release_paid_event_ticket_reservation(uuid)',
-    'execute'
-  ) then
-    raise exception 'service_role lost execute on the ticket reservation functions';
-  end if;
-end;
-$$;
-
 \o /dev/null
 select set_config('request.jwt.claims', '{}', true);
 \o
@@ -675,8 +648,7 @@ begin
     foreach fn in array array[
       'public.reserve_event_ticket(uuid, uuid, uuid)',
       'public.release_event_ticket(uuid)',
-      'public.event_seat_counts_unfiltered(uuid[])',
-      'public.backfill_event_tickets_and_applications()'
+      'public.event_seat_counts_unfiltered(uuid[])'
     ] loop
       if has_function_privilege(role_name, fn, 'execute') then
         raise exception '% can execute %', role_name, fn;
@@ -712,7 +684,7 @@ update public.user_info set role_access = 'basic' where id = :'user_a_id';
 
 insert into public.events (
   name, description, regular_price, member_price, max_capacity, slug,
-  registration_start_time, registration_end_time, status, applications_enabled
+  registration_opens_at, registration_closes_at, status, requires_application
 )
 values (
   'RLS Application Event', 'RLS application event', 0, 0, 10, 'rls-application-event',

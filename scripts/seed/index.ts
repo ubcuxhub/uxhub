@@ -254,7 +254,6 @@ async function prunePass(
       ["Purchases", pruned.purchases],
       ["Event tickets", pruned.tickets],
       ["Event applications", pruned.applications],
-      ["Legacy event registrations", pruned.legacyRegistrations],
       ["Application responses", pruned.responses],
       ["Check-ins", pruned.checkIns],
     ] as const) {

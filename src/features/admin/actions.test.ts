@@ -355,10 +355,10 @@ describe("saveAdminEventAction", () => {
     expect(adminRpc).not.toHaveBeenCalled();
   });
 
-  it.each(["active", "archived"] as const)("rejects scheduling a %s event", async (status) => {
+  it("rejects scheduling an active event", async () => {
     await expect(saveAdminEventAction({
       ...saveInput,
-      event: { ...saveInput.event, status, publish_at: "2099-08-01T18:00:00Z" },
+      event: { ...saveInput.event, status: "active", publish_at: "2099-08-01T18:00:00Z" },
     })).rejects.toThrow("Only draft events can have a publish date.");
     expect(adminRpc).not.toHaveBeenCalled();
   });

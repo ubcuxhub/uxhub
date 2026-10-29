@@ -109,19 +109,18 @@ describe("admin event publishing", () => {
       expect((await fetchEventById(fixtures.supabase, future.id))!.status).toBe("draft");
     }));
 
-  it.each(["active", "archived"] as const)("rejects a schedule on %s and clears it on a manual status change", (status) =>
+  it("rejects a schedule on an active event and clears it on a manual status change", () =>
     withFixtures(async (fixtures) => {
       const event = payload(fixtures, new Date(Date.now() + hour).toISOString());
-      await expect(save(fixtures, { ...event, status })).rejects.toMatchObject({
+      await expect(save(fixtures, { ...event, status: "active" })).rejects.toMatchObject({
         message: "Only draft events can have a publish date.",
       });
       const id = await save(fixtures, event);
-      const { error } = await fixtures.supabase.from("events").update({ status }).eq("id", id);
+      const { error } = await fixtures.supabase.from("events").update({ status: "active" }).eq("id", id);
       if (error) throw error;
       expect((await fetchEventById(fixtures.supabase, id))!.publish_at).toBeNull();
-      expect((await fetchEventById(fixtures.supabase, id))!.status).toBe(status);
-      expect(await fetchEventById(clientAs(null), id)).toEqual(status === "active"
-        ? expect.objectContaining({ status: "active" }) : null);
+      expect((await fetchEventById(fixtures.supabase, id))!.status).toBe("active");
+      expect(await fetchEventById(clientAs(null), id)).toEqual(expect.objectContaining({ status: "active" }));
     }));
 
   it("handles concurrent schedule edits and publishes the due batch", () =>

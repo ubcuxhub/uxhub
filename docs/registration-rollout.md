@@ -10,8 +10,8 @@ must work with the code that is live when it is pushed.
 | Step | Change | Status |
 | --- | --- | --- |
 | [1. Add](#1-add) | New schema beside the old | Done (`20261015000005`–`10`) |
-| [2. Move the code](#2-move-the-code) | Code uses only the new schema | In progress: PR A and PR B open |
-| [3. Remove](#3-remove) | Drop the legacy schema | After step 2 is live |
+| [2. Move the code](#2-move-the-code) | Code uses only the new schema | Done (`20261028223807`, `20261028235900`) |
+| [3. Remove](#3-remove) | Drop the legacy schema | Done, not pushed yet (`20261029000000`) |
 
 These migrations were first numbered `20270101000001`–`10`, a future date,
 so every migration made with `supabase migration new` sorted before them and
@@ -135,33 +135,56 @@ covers the trigger PR A's deployed code depends on.
 
 ## 3. Remove
 
-Push once step 2's code is live.
+`20261029000000_drop_legacy_registration_schema` runs against the code step 2
+deployed, which no longer uses anything it drops. It is not pushed yet. Its
+timestamp was set by hand, a few minutes ahead of the clock, because the CLI's
+sorted before `20261028235900`. In order, it:
 
-- **Backfill once more:** `backfill_event_tickets_and_applications()` picks up
-  registrations the old code wrote before step 2 deployed. Run it before
-  dropping anything.
-- **Policies on legacy columns:** "application questions: applicants read"
-  on `event_application_questions` still checks `registration_start_time`,
-  `registration_end_time` and `event_registrations`. After PR B those windows
-  are stale or null, but only admins read questions today. Rewrite it on
-  `registration_opens_at`, `registration_closes_at` and `event_applications`
-  before dropping the columns, or the drop fails (or `cascade` silently
-  removes it).
-- **Code:** delete the `legacy event column sync` test in
-  `ticket-reservation.integration.test.ts`, regenerate the types, and drop the
-  `as Partial<EventRow>` cast in `AdminEventsTable.test.tsx`.
-- **`event_status`:** archived events that have ended become `active` (keeping
-  members' history), the rest `draft`. Then recreate the enum without
-  `archived`.
-- **Drop:**
-  - `sync_legacy_event_columns`, the `legacy_event_*` helpers, and the backfill
-    function;
+- **Backfills once more:** `backfill_event_tickets_and_applications()` picks up
+  registrations the old code wrote before step 2 deployed.
+- **`event_status`:** archived events that have ended become `active`, keeping
+  members' history; the rest become `draft`. The enum is recreated without
+  `archived`. Every policy, check, index and trigger that reads
+  `events.status` or calls `event_is_public` blocks the type change, so the
+  migration drops and recreates them unchanged: the five public read policies
+  on events, mentors and sponsors, "applications: insert own",
+  `events_publish_schedule_requires_draft`, `events_pending_publication_idx`,
+  and the three publication triggers.
+- **Rewrites policies on the legacy schema**, before dropping what they read:
+  - "application questions: applicants read": applicants by
+    `event_applications`, or anyone while a public event's
+    `registration_opens_at`–`registration_closes_at` window is open. The old
+    window ignored the event's status;
+  - "check-in sessions: registered users read": ticket holders, by
+    `event_tickets`.
+- **Requires `check_ins.ticket_id` and
+  `event_application_responses.application_id`.** A row still without one is
+  first linked to the ticket or application its registration's person holds on
+  that event. Whatever is left is deleted: a check-in whose registration was
+  never attending (the legacy check-in page listed only attending ones), or a
+  response on an event that takes no applications.
+- **Drops:**
+  - the four "application responses: … own" policies by registration,
+    superseded by the "… own application" ones;
+  - `check_ins.event_registration_id` and
+    `event_application_responses.event_registration_id`;
+  - `sync_legacy_event_columns` and its trigger, the `legacy_event_*` helpers,
+    and the backfill function. `check_event_application_transition` loses the
+    skip setting only the backfill set;
   - `event_registrations`, `reserve_paid_event_ticket`,
-    `release_paid_event_ticket_reservation`, and `event_registration_counts`;
+    `release_paid_event_ticket_reservation`, `event_registration_counts`, and
+    `promote_from_waitlist`, an old trigger function on `event_registrations`
+    that no trigger called;
   - the legacy date and time columns and `applications_enabled`;
   - the `application_status` enum.
-- **Not null:** `check_ins.ticket_id` and
-  `event_application_responses.application_id`.
+
+`save_admin_event_atomically` builds its column list from `pg_attribute`, so
+it needed no change.
+
+The code drops the `legacy event column sync` test, the Archived option and
+badge, and the `as Partial<EventRow>` cast in `AdminEventsTable.test.tsx`. The
+seed no longer prunes `event_registrations`, and its four past events are
+`active`.
 
 ## Background: the 2026-10-17 break
 
@@ -177,5 +200,6 @@ admin.
   is forward-only.
 - `20261015000005` restores what the deployed code needs, exactly as main had
   it. Step 1 also replaces the rows `03`–`04` backfilled.
-- **To do:** `02` turned archived events into drafts without recording which,
-  so re-archive them by hand.
+- **To do:** `02` turned archived events into drafts without recording which.
+  Archived no longer exists after step 3, so publish the ended ones by hand
+  instead if members should keep them in their history.

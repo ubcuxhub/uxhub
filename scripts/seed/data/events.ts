@@ -74,7 +74,7 @@ export interface SeedEvent {
  * the last `registrationClosed` fixture into another open one costs a UI state.
  */
 export const EVENT_PHASES = {
-  /** Finished and archived: portal history, receipts, past check-ins. */
+  /** Finished and still active: portal history, receipts, past check-ins. */
   past: [
     "get-to-know-ux-hub",
     "design-sprint-past",
@@ -440,7 +440,7 @@ const portfolioReviewAgenda: AgendaItem[] = [
 export function buildSeedEvents(now: Date): SeedEvent[] {
   const today = startOfUtcDay(now);
   const schedule = {
-    /* Past — finished and archived. */
+    /* Past — finished, still active. */
     getToKnow: addMonths(today, -12),
     designSprintPast: addMonths(today, -10),
     uxathonPast: addMonths(today, -8),
@@ -495,12 +495,12 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
   });
 
   const seeded: SeedEvent[] = [
-  /* ── Past — archived ────────────────────────────────────────────────── */
+  /* ── Past — active ──────────────────────────────────────────────────── */
   {
     event: {
       name: `Get to Know UX Hub ${eventYear(schedule.getToKnow)}`,
       slug: "get-to-know-ux-hub",
-      status: "archived",
+      status: "active",
       description:
         "Our first event of the year and the easiest way to meet everyone. Short intro to what UX Hub runs across the year, a design-themed icebreaker, and plenty of time to talk to the exec team. No experience needed and nothing to prepare — come find out whether this is your kind of club.",
       regular_price: 0,
@@ -527,7 +527,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
     event: {
       name: `Design Sprint ${eventYear(schedule.designSprintPast)}`,
       slug: "design-sprint-past",
-      status: "archived",
+      status: "active",
       description:
         "One day, one brief, one clickable prototype. Teams of four run a compressed design sprint from problem framing through guerrilla research to a final critique in front of working designers. Our biggest first-term event and the fastest way to get something real into your portfolio.",
       regular_price: 15.0,
@@ -563,7 +563,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
     event: {
       name: `UXathon ${eventYear(schedule.uxathonPast)}`,
       slug: "uxathon-past",
-      status: "archived",
+      status: "active",
       event_type: "flagship",
       description:
         "Our flagship event: 32 hours, one open-ended brief, and a room full of teams turning it into something defensible. Mentors from across the Vancouver design scene rotate through all weekend, and the final round is judged on how well you argue for your decisions — not just how good the screens look. Food, snacks, and swag included.",
@@ -579,7 +579,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       agenda: [...uxathonAgendaDayOne, ...uxathonAgendaDayTwo],
       description_images: uxathonDescriptionImages,
     },
-    imageKey: "1.png",
+    imageKey: "4.png",
     mentors: uxathonMentors,
     sponsors: seedSponsorLogos,
     checkInSessions: [
@@ -605,7 +605,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
     event: {
       name: `Industry Talk: AI and UX ${eventYear(schedule.industryTalkPast)}`,
       slug: "industry-talk-ai-and-ux",
-      status: "archived",
+      status: "active",
       description:
         "A working product designer walks through what actually changed in their day job once generative tooling landed in the workflow — what it sped up, what it made worse, and which parts of the craft still have to be done by hand. Short talk, long Q&A.",
       regular_price: 5.0,
@@ -618,7 +618,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       max_capacity: 90,
       ...closedHistoricalRegistration(schedule.industryTalkPast),
     },
-    imageKey: "2.png",
+    imageKey: "5.png",
     checkInSessions: [
       {
         name: "Door Check-in",

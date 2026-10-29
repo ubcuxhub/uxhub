@@ -264,7 +264,7 @@ function membershipPurchase(
  * five upcoming events are left unbought by every account on purpose, so event
  * checkout can be run again and again — and because `pnpm seed` prunes
  * fixture-owned purchases, a ticket bought through the UI is undone by the next
- * run. Purchase history instead hangs off the archived past events, the ongoing
+ * run. Purchase history instead hangs off the past events, the ongoing
  * mentorship program, and the one upcoming event whose registration has already
  * closed.
  *
