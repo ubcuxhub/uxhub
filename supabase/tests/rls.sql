@@ -96,6 +96,30 @@ values (
   'User B response'
 );
 
+-- One agenda per event status. Items carry no event_id of their own, so the
+-- draft item is what proves the policy joins through its day to the event.
+insert into public.event_agenda_days (event_id, date)
+values (:'event_id', now()::date)
+returning id \gset agenda_day_
+
+insert into public.event_agenda_items (
+  event_agenda_day_id, title, start_time, end_time, building, room
+)
+values (
+  :'agenda_day_id', 'RLS Agenda Item', '10:00', '11:00', 'RLS Building', 'RLS Room'
+)
+returning id \gset agenda_item_
+
+insert into public.event_agenda_days (event_id, date)
+values (:'draft_event_id', now()::date)
+returning id \gset draft_agenda_day_
+
+insert into public.event_agenda_items (
+  event_agenda_day_id, title, start_time, end_time
+)
+values (:'draft_agenda_day_id', 'RLS Draft Agenda Item', '10:00', '11:00')
+returning id \gset draft_agenda_item_
+
 -- Both hold a ticket, so user A can read the event's check-in sessions.
 insert into public.event_tickets (event_id, user_id)
 values (:'event_id', :'user_a_id'), (:'event_id', :'user_b_id');
@@ -130,7 +154,42 @@ select set_config('rls.user_b_id', :'user_b_id', true);
 select set_config('rls.question_id', :'question_id', true);
 select set_config('rls.mentor_id', :'mentor_id', true);
 select set_config('rls.sponsor_id', :'sponsor_id', true);
+select set_config('rls.agenda_day_id', :'agenda_day_id', true);
+select set_config('rls.agenda_item_id', :'agenda_item_id', true);
+select set_config('rls.draft_agenda_day_id', :'draft_agenda_day_id', true);
+select set_config('rls.draft_agenda_item_id', :'draft_agenda_item_id', true);
 \o
+
+-- Agenda visibility for anonymous visitors. This runs after the settings above
+-- because the anon block at the top of the script has no fixture ids yet.
+set local role anon;
+do $$
+declare
+  visible_count integer;
+begin
+  select count(*) into visible_count
+  from public.event_agenda_items
+  where id = current_setting('rls.agenda_item_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'anon cannot read an active event agenda item';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_agenda_days
+  where id = current_setting('rls.draft_agenda_day_id')::uuid;
+  if visible_count <> 0 then
+    raise exception 'anon can read a draft event agenda day';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_agenda_items
+  where id = current_setting('rls.draft_agenda_item_id')::uuid;
+  if visible_count <> 0 then
+    raise exception 'anon can read a draft event agenda item';
+  end if;
+end;
+$$;
+reset role;
 
 set local role authenticated;
 
@@ -264,6 +323,72 @@ begin
   if visible_count <> 1 then
     raise exception 'registered user cannot read active event sponsor';
   end if;
+
+  select count(*) into visible_count
+  from public.event_agenda_days
+  where id = current_setting('rls.agenda_day_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'basic user cannot read an active event agenda day';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_agenda_items
+  where id = current_setting('rls.agenda_item_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'basic user cannot read an active event agenda item';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_agenda_days
+  where id = current_setting('rls.draft_agenda_day_id')::uuid;
+  if visible_count <> 0 then
+    raise exception 'basic user can read a draft event agenda day';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_agenda_items
+  where id = current_setting('rls.draft_agenda_item_id')::uuid;
+  if visible_count <> 0 then
+    raise exception 'basic user can read a draft event agenda item';
+  end if;
+
+  -- Agendas are written through the service-role client only.
+  begin
+    insert into public.event_agenda_days (event_id, date)
+    values (current_setting('rls.event_id')::uuid, now()::date + 1);
+    raise exception 'basic user inserted an agenda day';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    insert into public.event_agenda_items (
+      event_agenda_day_id, title, start_time, end_time
+    )
+    values (
+      current_setting('rls.agenda_day_id')::uuid, 'Injected', '12:00', '13:00'
+    );
+    raise exception 'basic user inserted an agenda item';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    update public.event_agenda_items
+    set title = 'Edited'
+    where id = current_setting('rls.agenda_item_id')::uuid;
+    raise exception 'basic user updated an agenda item';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    delete from public.event_agenda_days
+    where id = current_setting('rls.agenda_day_id')::uuid;
+    raise exception 'basic user deleted an agenda day';
+  exception
+    when insufficient_privilege then null;
+  end;
 
   -- Seats left are public, so the count covers every ticket on the event,
   -- not just the ones RLS shows the caller.
@@ -421,6 +546,20 @@ begin
     raise exception 'admin should see sponsor catalog';
   end if;
 
+  select count(*) into visible_count
+  from public.event_agenda_days
+  where id = current_setting('rls.draft_agenda_day_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'admin cannot read a draft event agenda day';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_agenda_items
+  where id = current_setting('rls.draft_agenda_item_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'admin cannot read a draft event agenda item';
+  end if;
+
   update public.user_info
   set first_name = 'Admin tried to edit'
   where id = current_setting('rls.user_b_id')::uuid;
@@ -484,6 +623,13 @@ begin
   where id = current_setting('rls.draft_event_id')::uuid;
   if changed_count <> 1 then
     raise exception 'manager cannot see a draft event';
+  end if;
+
+  select count(*) into changed_count
+  from public.event_agenda_items
+  where id = current_setting('rls.draft_agenda_item_id')::uuid;
+  if changed_count <> 1 then
+    raise exception 'manager cannot read a draft event agenda item';
   end if;
 
   update public.user_info

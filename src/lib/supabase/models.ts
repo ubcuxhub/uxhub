@@ -74,6 +74,14 @@ export type RoleAccess = Enums<"role_access_enum">;
 export type StudentStatus = Enums<"student_status">;
 export type UniversityYear = Enums<"uni_year">;
 
+export type EventAgendaDayRow = Tables<"event_agenda_days">;
+export type EventAgendaDayInsert = TablesInsert<"event_agenda_days">;
+export type EventAgendaDayUpdate = TablesUpdate<"event_agenda_days">;
+
+export type EventAgendaItemRow = Tables<"event_agenda_items">;
+export type EventAgendaItemInsert = TablesInsert<"event_agenda_items">;
+export type EventAgendaItemUpdate = TablesUpdate<"event_agenda_items">;
+
 export const ResponseType = {
   short_text: "short_text",
   long_text: "long_text",

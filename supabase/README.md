@@ -168,6 +168,8 @@ helper file, and fix it in one place.
 | `event_applications`          | `src/lib/supabase-helpers/event-applications.ts`  |
 | `event_application_questions` | `src/lib/supabase-helpers/event-applications.ts`  |
 | `event_application_responses` | `src/lib/supabase-helpers/event-applications.ts`  |
+| `event_agenda_days`           | `src/lib/supabase-helpers/event-agenda.ts`        |
+| `event_agenda_items`          | `src/lib/supabase-helpers/event-agenda.ts`        |
 | `check_in_sessions`           | `src/lib/supabase-helpers/check-ins.ts`           |
 | `check_ins`                   | `src/lib/supabase-helpers/check-ins.ts`           |
 | `mentors` / `event_mentors`   | `src/lib/supabase-helpers/event-people.ts`        |

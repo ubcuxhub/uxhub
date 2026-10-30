@@ -126,6 +126,75 @@ export type Database = {
           },
         ]
       }
+      event_agenda_days: {
+        Row: {
+          date: string
+          event_id: string
+          id: string
+          title: string | null
+        }
+        ComputedFields: never
+        Insert: {
+          date: string
+          event_id: string
+          id?: string
+          title?: string | null
+        }
+        Update: {
+          date?: string
+          event_id?: string
+          id?: string
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_agenda_days_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_agenda_items: {
+        Row: {
+          building: string | null
+          end_time: string
+          event_agenda_day_id: string
+          id: string
+          room: string | null
+          start_time: string
+          title: string
+        }
+        ComputedFields: never
+        Insert: {
+          building?: string | null
+          end_time: string
+          event_agenda_day_id: string
+          id?: string
+          room?: string | null
+          start_time: string
+          title: string
+        }
+        Update: {
+          building?: string | null
+          end_time?: string
+          event_agenda_day_id?: string
+          id?: string
+          room?: string | null
+          start_time?: string
+          title?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_agenda_items_event_agenda_day_id_fkey"
+            columns: ["event_agenda_day_id"]
+            isOneToOne: false
+            referencedRelation: "event_agenda_days"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_application_questions: {
         Row: {
           allowed_file_types: string[] | null
