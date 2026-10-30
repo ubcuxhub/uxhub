@@ -196,6 +196,9 @@ Local values belong in the git-ignored `.env.local`.
   `SENTRY_AUTH_TOKEN` upload source maps on Vercel builds
 - Check-in: server-only `CHECK_IN_TOKEN_SECRET` signs ticket QR codes
  (`src/lib/check-in-token.ts`); rotating it invalidates every issued ticket
+- Discount codes: server-only `DISCOUNT_CODE_<BUSINESS>`, one per partner in
+  `src/features/memberships/lib/discount-codes.ts`, kept out of the public repo.
+  A code whose variable is unset is not shown
 - Feature flags: `NEXT_PUBLIC_FEATURE_STUDENT_EVENTS` and
   `NEXT_PUBLIC_FEATURE_DARK_MODE` force a flag on or off; unset, both are on
   locally and on preview deploys and off in production (`src/lib/flags.ts`)
