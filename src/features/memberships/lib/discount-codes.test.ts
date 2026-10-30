@@ -2,10 +2,10 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
 
-import { getActiveDiscountCodes, type DiscountCode } from "./discount-codes";
+import { getActiveDiscountCodes, type ActiveDiscountCode } from "./discount-codes";
 
 // Ends with March 31, 2027 in Vancouver (PDT, UTC-7).
-const code: DiscountCode = {
+const code: ActiveDiscountCode = {
   businessName: "Test Shop",
   url: "https://example.com",
   description: "10% off",
@@ -23,6 +23,12 @@ describe("getActiveDiscountCodes", () => {
     expect(getActiveDiscountCodes([code], new Date("2027-03-31T23:30:00-07:00"))).toEqual([code]);
     // Midnight in Vancouver ends it.
     expect(getActiveDiscountCodes([code], new Date("2027-04-01T00:00:00-07:00"))).toEqual([]);
+  });
+
+  it("drops a code whose env var is unset", () => {
+    expect(
+      getActiveDiscountCodes([{ ...code, code: undefined }], new Date("2026-10-28T12:00:00-07:00"))
+    ).toEqual([]);
   });
 
   it("returns nothing when there are no codes", () => {
