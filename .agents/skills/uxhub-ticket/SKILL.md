@@ -18,17 +18,21 @@ Tickets live in the Notion **Tickets** database on the Engineering page.
 ## Steps
 
 1. Search Notion for a ticket covering the same work; if one exists, mention it.
-2. `notion-create-pages` with parent `data_source_id`, `template_id`, `allow_async: false`, and properties:
+2. Read the relevant code on `origin/main`, `docs/`, related PRs and branches, and related tickets,
+   so the scope, dependencies, and gotchas reflect what is already built.
+3. `notion-create-pages` with parent `data_source_id`, `template_id`, `allow_async: false`, and properties:
    `Name`, `Status`, `date:Deadline:start` (`YYYY-MM-DD`), `date:Deadline:is_datetime: 0`, and
    `Assignee` if known. Pass `effort: "Small"` only if asked.
-3. Fetch the page, then fill both sections with `notion-update-page` `update_content`, matching the
-   template's existing text (e.g. `## Acceptance Criteria\n<empty-block/>\n## Notes`).
-4. Reply with the ticket ID (`UX-n`), link, status, assignee, and deadline.
+4. Fetch the page, then fill it with `notion-update-page` `update_content`, matching the template's
+   existing text (e.g. `## Acceptance Criteria\n\n<p />\n\n## Notes`). Insert a `## Context` section
+   above `## Acceptance Criteria`; the template doesn't have one.
+5. Reply with the ticket ID (`UX-n`), link, status, assignee, and deadline.
 
 ## Writing
 
-- Bullets only, under 50 words total across both sections.
-- Acceptance Criteria: observable outcomes. Notes: why, context, gotchas.
+- Bullets only, under 60 words total across all three sections.
+- Context: one bullet on the current state, problem, or gap the ticket closes.
+- Acceptance Criteria: observable outcomes. Notes: dependencies and gotchas.
 - Plain and human; describe the work as not yet done, even if it already exists locally.
 - Stay high level: say what changes and why, not how. Leave function names, file paths,
   column names, and commands to whoever picks it up.

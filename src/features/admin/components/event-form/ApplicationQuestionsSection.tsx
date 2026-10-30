@@ -97,11 +97,11 @@ export function ApplicationQuestionsSection({
         <FieldLegend>Application Questions</FieldLegend>
         <div className="flex items-center gap-2">
           <Switch
-            id="applications_enabled"
+            id="requires_application"
             checked={enabled}
             onCheckedChange={onEnabledChange}
           />
-          <FieldLabel htmlFor="applications_enabled">Enabled</FieldLabel>
+          <FieldLabel htmlFor="requires_application">Enabled</FieldLabel>
         </div>
       </div>
 

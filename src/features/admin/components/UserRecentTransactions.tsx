@@ -32,7 +32,7 @@ export function UserRecentTransactions({ userId }: { userId: string }) {
 
   return (
     <section className="space-y-3" aria-label="Recent Transactions">
-      <h3 className="text-subheading">Recent Transactions</h3>
+      <h3 className="text-body font-medium">Recent Transactions</h3>
       {state.status === "loading" ? (
         <div
           role="status"
@@ -67,13 +67,13 @@ export function UserRecentTransactions({ userId }: { userId: string }) {
               className="flex flex-col gap-2 rounded-md border p-4 sm:flex-row sm:justify-between sm:gap-4"
             >
               <div className="min-w-0">
-                <p className="text-button break-words">{purchase.title}</p>
+                <p className="text-small font-medium break-words">{purchase.title}</p>
                 <p className="text-small text-muted-foreground">
                   {purchase.kind === "membership" ? "Annual membership" : "Event ticket"}
                 </p>
               </div>
               <div className="shrink-0 sm:text-right">
-                <p className="text-button">
+                <p className="text-small font-medium">
                   {new Intl.NumberFormat("en-CA", {
                     style: "currency",
                     currency: purchase.currency,

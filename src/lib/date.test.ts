@@ -5,7 +5,7 @@ import {
   formatEventDate,
   formatEventTime,
   formatTimestamp,
-  getPacificStartDefaults,
+  pacificDate,
   timestamptzToDatetimeLocal,
 } from "./date";
 
@@ -79,21 +79,15 @@ describe("formatTimestamp", () => {
   });
 });
 
-describe("getPacificStartDefaults", () => {
-  // The form defaults are what an admin sees before touching anything, so a
-  // UTC reading here would pre-fill tomorrow's date all evening.
+describe("pacificDate", () => {
+  // Grouping and "today" checks read this, so a UTC reading would move an
+  // evening event onto the next day.
   it("uses the Pacific calendar day, not the UTC one", () => {
-    expect(getPacificStartDefaults(new Date("2026-07-15T02:30:00Z"))).toEqual({
-      start_date: "2026-07-14",
-      start_time: "19:30",
-    });
+    expect(pacificDate("2026-07-15T02:30:00Z")).toBe("2026-07-14");
   });
 
-  it("zero-pads a single-digit month, day and hour", () => {
-    expect(getPacificStartDefaults(new Date("2026-03-09T16:05:00Z"))).toEqual({
-      start_date: "2026-03-09",
-      start_time: "09:05",
-    });
+  it("returns an empty string for a missing value", () => {
+    expect(pacificDate(null)).toBe("");
   });
 });
 

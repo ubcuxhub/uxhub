@@ -39,9 +39,11 @@ export type SquareWebhookEventRow = Tables<"square_webhook_events">;
 export type SquareWebhookEventInsert = TablesInsert<"square_webhook_events">;
 export type SquareWebhookEventUpdate = TablesUpdate<"square_webhook_events">;
 
-export type EventRegistrationRow = Tables<"event_registrations">;
-export type EventRegistrationInsert = TablesInsert<"event_registrations">;
-export type EventRegistrationUpdate = TablesUpdate<"event_registrations">;
+export type EventTicketRow = Tables<"event_tickets">;
+
+export type EventApplicationRow = Tables<"event_applications">;
+export type EventApplicationInsert = TablesInsert<"event_applications">;
+export type EventApplicationUpdate = TablesUpdate<"event_applications">;
 
 export type EventApplicationQuestionRow =
   Tables<"event_application_questions">;
@@ -65,12 +67,20 @@ export type CheckInRow = Tables<"check_ins">;
 export type CheckInInsert = TablesInsert<"check_ins">;
 export type CheckInUpdate = TablesUpdate<"check_ins">;
 
-export type ApplicationStatus = Enums<"application_status">;
+export type EventApplicationStatus = Enums<"event_application_status">;
 export type ResponseType = Enums<"response_type">;
 export type UserType = Enums<"user_type">;
 export type RoleAccess = Enums<"role_access_enum">;
 export type StudentStatus = Enums<"student_status">;
 export type UniversityYear = Enums<"uni_year">;
+
+export type EventAgendaDayRow = Tables<"event_agenda_days">;
+export type EventAgendaDayInsert = TablesInsert<"event_agenda_days">;
+export type EventAgendaDayUpdate = TablesUpdate<"event_agenda_days">;
+
+export type EventAgendaItemRow = Tables<"event_agenda_items">;
+export type EventAgendaItemInsert = TablesInsert<"event_agenda_items">;
+export type EventAgendaItemUpdate = TablesUpdate<"event_agenda_items">;
 
 export const ResponseType = {
   short_text: "short_text",

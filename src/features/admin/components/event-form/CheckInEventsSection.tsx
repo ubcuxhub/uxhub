@@ -124,6 +124,7 @@ const CheckInDateTimeField = ({
             <Calendar
               mode="single"
               selected={selectedDate}
+              defaultMonth={selectedDate}
               disabled={minDate ? { before: minDate } : undefined}
               onSelect={(newDate) => {
                 if (!newDate) return;

@@ -28,7 +28,7 @@ existing local database data, applies every migration in `supabase/migrations`,
 and runs the idempotent TypeScript seed reconciler. It never targets the linked remote database.
 
 The seed data lives under `scripts/seed/data/` and includes memberships, past,
-ongoing, and upcoming events, purchases, registrations, check-ins, and these
+ongoing, and upcoming events, purchases, tickets, applications, check-ins, and these
 eleven local login fixtures (all use password `123456`). Ten cover every
 membership state crossed with admin and non-admin, and one is the dedicated
 manager. The grid is listed in
@@ -47,15 +47,15 @@ To sync seed changes without destroying local data, run `pnpm seed`. Use
 The seed reconciles *to* its data, so by default it also removes seed-owned rows
 the data no longer describes. That is what makes event checkout re-testable:
 buy a ticket as one of the fixture accounts, re-run `pnpm seed`, and the
-purchase and registration are gone, so the event is buyable again.
+purchase and ticket are gone, so the event is buyable again.
 
 Deletion is scoped by ownership, not by table:
 
 | Prunable                                                  | Never touched                                          |
 | --------------------------------------------------------- | ------------------------------------------------------ |
 | Events and membership tiers whose slug is not in the data\* | Auth users and profiles created by hand                |
-| Mentors, sponsors, check-in sessions, application questions | Purchases and registrations belonging to any other account |
-| Purchases and registrations belonging to the fixture accounts | Covers uploaded through the admin UI (`covers/`)       |
+| Mentors, sponsors, check-in sessions, application questions | Purchases, tickets and applications belonging to any other account |
+| Purchases, tickets and applications belonging to the fixture accounts | Covers uploaded through the admin UI (`covers/`)       |
 | Cover images under the `seed/covers/` storage prefix       |                                                        |
 
 \* This includes events created through the admin UI. Such an event survives
@@ -109,17 +109,36 @@ Do these steps in order:
    the command refuses to run against a stack started by an older CLI; restart
    it with `pnpm exec supabase stop && pnpm exec supabase start`.
 
-4. **Push it to the hosted project before merging.**
+4. **Merging deploys it.** The production build on Vercel
+   (`scripts/vercel-build.sh`) runs `supabase db push` before `next build`, so
+   the migration reaches the hosted project before the build prerenders against
+   it and before the new code takes traffic. A failed migration fails the build,
+   and the current deployment keeps serving. Preview builds never touch the
+   hosted database.
+
+   The old code keeps serving while the new build runs, and a rollback does not
+   undo a migration, so the migration must not break the code already in
+   production (see the compatibility path under "Migration guidelines").
+   `db push` is forward-only; correct a bad migration with a new one.
+
+   CI fails a pull request whose new migration sorts before the newest one on
+   `main`, since `db push` would refuse it. That check can go stale while a PR
+   waits, so rerun it, or update the branch, after another migration merges.
+
+   To check a risky migration against production data before it ships, push it
+   yourself first; the build then finds nothing to apply:
 
    ```bash
    pnpm exec supabase db push
    ```
 
-   Nothing applies migrations automatically, and `db push` is forward-only. The
-   deploy that follows a merge expects the new schema, so push first. The
-   hosted schema then runs ahead of the deployed code, so the migration must not
-   break the code already in production (see the compatibility path under
-   "Migration guidelines").
+   The build needs `SUPABASE_MIGRATIONS_DB_URL` in Vercel's Production
+   environment: the session-mode pooler connection string (port 5432, from the
+   dashboard's Connect panel) with the password percent-encoded. The direct
+   host is IPv6-only, which Vercel's build machines cannot reach. Production
+   builds only run from `main`; to undo a deploy use Instant Rollback, because
+   redeploying an older commit fails when the hosted history has migrations
+   that commit lacks.
 
 5. **Update the data-access layer** (`src/lib/supabase-helpers/`):
    - Update the relevant helper's `select(...)` list, insert/update payloads,
@@ -145,9 +164,12 @@ helper file, and fix it in one place.
 | Table                         | Helper file                                       |
 | ----------------------------- | ------------------------------------------------- |
 | `events`                      | `src/lib/supabase-helpers/events.ts`              |
-| `event_registrations`         | `src/lib/supabase-helpers/event-registrations.ts` |
+| `event_tickets`               | `src/lib/supabase-helpers/event-tickets.ts`       |
+| `event_applications`          | `src/lib/supabase-helpers/event-applications.ts`  |
 | `event_application_questions` | `src/lib/supabase-helpers/event-applications.ts`  |
 | `event_application_responses` | `src/lib/supabase-helpers/event-applications.ts`  |
+| `event_agenda_days`           | `src/lib/supabase-helpers/event-agenda.ts`        |
+| `event_agenda_items`          | `src/lib/supabase-helpers/event-agenda.ts`        |
 | `check_in_sessions`           | `src/lib/supabase-helpers/check-ins.ts`           |
 | `check_ins`                   | `src/lib/supabase-helpers/check-ins.ts`           |
 | `mentors` / `event_mentors`   | `src/lib/supabase-helpers/event-people.ts`        |
@@ -215,7 +237,7 @@ The bucket is provisioned in two places, and they are not redundant:
 
 | Environment          | Mechanism                                          |
 | -------------------- | -------------------------------------------------- |
-| Remote / production  | the migration, applied with `pnpm exec supabase db push` |
+| Remote / production  | the migration, applied by the production build's `supabase db push` |
 | Local                | `pnpm seed` (`--only=storage` to run just this)     |
 
 Seeding provisions the bucket locally so a fresh database is usable straight
@@ -246,7 +268,7 @@ strings the compiler cannot validate. A rename here breaks silently at runtime:
 - **Embedded foreign-key hint joins** — e.g.
   `membership_types!membership_type_id(name)` in `fetchAdminUserRecords` and
   `user_info!user_id(first_name, last_name, email)` in
-  `fetchAttendingRegistrations`. These
+  `fetchCheckInAttendees`. These
   embed relationship/FK names that change with schema edits.
 
 ## Debugging checklist when something breaks
@@ -272,6 +294,58 @@ strings the compiler cannot validate. A rename here breaks silently at runtime:
   runtime. Verify the column names against `database.types.ts`.
 
 ## Migration guidelines
+
+### Publication watchdog
+
+The publication watchdog migration creates private state and a conditional
+`check-event-publication` job. No application role has access to this schema.
+Publication continues without notification configuration, but each health-check
+attempt records `configuration_missing` until configuration is supplied.
+
+Deploy the `/api/internal/event-publication` endpoint and configure a random,
+dedicated `EVENT_PUBLICATION_HEALTH_SECRET` in the server environment. In the
+hosted SQL editor, store the same value in Vault under
+`event_publication_health_secret`, and the full production HTTPS endpoint URL
+under `event_publication_health_url`. Use Vault's secret creation/update UI or
+parameterized SQL; do not commit values. Sentry's DSN must also be configured
+for alerts. Set these up before allowing a production monitoring window to run.
+Preview/local databases must never point to the production notification URL.
+
+Requests use a SHA-256 HMAC over `event-publication:<unix-seconds>`, passed in
+`x-publication-signature`, with the timestamp in `x-publication-timestamp`.
+The endpoint accepts signatures within five minutes of server time. This keeps
+the shared secret out of pg_net's database-readable request queue. See the
+[Supabase queue credential guidance](https://supabase.com/kb/troubleshooting/database-roles-can-read-request-headers-queued-by-pg_net).
+
+Before pushing, inspect `supabase_migrations.schema_migrations` and count legacy
+scheduled rows (`status = 'active' and publish_at > now()`). The unapplied
+activation migration preserves those rows as scheduled drafts. Apply migrations
+before merging; the watchdog has no dependency on the new endpoint until its
+notification secrets are configured.
+
+Inspect bounded attempts and HTTP delivery from a privileged SQL connection:
+
+```sql
+select w.event_id, w.publish_at, w.expected_run_at, w.attempts,
+       w.next_check_at, w.last_delivery_status, w.last_response_status,
+       request.id as request_id, r.status_code, r.timed_out
+from event_publication.watchdog w
+left join lateral unnest(w.request_ids) request(id) on true
+left join net._http_response r on r.id = request.id;
+```
+
+Three attempts with `next_check_at is null` means monitoring is exhausted.
+`last_delivery_status` captures configuration/enqueue outcomes and
+`last_response_status` captures responses observed by later checks; the final
+response is read using the query above. pg_net
+responses expire according to `pg_net.ttl` (six hours by default). Ordinary edits
+and publisher retries cannot restart exhausted windows. Correct the delivery
+configuration and deliberately change the event's publication date to rearm it.
+Use a non-sensitive test draft to verify an overdue alert reaches Sentry after
+deployment; local tests cover scheduling and authentication without sending
+external HTTP requests.
+
+### General rules
 
 - Create new migrations; never edit applied ones.
 - Keep migrations small and one-purpose with descriptive names.

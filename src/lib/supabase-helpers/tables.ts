@@ -9,9 +9,6 @@ export const TABLES = {
   appSettings: "app_settings",
   events: "events",
   userInfo: "user_info",
-  eventRegistrations: "event_registrations",
-  // Replace event_registrations once the code moves over
-  // (docs/registration-rollout.md).
   eventTickets: "event_tickets",
   eventApplications: "event_applications",
   eventApplicationQuestions: "event_application_questions",
@@ -25,6 +22,8 @@ export const TABLES = {
   membershipTypes: "membership_types",
   purchases: "purchases",
   squareWebhookEvents: "square_webhook_events",
+  eventAgendaDays: "event_agenda_days",
+  eventAgendaItems: "event_agenda_items",
 } as const;
 
 export type TableName = (typeof TABLES)[keyof typeof TABLES];

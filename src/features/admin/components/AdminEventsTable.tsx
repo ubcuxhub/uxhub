@@ -3,7 +3,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
-  Archive,
   ArrowDown,
   ArrowUp,
   Check,
@@ -49,11 +48,6 @@ const statusConfig = {
     className: "bg-success-bg text-success",
     icon: Check,
     label: "Active",
-  },
-  archived: {
-    className: "",
-    icon: Archive,
-    label: "Archived",
   },
   draft: {
     className: "bg-warning-bg text-warning",
@@ -129,10 +123,9 @@ function DetailItem({
   );
 }
 
-function formatSchedule(date: string | null, time: string | null) {
-  const formattedDate = formatEventDate(date, { month: "short" }) ?? "—";
-  const formattedTime = formatEventTime(time);
-  return formattedTime ? `${formattedDate} at ${formattedTime}` : formattedDate;
+function formatSchedule(timestamp: string | null) {
+  if (!timestamp) return "—";
+  return `${formatEventDate(timestamp, { month: "short" })} at ${formatEventTime(timestamp)}`;
 }
 
 function EventDetails({
@@ -152,16 +145,16 @@ function EventDetails({
       <DetailItem label="Status">{statusConfig[event.status].label}</DetailItem>
       <DetailItem label="Event type">{event.event_type}</DetailItem>
       <DetailItem label="Start">
-        {formatSchedule(event.start_date, event.start_time)}
+        {formatSchedule(event.starts_at)}
       </DetailItem>
       <DetailItem label="End">
-        {formatSchedule(event.end_date, event.end_time)}
+        {formatSchedule(event.ends_at)}
       </DetailItem>
       <DetailItem label="Registration opens">
-        {formatTimestamp(event.registration_start_time) ?? "—"}
+        {formatTimestamp(event.registration_opens_at) ?? "—"}
       </DetailItem>
       <DetailItem label="Registration closes">
-        {formatTimestamp(event.registration_end_time) ?? "—"}
+        {formatTimestamp(event.registration_closes_at) ?? "—"}
       </DetailItem>
       <DetailItem label="Registration status">
         {event.status === "draft"
@@ -202,7 +195,7 @@ function EventDetails({
         {event.description}
       </DetailItem>
       <DetailItem label="Applications enabled">
-        {event.applications_enabled ? "Yes" : "No"}
+        {event.requires_application ? "Yes" : "No"}
       </DetailItem>
       <DetailItem label="Mentors enabled">
         {event.mentors_enabled ? "Yes" : "No"}
@@ -270,7 +263,7 @@ const eventColumns: AdminDirectoryColumn<AdminEventTableRow>[] = [
     headerClassName: "whitespace-nowrap",
     cellClassName: "whitespace-nowrap text-muted-foreground",
     render: (row) =>
-      formatEventDate(row.event.start_date, { month: "short" }) ?? "—",
+      formatEventDate(row.event.starts_at, { month: "short" }) ?? "—",
   },
   {
     id: "registered",
@@ -342,14 +335,14 @@ export function AdminEventsTable({
         );
       })
       .sort((a, b) => {
-        const aDate = a.event.start_date;
-        const bDate = b.event.start_date;
+        const aDate = a.event.starts_at;
+        const bDate = b.event.starts_at;
 
         if (!aDate && !bDate) return 0;
         if (!aDate) return 1;
         if (!bDate) return -1;
 
-        const comparison = aDate.localeCompare(bDate);
+        const comparison = Date.parse(aDate) - Date.parse(bDate);
         return sortDirection === "ascending" ? comparison : -comparison;
       });
   }, [

@@ -40,17 +40,17 @@ returning id as auth_user_id, email
 
 insert into public.events (
   name, description, regular_price, member_price, max_capacity, slug,
-  registration_start_time, registration_end_time, status
+  registration_opens_at, registration_closes_at, status, requires_application
 )
 values (
   'RLS Event', 'RLS test event', 0, 0, 10, 'rls-event',
-  now() - interval '1 hour', now() + interval '1 hour', 'active'
+  now() - interval '1 hour', now() + interval '1 hour', 'active', true
 )
 returning id \gset event_
 
 insert into public.events (
   name, description, regular_price, member_price, max_capacity, slug,
-  registration_start_time, registration_end_time, status
+  registration_opens_at, registration_closes_at, status
 )
 values (
   'RLS Draft Event', 'RLS draft event', 0, 0, 10, 'rls-draft-event',
@@ -81,20 +81,48 @@ values (:'event_id', :'sponsor_id');
 insert into public.check_in_sessions (event_id, name, start_time, end_time)
 values (:'event_id', 'RLS Session', now(), now() + interval '1 hour');
 
-insert into public.event_registrations (event_id, user_id, status)
-values (:'event_id', :'user_b_id', 'pending')
-returning id \gset user_b_registration_
+insert into public.event_applications (event_id, user_id)
+values (:'event_id', :'user_b_id')
+returning id \gset user_b_application_
 
 insert into public.event_application_responses (
-  event_registration_id,
+  application_id,
   event_application_question_id,
   response
 )
 values (
-  :'user_b_registration_id',
+  :'user_b_application_id',
   :'question_id',
   'User B response'
 );
+
+-- One agenda per event status. Items carry no event_id of their own, so the
+-- draft item is what proves the policy joins through its day to the event.
+insert into public.event_agenda_days (event_id, date)
+values (:'event_id', now()::date)
+returning id \gset agenda_day_
+
+insert into public.event_agenda_items (
+  event_agenda_day_id, title, start_time, end_time, building, room
+)
+values (
+  :'agenda_day_id', 'RLS Agenda Item', '10:00', '11:00', 'RLS Building', 'RLS Room'
+)
+returning id \gset agenda_item_
+
+insert into public.event_agenda_days (event_id, date)
+values (:'draft_event_id', now()::date)
+returning id \gset draft_agenda_day_
+
+insert into public.event_agenda_items (
+  event_agenda_day_id, title, start_time, end_time
+)
+values (:'draft_agenda_day_id', 'RLS Draft Agenda Item', '10:00', '11:00')
+returning id \gset draft_agenda_item_
+
+-- Both hold a ticket, so user A can read the event's check-in sessions.
+insert into public.event_tickets (event_id, user_id)
+values (:'event_id', :'user_a_id'), (:'event_id', :'user_b_id');
 
 set local role anon;
 do $$
@@ -126,7 +154,42 @@ select set_config('rls.user_b_id', :'user_b_id', true);
 select set_config('rls.question_id', :'question_id', true);
 select set_config('rls.mentor_id', :'mentor_id', true);
 select set_config('rls.sponsor_id', :'sponsor_id', true);
+select set_config('rls.agenda_day_id', :'agenda_day_id', true);
+select set_config('rls.agenda_item_id', :'agenda_item_id', true);
+select set_config('rls.draft_agenda_day_id', :'draft_agenda_day_id', true);
+select set_config('rls.draft_agenda_item_id', :'draft_agenda_item_id', true);
 \o
+
+-- Agenda visibility for anonymous visitors. This runs after the settings above
+-- because the anon block at the top of the script has no fixture ids yet.
+set local role anon;
+do $$
+declare
+  visible_count integer;
+begin
+  select count(*) into visible_count
+  from public.event_agenda_items
+  where id = current_setting('rls.agenda_item_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'anon cannot read an active event agenda item';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_agenda_days
+  where id = current_setting('rls.draft_agenda_day_id')::uuid;
+  if visible_count <> 0 then
+    raise exception 'anon can read a draft event agenda day';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_agenda_items
+  where id = current_setting('rls.draft_agenda_item_id')::uuid;
+  if visible_count <> 0 then
+    raise exception 'anon can read a draft event agenda item';
+  end if;
+end;
+$$;
+reset role;
 
 set local role authenticated;
 
@@ -168,42 +231,42 @@ begin
   end;
 
   select count(*) into visible_count
-  from public.event_registrations
+  from public.event_applications
   where event_id = current_setting('rls.event_id')::uuid;
   if visible_count <> 0 then
-    raise exception 'user A can read user B registration';
+    raise exception 'user A can read user B application';
   end if;
 
   begin
-    insert into public.event_registrations (event_id, user_id, status)
+    insert into public.event_applications (event_id, user_id, status, offer_expires_at)
     values (
       current_setting('rls.event_id')::uuid,
       public.current_user_info_id(),
-      'accepted'
+      'accepted',
+      now() + interval '1 day'
     );
-    raise exception 'user A inserted a pre-approved registration';
+    raise exception 'user A inserted a pre-approved application';
   exception
     when insufficient_privilege or check_violation then
       null;
   end;
 
-  insert into public.event_registrations (event_id, user_id, status)
+  insert into public.event_applications (event_id, user_id)
   values (
     current_setting('rls.event_id')::uuid,
-    public.current_user_info_id(),
-    'pending'
+    public.current_user_info_id()
   );
 
-  update public.event_registrations
-  set status = 'accepted'
+  update public.event_applications
+  set status = 'rejected'
   where user_id = current_setting('rls.user_b_id')::uuid;
   get diagnostics changed_count = row_count;
   if changed_count <> 0 then
-    raise exception 'user A updated user B registration';
+    raise exception 'user A updated user B application';
   end if;
 
-  update public.event_registrations
-  set status = 'accepted'
+  update public.event_applications
+  set status = 'accepted', offer_expires_at = now() + interval '1 day'
   where user_id = public.current_user_info_id();
   get diagnostics changed_count = row_count;
   if changed_count <> 0 then
@@ -211,21 +274,26 @@ begin
   end if;
 
   insert into public.event_application_responses (
-    event_registration_id,
+    application_id,
     event_application_question_id,
     response
   )
   select id, current_setting('rls.question_id')::uuid, 'User A response'
-  from public.event_registrations
+  from public.event_applications
   where user_id = public.current_user_info_id();
 
   select count(*) into visible_count
-  from public.event_application_responses response
-  join public.event_registrations registration
-    on registration.id = response.event_registration_id
-  where registration.event_id = current_setting('rls.event_id')::uuid;
+  from public.event_application_responses
+  where event_application_question_id = current_setting('rls.question_id')::uuid;
   if visible_count <> 1 then
     raise exception 'user A should see one own response, saw %', visible_count;
+  end if;
+
+  select count(*) into visible_count
+  from public.event_tickets
+  where event_id = current_setting('rls.event_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'user A should see only their own ticket, saw %', visible_count;
   end if;
 
   select count(*) into visible_count
@@ -256,16 +324,80 @@ begin
     raise exception 'registered user cannot read active event sponsor';
   end if;
 
-  -- The admin dashboard reads registration totals through this function rather
-  -- than one head-count per event. It is security invoker, so a member must
-  -- only ever count their own row -- both user A and user B are registered for
-  -- this event, and user A may see exactly one of them.
-  select registration_count into visible_count
-  from public.event_registration_counts(
+  select count(*) into visible_count
+  from public.event_agenda_days
+  where id = current_setting('rls.agenda_day_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'basic user cannot read an active event agenda day';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_agenda_items
+  where id = current_setting('rls.agenda_item_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'basic user cannot read an active event agenda item';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_agenda_days
+  where id = current_setting('rls.draft_agenda_day_id')::uuid;
+  if visible_count <> 0 then
+    raise exception 'basic user can read a draft event agenda day';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_agenda_items
+  where id = current_setting('rls.draft_agenda_item_id')::uuid;
+  if visible_count <> 0 then
+    raise exception 'basic user can read a draft event agenda item';
+  end if;
+
+  -- Agendas are written through the service-role client only.
+  begin
+    insert into public.event_agenda_days (event_id, date)
+    values (current_setting('rls.event_id')::uuid, now()::date + 1);
+    raise exception 'basic user inserted an agenda day';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    insert into public.event_agenda_items (
+      event_agenda_day_id, title, start_time, end_time
+    )
+    values (
+      current_setting('rls.agenda_day_id')::uuid, 'Injected', '12:00', '13:00'
+    );
+    raise exception 'basic user inserted an agenda item';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    update public.event_agenda_items
+    set title = 'Edited'
+    where id = current_setting('rls.agenda_item_id')::uuid;
+    raise exception 'basic user updated an agenda item';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    delete from public.event_agenda_days
+    where id = current_setting('rls.agenda_day_id')::uuid;
+    raise exception 'basic user deleted an agenda day';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  -- Seats left are public, so the count covers every ticket on the event,
+  -- not just the ones RLS shows the caller.
+  select tickets into visible_count
+  from public.event_seat_counts(
     array[current_setting('rls.event_id')::uuid]
   );
-  if visible_count <> 1 then
-    raise exception 'member counted other registrations, saw %', visible_count;
+  if visible_count <> 2 then
+    raise exception 'member seat count missed tickets, saw %', visible_count;
   end if;
 
   -- The membership term end has to be readable by members and anonymous
@@ -371,35 +503,31 @@ begin
   end if;
 
   select count(*) into visible_count
-  from public.event_registrations
+  from public.event_applications
   where event_id = current_setting('rls.event_id')::uuid;
   if visible_count <> 2 then
-    raise exception 'admin should see both registrations, saw %', visible_count;
-  end if;
-
-  -- Same function, admin context: the count must cover every registration on
-  -- the event, not just the caller's.
-  select registration_count into visible_count
-  from public.event_registration_counts(
-    array[current_setting('rls.event_id')::uuid]
-  );
-  if visible_count <> 2 then
-    raise exception 'admin undercounted registrations, saw %', visible_count;
-  end if;
-
-  update public.event_registrations
-  set status = 'accepted'
-  where user_id = current_setting('rls.user_b_id')::uuid;
-  get diagnostics changed_count = row_count;
-  if changed_count <> 1 then
-    raise exception 'admin could not update user B registration';
+    raise exception 'admin should see both applications, saw %', visible_count;
   end if;
 
   select count(*) into visible_count
-  from public.event_application_responses response
-  join public.event_registrations registration
-    on registration.id = response.event_registration_id
-  where registration.event_id = current_setting('rls.event_id')::uuid;
+  from public.event_tickets
+  where event_id = current_setting('rls.event_id')::uuid;
+  if visible_count <> 2 then
+    raise exception 'admin should see both tickets, saw %', visible_count;
+  end if;
+
+  update public.event_applications
+  set status = 'accepted', offer_expires_at = now() + interval '1 day'
+  where event_id = current_setting('rls.event_id')::uuid
+    and user_id = current_setting('rls.user_b_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 1 then
+    raise exception 'admin could not update user B application';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_application_responses
+  where event_application_question_id = current_setting('rls.question_id')::uuid;
   if visible_count <> 2 then
     raise exception 'admin should see both responses, saw %', visible_count;
   end if;
@@ -416,6 +544,20 @@ begin
   where id = current_setting('rls.sponsor_id')::uuid;
   if visible_count <> 1 then
     raise exception 'admin should see sponsor catalog';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_agenda_days
+  where id = current_setting('rls.draft_agenda_day_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'admin cannot read a draft event agenda day';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_agenda_items
+  where id = current_setting('rls.draft_agenda_item_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'admin cannot read a draft event agenda item';
   end if;
 
   update public.user_info
@@ -481,6 +623,13 @@ begin
   where id = current_setting('rls.draft_event_id')::uuid;
   if changed_count <> 1 then
     raise exception 'manager cannot see a draft event';
+  end if;
+
+  select count(*) into changed_count
+  from public.event_agenda_items
+  where id = current_setting('rls.draft_agenda_item_id')::uuid;
+  if changed_count <> 1 then
+    raise exception 'manager cannot read a draft event agenda item';
   end if;
 
   update public.user_info
@@ -609,36 +758,6 @@ begin
 end;
 $$;
 
-do $$
-declare
-  role_name text;
-  function_signature text;
-begin
-  foreach role_name in array array['anon', 'authenticated'] loop
-    foreach function_signature in array array[
-      'public.reserve_paid_event_ticket(uuid, uuid, uuid)',
-      'public.release_paid_event_ticket_reservation(uuid)'
-    ] loop
-      if has_function_privilege(role_name, function_signature, 'execute') then
-        raise exception '% can execute %', role_name, function_signature;
-      end if;
-    end loop;
-  end loop;
-
-  if not has_function_privilege(
-    'service_role',
-    'public.reserve_paid_event_ticket(uuid, uuid, uuid)',
-    'execute'
-  ) or not has_function_privilege(
-    'service_role',
-    'public.release_paid_event_ticket_reservation(uuid)',
-    'execute'
-  ) then
-    raise exception 'service_role lost execute on the ticket reservation functions';
-  end if;
-end;
-$$;
-
 \o /dev/null
 select set_config('request.jwt.claims', '{}', true);
 \o
@@ -674,8 +793,8 @@ begin
   foreach role_name in array array['anon', 'authenticated'] loop
     foreach fn in array array[
       'public.reserve_event_ticket(uuid, uuid, uuid)',
-      'public.event_seat_counts_unfiltered(uuid[])',
-      'public.backfill_event_tickets_and_applications()'
+      'public.release_event_ticket(uuid)',
+      'public.event_seat_counts_unfiltered(uuid[])'
     ] loop
       if has_function_privilege(role_name, fn, 'execute') then
         raise exception '% can execute %', role_name, fn;
@@ -701,8 +820,176 @@ begin
 end;
 $$;
 
--- Scheduled events stay hidden, with their mentors, until publish_at passes.
-update public.events set publish_at = now() + interval '1 day' where id = :'event_id';
+-- Applications, responses and check-ins by application and ticket, without a
+-- registration (docs/registration-rollout.md step 2).
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+select role_access as user_a_saved_role from public.user_info where id = :'user_a_id' \gset
+update public.user_info set role_access = 'basic' where id = :'user_a_id';
+
+insert into public.events (
+  name, description, regular_price, member_price, max_capacity, slug,
+  registration_opens_at, registration_closes_at, status, requires_application
+)
+values (
+  'RLS Application Event', 'RLS application event', 0, 0, 10, 'rls-application-event',
+  now() - interval '1 hour', now() + interval '1 hour', 'active', true
+)
+returning id \gset application_event_
+
+insert into public.event_application_questions (event_id, question, response_type)
+values (:'application_event_id', 'Why apply?', 'long_text')
+returning id \gset application_question_
+
+insert into public.event_tickets (event_id, user_id)
+values (:'application_event_id', :'user_b_id')
+returning id \gset user_b_ticket_
+
+insert into public.check_in_sessions (event_id, name)
+values (:'application_event_id', 'RLS Application Session')
+returning id \gset application_session_
+
+\o /dev/null
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'user_a_auth_user_id',
+    'email', :'user_a_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+select set_config('rls.application_event_id', :'application_event_id', true);
+select set_config('rls.application_question_id', :'application_question_id', true);
+select set_config('rls.user_b_ticket_id', :'user_b_ticket_id', true);
+select set_config('rls.application_session_id', :'application_session_id', true);
+\o
+
+set local role authenticated;
+
+do $$
+declare
+  v_application_id uuid;
+  visible_count integer;
+  changed_count integer;
+begin
+  insert into public.event_applications (event_id, user_id)
+  values (current_setting('rls.application_event_id')::uuid, public.current_user_info_id())
+  returning id into v_application_id;
+
+  insert into public.event_application_responses (
+    application_id, event_application_question_id, response
+  )
+  values (v_application_id, current_setting('rls.application_question_id')::uuid, 'Because');
+
+  select count(*) into visible_count
+  from public.event_application_responses
+  where application_id = v_application_id;
+  if visible_count <> 1 then
+    raise exception 'user A should see their response by application, saw %', visible_count;
+  end if;
+
+  update public.event_applications
+  set status = 'accepted', offer_expires_at = now() + interval '1 day'
+  where id = v_application_id;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'user A accepted their own application';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_tickets
+  where event_id = current_setting('rls.application_event_id')::uuid;
+  if visible_count <> 0 then
+    raise exception 'user A can read user B ticket';
+  end if;
+
+  begin
+    insert into public.check_ins (ticket_id, check_in_session_id, checked_in_at)
+    values (
+      current_setting('rls.user_b_ticket_id')::uuid,
+      current_setting('rls.application_session_id')::uuid,
+      now()
+    );
+    raise exception 'user A checked user B in';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  if has_function_privilege('authenticated', 'public.release_event_ticket(uuid)', 'execute')
+     or has_function_privilege('anon', 'public.release_event_ticket(uuid)', 'execute') then
+    raise exception 'public roles can release tickets';
+  end if;
+end;
+$$;
+
+reset role;
+
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+update public.user_info set role_access = 'admin' where id = :'user_a_id';
+\o /dev/null
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'user_a_auth_user_id',
+    'email', :'user_a_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+\o
+
+set local role authenticated;
+
+do $$
+declare
+  visible_count integer;
+  changed_count integer;
+begin
+  select count(*) into visible_count
+  from public.event_tickets
+  where event_id = current_setting('rls.application_event_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'admin should see the ticket, saw %', visible_count;
+  end if;
+
+  update public.event_applications
+  set status = 'accepted', offer_expires_at = now() + interval '1 day'
+  where event_id = current_setting('rls.application_event_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 1 then
+    raise exception 'admin could not accept the application';
+  end if;
+
+  insert into public.check_ins (ticket_id, check_in_session_id, checked_in_at)
+  values (
+    current_setting('rls.user_b_ticket_id')::uuid,
+    current_setting('rls.application_session_id')::uuid,
+    now()
+  );
+
+  select count(*) into visible_count
+  from public.check_ins
+  where ticket_id = current_setting('rls.user_b_ticket_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'admin should see the check-in by ticket, saw %', visible_count;
+  end if;
+end;
+$$;
+
+reset role;
+
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+update public.user_info set role_access = :'user_a_saved_role' where id = :'user_a_id';
+
+-- Scheduled drafts stay hidden until the job actually changes their status.
+update public.events set status = 'draft', publish_at = now() + interval '1 day'
+where id = :'event_id';
 set local role anon;
 do $$
 begin
@@ -715,5 +1002,27 @@ begin
 end;
 $$;
 reset role;
+
+-- Publishing is a write; all active events are visible regardless of dates.
+update public.events set publish_at = now() - interval '1 second' where id = :'event_id';
+select public.publish_due_events();
+set local role anon;
+do $$
+begin
+  if not exists (select 1 from public.events where slug = 'rls-event' and status = 'active') then
+    raise exception 'anon cannot see an automatically activated event';
+  end if;
+  if not public.event_is_public('active', now() + interval '1 day') then
+    raise exception 'public visibility still depends on publish_at';
+  end if;
+  if has_function_privilege('anon', 'public.publish_due_events()', 'execute')
+     or has_function_privilege('authenticated', 'public.publish_due_events()', 'execute') then
+    raise exception 'public roles can publish events';
+  end if;
+end;
+$$;
+reset role;
+
+\ir event-publication.sql
 
 rollback;

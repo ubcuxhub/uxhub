@@ -17,7 +17,7 @@ export default async function EventsPage() {
 
   const supabase = createPublicClient();
   const events = await fetchEvents(supabase, {
-    orderBy: "start_date",
+    orderBy: "starts_at",
     status: "active",
   });
 

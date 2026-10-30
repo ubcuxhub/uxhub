@@ -1,8 +1,7 @@
 import { PageContainer } from "@/components/shared/PageContainer";
 import { EventTimeline } from "@/features/events/components/EventTimeline";
 import { EventsComingSoon } from "@/features/events/components/EventsComingSoon";
-import { splitEventsByDate } from "@/features/events/lib/event-timeline";
-import { getPacificStartDefaults } from "@/lib/date";
+import { splitEventsByTime } from "@/features/events/lib/event-timeline";
 import { FLAGS } from "@/lib/flags";
 import { createClient } from "@/lib/supabase/server";
 import { fetchEvents } from "@/lib/supabase-helpers/events";
@@ -11,10 +10,9 @@ export default async function PortalEvents() {
   if (!FLAGS.studentEvents) return <EventsComingSoon />;
 
   const supabase = await createClient();
-  const events = await fetchEvents(supabase, { orderBy: "start_date", status: "active" });
+  const events = await fetchEvents(supabase, { orderBy: "starts_at", status: "active" });
 
-  const today = getPacificStartDefaults().start_date;
-  const { upcomingEvents, pastEvents } = splitEventsByDate(events, today);
+  const { upcomingEvents, pastEvents } = splitEventsByTime(events, new Date());
 
   return (
     <PageContainer>

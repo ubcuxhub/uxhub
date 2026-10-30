@@ -5,31 +5,34 @@ import {
 } from "@/lib/supabase/models";
 import type { ApplicationQuestionTemplate } from "@/features/events/types";
 import type { CheckInSessionDraft } from "@/features/admin/types";
-import { getPacificStartDefaults } from "@/lib/date";
+import {
+  datetimeLocalToTimestamptz,
+  timestamptzToDatetimeLocal,
+} from "@/lib/date";
 
 export interface EventFormState {
   name: string;
   short_description: string;
   description: string;
   status: EventStatus;
+  publish_at: string;
   event_type: EventType;
   regular_price: string;
   member_price: string;
   location_building: string;
   location_room: string;
   location_address_url: string;
-  start_date: string;
-  start_time: string;
-  end_date: string;
-  end_time: string;
+  /** Pacific wall-clock `YYYY-MM-DDTHH:mm`, like every date field below. */
+  starts_at: string;
+  ends_at: string;
   max_capacity: string;
   image_url: string;
-  registration_start_time: string;
-  registration_end_time: string;
+  registration_opens_at: string;
+  registration_closes_at: string;
   created_at: string;
   mentors_enabled: boolean;
   sponsors_enabled: boolean;
-  applications_enabled: boolean;
+  requires_application: boolean;
 }
 
 export interface MentorDraft {
@@ -60,28 +63,30 @@ export const defaultFormState: EventFormState = {
   short_description: "",
   description: "",
   status: "draft",
+  publish_at: "",
   event_type: "regular",
   regular_price: "",
   member_price: "",
   location_building: "",
   location_room: "",
   location_address_url: "",
-  start_date: "",
-  start_time: "",
-  end_date: "",
-  end_time: "",
+  starts_at: "",
+  ends_at: "",
   max_capacity: "",
   image_url: "",
-  registration_start_time: "",
-  registration_end_time: "",
+  registration_opens_at: "",
+  registration_closes_at: "",
   created_at: "",
   mentors_enabled: false,
   sponsors_enabled: false,
-  applications_enabled: false,
+  requires_application: false,
 };
 
 export function getInitialFormState(): EventFormState {
-  return { ...defaultFormState, ...getPacificStartDefaults() };
+  return {
+    ...defaultFormState,
+    starts_at: timestamptzToDatetimeLocal(new Date().toISOString()),
+  };
 }
 
 export function isFreePricing(regularPrice: string, memberPrice: string) {
@@ -97,13 +102,16 @@ export function isDateTimeRangeInvalid(start: string, end: string) {
   return Boolean(start && end && new Date(start) >= new Date(end));
 }
 
+/** Whether a date field holds both its date and its time. */
+export function isCompleteDateTime(value: string) {
+  return datetimeLocalToTimestamptz(value) !== null;
+}
+
 export function isEventScheduleRangeInvalid(formState: EventFormState) {
-  const { start_date, start_time, end_date, end_time } = formState;
-  if (!start_date || !start_time || !end_date || !end_time) return false;
-  return isDateTimeRangeInvalid(
-    `${start_date}T${start_time}`,
-    `${end_date}T${end_time}`
-  );
+  const { starts_at, ends_at } = formState;
+  if (!isCompleteDateTime(starts_at) || !isCompleteDateTime(ends_at))
+    return false;
+  return isDateTimeRangeInvalid(starts_at, ends_at);
 }
 
 export function createFormSnapshot(
@@ -158,12 +166,36 @@ export function validateEventForm(
     error = "Every mentor requires a full name.";
   else if (invalidSections.sponsors)
     error = "Every sponsor requires a name.";
+  else if (formState.publish_at && formState.status !== "draft")
+    error = "Only draft events can have a publish date.";
+  else if (
+    formState.publish_at &&
+    timestamptzToDatetimeLocal(datetimeLocalToTimestamptz(formState.publish_at)) !==
+      formState.publish_at
+  )
+    error = "Publish date must be a valid date and time in Pacific time.";
+  else if (
+    formState.publish_at &&
+    Date.parse(datetimeLocalToTimestamptz(formState.publish_at)!) <= Date.now()
+  )
+    error = "Publish date must be in the future.";
+  else if (
+    !isCompleteDateTime(formState.starts_at) ||
+    !isCompleteDateTime(formState.ends_at)
+  )
+    error = "Event start and end dates and times are required.";
   else if (isEventScheduleRangeInvalid(formState))
     error = "Event end time must be after the start time.";
   else if (
+    [formState.registration_opens_at, formState.registration_closes_at].some(
+      (value) => value && !isCompleteDateTime(value)
+    )
+  )
+    error = "Registration dates require both a date and time.";
+  else if (
     isDateTimeRangeInvalid(
-      formState.registration_start_time,
-      formState.registration_end_time
+      formState.registration_opens_at,
+      formState.registration_closes_at
     )
   )
     error = "Registration end time must be after the start time.";

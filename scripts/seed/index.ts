@@ -17,7 +17,7 @@
  * makes an event ticket bought through the UI reversible — the next run drops
  * the purchase and the event is buyable again. Ownership is narrow and is
  * defined in `lib/prune.ts`: seed events and membership tiers by slug, and
- * purchases/registrations only when they belong to one of the fixture
+ * purchases, tickets and applications only when they belong to one of the fixture
  * accounts. Rows created by an account somebody made by hand are never touched.
  *
  * `--target=prod` exists to give admins demo events to work with while the
@@ -244,7 +244,7 @@ async function prunePass(
 ): Promise<string[]> {
   const lines: string[] = [];
 
-  /* ── Fixture-owned rows: purchases, registrations, and their children ── */
+  /* ── Fixture-owned rows: purchases, tickets, applications, and their children ── */
   if (shouldRun(options, "users") && profileIds.size > 0) {
     const pruned = await pruneUserFixtures(supabase, seedUsers, profileIds, {
       dryRun: options.dryRun,
@@ -252,7 +252,8 @@ async function prunePass(
 
     for (const [label, count] of [
       ["Purchases", pruned.purchases],
-      ["Event registrations", pruned.registrations],
+      ["Event tickets", pruned.tickets],
+      ["Event applications", pruned.applications],
       ["Application responses", pruned.responses],
       ["Check-ins", pruned.checkIns],
     ] as const) {
@@ -469,7 +470,7 @@ async function main(): Promise<void> {
       notices.push("Every seeded event is forced to draft.");
     }
     if (skipUsers) {
-      notices.push("User fixtures, purchases, and registrations are skipped.");
+      notices.push("User fixtures, purchases, tickets, and applications are skipped.");
     }
   }
 
@@ -530,7 +531,7 @@ async function main(): Promise<void> {
         image_url: seedImageUrl(supabase, BUCKET.eventImages.id, seed.imageKey),
         mentors_enabled: Boolean(seed.mentors?.length),
         sponsors_enabled: Boolean(seed.sponsors?.length),
-        applications_enabled: seed.applicationQuestions.length > 0,
+        requires_application: seed.applicationQuestions.length > 0,
       })),
       options
     );
@@ -705,7 +706,8 @@ async function main(): Promise<void> {
     summary.push(format("Auth users", userSummary.authUsers));
     summary.push(format("User profiles", userSummary.profiles));
     summary.push(format("Purchases", userSummary.purchases));
-    summary.push(format("Event registrations", userSummary.registrations));
+    summary.push(format("Event tickets", userSummary.tickets));
+    summary.push(format("Event applications", userSummary.applications));
     summary.push(format("Application responses", userSummary.responses));
     summary.push(format("Check-ins", userSummary.checkIns));
   }

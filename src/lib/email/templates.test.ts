@@ -11,14 +11,15 @@ const purchase = {
   id: "purchase-1",
 };
 
+// 6:00 p.m. – 8:00 p.m. PDT, in a past year so future offset changes can't
+// move it.
 const event = {
-  end_time: "20:00",
+  ends_at: "2025-09-13T03:00:00+00:00",
   location_address_url: null,
   location_building: "Buchanan",
   location_room: "A101",
   name: "Portfolio Night",
-  start_date: "2026-09-12",
-  start_time: "18:00",
+  starts_at: "2025-09-13T01:00:00+00:00",
 };
 
 describe("renderEventConfirmationEmail", () => {
@@ -30,7 +31,7 @@ describe("renderEventConfirmationEmail", () => {
     });
 
     expect(subject).toContain("Portfolio Night");
-    expect(html).toContain("September 12, 2026");
+    expect(html).toContain("September 12, 2025");
     expect(html).toContain("6:00 p.m. – 8:00 p.m.");
     expect(html).toContain("Buchanan A101");
     expect(html).toContain("$15.00");
@@ -40,7 +41,7 @@ describe("renderEventConfirmationEmail", () => {
     const { html } = renderEventConfirmationEmail({
       event: {
         ...event,
-        end_time: null,
+        ends_at: null,
         location_building: null,
         location_room: null,
       },

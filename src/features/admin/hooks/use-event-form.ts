@@ -54,28 +54,27 @@ function formStateFromEvent(event: EventRow): EventFormState {
     short_description: event.short_description ?? "",
     description: event.description ?? "",
     status: event.status,
+    publish_at: timestamptzToDatetimeLocal(event.publish_at),
     event_type: event.event_type,
     regular_price: String(event.regular_price ?? ""),
     member_price: String(event.member_price ?? ""),
     location_building: event.location_building ?? "",
     location_room: event.location_room ?? "",
     location_address_url: event.location_address_url ?? "",
-    start_date: event.start_date ?? "",
-    start_time: event.start_time ?? "",
-    end_date: event.end_date ?? "",
-    end_time: event.end_time ?? "",
+    starts_at: timestamptzToDatetimeLocal(event.starts_at),
+    ends_at: timestamptzToDatetimeLocal(event.ends_at),
     max_capacity: String(event.max_capacity ?? ""),
     image_url: event.image_url ?? "",
-    registration_start_time: timestamptzToDatetimeLocal(
-      event.registration_start_time
+    registration_opens_at: timestamptzToDatetimeLocal(
+      event.registration_opens_at
     ),
-    registration_end_time: timestamptzToDatetimeLocal(
-      event.registration_end_time
+    registration_closes_at: timestamptzToDatetimeLocal(
+      event.registration_closes_at
     ),
     created_at: event.created_at ?? "",
     mentors_enabled: event.mentors_enabled,
     sponsors_enabled: event.sponsors_enabled,
-    applications_enabled: event.applications_enabled,
+    requires_application: event.requires_application,
   };
 }
 
@@ -207,7 +206,11 @@ export function useEventForm({
   ) => {
     resetSuccessMessage();
     questions.setQuestionErrors({});
-    setFormState((current) => ({ ...current, [field]: value }));
+    setFormState((current) => ({
+      ...current,
+      [field]: value,
+      ...(field === "status" && value !== "draft" ? { publish_at: "" } : {}),
+    }));
   };
 
   const updateCheckInEvent = (
@@ -304,8 +307,8 @@ export function useEventForm({
           current.mentors_enabled || validation.invalidSections.mentors,
         sponsors_enabled:
           current.sponsors_enabled || validation.invalidSections.sponsors,
-        applications_enabled:
-          current.applications_enabled ||
+        requires_application:
+          current.requires_application ||
           validation.invalidSections.applications,
       }));
       setError(validation.error);
@@ -327,10 +330,13 @@ export function useEventForm({
         short_description: formState.short_description || null,
         description: formState.description,
         status: formState.status,
+        publish_at: formState.status === "draft"
+          ? datetimeLocalToTimestamptz(formState.publish_at)
+          : null,
         event_type: formState.event_type,
         mentors_enabled: formState.mentors_enabled,
         sponsors_enabled: formState.sponsors_enabled,
-        applications_enabled: formState.applications_enabled,
+        requires_application: formState.requires_application,
         regular_price: Number(formState.regular_price),
         member_price: Number(formState.member_price),
         max_capacity: Number(formState.max_capacity),
@@ -338,16 +344,14 @@ export function useEventForm({
         location_building: formState.location_building || undefined,
         location_room: formState.location_room || undefined,
         location_address_url: formState.location_address_url || undefined,
-        start_date: formState.start_date || undefined,
-        start_time: formState.start_time || undefined,
-        end_date: formState.end_date || undefined,
-        end_time: formState.end_time || undefined,
+        starts_at: datetimeLocalToTimestamptz(formState.starts_at),
+        ends_at: datetimeLocalToTimestamptz(formState.ends_at),
         image_url: imageUrl || null,
-        registration_start_time: datetimeLocalToTimestamptz(
-          formState.registration_start_time
+        registration_opens_at: datetimeLocalToTimestamptz(
+          formState.registration_opens_at
         ),
-        registration_end_time: datetimeLocalToTimestamptz(
-          formState.registration_end_time
+        registration_closes_at: datetimeLocalToTimestamptz(
+          formState.registration_closes_at
         ),
       };
       const checkInSessions = checkInEvents.map((session) => ({

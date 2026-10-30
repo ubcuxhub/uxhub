@@ -17,6 +17,17 @@ import { TABLES } from "./tables";
 
 type UserInfoWritePayload = Record<string, unknown>;
 
+/** Publication watchdog: aggregate only, never send event copy to logs. */
+export async function adminFindOverduePublications(before: string) {
+  const { count, error } = await supabaseAdmin
+    .from(TABLES.events)
+    .select("id", { count: "exact", head: true })
+    .eq("status", "draft")
+    .lte("publish_at", before);
+  if (error) throw error;
+  return count ?? 0;
+}
+
 export interface AdminUserInfoLookup {
   id: string;
   auth_user_id: string | null;
