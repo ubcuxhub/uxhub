@@ -109,17 +109,36 @@ Do these steps in order:
    the command refuses to run against a stack started by an older CLI; restart
    it with `pnpm exec supabase stop && pnpm exec supabase start`.
 
-4. **Push it to the hosted project before merging.**
+4. **Merging deploys it.** The production build on Vercel
+   (`scripts/vercel-build.sh`) runs `supabase db push` before `next build`, so
+   the migration reaches the hosted project before the build prerenders against
+   it and before the new code takes traffic. A failed migration fails the build,
+   and the current deployment keeps serving. Preview builds never touch the
+   hosted database.
+
+   The old code keeps serving while the new build runs, and a rollback does not
+   undo a migration, so the migration must not break the code already in
+   production (see the compatibility path under "Migration guidelines").
+   `db push` is forward-only; correct a bad migration with a new one.
+
+   CI fails a pull request whose new migration sorts before the newest one on
+   `main`, since `db push` would refuse it. That check can go stale while a PR
+   waits, so rerun it, or update the branch, after another migration merges.
+
+   To check a risky migration against production data before it ships, push it
+   yourself first; the build then finds nothing to apply:
 
    ```bash
    pnpm exec supabase db push
    ```
 
-   Nothing applies migrations automatically, and `db push` is forward-only. The
-   deploy that follows a merge expects the new schema, so push first. The
-   hosted schema then runs ahead of the deployed code, so the migration must not
-   break the code already in production (see the compatibility path under
-   "Migration guidelines").
+   The build needs `SUPABASE_MIGRATIONS_DB_URL` in Vercel's Production
+   environment: the session-mode pooler connection string (port 5432, from the
+   dashboard's Connect panel) with the password percent-encoded. The direct
+   host is IPv6-only, which Vercel's build machines cannot reach. Production
+   builds only run from `main`; to undo a deploy use Instant Rollback, because
+   redeploying an older commit fails when the hosted history has migrations
+   that commit lacks.
 
 5. **Update the data-access layer** (`src/lib/supabase-helpers/`):
    - Update the relevant helper's `select(...)` list, insert/update payloads,
@@ -216,7 +235,7 @@ The bucket is provisioned in two places, and they are not redundant:
 
 | Environment          | Mechanism                                          |
 | -------------------- | -------------------------------------------------- |
-| Remote / production  | the migration, applied with `pnpm exec supabase db push` |
+| Remote / production  | the migration, applied by the production build's `supabase db push` |
 | Local                | `pnpm seed` (`--only=storage` to run just this)     |
 
 Seeding provisions the bucket locally so a fresh database is usable straight

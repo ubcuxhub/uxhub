@@ -163,13 +163,16 @@ Read `supabase/README.md` before changing the schema.
   `src/lib/supabase/database.types.ts`. It reads the local database, so the
   types come from the migrations; CI regenerates them and fails on any
   difference.
-- Apply migrations to the hosted project with `pnpm exec supabase db push`
-  before merging. Nothing applies them automatically, and the deploy that
-  follows a merge expects the new schema; `/events/[slug]` is also prerendered
-  against the database at build time. The hosted schema then runs ahead of the
-  deployed code, so keep migrations backward-compatible with the code already
-  in production. `db push` is forward-only; correct a bad migration with a new
-  one.
+- Merging deploys the migration: the Vercel production build
+  (`scripts/vercel-build.sh`) runs `supabase db push` before `next build`, so
+  the schema is in place before `/events/[slug]` is prerendered against it. A
+  failed migration fails the build. The old code serves traffic while the build
+  runs and a rollback does not undo a migration, so keep migrations
+  backward-compatible with the code already in production. `db push` is
+  forward-only; correct a bad migration with a new one.
+- Keep the timestamp `supabase migration new` generates. CI
+  (`scripts/check-migration-order.sh`) fails a PR whose new migration sorts
+  before the newest one on `main`, because `db push` would refuse it.
 - Validate schema changes with `pnpm exec tsc --noEmit`, `pnpm lint`, and
   `pnpm build`.
 
@@ -198,12 +201,16 @@ Local values belong in the git-ignored `.env.local`.
   locally and on preview deploys and off in production (`src/lib/flags.ts`)
 - Seed `prod` target: `SEED_PROD_SUPABASE_URL` and
   `SEED_PROD_SUPABASE_SECRET_KEY`
+- Migrations: secret `SUPABASE_MIGRATIONS_DB_URL`, set in Vercel's Production
+  environment only, is the session-mode pooler connection string the
+  production build pushes migrations through. Never put it in `.env.local`
 
 `SQUARE_ENV` is optional and defaults to the sandbox; set it to `production`
 only for production credentials.
 
-Never expose the Supabase secret keys, Square access token, webhook signature
-key, Resend API key, Sentry auth token, or check-in token secret to client components.
+Never expose the Supabase secret keys, migrations database URL, Square access
+token, webhook signature key, Resend API key, Sentry auth token, or check-in
+token secret to client components.
 
 ## Quality
 
