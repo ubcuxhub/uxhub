@@ -87,14 +87,6 @@ function pacificParts(date: Date) {
   };
 }
 
-export function getPacificStartDefaults(date = new Date()) {
-  const parts = pacificParts(date);
-  return {
-    start_date: `${parts.year}-${parts.month}-${parts.day}`,
-    start_time: `${parts.hour}:${parts.minute}`,
-  };
-}
-
 export function timestamptzToDatetimeLocal(
   value: string | null | undefined
 ): string {
@@ -103,6 +95,11 @@ export function timestamptzToDatetimeLocal(
   if (!date) return "";
   const parts = pacificParts(date);
   return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+}
+
+/** The Pacific calendar day (`YYYY-MM-DD`) an instant falls on. */
+export function pacificDate(value: string | null | undefined): string {
+  return timestamptzToDatetimeLocal(value).slice(0, 10);
 }
 
 export function datetimeLocalToTimestamptz(value: string): string | null {

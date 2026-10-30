@@ -20,8 +20,8 @@ import {
 import { cn } from "@/lib/utils";
 
 interface RegistrationTimesProps {
-  registration_start_time: string;
-  registration_end_time: string;
+  registration_opens_at: string;
+  registration_closes_at: string;
   onFieldChange: <K extends keyof RegistrationTimesState>(
     field: K,
     value: RegistrationTimesState[K]
@@ -29,8 +29,8 @@ interface RegistrationTimesProps {
 }
 
 export interface RegistrationTimesState {
-  registration_start_time: string;
-  registration_end_time: string;
+  registration_opens_at: string;
+  registration_closes_at: string;
 }
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
@@ -121,6 +121,7 @@ const RegistrationDateTimeField = ({
             <Calendar
               mode="single"
               selected={selectedDate}
+              defaultMonth={selectedDate}
               disabled={minDate ? { before: minDate } : undefined}
               onSelect={(newDate) => {
                 if (!newDate) return;
@@ -143,43 +144,48 @@ const RegistrationDateTimeField = ({
           className="sm:w-32"
         />
       </div>
+      {value && (
+        <Button type="button" variant="ghost" className="w-fit" onClick={() => onChange("")}>
+          Clear {label.toLowerCase()}
+        </Button>
+      )}
     </Field>
   );
 };
 
 export const RegistrationTimes = ({
-  registration_start_time,
-  registration_end_time,
+  registration_opens_at,
+  registration_closes_at,
   onFieldChange,
 }: RegistrationTimesProps) => {
   const { date: startDateString } = splitDateTimeLocal(
-    registration_start_time
+    registration_opens_at
   );
-  const { date: endDateString } = splitDateTimeLocal(registration_end_time);
+  const { date: endDateString } = splitDateTimeLocal(registration_closes_at);
   const startDate = dateStringToDate(startDateString);
   const minEndTime = isSameDate(startDateString, endDateString)
-    ? splitDateTimeLocal(registration_start_time).time
+    ? splitDateTimeLocal(registration_opens_at).time
     : undefined;
   const hasInvalidRange = isDateTimeRangeInvalid(
-    registration_start_time,
-    registration_end_time
+    registration_opens_at,
+    registration_closes_at
   );
 
   return (
     <FieldGroup className="grid gap-4 md:grid-cols-2">
       <RegistrationDateTimeField
-        id="registration_start_time"
-        label="Registration Start Time"
-        value={registration_start_time}
-        onChange={(value) => onFieldChange("registration_start_time", value)}
+        id="registration_opens_at"
+        label="Registration Opens"
+        value={registration_opens_at}
+        onChange={(value) => onFieldChange("registration_opens_at", value)}
       />
       <RegistrationDateTimeField
-        id="registration_end_time"
-        label="Registration End Time"
-        value={registration_end_time}
+        id="registration_closes_at"
+        label="Registration Closes"
+        value={registration_closes_at}
         minDate={startDate}
         minTime={minEndTime}
-        onChange={(value) => onFieldChange("registration_end_time", value)}
+        onChange={(value) => onFieldChange("registration_closes_at", value)}
       />
       {hasInvalidRange && (
         <FieldError className="md:col-span-2">

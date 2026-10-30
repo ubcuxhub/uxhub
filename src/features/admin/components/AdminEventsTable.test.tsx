@@ -8,20 +8,17 @@ import { AdminEventsTable, type AdminEventTableRow } from "./AdminEventsTable";
 
 afterEach(cleanup);
 
-function row(id: string, name: string, start_date: string | null, status: EventStatus, registrationOpen: boolean): AdminEventTableRow {
+function row(id: string, name: string, starts_at: string | null, status: EventStatus, registrationOpen: boolean): AdminEventTableRow {
   return {
     event: {
-      id, name, start_date, status,
+      id, name, starts_at, status,
       max_capacity: 30,
       regular_price: 15,
       member_price: 5,
       agenda: null,
       description_images: [],
-      applications_enabled: false,
       created_at: null,
       description: "Event description",
-      end_date: null,
-      end_time: null,
       ends_at: null,
       event_type: "regular",
       image_url: null,
@@ -31,15 +28,11 @@ function row(id: string, name: string, start_date: string | null, status: EventS
       mentors_enabled: false,
       publish_at: null,
       registration_closes_at: null,
-      registration_end_time: null,
       registration_opens_at: null,
-      registration_start_time: null,
       requires_application: false,
       short_description: null,
       slug: id,
       sponsors_enabled: false,
-      start_time: null,
-      starts_at: null,
       updated_at: null,
     },
     registrationCount: 7,
@@ -48,10 +41,10 @@ function row(id: string, name: string, start_date: string | null, status: EventS
 }
 
 const rows = [
-  row("older", "Design Meetup", "2026-09-01", "active", false),
-  row("newer", "Design Workshop", "2026-11-01", "active", true),
-  row("draft", "Draft Workshop", "2026-12-01", "draft", true),
-  row("undated", "Archived Meetup", null, "archived", false),
+  row("older", "Design Meetup", "2026-09-01T17:00:00+00:00", "active", false),
+  row("newer", "Design Workshop", "2026-11-01T17:00:00+00:00", "active", true),
+  row("draft", "Draft Workshop", "2026-12-01T18:00:00+00:00", "draft", true),
+  row("undated", "Undated Meetup", null, "active", false),
 ];
 
 function rowNames() {
@@ -61,9 +54,9 @@ function rowNames() {
 describe("AdminEventsTable regression", () => {
   it("retains date ordering and leaves undated events last in both directions", () => {
     render(<AdminEventsTable rows={rows} />);
-    expect(rowNames()).toEqual(["View details for Draft Workshop", "View details for Design Workshop", "View details for Design Meetup", "View details for Archived Meetup"]);
+    expect(rowNames()).toEqual(["View details for Draft Workshop", "View details for Design Workshop", "View details for Design Meetup", "View details for Undated Meetup"]);
     fireEvent.click(screen.getByRole("button", { name: "Sort by date ascending" }));
-    expect(rowNames()).toEqual(["View details for Design Meetup", "View details for Design Workshop", "View details for Draft Workshop", "View details for Archived Meetup"]);
+    expect(rowNames()).toEqual(["View details for Design Meetup", "View details for Design Workshop", "View details for Draft Workshop", "View details for Undated Meetup"]);
   });
 
   it("combines trimmed name search with status and registration filters, including draft N/A", () => {
@@ -87,9 +80,9 @@ describe("AdminEventsTable regression", () => {
     render(<AdminEventsTable rows={rows} />);
     fireEvent.click(screen.getByRole("button", { name: "Filters" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Active" }));
-    fireEvent.click(screen.getByRole("checkbox", { name: "Archived" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Draft" }));
     fireEvent.click(screen.getByRole("checkbox", { name: "Closed" }));
-    expect(rowNames()).toEqual(["View details for Design Meetup", "View details for Archived Meetup"]);
+    expect(rowNames()).toEqual(["View details for Design Meetup", "View details for Undated Meetup"]);
   });
 
   it.each(["click", "Enter", " "])("opens the existing sheet by %s with the same management links", (activation) => {

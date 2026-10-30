@@ -10,7 +10,7 @@ import type {
 } from "@/lib/supabase/models";
 
 export interface PurchaseWithDetails extends PurchaseRow {
-  events: Pick<EventRow, "id" | "name" | "slug" | "start_date"> | null;
+  events: Pick<EventRow, "id" | "name" | "slug" | "starts_at"> | null;
   membership_types: Pick<MembershipTypeRow, "id" | "name" | "slug"> | null;
 }
 
@@ -156,7 +156,7 @@ export async function fetchPurchasesForUser(
     .select(
       `
       *,
-      events (id, name, slug, start_date),
+      events (id, name, slug, starts_at),
       membership_types (id, name, slug)
     `
     )
@@ -180,7 +180,7 @@ export async function fetchPurchaseForUser(
     .select(
       `
       *,
-      events (id, name, slug, start_date),
+      events (id, name, slug, starts_at),
       membership_types (id, name, slug)
     `
     )

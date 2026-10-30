@@ -2,46 +2,56 @@ import { describe, expect, it } from "vitest";
 
 import type { EventRow } from "@/lib/supabase/models";
 
-import { groupEventsByMonth, splitEventsByDate } from "./event-timeline";
+import { groupEventsByMonth, splitEventsByTime } from "./event-timeline";
 
-const event = (id: string, start_date: string | null, end_date: string | null = null) =>
-  ({ id, start_date, end_date }) as EventRow;
+const event = (id: string, starts_at: string | null, ends_at: string | null = null) =>
+  ({ id, starts_at, ends_at }) as EventRow;
 
-describe("splitEventsByDate", () => {
-  it("counts an event happening today as upcoming", () => {
-    const { upcomingEvents, pastEvents } = splitEventsByDate([event("a", "2026-10-26")], "2026-10-26");
+describe("splitEventsByTime", () => {
+  const now = new Date("2026-10-26T19:00:00Z");
+
+  it("counts an event that hasn't ended yet as upcoming", () => {
+    const events = [event("a", "2026-10-26T18:00:00Z", "2026-10-26T20:00:00Z")];
+    const { upcomingEvents, pastEvents } = splitEventsByTime(events, now);
     expect(upcomingEvents.map((e) => e.id)).toEqual(["a"]);
     expect(pastEvents).toEqual([]);
   });
 
-  it("lists past events newest first", () => {
-    const events = [event("old", "2026-01-01"), event("new", "2026-09-01")];
-    expect(splitEventsByDate(events, "2026-10-06").pastEvents.map((e) => e.id)).toEqual(["new", "old"]);
+  it("counts an event that ended earlier today as past", () => {
+    const events = [event("a", "2026-10-26T16:00:00Z", "2026-10-26T18:00:00Z")];
+    expect(splitEventsByTime(events, now).pastEvents.map((e) => e.id)).toEqual(["a"]);
   });
 
-  it("skips events without a date", () => {
-    const { upcomingEvents, pastEvents } = splitEventsByDate([event("a", null)], "2026-10-06");
+  it("lists past events newest first", () => {
+    const events = [event("old", "2026-01-01T18:00:00Z"), event("new", "2026-09-01T18:00:00Z")];
+    expect(splitEventsByTime(events, now).pastEvents.map((e) => e.id)).toEqual(["new", "old"]);
+  });
+
+  it("skips events without a start", () => {
+    const { upcomingEvents, pastEvents } = splitEventsByTime([event("a", null)], now);
     expect([...upcomingEvents, ...pastEvents]).toEqual([]);
   });
 
   it("counts a multi-day event currently happening as upcoming", () => {
-    const events = [event("multi-day", "2026-10-01", "2026-10-03")];
-    const { upcomingEvents, pastEvents } = splitEventsByDate(events, "2026-10-02");
+    const events = [event("multi-day", "2026-10-25T16:00:00Z", "2026-10-27T01:00:00Z")];
+    const { upcomingEvents, pastEvents } = splitEventsByTime(events, now);
     expect(upcomingEvents.map((e) => e.id)).toEqual(["multi-day"]);
     expect(pastEvents).toEqual([]);
   });
 
-  it("considers an event's end date when determining if it is past or upcoming", () => {
-    const events = [event("multi-day", "2026-10-01", "2026-10-03")];
-    const { upcomingEvents, pastEvents } = splitEventsByDate(events, "2026-10-04");
-    expect(upcomingEvents).toEqual([]);
-    expect(pastEvents.map((e) => e.id)).toEqual(["multi-day"]);
+  it("falls back to the start for an event without an end", () => {
+    const events = [event("a", "2026-10-26T18:00:00Z"), event("b", "2026-10-26T20:00:00Z")];
+    const { upcomingEvents, pastEvents } = splitEventsByTime(events, now);
+    expect(upcomingEvents.map((e) => e.id)).toEqual(["b"]);
+    expect(pastEvents.map((e) => e.id)).toEqual(["a"]);
   });
 });
 
 describe("groupEventsByMonth", () => {
-  it("keeps the first of the month in that month", () => {
-    const [group] = groupEventsByMonth([event("a", "2026-10-01")]);
+  it("groups by the Pacific month, not the UTC one", () => {
+    // 5 p.m. on October 31 in Vancouver, already November in UTC.
+    const [group] = groupEventsByMonth([event("a", "2026-11-01T00:00:00Z")]);
+    expect(group.key).toBe("2026-10");
     expect(group.label).toBe("October 2026");
   });
 });

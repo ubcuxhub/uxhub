@@ -1,5 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { FlowLink } from "@/components/shared/FlowLink";
+import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { EventAgendaTable } from "@/features/events/components/EventAgendaTable";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { requireAuth } from "@/lib/auth/guards";
@@ -8,7 +11,7 @@ import { createClient } from "@/lib/supabase/server";
 import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
 import { fetchEventAgenda } from "@/lib/supabase-helpers/event-agenda";
 import { Calendar, Link2, MapPin } from "lucide-react";
-import { formatEventDate, formatEventTime } from "@/lib/date";
+import { formatEventDate, formatEventTime, pacificDate } from "@/lib/date";
 import { resolveImagePreviewSrc } from "@/lib/event-image";
 import { fetchEventMentors, fetchEventSponsors } from "@/lib/supabase-helpers/event-people";
 import { EventPeopleCard } from "@/features/events/components/EventPeopleCard";
@@ -25,7 +28,9 @@ export default async function PortalEventPage({
   const { event: slug } = await params;
   await requireAuth();
   const supabase = await createClient();
-  const event = await fetchEventBySlug(supabase, slug, { status: "active" });
+  // No status filter: RLS returns drafts to admins and managers only, who
+  // can open one to test it (docs/event-states.md, "Drafts for admins").
+  const event = await fetchEventBySlug(supabase, slug);
   
   if (!event) {
     notFound();
@@ -34,15 +39,21 @@ export default async function PortalEventPage({
   const [agenda, mentors, sponsors] = await Promise.all([
     fetchEventAgenda(supabase, event.id),
     // Admins switch these sections off per event, as the public event page does.
-    event.mentors_enabled ? await fetchEventMentors(supabase, event.id) : [],
-    event.sponsors_enabled ? await fetchEventSponsors(supabase, event.id) : [],
+    event.mentors_enabled ? fetchEventMentors(supabase, event.id) : [],
+    event.sponsors_enabled ? fetchEventSponsors(supabase, event.id) : [],
   ]);
 
   const startTime = formatEventTime(event.starts_at);
   const endTime = formatEventTime(event.ends_at);
+  const endsOnLaterDay =
+    event.ends_at && pacificDate(event.ends_at) !== pacificDate(event.starts_at);
 
   return (
     <PageContainer backHref="/portal/events" backLabel="Back to Events" className="space-y-4">
+      {event.status !== "active" && (
+        <Alert>Draft: only admins can see this.</Alert>
+      )}
+      
       <div className="border-border-subtle rounded-md border">
         <div className="w-full h-51 bg-brand-blue-200 relative rounded-t-md">
           {/* cover image placeholder */}
@@ -67,7 +78,7 @@ export default async function PortalEventPage({
                 <div className="flex flex-col gap-1">
                   <p className="font-medium">
                     {formatEventDate(event.starts_at, { year: "numeric", month: "short" }) ?? "TBD"}
-                    {event.ends_at && event.ends_at !== event.ends_at
+                    {endsOnLaterDay
                       ? ` – ${formatEventDate(event.ends_at, { year: "numeric", month: "short" }) ?? "TBD"}`
                       : ""}
                   </p>
@@ -101,9 +112,18 @@ export default async function PortalEventPage({
             </div>
           </div>
           <p className="whitespace-pre-wrap">{event.description}</p>
+          {/* The public page shows active events only. */}
+          <Button asChild className="mt-6">
+            {event.status === "active" ? (
+              <Link href={`/events/${event.slug}`}>View full event details</Link>
+            ) : (
+              <FlowLink href={`/portal/events/${event.slug}/checkout`}>Register</FlowLink>
+            )}
+          </Button>
         </div>
       </div>
 
+      
       <EventAgendaTable eventName={event.name} agenda={agenda} />
 
       <EventPeopleCard type="mentors" people={mentors} />

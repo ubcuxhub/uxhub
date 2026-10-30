@@ -11,12 +11,63 @@ releasing a spot.
 | State | Members see it? | Comes from |
 | --- | --- | --- |
 | Draft | No | `status = draft` |
-| Scheduled | Not yet | `status = active`, `publish_at` in the future |
-| Published | Yes | `status = active`, `publish_at` empty or passed |
+| Scheduled | No | `status = draft`, `publish_at` set |
+| Published | Yes | `status = active` |
 
-Draft is the only way to hide an event. Whether an event is upcoming or past
-comes from `starts_at` and `ends_at`, not from its status, so a finished event
-stays Published and members keep their history.
+Draft events are hidden. Whether an event is upcoming or past comes from
+`starts_at` and `ends_at`, not from its status, so a finished event stays
+Published and members keep their history.
+
+### Scheduling publication
+
+The admin create/edit form has an optional **Publish Date & Time (Pacific)**
+field, available only for Draft events. Choose a future date to schedule the
+change from Draft to Active. Leave it empty to keep the event in Draft.
+Clearing it cancels publication; manually activating an event also clears its
+schedule.
+
+Saving, changing, clearing, deleting, or manually publishing a scheduled draft
+recalculates one shared database job for the earliest pending `publish_at`.
+It runs at that minute (rounded up for timestamps containing seconds), activates
+all due drafts, clears their dates, and schedules the next run. It runs even
+when nobody has the app open. Concurrent edits and publication are serialized
+before acquiring event row locks.
+
+When no schedules remain, both the publication job and recovery job are removed.
+While schedules exist, an hourly recovery check at minute 17 catches missed
+runs after database downtime. Failed updates leave the events unchanged and
+schedule a retry every minute until a successful run restores the normal
+schedule. Run history for these jobs is pruned to seven days during scheduling;
+there is no separate cleanup timer. Cron has no year field, so the timestamp
+predicate prevents an event scheduled more than a year away from publishing
+early if its calendar schedule fires in an earlier year.
+
+Each pending schedule also arms a bounded health watchdog. One shared job wakes
+five minutes after the expected publication run, then at five-minute intervals
+for at most three notification attempts per event schedule. Publication success,
+cancellation, deletion or manual status changes remove its window. Changing the
+publication date starts a new window; ordinary edits and publication retries do
+not reset the budget. Exhaustion removes its pending checks but does not stop
+publication retries or recovery. No five-minute polling job runs while idle.
+
+The watchdog uses `pg_net` to POST a timestamp and HMAC signature to
+`/api/internal/event-publication`. This endpoint independently counts drafts
+overdue by at least five minutes and reports `event.publication_overdue` through
+the existing server logger to Sentry. Queued requests contain no shared secret
+or event data. HTTP delivery is asynchronous; later checks inspect previous
+responses. The final request remains inspectable through its recorded request
+ID and `net._http_response` (subject to pg_net response retention).
+
+Monitoring shares database availability: it cannot alert during a complete
+database outage. Missed checks resume after the database returns. An unavailable
+endpoint consumes the same three-attempt budget; exhausted windows remain in
+the private `event_publication.watchdog` table until resolved or rescheduled.
+See [watchdog setup](../supabase/README.md#publication-watchdog) before enabling
+notifications in production.
+
+Public visibility depends only on Active status. The admin list reflects the
+stored status when refreshed. Public marketing pages retain their existing
+five-minute cache revalidation.
 
 ### Drafts for admins
 
@@ -43,10 +94,11 @@ Preview deploys share the production database (the free plan has no branching),
 so registrations and check-ins made on a test draft are real production rows.
 Keep the event in Draft afterwards, or delete it along with its registrations.
 
-**Not built yet:** today the portal event page and fulfillment
-(`createSquarePaymentForEventTicket`) both require `status = active`, even for
-admins. They move to `reserve_event_ticket` with the rest of the code
-(see [registration-rollout.md](registration-rollout.md)).
+The portal event page and checkout read the event under the viewer's RLS, so
+staff reach drafts and members get a 404. Fulfillment
+(`createSquarePaymentForEventTicket`) uses the service role, so it drops the
+`status = active` filter only for admins and managers, and
+`reserve_event_ticket` checks the role again.
 
 ## Admin: application
 

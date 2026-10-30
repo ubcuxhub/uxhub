@@ -110,11 +110,11 @@ export const EventCreateModify = ({
             onChange={form.setSponsors}
           />
           <ApplicationQuestionsSection
-            enabled={form.formState.applications_enabled}
+            enabled={form.formState.requires_application}
             applicationTemplate={form.applicationTemplate}
             questionErrors={form.questionErrors}
             onEnabledChange={(enabled) =>
-              form.handleFieldChange("applications_enabled", enabled)
+              form.handleFieldChange("requires_application", enabled)
             }
             onAdd={form.addApplicationQuestion}
             onRemove={form.removeApplicationQuestion}

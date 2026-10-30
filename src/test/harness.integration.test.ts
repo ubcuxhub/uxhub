@@ -1,8 +1,8 @@
 /**
  * Proves the harness itself: that `pnpm test:integration` reaches the local
  * database, that fixtures are visible to the app's own code while a test runs,
- * and that nothing survives the test. Step 1 of the integration plan builds the
- * `reserve_paid_event_ticket` cases on top of this.
+ * and that nothing survives the test. The `reserve_event_ticket` and
+ * fulfillment cases build on top of this.
  */
 import { afterAll, describe, expect, it } from "vitest";
 
@@ -114,14 +114,14 @@ describe("integration harness", () => {
     expect(data).toEqual([]);
   });
 
-  it("removes the purchase and registration a ticket leaves behind", async () => {
+  it("removes the purchase and ticket a checkout leaves behind", async () => {
     let eventId = "";
     let userId = "";
 
     // The user is created first on purpose. Deleting newest first would then
     // try the event before the user, and the purchase restricts that, while
-    // the registration blocks deleting the user. Neither row is tracked, as
-    // neither is when the app or `reserve_paid_event_ticket` writes it.
+    // the ticket blocks deleting the user. Neither row is tracked, as neither
+    // is when the app or `reserve_event_ticket` writes it.
     await withTaggedFixtures(async (fixtures) => {
       const user = await fixtures.createUser();
       const event = await fixtures.createEvent({ status: "active" });
@@ -143,27 +143,27 @@ describe("integration harness", () => {
         .single();
       expect(purchaseError).toBeNull();
 
-      const { error: registrationError } = await supabase
-        .from("event_registrations")
+      const { error: ticketError } = await supabase
+        .from("event_tickets")
         .insert({
           user_id: user.id,
           event_id: event.id,
           purchase_id: purchase!.id,
         });
-      expect(registrationError).toBeNull();
+      expect(ticketError).toBeNull();
     });
 
-    const [events, users, purchases, registrations] = await Promise.all([
+    const [events, users, purchases, tickets] = await Promise.all([
       supabase.from("events").select("id").eq("id", eventId),
       supabase.from("user_info").select("id").eq("id", userId),
       supabase.from("purchases").select("id").eq("event_id", eventId),
-      supabase.from("event_registrations").select("id").eq("event_id", eventId),
+      supabase.from("event_tickets").select("id").eq("event_id", eventId),
     ]);
 
     expect(events.data).toEqual([]);
     expect(users.data).toEqual([]);
     expect(purchases.data).toEqual([]);
-    expect(registrations.data).toEqual([]);
+    expect(tickets.data).toEqual([]);
   });
 
   afterAll(async () => {

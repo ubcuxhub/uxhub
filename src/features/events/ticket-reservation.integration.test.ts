@@ -1,7 +1,6 @@
 /**
  * The event_tickets / event_applications schema against the local database:
- * the legacy column sync, reserve_event_ticket, seat counts, application
- * transitions and their RLS. See docs/event-states.md for the rules.
+ * reserve_event_ticket, seat counts, application transitions and their RLS. See docs/event-states.md for the rules.
  */
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
@@ -19,8 +18,8 @@ const at = (offsetMs: number) => new Date(Date.now() + offsetMs).toISOString();
 function openEvent(fixtures: Fixtures, overrides: EventInsert = {}) {
   return fixtures.createEvent({
     status: "active",
-    registration_start_time: at(-hour),
-    registration_end_time: at(hour),
+    registration_opens_at: at(-hour),
+    registration_closes_at: at(hour),
     ...overrides,
   });
 }
@@ -65,47 +64,6 @@ async function apply(
   return updated.data;
 }
 
-describe("legacy event column sync", () => {
-  it("derives the new columns from the legacy ones the deployed code writes", () =>
-    withFixtures(async (fixtures) => {
-      const event = await fixtures.createEvent({
-        start_date: "2026-07-02",
-        start_time: "18:00:00",
-        end_date: null,
-        end_time: null,
-        registration_start_time: "2026-06-20T07:00:00.000Z",
-        registration_end_time: "2026-07-01T07:00:00.000Z",
-        applications_enabled: true,
-      });
-
-      // 18:00 and end of day in Vancouver (PDT, UTC-7).
-      expect(new Date(event.starts_at!).toISOString()).toBe("2026-07-03T01:00:00.000Z");
-      expect(new Date(event.ends_at!).toISOString()).toBe("2026-07-03T06:59:59.000Z");
-      expect(new Date(event.registration_opens_at!).toISOString()).toBe("2026-06-20T07:00:00.000Z");
-      expect(new Date(event.registration_closes_at!).toISOString()).toBe("2026-07-01T07:00:00.000Z");
-      expect(event.requires_application).toBe(true);
-
-      const { data: moved } = await db
-        .from("events")
-        .update({ start_time: "10:00:00", end_time: "12:00:00", applications_enabled: false })
-        .eq("id", event.id)
-        .select()
-        .single();
-      expect(new Date(moved!.starts_at!).toISOString()).toBe("2026-07-02T17:00:00.000Z");
-      expect(new Date(moved!.ends_at!).toISOString()).toBe("2026-07-02T19:00:00.000Z");
-      expect(moved!.requires_application).toBe(false);
-
-      // A writer of the new columns wins over the unchanged legacy ones.
-      const { data: direct } = await db
-        .from("events")
-        .update({ starts_at: "2026-07-05T17:00:00.000Z", ends_at: "2026-07-05T19:00:00.000Z" })
-        .eq("id", event.id)
-        .select()
-        .single();
-      expect(new Date(direct!.starts_at!).toISOString()).toBe("2026-07-05T17:00:00.000Z");
-    }));
-});
-
 describe("reserve_event_ticket", () => {
   it("issues one ticket per person and returns the same one for a retried purchase", () =>
     withFixtures(async (fixtures) => {
@@ -149,15 +107,15 @@ describe("reserve_event_ticket", () => {
 
       const early = await openEvent(fixtures, {
         slug: `early-${fixtures.tag}`,
-        registration_start_time: at(hour),
-        registration_end_time: at(2 * hour),
+        registration_opens_at: at(hour),
+        registration_closes_at: at(2 * hour),
       });
       expect((await reserve(early.id, a.id)).failure_reason).toBe("REGISTRATION_NOT_OPEN");
 
       const late = await openEvent(fixtures, {
         slug: `late-${fixtures.tag}`,
-        registration_start_time: at(-2 * hour),
-        registration_end_time: at(-hour),
+        registration_opens_at: at(-2 * hour),
+        registration_closes_at: at(-hour),
       });
       expect((await reserve(late.id, a.id)).failure_reason).toBe("REGISTRATION_CLOSED");
 
@@ -175,6 +133,7 @@ describe("reserve_event_ticket", () => {
       const draft = await openEvent(fixtures, { slug: `draft-${fixtures.tag}`, status: "draft" });
       const scheduled = await openEvent(fixtures, {
         slug: `scheduled-${fixtures.tag}`,
+        status: "draft",
         publish_at: at(hour),
       });
 
@@ -187,7 +146,7 @@ describe("reserve_event_ticket", () => {
 
   it("requires an accepted, unexpired offer, whose seat is already held", () =>
     withFixtures(async (fixtures) => {
-      const event = await openEvent(fixtures, { applications_enabled: true, max_capacity: 1 });
+      const event = await openEvent(fixtures, { requires_application: true, max_capacity: 1 });
       const [none, waiting, offered, lapsed] = [
         await fixtures.createUser(),
         await fixtures.createUser(),
@@ -231,7 +190,7 @@ describe("event_seat_counts", () => {
 describe("event_applications", () => {
   it("allows only the moves in the event states doc", () =>
     withFixtures(async (fixtures) => {
-      const event = await openEvent(fixtures, { applications_enabled: true });
+      const event = await openEvent(fixtures, { requires_application: true });
       const [a, b, c] = [
         await fixtures.createUser(),
         await fixtures.createUser(),
@@ -260,13 +219,13 @@ describe("event_applications", () => {
   it("lets members apply only for themselves, to open application events", () =>
     withFixtures(async (fixtures) => {
       const [member, other] = [await fixtures.createUser(), await fixtures.createUser()];
-      const event = await openEvent(fixtures, { applications_enabled: true });
+      const event = await openEvent(fixtures, { requires_application: true });
       const plain = await openEvent(fixtures, { slug: `plain-${fixtures.tag}` });
       const closed = await openEvent(fixtures, {
         slug: `closed-${fixtures.tag}`,
-        applications_enabled: true,
-        registration_start_time: at(-2 * hour),
-        registration_end_time: at(-hour),
+        requires_application: true,
+        registration_opens_at: at(-2 * hour),
+        registration_closes_at: at(-hour),
       });
       const client = clientAs(member);
       const insert = (eventId: string, userId = member.id) =>

@@ -10,7 +10,7 @@ import {
   fetchEventBySlug,
   fetchEvents,
 } from "@/lib/supabase-helpers/events";
-import { fetchEventRegistrationCount } from "@/lib/supabase-helpers/event-registrations";
+import { fetchEventSeatCounts } from "@/lib/supabase-helpers/event-tickets";
 import {
   fetchEventMentors,
   fetchEventSponsors,
@@ -43,11 +43,11 @@ interface AgendaItem {
 
 function getRegistrationStatus(event: EventRow) {
   const now = new Date();
-  const regStart = event.registration_start_time
-    ? new Date(event.registration_start_time)
+  const regStart = event.registration_opens_at
+    ? new Date(event.registration_opens_at)
     : null;
-  const regEnd = event.registration_end_time
-    ? new Date(event.registration_end_time)
+  const regEnd = event.registration_closes_at
+    ? new Date(event.registration_closes_at)
     : null;
   if (regStart && now < regStart) return "upcoming";
   if (regEnd && now > regEnd) return "closed";
@@ -85,15 +85,16 @@ export default async function EventDetailPage({
   const supabase = createPublicClient();
   const event = await fetchEventBySlug(supabase, slug, { status: "active" });
   if (!event) notFound();
-  const [registrationCount, mentors, sponsors] = await Promise.all([
-    fetchEventRegistrationCount(supabase, event.id),
+  const [seatCounts, mentors, sponsors] = await Promise.all([
+    fetchEventSeatCounts(supabase, [event.id]),
     fetchEventMentors(supabase, event.id),
     fetchEventSponsors(supabase, event.id),
   ]);
 
   /* ── Derived data ── */
   const regStatus = getRegistrationStatus(event);
-  const spotsLeft = event.max_capacity - registrationCount;
+  // Held offers count as taken (docs/event-states.md, "Seats").
+  const spotsLeft = seatCounts.get(event.id)?.seatsLeft ?? event.max_capacity;
   const canRegister = regStatus === "open" && spotsLeft > 0;
   const registerLabel = regStatus === "upcoming"
       ? "Registration Opens Soon"
@@ -106,11 +107,11 @@ export default async function EventDetailPage({
     event.member_price !== undefined &&
     Number(event.member_price) !== Number(event.regular_price);
 
-  const startDateFormatted = formatEventDate(event.start_date, {
+  const startDateFormatted = formatEventDate(event.starts_at, {
     weekday: "long",
   });
-  const startTimeFormatted = formatEventTime(event.start_time);
-  const endTimeFormatted = formatEventTime(event.end_time);
+  const startTimeFormatted = formatEventTime(event.starts_at);
+  const endTimeFormatted = formatEventTime(event.ends_at);
   const locationDisplay = [event.location_building, event.location_room]
     .filter(Boolean)
     .join(", ");

@@ -25,7 +25,8 @@ describe("user seed fixtures", () => {
       authUsers: 11,
       profiles: 11,
       purchases: 18,
-      registrations: 15,
+      tickets: 11,
+      applications: 5,
       responses: 22,
       checkIns: 6,
     });
@@ -85,7 +86,7 @@ describe("user seed fixtures", () => {
             ? purchaseByKey.get(registration.purchaseKey)
             : null;
           const event = eventBySlug.get(registration.eventSlug);
-          return registration.status === "accepted" &&
+          return registration.ticket &&
             purchase?.status === "completed" &&
             event
             ? [classifySeedEvent(event, fixedNow)]
@@ -95,6 +96,42 @@ describe("user seed fixtures", () => {
 
       expect(phases).toEqual(new Set(["past", "ongoing", "upcoming"]));
     }
+  });
+
+  it("keeps applications to events that take them, with a deadline when accepted", () => {
+    const withoutApplication = structuredClone(seedUsers);
+    const sprint = withoutApplication[0].registrations.find(
+      (registration) => registration.eventSlug === "design-sprint-past"
+    )!;
+    delete sprint.application;
+    expect(() =>
+      validateUserFixtures(withoutApplication, seedEvents, membershipTypes, fixedNow)
+    ).toThrow("needs an application");
+
+    const noDeadline = structuredClone(seedUsers);
+    noDeadline[0].registrations.find(
+      (registration) => registration.eventSlug === "design-sprint-past"
+    )!.application = { status: "accepted" };
+    expect(() =>
+      validateUserFixtures(noDeadline, seedEvents, membershipTypes, fixedNow)
+    ).toThrow("needs an offer deadline exactly when accepted");
+
+    const unaccepted = structuredClone(seedUsers);
+    unaccepted[0].registrations.find(
+      (registration) => registration.eventSlug === "design-sprint-past"
+    )!.application = { status: "waitlisted" };
+    expect(() =>
+      validateUserFixtures(unaccepted, seedEvents, membershipTypes, fixedNow)
+    ).toThrow("has a ticket without an accepted application");
+
+    const checkedInWithoutTicket = structuredClone(seedUsers);
+    const uxathon = checkedInWithoutTicket[0].registrations.find(
+      (registration) => registration.eventSlug === "uxathon-past"
+    )!;
+    uxathon.checkIns = { "Evening Headcount": fixedNow.toISOString() };
+    expect(() =>
+      validateUserFixtures(checkedInWithoutTicket, seedEvents, membershipTypes, fixedNow)
+    ).toThrow("has check-ins but no ticket");
   });
 
   it("rejects duplicate identity and purchase keys", () => {

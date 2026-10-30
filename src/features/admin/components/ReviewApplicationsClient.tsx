@@ -5,8 +5,12 @@ import { useSearchParams } from "next/navigation";
 import {
   ApplicationListCard,
 } from "@/features/admin/components/ApplicationListCard";
-import { type GroupedRegistration } from "@/features/events/types";
-import type { ApplicationStatus } from "@/lib/supabase/models";
+import {
+  APPLICATION_REVIEW_STATE_LABELS,
+  getApplicationReviewState,
+  type ApplicationReviewState,
+} from "@/features/admin/lib/application-review";
+import type { ApplicationSummary } from "@/lib/supabase-helpers/event-applications";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PageContainer } from "@/components/shared/PageContainer";
@@ -14,52 +18,78 @@ import { PageContainer } from "@/components/shared/PageContainer";
 interface ReviewApplicationsClientProps {
   eventId: string;
   eventName: string;
-  registrations: GroupedRegistration[];
+  applications: ApplicationSummary[];
 }
+
+const FILTERS: ApplicationReviewState[] = [
+  "submitted",
+  "waitlisted",
+  "accepted",
+  "registered",
+  "offer_expired",
+  "rejected",
+];
 
 export function ReviewApplicationsClient({
   eventId,
   eventName,
-  registrations,
+  applications,
 }: ReviewApplicationsClientProps) {
   const searchParams = useSearchParams();
 
   // Initialize status filters from URL query param
   const initialFilter = searchParams?.get("filter");
   const initialStatusFilters = useMemo(() => {
-    const filters = new Set<ApplicationStatus>();
-    if (initialFilter === "pending") {
-      filters.add("pending");
+    const filters = new Set<ApplicationReviewState>();
+    if (initialFilter === "submitted") {
+      filters.add("submitted");
     }
     return filters;
   }, [initialFilter]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilters, setStatusFilters] =
-    useState<Set<ApplicationStatus>>(initialStatusFilters);
+    useState<Set<ApplicationReviewState>>(initialStatusFilters);
 
-  const filteredRegistrations = useMemo(() => {
-    let filtered = [...registrations];
+  const reviewed = useMemo(
+    () =>
+      applications.map((application) => ({
+        ...application,
+        state: getApplicationReviewState(
+          {
+            status: application.status,
+            offer_expires_at: application.offerExpiresAt,
+          },
+          application.hasTicket
+        ),
+      })),
+    [applications]
+  );
+
+  const filteredApplications = useMemo(() => {
+    let filtered = reviewed;
 
     // Apply search filter
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
-        (reg) =>
-          reg.name.toLowerCase().includes(query) ||
-          reg.email.toLowerCase().includes(query)
+        (application) =>
+          application.name.toLowerCase().includes(query) ||
+          application.email.toLowerCase().includes(query)
       );
     }
 
     // Apply status filters
     if (statusFilters.size > 0) {
-      filtered = filtered.filter((reg) => statusFilters.has(reg.status));
+      filtered = filtered.filter((application) =>
+        statusFilters.has(application.state)
+      );
     }
 
     return filtered;
-  }, [registrations, searchQuery, statusFilters]);
+  }, [reviewed, searchQuery, statusFilters]);
 
-  const toggleStatusFilter = (status: ApplicationStatus) => {
+  const toggleStatusFilter = (status: ApplicationReviewState) => {
     setStatusFilters((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(status)) {
@@ -105,35 +135,18 @@ export function ReviewApplicationsClient({
 
                 {/* Filter Section */}
                 <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium">Filter:</span>
-                    <Button
-                      type="button"
-                      variant={
-                        statusFilters.has("pending") ? "default" : "outline"
-                      }
-                      onClick={() => toggleStatusFilter("pending")}
-                    >
-                      Pending
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={
-                        statusFilters.has("declined") ? "default" : "outline"
-                      }
-                      onClick={() => toggleStatusFilter("declined")}
-                    >
-                      Declined
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={
-                        statusFilters.has("accepted") ? "default" : "outline"
-                      }
-                      onClick={() => toggleStatusFilter("accepted")}
-                    >
-                      Accepted
-                    </Button>
+                    {FILTERS.map((state) => (
+                      <Button
+                        key={state}
+                        type="button"
+                        variant={statusFilters.has(state) ? "default" : "outline"}
+                        onClick={() => toggleStatusFilter(state)}
+                      >
+                        {APPLICATION_REVIEW_STATE_LABELS[state]}
+                      </Button>
+                    ))}
                     {(statusFilters.size > 0 || searchQuery.trim()) && (
                       <Button
                         type="button"
@@ -147,29 +160,29 @@ export function ReviewApplicationsClient({
                 </div>
 
                 {/* Applications List */}
-                {filteredRegistrations.length === 0 ? (
+                {filteredApplications.length === 0 ? (
                   <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed p-12 text-center">
                     <div className="text-2xl font-semibold">
-                      {registrations.length === 0
+                      {applications.length === 0
                         ? "No applications yet"
                         : "No applications match your filters"}
                     </div>
                     <p className="max-w-md text-sm text-muted-foreground">
-                      {registrations.length === 0
+                      {applications.length === 0
                         ? "Applications will appear here once users submit them."
                         : "Try adjusting your search or filter criteria."}
                     </p>
                   </div>
                 ) : (
                   <div className="grid gap-4">
-                    {filteredRegistrations.map((registration) => (
+                    {filteredApplications.map((application) => (
                       <ApplicationListCard
-                        key={registration.user_id}
-                        registrationId={registration.registrationId}
-                        name={registration.name}
-                        email={registration.email}
-                        applicationDate={registration.applicationDate}
-                        status={registration.status}
+                        key={application.applicationId}
+                        applicationId={application.applicationId}
+                        name={application.name}
+                        email={application.email}
+                        applicationDate={application.appliedAt}
+                        state={application.state}
                         eventId={eventId}
                       />
                     ))}

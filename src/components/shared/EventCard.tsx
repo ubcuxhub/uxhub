@@ -8,6 +8,7 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { formatEventDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import type { EventRow } from "@/lib/supabase/models";
 
@@ -19,13 +20,7 @@ export interface EventCardProps {
 }
 
 export function EventCard({ event, href, onClick, className }: EventCardProps) {
-  const formattedDate = event.start_date
-    ? new Date(event.start_date).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      })
-    : null;
+  const formattedDate = formatEventDate(event.starts_at, { month: "short" });
 
   const locationDisplay = [event.location_building, event.location_room]
     .filter(Boolean)

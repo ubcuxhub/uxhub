@@ -2,18 +2,15 @@ import type { DbClient } from "./types";
 import { TABLES } from "./tables";
 import type {
   CheckInSessionInsert,
-  EventRegistrationRow,
+  EventTicketRow,
 } from "@/lib/supabase/models";
 import type {
-  AttendingRegistration,
+  CheckInAttendee,
   CheckInSession,
 } from "@/features/admin/types";
 import { formatUserName } from "@/lib/user-name";
 
-type AttendingRegistrationQueryRow = Pick<
-  EventRegistrationRow,
-  "id" | "user_id"
-> & {
+type CheckInAttendeeQueryRow = Pick<EventTicketRow, "id" | "user_id"> & {
   user_info: {
     first_name: string | null;
     last_name: string | null;
@@ -35,12 +32,13 @@ export async function fetchCheckInSessions(
   return (data || []) as CheckInSession[];
 }
 
-export async function fetchAttendingRegistrations(
+/** Everyone holding a ticket to the event, newest first. */
+export async function fetchCheckInAttendees(
   supabase: DbClient,
   eventId: string
-): Promise<AttendingRegistration[]> {
+): Promise<CheckInAttendee[]> {
   const { data, error } = await supabase
-    .from(TABLES.eventRegistrations)
+    .from(TABLES.eventTickets)
     .select(
       `
       id,
@@ -49,17 +47,16 @@ export async function fetchAttendingRegistrations(
     `
     )
     .eq("event_id", eventId)
-    .eq("attending", true)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
   if (!data || data.length === 0) return [];
 
-  return data.map((reg: AttendingRegistrationQueryRow) => {
-    const userInfo = reg.user_info;
+  return data.map((ticket: CheckInAttendeeQueryRow) => {
+    const userInfo = ticket.user_info;
     return {
-      id: reg.id,
-      user_id: reg.user_id,
+      id: ticket.id,
+      user_id: ticket.user_id,
       user_name:
         userInfo?.first_name && userInfo.last_name
           ? formatUserName({
@@ -73,92 +70,72 @@ export async function fetchAttendingRegistrations(
 }
 
 /**
- * Returns a map keyed by `${registrationId}_${sessionId}` to the checked-in
- * timestamp (or null when not checked in).
+ * Returns a map keyed by `${ticketId}_${sessionId}` to the checked-in
+ * timestamp, for every check-in on the event's tickets.
  */
 export async function fetchCheckInStatuses(
   supabase: DbClient,
   eventId: string
 ): Promise<Map<string, string | null>> {
-  const { data: registrationsData, error: regsError } = await supabase
-    .from(TABLES.eventRegistrations)
-    .select("id")
-    .eq("event_id", eventId);
-
-  if (regsError) throw regsError;
-  if (!registrationsData || registrationsData.length === 0) {
-    return new Map();
-  }
-
-  const registrationIds = registrationsData.map(
-    (reg: Pick<EventRegistrationRow, "id">) => reg.id
-  );
-
   const { data, error } = await supabase
     .from(TABLES.checkIns)
-    .select("event_registration_id, check_in_session_id, checked_in_at")
-    .in("event_registration_id", registrationIds);
+    .select(
+      "ticket_id, check_in_session_id, checked_in_at, event_tickets!inner(event_id)"
+    )
+    .eq("event_tickets.event_id", eventId);
 
   if (error) throw error;
 
   const statusMap = new Map<string, string | null>();
-  (data || []).forEach(
-    (checkIn: {
-      event_registration_id: string;
-      check_in_session_id: string;
-      checked_in_at: string | null;
-    }) => {
-      const key = `${checkIn.event_registration_id}_${checkIn.check_in_session_id}`;
-      statusMap.set(key, checkIn.checked_in_at);
-    }
-  );
+  for (const checkIn of data ?? []) {
+    if (!checkIn.ticket_id) continue;
+    statusMap.set(
+      `${checkIn.ticket_id}_${checkIn.check_in_session_id}`,
+      checkIn.checked_in_at
+    );
+  }
 
   return statusMap;
 }
 
-/** Returns the check-in row id for a registration/session pair, or null. */
-export async function fetchCheckInId(
+/**
+ * Checks a ticket in to a session now and returns the stored time. Checking
+ * in again restamps it.
+ */
+export async function upsertCheckIn(
   supabase: DbClient,
-  registrationId: string,
+  ticketId: string,
   sessionId: string
-): Promise<string | null> {
+): Promise<string> {
   const { data, error } = await supabase
     .from(TABLES.checkIns)
-    .select("id")
-    .eq("event_registration_id", registrationId)
-    .eq("check_in_session_id", sessionId)
-    .maybeSingle();
+    .upsert(
+      {
+        ticket_id: ticketId,
+        check_in_session_id: sessionId,
+        checked_in_at: new Date().toISOString(),
+      },
+      { onConflict: "ticket_id,check_in_session_id" }
+    )
+    .select("checked_in_at")
+    .single();
 
-  // PGRST116 means no matching row, which is expected.
-  if (error && error.code !== "PGRST116") {
-    throw error;
-  }
-
-  return data?.id ?? null;
+  if (error) throw error;
+  return data.checked_in_at ?? new Date().toISOString();
 }
 
-export async function updateCheckInTimestamp(
+/** Removes a mistaken check-in so the ticket can be checked in again. */
+export async function deleteCheckIn(
   supabase: DbClient,
-  checkInId: string,
-  checkedInAt: string | null
+  ticketId: string,
+  sessionId: string
 ): Promise<void> {
   const { error } = await supabase
     .from(TABLES.checkIns)
-    .update({ checked_in_at: checkedInAt })
-    .eq("id", checkInId);
+    .delete()
+    .eq("ticket_id", ticketId)
+    .eq("check_in_session_id", sessionId);
 
-  if (error) throw error;
-}
-
-export async function insertCheckIn(
-  supabase: DbClient,
-  payload: {
-    event_registration_id: string;
-    check_in_session_id: string;
-    checked_in_at: string | null;
-  }
-): Promise<void> {
-  const { error } = await supabase.from(TABLES.checkIns).insert(payload);
   if (error) throw error;
 }
 
