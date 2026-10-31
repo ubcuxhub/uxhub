@@ -122,11 +122,11 @@ function ConfirmDialogBody({
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-0 sm:h-auto sm:gap-4">
-      <DialogHeader className="shrink-0 border-b pb-5 pl-5 pr-20 pt-16 text-left sm:border-0 sm:p-0">
+      <DialogHeader className="shrink-0 border-b border-border-subtle pb-5 pl-5 pr-20 pt-16 text-left sm:border-0 sm:p-0">
         <DialogTitle
           className={cn(
             icon &&
-              "flex items-center gap-3 text-destructive [&_svg]:size-6 sm:gap-2 sm:[&_svg]:size-4",
+              "flex items-center gap-3 text-error [&_svg]:size-6 sm:gap-2 sm:[&_svg]:size-4",
           )}
         >
           {icon}
@@ -153,15 +153,14 @@ function ConfirmDialogBody({
                   onChange={(event) => setTyped(event.target.value)}
                   aria-describedby={confirmation.hint ? hintId : undefined}
                   aria-invalid={mismatch || undefined}
-                  className={cn(mismatch && "border-destructive")}
                 />
                 {confirmation.hint ? (
-                  <p id={hintId} className="text-small text-muted-foreground">
+                  <p id={hintId} className="text-small text-fg-secondary">
                     {confirmation.hint}
                   </p>
                 ) : null}
                 {mismatch && confirmation.mismatchMessage ? (
-                  <p className="text-small text-destructive">
+                  <p className="text-small text-error">
                     {confirmation.mismatchMessage}
                   </p>
                 ) : null}
@@ -169,7 +168,7 @@ function ConfirmDialogBody({
             ) : null}
 
             {error ? (
-              <p className="text-small text-destructive">{error}</p>
+              <p className="text-small text-error">{error}</p>
             ) : null}
           </div>
         </div>
@@ -177,7 +176,7 @@ function ConfirmDialogBody({
         <div className="flex-1 sm:hidden" />
       )}
 
-      <DialogFooter className="mt-auto shrink-0 gap-3 border-t bg-background p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] [&>button]:w-full sm:mt-0 sm:gap-0 sm:border-0 sm:p-0 sm:[&>button]:w-auto">
+      <DialogFooter className="mt-auto shrink-0 gap-3 border-t border-border-subtle p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] [&>button]:w-full sm:mt-0 sm:gap-0 sm:border-0 sm:p-0 sm:[&>button]:w-auto">
         <Button
           type="button"
           variant="outline"

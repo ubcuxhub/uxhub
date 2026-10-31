@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { TriangleAlert } from "lucide-react";
 
-import { BackButton } from "@/components/shared/BackButton";
+import { BackButton, BackPill } from "@/components/shared/BackButton";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { CopyCode } from "@/components/shared/CopyCode";
 import { EventCard } from "@/components/shared/EventCard";
@@ -145,6 +145,22 @@ function ConfirmDialogs({ open }: { open?: string }) {
   );
 }
 
+/** Fires a real `dragenter` so ImageUpload shows its dragging state without a file. */
+function DraggingImageUpload() {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const target = ref.current?.querySelector<HTMLElement>("[class*='border-dashed']");
+    target?.dispatchEvent(
+      new DragEvent("dragenter", { bubbles: true, cancelable: true }),
+    );
+  }, []);
+  return (
+    <div ref={ref} className="w-full">
+      <ImageUpload onChange={() => {}} />
+    </div>
+  );
+}
+
 /** Drawn inside a transformed frame so its `fixed inset-0` stays contained. */
 function SuccessOverlayFrame() {
   return (
@@ -160,21 +176,35 @@ function Composites({ open }: SectionProps) {
       <SpecimenGroup
         title="BackButton"
         spec="§4.5"
-        description="Rendered by PageContainer and by feature pages with a backHref."
-        min="14rem"
+        description="40px pill, 20px side padding, 16px arrow, 8px gap. Rendered by PageContainer and by feature pages with a backHref."
+        min="16rem"
       >
-        <Specimen label="default label">
-          <BackButton link="/dev/components" />
-        </Specimen>
-        <Specimen label="named parent">
+        <Specimen label="BackButton, named parent">
           <BackButton link="/dev/components" label="Back to Events" />
+        </Specimen>
+        <Specimen label="BackPill, long label">
+          <BackPill href="/dev/components" label="Back to Manage Events" />
+        </Specimen>
+        <Specimen label="hover (forced)">
+          <BackPill
+            href="/dev/components"
+            label="Back to Events"
+            className="bg-surface-subtle"
+          />
+        </Specimen>
+        <Specimen label="focus (forced)">
+          <BackPill
+            href="/dev/components"
+            label="Back to Events"
+            className="focus-ring"
+          />
         </Specimen>
       </SpecimenGroup>
 
       <SpecimenGroup
         title="PageContainer"
         spec="§2.3"
-        description="Page padding and the optional back button. Shown in a frame."
+        description="Top 40px on desktop and tablet, 32px on mobile; sides 20 / 24 / 64. The back pill sits 24px above the title. Shown in a frame, so check the mobile preset too."
         min="100%"
       >
         <Specimen label="with backHref" bare>
@@ -196,24 +226,24 @@ function Composites({ open }: SectionProps) {
         min="20rem"
       >
         <Specimen label="image, priced (member price)" bare>
-          <EventCard event={EVENT} className="w-full" />
+          <EventCard event={EVENT} className="w-full max-w-sm" />
         </Specimen>
         <Specimen label="no image, free, long title" bare>
-          <EventCard event={FREE_EVENT} className="w-full" />
+          <EventCard event={FREE_EVENT} className="w-full max-w-sm" />
         </Specimen>
         <Specimen label="linked (href)" bare>
-          <EventCard event={EVENT} href="/dev/components" className="w-full" />
+          <EventCard event={EVENT} href="/dev/components" className="w-full max-w-sm" />
         </Specimen>
         <Specimen label="clickable (onClick)" bare>
-          <EventCard event={FREE_EVENT} onClick={() => {}} className="w-full" />
+          <EventCard event={FREE_EVENT} onClick={() => {}} className="w-full max-w-sm" />
         </Specimen>
       </SpecimenGroup>
 
       <SpecimenGroup
         title="ImageUpload"
         spec="§3.12"
-        description="Dragging and uploading are internal state, so they are checked by dragging a file over the empty one."
-        min="22rem"
+        description="The dragging specimen fires a dragenter on mount; uploading uses the `uploading` prop."
+        min="min(22rem, 100%)"
       >
         <Specimen label="empty" bare>
           <div className="w-full">
@@ -223,6 +253,14 @@ function Composites({ open }: SectionProps) {
         <Specimen label="uploaded" bare>
           <div className="w-full">
             <ImageUpload value={SQUARE_IMAGE} onChange={() => {}} />
+          </div>
+        </Specimen>
+        <Specimen label="dragging (dragenter fired on mount)" bare>
+          <DraggingImageUpload />
+        </Specimen>
+        <Specimen label="uploading" bare>
+          <div className="w-full">
+            <ImageUpload onChange={() => {}} uploading />
           </div>
         </Specimen>
         <Specimen label="disabled" bare>
@@ -251,7 +289,7 @@ function Composites({ open }: SectionProps) {
       <SpecimenGroup
         title="ConfirmDialog"
         spec="§3.7, §2.9"
-        description="Plain, typed challenge, pending and error. Portaled, so check each in theme=light and theme=dark, and on the mobile preset for the fullscreen layout."
+        description="Plain, typed challenge, pending and error. In the typed one, type a wrong value for the mismatch state and uxathon-2026 for the match. Portaled, so check each in theme=light and theme=dark, and on the mobile preset for the fullscreen layout."
         min="14rem"
       >
         <ConfirmDialogs open={open} />
