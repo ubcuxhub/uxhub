@@ -196,7 +196,7 @@ export function SponsorsSection({
               </Button>
               {sponsor.id && sponsor.isEditing && (
                 <p
-                  className="flex items-start gap-2 pr-8 text-small text-warning"
+                  className="flex items-start gap-2 pr-8 text-small text-warning-foreground"
                   role="note"
                 >
                   <AlertTriangle className="mt-0.5 size-4 shrink-0" />

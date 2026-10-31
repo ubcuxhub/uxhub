@@ -34,8 +34,8 @@ function FilterChip({
       className={cn(
         "group/chip relative inline-flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border border-border bg-card px-3.5 text-label whitespace-nowrap text-muted-foreground transition-colors duration-150 select-none focus-visible:focus-ring pointer-coarse:after:absolute pointer-coarse:after:-inset-[7px]",
         "not-data-[state=on]:enabled:hover:bg-muted",
-        "data-[state=on]:border-status-info-background data-[state=on]:bg-status-info-background data-[state=on]:pl-2.5 data-[state=on]:text-action-primary-strong dark:data-[state=on]:text-status-info-text",
-        "disabled:cursor-not-allowed disabled:text-text-disabled disabled:opacity-60",
+        "data-[state=on]:border-transparent data-[state=on]:bg-info data-[state=on]:pl-2.5 data-[state=on]:text-primary-active dark:data-[state=on]:text-info-foreground",
+        "disabled:cursor-not-allowed disabled:text-disabled-foreground disabled:opacity-60",
         className,
       )}
       {...props}

@@ -75,7 +75,7 @@ function DropdownMenuGroup({
 }
 
 const itemBase =
-  "relative flex min-h-11 w-full cursor-default items-center gap-2 rounded-md px-2 py-2 text-small text-foreground outline-hidden select-none transition-colors duration-150 focus:bg-muted data-[disabled]:pointer-events-none data-[disabled]:text-text-disabled data-[disabled]:[&_svg]:text-text-disabled sm:min-h-9 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground"
+  "relative flex min-h-11 w-full cursor-default items-center gap-2 rounded-md px-2 py-2 text-small text-foreground outline-hidden select-none transition-colors duration-150 focus:bg-muted data-[disabled]:pointer-events-none data-[disabled]:text-disabled-foreground data-[disabled]:[&_svg]:text-disabled-foreground sm:min-h-9 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 [&_svg:not([class*='text-'])]:text-muted-foreground"
 
 function DropdownMenuItem({
   className,
@@ -94,7 +94,7 @@ function DropdownMenuItem({
       className={cn(
         itemBase,
         "data-[inset]:pl-8",
-        "data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-status-error-background data-[variant=destructive]:data-[disabled]:text-text-disabled data-[variant=destructive]:[&_svg]:text-destructive data-[variant=destructive]:data-[disabled]:[&_svg]:text-text-disabled",
+        "data-[variant=destructive]:text-destructive data-[variant=destructive]:focus:bg-error data-[variant=destructive]:data-[disabled]:text-disabled-foreground data-[variant=destructive]:[&_svg]:text-destructive data-[variant=destructive]:data-[disabled]:[&_svg]:text-disabled-foreground",
         className
       )}
       {...props}

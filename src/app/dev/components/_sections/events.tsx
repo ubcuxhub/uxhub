@@ -132,7 +132,7 @@ function Section() {
         </Specimen>
         <Specimen label="hover (forced)" wide bare>
           <EventCard
-            className="w-full bg-background-secondary"
+            className="w-full bg-section"
             title="UXathon"
             href={HREF}
             venue="UBC Henry Angus (ANGU)"

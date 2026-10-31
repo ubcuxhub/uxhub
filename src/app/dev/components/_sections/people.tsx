@@ -123,7 +123,7 @@ function Section() {
         title="List row (§4.1)"
         description="64px avatar, 18px name, role · company, and a link labelled with the person."
       >
-        <div className="flex flex-col gap-3 rounded-lg border border-border-subtle bg-background-secondary p-4">
+        <div className="flex flex-col gap-3 rounded-lg border border-border-subtle bg-section p-4">
           <div className="flex items-center gap-4">
             <Avatar name="Alex Chen" src="/people/david.jpg" size={64} decorative />
             <div className="flex min-w-0 flex-1 flex-col">

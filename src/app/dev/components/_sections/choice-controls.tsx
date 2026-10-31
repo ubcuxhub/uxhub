@@ -286,7 +286,7 @@ function ChoiceControls() {
               {["Members only", "By application"].map((label) => (
                 <Field key={label} orientation="horizontal" data-disabled>
                   <RadioGroupItem value={label} aria-label={label} />
-                  <span className="text-body text-text-disabled">{label}</span>
+                  <span className="text-body text-disabled-foreground">{label}</span>
                 </Field>
               ))}
             </RadioGroup>

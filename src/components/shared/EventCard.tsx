@@ -47,7 +47,7 @@ function EventCard({
     <article
       data-slot="event-card"
       className={cn(
-        "relative flex flex-col-reverse gap-4 rounded-lg border bg-card p-4 transition-colors duration-150 hover:bg-background-secondary has-[a:focus-visible]:focus-ring sm:flex-row sm:items-center sm:gap-6 sm:p-5",
+        "relative flex flex-col-reverse gap-4 rounded-lg border bg-card p-4 transition-colors duration-150 hover:bg-section has-[a:focus-visible]:focus-ring sm:flex-row sm:items-center sm:gap-6 sm:p-5",
         className,
       )}
       {...props}

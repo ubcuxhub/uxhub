@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
  * `border-subtle`: `surface-hover` is 1.02:1 against white, too faint to read
  * as feedback.
  *
- * Link uses `text-info`: `action-primary` is the same blue in dark mode and
+ * Link uses `text-info-foreground`: `action-primary` is the same blue in dark mode and
  * only 3:1 on the dark page, where `status-info-text` steps up to blue-250.
  *
  * The disabled look swaps the fill and edge for the disabled tokens. A loading
@@ -31,14 +31,14 @@ import { cn } from "@/lib/utils";
  * since the spinner says why it can't be pressed.
  */
 const primary =
-  "border-transparent bg-action text-fg-inverse hover:bg-action-hover active:bg-action-strong " +
-  "disabled:not-aria-busy:border-action-disabled-border disabled:not-aria-busy:bg-action-disabled-bg disabled:not-aria-busy:text-fg-disabled " +
-  "aria-disabled:border-action-disabled-border aria-disabled:bg-action-disabled-bg aria-disabled:text-fg-disabled";
+  "border-transparent bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-active " +
+  "disabled:not-aria-busy:border-disabled-border disabled:not-aria-busy:bg-disabled disabled:not-aria-busy:text-disabled-foreground " +
+  "aria-disabled:border-disabled-border aria-disabled:bg-disabled aria-disabled:text-disabled-foreground";
 
 const secondary =
-  "border-border bg-background text-fg hover:bg-surface-subtle active:bg-border-subtle aria-pressed:bg-border-subtle " +
-  "disabled:not-aria-busy:border-action-disabled-border disabled:not-aria-busy:bg-action-disabled-bg disabled:not-aria-busy:text-fg-disabled " +
-  "aria-disabled:border-action-disabled-border aria-disabled:bg-action-disabled-bg aria-disabled:text-fg-disabled";
+  "border-border bg-background text-foreground hover:bg-muted active:bg-border-subtle aria-pressed:bg-border-subtle " +
+  "disabled:not-aria-busy:border-disabled-border disabled:not-aria-busy:bg-disabled disabled:not-aria-busy:text-disabled-foreground " +
+  "aria-disabled:border-disabled-border aria-disabled:bg-disabled aria-disabled:text-disabled-foreground";
 
 const buttonVariants = cva(
   "relative inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-full border border-transparent font-medium transition-colors duration-150 ease-out select-none focus-visible:focus-ring disabled:pointer-events-none aria-disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 pointer-coarse:after:absolute",
@@ -52,15 +52,15 @@ const buttonVariants = cva(
         /** @deprecated Use `secondary`. */
         outline: secondary,
         destructive:
-          "border-transparent bg-action-destructive font-semibold text-fg-inverse hover:bg-action-destructive-hover active:bg-action-destructive-strong " +
-          "disabled:not-aria-busy:border-action-disabled-border disabled:not-aria-busy:bg-action-disabled-bg disabled:not-aria-busy:text-fg-disabled " +
-          "aria-disabled:border-action-disabled-border aria-disabled:bg-action-disabled-bg aria-disabled:text-fg-disabled",
+          "border-transparent bg-destructive font-semibold text-destructive-foreground hover:bg-destructive-hover active:bg-destructive-active " +
+          "disabled:not-aria-busy:border-disabled-border disabled:not-aria-busy:bg-disabled disabled:not-aria-busy:text-disabled-foreground " +
+          "aria-disabled:border-disabled-border aria-disabled:bg-disabled aria-disabled:text-disabled-foreground",
         // Icon buttons and the few text uses with no DS equivalent. A disabled
         // ghost button only greys its label: a grey pill would read as a
         // secondary button.
         ghost:
-          "bg-transparent text-fg hover:bg-surface-subtle active:bg-border-subtle aria-pressed:bg-border-subtle disabled:not-aria-busy:text-fg-disabled aria-disabled:text-fg-disabled",
-        link: "rounded-sm text-info underline-offset-4 hover:underline disabled:not-aria-busy:text-fg-disabled aria-disabled:text-fg-disabled",
+          "bg-transparent text-foreground hover:bg-muted active:bg-border-subtle aria-pressed:bg-border-subtle disabled:not-aria-busy:text-disabled-foreground aria-disabled:text-disabled-foreground",
+        link: "rounded-sm text-info-foreground underline-offset-4 hover:underline disabled:not-aria-busy:text-disabled-foreground aria-disabled:text-disabled-foreground",
       },
       size: {
         md: "h-11 gap-2 px-4 text-button sm:h-10 pointer-coarse:after:inset-0 pointer-coarse:sm:after:-inset-y-[3px] [&_svg]:size-4",

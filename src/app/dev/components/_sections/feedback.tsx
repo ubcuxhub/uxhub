@@ -64,7 +64,7 @@ function OpenToasts({ open }: SectionProps) {
 function Stage({ children }: { children: React.ReactNode }) {
   return (
     <div
-      className="flex w-full flex-col gap-3 rounded-2xl bg-background-secondary p-4 sm:p-7"
+      className="flex w-full flex-col gap-3 rounded-2xl bg-section p-4 sm:p-7"
       style={{ "--width": "min(380px, 100%)" } as React.CSSProperties}
     >
       {children}

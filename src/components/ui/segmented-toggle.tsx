@@ -71,7 +71,7 @@ function SegmentedToggleItem({
       className={cn(
         "inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-full border border-transparent px-3 text-label whitespace-nowrap text-muted-foreground transition-colors duration-150 select-none hover:text-foreground focus-visible:focus-ring [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
         "data-[state=on]:border-border data-[state=on]:bg-card data-[state=on]:text-foreground",
-        "disabled:cursor-not-allowed disabled:text-text-disabled disabled:opacity-60 disabled:hover:text-text-disabled",
+        "disabled:cursor-not-allowed disabled:text-disabled-foreground disabled:opacity-60 disabled:hover:text-disabled-foreground",
         className,
       )}
       {...props}

@@ -27,63 +27,71 @@ const COLOUR_GROUPS: Array<{
   {
     title: "Background",
     tokens: [
-      { name: "background-default", variable: "--background-default", utility: "bg-background" },
-      { name: "background-secondary", variable: "--background-secondary", utility: "bg-surface-secondary" },
-      { name: "surface-default", variable: "--background-surface-default", utility: "bg-surface" },
-      { name: "surface-card", variable: "--background-surface-card", utility: "bg-surface-card" },
-      { name: "surface-modal", variable: "--background-surface-modal", utility: "bg-surface-modal" },
-      { name: "surface-subtle", variable: "--background-surface-subtle", utility: "bg-surface-subtle" },
-      { name: "surface-hover", variable: "--background-surface-hover", utility: "bg-surface-hover" },
+      { name: "background/default", variable: "--background-default", utility: "bg-background" },
+      { name: "background/secondary", variable: "--background-secondary", utility: "bg-section" },
+      { name: "background/surface-default", variable: "--background-surface-default", utility: "bg-background" },
+      { name: "background/surface-card", variable: "--background-surface-card", utility: "bg-card" },
+      { name: "background/surface-modal", variable: "--background-surface-modal", utility: "bg-popover" },
+      { name: "background/surface-subtle", variable: "--background-surface-subtle", utility: "bg-muted" },
+      { name: "background/surface-hover", variable: "--background-surface-hover", utility: "bg-accent" },
     ],
   },
   {
     title: "Text",
     tokens: [
-      { name: "text-primary", variable: "--text-primary", utility: "text-fg" },
-      { name: "text-secondary", variable: "--text-secondary", utility: "text-fg-secondary" },
-      { name: "text-muted", variable: "--text-muted", utility: "text-fg-muted" },
-      { name: "text-disabled", variable: "--text-disabled", utility: "text-fg-disabled" },
-      { name: "text-inverse", variable: "--text-inverse", utility: "text-fg-inverse" },
+      { name: "text/primary", variable: "--text-primary", utility: "text-foreground" },
+      { name: "text/secondary", variable: "--text-secondary", utility: "text-muted-foreground" },
+      { name: "text/muted", variable: "--text-muted", utility: "text-muted-foreground" },
+      { name: "text/disabled", variable: "--text-disabled", utility: "text-disabled-foreground" },
+      { name: "text/inverse", variable: "--text-inverse", utility: "text-primary-foreground" },
     ],
   },
   {
     title: "Border",
     tokens: [
-      { name: "border-default", variable: "--border-default", utility: "border-border" },
-      { name: "border-subtle", variable: "--border-subtle", utility: "border-border-subtle" },
+      { name: "border/default", variable: "--border-default", utility: "border-border" },
+      { name: "border/subtle", variable: "--border-subtle", utility: "border-border-subtle" },
     ],
   },
   {
     title: "Action",
     tokens: [
-      { name: "action-primary", variable: "--action-primary", utility: "bg-action" },
-      { name: "action-primary-hover", variable: "--action-primary-hover", utility: "bg-action-hover" },
-      { name: "action-primary-strong", variable: "--action-primary-strong", utility: "bg-action-strong" },
-      { name: "action-secondary", variable: "--action-secondary", utility: "no utility" },
-      { name: "action-focus", variable: "--action-focus", utility: "bg-focus" },
-      { name: "action-disabled-background", variable: "--action-disabled-background", utility: "bg-action-disabled-bg" },
-      { name: "action-disabled-border", variable: "--action-disabled-border", utility: "bg-action-disabled-border" },
-      { name: "action-destructive", variable: "--action-destructive", utility: "bg-action-destructive" },
-      { name: "action-destructive-hover", variable: "--action-destructive-hover", utility: "bg-action-destructive-hover" },
-      { name: "action-destructive-strong", variable: "--action-destructive-strong", utility: "bg-action-destructive-strong" },
+      { name: "action/primary", variable: "--action-primary", utility: "bg-primary" },
+      { name: "action/primary-hover", variable: "--action-primary-hover", utility: "bg-primary-hover" },
+      { name: "action/primary-strong", variable: "--action-primary-strong", utility: "bg-primary-active" },
+      { name: "action/secondary", variable: "--action-secondary", utility: "bg-background" },
+      { name: "action/focus", variable: "--action-focus", utility: "outline-ring" },
+      { name: "action/disabled-background", variable: "--action-disabled-background", utility: "bg-disabled" },
+      { name: "action/disabled-border", variable: "--action-disabled-border", utility: "border-disabled-border" },
+      { name: "action/destructive", variable: "--action-destructive", utility: "bg-destructive" },
+      { name: "action/destructive-hover", variable: "--action-destructive-hover", utility: "bg-destructive-hover" },
+      { name: "action/destructive-strong", variable: "--action-destructive-strong", utility: "bg-destructive-active" },
     ],
   },
   {
     title: "Status",
     tokens: [
-      { name: "success-text", variable: "--status-success-text", utility: "text-success" },
-      { name: "success-background", variable: "--status-success-background", utility: "bg-success-bg" },
-      { name: "warning-text", variable: "--status-warning-text", utility: "text-warning" },
-      { name: "warning-background", variable: "--status-warning-background", utility: "bg-warning-bg" },
-      { name: "error-text", variable: "--status-error-text", utility: "text-error" },
-      { name: "error-background", variable: "--status-error-background", utility: "bg-error-bg" },
-      { name: "info-text", variable: "--status-info-text", utility: "text-info" },
-      { name: "info-background", variable: "--status-info-background", utility: "bg-info-bg" },
+      { name: "status/success-text", variable: "--status-success-text", utility: "text-success-foreground" },
+      { name: "status/success-background", variable: "--status-success-background", utility: "bg-success" },
+      { name: "status/success-active", variable: "--status-success-active", utility: "bg-success-solid" },
+      { name: "status/warning-text", variable: "--status-warning-text", utility: "text-warning-foreground" },
+      { name: "status/warning-background", variable: "--status-warning-background", utility: "bg-warning" },
+      { name: "status/error-text", variable: "--status-error-text", utility: "text-destructive" },
+      { name: "status/error-background", variable: "--status-error-background", utility: "bg-error" },
+      { name: "status/info-text", variable: "--status-info-text", utility: "text-info-foreground" },
+      { name: "status/info-background", variable: "--status-info-background", utility: "bg-info" },
+    ],
+  },
+  {
+    title: "Transaction",
+    tokens: [
+      { name: "transaction/positive", variable: "--transaction-positive", utility: "text-transaction-positive" },
+      { name: "transaction/negative", variable: "--transaction-negative", utility: "text-transaction-negative" },
     ],
   },
   {
     title: "Overlay",
-    tokens: [{ name: "overlay-scrim", variable: "--overlay-scrim", utility: "bg-scrim" }],
+    tokens: [{ name: "overlay/scrim", variable: "--overlay-scrim", utility: "bg-scrim" }],
   },
 ];
 
@@ -183,10 +191,10 @@ function Swatch({
       />
       <div className="flex min-w-0 flex-col px-0.5">
         <span className="truncate text-label">{name}</span>
-        <span className="truncate text-badge text-fg-secondary">
+        <span className="truncate text-badge text-muted-foreground">
           {value || "…"}
         </span>
-        <span className="truncate text-badge text-fg-secondary">{utility}</span>
+        <span className="truncate text-badge text-muted-foreground">{utility}</span>
       </div>
     </div>
   );
@@ -210,10 +218,10 @@ function MotionDemo({
 
   return (
     <Specimen label={label} className="flex-col items-stretch">
-      <div className="relative h-8 w-full rounded-full bg-surface-subtle @container">
+      <div className="relative h-8 w-full rounded-full bg-muted @container">
         <div
           className={cn(
-            "absolute top-1 left-1 size-6 rounded-full bg-action transition-transform ease-out",
+            "absolute top-1 left-1 size-6 rounded-full bg-primary transition-transform ease-out",
             DURATION_CLASS[duration],
             moved && "translate-x-[calc(100cqw-2rem)]",
           )}
@@ -300,7 +308,7 @@ function Foundations() {
           <Specimen key={r.name} label={`${r.name} · ${r.px}px`} bare>
             <div
               className={cn(
-                "h-16 w-full border border-border bg-surface-subtle",
+                "h-16 w-full border border-border bg-muted",
                 r.cls,
               )}
             />
@@ -339,7 +347,7 @@ function Foundations() {
       >
         {ICON_SIZES.map(({ cls, label }) => (
           <Specimen key={cls} label={label}>
-            <div className="flex gap-3 text-fg-secondary">
+            <div className="flex gap-3 text-muted-foreground">
               {ICONS.map(({ Icon, name }) => (
                 <Icon key={name} className={cls} aria-hidden />
               ))}
@@ -348,13 +356,13 @@ function Foundations() {
         ))}
         <Specimen label="Icon + label, 8px gap, 16px">
           <span className="inline-flex items-center gap-2 text-body">
-            <Calendar className="size-4 text-fg-secondary" aria-hidden />
+            <Calendar className="size-4 text-muted-foreground" aria-hidden />
             Fri, Nov 14
           </span>
         </Specimen>
         <Specimen label="Icon + small label, 14px">
           <span className="inline-flex items-center gap-2 text-small">
-            <Ticket className="size-3.5 text-fg-secondary" aria-hidden />2
+            <Ticket className="size-3.5 text-muted-foreground" aria-hidden />2
             tickets
           </span>
         </Specimen>
@@ -377,7 +385,7 @@ function Foundations() {
           </div>
         </Specimen>
         <Specimen label="Level 3 · scrim + overlay-surface" bare>
-          <div className="relative w-full overflow-hidden rounded-2xl bg-surface-subtle p-4">
+          <div className="relative w-full overflow-hidden rounded-2xl bg-muted p-4">
             <div className="absolute inset-0 bg-scrim" />
             <div className="overlay-surface relative rounded-2xl p-4 text-small">
               Dialog
@@ -408,7 +416,7 @@ function Foundations() {
             { label: "size-nav-row", cls: "h-(--size-nav-row)" },
           ].map((t) => (
             <Specimen key={t.label} label={t.label} bare>
-              <div className={cn("w-full rounded-lg bg-surface-subtle", t.cls)} />
+              <div className={cn("w-full rounded-lg bg-muted", t.cls)} />
             </Specimen>
           ))}
         </div>

@@ -189,7 +189,7 @@ function Composites({ open }: SectionProps) {
           <BackPill
             href="/dev/components"
             label="Back to Events"
-            className="bg-surface-subtle"
+            className="bg-muted"
           />
         </Specimen>
         <Specimen label="focus (forced)">
@@ -208,7 +208,7 @@ function Composites({ open }: SectionProps) {
         min="100%"
       >
         <Specimen label="with backHref" bare>
-          <div className="w-full overflow-hidden rounded-xl border border-dashed border-border bg-surface-secondary">
+          <div className="w-full overflow-hidden rounded-xl border border-dashed border-border bg-section">
             <PageContainer backHref="/dev/components" backLabel="Back to Events">
               <h3 className="text-h2">Page title</h3>
               <p className="mt-2 text-body text-muted-foreground">

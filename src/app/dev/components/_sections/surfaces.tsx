@@ -52,10 +52,10 @@ const TONE_ICONS = {
 
 /** Tones callers still compose by hand (AdminEventsTable, EventTicket); their classes win. */
 const CALLER_TONES = [
-  { variant: "outline", label: "outline + bg-success-bg", cls: "border-transparent bg-success-bg text-success" },
-  { variant: "secondary", label: "secondary + bg-success-bg", cls: "bg-success-bg text-success" },
+  { variant: "outline", label: "outline + bg-success", cls: "border-transparent bg-success text-success-foreground" },
+  { variant: "secondary", label: "secondary + bg-success", cls: "bg-success text-success-foreground" },
   { variant: "destructive", label: "destructive (Draft)", cls: "" },
-  { variant: "outline", label: "outline + info tag", cls: "border-info bg-info-bg text-info" },
+  { variant: "outline", label: "outline + info tag", cls: "border-info-foreground bg-info text-info-foreground" },
 ] as const;
 
 const ROWS: {
@@ -73,7 +73,7 @@ const ROWS: {
 ];
 
 const EMPTY = (
-  <span aria-label="None" className="text-fg-secondary">
+  <span aria-label="None" className="text-muted-foreground">
     –
   </span>
 );
@@ -95,7 +95,7 @@ function TableInCard({ density }: { density?: "compact" }) {
         <div className="relative overflow-x-auto">
           <table className="w-full min-w-[40rem] whitespace-nowrap text-left text-table">
             <thead>
-              <tr className="h-(--size-table-row) border-b border-border-subtle text-table-heading text-fg-secondary">
+              <tr className="h-(--size-table-row) border-b border-border-subtle text-table-heading text-muted-foreground">
                 <th scope="col" className="w-12 pl-6 pr-2 font-medium">
                   <Checkbox aria-label="Select all" />
                 </th>
@@ -113,7 +113,7 @@ function TableInCard({ density }: { density?: "compact" }) {
                 <tr
                   key={row.email}
                   data-state={row.selected ? "selected" : undefined}
-                  className="h-(--size-table-row) data-[state=selected]:bg-surface-subtle"
+                  className="h-(--size-table-row) data-[state=selected]:bg-muted"
                 >
                   <td className="pl-6 pr-2">
                     <Checkbox
@@ -124,8 +124,8 @@ function TableInCard({ density }: { density?: "compact" }) {
                   <td className="px-3">
                     {/* Two lines don't fit a 40px compact row, so they share one. */}
                     <div className={density ? "flex items-baseline gap-2" : undefined}>
-                      <div className="text-fg">{row.name}</div>
-                      <div className="text-fg-secondary">{row.email}</div>
+                      <div className="text-foreground">{row.name}</div>
+                      <div className="text-muted-foreground">{row.email}</div>
                     </div>
                   </td>
                   <td className="px-3">{row.tier || EMPTY}</td>
@@ -149,7 +149,7 @@ function TableInCard({ density }: { density?: "compact" }) {
             </tbody>
           </table>
         </div>
-        <CardFooter className="flex-wrap justify-between gap-x-4 gap-y-2 border-t py-3 text-small text-fg-secondary [.border-t]:pt-3">
+        <CardFooter className="flex-wrap justify-between gap-x-4 gap-y-2 border-t py-3 text-small text-muted-foreground [.border-t]:pt-3">
           <span className="whitespace-nowrap">Showing 1–4 of 48 · Page 1 of 12</span>
           <span className="flex gap-2">
             <Button variant="secondary" size="sm" disabled>
@@ -290,7 +290,7 @@ function Surfaces() {
               <p className="text-small">Member ticket × 1 · $10.00</p>
             </CardContent>
             <CardFooter className="border-t">
-              <span className="text-small text-fg-secondary">Total $10.00</span>
+              <span className="text-small text-muted-foreground">Total $10.00</span>
             </CardFooter>
           </Card>
         </Specimen>
@@ -302,7 +302,7 @@ function Surfaces() {
           </Card>
         </Specimen>
         <Specimen label="Interactive (caller border/fill change on hover)" bare>
-          <Card className="w-full cursor-pointer transition-colors duration-150 hover:border-fg-secondary hover:bg-surface-hover">
+          <Card className="w-full cursor-pointer transition-colors duration-150 hover:border-muted-foreground hover:bg-accent">
             <CardHeader>
               <CardTitle>Hover me</CardTitle>
               <CardDescription>Cards change border and fill, never lift.</CardDescription>

@@ -75,7 +75,7 @@ const DialogContent = React.forwardRef<
             label={closeLabel}
             disabled={closeDisabled}
             className={cn(
-              "absolute z-10 text-fg-secondary hover:text-foreground",
+              "absolute z-10 text-muted-foreground hover:text-foreground",
               size === "large" || mobileFullscreen
                 ? "right-[max(1rem,env(safe-area-inset-right))] top-[max(1rem,env(safe-area-inset-top))] sm:right-4 sm:top-4"
                 : "right-4 top-[2.375rem] -translate-y-1/2",
@@ -136,7 +136,7 @@ const DialogDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <DialogPrimitive.Description
     ref={ref}
-    className={cn("text-small text-fg-secondary", className)}
+    className={cn("text-small text-muted-foreground", className)}
     {...props}
   />
 ));
