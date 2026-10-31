@@ -297,8 +297,8 @@ function Section() {
       <SpecimenGroup
         title="Hubbo"
         spec="§5.2"
-        min="min(26rem, 100%)"
-        description="No artwork yet: these are the development placeholders (nothing renders in production). Hero is 240px, card 120px, inline 32px and head 40px."
+        min="min(38rem, 100%)"
+        description="Sized by height: hero 240px and card 120px show the full-body art. Inline (32px) and head (40px) need head-only art that doesn’t exist yet, so they show development placeholders (nothing renders in production)."
       >
         {HUBBO_EMOTIONS.map((emotion) => (
           <Specimen key={emotion} label={emotion}>
@@ -310,6 +310,34 @@ function Section() {
           </Specimen>
         ))}
       </SpecimenGroup>
+
+      <Composition
+        title="Hubbo on the approved backgrounds"
+        description="§5.2: white, #F4F4F4, light purple #F4EAFE and #111111. Check that the edges stay clean on each."
+      >
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            ["White", "#FFFFFF"],
+            ["Grey", "#F4F4F4"],
+            ["Light purple", "#F4EAFE"],
+            ["Black", "#111111"],
+          ].map(([name, colour]) => (
+            <div
+              key={name}
+              className="flex flex-col items-center gap-2 rounded-xl border border-border p-4"
+              style={{ backgroundColor: colour }}
+            >
+              <Hubbo emotion="proud" size="card" />
+              <span
+                className="text-label"
+                style={{ color: colour === "#111111" ? "#FFFFFF" : "#111111" }}
+              >
+                {name}
+              </span>
+            </div>
+          ))}
+        </div>
+      </Composition>
 
       <Composition
         title="Hubbo in an empty state"

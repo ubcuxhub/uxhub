@@ -1,25 +1,60 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { Hubbo, HUBBO_ART, type HubboEmotion } from "./Hubbo";
+import { Hubbo, HUBBO_ART, HUBBO_EMOTIONS } from "./Hubbo";
+
+const original = { ...HUBBO_ART };
+
+// Vitest resolves a PNG import to a bare path, not Next's `StaticImageData`,
+// so give next/image real dimensions to render with.
+beforeEach(() => {
+  for (const emotion of HUBBO_EMOTIONS) {
+    HUBBO_ART[emotion] = {
+      full: { src: `/${emotion}.png`, width: 300, height: 350 },
+    };
+  }
+});
 
 afterEach(() => {
   cleanup();
   vi.unstubAllEnvs();
-  delete HUBBO_ART.resting;
+  Object.assign(HUBBO_ART, original);
 });
 
 describe("Hubbo", () => {
-  it("renders nothing in production while there is no artwork", () => {
+  it("has full-body art registered for every emotion", () => {
+    for (const emotion of HUBBO_EMOTIONS) {
+      expect(original[emotion]?.full).toBeTruthy();
+    }
+  });
+
+  it.each(["hero", "card"] as const)("renders the art at %s size in production", (size) => {
     vi.stubEnv("NODE_ENV", "production");
-    const { container } = render(<Hubbo emotion="resting" />);
+    for (const emotion of HUBBO_EMOTIONS) {
+      const { container, unmount } = render(<Hubbo emotion={emotion} size={size} />);
+      expect(container.querySelector("img")).toBeTruthy();
+      unmount();
+    }
+  });
+
+  it.each(["inline", "head"] as const)("renders nothing at %s size in production while there is no head art", (size) => {
+    vi.stubEnv("NODE_ENV", "production");
+    const { container } = render(<Hubbo emotion="resting" size={size} />);
     expect(container.firstChild).toBeNull();
   });
 
-  it("renders a dev placeholder naming the emotion and size", () => {
+  it("renders a dev placeholder naming the emotion at head sizes", () => {
     vi.stubEnv("NODE_ENV", "development");
+    const { container } = render(<Hubbo emotion="resting" size="head" />);
+    const placeholder = container.querySelector("[data-slot=hubbo-placeholder]");
+    expect(placeholder?.getAttribute("title")).toBe("Hubbo · resting · 40px");
+  });
+
+  it("renders a placeholder naming the emotion and size when a slot has no art", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    HUBBO_ART.resting = {};
     render(<Hubbo emotion="resting" size="hero" />);
     expect(screen.getByText("Hubbo · resting")).toBeTruthy();
     expect(screen.getByText("240px")).toBeTruthy();
@@ -27,30 +62,31 @@ describe("Hubbo", () => {
 
   it("never renders bracketed placeholder copy", () => {
     vi.stubEnv("NODE_ENV", "development");
-    const emotions: HubboEmotion[] = ["welcoming", "curious", "excited", "proud", "thinking", "resting"];
-    for (const emotion of emotions) {
+    for (const emotion of HUBBO_EMOTIONS) {
+      HUBBO_ART[emotion] = {};
       const { container, unmount } = render(<Hubbo emotion={emotion} size="card" />);
       expect(container.textContent).not.toMatch(/\[|insert/i);
       unmount();
     }
   });
 
-  it("is decorative", () => {
-    vi.stubEnv("NODE_ENV", "development");
-    const { container } = render(<Hubbo emotion="curious" size="inline" />);
-    expect(container.firstElementChild?.getAttribute("aria-hidden")).toBe("true");
+  it("is decorative by default", () => {
+    const { container } = render(<Hubbo emotion="resting" size="card" />);
+    const img = container.querySelector("img")!;
+    expect(img.getAttribute("alt")).toBe("");
+    expect(img.getAttribute("aria-hidden")).toBe("true");
   });
 
-  it("uses head art for the small sizes and full art for the large ones", () => {
-    HUBBO_ART.resting = {
-      full: { src: "/full.png", width: 480, height: 480 },
-      head: { src: "/head.png", width: 96, height: 96 },
-    };
-    const { container, rerender } = render(<Hubbo emotion="resting" size="card" />);
-    const img = () => container.querySelector("img")!;
-    expect(img().getAttribute("src")).toContain("full.png");
-    expect(img().getAttribute("alt")).toBe("");
-    rerender(<Hubbo emotion="resting" size="head" />);
-    expect(img().getAttribute("src")).toContain("head.png");
+  it("takes alt text when the illustration carries meaning", () => {
+    render(<Hubbo emotion="resting" size="card" alt="Hubbo resting" />);
+    const img = screen.getByAltText("Hubbo resting");
+    expect(img.getAttribute("aria-hidden")).toBeNull();
+  });
+
+  it("sizes by height and keeps the aspect ratio", () => {
+    const { container } = render(<Hubbo emotion="resting" size="hero" />);
+    const img = container.querySelector("img")!;
+    expect(img.className).toContain("h-60");
+    expect(img.className).toContain("w-auto");
   });
 });
