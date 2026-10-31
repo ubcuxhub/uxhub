@@ -222,12 +222,6 @@
     @apply border-border outline-focus;
   }
 
-  /* 1.5px icon stroke (§2.7). CSS beats the SVG attribute lucide sets. The
-     marketing site keeps lucide's default. */
-  .lucide:not(.marketing-home *) {
-    stroke-width: 1.5;
-  }
-
   html {
     scroll-behavior: smooth;
   }

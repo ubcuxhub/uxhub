@@ -128,8 +128,8 @@ const ICONS = [
 ];
 
 const ICON_SIZES = [
-  { cls: "size-3.5", label: "14px · stroke 1.5" },
-  { cls: "size-4", label: "16px · stroke 1.5" },
+  { cls: "size-3.5", label: "14px · stroke 2" },
+  { cls: "size-4", label: "16px · stroke 2" },
   { cls: "size-5", label: "20px" },
   { cls: "size-6", label: "24px" },
 ];
@@ -334,7 +334,7 @@ function Foundations() {
       <SpecimenGroup
         title="Icons"
         spec="§2.7"
-        description="Lucide at 1.5px stroke, set globally (marketing keeps lucide's default). 16px beside 16px text with an 8px gap, 14px beside small text."
+        description="Lucide at its default 2px stroke (thicker than Figma's 1.5px, by choice). 16px beside 16px text with an 8px gap, 14px beside small text."
         min="16rem"
       >
         {ICON_SIZES.map(({ cls, label }) => (
