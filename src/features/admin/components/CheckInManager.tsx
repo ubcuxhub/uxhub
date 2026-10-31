@@ -38,16 +38,16 @@ function StatCard({
   return (
     <Card>
       <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-medium text-muted-foreground">
+        <CardTitle className="text-label text-muted-foreground">
           {title}
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className={`text-2xl font-bold ${valueClassName || ""}`}>
+        <div className={`text-h2 ${valueClassName || ""}`}>
           {value}
         </div>
         {subtitle && (
-          <p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
+          <p className="mt-1 text-label text-muted-foreground">{subtitle}</p>
         )}
       </CardContent>
     </Card>
@@ -214,8 +214,8 @@ export function CheckInManager({
             {/* Header */}
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-semibold">Check-In Management</h1>
-                <p className="text-sm text-muted-foreground">
+                <h1 className="text-h2">Check-In Management</h1>
+                <p className="text-small text-muted-foreground">
                   Manage attendee check-ins for this event
                 </p>
               </div>
@@ -231,10 +231,10 @@ export function CheckInManager({
                   <CardContent>
                     <div className="grid gap-4 md:grid-cols-4">
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">
+                        <p className="text-label text-muted-foreground">
                           Date & Time
                         </p>
-                        <p className="text-base">
+                        <p className="text-body">
                           {event.starts_at
                             ? `${formatEventDate(event.starts_at, {
                                 month: "short",
@@ -243,28 +243,28 @@ export function CheckInManager({
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">
+                        <p className="text-label text-muted-foreground">
                           Location
                         </p>
-                        <p className="text-base">
+                        <p className="text-body">
                           {event.location_building && event.location_room
                             ? `${event.location_building} ${event.location_room}`
                             : "TBD"}
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">
+                        <p className="text-label text-muted-foreground">
                           Max Capacity
                         </p>
-                        <p className="text-base">
+                        <p className="text-body">
                           {event.max_capacity} attendees
                         </p>
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-muted-foreground">
+                        <p className="text-label text-muted-foreground">
                           Price
                         </p>
-                        <p className="text-base">
+                        <p className="text-body">
                           ${Number(event.regular_price ?? 0).toFixed(2)}
                           {event.member_price !== event.regular_price && (
                             <span className="text-muted-foreground ml-1">
@@ -291,7 +291,7 @@ export function CheckInManager({
                           )}%`
                         : "0%"
                     }
-                    valueClassName="text-green-600"
+                    valueClassName="text-success"
                   />
                 </div>
 

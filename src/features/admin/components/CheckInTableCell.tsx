@@ -28,7 +28,6 @@ export function CheckInTableCell({
             checked={checked}
             onCheckedChange={() => onToggle(ticketId, sessionId, checked)}
             disabled={isUpdating}
-            className="rounded"
           />
         )}
       </div>
