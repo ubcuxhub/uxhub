@@ -13,7 +13,7 @@ export const EVENT_COLOUR_PRESETS = [
 /** Blue, selected for a new event and when a selected custom colour is removed. */
 export const DEFAULT_EVENT_COLOUR = "#325DC4";
 
-/** `text-primary` in light mode, the dark label on an event colour. */
+/** Light-mode `text-foreground` (#111111), the dark label on an event colour. */
 const DARK_TEXT = "#111111";
 const LIGHT_TEXT = "#FFFFFF";
 
@@ -57,7 +57,7 @@ export function contrastRatio(a: string, b: string): number {
   return (Math.max(la, lb) + 0.05) / (Math.min(la, lb) + 0.05);
 }
 
-/** White or `text-primary`, whichever contrasts more with the colour. */
+/** White or near-black (#111111), whichever contrasts more with the colour. */
 export function readableTextOn(hex: string): "light" | "dark" {
   return contrastRatio(hex, LIGHT_TEXT) >= contrastRatio(hex, DARK_TEXT)
     ? "light"
