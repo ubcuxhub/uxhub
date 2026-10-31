@@ -39,7 +39,7 @@ function ActionBanner({
       data-slot="action-banner"
       aria-labelledby={titleId}
       className={cn(
-        "flex flex-col gap-3 rounded-xl border border-border-subtle bg-background-secondary px-4 py-3 sm:flex-row sm:items-center sm:gap-4",
+        "flex flex-col gap-3 rounded-xl border border-border-subtle bg-section px-4 py-3 sm:flex-row sm:items-center sm:gap-4",
         className,
       )}
       {...props}

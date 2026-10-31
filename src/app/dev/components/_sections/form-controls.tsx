@@ -445,7 +445,7 @@ function FormControls({ open }: SectionProps) {
                 </Field>
                 <Field>
                   <FieldLabel htmlFor={id("f-year")}>
-                    Year <span className="font-normal text-fg-secondary">(Optional)</span>
+                    Year <span className="font-normal text-muted-foreground">(Optional)</span>
                   </FieldLabel>
                   <Select>
                     <SelectTrigger id={id("f-year")}>

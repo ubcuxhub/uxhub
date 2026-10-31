@@ -164,11 +164,11 @@ export const ImageUpload = ({
         className={cn(
           "relative rounded-2xl border-[1.5px] border-dashed p-6 transition-colors",
           disabled
-            ? "cursor-not-allowed border-action-disabled-border bg-action-disabled-bg"
+            ? "cursor-not-allowed border-disabled-border bg-disabled"
             : isDragging
-              ? "cursor-pointer border-action bg-surface-secondary"
-              : "cursor-pointer border-border hover:border-fg-secondary hover:bg-surface-hover",
-          error && !isDragging && "border-error",
+              ? "cursor-pointer border-primary bg-section"
+              : "cursor-pointer border-border hover:border-muted-foreground hover:bg-accent",
+          error && !isDragging && "border-destructive",
         )}
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
@@ -188,7 +188,7 @@ export const ImageUpload = ({
         {isUploading ? (
           <div className="flex min-h-36 flex-col items-center justify-center gap-3">
             <Spinner size="lg" />
-            <p className="text-small text-fg-secondary">Uploading…</p>
+            <p className="text-small text-muted-foreground">Uploading…</p>
           </div>
         ) : preview ? (
           <div className="relative">
@@ -221,8 +221,8 @@ export const ImageUpload = ({
               className={cn(
                 "flex size-12 items-center justify-center rounded-full",
                 disabled
-                  ? "bg-action-disabled-bg text-fg-disabled"
-                  : "bg-surface-subtle text-fg-secondary",
+                  ? "bg-disabled text-disabled-foreground"
+                  : "bg-muted text-muted-foreground",
               )}
             >
               <ImagePlus className="size-6" aria-hidden />
@@ -231,7 +231,7 @@ export const ImageUpload = ({
               <p
                 className={cn(
                   "text-body-medium",
-                  disabled ? "text-fg-disabled" : "text-fg",
+                  disabled ? "text-disabled-foreground" : "text-foreground",
                 )}
               >
                 Upload image
@@ -239,7 +239,7 @@ export const ImageUpload = ({
               <p
                 className={cn(
                   "text-small",
-                  disabled ? "text-fg-disabled" : "text-fg-secondary",
+                  disabled ? "text-disabled-foreground" : "text-muted-foreground",
                 )}
               >
                 Or drag one here. Square JPG or PNG, up to {EVENT_IMAGE_MAX_MB} MB.

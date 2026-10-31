@@ -411,7 +411,7 @@ function SidebarGroupLabel({
       data-slot="sidebar-group-label"
       data-sidebar="group-label"
       className={cn(
-        "flex h-8 shrink-0 items-center rounded-md px-3 text-label text-fg-secondary transition-[margin,opacity] duration-200 ease-out focus-visible:focus-ring [&>svg]:size-4 [&>svg]:shrink-0",
+        "flex h-8 shrink-0 items-center rounded-md px-3 text-label text-muted-foreground transition-[margin,opacity] duration-200 ease-out focus-visible:focus-ring [&>svg]:size-4 [&>svg]:shrink-0",
         "group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0",
         className,
       )}
@@ -432,7 +432,7 @@ function SidebarGroupAction({
       data-slot="sidebar-group-action"
       data-sidebar="group-action"
       className={cn(
-        "absolute top-3.5 right-3 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground transition-colors duration-150 hover:bg-surface-hover focus-visible:focus-ring [&>svg]:size-4 [&>svg]:shrink-0",
+        "absolute top-3.5 right-3 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground transition-colors duration-150 hover:bg-accent focus-visible:focus-ring [&>svg]:size-4 [&>svg]:shrink-0",
         // Increases the hit area of the button on mobile.
         "after:absolute after:-inset-2 md:after:hidden",
         "group-data-[collapsible=icon]:hidden",
@@ -486,9 +486,9 @@ const sidebarMenuButtonVariants = cva(
     "group-has-data-[sidebar=menu-action]/menu-item:pr-9",
     // Collapsed rail: a centred square with the icon alone.
     "group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-11! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0! group-data-[collapsible=icon]:[&>span:last-child]:sr-only",
-    "hover:bg-surface-hover active:bg-surface-subtle data-[active=true]:bg-surface-subtle data-[active=true]:hover:bg-surface-subtle data-[state=open]:hover:bg-surface-subtle",
-    "focus-visible:focus-ring disabled:pointer-events-none disabled:text-fg-disabled aria-disabled:pointer-events-none aria-disabled:text-fg-disabled disabled:[&>svg]:text-fg-disabled aria-disabled:[&>svg]:text-fg-disabled",
-    "[&>span:last-child]:truncate [&>svg]:size-5 [&>svg]:shrink-0 [&>svg]:text-fg-secondary [&>svg]:transition-colors [&>svg]:duration-150 hover:[&>svg]:text-sidebar-foreground data-[active=true]:[&>svg]:text-sidebar-foreground",
+    "hover:bg-accent active:bg-muted data-[active=true]:bg-muted data-[active=true]:hover:bg-muted data-[state=open]:hover:bg-muted",
+    "focus-visible:focus-ring disabled:pointer-events-none disabled:text-disabled-foreground aria-disabled:pointer-events-none aria-disabled:text-disabled-foreground disabled:[&>svg]:text-disabled-foreground aria-disabled:[&>svg]:text-disabled-foreground",
+    "[&>span:last-child]:truncate [&>svg]:size-5 [&>svg]:shrink-0 [&>svg]:text-muted-foreground [&>svg]:transition-colors [&>svg]:duration-150 hover:[&>svg]:text-sidebar-foreground data-[active=true]:[&>svg]:text-sidebar-foreground",
   ],
   {
     variants: {
@@ -574,7 +574,7 @@ function SidebarMenuAction({
       data-slot="sidebar-menu-action"
       data-sidebar="menu-action"
       className={cn(
-        "absolute top-3 right-3 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-fg-secondary transition-colors duration-150 hover:bg-surface-hover hover:text-sidebar-foreground focus-visible:focus-ring [&>svg]:size-4 [&>svg]:shrink-0",
+        "absolute top-3 right-3 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-sidebar-foreground focus-visible:focus-ring [&>svg]:size-4 [&>svg]:shrink-0",
         // Increases the hit area of the button on mobile.
         "after:absolute after:-inset-2 md:after:hidden",
         "peer-data-[size=default]/menu-button:top-3",
@@ -597,7 +597,7 @@ function SidebarMenuBadge({
       data-slot="sidebar-menu-badge"
       data-sidebar="menu-badge"
       className={cn(
-        "pointer-events-none absolute right-3 flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-badge text-fg-secondary tabular-nums select-none",
+        "pointer-events-none absolute right-3 flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-badge text-muted-foreground tabular-nums select-none",
         "peer-data-[size=default]/menu-button:top-3",
         "group-data-[collapsible=icon]:hidden",
         className,
@@ -701,8 +701,8 @@ function SidebarMenuSubButton({
       data-size={size}
       data-active={isActive}
       className={cn(
-        "flex h-8 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-body text-sidebar-foreground transition-colors duration-150 hover:bg-surface-hover focus-visible:focus-ring active:bg-surface-subtle disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-fg-secondary",
-        "data-[active=true]:bg-surface-subtle data-[active=true]:hover:bg-surface-subtle",
+        "flex h-8 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-body text-sidebar-foreground transition-colors duration-150 hover:bg-accent focus-visible:focus-ring active:bg-muted disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-muted-foreground",
+        "data-[active=true]:bg-muted data-[active=true]:hover:bg-muted",
         "group-data-[collapsible=icon]:hidden",
         className,
       )}

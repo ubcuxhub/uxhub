@@ -80,7 +80,7 @@ function SheetContent({
             <IconButton
               variant="ghost"
               label="Close"
-              className="absolute right-4 top-[1.875rem] -translate-y-1/2 text-fg-secondary hover:text-foreground"
+              className="absolute right-4 top-[1.875rem] -translate-y-1/2 text-muted-foreground hover:text-foreground"
             >
               <XIcon />
             </IconButton>
@@ -131,7 +131,7 @@ function SheetDescription({
   return (
     <SheetPrimitive.Description
       data-slot="sheet-description"
-      className={cn("text-small text-fg-secondary", className)}
+      className={cn("text-small text-muted-foreground", className)}
       {...props}
     />
   )

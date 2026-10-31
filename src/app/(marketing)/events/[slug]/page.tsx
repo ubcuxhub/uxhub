@@ -166,7 +166,7 @@ export default async function EventDetailPage({
               {hasMemberPrice && (
                 <span className="text-small text-muted-foreground">
                   Members:{" "}
-                  <span className="text-success">
+                  <span className="text-success-foreground">
                     {Number(event.member_price) === 0
                       ? "Free"
                       : `$${Number(event.member_price).toFixed(2)}`}
@@ -294,7 +294,7 @@ export default async function EventDetailPage({
                           href={mentor.linkedin_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                            className="shrink-0 text-primary hover:text-action-hover"
+                            className="shrink-0 text-primary hover:text-primary-hover"
                         >
                           <FaLinkedin size={24} />
                         </a>
