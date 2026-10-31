@@ -1,13 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { TriangleAlert } from "lucide-react";
 
 import { BackButton, BackPill } from "@/components/shared/BackButton";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { CopyCode } from "@/components/shared/CopyCode";
 import { MarketingEventCard } from "@/features/marketing/components/MarketingEventCard";
-import { ImageUpload } from "@/components/shared/ImageUpload";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { SuccessOverlay } from "@/components/shared/SuccessOverlay";
 import { Button } from "@/components/ui/button";
@@ -64,13 +63,6 @@ const FREE_EVENT: EventRow = {
   slug: "portfolio-review",
   event_type: "regular",
 };
-
-/** A tiny square image as a data URI, so ImageUpload can show an uploaded state offline. */
-const SQUARE_IMAGE =
-  "data:image/svg+xml;utf8," +
-  encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3A5FC4"/><stop offset="1" stop-color="#B67FC6"/></linearGradient></defs><rect width="240" height="240" fill="url(#g)"/></svg>`,
-  );
 
 type ConfirmKey = (typeof OPEN_STATES)[number];
 
@@ -145,22 +137,6 @@ function ConfirmDialogs({ open }: { open?: string }) {
   );
 }
 
-/** Fires a real `dragenter` so ImageUpload shows its dragging state without a file. */
-function DraggingImageUpload() {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const target = ref.current?.querySelector<HTMLElement>("[class*='border-dashed']");
-    target?.dispatchEvent(
-      new DragEvent("dragenter", { bubbles: true, cancelable: true }),
-    );
-  }, []);
-  return (
-    <div ref={ref} className="w-full">
-      <ImageUpload onChange={() => {}} />
-    </div>
-  );
-}
-
 /** Drawn inside a transformed frame so its `fixed inset-0` stays contained. */
 function SuccessOverlayFrame() {
   return (
@@ -220,9 +196,8 @@ function Composites({ open }: SectionProps) {
       </SpecimenGroup>
 
       <SpecimenGroup
-        title="EventCard"
-        spec="§3.5"
-        description="As on the marketing /events page: image or placeholder, priced footer or link."
+        title="MarketingEventCard"
+        description="As on the marketing /events page: image or placeholder, priced footer or link. The portal card is EventCard, in Event cards and timeline."
         min="20rem"
       >
         <Specimen label="image, priced (member price)" bare>
@@ -236,37 +211,6 @@ function Composites({ open }: SectionProps) {
         </Specimen>
         <Specimen label="clickable (onClick)" bare>
           <MarketingEventCard event={FREE_EVENT} onClick={() => {}} className="w-full max-w-sm" />
-        </Specimen>
-      </SpecimenGroup>
-
-      <SpecimenGroup
-        title="ImageUpload"
-        spec="§3.12"
-        description="The dragging specimen fires a dragenter on mount; uploading uses the `uploading` prop."
-        min="min(22rem, 100%)"
-      >
-        <Specimen label="empty" bare>
-          <div className="w-full">
-            <ImageUpload onChange={() => {}} />
-          </div>
-        </Specimen>
-        <Specimen label="uploaded" bare>
-          <div className="w-full">
-            <ImageUpload value={SQUARE_IMAGE} onChange={() => {}} />
-          </div>
-        </Specimen>
-        <Specimen label="dragging (dragenter fired on mount)" bare>
-          <DraggingImageUpload />
-        </Specimen>
-        <Specimen label="uploading" bare>
-          <div className="w-full">
-            <ImageUpload onChange={() => {}} uploading />
-          </div>
-        </Specimen>
-        <Specimen label="disabled" bare>
-          <div className="w-full">
-            <ImageUpload onChange={() => {}} disabled />
-          </div>
         </Specimen>
       </SpecimenGroup>
 
