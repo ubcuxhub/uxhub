@@ -249,6 +249,14 @@ variable name with the slash turned into a hyphen). Dark mode is
 `data-theme="dark"` on `<html>` (`src/lib/theme.ts`), and density is
 `data-density="compact"`.
 
+Colour utilities in new code: where shadcn has a slot, use its utility
+(`bg-primary`, `text-muted-foreground`, `bg-muted`, `border-input`,
+`bg-popover`). Otherwise use the design-system-named utility, whose class equals
+the Figma variable name (`bg-status-success-background`, `text-text-disabled`,
+`bg-overlay-scrim`). The `fg-*`, `action*`, `surface-*` and `*-bg` utilities are
+legacy: don't use them in new code. The shadcn bridge in `globals.css` is
+permanent.
+
 ## Merging pull requests
 
 `main` is protected by the `protect-main` ruleset, which requires one approving
