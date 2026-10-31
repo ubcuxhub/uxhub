@@ -61,12 +61,18 @@ function SelectOptions() {
 }
 
 /** Checkbox with the `indeterminate` DOM property set, which has no attribute. */
-function IndeterminateCheckbox({ label }: { label: string }) {
+function IndeterminateCheckbox({
+  label,
+  disabled,
+}: {
+  label: string;
+  disabled?: boolean;
+}) {
   const ref = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (ref.current) ref.current.indeterminate = true;
   }, []);
-  return <Checkbox ref={ref} aria-label={label} />;
+  return <Checkbox ref={ref} aria-label={label} disabled={disabled} />;
 }
 
 function FormControls({ open }: SectionProps) {
@@ -200,6 +206,20 @@ function FormControls({ open }: SectionProps) {
         <Specimen label="disabled, checked">
           <Checkbox aria-label="Disabled checked" disabled defaultChecked />
         </Specimen>
+        <Specimen label="disabled, indeterminate">
+          <IndeterminateCheckbox label="Disabled indeterminate" disabled />
+        </Specimen>
+        <Specimen label="aria-invalid">
+          <Checkbox aria-label="Invalid" aria-invalid />
+        </Specimen>
+        <Specimen label="disabled, with label">
+          <Field orientation="horizontal" data-disabled>
+            <Checkbox id={id("conduct")} disabled />
+            <FieldLabel htmlFor={id("conduct")}>
+              Agree to the code of conduct
+            </FieldLabel>
+          </Field>
+        </Specimen>
         <Specimen label="with label and description">
           <Field orientation="horizontal">
             <Checkbox id={id("terms")} defaultChecked />
@@ -224,10 +244,49 @@ function FormControls({ open }: SectionProps) {
         <Specimen label="disabled, on">
           <Switch aria-label="Disabled on" disabled defaultChecked />
         </Specimen>
+        <Specimen label="with label and description (Figma 3.2)">
+          <Field orientation="horizontal">
+            <FieldContent>
+              <FieldLabel htmlFor={id("waitlist")}>Waitlist</FieldLabel>
+              <FieldDescription>
+                Offer spots to the waitlist when someone cancels.
+              </FieldDescription>
+            </FieldContent>
+            <Switch id={id("waitlist")} defaultChecked />
+          </Field>
+        </Specimen>
         <Specimen label="with label">
           <div className="flex items-center gap-3">
             <Switch id={id("newsletter")} defaultChecked />
             <Label htmlFor={id("newsletter")}>Newsletter</Label>
+          </div>
+        </Specimen>
+      </SpecimenGroup>
+
+      <SpecimenGroup
+        title="Row alignment"
+        spec="§3.2"
+        description="Controls in one row share a height: 44px on phones, --size-control (40, or 32 compact) from sm up."
+        min="15rem"
+      >
+        <Specimen label="Input + Select + Buttons" wide>
+          <div className="flex w-full flex-wrap items-center gap-3">
+            <Input aria-label="Search" placeholder="Search events" className="min-w-40 flex-1" />
+            <div className="min-w-40 flex-1">
+              <Select defaultValue="3">
+                <SelectTrigger aria-label="Year (row)">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectOptions />
+              </Select>
+            </div>
+            <Button variant="outline">Filter</Button>
+            <Button>Search</Button>
+          </div>
+        </Specimen>
+        <Specimen label="Focus ring inside overflow-hidden parent (should not clip)" wide>
+          <div className="w-full overflow-hidden rounded-xl border p-2">
+            <Input aria-label="Clipped" placeholder="Tab into me" />
           </div>
         </Specimen>
       </SpecimenGroup>
@@ -270,7 +329,7 @@ function FormControls({ open }: SectionProps) {
           </Field>
         </Specimen>
         <Specimen label="FieldSet: legend + checkboxes">
-          <FieldSet>
+          <FieldSet className="w-full">
             <FieldLegend>Interests</FieldLegend>
             <FieldGroup className="gap-3">
               {["Research", "Visual design", "Prototyping"].map((name, i) => (
@@ -283,7 +342,7 @@ function FormControls({ open }: SectionProps) {
           </FieldSet>
         </Specimen>
         <Specimen label="FieldLegend variant=label">
-          <FieldSet>
+          <FieldSet className="w-full">
             <FieldLegend variant="label">Pronouns</FieldLegend>
             <Input aria-label="Pronouns" placeholder="she/her" />
           </FieldSet>
@@ -386,7 +445,7 @@ function FormControls({ open }: SectionProps) {
                 </Field>
                 <Field>
                   <FieldLabel htmlFor={id("f-year")}>
-                    Year <span className="text-muted-foreground">(Optional)</span>
+                    Year <span className="font-normal text-fg-secondary">(Optional)</span>
                   </FieldLabel>
                   <Select>
                     <SelectTrigger id={id("f-year")}>
