@@ -238,7 +238,7 @@ function Feedback({ open }: SectionProps) {
         <Specimen label="card (default), empty" bare>
           <Framed>
             <EmptyState
-              media={<Calendar />}
+              icon={<Calendar />}
               title="No upcoming events"
               description="New events show up here as soon as they’re published."
               actions={
@@ -252,7 +252,7 @@ function Feedback({ open }: SectionProps) {
         <Specimen label="card, no results" bare>
           <Framed>
             <EmptyState
-              media={<SearchX />}
+              icon={<SearchX />}
               title="No events match “portfolo”"
               description="Check the spelling or try a different word."
               actions={
@@ -266,7 +266,7 @@ function Feedback({ open }: SectionProps) {
         <Specimen label="card, load failed" bare>
           <Framed>
             <EmptyState
-              media={<CloudOff />}
+              icon={<CloudOff />}
               title="Couldn’t load events"
               description="Check your connection and try again."
               actions={
@@ -280,7 +280,7 @@ function Feedback({ open }: SectionProps) {
         <Specimen label="card, not found" bare>
           <Framed>
             <EmptyState
-              media={<CalendarX />}
+              icon={<CalendarX />}
               title="This event isn’t available"
               description="It may have been removed, or the link is wrong."
               actions={
@@ -296,7 +296,7 @@ function Feedback({ open }: SectionProps) {
             <EmptyState
               size="page"
               titleAs="h2"
-              media={<Calendar />}
+              icon={<Calendar />}
               title="No upcoming events"
               description="New events show up here as soon as they’re published."
               actions={
@@ -339,7 +339,7 @@ function Feedback({ open }: SectionProps) {
           </ActionBanner>
           <div className="rounded-2xl border border-border bg-card">
             <EmptyState
-              media={<Calendar />}
+              icon={<Calendar />}
               title="No upcoming events"
               description="New events show up here as soon as they’re published."
             />

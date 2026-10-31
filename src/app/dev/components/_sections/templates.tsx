@@ -65,18 +65,14 @@ import {
 } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { useCurrentSection } from "@/hooks/use-current-section";
+import { EventTimelineRail } from "@/features/events/components/EventTimelineRail";
 import {
   groupEventsByMonth,
   normalizeString,
 } from "@/features/events/lib/event-timeline";
-import {
-  datetimeLocalToTimestamptz,
-  formatEventDateLabel,
-  formatEventDateTimeLines,
-} from "@/lib/date";
+import { datetimeLocalToTimestamptz } from "@/lib/date";
 import type { IsoDate, WallTime } from "@/lib/date-input";
 import type { EventRow } from "@/lib/supabase/models";
-import { cn } from "@/lib/utils";
 
 import { Composition } from "../_gallery/Specimen";
 import type { GallerySection, SectionProps } from "../_gallery/types";
@@ -190,23 +186,20 @@ const JUDGES: readonly SearchableOption[] = [
 
 // --- Shared pieces --------------------------------------------------------
 
-/**
- * EmptyState's media slot is a 40px disc, so Hubbo sits above it at card size
- * until the component grows a slot for the art.
- */
+/** §4.4f: Hubbo at card size goes in EmptyState's `media` slot. */
 function HubboEmptyState({
   emotion,
-  className,
   ...props
-}: { emotion: HubboEmotion; className?: string } & Omit<
+}: { emotion: HubboEmotion } & Omit<
   React.ComponentProps<typeof EmptyState>,
-  "size" | "media"
+  "size" | "media" | "icon"
 >) {
   return (
-    <div className={cn("flex flex-col items-center pt-6", className)}>
-      <Hubbo emotion={emotion} size="card" />
-      <EmptyState size="card" className="pt-3" {...props} />
-    </div>
+    <EmptyState
+      size="card"
+      media={<Hubbo emotion={emotion} size="card" />}
+      {...props}
+    />
   );
 }
 
@@ -216,8 +209,8 @@ const h1 = "text-h1";
 
 /**
  * The target arrangement for the portal events page. `EventTimeline` still
- * brings its own search box and "Show Past Events" switch, so this lays the
- * same rail out under SearchField and SegmentedToggle instead.
+ * brings its own search box and "Show Past Events" switch, so this puts the
+ * same `EventTimelineRail` under SearchField and SegmentedToggle instead.
  */
 function EventsTemplate() {
   const [query, setQuery] = useState("");
@@ -283,68 +276,15 @@ function EventsTemplate() {
           />
         </div>
       ) : (
-        <div className="flex flex-col gap-10">
-          {groups.map((group) => (
-            <section key={group.key} aria-labelledby={`${group.key}-heading`}>
-              <h2 id={`${group.key}-heading`} className="mb-4 text-h2">
-                {group.label}
-              </h2>
-              <ol>
-                {group.events.map((item, index) => (
-                  <TimelineRow
-                    key={item.id}
-                    event={item}
-                    status={
-                      tab === "past" ? "past" : (MEMBER_STATUS[item.id] ?? null)
-                    }
-                    isLast={index === group.events.length - 1}
-                  />
-                ))}
-              </ol>
-            </section>
-          ))}
-        </div>
+        <EventTimelineRail
+          groups={groups}
+          hrefFor={() => HREF}
+          statusFor={(item) =>
+            tab === "past" ? "past" : (MEMBER_STATUS[item.id] ?? null)
+          }
+        />
       )}
     </PageContainer>
-  );
-}
-
-function TimelineRow({
-  event: item,
-  status,
-  isLast,
-}: {
-  event: EventRow;
-  status: Status | null;
-  isLast: boolean;
-}) {
-  return (
-    <li className="grid gap-y-2 pb-6 sm:grid-cols-[7.5rem_1.5rem_minmax(0,1fr)] sm:gap-x-4 sm:gap-y-0">
-      <p className="text-body font-medium text-foreground sm:pt-1 sm:font-normal">
-        {formatEventDateLabel(item.starts_at, item.ends_at)}
-      </p>
-      <div aria-hidden className="relative hidden sm:block">
-        <div
-          className={cn(
-            "absolute top-2 left-1/2 w-px -translate-x-1/2 border-l border-dashed border-border",
-            isLast ? "bottom-0" : "-bottom-6",
-          )}
-        />
-        <div className="absolute top-1 left-2 size-2 rounded-full bg-muted-foreground" />
-      </div>
-      <EventCard
-        title={item.name}
-        href={HREF}
-        venue={item.location_building}
-        when={
-          <EventCardDates
-            lines={formatEventDateTimeLines(item.starts_at, item.ends_at)}
-          />
-        }
-        status={status}
-        image={item.image_url ? { src: item.image_url } : null}
-      />
-    </li>
   );
 }
 
@@ -473,7 +413,6 @@ function DetailTemplate() {
         <CardContent>
           <HubboEmptyState
             emotion="welcoming"
-            className="pt-0"
             title="You’re not on a team yet"
             description="Join a team that has room, or start your own and invite up to three people."
             actions={
