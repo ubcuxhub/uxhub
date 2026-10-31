@@ -111,7 +111,7 @@ function EventTimelineItem({ event }: { event: EventRow }) {
           {formatEventDate(event.starts_at, { year: undefined, month: "short" })}
         </p>
         <div className="flex flex-col items-center self-stretch">
-          <div className="mt-2 size-2 shrink-0 rounded-full bg-fg-secondary" />
+          <div className="mt-2 size-2 shrink-0 rounded-full bg-muted-foreground" />
           <div className="flex-1 border-l-2 border-dashed border-border-subtle" />
         </div>
       </div>

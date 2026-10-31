@@ -15,7 +15,7 @@ import {
 import { cn } from "@/lib/utils"
 
 const navButton =
-  "inline-flex size-(--cell-size) cursor-pointer items-center justify-center rounded-full p-0 text-fg-secondary select-none transition-colors duration-150 hover:bg-muted hover:text-foreground focus-visible:focus-ring aria-disabled:pointer-events-none aria-disabled:text-fg-disabled"
+  "inline-flex size-(--cell-size) cursor-pointer items-center justify-center rounded-full p-0 text-muted-foreground select-none transition-colors duration-150 hover:bg-muted hover:text-foreground focus-visible:focus-ring aria-disabled:pointer-events-none aria-disabled:text-disabled-foreground"
 
 function Calendar({
   className,
@@ -82,13 +82,13 @@ function Calendar({
           "select-none",
           captionLayout === "label"
             ? "text-table"
-            : "flex h-8 items-center gap-1 rounded-full pr-2 pl-3 text-table [&>svg]:size-3.5 [&>svg]:text-fg-secondary",
+            : "flex h-8 items-center gap-1 rounded-full pr-2 pl-3 text-table [&>svg]:size-3.5 [&>svg]:text-muted-foreground",
           defaultClassNames.caption_label
         ),
         month_grid: "w-full border-collapse",
         weekdays: cn("flex", defaultClassNames.weekdays),
         weekday: cn(
-          "flex-1 text-label text-fg-secondary select-none",
+          "flex-1 text-label text-muted-foreground select-none",
           defaultClassNames.weekday
         ),
         week: cn("mt-2 flex w-full", defaultClassNames.week),
@@ -97,7 +97,7 @@ function Calendar({
           defaultClassNames.week_number_header
         ),
         week_number: cn(
-          "text-label text-fg-secondary select-none",
+          "text-label text-muted-foreground select-none",
           defaultClassNames.week_number
         ),
         day: cn(
@@ -108,18 +108,18 @@ function Calendar({
           defaultClassNames.day
         ),
         range_start: cn(
-          "rounded-l-full bg-surface-subtle",
+          "rounded-l-full bg-muted",
           defaultClassNames.range_start
         ),
         range_middle: cn("rounded-none", defaultClassNames.range_middle),
-        range_end: cn("rounded-r-full bg-surface-subtle", defaultClassNames.range_end),
+        range_end: cn("rounded-r-full bg-muted", defaultClassNames.range_end),
         today: cn(defaultClassNames.today),
         outside: cn(
-          "text-fg-disabled aria-selected:text-fg-disabled",
+          "text-disabled-foreground aria-selected:text-disabled-foreground",
           defaultClassNames.outside
         ),
         disabled: cn(
-          "text-fg-disabled",
+          "text-disabled-foreground",
           defaultClassNames.disabled
         ),
         hidden: cn("invisible", defaultClassNames.hidden),
@@ -202,7 +202,7 @@ function CalendarDayButton({
       data-range-end={modifiers.range_end}
       data-range-middle={modifiers.range_middle}
       className={cn(
-        "flex aspect-square size-auto w-full min-w-(--cell-size) cursor-pointer select-none flex-col items-center justify-center gap-1 rounded-full text-small leading-none text-foreground transition-colors duration-150 hover:bg-muted focus-visible:focus-ring disabled:pointer-events-none disabled:text-fg-disabled data-[today=true]:ring-1 data-[today=true]:ring-inset data-[today=true]:ring-border data-[selected-single=true]:bg-action data-[selected-single=true]:text-fg-inverse data-[selected-single=true]:hover:bg-action-hover data-[range-start=true]:bg-action data-[range-start=true]:text-fg-inverse data-[range-start=true]:hover:bg-action-hover data-[range-end=true]:bg-action data-[range-end=true]:text-fg-inverse data-[range-end=true]:hover:bg-action-hover data-[range-middle=true]:rounded-none data-[range-middle=true]:bg-surface-subtle data-[range-middle=true]:hover:bg-border-subtle group-data-[focused=true]/day:relative group-data-[focused=true]/day:z-10 [&>span]:text-small [&>span]:opacity-70",
+        "flex aspect-square size-auto w-full min-w-(--cell-size) cursor-pointer select-none flex-col items-center justify-center gap-1 rounded-full text-small leading-none text-foreground transition-colors duration-150 hover:bg-muted focus-visible:focus-ring disabled:pointer-events-none disabled:text-disabled-foreground data-[today=true]:ring-1 data-[today=true]:ring-inset data-[today=true]:ring-border data-[selected-single=true]:bg-primary data-[selected-single=true]:text-primary-foreground data-[selected-single=true]:hover:bg-primary-hover data-[range-start=true]:bg-primary data-[range-start=true]:text-primary-foreground data-[range-start=true]:hover:bg-primary-hover data-[range-end=true]:bg-primary data-[range-end=true]:text-primary-foreground data-[range-end=true]:hover:bg-primary-hover data-[range-middle=true]:rounded-none data-[range-middle=true]:bg-muted data-[range-middle=true]:hover:bg-border-subtle group-data-[focused=true]/day:relative group-data-[focused=true]/day:z-10 [&>span]:text-small [&>span]:opacity-70",
         defaultClassNames.day,
         className
       )}

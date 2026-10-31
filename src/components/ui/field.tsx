@@ -115,9 +115,9 @@ function FieldLabel({
     <Label
       data-slot="field-label"
       className={cn(
-        "group/field-label peer/field-label flex w-fit gap-2 group-data-[disabled=true]/field:text-fg-disabled",
+        "group/field-label peer/field-label flex w-fit gap-2 group-data-[disabled=true]/field:text-disabled-foreground",
         "has-[>[data-slot=field]]:w-full has-[>[data-slot=field]]:flex-col has-[>[data-slot=field]]:rounded-xl has-[>[data-slot=field]]:border [&>*]:data-[slot=field]:p-4",
-        "has-data-[state=checked]:border-action has-data-[state=checked]:ring-1 has-data-[state=checked]:ring-action has-[:checked]:border-action has-[:checked]:ring-1 has-[:checked]:ring-action",
+        "has-data-[state=checked]:border-primary has-data-[state=checked]:ring-1 has-data-[state=checked]:ring-primary has-[:checked]:border-primary has-[:checked]:ring-1 has-[:checked]:ring-primary",
         className
       )}
       {...props}
@@ -130,7 +130,7 @@ function FieldTitle({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="field-label"
       className={cn(
-        "flex w-fit items-center gap-2 text-body-medium group-data-[disabled=true]/field:text-fg-disabled",
+        "flex w-fit items-center gap-2 text-body-medium group-data-[disabled=true]/field:text-disabled-foreground",
         className
       )}
       {...props}
@@ -143,9 +143,9 @@ function FieldDescription({ className, ...props }: React.ComponentProps<"p">) {
     <p
       data-slot="field-description"
       className={cn(
-        "text-small text-fg-secondary group-has-[[data-orientation=horizontal]]/field:text-balance",
+        "text-small text-muted-foreground group-has-[[data-orientation=horizontal]]/field:text-balance",
         "last:mt-0 nth-last-2:-mt-1 [[data-variant=legend]+&]:-mt-1.5",
-        "[&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-action",
+        "[&>a]:underline [&>a]:underline-offset-4 [&>a:hover]:text-primary",
         className
       )}
       {...props}
@@ -173,7 +173,7 @@ function FieldSeparator({
       <Separator className="absolute inset-0 top-1/2 bg-border-subtle" />
       {children && (
         <span
-          className="relative mx-auto block w-fit bg-background px-2 text-fg-secondary"
+          className="relative mx-auto block w-fit bg-background px-2 text-muted-foreground"
           data-slot="field-separator-content"
         >
           {children}
@@ -226,7 +226,7 @@ function FieldError({
     <div
       role="alert"
       data-slot="field-error"
-      className={cn("text-small text-error", className)}
+      className={cn("text-small text-destructive", className)}
       {...props}
     >
       {content}

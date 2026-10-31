@@ -291,7 +291,7 @@ export function CheckInManager({
                           )}%`
                         : "0%"
                     }
-                    valueClassName="text-success"
+                    valueClassName="text-success-foreground"
                   />
                 </div>
 

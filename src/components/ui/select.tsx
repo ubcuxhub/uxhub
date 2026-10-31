@@ -19,14 +19,14 @@ const SelectTrigger = React.forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "flex h-11 w-full items-center justify-between gap-2 rounded-full border border-border bg-background px-5 py-2 text-left text-body text-foreground transition-colors duration-150 data-[placeholder]:text-fg-muted focus-visible:focus-ring aria-invalid:border-error disabled:cursor-not-allowed disabled:border-action-disabled-border disabled:bg-action-disabled-bg disabled:text-fg-disabled disabled:data-[placeholder]:text-fg-disabled sm:h-(--size-control) [&>span]:line-clamp-1",
+      "flex h-11 w-full items-center justify-between gap-2 rounded-full border border-border bg-background px-5 py-2 text-left text-body text-foreground transition-colors duration-150 data-[placeholder]:text-muted-foreground focus-visible:focus-ring aria-invalid:border-destructive disabled:cursor-not-allowed disabled:border-disabled-border disabled:bg-disabled disabled:text-disabled-foreground disabled:data-[placeholder]:text-disabled-foreground sm:h-(--size-control) [&>span]:line-clamp-1",
       className
     )}
     {...props}
   >
     {children}
     <SelectPrimitive.Icon asChild>
-      <ChevronDown className="size-4 shrink-0 text-fg-secondary" />
+      <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
 ));
@@ -39,7 +39,7 @@ const SelectScrollUpButton = React.forwardRef<
   <SelectPrimitive.ScrollUpButton
     ref={ref}
     className={cn(
-      "flex min-h-8 cursor-default items-center justify-center py-1 text-fg-secondary",
+      "flex min-h-8 cursor-default items-center justify-center py-1 text-muted-foreground",
       className
     )}
     {...props}
@@ -56,7 +56,7 @@ const SelectScrollDownButton = React.forwardRef<
   <SelectPrimitive.ScrollDownButton
     ref={ref}
     className={cn(
-      "flex min-h-8 cursor-default items-center justify-center py-1 text-fg-secondary",
+      "flex min-h-8 cursor-default items-center justify-center py-1 text-muted-foreground",
       className
     )}
     {...props}
@@ -105,7 +105,7 @@ const SelectLabel = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <SelectPrimitive.Label
     ref={ref}
-    className={cn("py-1.5 pl-8 pr-2 text-label text-fg-secondary", className)}
+    className={cn("py-1.5 pl-8 pr-2 text-label text-muted-foreground", className)}
     {...props}
   />
 ));
@@ -118,7 +118,7 @@ const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex min-h-11 w-full cursor-default select-none items-center rounded-md py-2 pl-8 pr-2 text-small text-foreground outline-none focus:bg-surface-subtle data-[disabled]:pointer-events-none data-[disabled]:text-fg-disabled sm:min-h-0",
+      "relative flex min-h-11 w-full cursor-default select-none items-center rounded-md py-2 pl-8 pr-2 text-small text-foreground outline-none focus:bg-muted data-[disabled]:pointer-events-none data-[disabled]:text-disabled-foreground sm:min-h-0",
       className
     )}
     {...props}

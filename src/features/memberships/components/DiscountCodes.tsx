@@ -30,7 +30,7 @@ export function DiscountCodes() {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={`Visit ${discount.businessName} (opens in a new tab)`}
-                className="text-small text-muted-foreground underline underline-offset-2 hover:text-action-hover"
+                className="text-small text-muted-foreground underline underline-offset-2 hover:text-primary-hover"
               >
                 Visit
               </a>

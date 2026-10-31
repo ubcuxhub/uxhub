@@ -249,13 +249,27 @@ variable name with the slash turned into a hyphen). Dark mode is
 `data-theme="dark"` on `<html>` (`src/lib/theme.ts`), and density is
 `data-density="compact"`.
 
-Colour utilities in new code: where shadcn has a slot, use its utility
-(`bg-primary`, `text-muted-foreground`, `bg-muted`, `border-input`,
-`bg-popover`). Otherwise use the design-system-named utility, whose class equals
-the Figma variable name (`bg-status-success-background`, `text-text-disabled`,
-`bg-overlay-scrim`). The `fg-*`, `action*`, `surface-*` and `*-bg` utilities are
-legacy: don't use them in new code. The shadcn bridge in `globals.css` is
-permanent.
+Colour classes use one shadcn-style vocabulary. Every shadcn slot keeps
+shadcn's meaning: `bg-background`, `bg-card`, `bg-popover`, `bg-primary`,
+`bg-secondary` (subtle grey fill), `bg-muted`, `bg-accent` (hover highlight),
+`bg-destructive`, `border-border`, `border-input`, `ring-ring`. Our other
+tokens follow shadcn's pattern: `X` is a fill, `X-foreground` the text on it,
+`X-hover` / `X-active` its hover and pressed fills, `X-border` its edge
+(`bg-section` for grey section backgrounds, `bg-primary-hover`, `bg-disabled
+text-disabled-foreground border-disabled-border`, `bg-success
+text-success-foreground`, `border-border-subtle`, `bg-scrim`). `destructive`
+is split by property: `bg-destructive` is the action red, while
+`text-destructive` (error copy) and `border-destructive` (invalid edges) are
+the readable error red; an error badge is `bg-error text-destructive`. Code
+names don't match Figma names one to one: `docs/design-system.md` §2.11 maps
+every Figma variable to its class, and each variable's code syntax in Figma
+shows the class. Figma's `text/primary` is `text-foreground`; `text-primary` is
+the blue action colour. Never put a fill in `text-` (`text-muted`,
+`text-secondary`, `text-success`): a lint rule rejects it. Until the epic
+branches land in the week of November 16, `globals.css` keeps the old `fg-*`,
+`action*`, `surface-*`, `*-bg`, `status-*`, `text-text-*`, `background-*` and
+`overlay-scrim` utilities as deprecated aliases; don't use them. The shadcn
+bridge in `globals.css` is permanent.
 
 ## Merging pull requests
 
