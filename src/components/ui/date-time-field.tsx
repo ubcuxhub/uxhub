@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { CalendarIcon } from "lucide-react"
+import { CalendarIcon, ClockIcon } from "lucide-react"
 
 import { DatePicker } from "@/components/ui/date-picker"
 import { IconButton } from "@/components/ui/icon-button"
@@ -11,14 +11,24 @@ import {
   PopoverAnchor,
   PopoverContent,
 } from "@/components/ui/popover"
+import { TimePicker } from "@/components/ui/time-picker"
+import { useActiveDescendant } from "@/hooks/use-active-descendant"
 import { usePacificNow } from "@/hooks/use-pacific-now"
 import {
   DATE_INPUT_ERROR,
+  END_TIME_ERROR,
   formatDateInput,
+  formatTimeInput,
+  isEndBeforeStart,
   parseDateInput,
+  parseTimeInput,
+  timeOptions,
   type IsoDate,
+  type WallTime,
 } from "@/lib/date-input"
 import { cn } from "@/lib/utils"
+
+const TIME_INPUT_ERROR = "Use a real time, like 9:00 AM."
 
 type FieldInputProps = Omit<
   React.ComponentProps<"input">,
@@ -29,8 +39,9 @@ interface PickerFieldProps<T extends string> extends FieldInputProps {
   value: T | null
   onValueChange: (value: T | null) => void
   /**
-   * Called with the message when the text can't be read, and with `null` when
-   * it clears. The caller renders the message in a `FieldError`.
+   * Called with the message when the text can't be read (or, for an end time,
+   * falls before the start), and with `null` when it clears. The caller renders
+   * the message in a `FieldError`.
    */
   onValidityChange?: (error: string | null) => void
   /** Submits the ISO value through a hidden input. */
@@ -43,6 +54,15 @@ interface DateFieldProps extends PickerFieldProps<IsoDate> {
   /** Today in Pacific time. Defaults to the live clock. */
   today?: IsoDate
   /** Start with the calendar open (for the gallery). */
+  defaultOpen?: boolean
+}
+
+interface TimeFieldProps extends PickerFieldProps<WallTime> {
+  /** End-time mode: options start after it and show durations. */
+  after?: WallTime
+  /** Minutes between options. Default 15. */
+  stepMinutes?: number
+  /** Start with the list open (for the gallery). */
   defaultOpen?: boolean
 }
 
@@ -83,6 +103,21 @@ function useReportValidity(
     reported.current = error
     report(error)
   }, [error])
+}
+
+/** Keep browser form validation in step with the value sent by the hidden input. */
+function useCommittedValidity(
+  inputRef: React.RefObject<HTMLInputElement | null>,
+  text: string,
+  submittedValue: string,
+  error: string | null,
+  draftMessage: string
+) {
+  React.useLayoutEffect(() => {
+    inputRef.current?.setCustomValidity(
+      text.trim() && !submittedValue ? error ?? draftMessage : ""
+    )
+  }, [inputRef, text, submittedValue, error, draftMessage])
 }
 
 function rangeError(min?: IsoDate, max?: IsoDate) {
@@ -139,6 +174,7 @@ function DateField({
   // Never submit the previous value while that draft is visible.
   const submittedValue =
     value && !parseError && text === formatDateInput(value) ? value : ""
+  useCommittedValidity(inputRef, text, submittedValue, parseError, DATE_INPUT_ERROR)
 
   const commit = () => {
     if (!text.trim()) {
@@ -201,6 +237,7 @@ function DateField({
                 commit()
                 setOpen(true)
               } else if (event.key === "Enter") {
+                event.preventDefault()
                 commit()
               }
             }}
@@ -252,6 +289,197 @@ function DateField({
   )
 }
 
+/**
+ * A time field (DS `DateTimeField`, Type=Time; §3.11): an ARIA combobox over a
+ * listbox of times. Focus stays in the input; Up and Down move through the list,
+ * Enter accepts, Esc closes. A time with no AM/PM reads as PM, and in end-time
+ * mode (`after`) takes the first match after the start.
+ */
+function TimeField({
+  value,
+  onValueChange,
+  onValidityChange,
+  name,
+  after,
+  stepMinutes = 15,
+  defaultOpen = false,
+  disabled,
+  className,
+  placeholder = "9:00 AM",
+  onBlur,
+  onKeyDown,
+  ref,
+  ...props
+}: TimeFieldProps) {
+  const [text, setText] = useFieldText(value, formatTimeInput)
+  const [parseError, setParseError] = React.useState<string | null>(null)
+  const [open, setOpen] = React.useState(defaultOpen)
+  const inputRef = React.useRef<HTMLInputElement | null>(null)
+  const wrapperRef = React.useRef<HTMLDivElement | null>(null)
+  const listboxId = React.useId()
+
+  const options = timeOptions({ after, stepMinutes })
+  const { activeIndex, setActiveIndex, onKeyDown: moveActive, getOptionId } =
+    useActiveDescendant(options.length, { homeEnd: false })
+
+  const beforeStart = !!(value && after && isEndBeforeStart(value, after))
+  const error = parseError ?? (beforeStart ? END_TIME_ERROR : null)
+  useReportValidity(error, onValidityChange)
+  // A visible draft must not submit the previous committed time.
+  const submittedValue =
+    value && !error && text === formatTimeInput(value) ? value : ""
+  useCommittedValidity(inputRef, text, submittedValue, error, TIME_INPUT_ERROR)
+  const draftTime = text.trim() ? parseTimeInput(text, { after }) : null
+
+  const accept = (time: WallTime) => {
+    setParseError(null)
+    setText(formatTimeInput(time))
+    if (time !== value) onValueChange(time)
+  }
+
+  const commit = () => {
+    if (!text.trim()) {
+      setParseError(null)
+      if (value !== null) onValueChange(null)
+      return
+    }
+    const parsed = parseTimeInput(text, { after })
+    if (!parsed) {
+      setParseError(TIME_INPUT_ERROR)
+      return
+    }
+    accept(parsed)
+  }
+
+  const openList = () => {
+    const parsed = text.trim() ? parseTimeInput(text, { after }) : value
+    const index = parsed ? options.findIndex((o) => o.value === parsed) : -1
+    setActiveIndex(index)
+    setOpen(true)
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverAnchor asChild>
+        <div
+          ref={wrapperRef}
+          data-slot="time-field"
+          className={cn("relative w-full", className)}
+        >
+          <Input
+            {...props}
+            ref={mergeRefs(inputRef, ref ?? null)}
+            type="text"
+            role="combobox"
+            aria-haspopup="listbox"
+            aria-expanded={open}
+            aria-controls={open ? listboxId : undefined}
+            aria-autocomplete="none"
+            aria-activedescendant={
+              open && activeIndex >= 0 ? getOptionId(activeIndex) : undefined
+            }
+            value={text}
+            disabled={disabled}
+            placeholder={placeholder}
+            autoComplete="off"
+            spellCheck={false}
+            aria-invalid={error ? true : props["aria-invalid"]}
+            className={inputClass}
+            onChange={(event) => {
+              const next = event.target.value
+              setText(next)
+              setParseError(null)
+              // Follow the typing: the matching option lights up, so Enter
+              // accepts what was typed.
+              const parsed = next.trim() ? parseTimeInput(next, { after }) : null
+              setActiveIndex(parsed ? options.findIndex((o) => o.value === parsed) : -1)
+            }}
+            onBlur={(event) => {
+              onBlur?.(event)
+              commit()
+              setOpen(false)
+            }}
+            onKeyDown={(event) => {
+              onKeyDown?.(event)
+              if (event.defaultPrevented) return
+              if (!open) {
+                if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                  event.preventDefault()
+                  openList()
+                } else if (event.key === "Enter") {
+                  event.preventDefault()
+                  commit()
+                }
+                return
+              }
+              moveActive(event)
+              if (event.key === "Enter") {
+                event.preventDefault()
+                const option = options[activeIndex]
+                if (option) {
+                  accept(option.value)
+                } else {
+                  commit()
+                }
+                setOpen(false)
+              }
+            }}
+          />
+          <IconButton
+            variant="ghost"
+            label="Choose time"
+            data-slot="date-time-trigger"
+            aria-haspopup="listbox"
+            aria-expanded={open}
+            disabled={disabled}
+            className={triggerClass}
+            // Keep focus in the input, where the list is driven from.
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => {
+              inputRef.current?.focus()
+              if (open) setOpen(false)
+              else openList()
+            }}
+          >
+            <ClockIcon aria-hidden />
+          </IconButton>
+          {name ? (
+            <input type="hidden" name={name} value={submittedValue} disabled={disabled} />
+          ) : null}
+        </div>
+      </PopoverAnchor>
+      <PopoverContent
+        align="start"
+        collisionPadding={16}
+        className="w-60 max-w-[calc(100vw-2rem)] p-2"
+        onOpenAutoFocus={(event) => event.preventDefault()}
+        onCloseAutoFocus={(event) => event.preventDefault()}
+        onMouseDown={(event) => event.preventDefault()}
+        onInteractOutside={(event) => {
+          if (isInside(wrapperRef.current, event.target, "input, [data-slot=date-time-trigger]")) {
+            event.preventDefault()
+          }
+        }}
+      >
+        <TimePicker
+          id={listboxId}
+          label={after ? "End time" : "Start time"}
+          options={options}
+          value={value}
+          onValueChange={(time) => {
+            accept(time)
+            setOpen(false)
+            inputRef.current?.focus()
+          }}
+          activeIndex={activeIndex}
+          getOptionId={getOptionId}
+          scrollTarget={draftTime}
+        />
+      </PopoverContent>
+    </Popover>
+  )
+}
+
 /** The browser's date, only used before the Pacific clock has hydrated. */
 function localToday(): IsoDate {
   const now = new Date()
@@ -259,5 +487,5 @@ function localToday(): IsoDate {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}` as IsoDate
 }
 
-export { DateField }
-export type { DateFieldProps }
+export { DateField, TimeField, TIME_INPUT_ERROR }
+export type { DateFieldProps, TimeFieldProps }

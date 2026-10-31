@@ -1,12 +1,17 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { DATE_INPUT_ERROR, type IsoDate } from "@/lib/date-input";
+import {
+  DATE_INPUT_ERROR,
+  END_TIME_ERROR,
+  type IsoDate,
+  type WallTime,
+} from "@/lib/date-input";
 
-import { DateField } from "./date-time-field";
+import { DateField, TimeField } from "./date-time-field";
 
 beforeAll(() => {
   globalThis.ResizeObserver = class ResizeObserver {
@@ -32,6 +37,7 @@ function Date_({
   min?: IsoDate;
   name?: string;
   disabled?: boolean;
+  required?: boolean;
 }) {
   const [value, setValue] = useState<IsoDate | null>(initial);
   return (
@@ -42,6 +48,36 @@ function Date_({
       onValueChange={setValue}
       onValidityChange={onValidityChange}
       {...props}
+    />
+  );
+}
+
+function Time_({
+  initial = null,
+  after,
+  onValidityChange,
+  name,
+  disabled,
+  required,
+}: {
+  initial?: WallTime | null;
+  after?: WallTime;
+  onValidityChange?: (error: string | null) => void;
+  name?: string;
+  disabled?: boolean;
+  required?: boolean;
+}) {
+  const [value, setValue] = useState<WallTime | null>(initial);
+  return (
+    <TimeField
+      aria-label="Time"
+      value={value}
+      onValueChange={setValue}
+      onValidityChange={onValidityChange}
+      after={after}
+      name={name}
+      disabled={disabled}
+      required={required}
     />
   );
 }
@@ -135,6 +171,42 @@ describe("DateField", () => {
     expect(new FormData(container.querySelector("form")!).has("start_date")).toBe(false);
   });
 
+  it("blocks form validation for a date draft until it commits", () => {
+    const { container } = render(
+      <form>
+        <Date_ initial="2026-11-14" name="start_date" required />
+      </form>,
+    );
+    const form = container.querySelector("form")!;
+    const input = screen.getByRole("textbox", { name: "Date" });
+
+    expect(form.checkValidity()).toBe(true);
+    fireEvent.change(input, { target: { value: "feb 30" } });
+    expect(form.checkValidity()).toBe(false);
+    fireEvent.change(input, { target: { value: "nov 15" } });
+    expect(form.checkValidity()).toBe(false);
+    fireEvent.blur(input);
+    expect(form.checkValidity()).toBe(true);
+    expect(new FormData(form).get("start_date")).toBe("2026-11-15");
+  });
+
+  it("prevents Enter from submitting an enclosing form while committing a date", () => {
+    const onSubmit = vi.fn((event: React.FormEvent) => event.preventDefault());
+    render(
+      <form onSubmit={onSubmit}>
+        <Date_ />
+        <button type="submit">Save</button>
+      </form>,
+    );
+    const input = screen.getByRole("textbox", { name: "Date" }) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "nov 14" } });
+    const enter = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
+    act(() => input.dispatchEvent(enter));
+    expect(enter.defaultPrevented).toBe(true);
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(input.value).toBe("Sat, Nov 14, 2026");
+  });
+
   it("opens the calendar on the selected day, focuses the selected day, picks, and returns focus", async () => {
     render(<Date_ initial="2026-11-14" />);
     const input = screen.getByRole("textbox", { name: "Date" });
@@ -167,5 +239,220 @@ describe("DateField", () => {
     expect((early as HTMLButtonElement).disabled).toBe(true);
     const ok = await screen.findByRole("button", { name: /November 10/ });
     expect((ok as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
+describe("TimeField", () => {
+  it("submits only a committed valid time while edited text stays visible", () => {
+    const { container } = render(
+      <form>
+        <Time_ initial="09:00" name="start_time" />
+      </form>,
+    );
+    const form = container.querySelector("form")!;
+    const input = screen.getByRole("combobox", { name: "Time" }) as HTMLInputElement;
+    const submitted = () => new FormData(form).get("start_time");
+
+    expect(submitted()).toBe("09:00");
+
+    fireEvent.change(input, { target: { value: "lunch" } });
+    expect(input.value).toBe("lunch");
+    expect(submitted()).toBe("");
+    fireEvent.blur(input);
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(submitted()).toBe("");
+
+    fireEvent.change(input, { target: { value: "10:30 am" } });
+    expect(submitted()).toBe("");
+    fireEvent.blur(input);
+    expect(input.value).toBe("10:30 AM");
+    expect(submitted()).toBe("10:30");
+  });
+
+  it("omits a disabled time field from FormData", () => {
+    const { container } = render(
+      <form>
+        <Time_ initial="09:00" name="start_time" disabled />
+      </form>,
+    );
+    expect(new FormData(container.querySelector("form")!).has("start_time")).toBe(false);
+  });
+
+  it("does not submit an end time before the start", () => {
+    const { container } = render(
+      <form>
+        <Time_ initial="08:30" after="09:00" name="end_time" />
+      </form>,
+    );
+    expect(new FormData(container.querySelector("form")!).get("end_time")).toBe("");
+    expect(container.querySelector("form")!.checkValidity()).toBe(false);
+  });
+
+  it("blocks form validation for invalid and uncommitted time drafts", () => {
+    const { container } = render(
+      <form>
+        <Time_ initial="09:00" name="start_time" required />
+      </form>,
+    );
+    const form = container.querySelector("form")!;
+    const input = screen.getByRole("combobox", { name: "Time" });
+
+    expect(form.checkValidity()).toBe(true);
+    fireEvent.change(input, { target: { value: "lunch" } });
+    expect(form.checkValidity()).toBe(false);
+    fireEvent.blur(input);
+    expect(form.checkValidity()).toBe(false);
+    fireEvent.change(input, { target: { value: "10:30 am" } });
+    expect(form.checkValidity()).toBe(false);
+    fireEvent.blur(input);
+    expect(form.checkValidity()).toBe(true);
+    expect(new FormData(form).get("start_time")).toBe("10:30");
+  });
+
+  it("prevents Enter from submitting a form with the time list closed or open", async () => {
+    const onSubmit = vi.fn((event: React.FormEvent) => event.preventDefault());
+    render(
+      <form onSubmit={onSubmit}>
+        <Time_ />
+        <button type="submit">Save</button>
+      </form>,
+    );
+    const input = screen.getByRole("combobox", { name: "Time" }) as HTMLInputElement;
+    const enter = () => {
+      const event = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
+      act(() => input.dispatchEvent(event));
+      expect(event.defaultPrevented).toBe(true);
+      expect(onSubmit).not.toHaveBeenCalled();
+    };
+
+    fireEvent.change(input, { target: { value: "10:30 am" } });
+    enter(); // list closed
+    expect(input.value).toBe("10:30 AM");
+
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    await screen.findByRole("listbox");
+    fireEvent.change(input, { target: { value: "10:07 am" } });
+    expect(input.hasAttribute("aria-activedescendant")).toBe(false);
+    enter(); // list open, no active option
+    expect(input.value).toBe("10:07 AM");
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    await screen.findByRole("listbox");
+    enter(); // list open, active option
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+  });
+
+  it("opens the time list near an off-grid typed draft instead of the old value", async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetTop")!;
+    Object.defineProperty(HTMLElement.prototype, "offsetTop", {
+      configurable: true,
+      get(this: HTMLElement) {
+        const match = this.id.match(/-option-(\d+)$/);
+        return match ? Number(match[1]) * 42 : 0;
+      },
+    });
+    try {
+      render(<Time_ initial="21:00" />);
+      const input = screen.getByRole("combobox", { name: "Time" });
+      fireEvent.change(input, { target: { value: "9:07 am" } });
+      fireEvent.keyDown(input, { key: "ArrowDown" });
+      const list = await screen.findByRole("listbox");
+      expect(list.scrollTop).toBe(36 * 42);
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, "offsetTop", descriptor);
+    }
+  });
+
+  it("reads a bare 9 as 9:00 PM", () => {
+    render(<Time_ />);
+    const input = screen.getByRole("combobox", { name: "Time" }) as HTMLInputElement;
+    typeAndBlur(input, "9");
+    expect(input.value).toBe("9:00 PM");
+  });
+
+  it("takes the first match after the start in end mode", () => {
+    render(<Time_ after="09:00" />);
+    const input = screen.getByRole("combobox") as HTMLInputElement;
+    typeAndBlur(input, "11");
+    expect(input.value).toBe("11:00 AM");
+  });
+
+  it("reports an end time before the start, and clears it when fixed", () => {
+    const onValidityChange = vi.fn();
+    render(<Time_ after="09:00" initial="08:30" onValidityChange={onValidityChange} />);
+    const input = screen.getByRole("combobox");
+    expect(onValidityChange).toHaveBeenLastCalledWith(END_TIME_ERROR);
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+
+    typeAndBlur(input, "10:30 am");
+    expect(onValidityChange).toHaveBeenLastCalledWith(null);
+  });
+
+  it("rejects text that isn't a time", () => {
+    const onValidityChange = vi.fn();
+    render(<Time_ onValidityChange={onValidityChange} />);
+    typeAndBlur(screen.getByRole("combobox"), "lunch");
+    expect(onValidityChange).toHaveBeenLastCalledWith("Use a real time, like 9:00 AM.");
+  });
+
+  it("moves aria-activedescendant with the arrows and accepts with Enter", async () => {
+    render(<Time_ initial="09:00" />);
+    const input = screen.getByRole("combobox") as HTMLInputElement;
+    input.focus();
+
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    const listbox = await screen.findByRole("listbox");
+    expect(input.getAttribute("aria-expanded")).toBe("true");
+    expect(input.getAttribute("aria-controls")).toBe(listbox.id);
+
+    const options = screen.getAllByRole("option");
+    // Opens on the current value, 9:00 AM.
+    expect(input.getAttribute("aria-activedescendant")).toBe(options[36].id);
+
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(input.getAttribute("aria-activedescendant")).toBe(options[37].id);
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(input.getAttribute("aria-activedescendant")).toBe(options[38].id);
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+    expect(input.getAttribute("aria-activedescendant")).toBe(options[37].id);
+
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+    expect(input.value).toBe("9:15 AM");
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("closes on Escape and keeps focus in the input", async () => {
+    render(<Time_ initial="09:00" />);
+    const input = screen.getByRole("combobox");
+    input.focus();
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    await screen.findByRole("listbox");
+
+    fireEvent.keyDown(input, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("lists end times after the start with durations", async () => {
+    render(<Time_ after="10:00" />);
+    const input = screen.getByRole("combobox");
+    input.focus();
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    await screen.findByRole("listbox");
+
+    const first = screen.getAllByRole("option")[0];
+    expect(first.textContent).toBe("10:15 AM15 min");
+    expect(screen.getByText("Pacific Time")).not.toBeNull();
+  });
+
+  it("picks an option by click", async () => {
+    render(<Time_ />);
+    const input = screen.getByRole("combobox") as HTMLInputElement;
+    fireEvent.click(screen.getByRole("button", { name: "Choose time" }));
+    const option = await screen.findByRole("option", { name: "1:30 PM" });
+    act(() => option.click());
+    await waitFor(() => expect(input.value).toBe("1:30 PM"));
   });
 });
