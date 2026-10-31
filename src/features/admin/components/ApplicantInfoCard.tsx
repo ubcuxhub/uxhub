@@ -7,9 +7,23 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { StatusBadge, type Status } from "@/components/ui/status-badge";
-import type { ApplicationReviewState } from "@/features/admin/lib/application-review";
-import { Clock, X, Check, User, Mail, Calendar, Ticket, Hourglass } from "lucide-react";
+import {
+  APPLICATION_REVIEW_STATE_LABELS,
+  type ApplicationReviewState,
+} from "@/features/admin/lib/application-review";
+import {
+  Clock,
+  X,
+  Check,
+  CircleMinus,
+  User,
+  Mail,
+  Calendar,
+  Ticket,
+  Hourglass,
+} from "lucide-react";
 import { formatTimestamp } from "@/lib/date";
 
 interface ApplicantInfoCardProps {
@@ -38,18 +52,27 @@ export function ApplicationStateIcon({ state }: { state: ApplicationReviewState 
 }
 
 /**
- * The design system has one badge per status, not per application state:
- * under review reads as pending, and a lapsed offer or rejection as not
- * selected.
+ * Under review reads as pending and a registered applicant as going. A lapsed
+ * offer and a rejection have no admin-facing status in the design system
+ * ("Not selected" is member wording), so they keep their own labels.
  */
-const BADGE_STATUS: Record<ApplicationReviewState, Status> = {
+const BADGE_STATUS: Partial<Record<ApplicationReviewState, Status>> = {
   submitted: "pending",
   waitlisted: "waitlisted",
   accepted: "accepted",
   registered: "going",
-  offer_expired: "not_selected",
-  rejected: "not_selected",
 };
+
+function ApplicationStateBadge({ state }: { state: ApplicationReviewState }) {
+  const status = BADGE_STATUS[state];
+  if (status) return <StatusBadge status={status} />;
+  return (
+    <Badge variant="neutral">
+      <CircleMinus aria-hidden />
+      {APPLICATION_REVIEW_STATE_LABELS[state]}
+    </Badge>
+  );
+}
 
 export function ApplicantInfoCard({
   name,
@@ -72,7 +95,7 @@ export function ApplicantInfoCard({
               {email}
             </CardDescription>
           </div>
-          <StatusBadge status={BADGE_STATUS[state]} />
+          <ApplicationStateBadge state={state} />
         </div>
       </CardHeader>
       <CardContent className="space-y-1">
