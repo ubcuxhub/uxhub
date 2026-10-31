@@ -228,12 +228,10 @@ token secret to client components.
   transaction it rolls back, and every assertion is scoped to its own fixtures,
   so it is safe and repeatable against a seeded database. CI runs it in the
   build job against the throwaway database `supabase start` creates.
-- Do not verify changes by driving the app in a browser unless you are
-  explicitly asked to. Never sign in, and never type credentials — including
-  the local seed passwords in `scripts/seed/data/users.ts` — into a form. Take
-  automated verification as far as it goes (lint, types, Vitest, `pnpm build`,
-  direct `psql` queries), then hand the reviewer a list of what still needs
-  checking by hand and why.
+- Never sign in, and never type credentials — including the local seed passwords
+  in `scripts/seed/data/users.ts` — into a form. Take automated verification as
+  far as it goes (lint, types, Vitest, `pnpm build`, direct `psql` queries),
+  then hand the reviewer a list of what still needs checking by hand and why.
 
 ## UI
 
