@@ -133,3 +133,112 @@ export function datetimeLocalToTimestamptz(value: string): string | null {
 
   return new Date(instant).toISOString();
 }
+
+const ENGLISH = "en-US";
+
+interface PacificCalendar {
+  year: string;
+  month: string;
+  weekday: string;
+  day: string;
+  time: string;
+  /** `YYYY-MM-DD`, for comparing calendar days. */
+  isoDay: string;
+}
+
+function pacificCalendar(value: string | null | undefined): PacificCalendar | null {
+  if (!value) return null;
+  const date = parseDate(value);
+  if (!date) return null;
+
+  const parts = new Intl.DateTimeFormat(ENGLISH, {
+    timeZone: PACIFIC_TIME_ZONE,
+    year: "numeric",
+    month: "short",
+    weekday: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  }).formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+
+  return {
+    year: get("year"),
+    month: get("month"),
+    weekday: get("weekday"),
+    day: get("day"),
+    // ICU puts a narrow no-break space before AM/PM; the design uses a plain one.
+    time: `${get("hour")}:${get("minute")} ${get("dayPeriod").toUpperCase()}`,
+    isoDay: pacificDate(value),
+  };
+}
+
+/**
+ * The short date a timeline row is labelled with, in Pacific time: "Jan 9",
+ * "Jan 9–10", "Jan 30–Feb 2", and "Dec 30, 2026–Jan 2, 2027" across a year.
+ * Falls back to the start alone when there is no end, or it is the same day.
+ */
+export function formatEventDateLabel(
+  start: string | null | undefined,
+  end?: string | null
+): string | null {
+  const from = pacificCalendar(start);
+  if (!from) return null;
+  const to = pacificCalendar(end);
+  if (!to || to.isoDay <= from.isoDay) return `${from.month} ${from.day}`;
+
+  if (to.year !== from.year) {
+    return `${from.month} ${from.day}, ${from.year}–${to.month} ${to.day}, ${to.year}`;
+  }
+  if (to.month !== from.month) {
+    return `${from.month} ${from.day}–${to.month} ${to.day}`;
+  }
+  return `${from.month} ${from.day}–${to.day}`;
+}
+
+/** One line of an event's schedule: the day ("Sat, Jan 9") and its time. */
+export interface EventDateLine {
+  day: string;
+  time: string;
+}
+
+/**
+ * The schedule split into display lines, in Pacific time. A same-day event is
+ * one line with a time range ("9:00 AM–7:00 PM"); a multi-day event is two
+ * lines, the start day with its start time and the end day with its end time.
+ */
+export function formatEventDateTimeLines(
+  start: string | null | undefined,
+  end?: string | null
+): EventDateLine[] {
+  const from = pacificCalendar(start);
+  if (!from) return [];
+  const startDay = `${from.weekday}, ${from.month} ${from.day}`;
+  const to = pacificCalendar(end);
+
+  if (!to || (to.isoDay === from.isoDay && to.time === from.time)) {
+    return [{ day: startDay, time: from.time }];
+  }
+  if (to.isoDay <= from.isoDay) {
+    return [{ day: startDay, time: `${from.time}–${to.time}` }];
+  }
+  return [
+    { day: startDay, time: from.time },
+    { day: `${to.weekday}, ${to.month} ${to.day}`, time: to.time },
+  ];
+}
+
+/**
+ * The schedule as one string: "Sat, Jan 9 9:00 AM–7:00 PM", or across days
+ * "Sat, Jan 9 9:00 AM – Sun, Jan 10 3:00 PM". Times are Pacific.
+ */
+export function formatEventDateTimeRange(
+  start: string | null | undefined,
+  end?: string | null
+): string | null {
+  const lines = formatEventDateTimeLines(start, end);
+  if (lines.length === 0) return null;
+  return lines.map((line) => `${line.day} ${line.time}`).join(" – ");
+}

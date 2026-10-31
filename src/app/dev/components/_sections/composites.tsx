@@ -6,7 +6,7 @@ import { TriangleAlert } from "lucide-react";
 import { BackButton, BackPill } from "@/components/shared/BackButton";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { CopyCode } from "@/components/shared/CopyCode";
-import { EventCard } from "@/components/shared/EventCard";
+import { MarketingEventCard } from "@/features/marketing/components/MarketingEventCard";
 import { ImageUpload } from "@/components/shared/ImageUpload";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { SuccessOverlay } from "@/components/shared/SuccessOverlay";
@@ -226,16 +226,16 @@ function Composites({ open }: SectionProps) {
         min="20rem"
       >
         <Specimen label="image, priced (member price)" bare>
-          <EventCard event={EVENT} className="w-full max-w-sm" />
+          <MarketingEventCard event={EVENT} className="w-full max-w-sm" />
         </Specimen>
         <Specimen label="no image, free, long title" bare>
-          <EventCard event={FREE_EVENT} className="w-full max-w-sm" />
+          <MarketingEventCard event={FREE_EVENT} className="w-full max-w-sm" />
         </Specimen>
         <Specimen label="linked (href)" bare>
-          <EventCard event={EVENT} href="/dev/components" className="w-full max-w-sm" />
+          <MarketingEventCard event={EVENT} href="/dev/components" className="w-full max-w-sm" />
         </Specimen>
         <Specimen label="clickable (onClick)" bare>
-          <EventCard event={FREE_EVENT} onClick={() => {}} className="w-full max-w-sm" />
+          <MarketingEventCard event={FREE_EVENT} onClick={() => {}} className="w-full max-w-sm" />
         </Specimen>
       </SpecimenGroup>
 
