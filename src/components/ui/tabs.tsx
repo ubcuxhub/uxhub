@@ -1,6 +1,7 @@
 "use client"
 
 import * as React from "react"
+import { cva } from "class-variance-authority"
 import { Tabs as TabsPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
@@ -55,6 +56,26 @@ function TabsList({
   )
 }
 
+/**
+ * The pill look shared by `TabsTrigger` and `TabNavLink`. `active` picks which
+ * attribute marks the selected pill: Radix's `data-state="active"` (Tabs) or
+ * `aria-current="page"` (route-based TabNav).
+ */
+const tabsTriggerVariants = cva(
+  "inline-flex h-11 shrink-0 items-center justify-center rounded-full px-4 text-button whitespace-nowrap text-muted-foreground transition-colors duration-150 hover:text-foreground focus-visible:focus-ring disabled:pointer-events-none disabled:text-disabled-foreground disabled:[&>[data-slot=tabs-trigger-count]]:text-disabled-foreground sm:h-(--size-control)",
+  {
+    variants: {
+      active: {
+        state:
+          "data-[state=active]:bg-muted data-[state=active]:text-foreground",
+        current:
+          "aria-[current=page]:bg-muted aria-[current=page]:text-foreground",
+      },
+    },
+    defaultVariants: { active: "state" },
+  }
+)
+
 interface TabsTriggerProps
   extends React.ComponentProps<typeof TabsPrimitive.Trigger> {
   /** Shown after the label in secondary text, and read as part of the name. */
@@ -70,10 +91,7 @@ function TabsTrigger({
   return (
     <TabsPrimitive.Trigger
       data-slot="tabs-trigger"
-      className={cn(
-        "inline-flex h-11 shrink-0 items-center justify-center rounded-full px-4 text-button whitespace-nowrap text-muted-foreground transition-colors duration-150 hover:text-foreground focus-visible:focus-ring disabled:pointer-events-none disabled:text-disabled-foreground disabled:[&>[data-slot=tabs-trigger-count]]:text-disabled-foreground data-[state=active]:bg-muted data-[state=active]:text-foreground sm:h-(--size-control)",
-        className
-      )}
+      className={cn(tabsTriggerVariants(), className)}
       {...props}
     >
       {children}
@@ -105,5 +123,5 @@ function TabsContent({
   )
 }
 
-export { Tabs, TabsList, TabsTrigger, TabsContent }
+export { Tabs, TabsList, TabsTrigger, TabsContent, tabsTriggerVariants }
 export type { TabsTriggerProps }
