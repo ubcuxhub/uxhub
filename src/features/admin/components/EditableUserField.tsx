@@ -22,7 +22,7 @@ export function EditableUserField({ label, field, value, editValue, isSaving, on
   if (typeof value === "boolean") {
     return (
       <div className="flex flex-col gap-2">
-        <Label htmlFor={id} className="flex items-center gap-2 text-small font-normal">
+        <Label htmlFor={id} className="flex items-center gap-2">
           <Checkbox id={id} checked={canEdit ? editValue === "true" : value} disabled={!canEdit || isSaving}
             onCheckedChange={(checked) => onValueChange(field, String(checked))} />
           {label}
@@ -34,7 +34,7 @@ export function EditableUserField({ label, field, value, editValue, isSaving, on
   return (
     <UserDetailField label={label} htmlFor={canEdit ? id : undefined}>
       {canEdit ? (
-        <Input id={id} className="text-small" value={editValue ?? ""} disabled={isSaving} onChange={(event) => onValueChange(field, event.target.value)} />
+        <Input id={id} value={editValue ?? ""} disabled={isSaving} onChange={(event) => onValueChange(field, event.target.value)} />
       ) : <UserDetailValue>
         <span className={value == null || value === "" ? "text-muted-foreground" : ""}>{value == null || value === "" ? "—" : String(value)}</span>
       </UserDetailValue>}

@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Popover,
+  PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-import { AdminDirectoryButton, AdminDirectoryPopoverContent } from "./AdminDirectoryControls";
+import { AdminDirectoryButton } from "./AdminDirectoryControls";
 
 interface DirectoryFilterGroup {
   id: string;
@@ -39,28 +40,28 @@ export function AdminDirectoryFilters({
           <ListFilter aria-hidden="true" />
           Filters
           {activeFilterCount > 0 && (
-            <Badge variant="secondary" className="min-w-5 justify-center px-1.5 font-normal">
+            <Badge variant="neutral" className="min-w-5 justify-center px-1.5">
               {activeFilterCount}
             </Badge>
           )}
         </AdminDirectoryButton>
       </PopoverTrigger>
-      <AdminDirectoryPopoverContent align="end" className="w-64 p-0">
+      <PopoverContent align="end" className="w-64 p-0">
         {groups.map((group, index) => (
           <div
             key={group.id}
             role="group"
             aria-labelledby={group.id}
-            className={index === 0 ? "p-4 pt-5" : "border-t p-4 pt-5"}
+            className={index === 0 ? "p-4 pt-5" : "border-t border-border-subtle p-4 pt-5"}
           >
-            <h3 id={group.id} className="mb-3 text-sm font-normal">
+            <h3 id={group.id} className="mb-3 text-small">
               {group.label}
             </h3>
             <div className="space-y-2">
               {group.options.map((option) => (
                 <label
                   key={option.value}
-                  className="flex cursor-pointer items-center gap-2 text-sm"
+                  className="flex cursor-pointer items-center gap-2 text-small"
                 >
                   <Checkbox
                     checked={group.selectedValues.has(option.value)}
@@ -73,18 +74,18 @@ export function AdminDirectoryFilters({
           </div>
         ))}
         {activeFilterCount > 0 && (
-          <div className="border-t p-2">
+          <div className="border-t border-border-subtle p-2">
             <Button
               type="button"
               variant="ghost"
-              className="w-full font-normal"
+              className="w-full"
               onClick={onClear}
             >
               Clear filters
             </Button>
           </div>
         )}
-      </AdminDirectoryPopoverContent>
+      </PopoverContent>
     </Popover>
   );
 }

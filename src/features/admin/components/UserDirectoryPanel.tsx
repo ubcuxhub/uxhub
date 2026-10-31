@@ -4,13 +4,15 @@ import { ArrowDown, ArrowUp } from "lucide-react";
 
 import {
   Select,
+  SelectContent,
   SelectItem,
+  SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import type { RoleAccess } from "@/lib/supabase/models";
 import { formatUserName } from "@/lib/user-name";
 import type { MembershipTypeOption, SortDirection, SortOption, UserRecord } from "../types";
-import { AdminDirectoryButton, AdminDirectorySelectTrigger, AdminDirectorySelectContent } from "./AdminDirectoryControls";
+import { AdminDirectoryButton } from "./AdminDirectoryControls";
 import { AdminDirectoryFilters } from "./AdminDirectoryFilters";
 import { AdminDirectoryTable, type AdminDirectoryColumn } from "./AdminDirectoryTable";
 import { AdminDirectoryToolbar } from "./AdminDirectoryToolbar";
@@ -68,13 +70,13 @@ export function UserDirectoryPanel({
         searchLabel="Search users by name or email"
       >
         <Select value={sortOption} onValueChange={(value) => onSortOptionChange(value as SortOption)}>
-          <AdminDirectorySelectTrigger aria-label="Sort by" className="sm:w-52">
+          <SelectTrigger aria-label="Sort by" className="sm:w-52">
             <span className="flex gap-1">Sort by <SelectValue /></span>
-          </AdminDirectorySelectTrigger>
-          <AdminDirectorySelectContent>
+          </SelectTrigger>
+          <SelectContent>
             <SelectItem value="name">Name</SelectItem>
             <SelectItem value="created_at">Date created</SelectItem>
-          </AdminDirectorySelectContent>
+          </SelectContent>
         </Select>
         <AdminDirectoryButton
           type="button"

@@ -1,13 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { DatePickerButton } from "../DatePickerButton";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
 
 interface PublicationPickerProps {
   value: string;
@@ -28,17 +27,12 @@ export function PublicationPicker({ value, disabled, onChange }: PublicationPick
       <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
         <Popover open={open && !disabled} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
-            <Button
+            <DatePickerButton
               id="publish_date"
-              type="button"
-              variant="outline"
               disabled={disabled}
               aria-describedby="publish_at_description"
-              className={cn("justify-start font-normal", !date && "text-muted-foreground")}
-            >
-              <CalendarIcon data-icon="inline-start" />
-              {selected ? selected.toLocaleDateString("en-CA", { dateStyle: "medium" }) : "Pick a date"}
-            </Button>
+              label={selected ? selected.toLocaleDateString("en-CA", { dateStyle: "medium" }) : undefined}
+            />
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
             <Calendar

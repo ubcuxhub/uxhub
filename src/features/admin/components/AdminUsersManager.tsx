@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Check, Pencil, X } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import {
@@ -306,20 +306,19 @@ export function AdminUsersManager({
                 editMode={editMode}
                 headerAction={canManageUsers ? (
                   <div className="flex gap-2">
-                    {editMode && <Button type="button" variant="outline" size="icon" className="rounded-full"
-                      aria-label="Discard changes" title="Discard changes" disabled={isSaving || pendingRole !== null || discardTarget !== null}
+                    {editMode && <IconButton label="Discard changes"
+                      disabled={isSaving || pendingRole !== null || discardTarget !== null}
                       onClick={() => setDiscardTarget("edit")}>
                       <X aria-hidden="true" />
-                    </Button>}
-                    <Button type="button" variant={editMode ? "secondary" : "outline"} size="icon" className="rounded-full"
-                      aria-label={editMode ? "Save changes" : "Edit User"} title={editMode ? "Save changes" : "Edit User"}
-                      aria-pressed={editMode} disabled={isSaving || pendingRole !== null || discardTarget !== null}
+                    </IconButton>}
+                    <IconButton label={editMode ? "Save changes" : "Edit User"}
+                      disabled={isSaving || pendingRole !== null || discardTarget !== null}
                       onClick={() => {
                         if (editMode) requestSave();
                         else { setSaveError(null); setDraft(createUserEditDraft(selectedUser)); }
                       }}>
                       {editMode ? <Check className="text-success" aria-hidden="true" /> : <Pencil aria-hidden="true" />}
-                    </Button>
+                    </IconButton>
                   </div>
                 ) : undefined}
               />
