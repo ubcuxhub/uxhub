@@ -1,48 +1,64 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "../styles/tokens/primitives.css";
+@import "../styles/tokens/semantic.css";
+@import "../styles/marketing.css";
 
-/* Dark mode via `.dark` class on an ancestor (typically <html>) */
-@custom-variant dark (&:is(.dark *));
+/* Dark mode via `data-theme="dark"` on <html> (see src/lib/theme.ts) */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* Token layers: primitives.css -> semantic.css (Light/Dark) -> this file.
+   This file only maps tokens to Tailwind utilities and the shadcn bridge.
+   Never put a semantic `--text-*` colour in `@theme`: Tailwind reads
+   `--text-*` there as a font size. */
 
 @theme inline {
-  --font-sans: var(--font-inter);
+  --font-sans: var(--font-dm-sans);
 
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-
-  /* ── Typography (Figma type scale) ──────────────────────────────── */
-  --text-h1: clamp(1.75rem, 1.606rem + 0.616vw, 2rem);
-  --text-h1--line-height: 1.2;
-  --text-h1--font-weight: 700;
-  --text-h2: clamp(1.375rem, 1.303rem + 0.308vw, 1.5rem);
-  --text-h2--line-height: 1.2;
+  /* ── Typography (size / line height / weight, 4px grid) ─────────── */
+  --text-h1: 2rem;
+  --text-h1--line-height: 2.5rem;
+  --text-h1--font-weight: 600;
+  --text-h2: 1.5rem;
+  --text-h2--line-height: 2rem;
   --text-h2--font-weight: 600;
-  --text-h3: clamp(1.1875rem, 1.151rem + 0.154vw, 1.25rem);
-  --text-h3--line-height: 1.2;
+  --text-h3: 1.25rem;
+  --text-h3--line-height: 1.75rem;
   --text-h3--font-weight: 600;
-  --text-subheading: clamp(1.0625rem, 1.026rem + 0.154vw, 1.125rem);
-  --text-subheading--line-height: 1.3;
+  --text-subheading: 1.125rem;
+  --text-subheading--line-height: 1.625rem;
   --text-subheading--font-weight: 500;
   --text-body: 1rem;
-  --text-body--line-height: 1.5;
+  --text-body--line-height: 1.5rem;
   --text-body--font-weight: 400;
+  --text-body-medium: 1rem;
+  --text-body-medium--line-height: 1.5rem;
+  --text-body-medium--font-weight: 500;
   --text-small: 0.875rem;
-  --text-small--line-height: 1.45;
+  --text-small--line-height: 1.25rem;
   --text-small--font-weight: 400;
   --text-label: 0.8125rem;
-  --text-label--line-height: 1.3;
-  --text-label--font-weight: 400;
+  --text-label--line-height: 1.125rem;
+  --text-label--font-weight: 500;
   --text-table: 0.875rem;
-  --text-table--line-height: 1.4;
-  --text-table--font-weight: 500;
+  --text-table--line-height: 1.25rem;
+  --text-table--font-weight: 400;
+  --text-table-heading: 1rem;
+  --text-table-heading--line-height: 1.5rem;
+  --text-table-heading--font-weight: 500;
   --text-button: 1rem;
-  --text-button--line-height: 1.25;
+  --text-button--line-height: 1.5rem;
   --text-button--font-weight: 500;
+  --text-button-small: 0.875rem;
+  --text-button-small--line-height: 1.25rem;
+  --text-button-small--font-weight: 500;
   --text-badge: 0.75rem;
-  --text-badge--line-height: 1;
-  --text-badge--font-weight: 600;
+  --text-badge--line-height: 1rem;
+  --text-badge--font-weight: 500;
+
+  /* ── Elevation ──────────────────────────────────────────────────── */
+  --shadow-overlay:
+    0 1px 2px rgb(17 17 17 / 0.04), 0 4px 16px rgb(17 17 17 / 0.06);
 
   --background-image-ux-hub: var(--gradient-ux-hub);
 
@@ -80,27 +96,27 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
-  /* ── Design-system tokens (Figma) ───────────────────────────────── */
+  /* ── Design-system utilities ────────────────────────────────────── */
   /* Brand — bg-brand-blue-500, text-brand-purple-700, etc. */
-  --color-brand-blue-200: var(--brand-blue-200);
-  --color-brand-blue-300: var(--brand-blue-300);
-  --color-brand-blue-500: var(--brand-blue-500);
-  --color-brand-blue-600: var(--brand-blue-600);
-  --color-brand-blue-700: var(--brand-blue-700);
-  --color-brand-purple-200: var(--brand-purple-200);
-  --color-brand-purple-300: var(--brand-purple-300);
-  --color-brand-purple-500: var(--brand-purple-500);
-  --color-brand-purple-600: var(--brand-purple-600);
-  --color-brand-purple-700: var(--brand-purple-700);
+  --color-brand-blue-200: var(--colour-blue-200);
+  --color-brand-blue-300: var(--colour-blue-300);
+  --color-brand-blue-500: var(--colour-blue-500);
+  --color-brand-blue-600: var(--colour-blue-600);
+  --color-brand-blue-700: var(--colour-blue-700);
+  --color-brand-purple-200: var(--colour-purple-200);
+  --color-brand-purple-300: var(--colour-purple-300);
+  --color-brand-purple-500: var(--colour-purple-500);
+  --color-brand-purple-600: var(--colour-purple-600);
+  --color-brand-purple-700: var(--colour-purple-700);
 
   /* Surfaces — bg-surface-card, bg-surface-subtle, etc. */
-  --color-surface: var(--surface-default);
-  --color-surface-card: var(--surface-card);
-  --color-surface-modal: var(--surface-modal);
-  --color-surface-subtle: var(--surface-subtle);
+  --color-surface: var(--background-surface-default);
+  --color-surface-card: var(--background-surface-card);
+  --color-surface-modal: var(--background-surface-modal);
+  --color-surface-subtle: var(--background-surface-subtle);
 
   /* Text tones — text-fg-secondary, text-fg-muted, etc. (fg-prefixed to
-     avoid a text-text-* collision with the shadcn text scale) */
+     avoid a text-text-* collision with the type scale) */
   --color-fg: var(--text-primary);
   --color-fg-secondary: var(--text-secondary);
   --color-fg-muted: var(--text-muted);
@@ -114,41 +130,26 @@
   --color-action: var(--action-primary);
   --color-action-hover: var(--action-primary-hover);
   --color-action-strong: var(--action-primary-strong);
-  --color-action-disabled: var(--action-disabled-text);
-  --color-action-disabled-bg: var(--action-disabled-bg);
+  --color-action-disabled: var(--text-disabled);
+  --color-action-disabled-bg: var(--action-disabled-background);
   --color-focus: var(--action-focus);
 
   /* Status — bg-success-bg text-success, etc. */
   --color-success: var(--status-success-text);
-  --color-success-bg: var(--status-success-bg);
+  --color-success-bg: var(--status-success-background);
   --color-success-active: var(--status-success-active);
   --color-warning: var(--status-warning-text);
-  --color-warning-bg: var(--status-warning-bg);
+  --color-warning-bg: var(--status-warning-background);
   --color-error: var(--status-error-text);
-  --color-error-bg: var(--status-error-bg);
+  --color-error-bg: var(--status-error-background);
   --color-info: var(--status-info-text);
-  --color-info-bg: var(--status-info-bg);
+  --color-info-bg: var(--status-info-background);
 }
 
-/* ── Primitives (raw palette, shared across both modes) ─────────────── */
+/* ── shadcn bridge ──────────────────────────────────────────────────────
+   Resolves through the semantic tokens, so it follows Light/Dark on its own. */
 
 :root {
-  --radius: 0.625rem;
-
-  /* Brand — blue */
-  --brand-blue-200: #89a4e4;
-  --brand-blue-300: #5f81d1;
-  --brand-blue-500: #325dc4;
-  --brand-blue-600: #2a4da0;
-  --brand-blue-700: #192f63;
-
-  /* Brand — purple */
-  --brand-purple-200: #ffe4fe;
-  --brand-purple-300: #e8b1e6;
-  --brand-purple-500: #c983c7;
-  --brand-purple-600: #865a85;
-  --brand-purple-700: #5e3f5d;
-
   /* UX Hub brand gradient — Figma: #3A5FC4 → #B67FC6 at 90% opacity */
   --gradient-ux-hub: linear-gradient(
     to bottom,
@@ -156,159 +157,39 @@
     rgb(182 127 198 / 90%)
   );
 
-  /* ── Light mode semantic tokens ──────────────────────────────────── */
-
-  /* Backgrounds & surfaces */
-  --background-default: #ffffff;
-  --background-secondary: #f8f8fa;
-  --surface-subtle: #f1f2f5;
-  --surface-default: #ffffff;
-  --surface-card: #ffffff;
-  --surface-modal: #ffffff;
-
-  /* Text */
-  --text-primary: #111111;
-  --text-secondary: #5f6368;
-  --text-muted: #8b9097;
-  --text-disabled: #5c6a7c;
-  --text-inverse: #ffffff;
-
-  /* Borders */
-  --border-default: #d9dce3;
-  --border-subtle: #e8eaf0;
-
-  /* Action */
-  --action-primary: #325dc4;
-  --action-primary-hover: #2a4da0;
-  --action-primary-strong: #192f63;
-  --action-secondary: #ffffff;
-  --action-focus: #5f81d1;
-  --action-disabled-bg: #e8eaf0;
-  --action-disabled-text: #8b9097;
-  --action-disabled-border: #d9dce3;
-
-  /* Status */
-  --status-success-text: #166534;
-  --status-success-bg: #dcfce7;
-  --status-success-active: #00a33e;
-  --status-warning-text: #92400e;
-  --status-warning-bg: #fef3c7;
-  --status-error-text: #b42318;
-  --status-error-bg: #fee4e2;
-  --status-info-text: #1d4ed8;
-  --status-info-bg: #dbeafe;
-
-  /* ── shadcn compatibility layer (light) ──────────────────────────── */
   --background: var(--background-default);
   --foreground: var(--text-primary);
-  --card: var(--surface-card);
+  --card: var(--background-surface-card);
   --card-foreground: var(--text-primary);
-  --popover: var(--surface-modal);
+  --popover: var(--background-surface-modal);
   --popover-foreground: var(--text-primary);
   --primary: var(--action-primary);
   --primary-foreground: var(--text-inverse);
-  --secondary: var(--surface-subtle);
+  --secondary: var(--background-surface-subtle);
   --secondary-foreground: var(--text-primary);
-  --muted: var(--surface-subtle);
+  --muted: var(--background-surface-subtle);
   --muted-foreground: var(--text-muted);
   --accent: var(--background-secondary);
   --accent-foreground: var(--text-primary);
+  /* Error text colour, not action-destructive: `text-destructive` is used for
+     error copy and action-destructive fails contrast at small sizes. */
   --destructive: var(--status-error-text);
   --destructive-foreground: var(--text-inverse);
   --border: var(--border-default);
   --input: var(--border-default);
   --ring: var(--action-focus);
 
-  --chart-1: var(--brand-blue-500);
-  --chart-2: var(--brand-purple-500);
-  --chart-3: var(--brand-blue-300);
-  --chart-4: var(--brand-purple-300);
-  --chart-5: var(--brand-blue-700);
+  --chart-1: var(--colour-blue-500);
+  --chart-2: var(--colour-purple-500);
+  --chart-3: var(--colour-blue-300);
+  --chart-4: var(--colour-purple-300);
+  --chart-5: var(--colour-blue-700);
 
   --sidebar: var(--background-secondary);
   --sidebar-foreground: var(--text-primary);
   --sidebar-primary: var(--action-primary);
   --sidebar-primary-foreground: var(--text-inverse);
-  --sidebar-accent: var(--surface-subtle);
-  --sidebar-accent-foreground: var(--text-primary);
-  --sidebar-border: var(--border-subtle);
-  --sidebar-ring: var(--action-focus);
-}
-
-/* ── Dark mode (derived — tunable) ─────────────────────────────────── */
-
-.dark {
-  /* Backgrounds & surfaces — blue-tinted dark neutrals */
-  --background-default: #101319;
-  --background-secondary: #171b23;
-  --surface-subtle: #1c2029;
-  --surface-default: #171b23;
-  --surface-card: #171b23;
-  --surface-modal: #1c2029;
-
-  /* Text */
-  --text-primary: #f1f2f5;
-  --text-secondary: #b4bac4;
-  --text-muted: #8b9097;
-  --text-disabled: #5c6a7c;
-  --text-inverse: #111111;
-
-  /* Borders */
-  --border-default: #2a2f3a;
-  --border-subtle: #22262f;
-
-  /* Action — lightened for contrast on dark surfaces */
-  --action-primary: #325dc4;
-  --action-primary-hover: #5f81d1;
-  --action-primary-strong: #2a4da0;
-  --action-secondary: #171b23;
-  --action-focus: #89a4e4;
-  --action-disabled-bg: #22262f;
-  --action-disabled-text: #5c6a7c;
-  --action-disabled-border: #2a2f3a;
-
-  /* Status — re-tinted text/backgrounds for dark surfaces */
-  --status-success-text: #4ade80;
-  --status-success-bg: #14271b;
-  --status-warning-text: #fbbf24;
-  --status-warning-bg: #2a220f;
-  --status-error-text: #f87171;
-  --status-error-bg: #2a1616;
-  --status-info-text: #7fa8f5;
-  --status-info-bg: #14203a;
-
-  /* ── shadcn compatibility layer (dark) ───────────────────────────── */
-  --background: var(--background-default);
-  --foreground: var(--text-primary);
-  --card: var(--surface-card);
-  --card-foreground: var(--text-primary);
-  --popover: var(--surface-modal);
-  --popover-foreground: var(--text-primary);
-  --primary: var(--action-primary);
-  --primary-foreground: var(--text-inverse);
-  --secondary: var(--surface-subtle);
-  --secondary-foreground: var(--text-primary);
-  --muted: var(--surface-subtle);
-  --muted-foreground: var(--text-muted);
-  --accent: var(--background-secondary);
-  --accent-foreground: var(--text-primary);
-  --destructive: var(--status-error-text);
-  --destructive-foreground: var(--text-inverse);
-  --border: var(--border-default);
-  --input: var(--border-default);
-  --ring: var(--action-focus);
-
-  --chart-1: var(--brand-blue-300);
-  --chart-2: var(--brand-purple-300);
-  --chart-3: var(--brand-blue-500);
-  --chart-4: var(--brand-purple-500);
-  --chart-5: var(--brand-blue-200);
-
-  --sidebar: var(--background-secondary);
-  --sidebar-foreground: var(--text-primary);
-  --sidebar-primary: var(--action-primary);
-  --sidebar-primary-foreground: var(--text-inverse);
-  --sidebar-accent: var(--surface-subtle);
+  --sidebar-accent: var(--background-surface-subtle);
   --sidebar-accent-foreground: var(--text-primary);
   --sidebar-border: var(--border-subtle);
   --sidebar-ring: var(--action-focus);
@@ -360,38 +241,4 @@
     top: 100%;
     height: env(safe-area-inset-bottom, 0px);
   }
-}
-
-/* ── Marketing home scope (unchanged) ──────────────────────────────── */
-
-.marketing-home {
-  --font-sans: var(--font-dm-sans), ui-sans-serif;
-  --font-serif: var(--font-lora), ui-serif;
-  --color-black: #383838;
-  --color-white: #f0eff2;
-  --color-gray: #7a7a7a;
-
-  /* UX Hub brand gradient, marketing diagonal — same stops as --gradient-ux-hub */
-  --gradient-ux-hub-diagonal: linear-gradient(
-    156deg,
-    rgb(58 95 196 / 90%),
-    rgb(182 127 198 / 90%)
-  );
-
-  background: var(--color-white);
-  color: var(--color-black);
-  font-family: var(--font-dm-sans), ui-sans-serif;
-  font-size: 16px;
-  overflow-x: hidden;
-}
-
-.marketing-home .text-gray {
-  color: var(--color-gray);
-}
-
-.marketing-home #home,
-.marketing-home #about-us,
-.marketing-home #events,
-.marketing-home #team {
-  scroll-margin-top: 100px;
 }

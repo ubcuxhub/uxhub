@@ -1,0 +1,67 @@
+/* Colour Primitives — raw palette from the 1.0 Portal Design System.
+   Names follow docs/design-system.md 2.11: `--colour-<hue>-<step>`.
+   Screens use the semantic tokens in semantic.css, not these. */
+
+:root {
+  /* Neutral */
+  --colour-neutral-0: #ffffff;
+  --colour-neutral-50: #fcfcfc;
+  --colour-neutral-100: #f8f8fa;
+  --colour-neutral-200: #f1f2f5;
+  --colour-neutral-300: #e8eaf0;
+  --colour-neutral-400: #d9dce3;
+  --colour-neutral-600: #5f6368;
+  --colour-neutral-700: #5c6a7c;
+  --colour-neutral-900: #111111;
+
+  /* Blue (brand) */
+  --colour-blue-100: #dbeafe;
+  --colour-blue-200: #89a4e4;
+  --colour-blue-250: #93b4f5;
+  --colour-blue-300: #5f81d1;
+  --colour-blue-400: #1d4ed8;
+  --colour-blue-450: #3f68d0;
+  --colour-blue-500: #325dc4;
+  --colour-blue-600: #2a4da0;
+  --colour-blue-700: #192f63;
+  --colour-blue-900: #172554;
+
+  /* Purple (brand) */
+  --colour-purple-200: #ffe4fe;
+  --colour-purple-300: #e8b1e6;
+  --colour-purple-500: #c983c7;
+  --colour-purple-600: #865a85;
+  --colour-purple-700: #5e3f5d;
+
+  /* Green */
+  --colour-green-0: #dffce9;
+  --colour-green-200: #6ee7a0;
+  --colour-green-400: #00a33e;
+  --colour-green-600: #166534;
+  --colour-green-900: #0f2e1c;
+
+  /* Yellow */
+  --colour-yellow-0: #fef3c7;
+  --colour-yellow-300: #fcd34d;
+  --colour-yellow-900: #92400e;
+  --colour-yellow-950: #2e2410;
+
+  /* Red */
+  --colour-red-0: #fee4e2;
+  --colour-red-300: #fca5a5;
+  --colour-red-500: #f62d2d;
+  --colour-red-600: #d11d1d;
+  --colour-red-650: #b42318;
+  --colour-red-700: #ac0000;
+  --colour-red-950: #3a1414;
+
+  /* Dark (surfaces and text for dark mode) */
+  --colour-dark-50: #17181b;
+  --colour-dark-100: #1b1c20;
+  --colour-dark-200: #25272c;
+  --colour-dark-300: #30333a;
+  --colour-dark-400: #666c78;
+  --colour-dark-600: #a8aeb8;
+  --colour-dark-700: #9aa1ac;
+  --colour-dark-900: #f4f5f7;
+}

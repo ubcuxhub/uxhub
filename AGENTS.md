@@ -139,7 +139,7 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
   into `supabase/templates/*.html` by `pnpm email:templates` — edit the module,
   not the generated HTML. `pnpm test` fails when the two fall out of sync.
 - Marketing typography and colors are scoped by `.marketing-home` in
-  `src/app/globals.css`; keep marketing-only styles inside that boundary.
+  `src/styles/marketing.css`; keep marketing-only styles inside that boundary.
 - Use the `@/*` alias for imports from `src/*`.
 - Server code logs through `log` from `@/lib/log`, which emits one structured
   JSON line per event. Name events as stable dot-paths (`payment.ticket_charge_failed`),
@@ -239,7 +239,15 @@ token secret to client components.
 
 Reuse `src/components/ui` primitives and `src/components/shared` composites
 before adding new primitives. Follow the existing shadcn conventions and use
-design tokens from `src/app/globals.css` instead of duplicating one-off styles.
+design tokens instead of duplicating one-off styles.
+
+Design tokens live in three layers: `src/styles/tokens/primitives.css` (raw
+colours), `src/styles/tokens/semantic.css` (Light and Dark aliases, plus
+density), and `src/app/globals.css` (maps them to Tailwind utilities and the
+shadcn bridge). CSS variable names follow `docs/design-system.md` (the Figma
+variable name with the slash turned into a hyphen). Dark mode is
+`data-theme="dark"` on `<html>` (`src/lib/theme.ts`), and density is
+`data-density="compact"`.
 
 ## Epics, responsiblity, and timeline
 

@@ -7,8 +7,8 @@ const authLightModeScript = `
 (function(){
   try {
     var root = document.documentElement;
-    root.dataset.authPreviousTheme = root.classList.contains("dark") ? "dark" : "light";
-    root.classList.remove("dark");
+    root.dataset.authPreviousTheme = root.getAttribute("data-theme") === "dark" ? "dark" : "light";
+    root.removeAttribute("data-theme");
   } catch (e) {}
 })();
 `;

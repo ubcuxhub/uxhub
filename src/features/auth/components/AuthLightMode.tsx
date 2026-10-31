@@ -2,13 +2,13 @@
 
 import { useEffect } from "react";
 
-import { applyTheme, type Theme } from "@/lib/theme";
+import { applyTheme, getThemeSnapshot, type Theme } from "@/lib/theme";
 
 export function AuthLightMode() {
   useEffect(() => {
     const root = document.documentElement;
     const previousTheme = (root.dataset.authPreviousTheme ||
-      (root.classList.contains("dark") ? "dark" : "light")) as Theme;
+      getThemeSnapshot()) as Theme;
 
     applyTheme("light");
 
