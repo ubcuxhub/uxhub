@@ -8,7 +8,7 @@ function Skeleton({
     <div
       aria-hidden
       data-slot="skeleton"
-      className={cn("animate-pulse rounded-md bg-surface-subtle", className)}
+      className={cn("animate-pulse rounded-md bg-muted", className)}
       {...props}
     />
   );

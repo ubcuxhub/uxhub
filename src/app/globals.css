@@ -9,8 +9,9 @@
 
 /* Token layers: primitives.css -> semantic.css (Light/Dark) -> this file.
    This file only maps tokens to Tailwind utilities and the shadcn bridge.
-   Never put a semantic `--text-*` colour in `@theme`: Tailwind reads
-   `--text-*` there as a font size. */
+   Colours are `--color-*`, except for the sanctioned per-property
+   `--text-color-*` and `--border-color-*` namespaces. Any other `--text-*`
+   key in `@theme` is a font size. */
 
 @theme inline {
   --font-sans: var(--font-dm-sans);
@@ -71,17 +72,42 @@
   --color-popover-foreground: var(--popover-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
+  --color-primary-hover: var(--action-primary-hover);
+  --color-primary-active: var(--action-primary-strong);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
+  --color-section: var(--background-secondary);
+  --color-section-foreground: var(--text-primary);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
+  /* `text-destructive` is error copy and `border-destructive` an invalid
+     edge: red-500 is 3.9:1 on white, too faint for small text. */
+  --text-color-destructive: var(--status-error-text);
+  --border-color-destructive: var(--status-error-text);
+  --color-destructive-hover: var(--action-destructive-hover);
+  --color-destructive-active: var(--action-destructive-strong);
+  --color-disabled: var(--action-disabled-background);
+  --color-disabled-foreground: var(--text-disabled);
+  --color-disabled-border: var(--action-disabled-border);
   --color-border: var(--border);
+  --color-border-subtle: var(--border-subtle);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-scrim: var(--overlay-scrim);
+  --color-success: var(--status-success-background);
+  --color-success-foreground: var(--status-success-text);
+  --color-success-solid: var(--status-success-active);
+  --color-warning: var(--status-warning-background);
+  --color-warning-foreground: var(--status-warning-text);
+  --color-error: var(--status-error-background);
+  --color-info: var(--status-info-background);
+  --color-info-foreground: var(--status-info-text);
+  --color-transaction-positive: var(--transaction-positive);
+  --color-transaction-negative: var(--transaction-negative);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -109,6 +135,10 @@
   --color-brand-purple-600: var(--colour-purple-600);
   --color-brand-purple-700: var(--colour-purple-700);
 
+  /* DEPRECATED aliases: remove the week of November 16. Old names stay so
+     epic branches cut before the rename still render the same. Do not use
+     them in new code; docs/design-system.md 2.11 maps their replacements.
+     Keys whose meaning changed cannot be aliased safely. */
   /* Surfaces — bg-surface-card, bg-surface-subtle, etc. */
   --color-surface: var(--background-surface-default);
   --color-surface-card: var(--background-surface-card);
@@ -125,14 +155,10 @@
   --color-fg-disabled: var(--text-disabled);
   --color-fg-inverse: var(--text-inverse);
 
-  /* Borders — border-border-subtle */
-  --color-border-subtle: var(--border-subtle);
-
   /* Action — bg-action, bg-action-hover, ring-focus, text-action-disabled, etc. */
   --color-action: var(--action-primary);
   --color-action-hover: var(--action-primary-hover);
   --color-action-strong: var(--action-primary-strong);
-  --color-action-disabled: var(--text-disabled);
   --color-action-disabled-bg: var(--action-disabled-background);
   --color-action-disabled-border: var(--action-disabled-border);
   --color-action-destructive: var(--action-destructive);
@@ -140,24 +166,14 @@
   --color-action-destructive-strong: var(--action-destructive-strong);
   --color-focus: var(--action-focus);
 
-  /* Overlay scrim — bg-scrim */
-  --color-scrim: var(--overlay-scrim);
-
-  /* Status — bg-success-bg text-success, etc. */
-  --color-success: var(--status-success-text);
+  /* Legacy status aliases. */
   --color-success-bg: var(--status-success-background);
   --color-success-active: var(--status-success-active);
-  --color-warning: var(--status-warning-text);
   --color-warning-bg: var(--status-warning-background);
-  --color-error: var(--status-error-text);
   --color-error-bg: var(--status-error-background);
-  --color-info: var(--status-info-text);
   --color-info-bg: var(--status-info-background);
 
-  /* Design-system names for tokens shadcn has no slot for; the class equals
-     the Figma variable name (bg-status-success-background, text-text-disabled).
-     Use these in new code instead of the fg-/action/surface-/-bg utilities
-     above, which are legacy. */
+  /* Legacy Figma-name aliases from the first rollout. */
   --color-background-secondary: var(--background-secondary);
   --color-background-surface-hover: var(--background-surface-hover);
   --color-text-disabled: var(--text-disabled);
@@ -174,8 +190,6 @@
   --color-status-error-background: var(--status-error-background);
   --color-status-info-background: var(--status-info-background);
   --color-status-success-active: var(--status-success-active);
-  --color-transaction-positive: var(--transaction-positive);
-  --color-transaction-negative: var(--transaction-negative);
   --color-overlay-scrim: var(--overlay-scrim);
 }
 
@@ -213,11 +227,11 @@
   --secondary-foreground: var(--text-primary);
   --muted: var(--background-surface-subtle);
   --muted-foreground: var(--text-muted);
-  --accent: var(--background-secondary);
+  --accent: var(--background-surface-hover);
   --accent-foreground: var(--text-primary);
-  /* Error text colour, not action-destructive: `text-destructive` is used for
-     error copy and action-destructive fails contrast at small sizes. */
-  --destructive: var(--status-error-text);
+  /* Fill utilities use action red; per-property theme keys above keep error
+     copy and invalid edges on the readable error red. */
+  --destructive: var(--action-destructive);
   --destructive-foreground: var(--text-inverse);
   --border: var(--border-default);
   --input: var(--border-default);
@@ -243,7 +257,7 @@
 
 @layer base {
   * {
-    @apply border-border outline-focus;
+    @apply border-border outline-ring;
   }
 
   html {

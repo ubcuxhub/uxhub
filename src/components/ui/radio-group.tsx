@@ -42,14 +42,14 @@ function RadioGroupItem({
       className={cn(
         "relative flex size-5 shrink-0 cursor-pointer items-center justify-center rounded-full border-[1.5px] border-muted-foreground bg-background transition-colors duration-150 focus-visible:focus-ring pointer-coarse:after:absolute pointer-coarse:after:-inset-3",
         "data-[state=checked]:border-primary aria-invalid:border-destructive",
-        "disabled:cursor-not-allowed disabled:border-border disabled:bg-action-disabled-background",
+        "disabled:cursor-not-allowed disabled:border-border disabled:bg-disabled",
         className,
       )}
       {...props}
     >
       <RadioGroupPrimitive.Indicator
         data-slot="radio-group-indicator"
-        className="size-2.5 rounded-full bg-primary data-[disabled]:bg-text-disabled"
+        className="size-2.5 rounded-full bg-primary data-[disabled]:bg-disabled-foreground"
       />
     </RadioGroupPrimitive.Item>
   );

@@ -31,11 +31,11 @@ export function SpecimenGroup({
         <h3 className="flex items-baseline gap-2 text-subheading">
           {title}
           {spec ? (
-            <span className="text-label text-fg-secondary">{spec}</span>
+            <span className="text-label text-muted-foreground">{spec}</span>
           ) : null}
         </h3>
         {description ? (
-          <p className="max-w-prose text-small text-fg-secondary">
+          <p className="max-w-prose text-small text-muted-foreground">
             {description}
           </p>
         ) : null}
@@ -79,13 +79,13 @@ export function Specimen({
         className={cn(
           "flex min-h-16 flex-wrap items-center gap-3",
           !bare &&
-            "rounded-xl border border-border-subtle bg-surface-card p-4",
+            "rounded-xl border border-border-subtle bg-card p-4",
           className,
         )}
       >
         {children}
       </div>
-      <figcaption className="px-1 text-label text-fg-secondary">
+      <figcaption className="px-1 text-label text-muted-foreground">
         {label}
       </figcaption>
     </figure>
@@ -112,11 +112,11 @@ export function Composition({
     >
       <div className="flex flex-col gap-0.5">
         <h3 className="text-subheading">
-          <span className="text-fg-secondary">Composition · </span>
+          <span className="text-muted-foreground">Composition · </span>
           {title}
         </h3>
         {description ? (
-          <p className="max-w-prose text-small text-fg-secondary">
+          <p className="max-w-prose text-small text-muted-foreground">
             {description}
           </p>
         ) : null}
@@ -129,7 +129,7 @@ export function Composition({
 /** Note shown where a section can't show something yet. */
 export function Placeholder({ children }: { children: ReactNode }) {
   return (
-    <p className="rounded-xl border border-dashed border-border bg-surface-subtle p-4 text-small text-fg-secondary">
+    <p className="rounded-xl border border-dashed border-border bg-muted p-4 text-small text-muted-foreground">
       {children}
     </p>
   );

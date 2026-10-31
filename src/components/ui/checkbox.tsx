@@ -24,12 +24,12 @@ const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
       <input
         type="checkbox"
         className={cn(
-          "relative size-5 shrink-0 cursor-pointer appearance-none rounded-sm border-[1.5px] border-fg-secondary bg-background transition-colors duration-150",
-          "before:absolute before:inset-0 before:bg-fg-inverse before:opacity-0 before:transition-opacity before:duration-150 before:content-[''] before:[mask:var(--checkbox-check)_center/0.875rem_no-repeat]",
-          "checked:border-action checked:bg-action checked:before:opacity-100",
-          "indeterminate:border-action indeterminate:bg-action indeterminate:before:opacity-100 indeterminate:before:[mask:var(--checkbox-dash)_center/0.875rem_no-repeat]",
-          "focus-visible:focus-ring aria-invalid:border-error",
-          "disabled:cursor-not-allowed disabled:border-action-disabled-border disabled:bg-action-disabled-bg disabled:before:bg-fg-disabled",
+          "relative size-5 shrink-0 cursor-pointer appearance-none rounded-sm border-[1.5px] border-muted-foreground bg-background transition-colors duration-150",
+          "before:absolute before:inset-0 before:bg-primary-foreground before:opacity-0 before:transition-opacity before:duration-150 before:content-[''] before:[mask:var(--checkbox-check)_center/0.875rem_no-repeat]",
+          "checked:border-primary checked:bg-primary checked:before:opacity-100",
+          "indeterminate:border-primary indeterminate:bg-primary indeterminate:before:opacity-100 indeterminate:before:[mask:var(--checkbox-dash)_center/0.875rem_no-repeat]",
+          "focus-visible:focus-ring aria-invalid:border-destructive",
+          "disabled:cursor-not-allowed disabled:border-disabled-border disabled:bg-disabled disabled:before:bg-disabled-foreground",
           className,
         )}
         style={{ ...glyphVars, ...style }}

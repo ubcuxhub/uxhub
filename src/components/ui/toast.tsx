@@ -32,8 +32,8 @@ export interface ToastOptions {
 }
 
 const MARK: Record<Exclude<ToastTone, "neutral">, string> = {
-  success: "bg-status-success-background text-status-success-text",
-  error: "bg-status-error-background text-status-error-text",
+  success: "bg-success text-success-foreground",
+  error: "bg-error text-destructive",
 };
 
 interface ToastViewProps extends ToastOptions {
@@ -96,7 +96,7 @@ function ToastView({
             action.onClick();
             onDismiss();
           }}
-          className="shrink-0 cursor-pointer rounded-sm px-1 py-0.5 text-label font-semibold text-primary underline underline-offset-2 hover:text-action-primary-hover focus-visible:focus-ring"
+          className="shrink-0 cursor-pointer rounded-sm px-1 py-0.5 text-label font-semibold text-primary underline underline-offset-2 hover:text-primary-hover focus-visible:focus-ring"
         >
           {action.label}
         </button>

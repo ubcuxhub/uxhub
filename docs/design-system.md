@@ -41,8 +41,9 @@ in Claude Design", is left out.
   - Green frames are Do, red frames are Don't.
   - `[BRACKETED TEXT]` is content still to come. Never ship it.
   - Sample names, numbers and dates are made up.
-  - `lowercase-hyphenated` names are tokens (Figma and CSS share them).
-    `CapitalizedNames` are components (same in Figma and React).
+  - `lowercase-hyphenated` names are tokens (Figma and CSS variables share
+    them; Tailwind classes differ, see §2.11). `CapitalizedNames` are
+    components (same in Figma and React).
   - 3.10–3.16 are drawings of components not yet in the library.
 - House rules: Canadian English; Title Case for navigation and page titles,
   sentence case everywhere else; white pages; content starts 40px from the
@@ -284,12 +285,13 @@ works at 200% zoom and phone width.
 
 ### 2.11 Figma variables
 
-Figma name = code name with the first hyphen as a slash
-(`action/primary` ↔ `--action-primary`).
+Figma names map directly to CSS variable names: replace the slash with a
+hyphen and add `--` (`action/primary` ↔ `--action-primary`). Tailwind
+classes use one shadcn-style vocabulary and follow the table below.
 
 | Collection | Modes | Contents |
 | --- | --- | --- |
-| Colour Primitives | Value | 49 raw colours (`--colour-<hue>-<step>`): neutral, blue, purple, green, yellow, red, dark. Hide from publishing |
+| Colour Primitives | Value | 49 raw colours in Figma (`--colour-<hue>-<step>`): neutral, blue, purple, green, yellow, red, dark. Hide from publishing |
 | Colour Tokens | Light, Dark | 36 semantic tokens, each aliasing a primitive; `overlay/scrim` is raw |
 | Radius Tokens | Value | `radius/none` … `radius/full` |
 | Stroke Tokens | Value | `thickness/thin`, `medium`, `thick` (`--stroke-thickness-*`) |
@@ -303,6 +305,63 @@ Text styles map to classes (`Headers/Header 1` → `.header-1`, …,
 
 Rules: bind every fill, stroke, radius, gap and padding to a variable (a raw
 hex or typed number is a bug); screens use Colour Tokens only.
+
+#### Colour code syntax
+
+Use a shadcn slot with its conventional meaning wherever one exists. For the
+remaining tokens, `X` is a fill, `X-foreground` is text on that fill,
+`X-hover` / `X-active` are its states, and `X-border` is its edge. Set each
+Figma colour variable's **Code syntax → Web** to the value in the last
+column.
+
+`destructive` intentionally uses Tailwind's per-property namespaces:
+`bg-destructive` is the action red, while `text-destructive` and
+`border-destructive` use the readable error red. Error feedback therefore uses
+`bg-error text-destructive`; there is no `error-foreground` class.
+
+| Figma variable | CSS variable | Class(es) | Code syntax (Web) |
+| --- | --- | --- | --- |
+| `background/default` | `--background-default` | `bg-background` | `bg-background` |
+| `background/secondary` | `--background-secondary` | `bg-section` (sidebar: `bg-sidebar`) | `bg-section` |
+| `background/surface-subtle` | `--background-surface-subtle` | `bg-muted`; `bg-secondary` for shadcn secondary buttons and badges | `bg-muted` |
+| `background/surface-default` | `--background-surface-default` | `bg-background` | `bg-background` |
+| `background/surface-card` | `--background-surface-card` | `bg-card` | `bg-card` |
+| `background/surface-modal` | `--background-surface-modal` | `bg-popover` | `bg-popover` |
+| `background/surface-hover` | `--background-surface-hover` | `bg-accent` | `bg-accent` |
+| `text/primary` | `--text-primary` | `text-foreground` (and the surface `*-foreground` classes) | `text-foreground` |
+| `text/secondary` | `--text-secondary` | `text-muted-foreground` | `text-muted-foreground` |
+| `text/muted` | `--text-muted` | `text-muted-foreground` | `text-muted-foreground` |
+| `text/disabled` | `--text-disabled` | `text-disabled-foreground` | `text-disabled-foreground` |
+| `text/inverse` | `--text-inverse` | `text-primary-foreground`, `text-destructive-foreground` | `text-primary-foreground` |
+| `border/default` | `--border-default` | `border-border`, `border-input` | `border-border` |
+| `border/subtle` | `--border-subtle` | `border-border-subtle`, `divide-border-subtle` | `border-border-subtle` |
+| `action/primary` | `--action-primary` | `bg-primary`, `text-primary`, `border-primary`, `ring-primary` | `bg-primary` |
+| `action/primary-hover` | `--action-primary-hover` | `hover:bg-primary-hover` | `bg-primary-hover` |
+| `action/primary-strong` | `--action-primary-strong` | `active:bg-primary-active` | `bg-primary-active` |
+| `action/secondary` | `--action-secondary` | `bg-background` with `border-border` | `bg-background` |
+| `action/focus` | `--action-focus` | `ring-ring`, `outline-ring`, `focus-ring` | `outline-ring` |
+| `action/disabled-border` | `--action-disabled-border` | `border-disabled-border` | `border-disabled-border` |
+| `action/disabled-background` | `--action-disabled-background` | `bg-disabled` | `bg-disabled` |
+| `action/destructive` | `--action-destructive` | `bg-destructive`, `ring-destructive` | `bg-destructive` |
+| `action/destructive-hover` | `--action-destructive-hover` | `hover:bg-destructive-hover` | `bg-destructive-hover` |
+| `action/destructive-strong` | `--action-destructive-strong` | `active:bg-destructive-active` | `bg-destructive-active` |
+| `status/success-text` | `--status-success-text` | `text-success-foreground` | `text-success-foreground` |
+| `status/success-background` | `--status-success-background` | `bg-success` | `bg-success` |
+| `status/success-active` | `--status-success-active` | `bg-success-solid` | `bg-success-solid` |
+| `status/warning-text` | `--status-warning-text` | `text-warning-foreground` | `text-warning-foreground` |
+| `status/warning-background` | `--status-warning-background` | `bg-warning` | `bg-warning` |
+| `status/error-text` | `--status-error-text` | `text-destructive`, `border-destructive` | `text-destructive` |
+| `status/error-background` | `--status-error-background` | `bg-error` | `bg-error` |
+| `status/info-text` | `--status-info-text` | `text-info-foreground` | `text-info-foreground` |
+| `status/info-background` | `--status-info-background` | `bg-info` | `bg-info` |
+| `transaction/positive` | `--transaction-positive` | `text-transaction-positive` | `text-transaction-positive` |
+| `transaction/negative` | `--transaction-negative` | `text-transaction-negative` | `text-transaction-negative` |
+| `overlay/scrim` | `--overlay-scrim` | `bg-scrim` | `bg-scrim` |
+
+The shadcn `chart-*` and `sidebar-*` slots and the code-only `brand-*`
+utilities remain namespaced as written. Deprecated pre-migration utilities
+remain as compatibility aliases in `globals.css` until the week of November
+16, after the final epic branch lands; do not use them in new code.
 
 ### 2.12 Dark mode
 
@@ -748,6 +807,10 @@ Organization lead), and Patterns parts (`Ticket`, `Hubbo/Placeholder`,
   matching 2.12.
 - 2.1 lists `text-muted` as 5.4:1 "on subtle" with the same hex as
   `text-secondary`.
+- `text/secondary` and `text/muted` are duplicate aliases in both modes, as
+  are `background/default` and `background/surface-default`.
+- The Figma page says there are 49 colour primitives; the committed primitive
+  token sheet contains 48.
 - 1.1 says 3.10–3.16 are drawings not yet in the library, but the Library page
   already has components for all of them.
 - Open placeholders: missed-confirmation outcome (4.3), email templates (4.3),
