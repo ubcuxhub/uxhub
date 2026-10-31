@@ -3,8 +3,10 @@
 // Usage: node scripts/codemods/colour-classes.mjs [--dry-run|--check]
 //   [--include-moved] [files...]
 // With no files, migrates tracked source files. The default safe subset is
-// idempotent; --include-moved is only for a branch that has never run the
-// colour rename because those keys now have different meanings.
+// idempotent. Never use --include-moved on files that already contain the new
+// vocabulary, including mixed-content branches after merging main: those keys
+// now have different meanings and would be converted a second time. Convert
+// the remaining moved forms selectively on those branches instead.
 
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
