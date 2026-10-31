@@ -14,6 +14,7 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
 import {
   Card,
   CardAction,
@@ -86,7 +87,7 @@ function TableInCard({ density }: { density?: "compact" }) {
           <CardTitle>Attendees</CardTitle>
           <CardDescription>UXathon 2026</CardDescription>
           <CardAction>
-            <Button variant="outline" className="h-8 px-3 text-button-small">
+            <Button variant="secondary" size="sm">
               Export
             </Button>
           </CardAction>
@@ -136,8 +137,8 @@ function TableInCard({ density }: { density?: "compact" }) {
                   </td>
                   <td className="pl-3 pr-6 text-right">
                     <Button
-                      variant="outline"
-                      className="h-8 px-3 text-button-small"
+                      variant="secondary"
+                      size="sm"
                       aria-label={`Edit ${row.name}`}
                     >
                       Edit
@@ -151,10 +152,10 @@ function TableInCard({ density }: { density?: "compact" }) {
         <CardFooter className="flex-wrap justify-between gap-x-4 gap-y-2 border-t py-3 text-small text-fg-secondary [.border-t]:pt-3">
           <span className="whitespace-nowrap">Showing 1–4 of 48 · Page 1 of 12</span>
           <span className="flex gap-2">
-            <Button variant="outline" className="h-8 px-3 text-button-small" disabled>
+            <Button variant="secondary" size="sm" disabled>
               Previous
             </Button>
-            <Button variant="outline" className="h-8 px-3 text-button-small">
+            <Button variant="secondary" size="sm">
               Next
             </Button>
           </span>
@@ -263,9 +264,9 @@ function Surfaces() {
               <CardTitle>UXathon 2026</CardTitle>
               <CardDescription>Nov 14 · Henry Angus 098</CardDescription>
               <CardAction>
-                <Button variant="outline" size="icon" aria-label="Edit">
+                <IconButton label="Edit">
                   <Pencil />
-                </Button>
+                </IconButton>
               </CardAction>
             </CardHeader>
             <CardContent>

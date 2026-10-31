@@ -7,7 +7,7 @@ import { Slot } from "radix-ui";
 
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -253,21 +253,23 @@ function Sidebar({
   );
 }
 
+/** The sidebar toggle as an `IconButton`: `aria-label` names it and its tooltip. */
 function SidebarTrigger({
   className,
   onClick,
-  "aria-label": ariaLabel = "Toggle sidebar",
+  "aria-label": label = "Toggle sidebar",
   ...props
-}: React.ComponentProps<typeof Button>) {
+}: Omit<React.ComponentProps<typeof IconButton>, "label" | "variant" | "size"> & {
+  "aria-label"?: string;
+}) {
   const { toggleSidebar } = useSidebar();
 
   return (
-    <Button
+    <IconButton
       data-sidebar="trigger"
       data-slot="sidebar-trigger"
       variant="ghost"
-      size="icon"
-      aria-label={ariaLabel}
+      label={label}
       className={className}
       onClick={(event) => {
         onClick?.(event);
@@ -276,7 +278,7 @@ function SidebarTrigger({
       {...props}
     >
       <PanelLeftIcon />
-    </Button>
+    </IconButton>
   );
 }
 

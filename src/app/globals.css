@@ -226,6 +226,18 @@
     scroll-behavior: smooth;
   }
 
+  /* Native scrollbars, date pickers and file-input chrome follow the theme.
+     On any `data-theme` element, so a nested dark column gets them too. */
+  :root {
+    color-scheme: light;
+  }
+  [data-theme="dark"] {
+    color-scheme: dark;
+  }
+  [data-theme="light"] {
+    color-scheme: light;
+  }
+
   body {
     @apply bg-background font-sans text-foreground;
     overflow-x: hidden;

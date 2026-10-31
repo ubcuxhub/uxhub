@@ -15,7 +15,7 @@ import {
 import { cn } from "@/lib/utils"
 
 const navButton =
-  "inline-flex size-(--cell-size) cursor-pointer items-center justify-center rounded-full p-0 text-fg-secondary select-none transition-colors duration-150 hover:bg-surface-hover hover:text-foreground focus-visible:focus-ring aria-disabled:pointer-events-none aria-disabled:text-fg-disabled"
+  "inline-flex size-(--cell-size) cursor-pointer items-center justify-center rounded-full p-0 text-fg-secondary select-none transition-colors duration-150 hover:bg-surface-subtle hover:text-foreground focus-visible:focus-ring aria-disabled:pointer-events-none aria-disabled:text-fg-disabled"
 
 function Calendar({
   className,
@@ -71,7 +71,7 @@ function Calendar({
           defaultClassNames.dropdowns
         ),
         dropdown_root: cn(
-          "relative rounded-full border border-border bg-background transition-colors duration-150 hover:bg-surface-hover has-focus-visible:focus-ring",
+          "relative rounded-full border border-border bg-background transition-colors duration-150 hover:bg-surface-subtle has-focus-visible:focus-ring",
           defaultClassNames.dropdown_root
         ),
         dropdown: cn(
@@ -202,7 +202,7 @@ function CalendarDayButton({
       data-range-end={modifiers.range_end}
       data-range-middle={modifiers.range_middle}
       className={cn(
-        "flex aspect-square size-auto w-full min-w-(--cell-size) cursor-pointer select-none flex-col items-center justify-center gap-1 rounded-full text-small leading-none text-foreground transition-colors duration-150 hover:bg-surface-hover focus-visible:focus-ring disabled:pointer-events-none disabled:text-fg-disabled data-[today=true]:ring-1 data-[today=true]:ring-inset data-[today=true]:ring-border data-[selected-single=true]:bg-action data-[selected-single=true]:text-fg-inverse data-[selected-single=true]:hover:bg-action-hover data-[range-start=true]:bg-action data-[range-start=true]:text-fg-inverse data-[range-start=true]:hover:bg-action-hover data-[range-end=true]:bg-action data-[range-end=true]:text-fg-inverse data-[range-end=true]:hover:bg-action-hover data-[range-middle=true]:rounded-none data-[range-middle=true]:bg-surface-subtle data-[range-middle=true]:hover:bg-surface-hover group-data-[focused=true]/day:relative group-data-[focused=true]/day:z-10 [&>span]:text-small [&>span]:opacity-70",
+        "flex aspect-square size-auto w-full min-w-(--cell-size) cursor-pointer select-none flex-col items-center justify-center gap-1 rounded-full text-small leading-none text-foreground transition-colors duration-150 hover:bg-surface-subtle focus-visible:focus-ring disabled:pointer-events-none disabled:text-fg-disabled data-[today=true]:ring-1 data-[today=true]:ring-inset data-[today=true]:ring-border data-[selected-single=true]:bg-action data-[selected-single=true]:text-fg-inverse data-[selected-single=true]:hover:bg-action-hover data-[range-start=true]:bg-action data-[range-start=true]:text-fg-inverse data-[range-start=true]:hover:bg-action-hover data-[range-end=true]:bg-action data-[range-end=true]:text-fg-inverse data-[range-end=true]:hover:bg-action-hover data-[range-middle=true]:rounded-none data-[range-middle=true]:bg-surface-subtle data-[range-middle=true]:hover:bg-border-subtle group-data-[focused=true]/day:relative group-data-[focused=true]/day:z-10 [&>span]:text-small [&>span]:opacity-70",
         defaultClassNames.day,
         className
       )}

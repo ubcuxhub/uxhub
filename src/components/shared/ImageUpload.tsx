@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, DragEvent, ChangeEvent } from "react";
-import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -203,11 +203,8 @@ export const ImageUpload = ({
             </div>
 
             {!disabled && (
-              <Button
-                type="button"
-                variant="secondary"
-                size="icon"
-                aria-label="Remove image"
+              <IconButton
+                label="Remove image"
                 className="absolute top-2 right-2"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -215,7 +212,7 @@ export const ImageUpload = ({
                 }}
               >
                 <X aria-hidden />
-              </Button>
+              </IconButton>
             )}
           </div>
         ) : (

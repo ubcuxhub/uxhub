@@ -4,7 +4,7 @@ import * as React from "react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 import { X } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
 import { cn } from "@/lib/utils";
 
 const Dialog = DialogPrimitive.Root;
@@ -70,11 +70,9 @@ const DialogContent = React.forwardRef<
       >
         {children}
         <DialogPrimitive.Close asChild>
-          <Button
-            type="button"
+          <IconButton
             variant="ghost"
-            size="icon"
-            aria-label={closeLabel}
+            label={closeLabel}
             disabled={closeDisabled}
             className={cn(
               "absolute z-10 text-fg-secondary hover:text-foreground",
@@ -84,7 +82,7 @@ const DialogContent = React.forwardRef<
             )}
           >
             <X />
-          </Button>
+          </IconButton>
         </DialogPrimitive.Close>
       </DialogPrimitive.Content>
     </DialogPortal>

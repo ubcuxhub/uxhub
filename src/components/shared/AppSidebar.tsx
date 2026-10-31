@@ -77,7 +77,12 @@ export function AppSidebarNav({
   const isActive = (href: string, exact = false) =>
     exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
   const collapsed = state === "collapsed" && !isMobile;
-  const toggleLabel = collapsed ? "Expand Sidebar" : "Collapse Sidebar";
+  // In the mobile drawer the button closes the drawer rather than collapsing.
+  const toggleLabel = isMobile
+    ? "Close menu"
+    : collapsed
+      ? "Expand Sidebar"
+      : "Collapse Sidebar";
 
   return (
     <Sidebar collapsible="icon">
