@@ -1,6 +1,7 @@
 import { defineConfig, globalIgnores } from "eslint/config";
 import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
+import { deprecatedColours } from "./eslint.deprecated-colours.mjs";
 
 // Fill names used as text, status names whose meaning changed, and the
 // nonexistent error-foreground pair. This catches classes that Tailwind would
@@ -33,6 +34,13 @@ const eslintConfig = defineConfig([
         },
       ],
     },
+  },
+  // Separate from the rule above so the severities stay independent: the old
+  // alias names still work until the week of November 16, so they only warn.
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    plugins: { "uxhub-colours": deprecatedColours },
+    rules: { "uxhub-colours/no-deprecated-colour-class": "warn" },
   },
   // Override default ignores of eslint-config-next.
   globalIgnores([

@@ -266,7 +266,9 @@ the blue action colour. Never put a fill in `text-` (`text-muted`,
 `text-secondary`, `text-success`): a lint rule rejects it. Until the epic
 branches land in the week of November 16, `globals.css` keeps the old `fg-*`,
 `action*`, `surface-*`, `*-bg`, `status-*`, `text-text-*`, `background-*` and
-`overlay-scrim` utilities as deprecated aliases; don't use them. The shadcn
+`overlay-scrim` utilities as deprecated aliases; don't use them. Lint now warns
+on every one of them (with any variant prefix or `/opacity`), naming the
+replacement, and the aliases are removed the week of November 16. The shadcn
 bridge in `globals.css` is permanent.
 
 ## Merging pull requests
