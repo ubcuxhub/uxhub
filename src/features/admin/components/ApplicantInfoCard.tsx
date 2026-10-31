@@ -8,11 +8,22 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge, type Status } from "@/components/ui/status-badge";
 import {
   APPLICATION_REVIEW_STATE_LABELS,
   type ApplicationReviewState,
 } from "@/features/admin/lib/application-review";
-import { Clock, X, Check, User, Mail, Calendar, Ticket, Hourglass } from "lucide-react";
+import {
+  Clock,
+  X,
+  Check,
+  CircleMinus,
+  User,
+  Mail,
+  Calendar,
+  Ticket,
+  Hourglass,
+} from "lucide-react";
 import { formatTimestamp } from "@/lib/date";
 
 interface ApplicantInfoCardProps {
@@ -40,6 +51,29 @@ export function ApplicationStateIcon({ state }: { state: ApplicationReviewState 
   }
 }
 
+/**
+ * Under review reads as pending and a registered applicant as going. A lapsed
+ * offer and a rejection have no admin-facing status in the design system
+ * ("Not selected" is member wording), so they keep their own labels.
+ */
+const BADGE_STATUS: Partial<Record<ApplicationReviewState, Status>> = {
+  submitted: "pending",
+  waitlisted: "waitlisted",
+  accepted: "accepted",
+  registered: "going",
+};
+
+function ApplicationStateBadge({ state }: { state: ApplicationReviewState }) {
+  const status = BADGE_STATUS[state];
+  if (status) return <StatusBadge status={status} />;
+  return (
+    <Badge variant="neutral">
+      <CircleMinus aria-hidden />
+      {APPLICATION_REVIEW_STATE_LABELS[state]}
+    </Badge>
+  );
+}
+
 export function ApplicantInfoCard({
   name,
   email,
@@ -61,12 +95,7 @@ export function ApplicantInfoCard({
               {email}
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2">
-            <ApplicationStateIcon state={state} />
-            <Badge variant="outline">
-              {APPLICATION_REVIEW_STATE_LABELS[state]}
-            </Badge>
-          </div>
+          <ApplicationStateBadge state={state} />
         </div>
       </CardHeader>
       <CardContent className="space-y-1">

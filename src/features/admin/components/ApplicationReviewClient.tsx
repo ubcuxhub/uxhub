@@ -110,8 +110,8 @@ export function ApplicationReviewClient({
       >
             {/* Header */}
             <div>
-              <h1 className="text-2xl font-semibold">Application Review</h1>
-              <p className="text-sm text-muted-foreground mt-1">
+              <h1 className="text-h2">Application Review</h1>
+              <p className="mt-1 text-small text-muted-foreground">
                 {event.name}
               </p>
             </div>
@@ -128,8 +128,8 @@ export function ApplicationReviewClient({
             {/* Application Responses */}
             <div className="space-y-4">
               <div>
-                <h2 className="text-xl font-semibold">Application Responses</h2>
-                <p className="text-sm text-muted-foreground mt-1">
+                <h2 className="text-h3">Application Responses</h2>
+                <p className="mt-1 text-small text-muted-foreground">
                   Review the applicant&apos;s responses to the application
                   questions
                 </p>
@@ -138,7 +138,7 @@ export function ApplicationReviewClient({
               {responses.length === 0 ? (
                 <Card>
                   <CardContent className="py-12 text-center">
-                    <p className="text-sm text-muted-foreground">
+                    <p className="text-small text-muted-foreground">
                       No application responses found.
                     </p>
                   </CardContent>

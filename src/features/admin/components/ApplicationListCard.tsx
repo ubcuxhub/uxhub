@@ -30,7 +30,7 @@ export function ApplicationListCard({
     <Link
       href={`/admin/events/${eventId}/review-applications/${applicationId}`}
     >
-      <Card className="cursor-pointer hover:bg-muted/50 transition-colors">
+      <Card className="cursor-pointer transition-colors hover:bg-surface-subtle">
         <CardHeader>
           <div className="flex items-start justify-between">
             <div className="flex-1">

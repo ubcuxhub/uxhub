@@ -95,13 +95,7 @@ export function StatusUpdateSection({
             {decisions.map((decision) => (
               <Button
                 key={decision}
-                variant={
-                  decision === "reject"
-                    ? "destructive"
-                    : decision === "waitlist"
-                      ? "outline"
-                      : "default"
-                }
+                variant={decision === "accept" ? "primary" : "secondary"}
                 onClick={() =>
                   onDecision(
                     decision,
@@ -109,22 +103,18 @@ export function StatusUpdateSection({
                   )
                 }
                 disabled={isUpdating || (decision === "accept" && !offerExpiresAt)}
-                className={
-                  decision === "accept"
-                    ? "flex-1 bg-success hover:bg-success/90"
-                    : "flex-1"
-                }
+                className="flex-1"
               >
                 {isUpdating ? (
                   <>
-                    <Spinner size="sm" className="mr-2" />
+                    <Spinner size="sm" />
                     Updating...
                   </>
                 ) : (
                   <>
-                    {decision === "accept" && <Check className="mr-2" />}
-                    {decision === "waitlist" && <Clock className="mr-2" />}
-                    {decision === "reject" && <X className="mr-2" />}
+                    {decision === "accept" && <Check />}
+                    {decision === "waitlist" && <Clock />}
+                    {decision === "reject" && <X />}
                     {decision === "accept" && state !== "submitted" && state !== "waitlisted"
                       ? "Re-offer"
                       : decision === "reject" && state === "accepted"
