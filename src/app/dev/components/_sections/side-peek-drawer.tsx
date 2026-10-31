@@ -23,12 +23,13 @@ const PEOPLE = [
 function Section({ open: initialState }: SectionProps) {
   const [open, setOpen] = useState(Boolean(initialState));
   const [personIndex, setPersonIndex] = useState(0);
+  const [savedNames, setSavedNames] = useState<string[]>(PEOPLE.map((person) => person.name));
   const [editing, setEditing] = useState(initialState === "drawer-edit" || initialState === "drawer-unsaved");
   const [name, setName] = useState<string>(initialState === "drawer-unsaved" ? "Jane Smit" : PEOPLE[0].name);
   const janeRef = useRef<HTMLButtonElement>(null);
   const alexRef = useRef<HTMLButtonElement>(null);
   const rowRefs = [janeRef, alexRef];
-  const person = PEOPLE[personIndex];
+  const person = { ...PEOPLE[personIndex], name: savedNames[personIndex] };
   const dirty = editing && name !== person.name;
 
   useEffect(() => {
@@ -42,7 +43,7 @@ function Section({ open: initialState }: SectionProps) {
 
   const selectPerson = (index: number) => {
     setPersonIndex(index);
-    setName(PEOPLE[index].name);
+    setName(savedNames[index]);
     setEditing(false);
     setOpen(true);
   };
@@ -81,8 +82,8 @@ function Section({ open: initialState }: SectionProps) {
                 onClick={() => selectPerson(index)}
                 className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-accent focus-visible:focus-ring aria-expanded:bg-muted"
               >
-                <Avatar name={item.name} size={40} decorative />
-                <span className="min-w-0 flex-1"><span className="block text-body-medium">{item.name}</span><span className="block text-small text-muted-foreground">{item.email}</span></span>
+                <Avatar name={savedNames[index]} size={40} decorative />
+                <span className="min-w-0 flex-1"><span className="block text-body-medium">{savedNames[index]}</span><span className="block text-small text-muted-foreground">{item.email}</span></span>
                 <span className="text-small text-muted-foreground">{item.membership}</span>
               </button>
             ))}
@@ -157,7 +158,7 @@ function Section({ open: initialState }: SectionProps) {
           {editing ? (
             <SidePeekDrawerFooter>
               <Button variant="secondary" onClick={() => { setName(person.name); setEditing(false); }}>Cancel</Button>
-              <Button onClick={() => setEditing(false)}>Save changes</Button>
+              <Button onClick={() => { setSavedNames((current) => current.map((saved, index) => index === personIndex ? name : saved)); setEditing(false); }}>Save changes</Button>
             </SidePeekDrawerFooter>
           ) : null}
         </SidePeekDrawerContent>

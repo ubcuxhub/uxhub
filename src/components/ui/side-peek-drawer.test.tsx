@@ -17,7 +17,7 @@ function Example({ dirty = false, onOpenChange = () => {} }: { dirty?: boolean; 
       <SidePeekDrawer open={open} onOpenChange={(next) => { onOpenChange(next); setOpen(next); }} dirty={dirty} returnFocusRef={rowRef}>
         <SidePeekDrawerContent aria-describedby={undefined}>
           <SidePeekDrawerHeader />
-          <SidePeekDrawerBody><SidePeekDrawerTitle>Jane Smith</SidePeekDrawerTitle></SidePeekDrawerBody>
+          <SidePeekDrawerBody><SidePeekDrawerTitle>Jane Smith</SidePeekDrawerTitle><button type="button">Last action</button></SidePeekDrawerBody>
         </SidePeekDrawerContent>
       </SidePeekDrawer>
     </>
@@ -45,11 +45,24 @@ describe("SidePeekDrawer", () => {
     fireEvent.click(screen.getByRole("button", { name: "Close panel (Esc)" }));
     fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Jane row" })));
   });
 
   it("opens the discard confirmation on Escape when dirty", () => {
     render(<Example dirty />);
     fireEvent.keyDown(screen.getByRole("dialog", { name: "Jane Smith" }), { key: "Escape" });
     expect(screen.getByRole("heading", { name: "Discard changes?" })).toBeTruthy();
+  });
+
+  it("wraps Tab within the panel while leaving the page nonmodal", () => {
+    render(<Example />);
+    expect(document.querySelector("[data-slot=dialog-overlay]")).toBeNull();
+    const first = screen.getByRole("button", { name: "Close panel (Esc)" });
+    const last = screen.getByRole("button", { name: "Last action" });
+    last.focus();
+    fireEvent.keyDown(last, { key: "Tab" });
+    expect(document.activeElement).toBe(first);
+    fireEvent.keyDown(first, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(last);
   });
 });
