@@ -128,9 +128,9 @@ const ICONS = [
 ];
 
 const ICON_SIZES = [
-  { cls: "size-3.5", label: "14px · stroke 2" },
-  { cls: "size-4", label: "16px · stroke 2" },
-  { cls: "size-5", label: "20px" },
+  { cls: "size-3.5", label: "14px · small buttons, badges" },
+  { cls: "size-4", label: "16px · buttons, fields" },
+  { cls: "size-5", label: "20px · sidebar nav, 12px gap" },
   { cls: "size-6", label: "24px" },
 ];
 
@@ -334,7 +334,7 @@ function Foundations() {
       <SpecimenGroup
         title="Icons"
         spec="§2.7"
-        description="Lucide at its default 2px stroke (thicker than Figma's 1.5px, by choice). 16px beside 16px text with an 8px gap, 14px beside small text."
+        description="Lucide at its default 2px stroke at every size (thicker than Figma's 1.5px, by choice). 16px beside body text with an 8px gap, 14px beside small text, 20px with a 12px gap in sidebar rows."
         min="16rem"
       >
         {ICON_SIZES.map(({ cls, label }) => (

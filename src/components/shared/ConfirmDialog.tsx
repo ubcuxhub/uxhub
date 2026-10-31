@@ -188,7 +188,8 @@ function ConfirmDialogBody({
         <Button
           type="button"
           variant={confirmVariant}
-          disabled={!satisfied || pending}
+          disabled={!satisfied}
+          loading={pending}
           onClick={() => onConfirm(typed)}
         >
           {pending ? (pendingLabel ?? confirmLabel) : confirmLabel}
