@@ -125,6 +125,29 @@ function FieldLabel({
   )
 }
 
+/**
+ * A label with an action at the far end of the row ("Forgot password?"). The
+ * label stays first in the DOM, so Tab goes label action, then the input.
+ * Never nest the action inside the `<label>`.
+ */
+function FieldLabelRow({
+  className,
+  action,
+  children,
+  ...props
+}: React.ComponentProps<"div"> & { action?: React.ReactNode }) {
+  return (
+    <div
+      data-slot="field-label-row"
+      className={cn("flex items-baseline justify-between gap-3", className)}
+      {...props}
+    >
+      {children}
+      {action}
+    </div>
+  )
+}
+
 function FieldTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -237,6 +260,7 @@ function FieldError({
 export {
   Field,
   FieldLabel,
+  FieldLabelRow,
   FieldDescription,
   FieldError,
   FieldGroup,
