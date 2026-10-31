@@ -16,7 +16,7 @@ interface SuccessOverlayProps {
 export function SuccessOverlay({ message, onClose }: SuccessOverlayProps) {
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-scrim"
       onClick={onClose}
     >
       <Card className="mx-4 max-w-md w-full">
@@ -27,7 +27,7 @@ export function SuccessOverlay({ message, onClose }: SuccessOverlayProps) {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-small text-muted-foreground">{message}</p>
+          <p className="text-small text-fg-secondary">{message}</p>
         </CardContent>
       </Card>
     </div>

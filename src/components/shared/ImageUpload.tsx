@@ -12,6 +12,8 @@ import {
   resolveImagePreviewSrc,
 } from "@/lib/event-image";
 import Image from "next/image";
+import { ImagePlus, X } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const getImageDimensions = (file: File) =>
   new Promise<{ width: number; height: number }>((resolve, reject) => {
@@ -36,6 +38,8 @@ interface ImageUploadProps {
   onChange: (path: string) => void;
   onFileChange?: (file: File | null) => void;
   disabled?: boolean;
+  /** Shows the uploading state; the component is not uploading on its own yet. */
+  uploading?: boolean;
 }
 
 export const ImageUpload = ({
@@ -43,9 +47,11 @@ export const ImageUpload = ({
   onChange,
   onFileChange,
   disabled = false,
+  uploading = false,
 }: ImageUploadProps) => {
   const [isDragging, setIsDragging] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
+  const [isUploadingInternal, setIsUploading] = useState(false);
+  const isUploading = uploading || isUploadingInternal;
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(() =>
     value ? resolveImagePreviewSrc(value) : null
@@ -153,13 +159,17 @@ export const ImageUpload = ({
 
   return (
     <Field data-invalid={!!error}>
-      <FieldLabel htmlFor="image_upload">Image Cover for the Event</FieldLabel>
+      <FieldLabel htmlFor="image_upload">Image cover for the event</FieldLabel>
       <div
-        className={`relative border-2 border-dashed rounded-lg p-6 transition-colors ${
-          isDragging
-            ? "border-primary bg-primary/5"
-            : "border-input hover:border-primary/50"
-        } ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+        className={cn(
+          "relative rounded-2xl border-[1.5px] border-dashed p-6 transition-colors",
+          disabled
+            ? "cursor-not-allowed border-action-disabled-border bg-action-disabled-bg"
+            : isDragging
+              ? "cursor-pointer border-action bg-surface-secondary"
+              : "cursor-pointer border-border hover:border-fg-secondary hover:bg-surface-hover",
+          error && !isDragging && "border-error",
+        )}
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -176,9 +186,9 @@ export const ImageUpload = ({
         />
 
         {isUploading ? (
-          <div className="flex flex-col items-center justify-center gap-2">
+          <div className="flex min-h-36 flex-col items-center justify-center gap-3">
             <Spinner size="lg" />
-            <p className="text-small text-muted-foreground">Uploading...</p>
+            <p className="text-small text-fg-secondary">Uploading…</p>
           </div>
         ) : preview ? (
           <div className="relative">
@@ -187,7 +197,7 @@ export const ImageUpload = ({
                 src={preview}
                 alt="Event preview"
                 fill
-                className="object-contain rounded-md"
+                className="rounded-lg object-contain"
                 unoptimized
               />
             </div>
@@ -195,38 +205,47 @@ export const ImageUpload = ({
             {!disabled && (
               <Button
                 type="button"
-                variant="destructive"
-                className="absolute top-2 right-2 bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                variant="secondary"
+                size="icon"
+                aria-label="Remove image"
+                className="absolute top-2 right-2"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleRemove();
                 }}
               >
-                Remove
+                <X aria-hidden />
               </Button>
             )}
           </div>
         ) : (
-          <div className="flex flex-col items-center justify-center gap-2 text-center">
-            <svg
-              className="w-12 h-12 text-muted-foreground"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          <div className="flex min-h-36 flex-col items-center justify-center gap-4 text-center">
+            <span
+              className={cn(
+                "flex size-12 items-center justify-center rounded-full",
+                disabled
+                  ? "bg-action-disabled-bg text-fg-disabled"
+                  : "bg-surface-subtle text-fg-secondary",
+              )}
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-              />
-            </svg>
-            <div className="text-small">
-              <p className="text-muted-foreground">
-                Drag and drop an image here, or click to select
+              <ImagePlus className="size-6" aria-hidden />
+            </span>
+            <div className="flex flex-col gap-1">
+              <p
+                className={cn(
+                  "text-body-medium",
+                  disabled ? "text-fg-disabled" : "text-fg",
+                )}
+              >
+                Upload image
               </p>
-              <p className="text-small text-muted-foreground mt-1">
-                Square JPG or PNG (max {EVENT_IMAGE_MAX_MB}MB)
+              <p
+                className={cn(
+                  "text-small",
+                  disabled ? "text-fg-disabled" : "text-fg-secondary",
+                )}
+              >
+                Or drag one here. Square JPG or PNG, up to {EVENT_IMAGE_MAX_MB} MB.
               </p>
             </div>
           </div>

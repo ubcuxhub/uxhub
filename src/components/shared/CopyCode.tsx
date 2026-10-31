@@ -98,7 +98,7 @@ export function CopyCode({ code }: CopyCodeProps) {
           type="button"
           onClick={handleCopy}
           aria-label="Copy discount code"
-          className="ml-auto mr-1 flex size-8 items-center justify-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="ml-auto mr-1 flex size-8 items-center justify-center rounded-full outline-none focus-visible:focus-ring"
         >
           <Copy className={cn("size-4", TRANSITION, LAYER_CLASSES[codeLayer])} aria-hidden />
         </button>
