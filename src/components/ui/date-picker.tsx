@@ -39,7 +39,7 @@ function PickerDayButton({
       data-selected={modifiers.selected || undefined}
       data-today={(modifiers.today && !modifiers.selected) || undefined}
       className={cn(
-        "flex size-10 cursor-pointer items-center justify-center rounded-full border border-transparent text-small text-foreground transition-colors duration-150 select-none hover:bg-muted focus-visible:focus-ring disabled:pointer-events-none disabled:text-text-disabled data-[today]:border-border data-[selected]:bg-primary data-[selected]:font-medium data-[selected]:text-primary-foreground data-[selected]:hover:bg-action-primary-hover",
+        "flex size-10 cursor-pointer items-center justify-center rounded-full border border-transparent text-small text-foreground transition-colors duration-150 select-none hover:bg-muted focus-visible:focus-ring disabled:pointer-events-none disabled:text-disabled-foreground data-[today]:border-border data-[selected]:bg-primary data-[selected]:font-medium data-[selected]:text-primary-foreground data-[selected]:hover:bg-primary-hover",
         className
       )}
       {...props}
@@ -48,7 +48,7 @@ function PickerDayButton({
 }
 
 const navButton =
-  "inline-flex size-9 cursor-pointer items-center justify-center rounded-full border border-border-subtle bg-card p-0 text-foreground transition-colors duration-150 hover:bg-muted focus-visible:focus-ring aria-disabled:pointer-events-none aria-disabled:text-text-disabled aria-disabled:opacity-50"
+  "inline-flex size-9 cursor-pointer items-center justify-center rounded-full border border-border-subtle bg-card p-0 text-foreground transition-colors duration-150 hover:bg-muted focus-visible:focus-ring aria-disabled:pointer-events-none aria-disabled:text-disabled-foreground aria-disabled:opacity-50"
 
 interface DatePickerProps {
   value: IsoDate | null
@@ -139,7 +139,7 @@ function DatePicker({
           type="button"
           disabled={todayDisabled}
           onClick={() => today && onValueChange(today)}
-          className="cursor-pointer rounded-sm text-small font-medium text-foreground underline underline-offset-2 hover:text-action-primary-hover focus-visible:focus-ring disabled:pointer-events-none disabled:text-text-disabled disabled:no-underline"
+          className="cursor-pointer rounded-sm text-small font-medium text-foreground underline underline-offset-2 hover:text-primary-hover focus-visible:focus-ring disabled:pointer-events-none disabled:text-disabled-foreground disabled:no-underline"
         >
           Today
         </button>
