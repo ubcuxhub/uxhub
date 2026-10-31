@@ -148,7 +148,7 @@ export const EventCreateModify = ({
             {eventId && (
               <Button
                 type="button"
-                variant="destructive"
+                variant="secondary"
                 onClick={() => form.setShowDeleteModal(true)}
                 disabled={form.isSubmitting || form.isDeleting}
               >

@@ -44,36 +44,24 @@ type RegistrationStatus = "open" | "closed" | "not-applicable";
 type SortDirection = "ascending" | "descending";
 
 const statusConfig = {
-  active: {
-    className: "bg-success-bg text-success",
-    icon: Check,
-    label: "Active",
-  },
-  draft: {
-    className: "bg-warning-bg text-warning",
-    icon: FilePen,
-    label: "Draft",
-  },
+  active: { variant: "success", icon: Check, label: "Active" },
+  draft: { variant: "neutral", icon: FilePen, label: "Draft" },
 } satisfies Record<
   EventStatus,
   {
-    className: string;
+    variant: "success" | "neutral";
     icon: typeof Check;
     label: string;
   }
 >;
 
 function EventStatusBadge({ status }: { status: EventStatus }) {
-  const { className, icon: Icon, label } = statusConfig[status];
+  const { variant, icon: Icon, label } = statusConfig[status];
 
   return (
-    <Badge
-      aria-label={label}
-      variant="secondary"
-      className={`size-7 justify-center p-0 sm:h-auto sm:w-auto sm:px-2.5 sm:py-0.5 ${className}`}
-    >
-      <Icon className="size-4 sm:hidden" aria-hidden="true" />
-      <span className="hidden sm:inline">{label}</span>
+    <Badge variant={variant}>
+      <Icon aria-hidden="true" />
+      {label}
     </Badge>
   );
 }
@@ -115,10 +103,10 @@ function DetailItem({
 }) {
   return (
     <div className={wide ? "sm:col-span-2" : undefined}>
-      <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <dt className="text-label uppercase tracking-wide text-muted-foreground">
         {label}
       </dt>
-      <dd className="mt-1 whitespace-pre-wrap text-sm">{children || "—"}</dd>
+      <dd className="mt-1 whitespace-pre-wrap text-small">{children || "—"}</dd>
     </div>
   );
 }
@@ -225,7 +213,7 @@ function EventDetails({
       </DetailItem>
       <DetailItem label="Agenda" wide>
         {agenda ? (
-          <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs">
+          <pre className="overflow-x-auto rounded-lg bg-muted p-3 text-label">
             {String(agenda)}
           </pre>
         ) : (
@@ -280,11 +268,12 @@ const eventColumns: AdminDirectoryColumn<AdminEventTableRow>[] = [
     header: "Registration Status",
     render: (row) => (
       <Badge
-        variant={row.event.status === "draft" ? "destructive" : "secondary"}
-        className={
-          row.event.status !== "draft" && row.registrationOpen
-            ? "bg-success-bg text-success"
-            : undefined
+        variant={
+          row.event.status === "draft"
+            ? "neutral"
+            : row.registrationOpen
+              ? "success"
+              : "neutral"
         }
       >
         {row.event.status === "draft"
@@ -460,7 +449,7 @@ export function AdminEventsTable({
                   </Link>
                 </Button>
               </div>
-              <div className="border-t px-4 py-5">
+              <div className="border-t border-border-subtle px-4 py-5">
                 <EventDetails row={selectedRow} />
               </div>
             </>

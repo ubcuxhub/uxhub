@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarIcon, TriangleAlert } from "lucide-react";
+import { TriangleAlert } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -14,7 +14,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { formatEventDate, timestamptzToDatetimeLocal } from "@/lib/date";
-import { cn } from "@/lib/utils";
+import { DatePickerButton } from "./DatePickerButton";
 import { setMembershipTermEndsAtAction } from "@/features/admin/actions";
 
 /** `YYYY-MM-DD` in Pacific time, the shape the server action expects. */
@@ -95,18 +95,10 @@ export function MembershipTermSettings({
         <Label htmlFor="membership-term-end">Term ends</Label>
         <Popover open={pickerOpen} onOpenChange={setPickerOpen}>
           <PopoverTrigger asChild>
-            <Button
+            <DatePickerButton
               id="membership-term-end"
-              type="button"
-              variant="outline"
-              className={cn(
-                "w-full justify-start text-left font-normal",
-                !draft && "text-muted-foreground",
-              )}
-            >
-              <CalendarIcon data-icon="inline-start" />
-              {formatEventDate(draft) ?? "Pick a date"}
-            </Button>
+              label={formatEventDate(draft) ?? undefined}
+            />
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
             <Calendar

@@ -110,7 +110,7 @@ function TierEditor({ tier }: { tier: MembershipTypeRow }) {
           {formatMembershipTypeName(tier.name)}
         </h3>
         <div className="flex items-center gap-2">
-          <Label htmlFor={activeId} className="text-small font-normal">
+          <Label htmlFor={activeId}>
             {draft.active ? "On sale" : "Retired"}
           </Label>
           <Switch

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarIcon } from "lucide-react";
 
+import { DatePickerButton } from "../DatePickerButton";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,7 +17,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
 
 interface RegistrationTimesProps {
   registration_opens_at: string;
@@ -104,18 +103,10 @@ const RegistrationDateTimeField = ({
       <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
-            <Button
+            <DatePickerButton
               id={`${id}_date`}
-              type="button"
-              variant="outline"
-              className={cn(
-                "w-full justify-start text-left font-normal",
-                !selectedDate && "text-muted-foreground"
-              )}
-            >
-              <CalendarIcon data-icon="inline-start" />
-              {selectedDate ? dateFormatter.format(selectedDate) : "Pick a date"}
-            </Button>
+              label={selectedDate ? dateFormatter.format(selectedDate) : undefined}
+            />
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
             <Calendar

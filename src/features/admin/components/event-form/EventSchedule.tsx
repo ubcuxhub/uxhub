@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, type ComponentProps } from "react";
-import { CalendarIcon } from "lucide-react";
 
+import { DatePickerButton } from "../DatePickerButton";
 import { Calendar } from "@/components/ui/calendar";
-import { Button } from "@/components/ui/button";
 import {
   Field,
   FieldError,
@@ -17,7 +16,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
 
 interface EventScheduleProps {
   starts_at: string;
@@ -71,7 +69,7 @@ const dateToDateString = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
-const DatePickerButton = ({
+const DatePickerField = ({
   id,
   value,
   placeholder,
@@ -90,18 +88,11 @@ const DatePickerButton = ({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
+        <DatePickerButton
           id={id}
-          type="button"
-          variant="outline"
-          className={cn(
-            "w-full justify-start text-left font-normal",
-            !selectedDate && "text-muted-foreground"
-          )}
-        >
-          <CalendarIcon data-icon="inline-start" />
-          {selectedDate ? dateFormatter.format(selectedDate) : placeholder}
-        </Button>
+          label={selectedDate ? dateFormatter.format(selectedDate) : undefined}
+          placeholder={placeholder}
+        />
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
         <Calendar
@@ -142,7 +133,7 @@ export const EventSchedule = ({
     <FieldGroup className="grid gap-4 md:grid-cols-2">
       <Field>
         <FieldLabel htmlFor="starts_at_date">Start Date <span className="text-destructive">*</span></FieldLabel>
-        <DatePickerButton
+        <DatePickerField
           id="starts_at_date"
           value={start.date}
           placeholder="Pick a start date"
@@ -168,7 +159,7 @@ export const EventSchedule = ({
       </Field>
       <Field>
         <FieldLabel htmlFor="ends_at_date">End Date <span className="text-destructive">*</span></FieldLabel>
-        <DatePickerButton
+        <DatePickerField
           id="ends_at_date"
           value={end.date}
           placeholder="Pick an end date"

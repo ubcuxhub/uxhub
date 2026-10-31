@@ -64,7 +64,7 @@ export function UserRecentTransactions({ userId }: { userId: string }) {
           {state.purchases.map((purchase) => (
             <li
               key={purchase.id}
-              className="flex flex-col gap-2 rounded-md border p-4 sm:flex-row sm:justify-between sm:gap-4"
+              className="flex flex-col gap-2 rounded-lg border p-4 sm:flex-row sm:justify-between sm:gap-4"
             >
               <div className="min-w-0">
                 <p className="text-small font-medium break-words">{purchase.title}</p>
