@@ -308,6 +308,9 @@ function TimeField({
   const beforeStart = !!(value && after && isEndBeforeStart(value, after))
   const error = parseError ?? (beforeStart ? END_TIME_ERROR : null)
   useReportValidity(error, onValidityChange)
+  // A visible draft must not submit the previous committed time.
+  const submittedValue =
+    value && !error && text === formatTimeInput(value) ? value : ""
 
   const accept = (time: WallTime) => {
     setParseError(null)
@@ -420,7 +423,9 @@ function TimeField({
           >
             <ClockIcon aria-hidden />
           </IconButton>
-          {name ? <input type="hidden" name={name} value={value ?? ""} /> : null}
+          {name ? (
+            <input type="hidden" name={name} value={submittedValue} disabled={disabled} />
+          ) : null}
         </div>
       </PopoverAnchor>
       <PopoverContent

@@ -55,10 +55,14 @@ function Time_({
   initial = null,
   after,
   onValidityChange,
+  name,
+  disabled,
 }: {
   initial?: WallTime | null;
   after?: WallTime;
   onValidityChange?: (error: string | null) => void;
+  name?: string;
+  disabled?: boolean;
 }) {
   const [value, setValue] = useState<WallTime | null>(initial);
   return (
@@ -68,6 +72,8 @@ function Time_({
       onValueChange={setValue}
       onValidityChange={onValidityChange}
       after={after}
+      name={name}
+      disabled={disabled}
     />
   );
 }
@@ -197,6 +203,50 @@ describe("DateField", () => {
 });
 
 describe("TimeField", () => {
+  it("submits only a committed valid time while edited text stays visible", () => {
+    const { container } = render(
+      <form>
+        <Time_ initial="09:00" name="start_time" />
+      </form>,
+    );
+    const form = container.querySelector("form")!;
+    const input = screen.getByRole("combobox", { name: "Time" }) as HTMLInputElement;
+    const submitted = () => new FormData(form).get("start_time");
+
+    expect(submitted()).toBe("09:00");
+
+    fireEvent.change(input, { target: { value: "lunch" } });
+    expect(input.value).toBe("lunch");
+    expect(submitted()).toBe("");
+    fireEvent.blur(input);
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(submitted()).toBe("");
+
+    fireEvent.change(input, { target: { value: "10:30 am" } });
+    expect(submitted()).toBe("");
+    fireEvent.blur(input);
+    expect(input.value).toBe("10:30 AM");
+    expect(submitted()).toBe("10:30");
+  });
+
+  it("omits a disabled time field from FormData", () => {
+    const { container } = render(
+      <form>
+        <Time_ initial="09:00" name="start_time" disabled />
+      </form>,
+    );
+    expect(new FormData(container.querySelector("form")!).has("start_time")).toBe(false);
+  });
+
+  it("does not submit an end time before the start", () => {
+    const { container } = render(
+      <form>
+        <Time_ initial="08:30" after="09:00" name="end_time" />
+      </form>,
+    );
+    expect(new FormData(container.querySelector("form")!).get("end_time")).toBe("");
+  });
+
   it("reads a bare 9 as 9:00 PM", () => {
     render(<Time_ />);
     const input = screen.getByRole("combobox", { name: "Time" }) as HTMLInputElement;

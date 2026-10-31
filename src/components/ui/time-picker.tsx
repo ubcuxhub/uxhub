@@ -118,7 +118,7 @@ function TimePicker({
               className={cn(
                 "flex h-10 shrink-0 cursor-pointer items-center justify-between gap-3 rounded-lg px-3 text-small text-foreground transition-colors duration-150 select-none hover:bg-muted data-[active]:bg-muted",
                 selected &&
-                  "bg-primary font-medium text-primary-foreground hover:bg-action-primary-hover data-[active]:bg-action-primary-hover"
+                  "bg-primary font-medium text-primary-foreground hover:bg-primary-hover data-[active]:bg-primary-hover"
               )}
             >
               <span>{option.label}</span>
