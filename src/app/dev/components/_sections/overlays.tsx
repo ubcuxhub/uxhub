@@ -1,6 +1,6 @@
 "use client";
 
-import { Info } from "lucide-react";
+import { Info, Trash2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -35,7 +35,6 @@ import {
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
@@ -46,6 +45,7 @@ const OPEN_STATES = [
   "dialog",
   "dialog-large",
   "dialog-mobile",
+  "dialog-tall",
   "dialog-delete",
   "sheet-right",
   "sheet-left",
@@ -55,12 +55,52 @@ const OPEN_STATES = [
 
 function Overlays({ open }: SectionProps) {
   return (
-    <TooltipProvider delayDuration={0}>
+    <>
       <div className="flex flex-col gap-8">
+        <SpecimenGroup title="Popover and Tooltip" spec="§3.7" min="14rem">
+          <Specimen label="Popover (?open=popover)">
+            <Popover defaultOpen={open === "popover"}>
+              <PopoverTrigger asChild>
+                <Button variant="outline">Open popover</Button>
+              </PopoverTrigger>
+              <PopoverContent align="start">
+                <PopoverHeader>
+                  <PopoverTitle>Date range</PopoverTitle>
+                  <PopoverDescription>
+                    Choose when registration opens.
+                  </PopoverDescription>
+                </PopoverHeader>
+              </PopoverContent>
+            </Popover>
+          </Specimen>
+          <Specimen label="Tooltip (?open=tooltip)">
+            <div className="flex gap-2">
+              <Tooltip defaultOpen={open === "tooltip"}>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" aria-label="More info">
+                    <Info />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom">
+                  Registration closes Nov 1
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" aria-label="Delete">
+                    <Trash2 />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Delete (opens after 300ms on hover)</TooltipContent>
+              </Tooltip>
+            </div>
+          </Specimen>
+        </SpecimenGroup>
+
         <SpecimenGroup
           title="Dialog"
           spec="§3.7"
-          description="Default, large (settings and checkout flows) and mobileFullscreen (ConfirmDialog). Open with the buttons, or force one with ?open=. Check each in theme=light and theme=dark, and on the mobile preset."
+          description="Default, large (settings and checkout flows), tall content and mobileFullscreen (ConfirmDialog). Open with the buttons, or force one with ?open=. Check each in theme=light and theme=dark, and on the mobile preset."
           min="14rem"
         >
           <Specimen label="Dialog · default (?open=dialog)">
@@ -79,7 +119,7 @@ function Overlays({ open }: SectionProps) {
                   <Label htmlFor="dialog-name">Event name</Label>
                   <Input id="dialog-name" defaultValue="UXathon 2026" />
                 </div>
-                <DialogFooter className="gap-3 sm:gap-0">
+                <DialogFooter>
                   <DialogClose asChild>
                     <Button variant="outline">Cancel</Button>
                   </DialogClose>
@@ -94,14 +134,18 @@ function Overlays({ open }: SectionProps) {
               <DialogTrigger asChild>
                 <Button variant="outline">Open large dialog</Button>
               </DialogTrigger>
-              <DialogContent size="large">
-                <DialogHeader>
+              <DialogContent
+                size="large"
+                className="flex flex-col gap-0 overflow-hidden p-0"
+              >
+                <DialogHeader className="shrink-0 border-b border-border-subtle p-5 pt-16 sm:p-6 sm:pt-6">
                   <DialogTitle>Settings</DialogTitle>
                   <DialogDescription>
-                    Fills the viewport on phones, 1000px wide on desktop.
+                    Fills the viewport on phones, 1000px wide on desktop. The
+                    body scrolls once, inside the dialog.
                   </DialogDescription>
                 </DialogHeader>
-                <div className="overflow-y-auto text-small text-muted-foreground">
+                <div className="min-h-0 flex-1 overflow-y-auto p-5 text-small text-fg-secondary sm:p-6">
                   {Array.from({ length: 24 }, (_, i) => (
                     <p key={i} className="py-1">
                       Row {i + 1}. Long content scrolls inside a large dialog.
@@ -112,19 +156,49 @@ function Overlays({ open }: SectionProps) {
             </Dialog>
           </Specimen>
 
+          <Specimen label="Dialog · tall content (?open=dialog-tall)">
+            <Dialog defaultOpen={open === "dialog-tall"}>
+              <DialogTrigger asChild>
+                <Button variant="outline">Open tall dialog</Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Terms of registration</DialogTitle>
+                  <DialogDescription>
+                    Stays 40px clear of the top and scrolls inside.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="grid gap-2 text-small text-fg-secondary">
+                  {Array.from({ length: 30 }, (_, i) => (
+                    <p key={i}>
+                      Clause {i + 1}. Attendees agree to follow the club code of
+                      conduct at every event.
+                    </p>
+                  ))}
+                </div>
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button variant="outline">Decline</Button>
+                  </DialogClose>
+                  <Button>Accept</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </Specimen>
+
           <Specimen label="Dialog · mobileFullscreen (?open=dialog-mobile)">
             <Dialog defaultOpen={open === "dialog-mobile"}>
               <DialogTrigger asChild>
                 <Button variant="outline">Open fullscreen on mobile</Button>
               </DialogTrigger>
               <DialogContent mobileFullscreen>
-                <DialogHeader className="border-b pb-5 pl-5 pr-20 pt-16 text-left sm:border-0 sm:p-0">
+                <DialogHeader className="border-b border-border-subtle pb-5 pl-5 pr-20 pt-16 text-left sm:border-0 sm:p-0">
                   <DialogTitle>Fullscreen on mobile</DialogTitle>
                   <DialogDescription>
                     Below 640px this fills the screen.
                   </DialogDescription>
                 </DialogHeader>
-                <DialogFooter className="mt-auto gap-3 border-t p-5 sm:mt-0 sm:gap-0 sm:border-0 sm:p-0 [&>button]:w-full sm:[&>button]:w-auto">
+                <DialogFooter className="mt-auto border-t border-border-subtle p-5 sm:mt-0 sm:border-0 sm:p-0 [&>button]:w-full sm:[&>button]:w-auto">
                   <DialogClose asChild>
                     <Button variant="outline">Cancel</Button>
                   </DialogClose>
@@ -175,36 +249,6 @@ function Overlays({ open }: SectionProps) {
           </Specimen>
         </SpecimenGroup>
 
-        <SpecimenGroup title="Popover and Tooltip" spec="§3.7" min="14rem">
-          <Specimen label="Popover (?open=popover)">
-            <Popover defaultOpen={open === "popover"}>
-              <PopoverTrigger asChild>
-                <Button variant="outline">Open popover</Button>
-              </PopoverTrigger>
-              <PopoverContent align="start">
-                <PopoverHeader>
-                  <PopoverTitle>Date range</PopoverTitle>
-                  <PopoverDescription>
-                    Choose when registration opens.
-                  </PopoverDescription>
-                </PopoverHeader>
-              </PopoverContent>
-            </Popover>
-          </Specimen>
-          <Specimen label="Tooltip (?open=tooltip)">
-            <Tooltip defaultOpen={open === "tooltip"}>
-              <TooltipTrigger asChild>
-                <Button variant="outline" size="icon" aria-label="More info">
-                  <Info />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent side="bottom" sideOffset={6}>
-                Registration closes Nov 1
-              </TooltipContent>
-            </Tooltip>
-          </Specimen>
-        </SpecimenGroup>
-
         <Composition
           title="Dialog"
           description="A destructive confirmation as the admin pages ask for it (?open=dialog-delete)."
@@ -223,7 +267,7 @@ function Overlays({ open }: SectionProps) {
                     undone.
                   </DialogDescription>
                 </DialogHeader>
-                <DialogFooter className="gap-3 sm:gap-0">
+                <DialogFooter>
                   <DialogClose asChild>
                     <Button variant="outline">Keep event</Button>
                   </DialogClose>
@@ -234,7 +278,7 @@ function Overlays({ open }: SectionProps) {
           </div>
         </Composition>
       </div>
-    </TooltipProvider>
+    </>
   );
 }
 
