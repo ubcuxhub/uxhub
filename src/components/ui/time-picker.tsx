@@ -79,9 +79,20 @@ function TimePicker({
   }, [])
 
   React.useEffect(() => {
-    if (activeIndex < 0) return
-    const row = listRef.current?.children[activeIndex] as HTMLElement | undefined
-    row?.scrollIntoView?.({ block: "nearest" })
+    const list = listRef.current
+    const row = activeIndex >= 0
+      ? (list?.children[activeIndex] as HTMLElement | undefined)
+      : undefined
+    if (!list || !row) return
+
+    // Keep the highlight visible inside the list without scrolling the page.
+    const rowTop = row.offsetTop
+    const rowBottom = rowTop + row.offsetHeight
+    if (rowTop < list.scrollTop) {
+      list.scrollTop = rowTop
+    } else if (rowBottom > list.scrollTop + list.clientHeight) {
+      list.scrollTop = rowBottom - list.clientHeight
+    }
   }, [activeIndex])
 
   return (
