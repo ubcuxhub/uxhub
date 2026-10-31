@@ -30,6 +30,17 @@ describe("cn", () => {
     }
   );
 
+  it.each([
+    "text-text-disabled",
+    "text-text-inverse",
+    "text-status-success-text",
+    "text-status-error-text",
+  ])("treats %s as a colour, not a font size", (colour) => {
+    expect(cn("text-small", colour)).toBe(`text-small ${colour}`);
+    expect(cn(colour, "text-small")).toBe(`${colour} text-small`);
+    expect(cn("text-muted-foreground", colour)).toBe(colour);
+  });
+
   it("lets a custom font size override another custom font size", () => {
     expect(cn("text-h3", "text-h2", "text-success")).toBe(
       "text-h2 text-success"

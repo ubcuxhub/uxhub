@@ -153,6 +153,30 @@
   --color-error-bg: var(--status-error-background);
   --color-info: var(--status-info-text);
   --color-info-bg: var(--status-info-background);
+
+  /* Design-system names for tokens shadcn has no slot for; the class equals
+     the Figma variable name (bg-status-success-background, text-text-disabled).
+     Use these in new code instead of the fg-/action/surface-/-bg utilities
+     above, which are legacy. */
+  --color-background-secondary: var(--background-secondary);
+  --color-background-surface-hover: var(--background-surface-hover);
+  --color-text-disabled: var(--text-disabled);
+  --color-text-inverse: var(--text-inverse);
+  --color-action-primary-hover: var(--action-primary-hover);
+  --color-action-primary-strong: var(--action-primary-strong);
+  --color-action-disabled-background: var(--action-disabled-background);
+  --color-status-success-text: var(--status-success-text);
+  --color-status-warning-text: var(--status-warning-text);
+  --color-status-error-text: var(--status-error-text);
+  --color-status-info-text: var(--status-info-text);
+  --color-status-success-background: var(--status-success-background);
+  --color-status-warning-background: var(--status-warning-background);
+  --color-status-error-background: var(--status-error-background);
+  --color-status-info-background: var(--status-info-background);
+  --color-status-success-active: var(--status-success-active);
+  --color-transaction-positive: var(--transaction-positive);
+  --color-transaction-negative: var(--transaction-negative);
+  --color-overlay-scrim: var(--overlay-scrim);
 }
 
 /* Every `transition-*` utility uses the design-system curve (§2.8). Tailwind's
