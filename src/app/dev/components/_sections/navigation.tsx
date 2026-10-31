@@ -151,7 +151,7 @@ function Navigation() {
       <SpecimenGroup
         title="Sidebar rows"
         spec="§3.4"
-        description="Row states: default, selected with a badge, disabled. 44px rows, 20px icons in text-secondary with a 12px gap, no weight change when selected."
+        description="Row states: default, selected with a badge, disabled. 44px rows, 20px icons in text/secondary with a 12px gap, no weight change when selected."
         min="18rem"
       >
         <Specimen label="Default, selected + badge, disabled" bare>

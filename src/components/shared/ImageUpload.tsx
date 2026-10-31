@@ -307,20 +307,20 @@ export const ImageUpload = ({
             "items-center justify-center gap-3 border-[1.5px] border-dashed p-4",
           view === "empty" &&
             !disabled &&
-            "border-muted-foreground/70 hover:bg-background-surface-hover",
+            "border-muted-foreground/70 hover:bg-accent",
           view === "empty" && !disabled && hasError &&
-            "min-h-[172px] border-status-error-text",
+            "min-h-[172px] border-destructive",
           view === "empty" &&
             disabled &&
-            "cursor-not-allowed border-border bg-action-disabled-background text-text-disabled",
+            "cursor-not-allowed border-border bg-disabled text-disabled-foreground",
           view === "dragging" &&
-            "items-center justify-center gap-3 border-[1.5px] border-dashed border-primary bg-status-info-background p-4",
+            "items-center justify-center gap-3 border-[1.5px] border-dashed border-primary bg-info p-4",
           view === "uploading" &&
             "justify-center gap-3 border border-border p-6",
           view === "uploaded" &&
             cn(
               "overflow-hidden border",
-              hasError ? "border-status-error-text" : "border-border",
+              hasError ? "border-destructive" : "border-border",
             ),
         )}
         onDragEnter={handleDragEnter}
@@ -342,8 +342,8 @@ export const ImageUpload = ({
 
         {view === "dragging" && (
           <>
-            <Upload className="size-6 text-status-info-text" aria-hidden />
-            <p className="text-body-medium text-status-info-text">
+            <Upload className="size-6 text-info-foreground" aria-hidden />
+            <p className="text-body-medium text-info-foreground">
               Drop to upload
             </p>
           </>
@@ -422,7 +422,7 @@ export const ImageUpload = ({
               <p
                 className={cn(
                   "min-w-0 flex-1 truncate text-small",
-                  disabled ? "text-text-disabled" : "text-foreground",
+                  disabled ? "text-disabled-foreground" : "text-foreground",
                 )}
               >
                 {showFileName ?? "Image uploaded"}
@@ -452,7 +452,7 @@ export const ImageUpload = ({
             <ImageIcon
               className={cn(
                 "size-6",
-                disabled ? "text-text-disabled" : "text-muted-foreground",
+                disabled ? "text-disabled-foreground" : "text-muted-foreground",
               )}
               aria-hidden
             />
@@ -471,7 +471,7 @@ export const ImageUpload = ({
                 id={hintId}
                 className={cn(
                   "max-w-64 text-center text-xs text-pretty",
-                  disabled ? "text-text-disabled" : "text-muted-foreground",
+                  disabled ? "text-disabled-foreground" : "text-muted-foreground",
                 )}
               >
                 {requirementsLine}

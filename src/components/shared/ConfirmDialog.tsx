@@ -126,7 +126,7 @@ function ConfirmDialogBody({
         <DialogTitle
           className={cn(
             icon &&
-              "flex items-center gap-3 text-error [&_svg]:size-6 sm:gap-2 sm:[&_svg]:size-4",
+              "flex items-center gap-3 text-destructive [&_svg]:size-6 sm:gap-2 sm:[&_svg]:size-4",
           )}
         >
           {icon}
@@ -155,12 +155,12 @@ function ConfirmDialogBody({
                   aria-invalid={mismatch || undefined}
                 />
                 {confirmation.hint ? (
-                  <p id={hintId} className="text-small text-fg-secondary">
+                  <p id={hintId} className="text-small text-muted-foreground">
                     {confirmation.hint}
                   </p>
                 ) : null}
                 {mismatch && confirmation.mismatchMessage ? (
-                  <p className="text-small text-error">
+                  <p className="text-small text-destructive">
                     {confirmation.mismatchMessage}
                   </p>
                 ) : null}
@@ -168,7 +168,7 @@ function ConfirmDialogBody({
             ) : null}
 
             {error ? (
-              <p className="text-small text-error">{error}</p>
+              <p className="text-small text-destructive">{error}</p>
             ) : null}
           </div>
         </div>
