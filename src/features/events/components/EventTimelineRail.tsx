@@ -72,7 +72,7 @@ function EventTimelineRow({
     .join(" ");
 
   return (
-    <li className="grid gap-y-2 pb-6 sm:grid-cols-[7.5rem_1.5rem_minmax(0,1fr)] sm:gap-x-4 sm:gap-y-0">
+    <li className="grid grid-cols-[minmax(0,1fr)] gap-y-2 pb-6 sm:grid-cols-[7.5rem_1.5rem_minmax(0,1fr)] sm:gap-x-4 sm:gap-y-0">
       <p className="text-body font-medium text-foreground sm:pt-1 sm:font-normal">
         {formatEventDateLabel(event.starts_at, event.ends_at)}
       </p>

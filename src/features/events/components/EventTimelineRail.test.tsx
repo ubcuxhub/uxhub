@@ -119,6 +119,18 @@ describe("EventTimelineRail", () => {
     expect(lines[2].className).toContain("bottom-0");
   });
 
+  it("gives phone rows one flexible column so every card is the same width", () => {
+    render(
+      <EventTimelineRail
+        groups={groupEventsByMonth(EVENTS)}
+        statusFor={noStatus}
+      />,
+    );
+    for (const row of screen.getAllByRole("listitem")) {
+      expect(row.className).toContain("grid-cols-[minmax(0,1fr)]");
+    }
+  });
+
   it("renders nothing but an empty wrapper for no groups", () => {
     const { container } = render(
       <EventTimelineRail groups={[]} statusFor={noStatus} className="mb-8" />,
