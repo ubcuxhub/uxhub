@@ -90,6 +90,32 @@ describe("SearchableDropdown", () => {
     expect([...document.querySelectorAll('input[name="judges"]')].map((node) => node.getAttribute("value"))).toEqual(["alex"])
   })
 
+  it("keeps selected labels and controls when async results replace the options", () => {
+    const onSingleChange = vi.fn()
+    const onMultipleChange = vi.fn()
+    const queryChange = vi.fn()
+    const { rerender } = render(<>
+      <SearchableDropdown options={options} placeholder="Search members" value="priya" onValueChange={onSingleChange} onQueryChange={queryChange} />
+      <SearchableDropdown options={options} multiple placeholder="Add a judge" value={["alex"]} onValueChange={onMultipleChange} onQueryChange={queryChange} />
+    </>)
+
+    rerender(<>
+      <SearchableDropdown options={[]} placeholder="Search members" value="priya" onValueChange={onSingleChange} onQueryChange={queryChange} />
+      <SearchableDropdown options={[]} multiple placeholder="Add a judge" value={["alex"]} onValueChange={onMultipleChange} onQueryChange={queryChange} />
+    </>)
+    expect(screen.getByText("Priya Shah")).toBeTruthy()
+    expect(screen.getByRole("button", { name: "Clear Priya Shah" })).toBeTruthy()
+    expect(screen.getByText("Alex Chen")).toBeTruthy()
+    fireEvent.click(screen.getByRole("button", { name: "Remove Alex Chen" }))
+    expect(onMultipleChange).toHaveBeenCalledWith([])
+  })
+
+  it("falls back to the value if the selected option was never loaded", () => {
+    render(<SearchableDropdown options={[]} placeholder="Search members" value="unknown" onValueChange={vi.fn()} onQueryChange={vi.fn()} />)
+    expect(screen.getByText("unknown")).toBeTruthy()
+    expect(screen.getByRole("button", { name: "Clear unknown" })).toBeTruthy()
+  })
+
   it("closes on Escape, then clears the query on a second Escape", () => {
     render(<Single />)
     const input = screen.getByRole("combobox") as HTMLInputElement

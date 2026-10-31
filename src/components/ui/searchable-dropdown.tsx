@@ -91,7 +91,16 @@ export function SearchableDropdown(props: SearchableDropdownProps) {
   const [announcement, setAnnouncement] = React.useState("")
   const multiple = props.multiple === true
   const values: readonly string[] = props.multiple ? props.value : props.value ? [props.value] : []
-  const selected = !multiple ? options.find((option) => option.value === values[0]) : undefined
+  const [cacheState, setCacheState] = React.useState(() => ({ source: options, map: new Map(options.map((option) => [option.value, option])) }))
+  let optionCache = cacheState.map
+  if (cacheState.source !== options) {
+    optionCache = new Map(optionCache)
+    for (const option of options) optionCache.set(option.value, option)
+    setCacheState({ source: options, map: optionCache })
+  }
+  const resolveOption = (value: string): SearchableOption =>
+    options.find((option) => option.value === value) ?? optionCache.get(value) ?? { value, label: value }
+  const selected = !multiple && values[0] ? resolveOption(values[0]) : undefined
   const visible = onQueryChange ? options : options.filter((option) => filter(option, query))
   const { activeIndex, setActiveIndex, onKeyDown: move, getOptionId } = useActiveDescendant(visible.length)
   const current = activeIndex >= 0 ? visible[activeIndex] : undefined
@@ -136,7 +145,7 @@ export function SearchableDropdown(props: SearchableDropdownProps) {
     }
   }
   const remove = (value: string) => {
-    const label = options.find((item) => item.value === value)?.label ?? value
+    const label = resolveOption(value).label
     if (props.multiple) props.onValueChange(props.value.filter((item) => item !== value))
     else props.onValueChange(null)
     setAnnouncement(`${label} removed`)
@@ -178,8 +187,7 @@ export function SearchableDropdown(props: SearchableDropdownProps) {
         >
           {!multiple && !selected ? <Search aria-hidden className="size-4 shrink-0 text-muted-foreground" /> : null}
           {multiple ? values.map((value) => {
-            const option = options.find((item) => item.value === value)
-            if (!option) return null
+            const option = resolveOption(value)
             return <span key={value} className="inline-flex h-7 max-w-full items-center gap-1.5 rounded-full bg-muted pl-1 pr-1.5 text-label text-foreground">
               {option.lead ? <span className="flex size-5 shrink-0 items-center justify-center overflow-hidden rounded-full [&_[data-slot=avatar]]:size-5">{option.lead}</span> : null}
               <span className="truncate">{option.label}</span>
