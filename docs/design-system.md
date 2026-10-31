@@ -3,8 +3,9 @@
 Condensed index of the Figma file
 [1.0 Portal Design System – UBC UX Hub](https://www.figma.com/design/1JFllaWKGIMb3hBOl5m2Py/1.0-Portal-Design-System-UBC-UX-Hub)
 (v1.0, last updated Oct 27, 2026; snapshot taken 2026-10-30). Figma stays the
-source of truth. Page links open the page's main frame. Section 6, "How to use
-in Claude Design", is left out.
+source of truth for the existing library; the student event-card badge decision
+in §3.3 is an extension awaiting Figma sync. Page links open the page's main
+frame. Section 6, "How to use in Claude Design", is left out.
 
 ## Contents
 
@@ -464,6 +465,34 @@ Every badge has a 14px icon and a label; one badge per item (current status
 only). Sizes Default and Large. FilterChips (optional count, Selected, Disabled)
 combine, sit above the list in one row with any Select.
 
+**Student event-card badge decision (to sync to Figma):** Use the exact labels
+from [event-states.md](event-states.md), with the existing status tones and a
+14px Lucide icon. Dates in badge labels use the short Pacific form shown below;
+the date is part of the label, not a separate badge. This is a display mapping,
+not a new stored event or application status. It supersedes `Pending` and
+`Accepted` as *student event-card* labels; the nine-badge table above remains a
+record of the current Figma library.
+
+| Source | Student badge label | Tone | Lucide icon |
+| --- | --- | --- | --- |
+| Availability | Opens Oct 12 | info | `calendar-days` |
+| Availability | Registration open | success | `door-open` |
+| Availability | Full | error | `lock` |
+| Availability | Registration closed | neutral | `door-closed` |
+| Availability | Past | neutral | `history` |
+| Own application | Under review | warning | `hourglass` |
+| Own application | Waitlisted | warning | `hourglass` |
+| Own application | Register by Oct 20 | info | `circle-alert` |
+| Own application | Offer expired | neutral | `clock-alert` |
+| Own application | Not selected | neutral | `circle-minus` |
+| Own ticket | Going | success | `circle-check` |
+| Own ticket | Checked in | success | `user-check` |
+
+`Opens` and `Register by` use the event's actual date; `Oct 12` and `Oct 20`
+are examples. Info marks an upcoming opening or a live confirmation deadline;
+neutral marks a closed or lapsed state. Keep the existing warning, success,
+and error meanings for the other rows.
+
 ### 3.4 Navigation
 
 - **Sidebar:** 256px, 88px collapsed. Members see the Browse group (Home,
@@ -664,16 +693,19 @@ logo or Hubbo in the grid.
 
 ### 4.3 Status lifecycle
 
-- Event states (Registration open, Full, Past) show until a member has their own
-  status. Member statuses (Pending, Accepted, Waitlisted, Not selected, Going,
-  Checked in): show only the current one.
+- The current Figma library lists event badges (Registration open, Full, Past)
+  and member badges (Pending, Accepted, Waitlisted, Not selected, Going,
+  Checked in). Student event cards use the labels in §3.3 and the priority
+  rules in [event-states.md](event-states.md).
 - Flows: open RSVP → Going directly. Application → Pending → Accepted (confirm
-  by deadline) → Going → Checked in → Past; or Waitlisted (spot opens →
-  Accepted) or Not selected. Innovators applying to UXathon are accepted on
-  submit and confirm without paying. Missed confirmation deadline:
-  `[TBD in Figma]`.
-- Only Accepted gets an action banner (the only status with a deadline).
-  Badges stay short.
+  by deadline) → Going → Checked in; or Waitlisted (spot opens → Accepted) or
+  Not selected. Checked in stays Checked in after the event ends; it does not
+  turn into Past. Innovators applying to UXathon are accepted on submit and
+  confirm without paying. Missed confirmation deadline: Offer expired on the
+  student event card, pending Figma sync.
+- Only an accepted offer gets an action banner (the only status with a
+  deadline). Its student event-card badge reads Register by [DATE]. Badges stay
+  short.
 
 | Status | Banner / card copy | Button | Email |
 | --- | --- | --- | --- |
@@ -813,5 +845,7 @@ Organization lead), and Patterns parts (`Ticket`, `Hubbo/Placeholder`,
   token sheet contains 48.
 - 1.1 says 3.10–3.16 are drawings not yet in the library, but the Library page
   already has components for all of them.
-- Open placeholders: missed-confirmation outcome (4.3), email templates (4.3),
-  Hubbo illustrations, illustrator name and master-file link (5.2).
+- 4.3 still marks the missed-confirmation outcome as TBD in Figma; §3.3 now
+  resolves its student badge as Offer expired and needs syncing to Figma.
+- Open placeholders: email templates (4.3), Hubbo illustrations, illustrator
+  name and master-file link (5.2).
