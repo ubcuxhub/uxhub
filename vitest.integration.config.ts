@@ -1,5 +1,5 @@
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 
 /**
  * Integration tests: Vitest against the local Supabase.
@@ -19,6 +19,8 @@ export default defineConfig({
   },
   test: {
     include: ["**/*.integration.test.ts"],
+    // `.claude/**` holds agent worktrees, which carry their own copies.
+    exclude: [...configDefaults.exclude, ".claude/**"],
     // Fixtures are scoped by a per-test tag rather than rolled back, so files
     // may run in parallel, but the cases inside one file share a context and
     // run in order.
