@@ -20,7 +20,7 @@ function Single({ initial = null, forcedQuery }: { initial?: string | null; forc
     if (!forcedQuery) return;
     const input = wrapper.current?.querySelector<HTMLInputElement>('input[role="combobox"]');
     if (!input) return;
-    input.focus();
+    input.focus({ preventScroll: true });
     const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
     setter?.call(input, forcedQuery);
     input.dispatchEvent(new Event("input", { bubbles: true }));
