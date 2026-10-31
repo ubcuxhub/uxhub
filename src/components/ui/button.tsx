@@ -10,6 +10,9 @@ import { cn } from "@/lib/utils";
  * aliases so call sites need no change: `default` = `primary`, `outline` =
  * `secondary`, size `default` = `md`.
  *
+ * `md` is 44px below `sm` and 40px above, matching Input and Select, so a
+ * button beside a field lines up on phones.
+ *
  * On coarse pointers an invisible `::after` grows the hit area to 44px (§2.4).
  * Its inset is measured from the padding box, so it is 1px more than the
  * overhang it adds past the 1px border. Every `after:` class is
@@ -60,10 +63,10 @@ const buttonVariants = cva(
         link: "rounded-sm text-info underline-offset-4 hover:underline disabled:not-aria-busy:text-fg-disabled aria-disabled:text-fg-disabled",
       },
       size: {
-        md: "h-10 gap-2 px-4 text-button pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-[3px] [&_svg]:size-4",
+        md: "h-11 gap-2 px-4 text-button sm:h-10 pointer-coarse:after:inset-0 pointer-coarse:sm:after:-inset-y-[3px] [&_svg]:size-4",
         /** @deprecated Use `md`. */
         default:
-          "h-10 gap-2 px-4 text-button pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-[3px] [&_svg]:size-4",
+          "h-11 gap-2 px-4 text-button sm:h-10 pointer-coarse:after:inset-0 pointer-coarse:sm:after:-inset-y-[3px] [&_svg]:size-4",
         sm: "h-8 gap-1.5 px-3 text-button-small pointer-coarse:after:-inset-[7px] [&_svg]:size-3.5",
         icon: "size-8 p-0 pointer-coarse:after:-inset-[7px] [&_svg]:size-4",
         "icon-sm":

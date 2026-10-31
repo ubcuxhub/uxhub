@@ -28,7 +28,7 @@ function Buttons() {
       <SpecimenGroup
         title="Button · variant × size"
         spec="§3.1"
-        description="md is 40px, sm is 32px. Link has no height or padding. Hover, pressed and focus are checked interactively (or in the forced-state group below)."
+        description="md is 40px (44px on phones, matching inputs), sm is 32px. Link has no height or padding. Hover, pressed and focus are checked interactively (or in the forced-state group below)."
         min="9rem"
       >
         {VARIANTS.flatMap((variant) =>
