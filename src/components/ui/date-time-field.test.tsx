@@ -30,6 +30,8 @@ function Date_({
   initial?: IsoDate | null;
   onValidityChange?: (error: string | null) => void;
   min?: IsoDate;
+  name?: string;
+  disabled?: boolean;
 }) {
   const [value, setValue] = useState<IsoDate | null>(initial);
   return (
@@ -97,19 +99,40 @@ describe("DateField", () => {
     expect(onValueChange).toHaveBeenCalledWith(null);
   });
 
-  it("submits the ISO value through a hidden input", () => {
+  it("submits only the committed ISO value while edited text stays visible", () => {
     const { container } = render(
-      <DateField
-        aria-label="Date"
-        name="start_date"
-        today={today}
-        value="2026-11-14"
-        onValueChange={() => {}}
-      />,
+      <form>
+        <Date_ initial="2026-11-14" name="start_date" />
+      </form>,
     );
-    const hidden = container.querySelector('input[type="hidden"]') as HTMLInputElement;
-    expect(hidden.name).toBe("start_date");
-    expect(hidden.value).toBe("2026-11-14");
+    const form = container.querySelector("form")!;
+    const input = screen.getByRole("textbox", { name: "Date" }) as HTMLInputElement;
+    const submitted = () => new FormData(form).get("start_date");
+
+    expect(submitted()).toBe("2026-11-14");
+
+    fireEvent.change(input, { target: { value: "feb 30" } });
+    expect(input.value).toBe("feb 30");
+    expect(submitted()).toBe("");
+    fireEvent.blur(input);
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(input.value).toBe("feb 30");
+    expect(submitted()).toBe("");
+
+    fireEvent.change(input, { target: { value: "nov 15" } });
+    expect(submitted()).toBe("");
+    fireEvent.blur(input);
+    expect(input.value).toBe("Sun, Nov 15, 2026");
+    expect(submitted()).toBe("2026-11-15");
+  });
+
+  it("omits a disabled date field from FormData", () => {
+    const { container } = render(
+      <form>
+        <Date_ initial="2026-11-14" name="start_date" disabled />
+      </form>,
+    );
+    expect(new FormData(container.querySelector("form")!).has("start_date")).toBe(false);
   });
 
   it("opens the calendar on the selected day, focuses the selected day, picks, and returns focus", async () => {
