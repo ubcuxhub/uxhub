@@ -1,9 +1,9 @@
 "use client";
 
-import { Calendar, CalendarDays, Home, LayoutDashboard, Users } from "lucide-react";
+import { CalendarCheck, House, Users } from "lucide-react";
 import type { ReactNode } from "react";
 
-import { AppSidebar } from "@/components/shared/AppSidebar";
+import { AppSidebarNav } from "@/components/shared/AppSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Sidebar,
@@ -20,7 +20,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 
-import { Composition, Placeholder, Specimen, SpecimenGroup } from "../_gallery/Specimen";
+import { Composition, Specimen, SpecimenGroup } from "../_gallery/Specimen";
 import type { GallerySection } from "../_gallery/types";
 
 /**
@@ -31,7 +31,7 @@ import type { GallerySection } from "../_gallery/types";
  */
 function SidebarFrame({ children }: { children: ReactNode }) {
   return (
-    <div className="relative h-[640px] overflow-hidden rounded-xl border [transform:translateZ(0)] [&_[data-slot=sidebar-container]]:h-full! [&_[data-slot=sidebar-wrapper]]:h-full [&_[data-slot=sidebar-wrapper]]:min-h-0!">
+    <div className="relative h-[680px] overflow-hidden rounded-xl border [transform:translateZ(0)] [&_[data-slot=sidebar-container]]:h-full! [&_[data-slot=sidebar-wrapper]]:h-full [&_[data-slot=sidebar-wrapper]]:min-h-0!">
       {children}
     </div>
   );
@@ -43,7 +43,7 @@ function PageBody() {
       <div className="flex flex-col gap-4 p-6">
         <div className="flex items-center gap-3">
           <SidebarTrigger />
-          <h3 className="text-h2">Events</h3>
+          <h3 className="text-h2">Manage Events</h3>
         </div>
         <Card>
           <CardHeader>
@@ -58,62 +58,57 @@ function PageBody() {
   );
 }
 
+/** A sidebar on its own, in a frame as tall as the shell. */
+function SidebarOnly({
+  defaultOpen = true,
+  isAdmin,
+  isManager,
+  pathname,
+}: {
+  defaultOpen?: boolean;
+  isAdmin: boolean;
+  isManager: boolean;
+  pathname: string;
+}) {
+  return (
+    <div className="relative h-[680px] w-fit overflow-hidden rounded-xl border [transform:translateZ(0)] [&_[data-slot=sidebar-container]]:h-full! [&_[data-slot=sidebar-wrapper]]:h-full [&_[data-slot=sidebar-wrapper]]:min-h-0!">
+      <SidebarProvider defaultOpen={defaultOpen}>
+        <AppSidebarNav isAdmin={isAdmin} isManager={isManager} pathname={pathname} />
+      </SidebarProvider>
+    </div>
+  );
+}
+
 /**
- * Admin items built from the same primitives as AppSidebar. `AppSidebar`
- * reads `useUser()` and the gallery has no signed-in user, so the admin group
- * can't be shown through it; PR 5 extracts `AppSidebarNav` and replaces this.
+ * Row states the real sidebar can't show at once: selected, a count badge,
+ * disabled. Hover and focus are checked by hand.
  */
-function AdminItemsReplica() {
+function RowStates() {
   return (
     <SidebarProvider className="min-h-0 w-full">
       <Sidebar collapsible="none" className="w-64 rounded-xl border">
         <SidebarContent>
           <SidebarGroup className="p-3">
-            <SidebarGroupLabel className="uppercase">Browse</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <SidebarMenu>
-                <SidebarMenuItem>
-                  <SidebarMenuButton isActive>
-                    <Home />
-                    <span>Home</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
-                  <SidebarMenuButton>
-                    <CalendarDays />
-                    <span>Events</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-          <SidebarGroup className="p-3">
-            <SidebarGroupLabel className="uppercase">Admin</SidebarGroupLabel>
+            <SidebarGroupLabel>Rows</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton>
-                    <LayoutDashboard />
-                    <span>Dashboard</span>
+                    <House />
+                    <span>Default</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuButton isActive>
-                    <Calendar />
-                    <span>Manage Events</span>
+                    <CalendarCheck />
+                    <span>Selected</span>
                   </SidebarMenuButton>
                   <SidebarMenuBadge>3</SidebarMenuBadge>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                  <SidebarMenuButton>
-                    <Users />
-                    <span>Manage Users</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-                <SidebarMenuItem>
                   <SidebarMenuButton disabled>
                     <Users />
-                    <span>Disabled item</span>
+                    <span>Disabled</span>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>
@@ -129,47 +124,67 @@ function Navigation() {
   return (
     <div className="flex flex-col gap-8">
       <SpecimenGroup
-        title="Sidebar rows"
+        title="Sidebar"
         spec="§3.4"
-        description="Menu button states, group labels (uppercase today) and a badge. Selected rows use data-active."
+        description="AppSidebarNav with fixture flags. Members see Browse; admins add Admin; managers add Club Settings. Collapsed is the 88px icon rail."
         min="18rem"
       >
-        <Specimen label="Browse + Admin groups, selected and disabled rows" bare wide>
-          <AdminItemsReplica />
+        <Specimen label="Member · Home selected" bare>
+          <SidebarOnly isAdmin={false} isManager={false} pathname="/portal" />
+        </Specimen>
+        <Specimen label="Admin · Manage Events selected" bare>
+          <SidebarOnly isAdmin isManager={false} pathname="/admin/events/new" />
+        </Specimen>
+        <Specimen label="Manager · Club Settings selected" bare>
+          <SidebarOnly isAdmin isManager pathname="/admin/settings" />
+        </Specimen>
+        <Specimen label="Admin · collapsed (88px)" bare>
+          <SidebarOnly
+            defaultOpen={false}
+            isAdmin
+            isManager
+            pathname="/admin/users"
+          />
+        </Specimen>
+      </SpecimenGroup>
+
+      <SpecimenGroup
+        title="Sidebar rows"
+        spec="§3.4"
+        description="Row states: default, selected with a badge, disabled. 44px rows, 16px icons in text-secondary, no weight change when selected."
+        min="18rem"
+      >
+        <Specimen label="Default, selected + badge, disabled" bare>
+          <RowStates />
         </Specimen>
       </SpecimenGroup>
 
       <Composition
         title="Sidebar"
-        description="AppSidebar in its current form, expanded and collapsed (icons only), inside a framed shell. Signed out, so the Admin group is absent."
+        description="The shell: AppSidebarNav beside a page title and a card, expanded and collapsed."
       >
         <div className="grid gap-6">
           <Specimen label="Expanded" bare>
             <div className="w-full">
               <SidebarFrame>
                 <SidebarProvider defaultOpen>
-                  <AppSidebar />
+                  <AppSidebarNav isAdmin isManager pathname="/admin/events" />
                   <PageBody />
                 </SidebarProvider>
               </SidebarFrame>
             </div>
           </Specimen>
-          <Specimen label="Collapsed (icon rail)" bare>
+          <Specimen label="Collapsed (88px icon rail)" bare>
             <div className="w-full">
               <SidebarFrame>
                 <SidebarProvider defaultOpen={false}>
-                  <AppSidebar />
+                  <AppSidebarNav isAdmin isManager pathname="/admin/events" />
                   <PageBody />
                 </SidebarProvider>
               </SidebarFrame>
             </div>
           </Specimen>
         </div>
-        <Placeholder>
-          AppSidebar reads useUser(), and a nested UserProvider can’t fake an
-          admin, so the Admin group isn’t shown here. PR 5 extracts a
-          prop-driven AppSidebarNav for that.
-        </Placeholder>
       </Composition>
     </div>
   );

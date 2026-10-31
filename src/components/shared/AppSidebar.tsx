@@ -4,10 +4,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
-  CalendarDays,
-  Home,
+  Calendar,
+  CalendarCheck,
+  House,
   LayoutDashboard,
-  PanelLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
   Settings,
   SlidersHorizontal,
   Users,
@@ -35,54 +37,78 @@ import {
 } from "@/components/ui/sidebar";
 
 const studentItems = [
-  { title: "Home", href: "/portal", icon: Home, exact: true },
+  { title: "Home", href: "/portal", icon: House, exact: true },
   ...(FLAGS.studentEvents
-    ? [{ title: "Events", href: "/portal/events", icon: CalendarDays }]
+    ? [{ title: "Events", href: "/portal/events", icon: Calendar }]
     : []),
 ];
 
-function useIsActive() {
-  const pathname = usePathname();
+export function AppSidebar() {
+  const { user } = useUser();
+
+  return (
+    <AppSidebarNav
+      isAdmin={hasAdminAccess(user?.role_access)}
+      isManager={hasManagerAccess(user?.role_access)}
+    />
+  );
+}
+
+/**
+ * The sidebar as a view of two flags. `AppSidebar` derives them from the
+ * signed-in user; the dev gallery passes fixtures. `pathname` overrides the
+ * current route so a fixture can show a selected row.
+ */
+export function AppSidebarNav({
+  isAdmin,
+  isManager,
+  pathname: pathnameOverride,
+}: {
+  isAdmin: boolean;
+  isManager: boolean;
+  pathname?: string;
+}) {
+  const { state, isMobile, toggleSidebar } = useSidebar();
+  const currentPathname = usePathname();
+  const pathname = pathnameOverride ?? currentPathname;
   // Index routes (e.g. /portal, /admin) are prefixes of every child route, so
   // they must match exactly; deeper routes match by prefix so child pages keep
   // their tab highlighted.
-  return (href: string, exact = false) =>
+  const isActive = (href: string, exact = false) =>
     exact ? pathname === href : pathname === href || pathname.startsWith(`${href}/`);
-}
-
-export function AppSidebar() {
-  const { user } = useUser();
-  const { state, toggleSidebar } = useSidebar();
-  const isActive = useIsActive();
-  const isAdmin = hasAdminAccess(user?.role_access);
-  const isManager = hasManagerAccess(user?.role_access);
+  const collapsed = state === "collapsed" && !isMobile;
+  const toggleLabel = collapsed ? "Expand Sidebar" : "Collapse Sidebar";
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarHeader className="p-3 group-data-[collapsible=icon]:hidden">
-        <Link href="/portal" aria-label="UBC UX Hub" className="px-2 py-1">
+      <SidebarHeader className="px-6 pt-10 pb-4 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-0">
+        <Link
+          href="/portal"
+          aria-label="UBC UX Hub"
+          className="block size-9 rounded-md transition-[width,height] duration-200 ease-out focus-visible:focus-ring group-data-[collapsible=icon]:size-8"
+        >
           <Image
             src="/icons/icon-dark.svg"
             alt=""
-            width={40}
-            height={40}
-            className="size-14 dark:hidden"
+            width={36}
+            height={36}
+            className="size-full dark:hidden"
             priority
           />
           <Image
             src="/icons/icon-light.svg"
             alt=""
-            width={40}
-            height={40}
-            className="hidden size-14 dark:block"
+            width={36}
+            height={36}
+            className="hidden size-full dark:block"
             priority
           />
         </Link>
       </SidebarHeader>
 
-      <SidebarContent className="group-data-[collapsible=icon]:invisible">
-        <SidebarGroup className="p-3 group-data-[collapsible=icon]:p-2">
-          <SidebarGroupLabel className="uppercase">Browse</SidebarGroupLabel>
+      <SidebarContent>
+        <SidebarGroup className="p-3 group-data-[collapsible=icon]:px-0">
+          <SidebarGroupLabel>Browse</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {studentItems.map((item) => (
@@ -104,8 +130,8 @@ export function AppSidebar() {
         </SidebarGroup>
 
         {isAdmin && (
-          <SidebarGroup className="p-3 group-data-[collapsible=icon]:p-2">
-            <SidebarGroupLabel className="uppercase">Admin</SidebarGroupLabel>
+          <SidebarGroup className="p-3 group-data-[collapsible=icon]:px-0">
+            <SidebarGroupLabel>Admin</SidebarGroupLabel>
             <SidebarGroupContent>
               <SidebarMenu>
                 <SidebarMenuItem>
@@ -128,7 +154,7 @@ export function AppSidebar() {
                     tooltip="Manage Events"
                   >
                     <Link href="/admin/events">
-                      <CalendarDays />
+                      <CalendarCheck />
                       <span>Manage Events</span>
                     </Link>
                   </SidebarMenuButton>
@@ -167,14 +193,10 @@ export function AppSidebar() {
         )}
       </SidebarContent>
 
-      <SidebarFooter className="p-3">
+      <SidebarFooter className="p-3 group-data-[collapsible=icon]:px-0">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton
-              onClick={() => openSettings()}
-              tooltip="Settings"
-              className="h-11 group-data-[collapsible=icon]:size-9! sm:h-9"
-            >
+            <SidebarMenuButton onClick={() => openSettings()} tooltip="Settings">
               <Settings />
               <span>Settings</span>
             </SidebarMenuButton>
@@ -182,12 +204,11 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton
               onClick={toggleSidebar}
-              tooltip={state === "collapsed" ? "Expand sidebar" : "Collapse sidebar"}
-              aria-label={state === "collapsed" ? "Expand sidebar" : "Collapse sidebar"}
-              className="h-11 group-data-[collapsible=icon]:size-9! sm:h-9"
+              tooltip={toggleLabel}
+              aria-label={toggleLabel}
             >
-              <PanelLeft />
-              <span>Collapse sidebar</span>
+              {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+              <span>{toggleLabel}</span>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
