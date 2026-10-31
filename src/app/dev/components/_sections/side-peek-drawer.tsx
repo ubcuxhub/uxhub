@@ -103,7 +103,7 @@ function Section({ open: initialState }: SectionProps) {
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <SidePeekDrawerTitle>{person.name}</SidePeekDrawerTitle>
-                  <ShieldCheck className="size-5 text-primary" strokeWidth={1.5} aria-label="Verified student" />
+                  <ShieldCheck className="size-5 text-primary" aria-label="Verified student" />
                   <span className="text-small text-muted-foreground">she/her</span>
                 </div>
                 <p className="text-small text-muted-foreground">Member since July 21, 2026</p>

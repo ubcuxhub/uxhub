@@ -122,7 +122,10 @@ const SidePeekDrawerContent = React.forwardRef<
             content.focus();
             return;
           }
-          if (event.shiftKey && document.activeElement === tabbables[0]) {
+          if (event.shiftKey && (
+            document.activeElement === tabbables[0] ||
+            document.activeElement === content.querySelector('[data-slot="side-peek-drawer-title"]')
+          )) {
             event.preventDefault();
             tabbables[tabbables.length - 1].focus();
           } else if (!event.shiftKey && document.activeElement === tabbables[tabbables.length - 1]) {
@@ -154,7 +157,7 @@ function SidePeekDrawerHeader({
     >
       <div className="flex items-center gap-1">
         <IconButton variant="ghost" label="Close panel (Esc)" onClick={requestClose} className="rounded-lg text-muted-foreground">
-          <ChevronsRight className="size-[18px]" strokeWidth={1.5} />
+          <ChevronsRight className="size-[18px]" />
         </IconButton>
         {fullPageHref ? (
           <Tooltip>
@@ -164,7 +167,7 @@ function SidePeekDrawerHeader({
                 aria-label="Open as full page"
                 className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "rounded-lg text-muted-foreground")}
               >
-                <Maximize2 className="size-[18px]" strokeWidth={1.5} aria-hidden />
+                <Maximize2 className="size-[18px]" aria-hidden />
               </Link>
             </TooltipTrigger>
             <TooltipContent>Open as full page</TooltipContent>

@@ -64,5 +64,9 @@ describe("SidePeekDrawer", () => {
     expect(document.activeElement).toBe(first);
     fireEvent.keyDown(first, { key: "Tab", shiftKey: true });
     expect(document.activeElement).toBe(last);
+    const title = screen.getByText("Jane Smith");
+    title.focus();
+    fireEvent.keyDown(title, { key: "Tab", shiftKey: true });
+    expect(document.activeElement).toBe(last);
   });
 });
