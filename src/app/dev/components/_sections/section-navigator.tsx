@@ -18,7 +18,6 @@ const sections: readonly NavigatorSection[] = [
 
 function NavigatorGallery({ open }: SectionProps) {
   const observedId = useCurrentSection(sections.map((section) => section.id));
-  const currentId = open === "menu" ? "navigator-registration" : observedId;
   return <div className="relative pb-28">
     <div className="mb-6 rounded-2xl border border-border bg-card p-6">
       <h3 className="text-title font-semibold text-foreground">Event setup</h3>
@@ -33,7 +32,7 @@ function NavigatorGallery({ open }: SectionProps) {
         <div className="h-12 rounded-xl border border-border-subtle bg-muted" />
       </div>
     </section>)}</div>
-    <SectionNavigator title="Event setup" sections={sections} currentId={currentId} defaultOpen={open === "menu"} />
+    <SectionNavigator title="Event setup" sections={sections} currentId={observedId} defaultOpen={open === "menu"} />
   </div>;
 }
 

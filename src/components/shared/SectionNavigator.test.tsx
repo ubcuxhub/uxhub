@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { cleanup, fireEvent, render, screen } from "@testing-library/react"
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import { SectionNavigator, type NavigatorSection } from "./SectionNavigator"
 
 const sections: NavigatorSection[] = [
@@ -11,7 +11,7 @@ const sections: NavigatorSection[] = [
   { id: "publishing", title: "Publishing", state: "not-started", required: true },
 ]
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); vi.unstubAllGlobals() })
 
 describe("SectionNavigator", () => {
   it("counts only required complete sections and names the trigger", () => {
@@ -29,5 +29,19 @@ describe("SectionNavigator", () => {
     render(<SectionNavigator title="Event setup" sections={sections} currentId="basics" onNavigate={onNavigate} defaultOpen />)
     fireEvent.click(screen.getByRole("menuitem", { name: /Publishing/ }))
     expect(onNavigate).toHaveBeenCalledWith("publishing")
+  })
+
+  it("scrolls to the section and focuses its heading by default", async () => {
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => callback(0))
+    const scrollIntoView = vi.fn()
+    const { container } = render(<>
+      <section id="publishing"><h2>Publishing heading</h2></section>
+      <SectionNavigator title="Event setup" sections={sections} currentId="basics" defaultOpen />
+    </>)
+    const target = container.querySelector<HTMLElement>("#publishing")!
+    target.scrollIntoView = scrollIntoView
+    fireEvent.click(screen.getByRole("menuitem", { name: /Publishing/ }))
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "start" })
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("heading", { name: "Publishing heading" })))
   })
 })

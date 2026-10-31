@@ -27,8 +27,8 @@ export interface SectionNavigatorProps {
 
 function SectionMark({ state, size = "menu" }: { state: SectionState; size?: "menu" | "pill" }) {
   const sizeClass = size === "pill" ? "size-4" : "size-[18px]"
-  if (state === "complete") return <span role="img" aria-label="Complete" className={cn("inline-flex shrink-0 items-center justify-center rounded-full bg-success-solid text-primary-foreground", sizeClass)}><Check aria-hidden className="size-3 stroke-[2.5]" /></span>
-  if (state === "attention") return <span role="img" aria-label="Needs attention" className={cn("inline-flex shrink-0 items-center justify-center rounded-full bg-destructive text-destructive-foreground", sizeClass)}><AlertCircle aria-hidden className="size-3.5 stroke-[2.5]" /></span>
+  if (state === "complete") return <span role="img" aria-label="Complete" className={cn("inline-flex shrink-0 items-center justify-center rounded-full bg-success-solid", sizeClass)}><Check aria-hidden className="size-3 stroke-[2.5] text-primary-foreground" /></span>
+  if (state === "attention") return <span role="img" aria-label="Needs attention" className={cn("inline-flex shrink-0 items-center justify-center rounded-full bg-destructive", sizeClass)}><AlertCircle aria-hidden className="size-3.5 stroke-[2.5] text-destructive-foreground" /></span>
   return <span role="img" aria-label={state === "optional" ? "Optional" : "Not started"} className={cn("inline-block shrink-0 rounded-full border-[1.5px] border-border", state === "optional" && "border-dashed", sizeClass)} />
 }
 
@@ -69,6 +69,7 @@ export function SectionNavigator({ title, sections, currentId, onNavigate, class
         </span>
         <span className="min-w-0 truncate text-small font-semibold">{current.title}</span>
         {issueCount > 0 ? <span className="flex shrink-0 items-center gap-1 text-label text-destructive"><AlertCircle aria-hidden className="size-3.5" />{issueCount} {issueCount === 1 ? "issue" : "issues"}</span> : null}
+        {!issueCount ? <SectionMark state={current.state} size="pill" /> : null}
         <span className="shrink-0 text-label tabular-nums text-muted-foreground">{String(currentIndex + 1).padStart(2, "0")}/{String(sections.length).padStart(2, "0")}</span>
         <ChevronDown aria-hidden className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
       </button>
