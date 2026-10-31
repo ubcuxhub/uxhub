@@ -344,7 +344,7 @@ function Section() {
 
       <Composition
         title="Hubbo in an empty state"
-        description="Card size above the copy. EmptyState’s media slot is a 40px disc, so this stand-in frames it locally until the wrap-up swaps it in. One per screen, never on payments or rejections."
+        description="Card size above the copy. EmptyState’s media slot is a 40px disc, so the art sits above it in a local frame (follow-up: a Hubbo slot on EmptyState). One per screen, never on payments or rejections."
       >
         <div className="flex max-w-md flex-col items-center rounded-xl border border-border bg-card pt-8">
           <Hubbo emotion="resting" size="card" />
