@@ -70,7 +70,13 @@ function ListRow({ name, description, lead, link }: ListRowProps) {
   return (
     <li
       data-slot="list-row"
-      className="flex min-w-0 flex-wrap items-center gap-4 rounded-lg border border-border-subtle bg-section p-4"
+      className={cn(
+        // Lead | text on phones, with the link on its own line under the text;
+        // lead | text | link from `sm`. Grid tracks (not flex-wrap) so the row
+        // can never be wider than its card: the text track is minmax(0, 1fr).
+        "grid min-w-0 grid-cols-[4rem_minmax(0,1fr)] items-center gap-x-4 gap-y-3 rounded-lg border border-border-subtle bg-section p-4",
+        link && "sm:grid-cols-[4rem_minmax(0,1fr)_auto]",
+      )}
     >
       {lead.kind === "person" ? (
         <Avatar name={name} src={lead.src} size={64} decorative />
@@ -93,7 +99,7 @@ function ListRow({ name, description, lead, link }: ListRowProps) {
         </span>
       )}
 
-      <span className="flex min-w-0 flex-1 flex-col">
+      <span className="flex min-w-0 flex-col [overflow-wrap:anywhere]">
         <span className="text-subheading">{name}</span>
         {description ? (
           <span className="text-small text-muted-foreground">{description}</span>
@@ -106,10 +112,10 @@ function ListRow({ name, description, lead, link }: ListRowProps) {
           target="_blank"
           rel="noopener noreferrer"
           aria-label={`${name} on ${link.label}`}
-          className="inline-flex shrink-0 items-center gap-2 rounded-sm text-small text-foreground underline underline-offset-4 hover:text-primary focus-visible:focus-ring max-sm:ml-20 max-sm:basis-full"
+          className="inline-flex items-center gap-2 rounded-sm text-small text-foreground underline underline-offset-4 hover:text-primary focus-visible:focus-ring col-start-2 min-w-0 justify-self-start sm:col-start-3 sm:justify-self-end"
         >
           {link.icon}
-          <span>{link.label}</span>
+          <span className="min-w-0 [overflow-wrap:anywhere]">{link.label}</span>
         </a>
       ) : null}
     </li>

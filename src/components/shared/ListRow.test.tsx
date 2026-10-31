@@ -52,4 +52,41 @@ describe("ListRow", () => {
 
     expect(screen.getByText("NS").getAttribute("aria-hidden")).not.toBeNull();
   });
+
+  // jsdom has no layout, so these pin the classes that keep the row inside a
+  // 375px card; the overflow itself was checked in the browser (gallery,
+  // /dev/components?section=lists, at 375px).
+  it("uses a bounded text track and no fixed-width wrapping link", () => {
+    render(
+      <ul>
+        <ListRow
+          name="Alexandria Montgomery-Featherstonehaugh"
+          description="Senior staff product designer and design systems lead · Northwind Traders International"
+          lead={{ kind: "person" }}
+          link={{ href: "https://example.com", label: "LinkedIn" }}
+        />
+      </ul>,
+    );
+
+    const row = screen.getByRole("listitem");
+    expect(row.className).toContain("grid-cols-[4rem_minmax(0,1fr)]");
+    expect(row.className).toContain("sm:grid-cols-[4rem_minmax(0,1fr)_auto]");
+    expect(row.className).not.toContain("flex-wrap");
+
+    const link = screen.getByRole("link");
+    expect(link.className).not.toContain("basis-full");
+    expect(link.className).not.toContain("ml-20");
+    expect(link.className).toContain("col-start-2");
+  });
+
+  it("keeps two columns when there is no link", () => {
+    render(
+      <ul>
+        <ListRow name="Alex Chen" lead={{ kind: "person" }} />
+      </ul>,
+    );
+    const row = screen.getByRole("listitem");
+    expect(row.className).toContain("grid-cols-[4rem_minmax(0,1fr)]");
+    expect(row.className).not.toContain("_auto]");
+  });
 });

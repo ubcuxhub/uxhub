@@ -48,6 +48,52 @@ describe("EmptyState", () => {
     expect(container.querySelector("[data-slot=empty-state-media]")).toBeNull();
   });
 
+  it("renders an icon in its own disc", () => {
+    const { container } = render(
+      <EmptyState title="No events" icon={<Calendar />} />,
+    );
+    expect(container.querySelector("[data-slot=empty-state-icon] svg")).toBeTruthy();
+    expect(container.querySelector("[data-slot=empty-state-media]")).toBeNull();
+  });
+
+  it("renders media unframed, above the title", () => {
+    const { container } = render(
+      <EmptyState
+        title="No events"
+        media={<span data-testid="art" />}
+      />,
+    );
+    const media = container.querySelector("[data-slot=empty-state-media]");
+    expect(media?.contains(screen.getByTestId("art"))).toBe(true);
+    // No 40px disc around art.
+    expect(media?.className).not.toContain("size-10");
+    expect(container.querySelector("[data-slot=empty-state-icon]")).toBeNull();
+    const title = screen.getByRole("heading", { name: "No events" });
+    expect(
+      media!.compareDocumentPosition(title) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
+  it("media wins when both media and icon are given", () => {
+    const { container } = render(
+      <EmptyState
+        title="No events"
+        icon={<Calendar />}
+        media={<span data-testid="art" />}
+      />,
+    );
+    expect(screen.getByTestId("art")).toBeTruthy();
+    expect(container.querySelector("[data-slot=empty-state-icon]")).toBeNull();
+    expect(container.querySelector("svg")).toBeNull();
+  });
+
+  it("drops the icon at inline size too", () => {
+    const { container } = render(
+      <EmptyState size="inline" title="No events" icon={<Calendar />} />,
+    );
+    expect(container.querySelector("[data-slot=empty-state-icon]")).toBeNull();
+  });
+
   it("omits empty parts and passes through props", () => {
     const { container } = render(
       <EmptyState title="No events" className="extra" data-testid="es" />,
