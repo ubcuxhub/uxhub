@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import Link from "next/link";
+import { BackPill } from "@/components/shared/BackButton";
 import { FLAGS } from "@/lib/flags";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,6 @@ import Footer from "@/features/marketing/homepage-sections/Footer";
 import {
   Calendar,
   MapPin,
-  ArrowLeft,
   ExternalLink,
   DollarSign,
 } from "lucide-react";
@@ -127,12 +126,7 @@ export default async function EventDetailPage({
         {/* ────────────────────── HERO SECTION ────────────────────── */}
         <section className="mt-20 px-[5%] pb-12 pt-8 md:px-[10%] lg:px-[15%]">
         {/* Back link */}
-        <Button asChild variant="link" className="mb-6 px-0">
-          <Link href="/events">
-            <ArrowLeft />
-            All Events
-          </Link>
-        </Button>
+        <BackPill href="/events" label="Back to Events" className="mb-6" />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
           {/* Left: Hero Image */}
@@ -161,7 +155,7 @@ export default async function EventDetailPage({
 
             {/* Price badge */}
             <div className="flex items-center gap-3">
-              <Badge variant="secondary" className="gap-2 px-4 py-2">
+              <Badge variant="neutral" size="large">
                 <DollarSign className="text-muted-foreground" />
                 <span>
                   {isFree

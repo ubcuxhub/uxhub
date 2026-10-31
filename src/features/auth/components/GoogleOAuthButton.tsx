@@ -74,11 +74,11 @@ export function GoogleOAuthButton({
       <Button
         type="button"
         variant="outline"
-        className="h-11 w-full font-medium shadow-none sm:h-10"
+        className="w-full"
         disabled={isLoading}
         onClick={handleGoogleOAuth}
       >
-        <FcGoogle className="size-5" />
+        <FcGoogle />
         {isLoading ? "Redirecting..." : "Continue with Google"}
       </Button>
 

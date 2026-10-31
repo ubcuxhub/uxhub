@@ -113,7 +113,7 @@ export function SettingsDialog() {
     <Dialog open={tab !== null} onOpenChange={handleOpenChange}>
       <DialogContent
         size="large"
-        className="flex overflow-hidden rounded-none p-0 sm:rounded-lg"
+        className="flex overflow-hidden p-0"
       >
         <DialogTitle className="sr-only">Profile & settings</DialogTitle>
         <DialogDescription className="sr-only">
