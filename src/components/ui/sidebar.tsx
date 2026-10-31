@@ -479,14 +479,14 @@ function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
 
 const sidebarMenuButtonVariants = cva(
   [
-    "peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md px-3 text-left text-body text-sidebar-foreground",
+    "peer/menu-button flex w-full items-center gap-3 overflow-hidden rounded-md px-3 text-left text-body text-sidebar-foreground",
     "transition-[width,height,padding,background-color] duration-200 ease-out",
     "group-has-data-[sidebar=menu-action]/menu-item:pr-9",
     // Collapsed rail: a centred square with the icon alone.
     "group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-11! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0! group-data-[collapsible=icon]:[&>span:last-child]:sr-only",
     "hover:bg-surface-hover active:bg-surface-subtle data-[active=true]:bg-surface-subtle data-[active=true]:hover:bg-surface-subtle data-[state=open]:hover:bg-surface-subtle",
     "focus-visible:focus-ring disabled:pointer-events-none disabled:text-fg-disabled aria-disabled:pointer-events-none aria-disabled:text-fg-disabled disabled:[&>svg]:text-fg-disabled aria-disabled:[&>svg]:text-fg-disabled",
-    "[&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-fg-secondary [&>svg]:transition-colors [&>svg]:duration-150 hover:[&>svg]:text-sidebar-foreground data-[active=true]:[&>svg]:text-sidebar-foreground",
+    "[&>span:last-child]:truncate [&>svg]:size-5 [&>svg]:shrink-0 [&>svg]:text-fg-secondary [&>svg]:transition-colors [&>svg]:duration-150 hover:[&>svg]:text-sidebar-foreground data-[active=true]:[&>svg]:text-sidebar-foreground",
   ],
   {
     variants: {
@@ -628,12 +628,12 @@ function SidebarMenuSkeleton({
     <div
       data-slot="sidebar-menu-skeleton"
       data-sidebar="menu-skeleton"
-      className={cn("flex h-(--size-nav-row) items-center gap-2 rounded-md px-3", className)}
+      className={cn("flex h-(--size-nav-row) items-center gap-3 rounded-md px-3", className)}
       {...props}
     >
       {showIcon && (
         <Skeleton
-          className="size-4 rounded-md"
+          className="size-5 rounded-md"
           data-sidebar="menu-skeleton-icon"
         />
       )}
