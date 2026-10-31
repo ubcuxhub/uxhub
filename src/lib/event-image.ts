@@ -35,6 +35,66 @@ export const EVENT_IMAGE_ERRORS = {
   square: "Event thumbnails must be square (same width and height).",
 } as const;
 
+/** What a picker accepts and enforces on the client; see `ImageUpload`. */
+export interface EventImageRequirements {
+  /** Width must equal height. */
+  square?: boolean;
+  /** Smallest accepted size, in px. */
+  minWidth?: number;
+  minHeight?: number;
+}
+
+const FILE_TYPE_LABELS: Record<string, string> = {
+  "image/gif": "GIF",
+  "image/webp": "WebP",
+  "image/avif": "AVIF",
+  "image/heic": "HEIC",
+  "image/heif": "HEIC",
+  "image/svg+xml": "SVG",
+  "image/bmp": "BMP",
+  "image/tiff": "TIFF",
+  "application/pdf": "PDF",
+};
+
+/**
+ * Names a rejected file's type for a message ("GIF"), or returns null when the
+ * browser reported nothing useful. Only types worth naming are listed; anything
+ * else falls back to a generic message.
+ */
+export function describeFileType(fileType: string): string | null {
+  return FILE_TYPE_LABELS[fileType.toLowerCase()] ?? null;
+}
+
+/** "That file is a GIF. Upload a JPG or PNG." */
+export function describeWrongFileType(fileType: string): string {
+  const label = describeFileType(fileType);
+  return label
+    ? `That file is ${/^[AEFHILMNORSX]/.test(label) ? "an" : "a"} ${label}. Upload a JPG or PNG.`
+    : "That file isn\u2019t a JPG or PNG. Upload a JPG or PNG.";
+}
+
+/** "Image must be at least 1600 × 400 px." */
+export function describeMinSize(minWidth: number, minHeight: number): string {
+  return `Image must be at least ${minWidth} \u00d7 ${minHeight} px.`;
+}
+
+/**
+ * The requirements line under "Upload image":
+ * "JPG or PNG, 1600 × 400 px or larger, up to 4 MB".
+ */
+export function describeImageRequirements({
+  square = false,
+  minWidth,
+  minHeight,
+}: EventImageRequirements = {}): string {
+  const parts = [`${square ? "Square " : ""}JPG or PNG`];
+  if (minWidth || minHeight) {
+    parts.push(`${minWidth ?? 1} \u00d7 ${minHeight ?? 1} px or larger`);
+  }
+  parts.push(`up to ${EVENT_IMAGE_MAX_MB} MB`);
+  return parts.join(", ");
+}
+
 const STORAGE_PUBLIC_PREFIX = "/storage/v1/object/public/";
 
 /** Longest slug segment kept in an object key, before the unique suffix. */

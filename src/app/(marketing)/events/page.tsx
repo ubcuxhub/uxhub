@@ -4,7 +4,7 @@ import { Card, CardTitle } from "@/components/ui/card";
 import { FLAGS } from "@/lib/flags";
 import Navbar from "@/features/marketing/homepage-sections/Navbar";
 import Footer from "@/features/marketing/homepage-sections/Footer";
-import { EventCard } from "@/components/shared/EventCard";
+import { MarketingEventCard } from "@/features/marketing/components/MarketingEventCard";
 import { createPublicClient } from "@/lib/supabase/public";
 import { fetchEvents } from "@/lib/supabase-helpers/events";
 
@@ -44,7 +44,7 @@ export default async function EventsPage() {
           ) : (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {events.map((event) => (
-                <EventCard
+                <MarketingEventCard
                   key={event.id}
                   event={event}
                   href={`/events/${event.slug || event.id}`}

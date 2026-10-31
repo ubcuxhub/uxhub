@@ -3,6 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   datetimeLocalToTimestamptz,
   formatEventDate,
+  formatEventDateLabel,
+  formatEventDateTimeLines,
+  formatEventDateTimeRange,
   formatEventTime,
   formatTimestamp,
   pacificDate,
@@ -148,5 +151,86 @@ describe("datetimeLocalToTimestamptz", () => {
 
     expect(instant).not.toBeNull();
     expect(timestamptzToDatetimeLocal(instant)).toBe(local);
+  });
+});
+
+// Fixtures are written as Vancouver wall-clock times and converted, so they
+// hold whichever UTC offset the runtime's tz database assigns to the date.
+const at = (local: string) => datetimeLocalToTimestamptz(local)!;
+
+describe("formatEventDateLabel", () => {
+  it("returns null without a start", () => {
+    expect(formatEventDateLabel(null, null)).toBeNull();
+    expect(formatEventDateLabel("not a date")).toBeNull();
+  });
+
+  it("labels a same-day event with one date", () => {
+    expect(formatEventDateLabel(at("2027-01-09T09:00"), at("2027-01-09T19:00"))).toBe("Jan 9");
+    expect(formatEventDateLabel(at("2027-01-09T09:00"))).toBe("Jan 9");
+  });
+
+  it("collapses a range within a month", () => {
+    expect(formatEventDateLabel(at("2027-01-09T09:00"), at("2027-01-10T15:00"))).toBe("Jan 9–10");
+  });
+
+  it("names both months across a month boundary", () => {
+    expect(formatEventDateLabel(at("2027-01-30T09:00"), at("2027-02-02T15:00"))).toBe("Jan 30–Feb 2");
+  });
+
+  it("adds the years across a year boundary", () => {
+    expect(formatEventDateLabel(at("2026-12-30T09:00"), at("2027-01-02T15:00"))).toBe(
+      "Dec 30, 2026–Jan 2, 2027"
+    );
+  });
+
+  // 06:30 UTC on Jul 11 is 11:30 p.m. on Jul 10 in Vancouver.
+  it("uses the Pacific day at the UTC-midnight boundary", () => {
+    expect(formatEventDateLabel("2027-07-11T06:30:00Z")).toBe("Jul 10");
+    expect(formatEventDateLabel(at("2027-07-10T09:00"), "2027-07-11T06:30:00Z")).toBe("Jul 10");
+    expect(formatEventDateLabel(at("2027-07-10T09:00"), "2027-07-11T08:30:00Z")).toBe("Jul 10–11");
+  });
+});
+
+describe("formatEventDateTimeRange", () => {
+  it("returns null without a start", () => {
+    expect(formatEventDateTimeRange(null, null)).toBeNull();
+  });
+
+  it("shows one time range for a single day", () => {
+    expect(formatEventDateTimeRange(at("2027-01-09T09:00"), at("2027-01-09T19:00"))).toBe(
+      "Sat, Jan 9 9:00 AM–7:00 PM"
+    );
+  });
+
+  it("shows only the start time when there is no end", () => {
+    expect(formatEventDateTimeRange(at("2027-01-09T09:00"))).toBe("Sat, Jan 9 9:00 AM");
+    expect(formatEventDateTimeRange(at("2027-01-09T09:00"), at("2027-01-09T09:00"))).toBe(
+      "Sat, Jan 9 9:00 AM"
+    );
+  });
+
+  it("shows the start and end of a multi-day event", () => {
+    expect(formatEventDateTimeRange(at("2027-01-09T09:00"), at("2027-01-10T15:00"))).toBe(
+      "Sat, Jan 9 9:00 AM – Sun, Jan 10 3:00 PM"
+    );
+  });
+
+  it("uses a plain space before AM and PM", () => {
+    expect(formatEventDateTimeRange(at("2027-01-09T09:00"), at("2027-01-09T19:00"))).not.toMatch(
+      /[\u202f\u00a0]/
+    );
+  });
+});
+
+describe("formatEventDateTimeLines", () => {
+  it("splits a multi-day event into a start line and an end line", () => {
+    expect(formatEventDateTimeLines(at("2027-01-09T09:00"), at("2027-01-10T15:00"))).toEqual([
+      { day: "Sat, Jan 9", time: "9:00 AM" },
+      { day: "Sun, Jan 10", time: "3:00 PM" },
+    ]);
+  });
+
+  it("returns no lines without a start", () => {
+    expect(formatEventDateTimeLines(null)).toEqual([]);
   });
 });
