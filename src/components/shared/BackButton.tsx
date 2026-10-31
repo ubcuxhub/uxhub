@@ -20,7 +20,7 @@ export function BackPill({ href, label, className }: BackPillProps) {
     <Link
       href={href}
       className={cn(
-        "relative inline-flex h-10 w-fit cursor-pointer items-center gap-2 rounded-full border border-border bg-background px-5 text-body whitespace-nowrap text-fg transition-colors duration-150 hover:bg-surface-subtle focus-visible:focus-ring pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-[3px]",
+        "relative inline-flex h-10 w-fit cursor-pointer items-center gap-2 rounded-full border border-border bg-background px-5 text-body whitespace-nowrap text-foreground transition-colors duration-150 hover:bg-muted focus-visible:focus-ring pointer-coarse:after:absolute pointer-coarse:after:inset-x-0 pointer-coarse:after:-inset-y-[3px]",
         className,
       )}
     >

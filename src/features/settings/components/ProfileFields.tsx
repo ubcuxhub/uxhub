@@ -297,7 +297,7 @@ function LockedField({
     <Field label={label} hint={hint}>
       <div
         className={cn(
-          "flex h-9 items-center rounded-md bg-surface-subtle px-3 text-body text-muted-foreground",
+          "flex h-9 items-center rounded-md bg-muted px-3 text-body text-muted-foreground",
           className,
         )}
       >

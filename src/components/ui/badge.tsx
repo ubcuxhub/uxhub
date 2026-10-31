@@ -23,18 +23,18 @@ const badgeVariants = cva(
   {
     variants: {
       variant: {
-        success: "bg-success-bg text-success",
-        warning: "bg-warning-bg text-warning",
-        error: "bg-error-bg text-error",
-        info: "bg-info-bg text-info",
-        neutral: "bg-surface-subtle text-fg-secondary",
+        success: "bg-success text-success-foreground",
+        warning: "bg-warning text-warning-foreground",
+        error: "bg-error text-destructive",
+        info: "bg-info text-info-foreground",
+        neutral: "bg-muted text-muted-foreground",
         tag: "border-border bg-transparent text-foreground",
         /** @deprecated Use `info`. */
-        default: "bg-info-bg text-info",
+        default: "bg-info text-info-foreground",
         /** @deprecated Use `neutral`. */
-        secondary: "bg-surface-subtle text-fg-secondary",
+        secondary: "bg-muted text-muted-foreground",
         /** @deprecated Use `error`. */
-        destructive: "bg-error-bg text-error",
+        destructive: "bg-error text-destructive",
         /** @deprecated Use `tag`. */
         outline: "border-border bg-transparent text-foreground",
       },

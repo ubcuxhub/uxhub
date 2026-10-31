@@ -317,7 +317,7 @@ export function AdminUsersManager({
                         if (editMode) requestSave();
                         else { setSaveError(null); setDraft(createUserEditDraft(selectedUser)); }
                       }}>
-                      {editMode ? <Check className="text-success" aria-hidden="true" /> : <Pencil aria-hidden="true" />}
+                      {editMode ? <Check className="text-success-foreground" aria-hidden="true" /> : <Pencil aria-hidden="true" />}
                     </IconButton>
                   </div>
                 ) : undefined}

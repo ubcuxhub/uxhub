@@ -21,13 +21,13 @@ export function SuccessOverlay({ message, onClose }: SuccessOverlayProps) {
     >
       <Card className="mx-4 max-w-md w-full">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-success">
+          <CardTitle className="flex items-center gap-2 text-success-foreground">
             <Check />
             Success
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="text-small text-fg-secondary">{message}</p>
+          <p className="text-small text-muted-foreground">{message}</p>
         </CardContent>
       </Card>
     </div>

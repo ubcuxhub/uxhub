@@ -137,13 +137,13 @@ function Buttons() {
         min="10rem"
       >
         <Specimen label="primary / hover">
-          <Button className="bg-action-hover">Label</Button>
+          <Button className="bg-primary-hover">Label</Button>
         </Specimen>
         <Specimen label="primary / pressed">
-          <Button className="bg-action-strong">Label</Button>
+          <Button className="bg-primary-active">Label</Button>
         </Specimen>
         <Specimen label="secondary / hover">
-          <Button variant="secondary" className="bg-surface-subtle">
+          <Button variant="secondary" className="bg-muted">
             Label
           </Button>
         </Specimen>
@@ -153,17 +153,17 @@ function Buttons() {
           </Button>
         </Specimen>
         <Specimen label="destructive / hover">
-          <Button variant="destructive" className="bg-action-destructive-hover">
+          <Button variant="destructive" className="bg-destructive-hover">
             Label
           </Button>
         </Specimen>
         <Specimen label="destructive / pressed">
-          <Button variant="destructive" className="bg-action-destructive-strong">
+          <Button variant="destructive" className="bg-destructive-active">
             Label
           </Button>
         </Specimen>
         <Specimen label="ghost / hover">
-          <Button variant="ghost" className="bg-surface-subtle">
+          <Button variant="ghost" className="bg-muted">
             Label
           </Button>
         </Specimen>
