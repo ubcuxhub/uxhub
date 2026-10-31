@@ -107,7 +107,7 @@ function Toolbar({
           <div className="flex items-baseline gap-2">
             <h1 className="text-h3">Component gallery</h1>
             <span className="rounded-full bg-muted px-2 py-0.5 text-badge text-muted-foreground">
-              dev only
+              Team gallery
             </span>
           </div>
 
