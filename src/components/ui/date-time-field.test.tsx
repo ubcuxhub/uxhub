@@ -37,6 +37,7 @@ function Date_({
   min?: IsoDate;
   name?: string;
   disabled?: boolean;
+  required?: boolean;
 }) {
   const [value, setValue] = useState<IsoDate | null>(initial);
   return (
@@ -57,12 +58,14 @@ function Time_({
   onValidityChange,
   name,
   disabled,
+  required,
 }: {
   initial?: WallTime | null;
   after?: WallTime;
   onValidityChange?: (error: string | null) => void;
   name?: string;
   disabled?: boolean;
+  required?: boolean;
 }) {
   const [value, setValue] = useState<WallTime | null>(initial);
   return (
@@ -74,6 +77,7 @@ function Time_({
       after={after}
       name={name}
       disabled={disabled}
+      required={required}
     />
   );
 }
@@ -167,6 +171,42 @@ describe("DateField", () => {
     expect(new FormData(container.querySelector("form")!).has("start_date")).toBe(false);
   });
 
+  it("blocks form validation for a date draft until it commits", () => {
+    const { container } = render(
+      <form>
+        <Date_ initial="2026-11-14" name="start_date" required />
+      </form>,
+    );
+    const form = container.querySelector("form")!;
+    const input = screen.getByRole("textbox", { name: "Date" });
+
+    expect(form.checkValidity()).toBe(true);
+    fireEvent.change(input, { target: { value: "feb 30" } });
+    expect(form.checkValidity()).toBe(false);
+    fireEvent.change(input, { target: { value: "nov 15" } });
+    expect(form.checkValidity()).toBe(false);
+    fireEvent.blur(input);
+    expect(form.checkValidity()).toBe(true);
+    expect(new FormData(form).get("start_date")).toBe("2026-11-15");
+  });
+
+  it("prevents Enter from submitting an enclosing form while committing a date", () => {
+    const onSubmit = vi.fn((event: React.FormEvent) => event.preventDefault());
+    render(
+      <form onSubmit={onSubmit}>
+        <Date_ />
+        <button type="submit">Save</button>
+      </form>,
+    );
+    const input = screen.getByRole("textbox", { name: "Date" }) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: "nov 14" } });
+    const enter = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
+    act(() => input.dispatchEvent(enter));
+    expect(enter.defaultPrevented).toBe(true);
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(input.value).toBe("Sat, Nov 14, 2026");
+  });
+
   it("opens the calendar on the selected day, focuses the selected day, picks, and returns focus", async () => {
     render(<Date_ initial="2026-11-14" />);
     const input = screen.getByRole("textbox", { name: "Date" });
@@ -245,6 +285,83 @@ describe("TimeField", () => {
       </form>,
     );
     expect(new FormData(container.querySelector("form")!).get("end_time")).toBe("");
+    expect(container.querySelector("form")!.checkValidity()).toBe(false);
+  });
+
+  it("blocks form validation for invalid and uncommitted time drafts", () => {
+    const { container } = render(
+      <form>
+        <Time_ initial="09:00" name="start_time" required />
+      </form>,
+    );
+    const form = container.querySelector("form")!;
+    const input = screen.getByRole("combobox", { name: "Time" });
+
+    expect(form.checkValidity()).toBe(true);
+    fireEvent.change(input, { target: { value: "lunch" } });
+    expect(form.checkValidity()).toBe(false);
+    fireEvent.blur(input);
+    expect(form.checkValidity()).toBe(false);
+    fireEvent.change(input, { target: { value: "10:30 am" } });
+    expect(form.checkValidity()).toBe(false);
+    fireEvent.blur(input);
+    expect(form.checkValidity()).toBe(true);
+    expect(new FormData(form).get("start_time")).toBe("10:30");
+  });
+
+  it("prevents Enter from submitting a form with the time list closed or open", async () => {
+    const onSubmit = vi.fn((event: React.FormEvent) => event.preventDefault());
+    render(
+      <form onSubmit={onSubmit}>
+        <Time_ />
+        <button type="submit">Save</button>
+      </form>,
+    );
+    const input = screen.getByRole("combobox", { name: "Time" }) as HTMLInputElement;
+    const enter = () => {
+      const event = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
+      act(() => input.dispatchEvent(event));
+      expect(event.defaultPrevented).toBe(true);
+      expect(onSubmit).not.toHaveBeenCalled();
+    };
+
+    fireEvent.change(input, { target: { value: "10:30 am" } });
+    enter(); // list closed
+    expect(input.value).toBe("10:30 AM");
+
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    await screen.findByRole("listbox");
+    fireEvent.change(input, { target: { value: "10:07 am" } });
+    expect(input.hasAttribute("aria-activedescendant")).toBe(false);
+    enter(); // list open, no active option
+    expect(input.value).toBe("10:07 AM");
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    await screen.findByRole("listbox");
+    enter(); // list open, active option
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+  });
+
+  it("opens the time list near an off-grid typed draft instead of the old value", async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetTop")!;
+    Object.defineProperty(HTMLElement.prototype, "offsetTop", {
+      configurable: true,
+      get(this: HTMLElement) {
+        const match = this.id.match(/-option-(\d+)$/);
+        return match ? Number(match[1]) * 42 : 0;
+      },
+    });
+    try {
+      render(<Time_ initial="21:00" />);
+      const input = screen.getByRole("combobox", { name: "Time" });
+      fireEvent.change(input, { target: { value: "9:07 am" } });
+      fireEvent.keyDown(input, { key: "ArrowDown" });
+      const list = await screen.findByRole("listbox");
+      expect(list.scrollTop).toBe(36 * 42);
+    } finally {
+      Object.defineProperty(HTMLElement.prototype, "offsetTop", descriptor);
+    }
   });
 
   it("reads a bare 9 as 9:00 PM", () => {

@@ -23,10 +23,7 @@ interface TimePickerProps {
   /** The listbox's id, for the input's `aria-controls`. */
   id?: string
   label?: string
-  /**
-   * Where the list opens when `value` isn't on it: the option nearest this.
-   * Defaults to 9:00 AM, or the first option in end-time mode.
-   */
+  /** Where the list opens: nearest to this, then value, then 9:00 AM. */
   scrollTarget?: WallTime | null
   className?: string
 }
@@ -69,15 +66,11 @@ function TimePicker({
   const optionId = getOptionId ?? ((i: number) => `${listboxId}-option-${i}`)
   const listRef = React.useRef<HTMLUListElement>(null)
 
-  // Open centred on the selected time, or the nearest one to where the user is.
+  // A typed draft takes precedence over the previous selected value.
   React.useLayoutEffect(() => {
     const list = listRef.current
     if (!list) return
-    const selected = value ? options.findIndex((o) => o.value === value) : -1
-    const index =
-      selected !== -1
-        ? selected
-        : nearestIndex(options, scrollTarget ?? (value ?? DEFAULT_SCROLL_TARGET))
+    const index = nearestIndex(options, scrollTarget ?? value ?? DEFAULT_SCROLL_TARGET)
     const row = list.children[index] as HTMLElement | undefined
     if (!row) return
     list.scrollTop = row.offsetTop - (list.clientHeight - row.offsetHeight) / 2

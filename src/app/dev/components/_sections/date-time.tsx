@@ -88,6 +88,8 @@ function LiveTime({
         onValidityChange={setError}
         after={after}
         defaultOpen={defaultOpen}
+        aria-describedby={error ? `${id}-error` : undefined}
+        aria-errormessage={error ? `${id}-error` : undefined}
       />
     </Labelled>
   );
@@ -120,6 +122,8 @@ function EventSchedule({ ids }: { ids: [string, string, string] }) {
           onValueChange={setEnd}
           onValidityChange={setEndError}
           after={start ?? undefined}
+          aria-describedby={endError ? `${ids[2]}-error` : undefined}
+          aria-errormessage={endError ? `${ids[2]}-error` : undefined}
         />
       </Labelled>
     </div>
@@ -256,6 +260,8 @@ function DateTime({ open }: SectionProps) {
                 value={null}
                 onValueChange={() => {}}
                 aria-invalid
+                aria-describedby={`${id("t-error")}-error`}
+                aria-errormessage={`${id("t-error")}-error`}
               />
             </Labelled>
           </div>

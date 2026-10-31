@@ -105,6 +105,21 @@ function useReportValidity(
   }, [error])
 }
 
+/** Keep browser form validation in step with the value sent by the hidden input. */
+function useCommittedValidity(
+  inputRef: React.RefObject<HTMLInputElement | null>,
+  text: string,
+  submittedValue: string,
+  error: string | null,
+  draftMessage: string
+) {
+  React.useLayoutEffect(() => {
+    inputRef.current?.setCustomValidity(
+      text.trim() && !submittedValue ? error ?? draftMessage : ""
+    )
+  }, [inputRef, text, submittedValue, error, draftMessage])
+}
+
 function rangeError(min?: IsoDate, max?: IsoDate) {
   if (min && max) {
     return `Pick a date from ${formatDateInput(min)} to ${formatDateInput(max)}.`
@@ -159,6 +174,7 @@ function DateField({
   // Never submit the previous value while that draft is visible.
   const submittedValue =
     value && !parseError && text === formatDateInput(value) ? value : ""
+  useCommittedValidity(inputRef, text, submittedValue, parseError, DATE_INPUT_ERROR)
 
   const commit = () => {
     if (!text.trim()) {
@@ -221,6 +237,7 @@ function DateField({
                 commit()
                 setOpen(true)
               } else if (event.key === "Enter") {
+                event.preventDefault()
                 commit()
               }
             }}
@@ -311,6 +328,8 @@ function TimeField({
   // A visible draft must not submit the previous committed time.
   const submittedValue =
     value && !error && text === formatTimeInput(value) ? value : ""
+  useCommittedValidity(inputRef, text, submittedValue, error, TIME_INPUT_ERROR)
+  const draftTime = text.trim() ? parseTimeInput(text, { after }) : null
 
   const accept = (time: WallTime) => {
     setParseError(null)
@@ -388,15 +407,16 @@ function TimeField({
                   event.preventDefault()
                   openList()
                 } else if (event.key === "Enter") {
+                  event.preventDefault()
                   commit()
                 }
                 return
               }
               moveActive(event)
               if (event.key === "Enter") {
+                event.preventDefault()
                 const option = options[activeIndex]
                 if (option) {
-                  event.preventDefault()
                   accept(option.value)
                 } else {
                   commit()
@@ -453,6 +473,7 @@ function TimeField({
           }}
           activeIndex={activeIndex}
           getOptionId={getOptionId}
+          scrollTarget={draftTime}
         />
       </PopoverContent>
     </Popover>
