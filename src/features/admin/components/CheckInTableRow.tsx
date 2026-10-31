@@ -22,7 +22,7 @@ export function CheckInTableRow({
   updatingCells,
 }: CheckInTableRowProps) {
   return (
-    <tr className="border-b hover:bg-muted/50">
+    <tr className="border-b border-border-subtle hover:bg-muted">
       <td className="px-4 py-3 text-table">{attendee.user_name}</td>
       {sessions.map((session) => {
         const key = `${attendee.id}_${session.id}`;

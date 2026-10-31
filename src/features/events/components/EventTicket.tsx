@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { Calendar, Clock, MapPin } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
+import { StatusBadge, type Status } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
 import { toQrSvg } from "@/features/events/lib/qr-code";
 import type {
@@ -39,7 +40,7 @@ export function EventTicket({
     <article
       aria-label={`Ticket for ${event.name}`}
       className={cn(
-        "w-full max-w-sm overflow-hidden rounded-xl border bg-card text-card-foreground shadow-sm",
+        "w-full max-w-sm overflow-hidden rounded-xl border bg-card text-card-foreground",
         className
       )}
     >
@@ -68,7 +69,7 @@ export function EventTicket({
       <div className="space-y-4 p-5">
         <div className="min-w-0">
           <p className="text-label text-muted-foreground">Ticket holder</p>
-          <p className="truncate font-medium">{holder.name}</p>
+          <p className="truncate text-body-medium">{holder.name}</p>
           {holder.email && (
             <p className="truncate text-small text-muted-foreground">
               {holder.email}
@@ -81,14 +82,22 @@ export function EventTicket({
   );
 }
 
-const BADGE_LABEL: Record<TicketBadge, string> = {
-  under_review: "Under review",
-  waitlisted: "Waitlisted",
+/**
+ * Ticket badges that are one of the design system's statuses. "Under review"
+ * reads as "Pending". The rest are dated or one-off states with no status of
+ * their own, so they render as a tag.
+ */
+const BADGE_STATUS: Partial<Record<TicketBadge, Status>> = {
+  under_review: "pending",
+  waitlisted: "waitlisted",
+  not_selected: "not_selected",
+  going: "going",
+  checked_in: "checked_in",
+};
+
+const TAG_LABEL: Partial<Record<TicketBadge, string>> = {
   register_by: "Register by",
   offer_expired: "Offer expired",
-  not_selected: "Not selected",
-  going: "Going",
-  checked_in: "Checked in",
 };
 
 function TicketStatusBadge({
@@ -98,23 +107,15 @@ function TicketStatusBadge({
   badge: TicketBadge;
   registerBy?: string | null;
 }) {
+  const status = BADGE_STATUS[badge];
+  if (status) return <StatusBadge status={status} />;
+
   const label =
     badge === "register_by" && registerBy
       ? `Register by ${registerBy}`
-      : BADGE_LABEL[badge];
-  const highlighted = badge === "going" || badge === "checked_in";
+      : TAG_LABEL[badge];
 
-  return (
-    <Badge
-      variant="outline"
-      className={cn(
-        "shrink-0",
-        highlighted && "border-transparent bg-success-bg text-success"
-      )}
-    >
-      {label}
-    </Badge>
-  );
+  return <Badge variant="tag">{label}</Badge>;
 }
 
 function TicketDetail({
