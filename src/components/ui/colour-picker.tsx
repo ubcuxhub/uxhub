@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
  * Event colour swatches and the custom-colour popover (§3.10).
  *
  * The swatch fill and its edge are the organizer's colour, not tokens, so they
- * are inline styles. The edge is `text-primary` at 12% (the spec's
+ * are inline styles. The edge uses `--foreground` at 12% (the spec's
  * rgba(17,17,17,.12) in light mode), which keeps white and pale colours
  * visible and flips to a light edge in dark mode.
  *
