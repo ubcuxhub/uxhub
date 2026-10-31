@@ -12,6 +12,9 @@ const typeScaleClasses = [
   "text-table",
   "text-button",
   "text-badge",
+  "text-body-medium",
+  "text-table-heading",
+  "text-button-small",
 ];
 
 describe("cn", () => {
@@ -42,6 +45,21 @@ describe("cn", () => {
   it("lets a custom font size override a built-in one", () => {
     expect(cn("text-sm", "text-h3", "text-success")).toBe(
       "text-h3 text-success"
+    );
+  });
+
+  it("lets a later size replace an earlier one among the added sizes", () => {
+    expect(cn("text-button", "text-button-small", "text-success")).toBe(
+      "text-button-small text-success"
+    );
+    expect(cn("text-body", "text-body-medium")).toBe("text-body-medium");
+  });
+
+  it("treats shadow-overlay as an elevation, not a shadow colour", () => {
+    expect(cn("shadow-md", "shadow-overlay")).toBe("shadow-overlay");
+    expect(cn("shadow-overlay", "shadow-sm")).toBe("shadow-sm");
+    expect(cn("shadow-overlay", "shadow-fg-inverse")).toBe(
+      "shadow-overlay shadow-fg-inverse"
     );
   });
 });

@@ -114,6 +114,8 @@
   --color-surface-card: var(--background-surface-card);
   --color-surface-modal: var(--background-surface-modal);
   --color-surface-subtle: var(--background-surface-subtle);
+  --color-surface-hover: var(--background-surface-hover);
+  --color-surface-secondary: var(--background-secondary);
 
   /* Text tones — text-fg-secondary, text-fg-muted, etc. (fg-prefixed to
      avoid a text-text-* collision with the type scale) */
@@ -132,7 +134,14 @@
   --color-action-strong: var(--action-primary-strong);
   --color-action-disabled: var(--text-disabled);
   --color-action-disabled-bg: var(--action-disabled-background);
+  --color-action-disabled-border: var(--action-disabled-border);
+  --color-action-destructive: var(--action-destructive);
+  --color-action-destructive-hover: var(--action-destructive-hover);
+  --color-action-destructive-strong: var(--action-destructive-strong);
   --color-focus: var(--action-focus);
+
+  /* Overlay scrim — bg-scrim */
+  --color-scrim: var(--overlay-scrim);
 
   /* Status — bg-success-bg text-success, etc. */
   --color-success: var(--status-success-text);
@@ -146,10 +155,21 @@
   --color-info-bg: var(--status-info-background);
 }
 
-/* ── shadcn bridge ──────────────────────────────────────────────────────
-   Resolves through the semantic tokens, so it follows Light/Dark on its own. */
+/* Every `transition-*` utility uses the design-system curve (§2.8). Tailwind's
+   `ease-out` is the same curve. */
+@theme {
+  --default-transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
+}
 
-:root {
+/* ── shadcn bridge ──────────────────────────────────────────────────────
+   Resolves through the semantic tokens, so it follows Light/Dark on its own.
+   Custom properties resolve where they are declared, so a `data-theme`
+   subtree has to re-declare the bridge to pick up its own semantic values
+   (a nested dark column in the /dev/components gallery). On <html> the second
+   selector is the same element as `:root`, which is harmless. */
+
+:root,
+[data-theme] {
   /* UX Hub brand gradient — Figma: #3A5FC4 → #B67FC6 at 90% opacity */
   --gradient-ux-hub: linear-gradient(
     to bottom,
@@ -199,7 +219,13 @@
 
 @layer base {
   * {
-    @apply border-border outline-ring/50;
+    @apply border-border outline-focus;
+  }
+
+  /* 1.5px icon stroke (§2.7). CSS beats the SVG attribute lucide sets. The
+     marketing site keeps lucide's default. */
+  .lucide:not(.marketing-home *) {
+    stroke-width: 1.5;
   }
 
   html {
@@ -217,6 +243,17 @@
     -webkit-appearance: none;
     margin: 0;
   }
+}
+
+/* Focus indicator: a 2px outline survives forced-colours mode (§3.7). */
+@utility focus-ring {
+  outline: 2px solid var(--action-focus);
+  outline-offset: 2px;
+}
+
+/* Shared surface for popovers, menus, tooltips and dialogs (§2.6). */
+@utility overlay-surface {
+  @apply border border-border bg-popover text-popover-foreground shadow-overlay;
 }
 
 /* Extend overlay surfaces into iOS safe areas without moving their controls
