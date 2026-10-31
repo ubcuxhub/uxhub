@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { afterEach, describe, expect, it } from "vitest"
+import { afterEach, describe, expect, it, vi } from "vitest"
 import { cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { useState } from "react"
 
@@ -45,6 +45,24 @@ describe("SearchableDropdown", () => {
     expect(screen.getByRole("status").textContent).toContain("2 matches")
     fireEvent.change(input, { target: { value: "researcher" } })
     expect(screen.getAllByRole("option")).toHaveLength(1)
+  })
+
+  it("scrolls only the list to reveal the active option", () => {
+    render(<Single />)
+    const input = screen.getByRole("combobox")
+    fireEvent.focus(input)
+    const list = screen.getByRole("listbox") as HTMLElement
+    const rows = screen.getAllByRole("option")
+    const scrollIntoView = vi.fn()
+    Object.defineProperty(list, "clientHeight", { configurable: true, value: 80 })
+    Object.defineProperty(rows[1], "offsetTop", { configurable: true, value: 120 })
+    Object.defineProperty(rows[1], "offsetHeight", { configurable: true, value: 40 })
+    Object.defineProperty(rows[1], "scrollIntoView", { configurable: true, value: scrollIntoView })
+
+    fireEvent.keyDown(input, { key: "ArrowDown" })
+    fireEvent.keyDown(input, { key: "ArrowDown" })
+    expect(list.scrollTop).toBe(80)
+    expect(scrollIntoView).not.toHaveBeenCalled()
   })
 
   it("chooses with Enter and submits the single hidden value", () => {

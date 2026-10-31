@@ -98,8 +98,18 @@ export function SearchableDropdown(props: SearchableDropdownProps) {
 
   React.useEffect(() => {
     if (!open || activeIndex < 0) return
-    const row = listRef.current?.children[activeIndex] as HTMLElement | undefined
-    if (typeof row?.scrollIntoView === "function") row.scrollIntoView({ block: "nearest" })
+    const list = listRef.current
+    const row = list?.children[activeIndex] as HTMLElement | undefined
+    if (!list || !row) return
+
+    // Keep the active option visible without moving the page behind the menu.
+    const rowTop = row.offsetTop
+    const rowBottom = rowTop + row.offsetHeight
+    if (rowTop < list.scrollTop) {
+      list.scrollTop = rowTop
+    } else if (rowBottom > list.scrollTop + list.clientHeight) {
+      list.scrollTop = rowBottom - list.clientHeight
+    }
   }, [activeIndex, open])
 
   const updateQuery = (next: string) => {
