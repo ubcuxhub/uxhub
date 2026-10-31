@@ -249,6 +249,26 @@ variable name with the slash turned into a hyphen). Dark mode is
 `data-theme="dark"` on `<html>` (`src/lib/theme.ts`), and density is
 `data-density="compact"`.
 
+## Merging pull requests
+
+`main` is protected by the `protect-main` ruleset, which requires one approving
+review. GitHub doesn't let anyone approve their own pull request, so when an
+agent works under the `johnny-581` account (which can bypass the ruleset) and
+that user asks for a merge, merge with the bypass instead of waiting for an
+approval:
+
+```bash
+gh pr ready <number>
+gh pr merge <number> --admin --merge --delete-branch
+```
+
+- Merge only when the user asked for that pull request (or batch), it has been
+  reviewed for correctness, and its CI checks are green.
+- Use a merge commit (`--merge`), not squash or rebase.
+- For stacked pull requests, retarget each dependent one to `main`
+  (`gh pr edit <n> --base main`) before deleting the branch it's based on.
+- Other accounts follow the normal review flow.
+
 ## Epics, responsiblity, and timeline
 
 @docs/epics.md
