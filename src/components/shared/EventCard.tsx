@@ -1,90 +1,130 @@
+import { Calendar } from "lucide-react";
 import Link from "next/link";
-import {
-  Card,
-  CardContent,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { formatEventDate } from "@/lib/date";
-import { cn } from "@/lib/utils";
-import type { EventRow } from "@/lib/supabase/models";
+import * as React from "react";
 
-export interface EventCardProps {
-  event: EventRow;
-  href?: string;
-  onClick?: () => void;
-  className?: string;
+import { StatusBadge, type Status } from "@/components/ui/status-badge";
+import type { EventDateLine } from "@/lib/date";
+import { cn } from "@/lib/utils";
+
+export interface EventCardProps
+  extends Omit<React.ComponentProps<"article">, "title"> {
+  title: string;
+  href: string;
+  venue?: string | null;
+  /**
+   * One or two pre-formatted date-time lines. Use `EventCardDates` for the
+   * design's look: the day in medium weight, then the time.
+   */
+  when: React.ReactNode;
+  /** One StatusBadge; leave out when the status isn't known. */
+  status?: Status | null;
+  /** The event image, cropped square. Decorative, so it has no alt text. */
+  image?: { src: string } | null;
+  /** Default "h3". */
+  headingLevel?: "h2" | "h3";
 }
 
-export function EventCard({ event, href, onClick, className }: EventCardProps) {
-  const formattedDate = formatEventDate(event.starts_at, { month: "short" });
-
-  const locationDisplay = [event.location_building, event.location_room]
-    .filter(Boolean)
-    .join(" ");
+/**
+ * One event in a list or the timeline (§3.5): title, venue, date line(s), one
+ * StatusBadge and a square thumbnail. The whole card is one link, so it is one
+ * Tab stop, and its accessible name is the title alone. It never lifts: hover
+ * only changes the fill. On phones the thumbnail moves above the text.
+ */
+function EventCard({
+  title,
+  href,
+  venue,
+  when,
+  status,
+  image,
+  headingLevel = "h3",
+  className,
+  ...props
+}: EventCardProps) {
+  const Heading = headingLevel;
 
   return (
-    <Card
+    <article
+      data-slot="event-card"
       className={cn(
-        // Flush image: no top padding, and the card's own radius clips it.
-        "gap-4 overflow-hidden pt-0 pb-5 shadow-none transition-colors",
-        onClick && "cursor-pointer hover:border-fg-muted",
+        "relative flex flex-col-reverse gap-4 rounded-lg border bg-card p-4 transition-colors duration-150 hover:bg-background-secondary has-[a:focus-visible]:focus-ring sm:flex-row sm:items-center sm:gap-6 sm:p-5",
         className,
       )}
-      onClick={onClick}
+      {...props}
     >
-      {event.image_url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={event.image_url}
-          alt={event.name}
-          className="aspect-video w-full object-cover"
-        />
-      ) : (
-        <div className="flex aspect-video w-full items-center justify-center bg-surface-subtle text-small text-fg-secondary">
-          No image
-        </div>
-      )}
-
-      <CardHeader className="gap-1">
-        <CardTitle className="line-clamp-1 text-subheading">
-          {event.name}
-        </CardTitle>
-        <CardDescription className="flex flex-col gap-0.5 text-small text-fg-secondary">
-          {formattedDate && <span>{formattedDate}</span>}
-          {locationDisplay && (
-            <span className="line-clamp-1">{locationDisplay}</span>
-          )}
-        </CardDescription>
-      </CardHeader>
-
-      <CardContent>
-        <p className="line-clamp-3 text-small text-fg-secondary">
-          {event.short_description || event.description}
-        </p>
-      </CardContent>
-
-      <CardFooter className="mt-auto">
-        {href ? (
-          <Button asChild className="w-full">
-            <Link href={href}>View event</Link>
-          </Button>
-        ) : (
-          <div className="text-small font-medium text-fg">
-            {Number(event.regular_price) === 0
-              ? "Free"
-              : `$${Number(event.regular_price).toFixed(2)}`}
-            {event.member_price !== event.regular_price && (
-              <span className="ml-1 font-normal text-fg-secondary">
-                / ${Number(event.member_price ?? 0).toFixed(2)} member
-              </span>
-            )}
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <Heading className="text-subheading text-pretty break-words text-foreground">
+          <Link
+            href={href}
+            className="outline-none after:absolute after:inset-0 after:rounded-lg after:content-['']"
+          >
+            {title}
+          </Link>
+        </Heading>
+        {venue ? (
+          <p className="text-body text-muted-foreground">{venue}</p>
+        ) : null}
+        <div className="text-body text-foreground">{when}</div>
+        {status ? (
+          <div className="mt-2 flex">
+            <StatusBadge status={status} size="large" />
           </div>
+        ) : null}
+      </div>
+      <div
+        data-slot="event-card-thumbnail"
+        aria-hidden
+        className="flex h-35 w-full shrink-0 items-center justify-center overflow-hidden rounded-3xl bg-muted sm:size-40"
+      >
+        {image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={image.src}
+            alt=""
+            loading="lazy"
+            className="size-full object-cover"
+          />
+        ) : (
+          <Calendar className="size-6 text-muted-foreground" aria-hidden />
         )}
-      </CardFooter>
-    </Card>
+      </div>
+    </article>
   );
 }
+
+/**
+ * The date lines for an EventCard's `when`: the day in medium weight, then the
+ * time, with an en dash between two lines ("Sat, Jan 9 9:00 AM–7:00 PM –
+ * Sun, Jan 10 9:00 AM–3:00 PM"). Wraps onto two rows when narrow.
+ */
+function EventCardDates({
+  lines,
+  className,
+  ...props
+}: { lines: readonly EventDateLine[] } & React.ComponentProps<"p">) {
+  return (
+    <p
+      data-slot="event-card-dates"
+      className={cn("flex flex-wrap gap-x-2", className)}
+      {...props}
+    >
+      {lines.map((line, index) => (
+        // The dash travels with the line after it, so a wrap never leaves it
+        // dangling at the end of the first row.
+        <span key={`${line.day}-${index}`} className="whitespace-nowrap">
+          {index > 0 ? (
+            <>
+              <span aria-hidden className="mr-2 text-muted-foreground">
+                –
+              </span>
+              <span className="sr-only">to </span>
+            </>
+          ) : null}
+          <span className="font-medium">{line.day}</span> {line.time}
+        </span>
+      ))}
+    </p>
+  );
+}
+
+export { EventCard, EventCardDates };
