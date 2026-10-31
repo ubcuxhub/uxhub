@@ -298,7 +298,7 @@ function Section() {
         title="Hubbo"
         spec="§5.2"
         min="min(38rem, 100%)"
-        description="Sized by height: hero 240px and card 120px show the full-body art. Inline (32px) and head (40px) need head-only art that doesn’t exist yet, so they show development placeholders (nothing renders in production)."
+        description="Sized by height: hero 240px and card 120px show full-body art; inline 32px and head 40px show head-only art. Each pose keeps its own aspect ratio."
       >
         {HUBBO_EMOTIONS.map((emotion) => (
           <Specimen key={emotion} label={emotion}>
@@ -313,7 +313,7 @@ function Section() {
 
       <Composition
         title="Hubbo on the approved backgrounds"
-        description="§5.2: white, #F4F4F4, light purple #F4EAFE and #111111. Check that the edges stay clean on each."
+        description="§5.2: full-body and head-only art on white, #F4F4F4, light purple #F4EAFE and #111111. Check that the edges stay clean on each."
       >
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
@@ -327,7 +327,10 @@ function Section() {
               className="flex flex-col items-center gap-2 rounded-xl border border-border p-4"
               style={{ backgroundColor: colour }}
             >
-              <Hubbo emotion="proud" size="card" />
+              <div className="flex flex-col items-center gap-3">
+                <Hubbo emotion="proud" size="card" />
+                <Hubbo emotion="proud" size="head" />
+              </div>
               <span
                 className="text-label"
                 style={{ color: colour === "#111111" ? "#FFFFFF" : "#111111" }}

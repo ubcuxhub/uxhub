@@ -12,7 +12,8 @@ const original = { ...HUBBO_ART };
 beforeEach(() => {
   for (const emotion of HUBBO_EMOTIONS) {
     HUBBO_ART[emotion] = {
-      full: { src: `/${emotion}.png`, width: 300, height: 350 },
+      full: { src: `/${emotion}-full.png`, width: 300, height: 350 },
+      head: { src: `/${emotion}-head.png`, width: 100, height: 100 },
     };
   }
 });
@@ -24,29 +25,41 @@ afterEach(() => {
 });
 
 describe("Hubbo", () => {
-  it("has full-body art registered for every emotion", () => {
+  it("has full-body and head-only art registered for every emotion", () => {
     for (const emotion of HUBBO_EMOTIONS) {
       expect(original[emotion]?.full).toBeTruthy();
+      expect(original[emotion]?.head).toBeTruthy();
     }
   });
 
-  it.each(["hero", "card"] as const)("renders the art at %s size in production", (size) => {
+  it.each([
+    ["hero", "full", "h-60"],
+    ["card", "full", "h-30"],
+    ["inline", "head", "h-8"],
+    ["head", "head", "h-10"],
+  ] as const)("renders the %s size with %s art in production", (size, art, heightClass) => {
     vi.stubEnv("NODE_ENV", "production");
     for (const emotion of HUBBO_EMOTIONS) {
       const { container, unmount } = render(<Hubbo emotion={emotion} size={size} />);
-      expect(container.querySelector("img")).toBeTruthy();
+      const img = container.querySelector("img");
+      expect(img).toBeTruthy();
+      expect(decodeURIComponent(img!.getAttribute("src")!)).toContain(`/${emotion}-${art}.png`);
+      expect(img!.className).toContain(heightClass);
+      expect(container.querySelector("[data-slot=hubbo-placeholder]")).toBeNull();
       unmount();
     }
   });
 
-  it.each(["inline", "head"] as const)("renders nothing at %s size in production while there is no head art", (size) => {
+  it("renders nothing in production when a slot has no art", () => {
     vi.stubEnv("NODE_ENV", "production");
-    const { container } = render(<Hubbo emotion="resting" size={size} />);
+    HUBBO_ART.resting = { full: HUBBO_ART.resting?.full };
+    const { container } = render(<Hubbo emotion="resting" size="head" />);
     expect(container.firstChild).toBeNull();
   });
 
-  it("renders a dev placeholder naming the emotion at head sizes", () => {
+  it("renders a dev placeholder naming the emotion when head art is missing", () => {
     vi.stubEnv("NODE_ENV", "development");
+    HUBBO_ART.resting = { full: HUBBO_ART.resting?.full };
     const { container } = render(<Hubbo emotion="resting" size="head" />);
     const placeholder = container.querySelector("[data-slot=hubbo-placeholder]");
     expect(placeholder?.getAttribute("title")).toBe("Hubbo · resting · 40px");

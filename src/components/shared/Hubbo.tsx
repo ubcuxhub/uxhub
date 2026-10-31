@@ -8,6 +8,12 @@ import proud from "@/assets/hubbo/proud.png";
 import resting from "@/assets/hubbo/resting.png";
 import thinking from "@/assets/hubbo/thinking.png";
 import welcoming from "@/assets/hubbo/welcoming.png";
+import curiousHead from "@/assets/hubbo/head-only/curious.png";
+import excitedHead from "@/assets/hubbo/head-only/excited.png";
+import proudHead from "@/assets/hubbo/head-only/proud.png";
+import restingHead from "@/assets/hubbo/head-only/resting.png";
+import thinkingHead from "@/assets/hubbo/head-only/thinking.png";
+import welcomingHead from "@/assets/hubbo/head-only/welcoming.png";
 
 export type HubboEmotion =
   | "welcoming"
@@ -31,19 +37,17 @@ export type HubboSize = "hero" | "card" | "inline" | "head";
 /**
  * The artwork, one entry per emotion (§5.2). `full` is the full-colour body,
  * used at hero and card sizes; `head` is the head-only set for inline and head
- * sizes. Only the full bodies exist so far: the head sizes show a dev
- * placeholder (nothing in production) until head art is added here. A full body
- * is never cropped to stand in for a head.
+ * sizes. A full body is never cropped to stand in for a head.
  */
 export const HUBBO_ART: Partial<
   Record<HubboEmotion, { full?: StaticImageData; head?: StaticImageData }>
 > = {
-  welcoming: { full: welcoming },
-  curious: { full: curious },
-  excited: { full: excited },
-  proud: { full: proud },
-  thinking: { full: thinking },
-  resting: { full: resting },
+  welcoming: { full: welcoming, head: welcomingHead },
+  curious: { full: curious, head: curiousHead },
+  excited: { full: excited, head: excitedHead },
+  proud: { full: proud, head: proudHead },
+  thinking: { full: thinking, head: thinkingHead },
+  resting: { full: resting, head: restingHead },
 };
 
 /**
@@ -84,10 +88,8 @@ interface HubboProps {
  * refunds, private information (profiles, settings) or rejections. It fits
  * welcomes, inviting empty states, form tips, confirmations and errors.
  *
- * Where a slot has no art (head sizes for now) it renders nothing in
- * production, and in development a dashed placeholder naming the emotion at the
- * slot's size, so a layout can be built now and the art dropped into
- * `HUBBO_ART` later.
+ * If a slot has no art, it renders nothing in production and a dashed
+ * placeholder in development.
  */
 export function Hubbo({ emotion, size = "card", className, alt }: HubboProps) {
   const slot = SIZES[size];
