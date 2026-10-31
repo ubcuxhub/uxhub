@@ -114,8 +114,8 @@ export function ReviewApplicationsClient({
     >
             <header className="flex flex-col gap-4">
               <div>
-                <h1 className="text-2xl font-semibold">Review Applications</h1>
-                <p className="text-sm text-muted-foreground">
+                <h1 className="text-h2">Review Applications</h1>
+                <p className="text-small text-muted-foreground">
                   {eventName}
                 </p>
               </div>
@@ -136,12 +136,12 @@ export function ReviewApplicationsClient({
                 {/* Filter Section */}
                 <div className="flex flex-col gap-2">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium">Filter:</span>
+                    <span className="text-body-medium">Filter:</span>
                     {FILTERS.map((state) => (
                       <Button
                         key={state}
                         type="button"
-                        variant={statusFilters.has(state) ? "default" : "outline"}
+                        variant={statusFilters.has(state) ? "primary" : "secondary"}
                         onClick={() => toggleStatusFilter(state)}
                       >
                         {APPLICATION_REVIEW_STATE_LABELS[state]}
@@ -150,7 +150,7 @@ export function ReviewApplicationsClient({
                     {(statusFilters.size > 0 || searchQuery.trim()) && (
                       <Button
                         type="button"
-                        variant="outline"
+                        variant="secondary"
                         onClick={clearFilters}
                       >
                         Clear Filters
@@ -161,13 +161,13 @@ export function ReviewApplicationsClient({
 
                 {/* Applications List */}
                 {filteredApplications.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed p-12 text-center">
-                    <div className="text-2xl font-semibold">
+                  <div className="flex flex-col items-center justify-center gap-4 rounded-xl border border-dashed p-12 text-center">
+                    <div className="text-h3">
                       {applications.length === 0
                         ? "No applications yet"
                         : "No applications match your filters"}
                     </div>
-                    <p className="max-w-md text-sm text-muted-foreground">
+                    <p className="max-w-md text-small text-muted-foreground">
                       {applications.length === 0
                         ? "Applications will appear here once users submit them."
                         : "Try adjusting your search or filter criteria."}

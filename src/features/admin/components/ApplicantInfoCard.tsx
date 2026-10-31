@@ -7,11 +7,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-  APPLICATION_REVIEW_STATE_LABELS,
-  type ApplicationReviewState,
-} from "@/features/admin/lib/application-review";
+import { StatusBadge, type Status } from "@/components/ui/status-badge";
+import type { ApplicationReviewState } from "@/features/admin/lib/application-review";
 import { Clock, X, Check, User, Mail, Calendar, Ticket, Hourglass } from "lucide-react";
 import { formatTimestamp } from "@/lib/date";
 
@@ -40,6 +37,20 @@ export function ApplicationStateIcon({ state }: { state: ApplicationReviewState 
   }
 }
 
+/**
+ * The design system has one badge per status, not per application state:
+ * under review reads as pending, and a lapsed offer or rejection as not
+ * selected.
+ */
+const BADGE_STATUS: Record<ApplicationReviewState, Status> = {
+  submitted: "pending",
+  waitlisted: "waitlisted",
+  accepted: "accepted",
+  registered: "going",
+  offer_expired: "not_selected",
+  rejected: "not_selected",
+};
+
 export function ApplicantInfoCard({
   name,
   email,
@@ -61,12 +72,7 @@ export function ApplicantInfoCard({
               {email}
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2">
-            <ApplicationStateIcon state={state} />
-            <Badge variant="outline">
-              {APPLICATION_REVIEW_STATE_LABELS[state]}
-            </Badge>
-          </div>
+          <StatusBadge status={BADGE_STATUS[state]} />
         </div>
       </CardHeader>
       <CardContent className="space-y-1">
