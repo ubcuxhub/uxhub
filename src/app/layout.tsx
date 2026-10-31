@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { DM_Sans, Lora } from "next/font/google";
+import { Toaster } from "@/components/ui/toast";
 import { UserProvider } from "@/lib/auth/user-context";
 import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
@@ -56,6 +57,7 @@ export default function RootLayout({
           {children}
           {flow}
         </UserProvider>
+        <Toaster />
         <Analytics />
         <SpeedInsights />
       </body>
