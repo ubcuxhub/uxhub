@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
  * themes stay in step.
  */
 const alertVariants = cva(
-  "flex items-start gap-3 rounded-lg border border-transparent p-4 text-small",
+  "flex items-start gap-2 rounded-xl border border-transparent p-4 text-small",
   {
     variants: {
       variant: {
@@ -41,7 +41,7 @@ function Alert({ className, variant, icon, children, ...props }: AlertProps) {
       className={cn(alertVariants({ variant }), className)}
       {...props}
     >
-      {icon ? <span className="mt-0.5 shrink-0">{icon}</span> : null}
+      {icon ? <span className="mt-0.5 shrink-0 [&>svg]:size-4">{icon}</span> : null}
       <div className="min-w-0">{children}</div>
     </div>
   );
@@ -52,7 +52,7 @@ function AlertTitle({ className, ...props }: React.ComponentProps<"p">) {
 }
 
 function AlertDescription({ className, ...props }: React.ComponentProps<"p">) {
-  return <p className={cn("mt-1 opacity-90", className)} {...props} />;
+  return <p className={cn("mt-1", className)} {...props} />;
 }
 
 export { Alert, AlertTitle, AlertDescription, alertVariants };
