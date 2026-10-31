@@ -12,9 +12,9 @@ export default function ShellLayout({
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-16 items-center gap-2 px-4 md:hidden">
-          <SidebarTrigger />
-          <span className="font-semibold">UBC UX Hub</span>
+        <header className="flex h-14 shrink-0 items-center gap-3 px-5 md:hidden">
+          <SidebarTrigger aria-label="Open menu" />
+          <span className="text-body-medium">UBC UX Hub</span>
         </header>
         <div className="flex flex-1 flex-col overflow-y-auto">{children}</div>
       </SidebarInset>
