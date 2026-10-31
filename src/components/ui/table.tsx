@@ -118,7 +118,7 @@ function TableHeader({ className, ...props }: React.ComponentProps<"thead">) {
   return (
     <thead
       data-slot="table-header"
-      className={cn("[&_tr]:bg-background-secondary", className)}
+      className={cn("[&_tr]:bg-section", className)}
       {...props}
     />
   );
@@ -154,8 +154,8 @@ function TableRow({ className, onClick, ...props }: React.ComponentProps<"tr">) 
       className={cn(
         "relative border-b border-border-subtle bg-card transition-colors duration-150 last:border-b-0",
         "data-[state=selected]:bg-muted",
-        "has-[[data-slot=table-row-button]]:cursor-pointer has-[[data-slot=table-row-button]]:hover:bg-background-surface-hover has-[[data-slot=table-row-button]]:data-[state=selected]:hover:bg-muted",
-        "has-[[data-slot=table-row-button]:focus-visible]:outline-2 has-[[data-slot=table-row-button]:focus-visible]:-outline-offset-2 has-[[data-slot=table-row-button]:focus-visible]:outline-focus",
+        "has-[[data-slot=table-row-button]]:cursor-pointer has-[[data-slot=table-row-button]]:hover:bg-accent has-[[data-slot=table-row-button]]:data-[state=selected]:hover:bg-muted",
+        "has-[[data-slot=table-row-button]:focus-visible]:outline-2 has-[[data-slot=table-row-button]:focus-visible]:-outline-offset-2 has-[[data-slot=table-row-button]:focus-visible]:outline-ring",
         className,
       )}
       onClick={(event) => {

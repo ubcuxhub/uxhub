@@ -130,7 +130,7 @@ export const EventCreateModify = ({
           )}
           {form.successMessage && (
             <Field>
-              <FieldDescription className="text-success">
+              <FieldDescription className="text-success-foreground">
                 {form.successMessage}
               </FieldDescription>
             </Field>

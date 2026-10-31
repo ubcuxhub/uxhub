@@ -145,7 +145,7 @@ function Overlays({ open }: SectionProps) {
                     body scrolls once, inside the dialog.
                   </DialogDescription>
                 </DialogHeader>
-                <div className="min-h-0 flex-1 overflow-y-auto p-5 text-small text-fg-secondary sm:p-6">
+                <div className="min-h-0 flex-1 overflow-y-auto p-5 text-small text-muted-foreground sm:p-6">
                   {Array.from({ length: 24 }, (_, i) => (
                     <p key={i} className="py-1">
                       Row {i + 1}. Long content scrolls inside a large dialog.
@@ -168,7 +168,7 @@ function Overlays({ open }: SectionProps) {
                     Stays 40px clear of the top and scrolls inside.
                   </DialogDescription>
                 </DialogHeader>
-                <div className="grid gap-2 text-small text-fg-secondary">
+                <div className="grid gap-2 text-small text-muted-foreground">
                   {Array.from({ length: 30 }, (_, i) => (
                     <p key={i}>
                       Clause {i + 1}. Attendees agree to follow the club code of

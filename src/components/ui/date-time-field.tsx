@@ -155,6 +155,10 @@ function DateField({
   useReportValidity(parseError, onValidityChange)
 
   const today = (todayProp ?? (now?.date as IsoDate | undefined)) ?? localToday()
+  // Text edits are a draft until blur or a picker selection commits them.
+  // Never submit the previous value while that draft is visible.
+  const submittedValue =
+    value && !parseError && text === formatDateInput(value) ? value : ""
 
   const commit = () => {
     if (!text.trim()) {
@@ -233,7 +237,9 @@ function DateField({
           >
             <CalendarIcon aria-hidden />
           </IconButton>
-          {name ? <input type="hidden" name={name} value={value ?? ""} /> : null}
+          {name ? (
+            <input type="hidden" name={name} value={submittedValue} disabled={disabled} />
+          ) : null}
         </div>
       </PopoverAnchor>
       <PopoverContent

@@ -2,6 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildEventImageObjectKey,
+  describeFileType,
+  describeImageRequirements,
+  describeMinSize,
+  describeWrongFileType,
   EVENT_IMAGE_ERRORS,
   EVENT_IMAGE_MAX_BYTES,
   getImageDimensions,
@@ -316,5 +320,68 @@ describe("resolveImagePreviewSrc", () => {
     expect(resolveImagePreviewSrc("event_images/a-cover.jpg")).toBe(
       "/event_images/a-cover.jpg"
     );
+  });
+});
+
+describe("describeFileType", () => {
+  it("names the types worth naming", () => {
+    expect(describeFileType("image/gif")).toBe("GIF");
+    expect(describeFileType("image/webp")).toBe("WebP");
+    expect(describeFileType("application/pdf")).toBe("PDF");
+  });
+
+  it("ignores case and returns null for anything else", () => {
+    expect(describeFileType("IMAGE/GIF")).toBe("GIF");
+    expect(describeFileType("")).toBeNull();
+    expect(describeFileType("application/x-unknown")).toBeNull();
+  });
+});
+
+describe("describeWrongFileType", () => {
+  it("names the file's type and says what to upload", () => {
+    expect(describeWrongFileType("image/gif")).toBe(
+      "That file is a GIF. Upload a JPG or PNG."
+    );
+  });
+
+  it("uses an for a vowel sound", () => {
+    expect(describeWrongFileType("image/svg+xml")).toBe(
+      "That file is an SVG. Upload a JPG or PNG."
+    );
+  });
+
+  it("falls back when the type is unknown", () => {
+    expect(describeWrongFileType("")).toBe(
+      "That file isn\u2019t a JPG or PNG. Upload a JPG or PNG."
+    );
+  });
+});
+
+describe("describeMinSize", () => {
+  it("states the smallest accepted size", () => {
+    expect(describeMinSize(1600, 400)).toBe(
+      "Image must be at least 1600 \u00d7 400 px."
+    );
+  });
+});
+
+describe("describeImageRequirements", () => {
+  it("defaults to any JPG or PNG within the size limit", () => {
+    expect(describeImageRequirements()).toBe("JPG or PNG, up to 4 MB");
+  });
+
+  it("says square", () => {
+    expect(describeImageRequirements({ square: true })).toBe(
+      "Square JPG or PNG, up to 4 MB"
+    );
+  });
+
+  it("adds a minimum size", () => {
+    expect(
+      describeImageRequirements({ minWidth: 1600, minHeight: 400 })
+    ).toBe("JPG or PNG, 1600 \u00d7 400 px or larger, up to 4 MB");
+    expect(
+      describeImageRequirements({ square: true, minWidth: 600, minHeight: 600 })
+    ).toBe("Square JPG or PNG, 600 \u00d7 600 px or larger, up to 4 MB");
   });
 });

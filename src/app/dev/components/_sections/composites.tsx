@@ -6,7 +6,7 @@ import { TriangleAlert } from "lucide-react";
 import { BackButton, BackPill } from "@/components/shared/BackButton";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { CopyCode } from "@/components/shared/CopyCode";
-import { EventCard } from "@/components/shared/EventCard";
+import { MarketingEventCard } from "@/features/marketing/components/MarketingEventCard";
 import { ImageUpload } from "@/components/shared/ImageUpload";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { SuccessOverlay } from "@/components/shared/SuccessOverlay";
@@ -189,7 +189,7 @@ function Composites({ open }: SectionProps) {
           <BackPill
             href="/dev/components"
             label="Back to Events"
-            className="bg-surface-subtle"
+            className="bg-muted"
           />
         </Specimen>
         <Specimen label="focus (forced)">
@@ -208,7 +208,7 @@ function Composites({ open }: SectionProps) {
         min="100%"
       >
         <Specimen label="with backHref" bare>
-          <div className="w-full overflow-hidden rounded-xl border border-dashed border-border bg-surface-secondary">
+          <div className="w-full overflow-hidden rounded-xl border border-dashed border-border bg-section">
             <PageContainer backHref="/dev/components" backLabel="Back to Events">
               <h3 className="text-h2">Page title</h3>
               <p className="mt-2 text-body text-muted-foreground">
@@ -226,16 +226,16 @@ function Composites({ open }: SectionProps) {
         min="20rem"
       >
         <Specimen label="image, priced (member price)" bare>
-          <EventCard event={EVENT} className="w-full max-w-sm" />
+          <MarketingEventCard event={EVENT} className="w-full max-w-sm" />
         </Specimen>
         <Specimen label="no image, free, long title" bare>
-          <EventCard event={FREE_EVENT} className="w-full max-w-sm" />
+          <MarketingEventCard event={FREE_EVENT} className="w-full max-w-sm" />
         </Specimen>
         <Specimen label="linked (href)" bare>
-          <EventCard event={EVENT} href="/dev/components" className="w-full max-w-sm" />
+          <MarketingEventCard event={EVENT} href="/dev/components" className="w-full max-w-sm" />
         </Specimen>
         <Specimen label="clickable (onClick)" bare>
-          <EventCard event={FREE_EVENT} onClick={() => {}} className="w-full max-w-sm" />
+          <MarketingEventCard event={FREE_EVENT} onClick={() => {}} className="w-full max-w-sm" />
         </Specimen>
       </SpecimenGroup>
 

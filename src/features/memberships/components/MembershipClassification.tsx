@@ -71,7 +71,7 @@ export function MembershipClassification({
             type="button"
             onClick={() => setSelection(option.audience)}
             className={cn(
-              "rounded-lg border p-5 text-left transition-colors hover:bg-accent",
+              "rounded-lg border p-5 text-left transition-colors hover:bg-section",
               selection === option.audience &&
                 "border-primary bg-primary/5 ring-1 ring-primary",
             )}

@@ -1,13 +1,14 @@
 "use client";
 
-import { Calendar } from "lucide-react";
-import Link from "next/link";
-import { useState } from "react";
+import { useId, useState } from "react";
 
+import { EventCard, EventCardDates } from "@/components/shared/EventCard";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { formatEventDate, formatEventTime, pacificDate } from "@/lib/date";
+import { formatEventDateLabel, formatEventDateTimeLines } from "@/lib/date";
 import { resolveImagePreviewSrc } from "@/lib/event-image";
+import type { Status } from "@/components/ui/status-badge";
+import { cn } from "@/lib/utils";
 import type { EventRow } from "@/lib/supabase/models";
 import { groupEventsByMonth, normalizeString } from "@/features/events/lib/event-timeline";
 import { Input } from "@/components/ui/input";
@@ -15,12 +16,19 @@ import { Input } from "@/components/ui/input";
 interface EventTimelineProps {
   upcomingEvents: EventRow[];
   pastEvents: EventRow[];
+  /**
+   * The badge for an event's card, e.g. the member's own status ("going",
+   * "waitlisted"). Defaults to "past" for past events and no badge otherwise.
+   */
+  statusFor?: (event: EventRow) => Status | null;
 }
 
 export function EventTimeline({
   upcomingEvents,
   pastEvents,
+  statusFor,
 }: EventTimelineProps) {
+  const showPastId = useId();
   const [showPastEvents, setShowPastEvents] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   
@@ -43,8 +51,7 @@ export function EventTimeline({
 
   return (
     <>
-    <div>
-      <div className="w-full flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-8 mb-20">
+      <div className="mb-10 flex w-full flex-col items-center justify-between gap-4 sm:flex-row sm:gap-8">
         <Input
           placeholder="Search events..."
           aria-label="Search events"
@@ -53,30 +60,44 @@ export function EventTimeline({
           type="search"
           className="w-full"
         />
-        <div className="w-fit flex items-center text-primary">
-          <Label htmlFor="show-past-events" className="mr-2">
+        <div className="flex w-fit shrink-0 items-center whitespace-nowrap text-primary">
+          <Label htmlFor={showPastId} className="mr-2">
             Show Past Events
           </Label>
           <Switch
-            id="show-past-events"
+            id={showPastId}
             checked={showPastEvents}
             onCheckedChange={setShowPastEvents}
           />
         </div>
       </div>
-    </div>
 
       {filteredGroups.length === 0 ? (
         <p className="text-muted-foreground my-8">{emptyMessage}</p>
       ) : (
-        <div className="mb-8">
+        <div className="mb-8 flex flex-col gap-10">
           {filteredGroups.map((group) => (
-            <div key={group.key}>
-              <h2 className="mt-4 mb-5 text-h2">{group.label}</h2>
-              {group.events.map((event) => (
-                <EventTimelineItem key={event.id} event={event} />
-              ))}
-            </div>
+            <section key={group.key}>
+              <h2 className="mb-4 text-h2">{group.label}</h2>
+              <ol>
+                {group.events.map((event, index) => (
+                  <EventTimelineRow
+                    key={event.id}
+                    event={event}
+                    // Without a `statusFor`, only "past" is known: the member's
+                    // own status (going, waitlisted, ...) isn't loaded here.
+                    status={
+                      statusFor
+                        ? statusFor(event)
+                        : showPastEvents
+                          ? "past"
+                          : null
+                    }
+                    isLast={index === group.events.length - 1}
+                  />
+                ))}
+              </ol>
+            </section>
           ))}
         </div>
       )}
@@ -84,64 +105,56 @@ export function EventTimeline({
   );
 }
 
-function EventTimelineItem({ event }: { event: EventRow }) {
-  const location = [event.location_building, event.location_room]
+/**
+ * One row of the design-system rail (§3.9): the date marker, a dashed rail
+ * with a dot, then the EventCard. On phones the rail hides and the date sits
+ * above the card.
+ */
+function EventTimelineRow({
+  event,
+  status,
+  isLast,
+}: {
+  event: EventRow;
+  status: Status | null;
+  isLast: boolean;
+}) {
+  const venue = [event.location_building, event.location_room]
     .filter(Boolean)
     .join(" ");
-  const dateOptions = { month: "short", weekday: "short" } as const;
-  const endDate =
-    pacificDate(event.ends_at) !== pacificDate(event.starts_at)
-      ? formatEventDate(event.ends_at, dateOptions)
-      : null;
-  const startDateTime = [
-    formatEventDate(event.starts_at, dateOptions),
-    formatEventTime(event.starts_at),
-  ]
-    .filter(Boolean)
-    .join(" ");
-  const endDateTime = [endDate, formatEventTime(event.ends_at)]
-    .filter(Boolean)
-    .join(" ");
-  const dateTime = [startDateTime, endDateTime].filter(Boolean).join(" – ");
 
   return (
-    <div className="flex gap-3 sm:gap-8 sm:min-h-72">
-      <div className="flex justify-end gap-4">
-        <p className="hidden min-w-28 text-end sm:block">
-          {formatEventDate(event.starts_at, { year: undefined, month: "short" })}
-        </p>
-        <div className="flex flex-col items-center self-stretch">
-          <div className="mt-2 size-2 shrink-0 rounded-full bg-fg-secondary" />
-          <div className="flex-1 border-l-2 border-dashed border-border-subtle" />
-        </div>
-      </div>
-
-      <Link
-        href={`/portal/events/${event.slug}`}
-        className="flex w-full min-w-0 self-start items-center justify-between gap-6 rounded-xl border p-4 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-52 sm:px-5"
-      >
-        <div className="flex min-w-0 flex-col gap-5">
-          <div className="flex flex-col gap-3">
-            <h3 className="text-h3">{event.name}</h3>
-            {location && <p>{location}</p>}
-            {dateTime && <p>{dateTime}</p>}
-          </div>
-        </div>
-        <div className="size-20 shrink-0 overflow-hidden rounded-3xl bg-muted sm:size-40">
-          {event.image_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={resolveImagePreviewSrc(event.image_url)}
-              alt=""
-              className="size-full object-cover"
-            />
-          ) : (
-            <div className="flex size-full items-center justify-center">
-              <Calendar className="text-muted-foreground" />
-            </div>
+    <li className="grid gap-y-2 pb-6 sm:grid-cols-[7.5rem_1.5rem_minmax(0,1fr)] sm:gap-x-4 sm:gap-y-0">
+      <p className="text-body font-medium text-foreground sm:pt-1 sm:font-normal">
+        {formatEventDateLabel(event.starts_at, event.ends_at)}
+      </p>
+      <div aria-hidden className="relative hidden sm:block">
+        <div
+          className={cn(
+            "absolute top-2 left-1/2 w-px -translate-x-1/2 border-l border-dashed border-border",
+            // The line bridges the 24px gap to the next row, and stops at the
+            // card's bottom edge on the last one.
+            isLast ? "bottom-0" : "-bottom-6",
           )}
-        </div>
-      </Link>
-    </div>
+        />
+        <div className="absolute top-1 left-2 size-2 rounded-full bg-muted-foreground" />
+      </div>
+      <EventCard
+        title={event.name}
+        href={`/portal/events/${event.slug}`}
+        venue={venue || null}
+        when={
+          <EventCardDates
+            lines={formatEventDateTimeLines(event.starts_at, event.ends_at)}
+          />
+        }
+        status={status}
+        image={
+          event.image_url
+            ? { src: resolveImagePreviewSrc(event.image_url) }
+            : null
+        }
+      />
+    </li>
   );
 }

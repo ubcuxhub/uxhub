@@ -35,11 +35,12 @@ function Labelled({
   children: React.ReactNode;
   error?: string | null;
 }) {
+  const errorId = `${htmlFor}-error`;
   return (
     <Field data-invalid={error ? true : undefined}>
       <FieldLabel htmlFor={htmlFor}>{label}</FieldLabel>
       {children}
-      {error ? <FieldError>{error}</FieldError> : null}
+      {error ? <FieldError id={errorId}>{error}</FieldError> : null}
     </Field>
   );
 }
@@ -55,6 +56,7 @@ function LiveDate({ label, id }: { label: string; id: string }) {
         value={value}
         onValueChange={setValue}
         onValidityChange={setError}
+        aria-describedby={error ? `${id}-error` : undefined}
         today={TODAY}
         min={TODAY}
       />
@@ -172,6 +174,7 @@ function DateTime({ open }: SectionProps) {
                 value={null}
                 onValueChange={() => {}}
                 aria-invalid
+                aria-describedby={`${id("d-error")}-error`}
               />
             </Labelled>
           </div>

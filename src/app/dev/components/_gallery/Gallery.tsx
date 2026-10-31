@@ -73,7 +73,7 @@ export function Gallery(params: GalleryParams) {
 
       <main className="mx-auto flex max-w-[1600px] flex-col gap-14 px-5 py-10 sm:px-8">
         {visible.length === 0 ? (
-          <p className="text-body text-fg-secondary">
+          <p className="text-body text-muted-foreground">
             No section called “{section}”. Pick one from the toolbar.
           </p>
         ) : null}
@@ -106,7 +106,7 @@ function Toolbar({
         <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
           <div className="flex items-baseline gap-2">
             <h1 className="text-h3">Component gallery</h1>
-            <span className="rounded-full bg-surface-subtle px-2 py-0.5 text-badge text-fg-secondary">
+            <span className="rounded-full bg-muted px-2 py-0.5 text-badge text-muted-foreground">
               dev only
             </span>
           </div>
@@ -186,7 +186,7 @@ function ControlGroup({
 }) {
   return (
     <div className="flex flex-wrap items-center gap-1.5">
-      <span className="mr-1 text-label text-fg-secondary">{label}</span>
+      <span className="mr-1 text-label text-muted-foreground">{label}</span>
       {children}
     </div>
   );
@@ -209,8 +209,8 @@ function Chip({
       className={cn(
         "inline-flex h-7 items-center rounded-full border px-3 text-label transition-colors duration-150 focus-visible:focus-ring",
         active
-          ? "border-action bg-action text-fg-inverse"
-          : "border-border bg-background text-foreground hover:bg-surface-hover",
+          ? "border-primary bg-primary text-primary-foreground"
+          : "border-border bg-background text-foreground hover:bg-accent",
       )}
     >
       {children}
@@ -241,9 +241,9 @@ function SectionFrame({
         <h2 id={`${id}-heading`} className="text-h2">
           {title}
         </h2>
-        <span className="text-small text-fg-secondary">{spec}</span>
+        <span className="text-small text-muted-foreground">{spec}</span>
         {layout === "page" || forcesOpen ? (
-          <span className="ml-auto text-label text-fg-secondary">
+          <span className="ml-auto text-label text-muted-foreground">
             Page theme: {theme === "dark" ? "dark" : "light"}
           </span>
         ) : null}
@@ -279,7 +279,7 @@ function ThemeColumn({
       data-column={mode}
       className="flex min-w-0 flex-col gap-4 rounded-2xl border border-border bg-background p-6 text-foreground"
     >
-      <span className="text-label text-fg-secondary">
+      <span className="text-label text-muted-foreground">
         {mode === "light" ? "Light" : "Dark"}
       </span>
       {children}
