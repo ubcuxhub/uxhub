@@ -1,12 +1,17 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { DATE_INPUT_ERROR, type IsoDate } from "@/lib/date-input";
+import {
+  DATE_INPUT_ERROR,
+  END_TIME_ERROR,
+  type IsoDate,
+  type WallTime,
+} from "@/lib/date-input";
 
-import { DateField } from "./date-time-field";
+import { DateField, TimeField } from "./date-time-field";
 
 beforeAll(() => {
   globalThis.ResizeObserver = class ResizeObserver {
@@ -40,6 +45,27 @@ function Date_({
       onValueChange={setValue}
       onValidityChange={onValidityChange}
       {...props}
+    />
+  );
+}
+
+function Time_({
+  initial = null,
+  after,
+  onValidityChange,
+}: {
+  initial?: WallTime | null;
+  after?: WallTime;
+  onValidityChange?: (error: string | null) => void;
+}) {
+  const [value, setValue] = useState<WallTime | null>(initial);
+  return (
+    <TimeField
+      aria-label="Time"
+      value={value}
+      onValueChange={setValue}
+      onValidityChange={onValidityChange}
+      after={after}
     />
   );
 }
@@ -144,5 +170,99 @@ describe("DateField", () => {
     expect((early as HTMLButtonElement).disabled).toBe(true);
     const ok = await screen.findByRole("button", { name: /November 10/ });
     expect((ok as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
+describe("TimeField", () => {
+  it("reads a bare 9 as 9:00 PM", () => {
+    render(<Time_ />);
+    const input = screen.getByRole("combobox", { name: "Time" }) as HTMLInputElement;
+    typeAndBlur(input, "9");
+    expect(input.value).toBe("9:00 PM");
+  });
+
+  it("takes the first match after the start in end mode", () => {
+    render(<Time_ after="09:00" />);
+    const input = screen.getByRole("combobox") as HTMLInputElement;
+    typeAndBlur(input, "11");
+    expect(input.value).toBe("11:00 AM");
+  });
+
+  it("reports an end time before the start, and clears it when fixed", () => {
+    const onValidityChange = vi.fn();
+    render(<Time_ after="09:00" initial="08:30" onValidityChange={onValidityChange} />);
+    const input = screen.getByRole("combobox");
+    expect(onValidityChange).toHaveBeenLastCalledWith(END_TIME_ERROR);
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+
+    typeAndBlur(input, "10:30 am");
+    expect(onValidityChange).toHaveBeenLastCalledWith(null);
+  });
+
+  it("rejects text that isn't a time", () => {
+    const onValidityChange = vi.fn();
+    render(<Time_ onValidityChange={onValidityChange} />);
+    typeAndBlur(screen.getByRole("combobox"), "lunch");
+    expect(onValidityChange).toHaveBeenLastCalledWith("Use a real time, like 9:00 AM.");
+  });
+
+  it("moves aria-activedescendant with the arrows and accepts with Enter", async () => {
+    render(<Time_ initial="09:00" />);
+    const input = screen.getByRole("combobox") as HTMLInputElement;
+    input.focus();
+
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    const listbox = await screen.findByRole("listbox");
+    expect(input.getAttribute("aria-expanded")).toBe("true");
+    expect(input.getAttribute("aria-controls")).toBe(listbox.id);
+
+    const options = screen.getAllByRole("option");
+    // Opens on the current value, 9:00 AM.
+    expect(input.getAttribute("aria-activedescendant")).toBe(options[36].id);
+
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(input.getAttribute("aria-activedescendant")).toBe(options[37].id);
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    expect(input.getAttribute("aria-activedescendant")).toBe(options[38].id);
+    fireEvent.keyDown(input, { key: "ArrowUp" });
+    expect(input.getAttribute("aria-activedescendant")).toBe(options[37].id);
+
+    fireEvent.keyDown(input, { key: "Enter" });
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+    expect(input.value).toBe("9:15 AM");
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("closes on Escape and keeps focus in the input", async () => {
+    render(<Time_ initial="09:00" />);
+    const input = screen.getByRole("combobox");
+    input.focus();
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    await screen.findByRole("listbox");
+
+    fireEvent.keyDown(input, { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("listbox")).toBeNull());
+    expect(document.activeElement).toBe(input);
+  });
+
+  it("lists end times after the start with durations", async () => {
+    render(<Time_ after="10:00" />);
+    const input = screen.getByRole("combobox");
+    input.focus();
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    await screen.findByRole("listbox");
+
+    const first = screen.getAllByRole("option")[0];
+    expect(first.textContent).toBe("10:15 AM15 min");
+    expect(screen.getByText("Pacific Time")).not.toBeNull();
+  });
+
+  it("picks an option by click", async () => {
+    render(<Time_ />);
+    const input = screen.getByRole("combobox") as HTMLInputElement;
+    fireEvent.click(screen.getByRole("button", { name: "Choose time" }));
+    const option = await screen.findByRole("option", { name: "1:30 PM" });
+    act(() => option.click());
+    await waitFor(() => expect(input.value).toBe("1:30 PM"));
   });
 });
