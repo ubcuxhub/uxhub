@@ -12,7 +12,9 @@ import { cn } from "@/lib/utils";
  *
  * On coarse pointers an invisible `::after` grows the hit area to 44px (§2.4).
  * Its inset is measured from the padding box, so it is 1px more than the
- * overhang it adds past the 1px border.
+ * overhang it adds past the 1px border. Every `after:` class is
+ * `pointer-coarse:`-only: an in-flow `::after` on fine pointers would be a
+ * flex item, and the gap before it would push the label off centre.
  *
  * Hover and pressed on Secondary and Ghost step through `surface-subtle` then
  * `border-subtle`: `surface-hover` is 1.02:1 against white, too faint to read
@@ -36,7 +38,7 @@ const secondary =
   "aria-disabled:border-action-disabled-border aria-disabled:bg-action-disabled-bg aria-disabled:text-fg-disabled";
 
 const buttonVariants = cva(
-  "relative inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-full border border-transparent font-medium transition-colors duration-150 ease-out select-none focus-visible:focus-ring disabled:pointer-events-none aria-disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 after:content-[''] pointer-coarse:after:absolute",
+  "relative inline-flex shrink-0 cursor-pointer items-center justify-center whitespace-nowrap rounded-full border border-transparent font-medium transition-colors duration-150 ease-out select-none focus-visible:focus-ring disabled:pointer-events-none aria-disabled:pointer-events-none [&_svg]:pointer-events-none [&_svg]:shrink-0 pointer-coarse:after:absolute",
   {
     variants: {
       variant: {
