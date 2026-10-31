@@ -112,7 +112,7 @@ function EventTimelineItem({ event }: { event: EventRow }) {
         </p>
         <div className="flex flex-col items-center self-stretch">
           <div className="mt-2 size-2 shrink-0 rounded-full bg-fg-secondary" />
-          <div className="flex-1 border-l-2 border-dashed border-subtle" />
+          <div className="flex-1 border-l-2 border-dashed border-border-subtle" />
         </div>
       </div>
 

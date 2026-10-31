@@ -38,7 +38,7 @@ export default async function EventsPage() {
           </div>
 
           {events.length === 0 ? (
-            <Card className="border-dashed py-20 text-center shadow-none">
+            <Card className="border-dashed py-20 text-center">
               <CardTitle>No events scheduled yet</CardTitle>
             </Card>
           ) : (

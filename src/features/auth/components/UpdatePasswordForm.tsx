@@ -14,7 +14,6 @@ import {
   getAuthActionErrorMessage,
 } from "../auth-errors";
 import { AuthPanel } from "./AuthPanel";
-import { authInputClassName } from "./auth-styles";
 import { AuthSubmitButton } from "./AuthSubmitButton";
 
 export function UpdatePasswordForm({
@@ -74,7 +73,7 @@ export function UpdatePasswordForm({
     >
       <form onSubmit={handleUpdatePassword} className="space-y-6">
         <Field>
-          <FieldLabel htmlFor="password" className="text-body text-foreground">
+          <FieldLabel htmlFor="password">
             New password
           </FieldLabel>
           <Input
@@ -84,7 +83,6 @@ export function UpdatePasswordForm({
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className={authInputClassName}
           />
         </Field>
 

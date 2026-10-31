@@ -19,7 +19,6 @@ import {
 } from "../auth-errors";
 import { setPendingEmail } from "../pending-email";
 import { AuthPanel } from "./AuthPanel";
-import { authInputClassName } from "./auth-styles";
 import { AuthSubmitButton } from "./AuthSubmitButton";
 
 export function ForgotPasswordForm({
@@ -93,7 +92,7 @@ export function ForgotPasswordForm({
     >
       <form onSubmit={handleForgotPassword} className="space-y-6">
         <Field className="gap-2">
-          <FieldLabel htmlFor="email" className="text-body text-foreground">
+          <FieldLabel htmlFor="email">
             Email
           </FieldLabel>
           <Input
@@ -103,7 +102,6 @@ export function ForgotPasswordForm({
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className={authInputClassName}
           />
         </Field>
 
