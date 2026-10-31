@@ -103,11 +103,19 @@ function TabNavLink({
   const active = isActive(pathname, href, exact)
   const ref = React.useRef<HTMLAnchorElement>(null)
 
-  // Keep the current page's link in view when the row overflows.
+  // Keep the current page's link in view when the row overflows. Only the
+  // row's own `scrollLeft` moves: `scrollIntoView` would also scroll the
+  // window to a TabNav that sits below the fold.
   React.useEffect(() => {
-    if (active) {
-      ref.current?.scrollIntoView?.({ inline: "nearest", block: "nearest" })
-    }
+    const link = ref.current
+    const row = link?.closest("ul")
+    if (!active || !link || !row || row.scrollWidth <= row.clientWidth) return
+    const rowBox = row.getBoundingClientRect()
+    const linkBox = link.getBoundingClientRect()
+    const leftEdge = linkBox.left - rowBox.left
+    const rightEdge = linkBox.right - rowBox.right
+    if (leftEdge < 0) row.scrollLeft += leftEdge
+    else if (rightEdge > 0) row.scrollLeft += rightEdge
   }, [active])
 
   return (

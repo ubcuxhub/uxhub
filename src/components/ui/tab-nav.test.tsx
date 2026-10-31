@@ -1,11 +1,14 @@
 // @vitest-environment jsdom
 
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { TabNav, TabNavLink } from "./tab-nav";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
 
 const BASE = "/admin/events/abc";
 
@@ -104,5 +107,56 @@ describe("TabNav", () => {
     render(<Example pathname="/portal" />);
 
     expect(current()).toHaveLength(0);
+  });
+
+  describe("keeping the current link in view", () => {
+    // jsdom has no layout, so give the row a 100px viewport and the current
+    // link (the last one, 200-260px) a position outside it.
+    function mockLayout(overflows: boolean) {
+      vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockImplementation(
+        function (this: HTMLElement) {
+          return this.tagName === "UL" ? (overflows ? 300 : 100) : 0;
+        },
+      );
+      vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(
+        function (this: HTMLElement) {
+          return this.tagName === "UL" ? 100 : 0;
+        },
+      );
+      vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(
+        function (this: Element) {
+          const box =
+            this.tagName === "UL"
+              ? { left: 0, right: 100 }
+              : { left: 200, right: 260 };
+          return { ...box, top: 0, bottom: 0, width: 0, height: 0, x: 0, y: 0, toJSON() {} };
+        },
+      );
+    }
+
+    it("scrolls only the row sideways, never the window or an ancestor", () => {
+      mockLayout(true);
+      const scrollTo = vi.spyOn(window, "scrollTo").mockImplementation(() => {});
+      const scrollIntoView = vi.fn();
+      Element.prototype.scrollIntoView = scrollIntoView;
+
+      render(<Example pathname={`${BASE}/check-in`} />);
+
+      const row = screen.getByRole("navigation").querySelector("ul")!;
+      expect(row.scrollLeft).toBe(160);
+      expect(scrollTo).not.toHaveBeenCalled();
+      expect(scrollIntoView).not.toHaveBeenCalled();
+      // @ts-expect-error restore the jsdom default (the method is undefined there)
+      delete Element.prototype.scrollIntoView;
+    });
+
+    it("leaves the row alone when it does not overflow", () => {
+      mockLayout(false);
+
+      render(<Example pathname={`${BASE}/check-in`} />);
+
+      const row = screen.getByRole("navigation").querySelector("ul")!;
+      expect(row.scrollLeft).toBe(0);
+    });
   });
 });
