@@ -39,7 +39,7 @@ export function EventAgendaTable({ eventName, agenda }: EventAgendaTableProps) {
                   <th colSpan={4} className="px-4 py-3 text-left font-normal">
                     <div className="flex items-center gap-4">
                       <span
-                        className={cn("size-2 shrink-0 rounded-full", isToday ? "bg-action" : "bg-border")}
+                        className={cn("size-2 shrink-0 rounded-full", isToday ? "bg-primary" : "bg-border")}
                         aria-hidden
                       />
                       <span>
@@ -62,7 +62,7 @@ export function EventAgendaTable({ eventName, agenda }: EventAgendaTableProps) {
                           {/* `invisible` keeps the dot's space, so rows stay aligned when it appears. */}
                           <span
                             className={cn(
-                              "size-2 shrink-0 rounded-full bg-success-active",
+                              "size-2 shrink-0 rounded-full bg-success-solid",
                               !isHappening && "invisible"
                             )}
                             aria-hidden

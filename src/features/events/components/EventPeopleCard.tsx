@@ -60,7 +60,7 @@ const PEOPLE_KINDS: { mentors: PeopleKind<MentorRow>; sponsors: PeopleKind<Spons
     // `sponsors` has no tagline or website column yet. Once it does, map the
     // tagline to `subtitle` and the website to:
     //   { href: sponsor.website_url, label: "Website", ariaLabel: `${sponsor.name} website`,
-    //     icon: <Link2 className="size-4 shrink-0 text-fg-secondary" aria-hidden /> }
+    //     icon: <Link2 className="size-4 shrink-0 text-muted-foreground" aria-hidden /> }
     // with `Link2` from lucide-react.
     toItem: (sponsor) => ({
       id: sponsor.id,
@@ -86,7 +86,7 @@ export function EventPeopleCard(props: EventPeopleCardProps) {
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-3">
           <h3 className="text-h3">{title}</h3>
-          <p className="text-fg-secondary">
+          <p className="text-muted-foreground">
             Displaying {items.length} {items.length === 1 ? singular : plural}
           </p>
         </div>
@@ -103,7 +103,7 @@ export function EventPeopleCard(props: EventPeopleCardProps) {
 
             <div className="flex min-w-0 flex-1 flex-col gap-1">
               <p className="text-subheading">{person.name}</p>
-              {person.subtitle && <p className="text-fg-secondary">{person.subtitle}</p>}
+              {person.subtitle && <p className="text-muted-foreground">{person.subtitle}</p>}
             </div>
 
             {person.link && (
@@ -112,7 +112,7 @@ export function EventPeopleCard(props: EventPeopleCardProps) {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label={person.link.ariaLabel}
-                className="flex shrink-0 items-center gap-2 text-button underline underline-offset-2 hover:text-action-hover"
+                className="flex shrink-0 items-center gap-2 text-button underline underline-offset-2 hover:text-primary-hover"
               >
                 {person.link.icon}
                 {person.link.label}
@@ -130,7 +130,7 @@ function PersonAvatar({ name, imageUrl }: { name: string; imageUrl: string | nul
     return (
       <div
         aria-hidden
-        className="flex size-16 shrink-0 items-center justify-center rounded-full bg-muted text-subheading text-fg-secondary"
+        className="flex size-16 shrink-0 items-center justify-center rounded-full bg-muted text-subheading text-muted-foreground"
       >
         {name.charAt(0)}
       </div>

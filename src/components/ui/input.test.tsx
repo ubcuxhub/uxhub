@@ -16,14 +16,14 @@ describe("Input without leadingIcon", () => {
     const { container } = render(
       <Input aria-label="Name" placeholder="Enter your name" className="extra" />,
     );
-    expect(container.innerHTML).toMatchInlineSnapshot(`"<input class="flex h-11 w-full rounded-full border border-border bg-background px-5 py-1 text-body text-foreground transition-colors duration-150 file:border-0 file:bg-transparent file:text-table file:text-foreground placeholder:text-fg-muted focus-visible:focus-ring aria-invalid:border-error disabled:cursor-not-allowed disabled:border-action-disabled-border disabled:bg-action-disabled-bg disabled:text-fg-disabled disabled:placeholder:text-fg-disabled sm:h-(--size-control) extra" aria-label="Name" placeholder="Enter your name">"`);
+    expect(container.innerHTML).toMatchInlineSnapshot(`"<input class="flex h-11 w-full rounded-full border border-border bg-background px-5 py-1 text-body text-foreground transition-colors duration-150 file:border-0 file:bg-transparent file:text-table file:text-foreground placeholder:text-muted-foreground focus-visible:focus-ring aria-invalid:border-destructive disabled:cursor-not-allowed disabled:border-disabled-border disabled:bg-disabled disabled:text-disabled-foreground disabled:placeholder:text-disabled-foreground sm:h-(--size-control) extra" aria-label="Name" placeholder="Enter your name">"`);
   });
 
   it("renders a bare <input> for type=number and aria-invalid", () => {
     const { container } = render(
       <Input aria-label="Seats" type="number" defaultValue={40} aria-invalid disabled />,
     );
-    expect(container.innerHTML).toMatchInlineSnapshot(`"<input class="flex h-11 w-full rounded-full border border-border bg-background px-5 py-1 text-body text-foreground transition-colors duration-150 file:border-0 file:bg-transparent file:text-table file:text-foreground placeholder:text-fg-muted focus-visible:focus-ring aria-invalid:border-error disabled:cursor-not-allowed disabled:border-action-disabled-border disabled:bg-action-disabled-bg disabled:text-fg-disabled disabled:placeholder:text-fg-disabled sm:h-(--size-control)" aria-label="Seats" aria-invalid="true" disabled="" type="number" value="40">"`);
+    expect(container.innerHTML).toMatchInlineSnapshot(`"<input class="flex h-11 w-full rounded-full border border-border bg-background px-5 py-1 text-body text-foreground transition-colors duration-150 file:border-0 file:bg-transparent file:text-table file:text-foreground placeholder:text-muted-foreground focus-visible:focus-ring aria-invalid:border-destructive disabled:cursor-not-allowed disabled:border-disabled-border disabled:bg-disabled disabled:text-disabled-foreground disabled:placeholder:text-disabled-foreground sm:h-(--size-control)" aria-label="Seats" aria-invalid="true" disabled="" type="number" value="40">"`);
   });
 
   it("has no wrapper, and the root is the input", () => {

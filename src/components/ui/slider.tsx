@@ -120,7 +120,7 @@ function Slider({
         <output
           htmlFor={id}
           aria-live="off"
-          className="w-11 shrink-0 text-right text-small text-muted-foreground tabular-nums peer-disabled:text-text-disabled"
+          className="w-11 shrink-0 text-right text-small text-muted-foreground tabular-nums peer-disabled:text-disabled-foreground"
         >
           {formatValue(value)}
         </output>

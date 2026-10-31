@@ -297,7 +297,7 @@ function FieldExtensions() {
         </Specimen>
         <Specimen label="Disabled">
           <div className="flex w-full items-center gap-4">
-            <span id={id("zoom-disabled")} className="text-label text-text-disabled">
+            <span id={id("zoom-disabled")} className="text-label text-disabled-foreground">
               Zoom
             </span>
             <Slider

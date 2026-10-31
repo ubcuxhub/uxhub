@@ -108,7 +108,7 @@ export function CopyCode({ code }: CopyCodeProps) {
       <span aria-live="polite" className="sr-only">
         {copied ? "Code copied" : ""}
       </span>
-      <p aria-live="polite" className="text-small text-error">
+      <p aria-live="polite" className="text-small text-destructive">
         {failed ? "Failed to copy code." : ""}
       </p>
     </div>

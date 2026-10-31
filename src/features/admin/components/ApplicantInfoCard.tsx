@@ -37,13 +37,13 @@ interface ApplicantInfoCardProps {
 export function ApplicationStateIcon({ state }: { state: ApplicationReviewState }) {
   switch (state) {
     case "submitted":
-      return <Clock className="text-warning" />;
+      return <Clock className="text-warning-foreground" />;
     case "waitlisted":
       return <Hourglass className="text-muted-foreground" />;
     case "accepted":
-      return <Check className="text-success" />;
+      return <Check className="text-success-foreground" />;
     case "registered":
-      return <Ticket className="text-success" />;
+      return <Ticket className="text-success-foreground" />;
     case "offer_expired":
       return <Clock className="text-destructive" />;
     case "rejected":

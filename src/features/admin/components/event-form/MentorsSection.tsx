@@ -206,7 +206,7 @@ export function MentorsSection({
               </Button>
               {mentor.id && mentor.isEditing && (
                 <p
-                  className="col-span-full flex items-center gap-2 pr-8 text-small text-warning"
+                  className="col-span-full flex items-center gap-2 pr-8 text-small text-warning-foreground"
                   role="note"
                 >
                   <AlertTriangle className="size-4 shrink-0" />
