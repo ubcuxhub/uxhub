@@ -35,12 +35,11 @@ const eslintConfig = defineConfig([
       ],
     },
   },
-  // Separate from the rule above so the severities stay independent: the old
-  // alias names still work until the week of November 16, so they only warn.
+  // Old alias names: each report names the replacement class from §2.11.
   {
     files: ["src/**/*.{ts,tsx}"],
     plugins: { "uxhub-colours": deprecatedColours },
-    rules: { "uxhub-colours/no-deprecated-colour-class": "warn" },
+    rules: { "uxhub-colours/no-deprecated-colour-class": "error" },
   },
   // Override default ignores of eslint-config-next.
   globalIgnores([
