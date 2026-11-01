@@ -124,6 +124,10 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
   ) => {
     const Comp = asChild ? Slot : "button";
     const busy = loading && !asChild;
+    // An anchor ignores `disabled`, so a disabled link button is made inert by
+    // hand: out of the tab order, announced as disabled, and its click (from a
+    // mouse, Enter or a screen reader) swallowed before any handler sees it.
+    const inertLink = asChild && disabled;
     return (
       <Comp
         className={cn(buttonVariants({ variant, size, className }))}
@@ -131,6 +135,16 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         disabled={busy || disabled}
         aria-busy={busy || undefined}
         {...props}
+        {...(inertLink
+          ? {
+              "aria-disabled": true,
+              tabIndex: -1,
+              onClickCapture: (event: React.MouseEvent) => {
+                event.preventDefault();
+                event.stopPropagation();
+              },
+            }
+          : null)}
       >
         {busy ? (
           <>

@@ -4,7 +4,7 @@ import * as React from "react"
 import { XIcon } from "lucide-react"
 import { Dialog as SheetPrimitive } from "radix-ui"
 
-import { focusContentOnOpen } from "@/components/ui/dialog"
+import { focusContentOnOpen, guardEscape } from "@/components/ui/dialog"
 import { IconButton } from "@/components/ui/icon-button"
 import { cn } from "@/lib/utils"
 
@@ -52,6 +52,7 @@ function SheetContent({
   side = "right",
   showCloseButton = true,
   onOpenAutoFocus,
+  onEscapeKeyDown,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left"
@@ -78,6 +79,7 @@ function SheetContent({
           className
         )}
         onOpenAutoFocus={(event) => focusContentOnOpen(event, onOpenAutoFocus)}
+        onEscapeKeyDown={(event) => guardEscape(event, onEscapeKeyDown)}
         {...props}
       >
         {children}

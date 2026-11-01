@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -52,6 +52,13 @@ export interface ConfirmDialogProps {
   pending?: boolean;
   /** Receives the confirmation text, so callers need not mirror it in state. */
   onConfirm: (typed: string) => void;
+  /**
+   * Where focus goes when the dialog closes. Defaults to whatever held focus
+   * when it opened. Pass this when that element goes away first, as a menu
+   * item does when its `onSelect` opens the dialog: point it at the menu's
+   * trigger.
+   */
+  returnFocusRef?: React.RefObject<HTMLElement | null>;
 }
 
 /**
@@ -64,13 +71,19 @@ export interface ConfirmDialogProps {
  * The dialog never closes itself on confirm: some callers navigate away, others
  * stay open to show a server error. Close it from the caller once the action
  * has actually succeeded.
+ *
+ * The dialog has no `DialogTrigger`, so Radix has nothing to hand focus back
+ * to. It remembers the element focused at open (or uses `returnFocusRef`) and
+ * restores focus there on close.
  */
 export function ConfirmDialog({
   open,
   onOpenChange,
   pending = false,
+  returnFocusRef,
   ...body
 }: ConfirmDialogProps) {
+  const openedFrom = useRef<HTMLElement | null>(null);
   return (
     <Dialog
       open={open}
@@ -79,7 +92,25 @@ export function ConfirmDialog({
         onOpenChange(next);
       }}
     >
-      <DialogContent closeDisabled={pending} mobileFullscreen>
+      <DialogContent
+        closeDisabled={pending}
+        mobileFullscreen
+        onOpenAutoFocus={() => {
+          // Runs before focus moves in, so this is still the opener.
+          openedFrom.current =
+            document.activeElement instanceof HTMLElement &&
+            document.activeElement !== document.body
+              ? document.activeElement
+              : null;
+        }}
+        onCloseAutoFocus={(event) => {
+          const target = returnFocusRef?.current ?? openedFrom.current;
+          openedFrom.current = null;
+          if (!target?.isConnected) return;
+          event.preventDefault();
+          target.focus();
+        }}
+      >
         {/* Radix unmounts this while the dialog is closed, so the confirmation
             input below resets on its own — reopening never finds a primed
             button left over from last time. */}

@@ -103,3 +103,105 @@ describe("DialogContent initial focus", () => {
     expect(document.activeElement).toBe(screen.getByRole("dialog"));
   });
 });
+
+function renderControlled(
+  contentProps: Partial<React.ComponentProps<typeof DialogContent>> = {},
+  body: React.ReactNode = <button type="button">First action</button>,
+) {
+  const onOpenChange = vi.fn();
+  render(
+    <Dialog open onOpenChange={onOpenChange}>
+      <DialogContent {...contentProps}>
+        <DialogTitle>Edit thing</DialogTitle>
+        <DialogDescription>Change the thing.</DialogDescription>
+        {body}
+      </DialogContent>
+    </Dialog>,
+  );
+  return onOpenChange;
+}
+
+/** Radix registers its outside-pointer listener on a timeout. */
+const settle = () =>
+  act(async () => void (await new Promise((resolve) => setTimeout(resolve, 10))));
+
+describe("DialogContent closeDisabled", () => {
+  it("closes on Esc and outside clicks when enabled", async () => {
+    const onOpenChange = renderControlled();
+    await settle();
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+
+    onOpenChange.mockClear();
+    // Radix dismisses on the click that follows the pointer-down.
+    fireEvent.pointerDown(document.body);
+    fireEvent.click(document.body);
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("blocks Esc and outside clicks as well as the X", async () => {
+    const onOpenChange = renderControlled({ closeDisabled: true });
+    await settle();
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    fireEvent.pointerDown(document.body);
+    fireEvent.click(document.body);
+
+    expect(onOpenChange).not.toHaveBeenCalled();
+    expect(
+      (screen.getByRole("button", { name: "Close" }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+  });
+
+  it("runs the caller's handlers first and honours their preventDefault", async () => {
+    const onEscapeKeyDown = vi.fn((event: Event) => event.preventDefault());
+    const onInteractOutside = vi.fn((event: Event) => event.preventDefault());
+    const onOpenChange = renderControlled({ onEscapeKeyDown, onInteractOutside });
+    await settle();
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    fireEvent.pointerDown(document.body);
+    fireEvent.click(document.body);
+
+    expect(onEscapeKeyDown).toHaveBeenCalledTimes(1);
+    expect(onInteractOutside).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+});
+
+describe("DialogContent Esc and [data-escape-clears] fields", () => {
+  const field = (value: string) => (
+    <div data-escape-clears>
+      <input aria-label="Search" defaultValue={value} />
+      <button type="button">Clear</button>
+    </div>
+  );
+
+  it("stays open when Esc is pressed in a field that holds text", () => {
+    const onOpenChange = renderControlled({}, field("ux"));
+    fireEvent.keyDown(screen.getByLabelText("Search"), { key: "Escape" });
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it("stays open when Esc is pressed on a control beside a field that holds text", () => {
+    const onOpenChange = renderControlled({}, field("ux"));
+    fireEvent.keyDown(screen.getByRole("button", { name: "Clear" }), {
+      key: "Escape",
+    });
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it("closes when the field is empty", () => {
+    const onOpenChange = renderControlled({}, field(""));
+    fireEvent.keyDown(screen.getByLabelText("Search"), { key: "Escape" });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("closes when the input is not inside a marked field", () => {
+    const onOpenChange = renderControlled(
+      {},
+      <input aria-label="Name" defaultValue="ux" />,
+    );
+    fireEvent.keyDown(screen.getByLabelText("Name"), { key: "Escape" });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+});
