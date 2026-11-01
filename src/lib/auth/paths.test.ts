@@ -8,6 +8,7 @@ describe("auth paths", () => {
       ["/portal", "/portal"],
       ["/portal/events?filter=upcoming#tickets", "/portal/events?filter=upcoming#tickets"],
       ["/", "/"],
+      ["/portal/membership/join?returnTo=%2Fportal", "/portal/membership/join?returnTo=%2Fportal"],
     ])("keeps the internal path %j", (value, expected) => {
       expect(getSafeInternalPath(value)).toBe(expected);
     });
@@ -24,6 +25,14 @@ describe("auth paths", () => {
       ["\\example.com"],
       ["/\texample.com"],
       ["/\n/example.com"],
+      ["/%5Cevil.com"],
+      ["/%5cevil.com"],
+      ["/%09/evil.com"],
+      ["/%0a/evil.com"],
+      ["/portal/%5Cevil.com"],
+      ["https://evil.com"],
+      ["//evil.com"],
+      ["/\\evil.com"],
     ])("rejects the unsafe destination %j", (value) => {
       expect(getSafeInternalPath(value)).toBe("/portal");
     });
