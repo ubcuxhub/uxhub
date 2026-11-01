@@ -145,6 +145,23 @@ describe("SidePeekDrawer", () => {
       expect(screen.getByRole("dialog", { name: "Jane Smith" })).toBeTruthy();
     });
 
+    it("clears a SearchField inside the panel first, then closes on the next Escape", () => {
+      const onOpenChange = vi.fn();
+      function InPanelSearch() {
+        const [query, setQuery] = useState("jane");
+        return <SearchField label="Search notes" value={query} onValueChange={setQuery} />;
+      }
+      render(<Example onOpenChange={onOpenChange} inDrawer={<InPanelSearch />} />);
+      const search = screen.getByRole("searchbox", { name: "Search notes" }) as HTMLInputElement;
+      search.focus();
+      fireEvent.keyDown(search, { key: "Escape" });
+      expect(search.value).toBe("");
+      expect(onOpenChange).not.toHaveBeenCalled();
+      expect(screen.getByRole("dialog", { name: "Jane Smith" })).toBeTruthy();
+      fireEvent.keyDown(search, { key: "Escape" });
+      expect(onOpenChange).toHaveBeenCalledWith(false);
+    });
+
     it("ignores Escape pressed on another page control", () => {
       const onOpenChange = vi.fn();
       render(<Example onOpenChange={onOpenChange} />);

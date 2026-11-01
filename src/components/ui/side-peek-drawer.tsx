@@ -153,22 +153,6 @@ const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
- * Radix reads `defaultPrevented` once, right after `onEscapeKeyDown`, to decide
- * whether to dismiss. Calling `preventDefault()` to say "not this one" would
- * also mark the keystroke as handled for everyone after it, so a SearchField
- * (which bails on `defaultPrevented`) would never clear. Report "prevented" to
- * that one read and the real value to every later one.
- */
-function skipDismissOnce(event: KeyboardEvent) {
-  const real = Object.getOwnPropertyDescriptor(Event.prototype, "defaultPrevented")?.get;
-  let reads = 0;
-  Object.defineProperty(event, "defaultPrevented", {
-    configurable: true,
-    get: () => (reads++ === 0 ? true : (real?.call(event) ?? false)),
-  });
-}
-
-/**
  * Esc closes the panel only when it is meant for the panel: from inside it, or
  * with nothing focused. Esc typed into the page (a search box, say) or into a
  * field that clears on Esc (`data-escape-clears` with text in it) is not ours.
@@ -236,7 +220,10 @@ const SidePeekDrawerContent = React.forwardRef<
         onEscapeKeyDown={(event) => {
           onEscapeKeyDown?.(event);
           if (event.defaultPrevented) return;
-          if (isEscapeForOthers(event, contentRef.current)) skipDismissOnce(event);
+          // Preventing the keystroke is how Radix is told not to dismiss. Fields
+          // that clear on Esc (SearchField, SearchableDropdown) ignore a keydown
+          // that was prevented before their own handler ran, so they still clear.
+          if (isEscapeForOthers(event, contentRef.current)) event.preventDefault();
         }}
         onInteractOutside={(event) => {
           onInteractOutside?.(event);

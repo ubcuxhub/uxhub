@@ -70,6 +70,25 @@ describe("SearchField", () => {
     expect(input.value).toBe("");
   });
 
+  it("lets only the caller's own onKeyDown opt out of the clear", () => {
+    const keep = (event: React.KeyboardEvent) => event.preventDefault();
+    render(<SearchField label="Search" defaultValue="alex" onKeyDown={keep} />);
+    const input = screen.getByRole("searchbox") as HTMLInputElement;
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(input.value).toBe("alex");
+  });
+
+  it("still clears when an overlay already prevented the keydown", () => {
+    render(
+      <div onKeyDownCapture={(event) => event.preventDefault()}>
+        <SearchField label="Search" defaultValue="alex" />
+      </div>,
+    );
+    const input = screen.getByRole("searchbox") as HTMLInputElement;
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(input.value).toBe("");
+  });
+
   it("announces the result count", () => {
     const { rerender } = render(<SearchField label="Search" resultCount={3} />);
     expect(screen.getByRole("status").textContent).toBe("3 results");
