@@ -40,7 +40,8 @@ function Calendar({
       captionLayout={captionLayout}
       formatters={{
         formatMonthDropdown: (date) =>
-          date.toLocaleString("default", { month: "short" }),
+          // A fixed locale: "default" differs between the server and browsers.
+          date.toLocaleString("en-US", { month: "short" }),
         ...formatters,
       }}
       classNames={{
@@ -190,7 +191,8 @@ function CalendarDayButton({
     <button
       ref={ref}
       type="button"
-      data-day={day.date.toLocaleDateString()}
+      // ISO, not toLocaleDateString(): the same on the server and every browser.
+      data-day={`${day.date.getFullYear()}-${String(day.date.getMonth() + 1).padStart(2, "0")}-${String(day.date.getDate()).padStart(2, "0")}`}
       data-today={modifiers.today && !modifiers.selected}
       data-selected-single={
         modifiers.selected &&

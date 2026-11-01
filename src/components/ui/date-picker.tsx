@@ -35,7 +35,8 @@ function PickerDayButton({
     <button
       ref={ref}
       type="button"
-      data-day={day.date.toLocaleDateString()}
+      // ISO, not toLocaleDateString(): the same on the server and every browser.
+      data-day={localDateToIso(day.date)}
       data-selected={modifiers.selected || undefined}
       data-today={(modifiers.today && !modifiers.selected) || undefined}
       className={cn(

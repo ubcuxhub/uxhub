@@ -11,7 +11,7 @@ const purchase = {
   id: "purchase-1",
 };
 
-// 6:00 p.m. – 8:00 p.m. PDT, in a past year so future offset changes can't
+// 6:00 PM – 8:00 PM PDT, in a past year so future offset changes can't
 // move it.
 const event = {
   ends_at: "2025-09-13T03:00:00+00:00",
@@ -32,7 +32,7 @@ describe("renderEventConfirmationEmail", () => {
 
     expect(subject).toContain("Portfolio Night");
     expect(html).toContain("September 12, 2025");
-    expect(html).toContain("6:00 p.m. – 8:00 p.m.");
+    expect(html).toContain("6:00 PM – 8:00 PM");
     expect(html).toContain("Buchanan A101");
     expect(html).toContain("$15.00");
   });
@@ -52,7 +52,7 @@ describe("renderEventConfirmationEmail", () => {
     expect(html).not.toContain("null");
     expect(html).not.toContain("undefined");
     expect(html).not.toContain("Location");
-    expect(html).toContain("6:00 p.m.");
+    expect(html).toContain("6:00 PM");
     expect(html).not.toContain("–");
   });
 

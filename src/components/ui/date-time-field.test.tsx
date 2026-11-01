@@ -2,7 +2,7 @@
 
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { useState } from "react";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import {
   DATE_INPUT_ERROR,
@@ -454,5 +454,183 @@ describe("TimeField", () => {
     const option = await screen.findByRole("option", { name: "1:30 PM" });
     act(() => option.click());
     await waitFor(() => expect(input.value).toBe("1:30 PM"));
+  });
+});
+
+describe("a value set from outside", () => {
+  function Controlled({
+    kind,
+    onValidityChange,
+  }: {
+    kind: "date" | "time";
+    onValidityChange: (error: string | null) => void;
+  }) {
+    const [date, setDate] = useState<IsoDate | null>(null);
+    const [time, setTime] = useState<WallTime | null>(null);
+    return (
+      <form>
+        {kind === "date" ? (
+          <DateField
+            aria-label="Field"
+            name="field"
+            today={today}
+            value={date}
+            onValueChange={setDate}
+            onValidityChange={onValidityChange}
+          />
+        ) : (
+          <TimeField
+            aria-label="Field"
+            name="field"
+            value={time}
+            onValueChange={setTime}
+            onValidityChange={onValidityChange}
+          />
+        )}
+        <button
+          type="button"
+          onClick={() => (kind === "date" ? setDate("2026-11-20") : setTime("22:00"))}
+        >
+          Set from outside
+        </button>
+      </form>
+    );
+  }
+
+  it.each([
+    ["date", "abc", "Fri, Nov 20, 2026", "2026-11-20"],
+    ["time", "abc", "10:00 PM", "22:00"],
+  ] as const)("clears a stale %s parse error", (kind, bad, shown, submitted) => {
+    const onValidityChange = vi.fn();
+    const { container } = render(
+      <Controlled kind={kind} onValidityChange={onValidityChange} />,
+    );
+    const form = container.querySelector("form")!;
+    const input = screen.getByLabelText("Field") as HTMLInputElement;
+
+    typeAndBlur(input, bad);
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(form.checkValidity()).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Set from outside" }));
+
+    expect(input.value).toBe(shown);
+    expect(input.getAttribute("aria-invalid")).toBeNull();
+    expect(onValidityChange).toHaveBeenLastCalledWith(null);
+    expect(new FormData(form).get("field")).toBe(submitted);
+    expect(form.checkValidity()).toBe(true);
+  });
+});
+
+describe("a yearless date in a past window", () => {
+  it("reads yesterday's date as this year's when max is today", () => {
+    const onValidityChange = vi.fn();
+    const onValueChange = vi.fn();
+    render(
+      <DateField
+        aria-label="Date"
+        today={today}
+        max={today}
+        value={null}
+        onValueChange={onValueChange}
+        onValidityChange={onValidityChange}
+      />,
+    );
+    typeAndBlur(screen.getByRole("textbox", { name: "Date" }), "oct 30");
+    expect(onValueChange).toHaveBeenCalledWith("2026-10-30");
+    expect(onValidityChange).not.toHaveBeenCalledWith(expect.any(String));
+  });
+});
+
+describe("on a touch screen", () => {
+  const original = window.matchMedia;
+  beforeAll(() => {
+    window.matchMedia = vi.fn((query: string) => ({
+      matches: query === "(pointer: coarse)",
+      media: query,
+      onchange: null,
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    })) as unknown as typeof window.matchMedia;
+  });
+  afterAll(() => {
+    window.matchMedia = original;
+  });
+
+  it("returns focus to the calendar button, not the input, after a date pick", async () => {
+    render(<Date_ initial="2026-11-14" />);
+    const input = screen.getByRole("textbox", { name: "Date" }) as HTMLInputElement;
+    const trigger = screen.getByRole("button", { name: "Choose date" });
+
+    fireEvent.click(trigger);
+    fireEvent.click(await screen.findByRole("button", { name: /November 15/ }));
+
+    await waitFor(() => expect(screen.queryByRole("grid")).toBeNull());
+    expect(input.value).toBe("Sun, Nov 15, 2026");
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("leaves the time input unfocused when the list opens and an option is picked", async () => {
+    render(<Time_ />);
+    const input = screen.getByRole("combobox") as HTMLInputElement;
+
+    fireEvent.click(screen.getByRole("button", { name: "Choose time" }));
+    expect(document.activeElement).not.toBe(input);
+    const option = await screen.findByRole("option", { name: "1:30 PM" });
+    act(() => option.click());
+
+    await waitFor(() => expect(input.value).toBe("1:30 PM"));
+    expect(document.activeElement).not.toBe(input);
+  });
+});
+
+describe("Tab out of the calendar", () => {
+  function DateThenNext() {
+    const [value, setValue] = useState<IsoDate | null>("2026-11-14");
+    return (
+      <form>
+        <DateField aria-label="Date" today={today} value={value} onValueChange={setValue} />
+        <input aria-label="Next field" />
+      </form>
+    );
+  }
+
+  it("goes on to the next field from the last control", async () => {
+    render(<DateThenNext />);
+    fireEvent.click(screen.getByRole("button", { name: "Choose date" }));
+    await screen.findByRole("grid");
+    const todayLink = screen.getByRole("button", { name: "Today" });
+    todayLink.focus();
+
+    expect(fireEvent.keyDown(todayLink, { key: "Tab" })).toBe(false);
+    await waitFor(() => expect(screen.queryByRole("grid")).toBeNull());
+    expect(document.activeElement).toBe(screen.getByLabelText("Next field"));
+  });
+
+  it("goes back to the calendar button from the first control", async () => {
+    render(<DateThenNext />);
+    const trigger = screen.getByRole("button", { name: "Choose date" });
+    fireEvent.click(trigger);
+    const grid = await screen.findByRole("grid");
+    const popover = grid.closest("[role=dialog]") as HTMLElement;
+    const first = popover.querySelector<HTMLElement>("button:not([disabled])")!;
+    first.focus();
+
+    expect(fireEvent.keyDown(first, { key: "Tab", shiftKey: true })).toBe(false);
+    await waitFor(() => expect(screen.queryByRole("grid")).toBeNull());
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it("leaves Tab between the calendar's own controls alone", async () => {
+    render(<DateThenNext />);
+    fireEvent.click(screen.getByRole("button", { name: "Choose date" }));
+    const selected = await screen.findByRole("button", { name: /November 14/ });
+    await waitFor(() => expect(document.activeElement).toBe(selected));
+
+    expect(fireEvent.keyDown(selected, { key: "Tab" })).toBe(true);
+    expect(screen.queryByRole("grid")).not.toBeNull();
   });
 });

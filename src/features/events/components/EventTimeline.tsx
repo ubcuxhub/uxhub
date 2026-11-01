@@ -1,13 +1,15 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 
+import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Label } from "@/components/ui/label";
+import { SearchField } from "@/components/ui/search-field";
 import { Switch } from "@/components/ui/switch";
 import type { Status } from "@/components/ui/status-badge";
 import type { EventRow } from "@/lib/supabase/models";
 import { groupEventsByMonth, normalizeString } from "@/features/events/lib/event-timeline";
-import { Input } from "@/components/ui/input";
 import { EventTimelineRail } from "./EventTimelineRail";
 
 interface EventTimelineProps {
@@ -26,11 +28,12 @@ export function EventTimeline({
   statusFor,
 }: EventTimelineProps) {
   const showPastId = useId();
+  const searchRef = useRef<HTMLInputElement>(null);
   const [showPastEvents, setShowPastEvents] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  
+
   const displayedEvents = showPastEvents ? pastEvents : upcomingEvents;
-  
+
   // filter events based on search query
   const query = normalizeString(searchQuery);
   const filteredEvents = (query) ? displayedEvents.filter((event) => {
@@ -40,26 +43,30 @@ export function EventTimeline({
       (event.location_room && normalizeString(event.location_room).includes(query))
     )
   }) : displayedEvents;
-  
-  const emptyMessage = query ? `No events match "${searchQuery}".` : showPastEvents ? "No past events." : "No events scheduled yet.";
 
   // group events by month
   const filteredGroups = groupEventsByMonth(filteredEvents);
 
+  const clearSearch = () => {
+    setSearchQuery("");
+    searchRef.current?.focus();
+  };
+
   return (
     <>
       <div className="mb-10 flex w-full flex-col items-center justify-between gap-4 sm:flex-row sm:gap-8">
-        <Input
-          placeholder="Search events..."
-          aria-label="Search events"
+        <SearchField
+          ref={searchRef}
+          label="Search events"
+          placeholder="Search events"
           value={searchQuery}
-          onChange={(e) => {setSearchQuery(e.target.value)}}
-          type="search"
-          className="w-full"
+          onValueChange={setSearchQuery}
+          // Announce the count only while searching, not on every page load.
+          resultCount={query ? filteredEvents.length : undefined}
         />
-        <div className="flex w-fit shrink-0 items-center whitespace-nowrap text-primary">
+        <div className="flex w-fit shrink-0 items-center whitespace-nowrap text-foreground">
           <Label htmlFor={showPastId} className="mr-2">
-            Show Past Events
+            Show past events
           </Label>
           <Switch
             id={showPastId}
@@ -70,7 +77,27 @@ export function EventTimeline({
       </div>
 
       {filteredGroups.length === 0 ? (
-        <p className="text-muted-foreground my-8">{emptyMessage}</p>
+        query ? (
+          <EmptyState
+            size="inline"
+            titleAs="h2"
+            className="my-8"
+            title={`No events match “${searchQuery.trim()}”`}
+            description="Check the spelling, or try an event name or a venue."
+            actions={
+              <Button size="sm" variant="secondary" onClick={clearSearch}>
+                Clear search
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState
+            size="inline"
+            titleAs="h2"
+            className="my-8"
+            title={showPastEvents ? "No past events" : "No events scheduled yet"}
+          />
+        )
       ) : (
         <EventTimelineRail
           className="mb-8"
