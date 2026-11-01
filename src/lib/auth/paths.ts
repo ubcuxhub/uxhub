@@ -1,5 +1,10 @@
 const INTERNAL_ORIGIN = "https://uxhub.local";
 
+// Percent-encoded backslashes and control characters (%5C, %09, %0A, ...) in
+// the path. They stay literal after one decode, but a layer that decodes again
+// before resolving would turn them into a protocol-relative URL.
+const ENCODED_UNSAFE_PATH = /%(?:5c|[01][0-9a-f]|7f)/i;
+
 export function getSafeInternalPath(
   value: string | null | undefined,
   fallback = "/portal",
@@ -7,7 +12,8 @@ export function getSafeInternalPath(
   if (
     !value ||
     !value.startsWith("/") ||
-    /[\u0000-\u001f\u007f\\]/.test(value)
+    /[\u0000-\u001f\u007f\\]/.test(value) ||
+    ENCODED_UNSAFE_PATH.test(value.split(/[?#]/, 1)[0])
   ) {
     return fallback;
   }
