@@ -62,6 +62,14 @@ describe("SearchField", () => {
     expect(onParentKeyDown).toHaveBeenCalledTimes(1);
   });
 
+  it("marks the input so overlays leave Escape to it", () => {
+    render(<SearchField label="Search" defaultValue="alex" />);
+    const input = screen.getByRole("searchbox") as HTMLInputElement;
+    expect(input.hasAttribute("data-escape-clears")).toBe(true);
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(input.value).toBe("");
+  });
+
   it("announces the result count", () => {
     const { rerender } = render(<SearchField label="Search" resultCount={3} />);
     expect(screen.getByRole("status").textContent).toBe("3 results");
