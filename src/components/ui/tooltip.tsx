@@ -5,6 +5,34 @@ import { Tooltip as TooltipPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 
+/**
+ * How the last input arrived. Radix opens a tooltip on any `focus`, with no
+ * delay, so focus handed back by a menu or dialog (`element.focus()` after a
+ * mouse click) would pop it. Browsers show a focus ring only after keyboard
+ * use, and the tooltip follows the same rule: it opens on focus only when the
+ * last input was the keyboard (or nothing has been pressed yet). Hover still
+ * opens it either way.
+ */
+let keyboardModality = true
+let watchingModality = false
+
+function watchInputModality() {
+  if (watchingModality || typeof document === "undefined") return
+  watchingModality = true
+  document.addEventListener(
+    "keydown",
+    (event) => {
+      if (event.metaKey || event.ctrlKey || event.altKey) return
+      keyboardModality = true
+    },
+    true
+  )
+  for (const type of ["pointerdown", "mousedown", "touchstart"]) {
+    document.addEventListener(type, () => (keyboardModality = false), true)
+  }
+}
+watchInputModality()
+
 function TooltipProvider({
   delayDuration = 300,
   ...props
@@ -30,9 +58,20 @@ function Tooltip({
 }
 
 function TooltipTrigger({
+  onFocus,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
-  return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />
+  return (
+    <TooltipPrimitive.Trigger
+      data-slot="tooltip-trigger"
+      onFocus={(event) => {
+        onFocus?.(event)
+        // Radix skips its focus-open when the event is default-prevented.
+        if (!keyboardModality) event.preventDefault()
+      }}
+      {...props}
+    />
+  )
 }
 
 function TooltipContent({

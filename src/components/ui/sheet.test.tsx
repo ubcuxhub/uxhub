@@ -78,3 +78,44 @@ describe("SheetContent initial focus", () => {
     );
   });
 });
+
+describe("SheetContent Esc and [data-escape-clears] fields", () => {
+  function renderControlled(
+    value: string,
+    onEscapeKeyDown?: (event: Event) => void,
+  ) {
+    const onOpenChange = vi.fn();
+    render(
+      <Sheet open onOpenChange={onOpenChange}>
+        <SheetContent onEscapeKeyDown={onEscapeKeyDown}>
+          <SheetTitle>Event details</SheetTitle>
+          <SheetDescription>View the event.</SheetDescription>
+          <div data-escape-clears>
+            <input aria-label="Search" defaultValue={value} />
+          </div>
+        </SheetContent>
+      </Sheet>,
+    );
+    return onOpenChange;
+  }
+
+  it("stays open when Esc is pressed in a field that holds text", () => {
+    const onOpenChange = renderControlled("ux");
+    fireEvent.keyDown(screen.getByLabelText("Search"), { key: "Escape" });
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it("closes when the field is empty", () => {
+    const onOpenChange = renderControlled("");
+    fireEvent.keyDown(screen.getByLabelText("Search"), { key: "Escape" });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("runs the caller's handler first and honours preventDefault", () => {
+    const onEscapeKeyDown = vi.fn((event: Event) => event.preventDefault());
+    const onOpenChange = renderControlled("", onEscapeKeyDown);
+    fireEvent.keyDown(screen.getByLabelText("Search"), { key: "Escape" });
+    expect(onEscapeKeyDown).toHaveBeenCalledTimes(1);
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+});

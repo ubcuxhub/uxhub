@@ -40,6 +40,41 @@ function focusContentOnOpen(
   (marked ?? content).focus({ preventScroll: true });
 }
 
+/**
+ * A field marked `data-escape-clears` (SearchField, SearchableDropdown) uses
+ * Esc to clear its text first. While such a field holds text, Esc must not
+ * also close the dialog or sheet around it. The marker may sit on the input or
+ * on a wrapper; the focused element can be the input or a control beside it.
+ * Shared with `ui/sheet`.
+ */
+function escapeClearsField(event: Event) {
+  const target = event.target;
+  if (!(target instanceof Element)) return false;
+  const host = target.closest("[data-escape-clears]");
+  if (!host) return false;
+  const field =
+    target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement
+      ? target
+      : host.querySelector<HTMLInputElement | HTMLTextAreaElement>(
+          "input, textarea",
+        );
+  return Boolean(field && field.value !== "");
+}
+
+/**
+ * Composes with callers: their `onEscapeKeyDown` runs first and
+ * `preventDefault()` keeps the overlay open. Shared with `ui/sheet`.
+ */
+function guardEscape(
+  event: KeyboardEvent,
+  onEscapeKeyDown?: (event: KeyboardEvent) => void,
+  blocked = false,
+) {
+  onEscapeKeyDown?.(event);
+  if (event.defaultPrevented) return;
+  if (blocked || escapeClearsField(event)) event.preventDefault();
+}
+
 const DialogOverlay = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
@@ -57,6 +92,10 @@ DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 interface DialogContentProps
   extends React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> {
+  /**
+   * Blocks every way of closing, not only the X: Esc and clicks outside too.
+   * Use it while a save is in flight.
+   */
   closeDisabled?: boolean;
   closeLabel?: string;
   mobileFullscreen?: boolean;
@@ -76,6 +115,8 @@ const DialogContent = React.forwardRef<
       mobileFullscreen = false,
       size = "default",
       onOpenAutoFocus,
+      onEscapeKeyDown,
+      onInteractOutside,
       ...props
     },
     ref,
@@ -99,6 +140,13 @@ const DialogContent = React.forwardRef<
           className,
         )}
         onOpenAutoFocus={(event) => focusContentOnOpen(event, onOpenAutoFocus)}
+        onEscapeKeyDown={(event) =>
+          guardEscape(event, onEscapeKeyDown, closeDisabled)
+        }
+        onInteractOutside={(event) => {
+          onInteractOutside?.(event);
+          if (closeDisabled) event.preventDefault();
+        }}
         {...props}
       >
         {children}
@@ -177,6 +225,7 @@ DialogDescription.displayName = DialogPrimitive.Description.displayName;
 
 export {
   focusContentOnOpen,
+  guardEscape,
   Dialog,
   DialogPortal,
   DialogOverlay,
