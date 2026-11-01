@@ -67,10 +67,10 @@ export default function TeamSection() {
     <div id="team" className="w-full">
       {/* header */}
       <div className="mb-12 md:px-[20%] px-[5%]">
-        <p className="mb-0 text-gray-500 italic font-serif text-[31.871px] font-semibold">
+        <p className="mb-0 text-gray font-serif italic font-semibold text-[32px]">
           the team
         </p>
-        <h2 className="text-[38px] font-bold text-[#383838] font-sans">
+        <h2 className="text-[40px] font-bold leading-tight">
           The people behind the process
         </h2>
       </div>
