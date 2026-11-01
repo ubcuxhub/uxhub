@@ -93,21 +93,49 @@ function monthFromWord(word: string): number | null {
   return index === -1 ? null : index + 1;
 }
 
-/** The next occurrence of month/day on or after `today`; a Feb 29 may skip years. */
-function nextOccurrence(month: number, day: number, today: IsoDate) {
-  const { year: startYear } = splitIso(today);
-  for (let year = startYear; year <= startYear + 8; year += 1) {
+/**
+ * A month/day with no year: the year that keeps it within `range`, trying the
+ * next occurrence on or after `today` first, then the previous one, then
+ * further out in the same order. With nothing in range, the next occurrence,
+ * so the caller can say the date is out of range. A Feb 29 may skip years.
+ */
+function nearestOccurrence(
+  month: number,
+  day: number,
+  today: IsoDate,
+  range: DateRange,
+): IsoDate | null {
+  const { year: thisYear } = splitIso(today);
+  const upcoming: IsoDate[] = [];
+  const earlier: IsoDate[] = [];
+  for (let year = thisYear - 8; year <= thisYear + 8; year += 1) {
     if (!isRealDate(year, month, day)) continue;
     const iso = toIso(year, month, day);
-    if (iso >= today) return iso;
+    if (iso >= today) upcoming.push(iso);
+    else earlier.unshift(iso);
   }
-  return null;
+
+  const candidates: IsoDate[] = [];
+  for (let i = 0; i < Math.max(upcoming.length, earlier.length); i += 1) {
+    if (upcoming[i]) candidates.push(upcoming[i]);
+    if (earlier[i]) candidates.push(earlier[i]);
+  }
+  return (
+    candidates.find((date) => withinRange(date, range.min, range.max)) ??
+    upcoming[0] ??
+    null
+  );
 }
 
 function addDays(date: IsoDate, days: number): IsoDate {
   const { year, month, day } = splitIso(date);
   const next = new Date(Date.UTC(year, month - 1, day + days));
   return toIso(next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate());
+}
+
+interface DateRange {
+  min?: IsoDate;
+  max?: IsoDate;
 }
 
 function withinRange(date: IsoDate, min?: IsoDate, max?: IsoDate) {
@@ -121,8 +149,9 @@ function resolveParts(
   day: number,
   year: number | null,
   today: IsoDate,
+  range: DateRange,
 ): IsoDate | null {
-  if (year === null) return nextOccurrence(month, day, today);
+  if (year === null) return nearestOccurrence(month, day, today, range);
   return isRealDate(year, month, day) ? toIso(year, month, day) : null;
 }
 
@@ -134,6 +163,7 @@ function expandYear(text: string): number {
 function parseDateParts(
   raw: string,
   today: IsoDate,
+  range: DateRange,
 ): IsoDate | null {
   const text = raw.trim().toLowerCase();
   if (!text) return null;
@@ -142,7 +172,7 @@ function parseDateParts(
   if (text === "tomorrow") return addDays(today, 1);
 
   const iso = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(text);
-  if (iso) return resolveParts(Number(iso[2]), Number(iso[3]), Number(iso[1]), today);
+  if (iso) return resolveParts(Number(iso[2]), Number(iso[3]), Number(iso[1]), today, range);
 
   const numeric = /^(\d{1,2})[/.-](\d{1,2})(?:[/.-](\d{2}|\d{4}))?$/.exec(text);
   if (numeric) {
@@ -151,6 +181,7 @@ function parseDateParts(
       Number(numeric[2]),
       numeric[3] ? expandYear(numeric[3]) : null,
       today,
+      range,
     );
   }
 
@@ -168,11 +199,11 @@ function parseDateParts(
 
   const monthFirst = monthFromWord(first);
   if (monthFirst && /^\d{1,2}$/.test(second)) {
-    return resolveParts(monthFirst, Number(second), year, today);
+    return resolveParts(monthFirst, Number(second), year, today, range);
   }
   const monthSecond = monthFromWord(second);
   if (monthSecond && /^\d{1,2}$/.test(first)) {
-    return resolveParts(monthSecond, Number(first), year, today);
+    return resolveParts(monthSecond, Number(first), year, today, range);
   }
   return null;
 }
@@ -180,14 +211,15 @@ function parseDateParts(
 /**
  * "Nov 14", "november 14 2026", "14 Nov", "11/14", "11/14/2026", "2026-11-14",
  * "Sat, Nov 14, 2026", "today", "tomorrow". With no year, the next occurrence
- * on or after `today`. A date outside `min`/`max`, or one that doesn't exist
- * ("Feb 30"), is `null`.
+ * on or after `today`, unless only an earlier one fits `min`/`max` ("Oct 30"
+ * with `max` today reads as this year's). A date outside `min`/`max`, or one
+ * that doesn't exist ("Feb 30"), is `null`.
  */
 export function parseDateInput(
   text: string,
   opts: { today: IsoDate; min?: IsoDate; max?: IsoDate },
 ): IsoDate | null {
-  const date = parseDateParts(text, opts.today);
+  const date = parseDateParts(text, opts.today, opts);
   return date && withinRange(date, opts.min, opts.max) ? date : null;
 }
 

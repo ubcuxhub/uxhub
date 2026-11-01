@@ -60,6 +60,29 @@ describe("parseDateInput", () => {
     expect(parseDateInput("yesterday", opts)).toBeNull();
   });
 
+  // A yearless date takes the year that fits the range: the next occurrence
+  // first, then the previous one, then further out. Today is Oct 31, 2026.
+  it.each<[string, { min?: IsoDate; max?: IsoDate }, string | null]>([
+    // A backfill field (max today): yesterday's date is this year's, not next.
+    ["Oct 30", { max: today }, "2026-10-30"],
+    ["Jan 5", { max: today }, "2026-01-05"],
+    ["Oct 31", { max: today }, "2026-10-31"],
+    ["11/14", { max: today }, "2025-11-14"],
+    // A window wholly in the past.
+    ["Mar 3", { min: "2025-01-01", max: "2025-12-31" }, "2025-03-03"],
+    // A window wholly in the future, past the next occurrence.
+    ["Mar 3", { min: "2028-01-01", max: "2028-12-31" }, "2028-03-03"],
+    // Both occurrences fit: the next one wins.
+    ["Oct 30", { min: "2025-01-01", max: "2027-12-31" }, "2027-10-30"],
+    // A Feb 29 in a past window.
+    ["Feb 29", { min: "2024-01-01", max: today }, "2024-02-29"],
+    // Nothing fits.
+    ["Oct 30", { min: today, max: "2026-12-31" }, null],
+    ["Mar 3", { min: "2040-01-01" }, null],
+  ])("reads %j within %j as %s", (text, range, expected) => {
+    expect(parseDateInput(text, { today, ...range })).toBe(expected);
+  });
+
   it.each(["", "   ", "abc", "Feb 30", "13/40", "0/5", "Nov", "Nov 32", "Foo 14", "14", "Nov 14 20"])(
     "rejects %j",
     (text) => {

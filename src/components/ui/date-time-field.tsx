@@ -75,18 +75,57 @@ function mergeRefs<T>(...refs: React.Ref<T>[]) {
   }
 }
 
-/** The text in the box, reset whenever the value changes from outside. */
+/**
+ * The text in the box and its parse error. Both reset whenever the value
+ * changes from outside, so a new value never shows under an old error.
+ */
 function useFieldText<T extends string>(
   value: T | null,
   format: (value: T) => string
 ) {
   const [text, setText] = React.useState(value ? format(value) : "")
+  const [parseError, setParseError] = React.useState<string | null>(null)
   const [seen, setSeen] = React.useState(value)
   if (seen !== value) {
     setSeen(value)
     setText(value ? format(value) : "")
+    setParseError(null)
   }
-  return [text, setText] as const
+  return { text, setText, parseError, setParseError }
+}
+
+/**
+ * Whether the primary pointer is a finger. Focusing a text input there raises
+ * the on-screen keyboard, so picks from a list or calendar leave it alone.
+ */
+function isCoarsePointer() {
+  return (
+    typeof window !== "undefined" &&
+    typeof window.matchMedia === "function" &&
+    window.matchMedia("(pointer: coarse)").matches
+  )
+}
+
+const TABBABLE =
+  'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
+const tabbables = (root: ParentNode) =>
+  Array.from(root.querySelectorAll<HTMLElement>(TABBABLE)).filter(
+    (element) => element.tabIndex >= 0
+  )
+
+/**
+ * The first tabbable element after `field` in the page, outside `popover`.
+ * The popover is portaled to the end of `<body>`, so the browser's own Tab
+ * would leave the page instead of reaching the next form field.
+ */
+function nextTabbableAfter(field: HTMLElement, popover: HTMLElement) {
+  return tabbables(document).find(
+    (element) =>
+      !field.contains(element) &&
+      !popover.contains(element) &&
+      !!(field.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_FOLLOWING)
+  )
 }
 
 /** Reports each change of the error to the caller, but not the initial null. */
@@ -161,10 +200,13 @@ function DateField({
   ...props
 }: DateFieldProps) {
   const now = usePacificNow()
-  const [text, setText] = useFieldText(value, formatDateInput)
-  const [parseError, setParseError] = React.useState<string | null>(null)
+  const { text, setText, parseError, setParseError } = useFieldText(
+    value,
+    formatDateInput
+  )
   const [open, setOpen] = React.useState(defaultOpen)
   const inputRef = React.useRef<HTMLInputElement | null>(null)
+  const triggerRef = React.useRef<HTMLButtonElement | null>(null)
   const wrapperRef = React.useRef<HTMLDivElement | null>(null)
 
   useReportValidity(parseError, onValidityChange)
@@ -199,7 +241,27 @@ function DateField({
     setText(formatDateInput(date))
     onValueChange(date)
     setOpen(false)
-    inputRef.current?.focus()
+    // On a phone, focusing the input would throw up the keyboard.
+    if (isCoarsePointer()) triggerRef.current?.focus()
+    else inputRef.current?.focus()
+  }
+
+  // The popover sits at the end of <body>: Tab out of its last control goes on
+  // to the field after this one, and Shift+Tab out of its first goes back to
+  // the calendar button, as if the panel sat right after it.
+  const keepTabInPage = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== "Tab" || event.defaultPrevented) return
+    const controls = tabbables(event.currentTarget)
+    const edge = event.shiftKey ? controls[0] : controls[controls.length - 1]
+    if (controls.length && event.target !== edge) return
+    const wrapper = wrapperRef.current
+    const target = event.shiftKey
+      ? triggerRef.current
+      : (wrapper && nextTabbableAfter(wrapper, event.currentTarget)) ??
+        triggerRef.current
+    event.preventDefault()
+    setOpen(false)
+    target?.focus()
   }
 
   return (
@@ -243,6 +305,7 @@ function DateField({
             }}
           />
           <IconButton
+            ref={triggerRef}
             variant="ghost"
             label="Choose date"
             data-slot="date-time-trigger"
@@ -270,6 +333,7 @@ function DateField({
         }}
         onCloseAutoFocus={(event) => event.preventDefault()}
         onEscapeKeyDown={() => inputRef.current?.focus()}
+        onKeyDown={keepTabInPage}
         onInteractOutside={(event) => {
           if (isInside(wrapperRef.current, event.target, "[data-slot=date-time-trigger]")) {
             event.preventDefault()
@@ -311,8 +375,10 @@ function TimeField({
   ref,
   ...props
 }: TimeFieldProps) {
-  const [text, setText] = useFieldText(value, formatTimeInput)
-  const [parseError, setParseError] = React.useState<string | null>(null)
+  const { text, setText, parseError, setParseError } = useFieldText(
+    value,
+    formatTimeInput
+  )
   const [open, setOpen] = React.useState(defaultOpen)
   const inputRef = React.useRef<HTMLInputElement | null>(null)
   const wrapperRef = React.useRef<HTMLDivElement | null>(null)
@@ -433,10 +499,12 @@ function TimeField({
             aria-expanded={open}
             disabled={disabled}
             className={triggerClass}
-            // Keep focus in the input, where the list is driven from.
+            // Keep focus in the input, where the list is driven from. On a
+            // phone, leave focus be: the input would raise the keyboard over
+            // the list, and options are tapped instead of arrowed to.
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => {
-              inputRef.current?.focus()
+              if (!isCoarsePointer()) inputRef.current?.focus()
               if (open) setOpen(false)
               else openList()
             }}
@@ -469,7 +537,7 @@ function TimeField({
           onValueChange={(time) => {
             accept(time)
             setOpen(false)
-            inputRef.current?.focus()
+            if (!isCoarsePointer()) inputRef.current?.focus()
           }}
           activeIndex={activeIndex}
           getOptionId={getOptionId}

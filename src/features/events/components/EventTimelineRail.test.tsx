@@ -131,6 +131,24 @@ describe("EventTimelineRail", () => {
     }
   });
 
+  // 7:00 PM to midnight on Sat, Nov 14, 2026, in permanent PDT (UTC-7).
+  it("labels an event that ends at midnight with its start day alone", () => {
+    render(
+      <EventTimelineRail
+        groups={groupEventsByMonth([
+          event("social", "Late Social", "2026-11-15T02:00:00Z", {
+            ends_at: "2026-11-15T07:00:00Z",
+          }),
+        ])}
+        statusFor={noStatus}
+      />,
+    );
+    expect(screen.getByRole("heading", { level: 2 }).textContent).toBe("November 2026");
+    expect(screen.getByText("Nov 14")).toBeTruthy();
+    expect(screen.queryByText(/Nov 14–15/)).toBeNull();
+    expect(screen.getByText("7:00 PM–12:00 AM")).toBeTruthy();
+  });
+
   it("renders nothing but an empty wrapper for no groups", () => {
     const { container } = render(
       <EventTimelineRail groups={[]} statusFor={noStatus} className="mb-8" />,
