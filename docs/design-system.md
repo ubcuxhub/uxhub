@@ -360,9 +360,10 @@ column.
 | `overlay/scrim` | `--overlay-scrim` | `bg-scrim` | `bg-scrim` |
 
 The shadcn `chart-*` and `sidebar-*` slots and the code-only `brand-*`
-utilities remain namespaced as written. Deprecated pre-migration utilities
-remain as compatibility aliases in `globals.css` until the week of November
-16, after the final epic branch lands; do not use them in new code.
+utilities remain namespaced as written. The pre-migration utilities (`fg-*`,
+`action*`, `surface-*`, `*-bg`, `status-*`, `text-text-*`, `background-*`,
+`overlay-scrim`) were removed; lint rejects them and names the replacement
+from this table.
 
 ### 2.12 Dark mode
 
