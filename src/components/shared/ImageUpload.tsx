@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useEffect,
   useId,
   useRef,
   useState,
@@ -114,6 +115,7 @@ export const ImageUpload = ({
   const generatedId = useId();
   const inputId = id ?? `${generatedId}-image-upload`;
   const hintId = `${inputId}-hint`;
+  const errorId = `${inputId}-error`;
   const labelId = `${inputId}-label`;
 
   const [isDragging, setIsDragging] = useState(false);
@@ -130,6 +132,23 @@ export const ImageUpload = ({
   // dragenter and dragleave also fire for every child crossed; counting them
   // keeps the dragging state from flickering off mid-drag.
   const dragDepth = useRef(0);
+  // Picking, removing, and a new stored value each bump this. `handleFile`
+  // awaits (image decode, FileReader), and only the latest request may write.
+  const latestRequest = useRef(0);
+  const reader = useRef<FileReader | null>(null);
+
+  useEffect(
+    () => () => {
+      latestRequest.current += 1;
+      reader.current?.abort();
+    },
+    [],
+  );
+
+  // A new stored value supersedes any pick still being decoded.
+  useEffect(() => {
+    latestRequest.current += 1;
+  }, [value]);
 
   const error = externalError || localError;
 
@@ -216,6 +235,11 @@ export const ImageUpload = ({
   };
 
   const handleFile = async (file: File) => {
+    const request = ++latestRequest.current;
+    const isStale = () => request !== latestRequest.current;
+    reader.current?.abort();
+    reader.current = null;
+
     if (!isAllowedEventImageType(file.type)) {
       setLocalError(describeWrongFileType(file.type));
       return;
@@ -228,6 +252,8 @@ export const ImageUpload = ({
     }
 
     const dimensions = await getImageDimensions(file).catch(() => null);
+    // A later pick, a removal or a new stored value happened while decoding.
+    if (isStale()) return;
     if (!dimensions) {
       setLocalError(EVENT_IMAGE_ERRORS.dimensions);
       return;
@@ -251,15 +277,20 @@ export const ImageUpload = ({
     setPickedName(file.name);
     setStatus("Image selected");
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setPreview(reader.result as string);
+    const fileReader = new FileReader();
+    reader.current = fileReader;
+    fileReader.onload = () => {
+      if (isStale()) return;
+      setPreview(fileReader.result as string);
     };
-    reader.readAsDataURL(file);
+    fileReader.readAsDataURL(file);
     onFileChange?.(file);
   };
 
   const handleRemove = () => {
+    latestRequest.current += 1;
+    reader.current?.abort();
+    reader.current = null;
     setPreview(null);
     setPickedName(null);
     setLocalError(null);
@@ -287,6 +318,8 @@ export const ImageUpload = ({
   const requirementsLine = hint ?? `Or drag one here. ${describeImageRequirements(requirements)}.`;
   const hasError = !!error;
   const showHint = view === "empty" && !hasError;
+  // The hint gives way to the error, so the controls point at whichever shows.
+  const describedBy = showHint ? hintId : hasError ? errorId : undefined;
 
   return (
     <Field
@@ -337,7 +370,8 @@ export const ImageUpload = ({
           className="sr-only"
           tabIndex={-1}
           disabled={disabled}
-          aria-describedby={showHint ? hintId : undefined}
+          aria-describedby={describedBy}
+          aria-invalid={hasError || undefined}
         />
 
         {view === "dragging" && (
@@ -432,6 +466,8 @@ export const ImageUpload = ({
                 variant="secondary"
                 size="sm"
                 disabled={disabled}
+                aria-describedby={describedBy}
+                aria-invalid={hasError || undefined}
                 onClick={openPicker}
               >
                 Replace
@@ -461,7 +497,8 @@ export const ImageUpload = ({
               variant="secondary"
               size="sm"
               disabled={disabled}
-              aria-describedby={showHint ? hintId : undefined}
+              aria-describedby={describedBy}
+              aria-invalid={hasError || undefined}
               onClick={openPicker}
             >
               Upload image
@@ -481,7 +518,7 @@ export const ImageUpload = ({
         )}
       </div>
 
-      <FieldError>{error}</FieldError>
+      <FieldError id={errorId}>{error}</FieldError>
       <div role="status" aria-live="polite" className="sr-only">
         {liveMessage}
       </div>

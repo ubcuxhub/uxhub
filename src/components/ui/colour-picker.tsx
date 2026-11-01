@@ -267,38 +267,56 @@ function ColourPicker({
 }: ColourPickerProps) {
   const labelId = React.useId();
   const rowRef = React.useRef<HTMLDivElement>(null);
-  const focusAfterRemove = React.useRef<number | null>(null);
+  // Armed by a removal: where focus goes once the parent has applied it.
+  // `index` counts rendered custom swatches only (entries `normalizeHex` drops
+  // are not in the DOM), and `length` is the list length at the time.
+  const focusAfterRemove = React.useRef<{ index: number; length: number } | null>(
+    null,
+  );
   const [open, setOpen] = React.useState(defaultOpen ?? false);
 
   const selected = normalizeHex(value);
 
   // A removed swatch takes focus with it. Hand focus to the swatch that slid
-  // into its place, or to Add when it was the last one.
+  // into its place, or to Add when it was the last one. It fires only once the
+  // list has actually got shorter (a parent that saves asynchronously, or
+  // rejects the removal, leaves it armed until then or until the next action),
+  // and only if focus is still lost or inside the row.
   React.useEffect(() => {
-    const index = focusAfterRemove.current;
-    if (index === null) return;
+    const armed = focusAfterRemove.current;
+    const row = rowRef.current;
+    if (!armed || !row || customColours.length >= armed.length) return;
     focusAfterRemove.current = null;
-    const swatches = rowRef.current?.querySelectorAll<HTMLElement>(
+    const active = document.activeElement;
+    if (active && active !== document.body && !row.contains(active)) return;
+    const swatches = row.querySelectorAll<HTMLElement>(
       '[data-slot="colour-swatch"]',
     );
     const target =
-      swatches?.[EVENT_COLOUR_PRESETS.length + index] ??
-      rowRef.current?.querySelector<HTMLElement>('[data-slot="colour-add"]');
+      swatches[EVENT_COLOUR_PRESETS.length + armed.index] ??
+      row.querySelector<HTMLElement>('[data-slot="colour-add"]');
     target?.focus();
   }, [customColours]);
 
   const select = (hex: string) => {
+    focusAfterRemove.current = null;
     if (hex !== selected) onValueChange(hex);
   };
 
   const remove = (index: number) => {
     const hex = normalizeHex(customColours[index] ?? "");
-    focusAfterRemove.current = index;
+    focusAfterRemove.current = {
+      index: customColours
+        .slice(0, index)
+        .filter((custom) => normalizeHex(custom) !== null).length,
+      length: customColours.length,
+    };
     onCustomColoursChange(customColours.filter((_, i) => i !== index));
     if (hex && hex === selected) onValueChange(DEFAULT_EVENT_COLOUR);
   };
 
   const useColour = (hex: string) => {
+    focusAfterRemove.current = null;
     const known =
       EVENT_COLOUR_PRESETS.some((preset) => preset.hex === hex) ||
       customColours.some((custom) => normalizeHex(custom) === hex);

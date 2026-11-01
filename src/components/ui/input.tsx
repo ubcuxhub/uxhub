@@ -4,6 +4,7 @@ import * as React from "react";
 import type { LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { joinIds, useFieldControl } from "@/components/ui/field";
 
 type InputProps = React.ComponentProps<"input"> & {
   "data-allow-number-step"?: boolean | "true" | "false";
@@ -23,9 +24,18 @@ const allowsNumberStep = (input: HTMLInputElement) =>
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
   (
-    { className, type, onKeyDown, onWheel, leadingIcon: LeadingIcon, wrapperClassName, ...props },
+    {
+      className,
+      type,
+      onKeyDown,
+      onWheel,
+      leadingIcon: LeadingIcon,
+      wrapperClassName,
+      ...props
+    },
     ref,
   ) => {
+    const field = useFieldControl();
     const handleKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
       onKeyDown?.(event);
 
@@ -69,6 +79,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         onKeyDown={handleKeyDown}
         onWheel={handleWheel}
         {...props}
+        aria-describedby={joinIds(props["aria-describedby"], field.describedBy)}
+        aria-invalid={props["aria-invalid"] ?? field.invalid}
       />
     );
 

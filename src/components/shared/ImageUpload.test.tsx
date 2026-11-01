@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ImageUpload } from "./ImageUpload";
 
@@ -193,3 +193,151 @@ describe("ImageUpload", () => {
     expect(screen.queryByText("Drop to upload")).toBeNull();
   });
 });
+
+/**
+ * jsdom never decodes images, so each `<img>` created for a pick waits in
+ * `pending` until the test settles it with `decode(index, size)`.
+ */
+describe("ImageUpload picks", () => {
+  type Pending = { image: HTMLImageElement; src: string };
+  const pending: Pending[] = [];
+  let urlCount = 0;
+
+  beforeEach(() => {
+    pending.length = 0;
+    urlCount = 0;
+    // jsdom has no object URLs; the stubs are removed again in afterEach.
+    Object.assign(URL, {
+      createObjectURL: () => `blob:test-${urlCount++}`,
+      revokeObjectURL: () => {},
+    });
+    vi.spyOn(HTMLImageElement.prototype, "src", "set").mockImplementation(function (
+      this: HTMLImageElement,
+      src: string,
+    ) {
+      // next/image sets `src` too; only the object URLs are decodes.
+      if (src.startsWith("blob:")) pending.push({ image: this, src });
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    Reflect.deleteProperty(URL, "createObjectURL");
+    Reflect.deleteProperty(URL, "revokeObjectURL");
+  });
+
+  function decode(index: number, width: number, height = width) {
+    const { image } = pending[index];
+    Object.defineProperty(image, "naturalWidth", { value: width });
+    Object.defineProperty(image, "naturalHeight", { value: height });
+    act(() => image.onload?.(new Event("load")));
+  }
+
+  const pick = (f: File) =>
+    fireEvent.change(input(), { target: { files: [f] } });
+
+  it("previews a valid pick and reports the file", async () => {
+    const onFileChange = vi.fn();
+    render(<ImageUpload onChange={noop} onFileChange={onFileChange} />);
+    const png = file("cover.png", "image/png");
+    pick(png);
+    decode(0, 400);
+    await waitFor(() => expect(onFileChange).toHaveBeenCalledExactlyOnceWith(png));
+    await waitFor(() => expect(screen.getByText("cover.png")).toBeTruthy());
+    expect(screen.getByRole("status").textContent).toBe("Image selected");
+    await waitFor(() =>
+      expect(screen.getByAltText("Event preview").getAttribute("src")).toMatch(
+        /^data:image\/png/,
+      ),
+    );
+  });
+
+  it("rejects a non-square pick", async () => {
+    const onFileChange = vi.fn();
+    render(<ImageUpload onChange={noop} onFileChange={onFileChange} />);
+    pick(file("wide.png", "image/png"));
+    decode(0, 800, 400);
+    await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
+    expect(onFileChange).not.toHaveBeenCalled();
+  });
+
+  it("lets a later file win when an earlier one finishes decoding last", async () => {
+    const onFileChange = vi.fn();
+    render(<ImageUpload onChange={noop} onFileChange={onFileChange} />);
+    const big = file("big.png", "image/png");
+    const small = file("small.jpg", "image/jpeg");
+    pick(big);
+    pick(small);
+    expect(pending).toHaveLength(2);
+
+    decode(1, 400);
+    await waitFor(() => expect(onFileChange).toHaveBeenCalledWith(small));
+    decode(0, 400);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    expect(onFileChange).toHaveBeenCalledTimes(1);
+    expect(screen.getByText("small.jpg")).toBeTruthy();
+    expect(screen.queryByText("big.png")).toBeNull();
+  });
+
+  it("ignores a stale decode failure after a later valid pick", async () => {
+    render(<ImageUpload onChange={noop} />);
+    pick(file("old.png", "image/png"));
+    pick(file("new.png", "image/png"));
+    decode(1, 400);
+    await waitFor(() => expect(screen.getByText("new.png")).toBeTruthy());
+    act(() => pending[0].image.onerror?.(new Event("error")));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("doesn't bring the image back if it is removed before decoding finishes", async () => {
+    const onFileChange = vi.fn();
+    render(<ImageUpload onChange={noop} value="/covers/a.png" onFileChange={onFileChange} />);
+    pick(file("b.png", "image/png"));
+    fireEvent.click(screen.getByRole("button", { name: "Remove image" }));
+    expect(onFileChange).toHaveBeenLastCalledWith(null);
+
+    decode(0, 400);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(onFileChange).toHaveBeenCalledTimes(1);
+    expect(screen.queryByAltText("Event preview")).toBeNull();
+  });
+
+  it("ignores a pick that finishes after a new stored value arrives", async () => {
+    const onFileChange = vi.fn();
+    const { rerender } = render(
+      <ImageUpload onChange={noop} value="/covers/a.png" onFileChange={onFileChange} />,
+    );
+    pick(file("b.png", "image/png"));
+    rerender(<ImageUpload onChange={noop} value="/covers/c.png" onFileChange={onFileChange} />);
+    decode(0, 400);
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(onFileChange).not.toHaveBeenCalled();
+    expect(screen.getByText("c.png")).toBeTruthy();
+  });
+});
+
+describe("ImageUpload error wiring", () => {
+  it("points the controls at the error that replaces the hint", () => {
+    const { rerender } = render(<ImageUpload id="cover" onChange={noop} />);
+    const button = () => screen.getByRole("button", { name: "Upload image" });
+    expect(button().getAttribute("aria-describedby")).toBe("cover-hint");
+    expect(button().hasAttribute("aria-invalid")).toBe(false);
+
+    rerender(<ImageUpload id="cover" onChange={noop} error="Upload failed." />);
+    const alert = screen.getByRole("alert");
+    expect(alert.id).toBe("cover-error");
+    expect(button().getAttribute("aria-describedby")).toBe("cover-error");
+    expect(button().getAttribute("aria-invalid")).toBe("true");
+    expect(input().getAttribute("aria-describedby")).toBe("cover-error");
+  });
+
+  it("does the same for Replace once an image is showing", () => {
+    render(<ImageUpload id="cover" onChange={noop} value="/a.png" error="Too big." />);
+    const replace = screen.getByRole("button", { name: "Replace" });
+    expect(replace.getAttribute("aria-describedby")).toBe("cover-error");
+    expect(replace.getAttribute("aria-invalid")).toBe("true");
+  });
+});
+

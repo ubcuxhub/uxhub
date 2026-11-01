@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -109,6 +109,80 @@ describe("ColourPicker", () => {
     fireEvent.click(screen.getByRole("button", { name: "Remove #2F8F6B" }));
     expect(document.activeElement).toBe(
       screen.getByRole("button", { name: "Add custom colour" }),
+    );
+  });
+});
+
+describe("ColourPicker focus after removal", () => {
+  const swatch = (hex: string) =>
+    screen.getByRole("button", { name: `Custom colour ${hex}` });
+  const remove = (hex: string) =>
+    fireEvent.click(screen.getByRole("button", { name: `Remove ${hex}` }));
+
+  it("moves focus to the swatch that slid into the removed one's place", () => {
+    render(<Harness initialCustom={["#2F8F6B", "#AA3366", "#112233"]} />);
+    remove("#2F8F6B");
+    expect(document.activeElement).toBe(swatch("#AA3366"));
+  });
+
+  it("counts only rendered swatches when an invalid entry sits before the removed one", () => {
+    render(<Harness initialCustom={["nope", "#2F8F6B", "#AA3366"]} />);
+    remove("#2F8F6B");
+    expect(document.activeElement).toBe(swatch("#AA3366"));
+  });
+
+  it("doesn't fire when the parent ignores the removal, nor on a later add", () => {
+    function Stubborn() {
+      const [custom, setCustom] = useState(["#2F8F6B"]);
+      const [value, setValue] = useState("#325DC4");
+      return (
+        <ColourPicker
+          label="Event colour"
+          value={value}
+          onValueChange={setValue}
+          customColours={custom}
+          // Rejects removals (shorter lists) but accepts additions.
+          onCustomColoursChange={(next) => {
+            if (next.length > custom.length) setCustom(next);
+          }}
+        />
+      );
+    }
+    render(<Stubborn />);
+    remove("#2F8F6B");
+    expect(document.activeElement).not.toBe(
+      screen.getByRole("button", { name: "Add custom colour" }),
+    );
+
+    // The user then adds a colour: focus must not jump to a swatch.
+    fireEvent.click(screen.getByRole("button", { name: "Add custom colour" }));
+    fireEvent.change(screen.getByLabelText("Hex"), { target: { value: "#112233" } });
+    fireEvent.click(screen.getByRole("button", { name: "Use colour" }));
+    expect(document.activeElement).not.toBe(swatch("#112233"));
+    expect(document.activeElement).not.toBe(swatch("#2F8F6B"));
+  });
+
+  it("still moves focus when the parent applies the removal a render later", async () => {
+    function Slow() {
+      const [custom, setCustom] = useState(["#2F8F6B"]);
+      return (
+        <ColourPicker
+          label="Event colour"
+          value="#325DC4"
+          onValueChange={() => {}}
+          customColours={custom}
+          onCustomColoursChange={(next) => {
+            setTimeout(() => setCustom(next), 0);
+          }}
+        />
+      );
+    }
+    render(<Slow />);
+    remove("#2F8F6B");
+    await waitFor(() =>
+      expect(document.activeElement).toBe(
+        screen.getByRole("button", { name: "Add custom colour" }),
+      ),
     );
   });
 });
