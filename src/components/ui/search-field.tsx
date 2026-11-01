@@ -72,6 +72,7 @@ function SearchField({
         aria-label={label}
         value={value}
         disabled={disabled}
+        data-escape-clears=""
         enterKeyHint="search"
         autoComplete="off"
         spellCheck={false}

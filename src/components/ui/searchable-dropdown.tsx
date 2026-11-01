@@ -28,6 +28,8 @@ interface CommonProps {
   disabled?: boolean
   className?: string
   "aria-label"?: string
+  /** Names the field from another element. Beats `aria-label`; a `<label for>` also works. */
+  "aria-labelledby"?: string
   "aria-invalid"?: boolean
   "aria-describedby"?: string
 }
@@ -78,17 +80,20 @@ function defaultFilter(option: SearchableOption, query: string) {
 export function SearchableDropdown(props: SearchableDropdownProps) {
   const { options, placeholder, noResults, noResultsHint, onQueryChange, loading = false,
     filter = defaultFilter, name, disabled, className, id, "aria-label": ariaLabel,
-    "aria-invalid": invalid, "aria-describedby": describedBy } = props
+    "aria-labelledby": labelledBy, "aria-invalid": invalid, "aria-describedby": describedBy } = props
   const generatedId = React.useId()
   const inputId = id ?? generatedId
   const listId = `${inputId}-listbox`
   const statusId = `${inputId}-status`
+  const selectedId = `${inputId}-selected`
   const inputRef = React.useRef<HTMLInputElement>(null)
   const fieldRef = React.useRef<HTMLDivElement>(null)
   const listRef = React.useRef<HTMLDivElement>(null)
   const [open, setOpen] = React.useState(false)
   const [query, setQuery] = React.useState("")
   const [announcement, setAnnouncement] = React.useState("")
+  const [labelText, setLabelText] = React.useState("")
+  const announceTimer = React.useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const multiple = props.multiple === true
   const values: readonly string[] = props.multiple ? props.value : props.value ? [props.value] : []
   const [cacheState, setCacheState] = React.useState(() => ({ source: options, map: new Map(options.map((option) => [option.value, option])) }))
@@ -102,7 +107,8 @@ export function SearchableDropdown(props: SearchableDropdownProps) {
     options.find((option) => option.value === value) ?? optionCache.get(value) ?? { value, label: value }
   const selected = !multiple && values[0] ? resolveOption(values[0]) : undefined
   const visible = onQueryChange ? options : options.filter((option) => filter(option, query))
-  const { activeIndex, setActiveIndex, onKeyDown: move, getOptionId } = useActiveDescendant(visible.length)
+  // Home and End belong to the caret in an editable combobox.
+  const { activeIndex, setActiveIndex, onKeyDown: move, getOptionId } = useActiveDescendant(visible.length, { homeEnd: false })
   const current = activeIndex >= 0 ? visible[activeIndex] : undefined
 
   React.useEffect(() => {
@@ -121,15 +127,27 @@ export function SearchableDropdown(props: SearchableDropdownProps) {
     }
   }, [activeIndex, open])
 
+  React.useEffect(() => () => clearTimeout(announceTimer.current), [])
+
   const updateQuery = (next: string) => {
     setQuery(next)
     setActiveIndex(-1)
     onQueryChange?.(next)
   }
+  // Closing drops the typed query, so the closed field always shows the committed value.
   const changeOpen = (next: boolean) => {
     if (disabled) return
+    if (next && !open) setLabelText(inputRef.current?.labels?.[0]?.textContent?.trim() ?? "")
     setOpen(next)
-    if (!next) setActiveIndex(-1)
+    if (!next) {
+      setActiveIndex(-1)
+      if (query) updateQuery("")
+    }
+  }
+  // Escape closes the list but keeps the query; a second Escape clears it.
+  const closeKeepingQuery = () => {
+    setOpen(false)
+    setActiveIndex(-1)
   }
   const choose = (option: SearchableOption) => {
     if (props.multiple) {
@@ -149,11 +167,16 @@ export function SearchableDropdown(props: SearchableDropdownProps) {
     if (props.multiple) props.onValueChange(props.value.filter((item) => item !== value))
     else props.onValueChange(null)
     setAnnouncement(`${label} removed`)
+    // Clear it once spoken, so removing another chip with the same label is announced again.
+    clearTimeout(announceTimer.current)
+    announceTimer.current = setTimeout(() => setAnnouncement(""), 1500)
     inputRef.current?.focus()
   }
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Escape") {
-      if (open) { event.preventDefault(); changeOpen(false) }
+      // An open list is closed by the popover's own Escape handler, which marks the event handled.
+      if (event.defaultPrevented) return
+      if (open) { event.preventDefault(); closeKeepingQuery() }
       else if (query) { event.preventDefault(); updateQuery("") }
       return
     }
@@ -163,13 +186,20 @@ export function SearchableDropdown(props: SearchableDropdownProps) {
       remove(props.value[props.value.length - 1])
       return
     }
-    if (event.key === "Enter" && open && current) {
-      event.preventDefault()
-      choose(current)
+    if (event.key === "Enter") {
+      if (event.nativeEvent.isComposing) return
+      if (open && current) {
+        event.preventDefault()
+        choose(current)
+      } else if (open || query) {
+        // Nothing highlighted: never submit the enclosing form half-filled.
+        event.preventDefault()
+        const only = visible.length === 1 ? visible[0] : undefined
+        if (query && only && !loading && !values.includes(only.value)) choose(only)
+      }
       return
     }
-    if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
-      if ((event.key === "Home" || event.key === "End") && !open) return
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
       if (!open) changeOpen(true)
       move(event)
     }
@@ -183,7 +213,7 @@ export function SearchableDropdown(props: SearchableDropdownProps) {
           data-slot="searchable-dropdown-field"
           data-invalid={invalid || undefined}
           onClick={() => { if (!disabled) { changeOpen(true); inputRef.current?.focus() } }}
-          className={cn("flex min-h-10 w-full min-w-0 items-center gap-2 rounded-full border border-input bg-background px-3 text-body text-foreground focus-within:focus-ring data-[invalid]:border-destructive", multiple && "flex-wrap gap-1.5 py-1 pl-1.5", disabled && "cursor-not-allowed bg-disabled text-disabled-foreground")}
+          className={cn("flex min-h-10 w-full min-w-0 items-center gap-2 rounded-full border border-border bg-background px-5 text-body text-foreground transition-colors duration-150 has-[input:focus-visible]:focus-ring data-[invalid]:border-destructive", multiple ? "min-h-11 flex-wrap gap-1.5 py-1 pl-1.5 sm:min-h-(--size-control)" : "h-11 sm:h-(--size-control)", disabled && "cursor-not-allowed border-disabled-border bg-disabled text-disabled-foreground")}
         >
           {!multiple && !selected ? <Search aria-hidden className="size-4 shrink-0 text-muted-foreground" /> : null}
           {multiple ? values.map((value) => {
@@ -196,24 +226,24 @@ export function SearchableDropdown(props: SearchableDropdownProps) {
           }) : selected && !open && !query ? <span className="flex min-w-0 flex-1 items-center gap-2">{selected.lead}<span className="truncate">{selected.label}</span></span> : null}
           <input
             ref={inputRef} id={inputId} role="combobox" type="text" autoComplete="off"
-            aria-label={ariaLabel ?? placeholder} aria-autocomplete="list" aria-expanded={open}
-            aria-controls={listId} aria-activedescendant={open && current ? getOptionId(activeIndex) : undefined}
-            aria-invalid={invalid || undefined} aria-describedby={[describedBy, statusId].filter(Boolean).join(" ")}
+            aria-label={ariaLabel} aria-labelledby={labelledBy} aria-autocomplete="list" aria-expanded={open}
+            aria-controls={open ? listId : undefined} aria-activedescendant={open && current ? getOptionId(activeIndex) : undefined}
+            aria-invalid={invalid || undefined} aria-describedby={[describedBy, selected ? selectedId : undefined, statusId].filter(Boolean).join(" ")}
             disabled={disabled} value={query}
             placeholder={multiple ? (props.multiple ? props.addPlaceholder ?? placeholder : placeholder) : selected && !open ? "" : placeholder}
-            onFocus={() => changeOpen(true)} onChange={(event) => { updateQuery(event.target.value); changeOpen(true) }}
-            onKeyDown={onKeyDown}
-            className={cn("min-w-0 flex-1 bg-transparent text-body text-foreground outline-none placeholder:text-muted-foreground", multiple && "min-w-24", selected && !open && !query && "w-0 flex-none")}
+            onBlur={(event) => { if (!fieldRef.current?.contains(event.relatedTarget as Node | null)) changeOpen(false) }}
+            onChange={(event) => { updateQuery(event.target.value); changeOpen(true) }}
+            onKeyDown={onKeyDown} data-escape-clears=""
+            className={cn("min-w-0 flex-1 bg-transparent text-body text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:placeholder:text-disabled-foreground", multiple && "min-w-24", selected && !open && !query && "w-0 flex-none")}
           />
           {multiple ? null : selected && !open ? <button type="button" aria-label={`Clear ${selected.label}`} disabled={disabled} onClick={(event) => { event.stopPropagation(); remove(selected.value) }} className="flex size-7 shrink-0 items-center justify-center rounded-full hover:bg-accent focus-visible:focus-ring"><X aria-hidden className="size-4" /></button> : <ChevronDown aria-hidden className="size-4 shrink-0 text-muted-foreground" />}
         </div>
       </PopoverAnchor>
-      <PopoverContent align="start" sideOffset={8} onOpenAutoFocus={(event) => event.preventDefault()} onCloseAutoFocus={(event) => event.preventDefault()} onInteractOutside={(event) => { if (fieldRef.current?.contains(event.target as Node)) event.preventDefault() }} className="w-(--radix-popover-trigger-width) min-w-64 p-1.5">
-        <div ref={listRef} id={listId} role="listbox" aria-label={ariaLabel ?? placeholder} aria-multiselectable={multiple || undefined} className="max-h-64 overflow-y-auto">
+      <PopoverContent align="start" sideOffset={8} onEscapeKeyDown={(event) => { event.preventDefault(); closeKeepingQuery() }} onOpenAutoFocus={(event) => event.preventDefault()} onCloseAutoFocus={(event) => event.preventDefault()} onInteractOutside={(event) => { if (fieldRef.current?.contains(event.target as Node)) event.preventDefault() }} className="w-(--radix-popover-trigger-width) min-w-64 p-1.5">
+        <div ref={listRef} id={listId} role="listbox" aria-label={labelledBy ? undefined : ariaLabel ?? (labelText || placeholder)} aria-labelledby={labelledBy} aria-multiselectable={multiple || undefined} onMouseDown={(event) => event.preventDefault()} className="max-h-64 overflow-y-auto">
           {loading ? <p className="px-3 py-6 text-center text-small text-muted-foreground">Searching…</p> : visible.length ? visible.map((option, index) => <div
             key={option.value} id={getOptionId(index)} role="option" aria-selected={values.includes(option.value)}
             data-active={activeIndex === index || undefined}
-            onMouseDown={(event) => event.preventDefault()}
             onMouseEnter={() => setActiveIndex(index)} onClick={() => choose(option)}
             className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-small text-foreground hover:bg-muted data-[active]:bg-muted"
           >
@@ -226,6 +256,7 @@ export function SearchableDropdown(props: SearchableDropdownProps) {
       </PopoverContent>
     </Popover>
     <span id={statusId} role="status" aria-live="polite" className="sr-only">{announcement ? `${announcement}. ` : ""}{loading ? "Searching" : `${visible.length} ${visible.length === 1 ? "match" : "matches"}`}</span>
-    {name ? values.map((value) => <input key={value} type="hidden" name={name} value={value} />) : null}
+    {selected ? <span id={selectedId} className="sr-only">Selected: {selected.label}</span> : null}
+    {name ? values.map((value) => <input key={value} type="hidden" name={name} value={value} disabled={disabled} />) : null}
   </div>
 }

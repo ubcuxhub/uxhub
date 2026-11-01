@@ -4,6 +4,7 @@ import * as React from "react";
 import { cva, type VariantProps } from "class-variance-authority";
 import { PanelLeftIcon } from "lucide-react";
 import { Slot } from "radix-ui";
+import { usePathname } from "next/navigation";
 
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,12 @@ type SidebarContextProps = {
   setOpenMobile: (open: boolean) => void;
   isMobile: boolean;
   toggleSidebar: () => void;
+  /**
+   * The control that opens the mobile sheet. The sheet isn't opened through a
+   * Radix trigger, so Radix has nothing to return focus to on close; the sheet
+   * focuses this instead.
+   */
+  triggerRef: React.RefObject<HTMLElement | null>;
 };
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null);
@@ -51,6 +58,25 @@ function useSidebar() {
   }
 
   return context;
+}
+
+function isEditableTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  return (
+    target.isContentEditable ||
+    target.closest(
+      "input, textarea, select, [contenteditable]:not([contenteditable=false])",
+    ) !== null
+  );
+}
+
+/** Any open dialog or sheet other than the mobile sidebar sheet itself. */
+function hasOpenModal() {
+  return (
+    document.querySelector(
+      '[role="dialog"][data-state="open"]:not([data-slot="sidebar"]), [role="alertdialog"][data-state="open"]',
+    ) !== null
+  );
 }
 
 function SidebarProvider({
@@ -68,6 +94,17 @@ function SidebarProvider({
 }) {
   const isMobile = useIsMobile();
   const [openMobile, setOpenMobile] = React.useState(false);
+  const triggerRef = React.useRef<HTMLElement | null>(null);
+
+  // The shell layout outlives soft navigation, so the mobile sheet would stay
+  // open over the page its own link just opened. Close it when the route
+  // changes (adjusting state during render, not in an effect).
+  const pathname = usePathname();
+  const [lastPathname, setLastPathname] = React.useState(pathname);
+  if (pathname !== lastPathname) {
+    setLastPathname(pathname);
+    setOpenMobile(false);
+  }
 
   // This is the internal state of the sidebar.
   // We use openProp and setOpenProp for control from outside the component.
@@ -97,12 +134,23 @@ function SidebarProvider({
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
-        event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
-        (event.metaKey || event.ctrlKey)
+        event.key.toLowerCase() !== SIDEBAR_KEYBOARD_SHORTCUT ||
+        !(event.metaKey || event.ctrlKey) ||
+        event.shiftKey ||
+        event.altKey ||
+        event.repeat
       ) {
-        event.preventDefault();
-        toggleSidebar();
+        return;
       }
+      // Another handler already took the key. This also keeps a nested
+      // provider from toggling a second time.
+      if (event.defaultPrevented) return;
+      // Ctrl/Cmd+B is bold in text fields and rich-text editors.
+      if (isEditableTarget(event.target)) return;
+      // A modal owns the keyboard; the page behind it must not move.
+      if (hasOpenModal()) return;
+      event.preventDefault();
+      toggleSidebar();
     };
 
     window.addEventListener("keydown", handleKeyDown);
@@ -122,6 +170,7 @@ function SidebarProvider({
       openMobile,
       setOpenMobile,
       toggleSidebar,
+      triggerRef,
     }),
     [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar],
   );
@@ -163,7 +212,8 @@ function Sidebar({
   variant?: "sidebar" | "floating" | "inset";
   collapsible?: "offcanvas" | "icon" | "none";
 }) {
-  const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
+  const { isMobile, state, openMobile, setOpenMobile, triggerRef } =
+    useSidebar();
 
   if (collapsible === "none") {
     return (
@@ -194,6 +244,13 @@ function Sidebar({
             } as React.CSSProperties
           }
           side={side}
+          onCloseAutoFocus={(event) => {
+            // Settings (or another overlay) opened from the menu takes focus
+            // itself; otherwise hand it back to the button that opened us.
+            event.preventDefault();
+            if (window.location.hash.startsWith("#settings")) return;
+            triggerRef.current?.focus();
+          }}
         >
           <SheetHeader className="sr-only">
             <SheetTitle>Sidebar</SheetTitle>
@@ -257,15 +314,21 @@ function Sidebar({
 function SidebarTrigger({
   className,
   onClick,
+  ref,
   "aria-label": label = "Toggle sidebar",
   ...props
 }: Omit<React.ComponentProps<typeof IconButton>, "label" | "variant" | "size"> & {
   "aria-label"?: string;
 }) {
-  const { toggleSidebar } = useSidebar();
+  const { toggleSidebar, triggerRef } = useSidebar();
 
   return (
     <IconButton
+      ref={(node) => {
+        triggerRef.current = node;
+        if (typeof ref === "function") ref(node);
+        else if (ref) ref.current = node;
+      }}
       data-sidebar="trigger"
       data-slot="sidebar-trigger"
       variant="ghost"
@@ -432,7 +495,7 @@ function SidebarGroupAction({
       data-slot="sidebar-group-action"
       data-sidebar="group-action"
       className={cn(
-        "absolute top-3.5 right-3 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground transition-colors duration-150 hover:bg-accent focus-visible:focus-ring [&>svg]:size-4 [&>svg]:shrink-0",
+        "absolute top-3.5 right-3 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground transition-colors duration-150 hover:bg-muted focus-visible:focus-ring [&>svg]:size-4 [&>svg]:shrink-0",
         // Increases the hit area of the button on mobile.
         "after:absolute after:-inset-2 md:after:hidden",
         "group-data-[collapsible=icon]:hidden",
@@ -486,7 +549,7 @@ const sidebarMenuButtonVariants = cva(
     "group-has-data-[sidebar=menu-action]/menu-item:pr-9",
     // Collapsed rail: a centred square with the icon alone.
     "group-data-[collapsible=icon]:mx-auto group-data-[collapsible=icon]:size-11! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0! group-data-[collapsible=icon]:[&>span:last-child]:sr-only",
-    "hover:bg-accent active:bg-muted data-[active=true]:bg-muted data-[active=true]:hover:bg-muted data-[state=open]:hover:bg-muted",
+    "hover:bg-muted active:bg-border-subtle data-[active=true]:bg-muted data-[active=true]:hover:bg-muted data-[state=open]:hover:bg-muted",
     "focus-visible:focus-ring disabled:pointer-events-none disabled:text-disabled-foreground aria-disabled:pointer-events-none aria-disabled:text-disabled-foreground disabled:[&>svg]:text-disabled-foreground aria-disabled:[&>svg]:text-disabled-foreground",
     "[&>span:last-child]:truncate [&>svg]:size-5 [&>svg]:shrink-0 [&>svg]:text-muted-foreground [&>svg]:transition-colors [&>svg]:duration-150 hover:[&>svg]:text-sidebar-foreground data-[active=true]:[&>svg]:text-sidebar-foreground",
   ],
@@ -530,6 +593,7 @@ function SidebarMenuButton({
       data-sidebar="menu-button"
       data-size={size}
       data-active={isActive}
+      aria-current={isActive ? "page" : undefined}
       className={cn(sidebarMenuButtonVariants({ variant, size }), className)}
       {...props}
     />
@@ -574,7 +638,7 @@ function SidebarMenuAction({
       data-slot="sidebar-menu-action"
       data-sidebar="menu-action"
       className={cn(
-        "absolute top-3 right-3 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-sidebar-foreground focus-visible:focus-ring [&>svg]:size-4 [&>svg]:shrink-0",
+        "absolute top-3 right-3 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-muted-foreground transition-colors duration-150 hover:bg-muted hover:text-sidebar-foreground focus-visible:focus-ring [&>svg]:size-4 [&>svg]:shrink-0",
         // Increases the hit area of the button on mobile.
         "after:absolute after:-inset-2 md:after:hidden",
         "peer-data-[size=default]/menu-button:top-3",
@@ -700,8 +764,9 @@ function SidebarMenuSubButton({
       data-sidebar="menu-sub-button"
       data-size={size}
       data-active={isActive}
+      aria-current={isActive ? "page" : undefined}
       className={cn(
-        "flex h-8 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-body text-sidebar-foreground transition-colors duration-150 hover:bg-accent focus-visible:focus-ring active:bg-muted disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-muted-foreground",
+        "flex h-8 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-body text-sidebar-foreground transition-colors duration-150 hover:bg-muted focus-visible:focus-ring active:bg-border-subtle disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-muted-foreground",
         "data-[active=true]:bg-muted data-[active=true]:hover:bg-muted",
         "group-data-[collapsible=icon]:hidden",
         className,
