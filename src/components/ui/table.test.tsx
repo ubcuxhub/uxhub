@@ -163,4 +163,79 @@ describe("TableRowButton", () => {
     fireEvent.click(screen.getByRole("button", { name: "Alex Chen" }));
     expect(onClick).toHaveBeenCalledTimes(2);
   });
+
+  it("in a sticky table, the row's onClick runs once per click", () => {
+    const rowClick = vi.fn();
+    const buttonClick = vi.fn();
+    render(
+      <Table stickyFirstColumn>
+        <TableBody>
+          <TableRow onClick={rowClick}>
+            <TableCell>
+              <TableRowButton onClick={buttonClick}>Alex Chen</TableRowButton>
+            </TableCell>
+            <TableCell>alex@example.com</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>,
+    );
+    // A plain cell: the click is forwarded to the button, not counted twice.
+    fireEvent.click(screen.getByText("alex@example.com"));
+    expect(rowClick).toHaveBeenCalledTimes(1);
+    expect(buttonClick).toHaveBeenCalledTimes(1);
+
+    // The button itself.
+    fireEvent.click(screen.getByRole("button", { name: "Alex Chen" }));
+    expect(rowClick).toHaveBeenCalledTimes(2);
+    expect(buttonClick).toHaveBeenCalledTimes(2);
+
+    // Still forwards after an earlier click.
+    fireEvent.click(screen.getByText("alex@example.com"));
+    expect(rowClick).toHaveBeenCalledTimes(3);
+    expect(buttonClick).toHaveBeenCalledTimes(3);
+  });
+
+  it("does not forward a click that the row's onClick cancelled", () => {
+    const buttonClick = vi.fn();
+    render(
+      <Table stickyFirstColumn>
+        <TableBody>
+          <TableRow onClick={(event) => event.preventDefault()}>
+            <TableCell>
+              <TableRowButton onClick={buttonClick}>Alex Chen</TableRowButton>
+            </TableCell>
+            <TableCell>alex@example.com</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>,
+    );
+    fireEvent.click(screen.getByText("alex@example.com"));
+    expect(buttonClick).not.toHaveBeenCalled();
+  });
+});
+
+describe("TableCell", () => {
+  it("lifts links and controls above the row button's overlay", () => {
+    render(
+      <Table>
+        <TableBody>
+          <TableRow>
+            <TableCell>
+              <TableRowButton>Alex Chen</TableRowButton>
+            </TableCell>
+            <TableCell>
+              <a href="mailto:alex@example.com">alex@example.com</a>
+            </TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>,
+    );
+    const cell = screen.getByRole("link").closest("td")!;
+    // Tailwind emits `relative z-10` for links and controls inside the cell,
+    // but not for the row button, whose own `::after` needs the row as its
+    // containing block.
+    expect(cell.className).toContain("a,button,input,select,textarea");
+    expect(cell.className).toContain(":not([data-slot=table-row-button])]:relative");
+    expect(cell.className).toContain(":not([data-slot=table-row-button])]:z-10");
+  });
 });
