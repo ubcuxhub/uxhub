@@ -174,8 +174,9 @@ export function SearchableDropdown(props: SearchableDropdownProps) {
   }
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Escape") {
-      // An open list is closed by the popover's own Escape handler, which marks the event handled.
-      if (event.defaultPrevented) return
+      // The popover's Escape handler has already closed an open list (and marked the event
+      // handled), and an enclosing overlay may have prevented it to skip its own dismissal.
+      // Neither stops this: closing again is a no-op, and a typed query still clears.
       if (open) { event.preventDefault(); closeKeepingQuery() }
       else if (query) { event.preventDefault(); updateQuery("") }
       return

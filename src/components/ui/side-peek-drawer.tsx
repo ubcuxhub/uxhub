@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChevronsRight, Maximize2 } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 
@@ -15,14 +16,25 @@ interface SidePeekDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   dirty?: boolean;
+  /** Where focus goes on close. Falls back to whatever had focus when the panel opened. */
   returnFocusRef?: React.RefObject<HTMLElement | null>;
   children: React.ReactNode;
 }
 
-const SidePeekDrawerContext = React.createContext<{
+interface SidePeekDrawerContextValue {
   requestClose: () => void;
+  /** Leaves for `href`, asking first when there are unsaved changes. */
+  requestNavigate: (href: string) => void;
+  dirty: boolean;
+  /** Below `sm` the panel covers the screen, so it is modal there. */
+  phone: boolean;
   returnFocusRef?: React.RefObject<HTMLElement | null>;
-} | null>(null);
+  /** The element focused when the panel opened, for when `returnFocusRef` is missing or gone. */
+  openerRef: React.MutableRefObject<HTMLElement | null>;
+  contentRef: React.MutableRefObject<HTMLElement | null>;
+}
+
+const SidePeekDrawerContext = React.createContext<SidePeekDrawerContextValue | null>(null);
 
 function useSidePeekDrawer() {
   const context = React.useContext(SidePeekDrawerContext);
@@ -30,7 +42,29 @@ function useSidePeekDrawer() {
   return context;
 }
 
-/** A nonmodal panel: the page remains scrollable and row clicks can swap records. */
+/** Matches the `sm:` breakpoint the panel's width switches at. */
+const PHONE_QUERY = "(max-width: 639px)";
+
+function subscribePhone(onChange: () => void) {
+  if (typeof window.matchMedia !== "function") return () => {};
+  const query = window.matchMedia(PHONE_QUERY);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+function getPhoneSnapshot() {
+  return typeof window.matchMedia === "function" && window.matchMedia(PHONE_QUERY).matches;
+}
+
+function usePhone() {
+  return React.useSyncExternalStore(subscribePhone, getPhoneSnapshot, () => false);
+}
+
+/**
+ * A panel beside its list: the page stays scrollable and a row click swaps the
+ * record. At phone width it fills the screen, so it becomes modal there (focus
+ * trapped, the page behind hidden from assistive tech).
+ */
 function SidePeekDrawer({
   open,
   onOpenChange,
@@ -38,16 +72,54 @@ function SidePeekDrawer({
   returnFocusRef,
   children,
 }: SidePeekDrawerProps) {
+  const router = useRouter();
+  const phone = usePhone();
   const [confirmOpen, setConfirmOpen] = React.useState(false);
-  const requestClose = React.useCallback(() => {
-    if (dirty) setConfirmOpen(true);
-    else onOpenChange(false);
-  }, [dirty, onOpenChange]);
+  const [pendingHref, setPendingHref] = React.useState<string | null>(null);
+  const openerRef = React.useRef<HTMLElement | null>(null);
+  const contentRef = React.useRef<HTMLElement | null>(null);
+  const restoreRef = React.useRef<HTMLElement | null>(null);
+
+  // Remember what had focus so "Keep editing" can put it back.
+  const rememberFocus = () => {
+    const active = document.activeElement;
+    restoreRef.current =
+      active instanceof HTMLElement && contentRef.current?.contains(active) ? active : null;
+  };
+
+  const requestClose = () => {
+    if (dirty) {
+      rememberFocus();
+      setPendingHref(null);
+      setConfirmOpen(true);
+    } else {
+      onOpenChange(false);
+    }
+  };
+
+  const requestNavigate = (href: string) => {
+    rememberFocus();
+    setPendingHref(href);
+    setConfirmOpen(true);
+  };
+
+  const keepEditing = () => {
+    setConfirmOpen(false);
+    setPendingHref(null);
+    // The confirmation's own focus return has nowhere to go (it has no trigger),
+    // so put focus back in the panel once it has let go.
+    const restore = restoreRef.current?.isConnected
+      ? restoreRef.current
+      : contentRef.current?.querySelector<HTMLElement>('[data-slot="side-peek-drawer-title"]');
+    requestAnimationFrame(() => restore?.focus({ preventScroll: true }));
+  };
 
   return (
-    <SidePeekDrawerContext.Provider value={{ requestClose, returnFocusRef }}>
+    <SidePeekDrawerContext.Provider
+      value={{ requestClose, requestNavigate, dirty, phone, returnFocusRef, openerRef, contentRef }}
+    >
       <DialogPrimitive.Root
-        modal={false}
+        modal={phone}
         open={open}
         onOpenChange={(next) => {
           if (next) onOpenChange(true);
@@ -58,7 +130,10 @@ function SidePeekDrawer({
       </DialogPrimitive.Root>
       <ConfirmDialog
         open={confirmOpen}
-        onOpenChange={setConfirmOpen}
+        onOpenChange={(next) => {
+          if (next) setConfirmOpen(true);
+          else keepEditing();
+        }}
         title="Discard changes?"
         description="Your unsaved changes will be lost."
         cancelLabel="Keep editing"
@@ -66,6 +141,8 @@ function SidePeekDrawer({
         onConfirm={() => {
           setConfirmOpen(false);
           onOpenChange(false);
+          if (pendingHref) router.push(pendingHref);
+          setPendingHref(null);
         }}
       />
     </SidePeekDrawerContext.Provider>
@@ -75,15 +152,46 @@ function SidePeekDrawer({
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
+/**
+ * Esc closes the panel only when it is meant for the panel: from inside it, or
+ * with nothing focused. Esc typed into the page (a search box, say) or into a
+ * field that clears on Esc (`data-escape-clears` with text in it) is not ours.
+ * Radix already skips the panel when another layer (a popover, a dialog) is on top.
+ */
+function isEscapeForOthers(event: KeyboardEvent, content: HTMLElement | null) {
+  const target = event.target instanceof Element ? event.target : null;
+  const clears = target?.closest("[data-escape-clears]");
+  if (clears) {
+    const field =
+      clears instanceof HTMLInputElement || clears instanceof HTMLTextAreaElement
+        ? clears
+        : clears.querySelector<HTMLInputElement | HTMLTextAreaElement>("input, textarea");
+    if (field?.value) return true;
+  }
+  if (!target || target === document.body || target === document.documentElement) return false;
+  return !content?.contains(target);
+}
+
 const SidePeekDrawerContent = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, onOpenAutoFocus, onCloseAutoFocus, onKeyDown, onInteractOutside, onPointerDownOutside, children, ...props }, ref) => {
-  const { returnFocusRef } = useSidePeekDrawer();
+>(({ className, onOpenAutoFocus, onCloseAutoFocus, onKeyDownCapture, onEscapeKeyDown, onInteractOutside, onPointerDownOutside, children, ...props }, ref) => {
+  const { returnFocusRef, openerRef, contentRef, phone } = useSidePeekDrawer();
+  const setRefs = (node: HTMLDivElement | null) => {
+    contentRef.current = node;
+    if (typeof ref === "function") ref(node);
+    else if (ref) ref.current = node;
+  };
+  const returnTarget = () => {
+    const explicit = returnFocusRef?.current;
+    if (explicit?.isConnected) return explicit;
+    const opener = openerRef.current;
+    return opener?.isConnected ? opener : null;
+  };
   return (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Content
-        ref={ref}
+        ref={setRefs}
         data-slot="side-peek-drawer-content"
         className={cn(
           "safe-area-bleed-y fixed inset-y-0 right-0 z-50 flex h-dvh w-full flex-col overflow-hidden border-l border-border-subtle bg-popover text-popover-foreground shadow-overlay duration-200 ease-out data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:slide-out-to-right data-[state=open]:slide-in-from-right motion-reduce:data-[state=closed]:slide-out-to-right-0 motion-reduce:data-[state=open]:slide-in-from-right-0 motion-reduce:data-[state=closed]:fade-out-0 motion-reduce:data-[state=open]:fade-in-0 sm:w-[560px]",
@@ -93,15 +201,29 @@ const SidePeekDrawerContent = React.forwardRef<
           onOpenAutoFocus?.(event);
           if (event.defaultPrevented) return;
           event.preventDefault();
-          (event.currentTarget as HTMLElement)
-            .querySelector<HTMLElement>('[data-slot="side-peek-drawer-title"]')
-            ?.focus();
+          const content = event.currentTarget as HTMLElement;
+          const active = document.activeElement;
+          openerRef.current =
+            active instanceof HTMLElement && active !== document.body && !content.contains(active)
+              ? active
+              : null;
+          content.querySelector<HTMLElement>('[data-slot="side-peek-drawer-title"]')?.focus();
         }}
         onCloseAutoFocus={(event) => {
           onCloseAutoFocus?.(event);
           if (event.defaultPrevented) return;
+          const target = returnTarget();
+          if (!target) return;
           event.preventDefault();
-          returnFocusRef?.current?.focus();
+          target.focus();
+        }}
+        onEscapeKeyDown={(event) => {
+          onEscapeKeyDown?.(event);
+          if (event.defaultPrevented) return;
+          // Preventing the keystroke is how Radix is told not to dismiss. Fields
+          // that clear on Esc (SearchField, SearchableDropdown) ignore a keydown
+          // that was prevented before their own handler ran, so they still clear.
+          if (isEscapeForOthers(event, contentRef.current)) event.preventDefault();
         }}
         onInteractOutside={(event) => {
           onInteractOutside?.(event);
@@ -111,26 +233,32 @@ const SidePeekDrawerContent = React.forwardRef<
           onPointerDownOutside?.(event);
           event.preventDefault();
         }}
-        onKeyDown={(event) => {
-          onKeyDown?.(event);
-          if (event.defaultPrevented || event.key !== "Tab") return;
+        // Nonmodal: Tab leaves the panel at either edge instead of wrapping, so
+        // keyboard users can get back to the list. Radix's focus scope would
+        // wrap, so stop the keystroke before it gets there. Shift+Tab from the
+        // first control goes straight back to the row that opened the panel
+        // (the panel sits at the end of the DOM, so the browser would land on
+        // the page's last control). Modal (phone) keeps Radix's trap.
+        onKeyDownCapture={(event) => {
+          onKeyDownCapture?.(event);
+          if (phone || event.defaultPrevented || event.key !== "Tab") return;
+          if (event.ctrlKey || event.altKey || event.metaKey) return;
           const content = event.currentTarget;
+          if (!(event.target instanceof Node) || !content.contains(event.target)) return;
           const tabbables = Array.from(content.querySelectorAll<HTMLElement>(FOCUSABLE))
             .filter((item) => item.getAttribute("aria-hidden") !== "true" && item.tabIndex >= 0);
-          if (tabbables.length === 0) {
-            event.preventDefault();
-            content.focus();
-            return;
-          }
-          if (event.shiftKey && (
-            document.activeElement === tabbables[0] ||
-            document.activeElement === content.querySelector('[data-slot="side-peek-drawer-title"]')
-          )) {
-            event.preventDefault();
-            tabbables[tabbables.length - 1].focus();
-          } else if (!event.shiftKey && document.activeElement === tabbables[tabbables.length - 1]) {
-            event.preventDefault();
-            tabbables[0].focus();
+          const active = document.activeElement;
+          const atFirst = tabbables.length === 0 || active === tabbables[0] || active === content;
+          const atLast = tabbables.length === 0 || active === tabbables[tabbables.length - 1];
+          if (event.shiftKey && atFirst) {
+            const target = returnTarget();
+            if (target) {
+              event.preventDefault();
+              target.focus();
+            }
+            event.stopPropagation();
+          } else if (!event.shiftKey && atLast) {
+            event.stopPropagation();
           }
         }}
         {...props}
@@ -148,7 +276,7 @@ function SidePeekDrawerHeader({
   className,
   ...props
 }: React.ComponentProps<"div"> & { fullPageHref?: string; actions?: React.ReactNode }) {
-  const { requestClose } = useSidePeekDrawer();
+  const { requestClose, requestNavigate, dirty } = useSidePeekDrawer();
   return (
     <div
       data-slot="side-peek-drawer-header"
@@ -165,6 +293,13 @@ function SidePeekDrawerHeader({
               <Link
                 href={fullPageHref}
                 aria-label="Open as full page"
+                onClick={(event) => {
+                  // A new-tab click keeps this tab's edits, so only plain clicks ask first.
+                  if (!dirty || event.defaultPrevented || event.button !== 0) return;
+                  if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                  event.preventDefault();
+                  requestNavigate(fullPageHref);
+                }}
                 className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "rounded-lg text-muted-foreground")}
               >
                 <Maximize2 className="size-[18px]" aria-hidden />

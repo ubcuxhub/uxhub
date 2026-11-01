@@ -79,8 +79,11 @@ function SearchField({
         className="pr-11 pl-11 [&::-webkit-search-cancel-button]:appearance-none [&::-webkit-search-decoration]:appearance-none"
         onChange={(event) => change(event.target.value)}
         onKeyDown={(event) => {
+          // Only the caller's own handler can opt out. An overlay that already
+          // prevented this Esc (to skip its own dismissal) must not stop the clear.
+          const preventedBefore = event.defaultPrevented;
           onKeyDown?.(event);
-          if (event.defaultPrevented || event.key !== "Escape" || !value) return;
+          if ((event.defaultPrevented && !preventedBefore) || event.key !== "Escape" || !value) return;
           event.preventDefault();
           event.stopPropagation();
           change("");
