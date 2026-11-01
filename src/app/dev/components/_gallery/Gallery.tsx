@@ -526,11 +526,7 @@ function SectionPage({
         <p className="max-w-prose text-body text-muted-foreground">{description}</p>
 
         {importLine ? (
-          // CopyCode's hidden "Code Copied!" layer waits at 125% scale, so a
-          // full-width pill spills sideways; clip it (with room for the ring).
-          <div className="-mx-1 min-w-0 overflow-x-clip px-1">
-            <CopyCode code={importLine} label="Copy import line" />
-          </div>
+          <CopyCode code={importLine} label="Copy import line" />
         ) : null}
 
         {openStates?.length ? (

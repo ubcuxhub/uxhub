@@ -82,7 +82,9 @@ export function CopyCode({ code, label = "Copy code" }: CopyCodeProps) {
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="relative flex h-10 w-fit min-w-48 max-w-full items-center rounded-full bg-muted text-muted-foreground">
+      {/* Clipped, so a layer waiting at 125% can't widen the page; the 4px
+          margin leaves room for the button's focus ring. */}
+      <div className="relative flex h-10 w-fit min-w-48 max-w-full items-center overflow-clip rounded-full bg-muted text-muted-foreground [overflow-clip-margin:4px]">
         <span
           title={code}
           className={cn(
