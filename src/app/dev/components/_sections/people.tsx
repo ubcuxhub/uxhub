@@ -160,6 +160,10 @@ function Section() {
 const section: GallerySection = {
   id: "people",
   title: "Avatars",
+  group: "Data display",
+  description: "Avatars and avatar groups for people, with initials and anonymous fallbacks.",
+  importPath: "@/components/ui/avatar",
+  importNames: ["Avatar", "AvatarGroup"],
   spec: "§3.9",
   layout: "split",
   Component: Section,

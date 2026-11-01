@@ -355,6 +355,10 @@ function Buttons() {
 const section: GallerySection = {
   id: "buttons",
   title: "Buttons",
+  group: "Actions",
+  description: "Use a Button for an action on the page, and an IconButton when an icon alone says it (its label becomes the tooltip).",
+  importPath: "@/components/ui/button",
+  importNames: ["Button"],
   spec: "§3.1",
   layout: "split",
   Component: Buttons,

@@ -367,6 +367,8 @@ function Section() {
 const section: GallerySection = {
   id: "media",
   title: "Image upload and Hubbo",
+  group: "Forms",
+  description: "Upload an event image with ImageUpload, and use the Hubbo mascot in empty and success states.",
   spec: "§3.12, §5.2",
   layout: "split",
   Component: Section,

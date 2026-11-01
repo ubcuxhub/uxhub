@@ -245,6 +245,8 @@ function Composites({ open }: SectionProps) {
 const section: GallerySection = {
   id: "composites",
   title: "Shared composites",
+  group: "Composites",
+  description: "Shared building blocks: BackButton, PageContainer, CopyCode, SuccessOverlay and ConfirmDialog.",
   spec: "§3.5, §3.7, §4.5",
   layout: "split",
   openStates: OPEN_STATES,

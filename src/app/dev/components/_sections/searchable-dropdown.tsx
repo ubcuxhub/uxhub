@@ -57,5 +57,5 @@ function SearchableDropdownSection({ open }: SectionProps) {
   </div>;
 }
 
-const section: GallerySection = { id: "searchable-dropdown", title: "Searchable dropdown", spec: "§3.13", layout: "split", openStates: ["typing", "no-results"], Component: SearchableDropdownSection };
+const section: GallerySection = { id: "searchable-dropdown", title: "Searchable dropdown", group: "Forms", description: "Choose one or many from a long list by typing, such as members or judges.", importPath: "@/components/ui/searchable-dropdown", importNames: ["SearchableDropdown"], spec: "§3.13", layout: "split", openStates: ["typing", "no-results"], Component: SearchableDropdownSection };
 export default section;

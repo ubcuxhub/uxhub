@@ -306,6 +306,8 @@ function TabsAndMenus({ open }: SectionProps) {
 const section: GallerySection = {
   id: "tabs-and-menus",
   title: "Tabs and menus",
+  group: "Navigation",
+  description: "Tabs switch between parts of one object; a DropdownMenu holds its less common actions.",
   spec: "§3.4, §3.7",
   layout: "split",
   openStates: OPEN_STATES,

@@ -170,6 +170,10 @@ function Section({ open: initialState }: SectionProps) {
 const section: GallerySection = {
   id: "side-peek-drawer",
   title: "Side peek drawer",
+  group: "Overlays",
+  description: "Open a record beside its list to read or edit it without leaving the page.",
+  importPath: "@/components/ui/side-peek-drawer",
+  importNames: ["SidePeekDrawer", "SidePeekDrawerContent"],
   spec: "§3.15",
   layout: "page",
   openStates: ["drawer", "drawer-edit", "drawer-unsaved"],
