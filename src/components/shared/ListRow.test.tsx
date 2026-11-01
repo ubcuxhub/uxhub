@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { ListCard, ListRow } from "./ListRow";
@@ -88,5 +88,35 @@ describe("ListRow", () => {
     const row = screen.getByRole("listitem");
     expect(row.className).toContain("grid-cols-[4rem_minmax(0,1fr)]");
     expect(row.className).not.toContain("_auto]");
+  });
+});
+
+describe("ListRow organization logo", () => {
+  it("shows the initials when the logo fails to load", () => {
+    const { container } = render(
+      <ul>
+        <ListRow
+          name="Figma Student"
+          lead={{ kind: "organization", logoSrc: "/gone.png" }}
+        />
+      </ul>,
+    );
+    const img = container.querySelector("img") as HTMLImageElement;
+    expect(img.getAttribute("src")).toBe("/gone.png");
+
+    fireEvent.error(img);
+
+    expect(container.querySelector("img")).toBeNull();
+    expect(screen.getByRole("listitem").textContent).toContain("FS");
+  });
+
+  it("shows the initials when there is no logo", () => {
+    const { container } = render(
+      <ul>
+        <ListRow name="Figma Student" lead={{ kind: "organization" }} />
+      </ul>,
+    );
+    expect(container.querySelector("img")).toBeNull();
+    expect(screen.getByRole("listitem").textContent).toContain("FS");
   });
 });

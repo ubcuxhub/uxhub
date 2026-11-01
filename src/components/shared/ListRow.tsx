@@ -1,3 +1,5 @@
+"use client";
+
 import * as React from "react";
 
 import { Avatar } from "@/components/ui/avatar";
@@ -30,6 +32,34 @@ function getOrganizationInitials(name: string): string {
   const last =
     words.length > 1 ? (Array.from(words[words.length - 1])[0] ?? "") : "";
   return (first + last).toLocaleUpperCase();
+}
+
+/**
+ * An organization's logo, or its initials when there is no URL or the URL
+ * fails to load. Keyed on the URL so a new logo gets a fresh try.
+ */
+function OrganizationMark({
+  name,
+  logoSrc,
+}: {
+  name: string;
+  logoSrc?: string | null;
+}) {
+  const [failedSrc, setFailedSrc] = React.useState<string | null>(null);
+
+  if (logoSrc && failedSrc !== logoSrc) {
+    return (
+      // Organization marks keep their own colours; this white tile is intentional in every theme.
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={logoSrc}
+        alt=""
+        className="size-12 object-contain"
+        onError={() => setFailedSrc(logoSrc)}
+      />
+    );
+  }
+  return <>{getOrganizationInitials(name)}</>;
 }
 
 /** A titled card containing one vertical list of people or organizations. */
@@ -85,17 +115,7 @@ function ListRow({ name, description, lead, link }: ListRowProps) {
           aria-hidden
           className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border-subtle bg-white p-2 text-subheading text-black"
         >
-          {lead.logoSrc ? (
-            // Organization marks keep their own colours; this white tile is intentional in every theme.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={lead.logoSrc}
-              alt=""
-              className="size-12 object-contain"
-            />
-          ) : (
-            getOrganizationInitials(name)
-          )}
+          <OrganizationMark name={name} logoSrc={lead.logoSrc} />
         </span>
       )}
 

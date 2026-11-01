@@ -40,7 +40,7 @@ export function DiscountCodes() {
             </p>
 
             <div className="flex flex-col gap-1 mt-2">
-              <CopyCode code={discount.code} />
+              <CopyCode code={discount.code} label="Copy discount code" />
               {/* <p className="text-small text-muted-foreground">
                 Expires {formatEventDate(discount.expiresAt)}
               </p> */}

@@ -3,9 +3,9 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { readableTextOn } from "@/lib/event-colour";
+import { contrastRatio, eventColourTint } from "@/lib/event-colour";
 
-import { Ticket } from "./Ticket";
+import { Ticket, ticketAppearance } from "./Ticket";
 
 afterEach(cleanup);
 
@@ -30,17 +30,46 @@ describe("Ticket", () => {
     expect(article.textContent).toContain("John Doe");
   });
 
-  it("takes its label colour from readableTextOn", () => {
-    for (const hex of ["#325DC4", "#C983C7", "#4A5E8A", "#F3E9C6", "#FFFFFF"]) {
-      const expected =
-        readableTextOn(hex) === "light"
-          ? "rgb(255, 255, 255)"
-          : "rgb(17, 17, 17)";
-      expect(labelColour(hex), hex).toBe(expected);
-    }
-    // The pale colour gets the dark label, the default Blue the light one.
+  it("picks a dark label on pale colours and a white one on deep colours", () => {
     expect(labelColour("#F3E9C6")).toBe("rgb(17, 17, 17)");
+    expect(labelColour("#FFFFFF")).toBe("rgb(17, 17, 17)");
+    expect(labelColour("#C983C7")).toBe("rgb(17, 17, 17)");
     expect(labelColour("#325DC4")).toBe("rgb(255, 255, 255)");
+    expect(labelColour("#4A5E8A")).toBe("rgb(255, 255, 255)");
+  });
+
+  it("keeps the label at AA contrast along the whole gradient", () => {
+    const hexes = [
+      "#325DC4",
+      "#C983C7",
+      "#4A5E8A",
+      "#F3E9C6",
+      "#FFFFFF",
+      "#000000",
+      "#808080",
+      "#2F8F6B",
+      "#E0457B",
+    ];
+    for (const hex of hexes) {
+      const { label, tint } = ticketAppearance(hex);
+      expect(contrastRatio(hex, label), `${hex} base`).toBeGreaterThanOrEqual(4.5);
+      expect(
+        contrastRatio(eventColourTint(hex, tint), label),
+        `${hex} top`,
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+  });
+
+  it("holds back the white tint on Blue, where the old fill gave 2.8:1", () => {
+    const { tint } = ticketAppearance("#325DC4");
+    expect(tint).toBeLessThan(0.45);
+    expect(tint).toBeGreaterThan(0);
+    // A colour whose label already passes keeps the full tint.
+    expect(ticketAppearance("#F3E9C6").tint).toBe(0.45);
+  });
+
+  it("falls back to the default colour for an invalid hex", () => {
+    expect(() => render(<Ticket {...base} eventColour="not-a-colour" />)).not.toThrow();
   });
 
   it("paints the event colour as a gradient", () => {
@@ -68,15 +97,45 @@ describe("Ticket", () => {
 
     expect(screen.queryByTestId("qr")).toBeNull();
     expect(screen.getByText("Confirm by Nov 14")).toBeTruthy();
+    // The state is in the name too, not only in the greyscale.
+    expect(
+      screen.getByRole("article", {
+        name: "Ticket for Design Sprint, not confirmed",
+      }),
+    ).toBeTruthy();
     expect(
       container.querySelector("[data-slot='ticket-shape']")?.className,
     ).toContain("grayscale");
+  });
+
+  it("says it is not confirmed yet when pending and no caption is given", () => {
+    const { container } = render(<Ticket {...base} state="pending" />);
+
+    expect(screen.getByText("Not confirmed yet")).toBeTruthy();
+    expect(
+      container.querySelector("[data-slot='ticket-caption'] svg"),
+    ).toBeTruthy();
+  });
+
+  it("cuts the notches out instead of painting them over the surface", () => {
+    const { container } = render(<Ticket {...base} />);
+    const shape = container.querySelector(
+      "[data-slot='ticket-shape']",
+    ) as HTMLElement;
+
+    expect(container.innerHTML).not.toContain("bg-background");
+    const mask =
+      shape.style.maskImage || shape.style.getPropertyValue("-webkit-mask-image");
+    expect(mask.match(/radial-gradient/g)).toHaveLength(2);
   });
 
   it("says Checked in when used and keeps a dimmed code", () => {
     render(<Ticket {...base} state="used" code={<svg data-testid="qr" />} />);
 
     expect(screen.getByText("Checked in")).toBeTruthy();
+    expect(
+      screen.getByRole("article", { name: "Ticket for Design Sprint, checked in" }),
+    ).toBeTruthy();
     expect(screen.getByTestId("qr").parentElement?.className).toContain(
       "opacity-50",
     );

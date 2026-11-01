@@ -29,13 +29,17 @@ const TRANSITION =
 
 interface CopyCodeProps {
   code: string;
+  /** The copy button's accessible name, such as "Copy referral code". */
+  label?: string;
 }
 
 /**
  * A pill showing `code` with a copy button. After a copy, the code and icon
- * shrink away while "Code Copied!" shrinks in, then the reverse.
+ * shrink away while "Code Copied!" shrinks in, then the reverse. The pill is at
+ * least 12rem wide and grows with the code up to its container; a longer code
+ * is truncated (the full code is its tooltip and is what gets copied).
  */
-export function CopyCode({ code }: CopyCodeProps) {
+export function CopyCode({ code, label = "Copy code" }: CopyCodeProps) {
   const [copied, setCopied] = useState(false);
   // False while the layer that just left is still animating out.
   const [settled, setSettled] = useState(true);
@@ -78,8 +82,15 @@ export function CopyCode({ code }: CopyCodeProps) {
 
   return (
     <div className="flex flex-col gap-1">
-      <div className="relative flex h-10 w-48 items-center rounded-full bg-muted text-muted-foreground">
-        <span className={cn("pl-4 text-small", TRANSITION, LAYER_CLASSES[codeLayer])}>
+      <div className="relative flex h-10 w-fit min-w-48 max-w-full items-center rounded-full bg-muted text-muted-foreground">
+        <span
+          title={code}
+          className={cn(
+            "min-w-0 truncate pl-4 pr-2 text-small",
+            TRANSITION,
+            LAYER_CLASSES[codeLayer]
+          )}
+        >
           {code}
         </span>
 
@@ -97,8 +108,8 @@ export function CopyCode({ code }: CopyCodeProps) {
         <button
           type="button"
           onClick={handleCopy}
-          aria-label="Copy discount code"
-          className="ml-auto mr-1 flex size-8 items-center justify-center rounded-full outline-none focus-visible:focus-ring"
+          aria-label={label}
+          className="ml-auto mr-1 flex size-8 shrink-0 items-center justify-center rounded-full outline-none focus-visible:focus-ring"
         >
           <Copy className={cn("size-4", TRANSITION, LAYER_CLASSES[codeLayer])} aria-hidden />
         </button>
