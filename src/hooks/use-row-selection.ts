@@ -1,47 +1,74 @@
 "use client";
 
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 
 /**
  * Row selection for a list that can change under it (search, filter, page).
  *
- * Selection is pruned to `currentIds` as they change, so "2 selected" always
- * matches what is on screen and a row that was filtered out doesn't come back
- * selected when the filter is cleared. `toggleAll` acts on the current results
- * only (§3.16).
+ * `currentIds` is the list as it is now: every result for a client list, or
+ * only the visible page for a server-paged one. The hook never prunes the
+ * selection to it, so ticked rows survive a page change, a search that hides
+ * them and a refetch that briefly renders `[]`. "N selected" counts them all;
+ * the caller drops them with `clear()` or `setSelected()`. The header checkbox
+ * (`allState`, `toggleAll`) and `exportIds` follow the current results (§3.16).
+ *
+ * Every action is a functional update against the latest state, so several
+ * calls in one handler (`ids.forEach(selection.toggle)`) all land.
  */
 export function useRowSelection<Id extends string>(currentIds: readonly Id[]) {
-  const [ids, setIds] = useState<ReadonlySet<Id>>(() => new Set());
+  const [selected, setIds] = useState<ReadonlySet<Id>>(() => new Set());
+
+  // `toggleAll` runs inside a state updater, which must not close over this
+  // render's ids: keep the latest in a ref.
+  const currentRef = useRef(currentIds);
+  useLayoutEffect(() => {
+    currentRef.current = currentIds;
+  });
 
   const current = new Set(currentIds);
-  const selected = new Set([...ids].filter((id) => current.has(id)));
+  let visibleSelected = 0;
+  for (const id of current) if (selected.has(id)) visibleSelected += 1;
 
-  // Prune during render, the supported way to derive state from props: React
-  // re-renders straight away without committing the stale set.
-  if (selected.size !== ids.size) setIds(selected);
-
-  const selectedCount = selected.size;
   const allState: boolean | "indeterminate" =
-    selectedCount === 0
+    visibleSelected === 0
       ? false
-      : selectedCount === current.size
+      : visibleSelected === current.size
         ? true
         : "indeterminate";
 
   return {
-    selected: selected as ReadonlySet<Id>,
+    /** Every selected id, including any not in `currentIds` right now. */
+    selected,
     isSelected: (id: Id) => selected.has(id),
-    toggle: (id: Id) => {
-      const next = new Set(selected);
-      if (!next.delete(id)) next.add(id);
-      setIds(next);
-    },
-    toggleAll: () => setIds(allState === true ? new Set() : new Set(current)),
+    toggle: (id: Id) =>
+      setIds((prev) => {
+        const next = new Set(prev);
+        if (!next.delete(id)) next.add(id);
+        return next;
+      }),
+    /** Selects every current result, or deselects them when all are selected. */
+    toggleAll: () =>
+      setIds((prev) => {
+        const ids = currentRef.current;
+        const all = ids.length > 0 && ids.every((id) => prev.has(id));
+        const next = new Set(prev);
+        for (const id of ids) {
+          if (all) next.delete(id);
+          else next.add(id);
+        }
+        return next;
+      }),
+    /** Replaces the selection, e.g. a shift-click range or "select these 3". */
+    setSelected: (ids: Iterable<Id>) => setIds(new Set(ids)),
     clear: () => setIds(new Set()),
+    /** The header checkbox: about the current results only. */
     allState,
     /** The selected rows, or every current result when none are (§3.16). */
-    exportIds: (selectedCount > 0
-      ? currentIds.filter((id) => selected.has(id))
+    exportIds: (selected.size > 0
+      ? [
+          ...currentIds.filter((id) => selected.has(id)),
+          ...[...selected].filter((id) => !current.has(id)),
+        ]
       : currentIds) as readonly Id[],
   };
 }

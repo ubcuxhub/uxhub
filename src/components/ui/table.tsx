@@ -144,9 +144,11 @@ const INTERACTIVE = "a,button,input,select,textarea,label,[role='button'],[role=
  * A pinned cell holds the stretched button's positioning context, so it can
  * only cover its own cell. In a sticky table the row forwards a click anywhere
  * else to the row button; keyboard and assistive tech still use the button.
+ * `onClick` runs once per user click, never for the forwarded one.
  */
 function TableRow({ className, onClick, ...props }: React.ComponentProps<"tr">) {
   const sticky = React.useContext(StickyContext);
+  const forwarding = React.useRef(false);
 
   return (
     <tr
@@ -159,13 +161,23 @@ function TableRow({ className, onClick, ...props }: React.ComponentProps<"tr">) 
         className,
       )}
       onClick={(event) => {
+        // The click forwarded below bubbles back to this row; it is not a
+        // second user click.
+        if (forwarding.current) return;
         onClick?.(event);
         if (!sticky || event.defaultPrevented) return;
         const target = event.target as HTMLElement;
         if (target.closest(INTERACTIVE)) return;
-        event.currentTarget
-          .querySelector<HTMLElement>("[data-slot=table-row-button]")
-          ?.click();
+        const button = event.currentTarget.querySelector<HTMLElement>(
+          "[data-slot=table-row-button]",
+        );
+        if (!button) return;
+        forwarding.current = true;
+        try {
+          button.click();
+        } finally {
+          forwarding.current = false;
+        }
       }}
       {...props}
     />
@@ -192,6 +204,10 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
       data-slot="table-cell"
       className={cn(
         "h-(--size-table-row) bg-inherit px-5 align-middle text-table text-foreground",
+        // The row button's `::after` covers the row, and a plain link or control
+        // is not positioned, so it would paint underneath. Lift them above it.
+        "[&_:is(a,button,input,select,textarea,[role=button],[role=menuitem]):not([data-slot=table-row-button])]:relative",
+        "[&_:is(a,button,input,select,textarea,[role=button],[role=menuitem]):not([data-slot=table-row-button])]:z-10",
         className,
       )}
       {...props}
