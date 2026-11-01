@@ -18,10 +18,7 @@ import {
 import { useUser } from "@/lib/auth/user-context";
 import { FLAGS } from "@/lib/flags";
 import { hasAdminAccess, hasManagerAccess } from "@/lib/auth/roles";
-import {
-  SettingsDialog,
-  openSettings,
-} from "@/features/settings/components/SettingsDialog";
+import { openSettings } from "@/features/settings/components/SettingsDialog";
 import {
   Sidebar,
   SidebarContent,
@@ -68,7 +65,7 @@ export function AppSidebarNav({
   isManager: boolean;
   pathname?: string;
 }) {
-  const { state, isMobile, toggleSidebar } = useSidebar();
+  const { state, isMobile, toggleSidebar, setOpenMobile } = useSidebar();
   const currentPathname = usePathname();
   const pathname = pathnameOverride ?? currentPathname;
   // Index routes (e.g. /portal, /admin) are prefixes of every child route, so
@@ -201,7 +198,14 @@ export function AppSidebarNav({
       <SidebarFooter className="p-3 group-data-[collapsible=icon]:px-0">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton onClick={() => openSettings()} tooltip="Settings">
+            <SidebarMenuButton
+              onClick={() => {
+                // The dialog lives in the shell layout, outside this sheet.
+                setOpenMobile(false);
+                openSettings();
+              }}
+              tooltip="Settings"
+            >
               <Settings />
               <span>Settings</span>
             </SidebarMenuButton>
@@ -218,8 +222,6 @@ export function AppSidebarNav({
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarFooter>
-
-      <SettingsDialog />
     </Sidebar>
   );
 }
