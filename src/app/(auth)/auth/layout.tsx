@@ -1,17 +1,8 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import { AuthLightMode } from "@/features/auth/components/AuthLightMode";
-
-const authLightModeScript = `
-(function(){
-  try {
-    var root = document.documentElement;
-    root.dataset.authPreviousTheme = root.getAttribute("data-theme") === "dark" ? "dark" : "light";
-    root.removeAttribute("data-theme");
-  } catch (e) {}
-})();
-`;
+import { ForceLightTheme } from "@/components/shared/ForceLightTheme";
+import { forceLightThemeScript } from "@/lib/theme";
 
 export default function AuthLayout({
   children,
@@ -20,8 +11,8 @@ export default function AuthLayout({
 }>) {
   return (
     <main className="min-h-svh bg-ux-hub text-foreground lg:bg-background lg:bg-none">
-      <script dangerouslySetInnerHTML={{ __html: authLightModeScript }} />
-      <AuthLightMode />
+      <script dangerouslySetInnerHTML={{ __html: forceLightThemeScript }} />
+      <ForceLightTheme />
 
       <div className="grid min-h-svh lg:grid-cols-[minmax(320px,467px)_minmax(0,1fr)]">
         <aside className="relative hidden overflow-hidden bg-ux-hub px-16 py-[72px] lg:block">

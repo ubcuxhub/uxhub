@@ -74,3 +74,13 @@ const disabledInitScript = `(function(){try{document.documentElement.removeAttri
 export const themeInitScript = FLAGS.darkMode
   ? enabledInitScript
   : disabledInitScript;
+
+/** `data-*` attribute that remembers the theme to restore after a forced-light route. */
+export const FORCED_LIGHT_PREVIOUS_ATTR = "data-previous-theme";
+
+/**
+ * Inline script for routes that always render light (auth, marketing). It
+ * remembers the live theme, then clears it before first paint so there is no
+ * flash of dark. `ForceLightTheme` restores the remembered theme on leaving.
+ */
+export const forceLightThemeScript = `(function(){try{var r=document.documentElement;r.setAttribute("${FORCED_LIGHT_PREVIOUS_ATTR}",r.getAttribute("data-theme")==="dark"?"dark":"light");r.removeAttribute("data-theme");}catch(e){}})();`;

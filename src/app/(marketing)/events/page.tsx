@@ -25,7 +25,7 @@ export default async function EventsPage() {
     <main className="min-h-screen">
       <Navbar />
 
-      <div className="mt-[80px] min-h-[60vh] bg-background px-8 py-8 font-sans text-body text-foreground">
+      <div className="mt-[80px] min-h-[60vh] px-8 py-8 font-sans text-body text-foreground">
         <div className="mx-auto max-w-5xl">
           <div className="mb-8">
             <p className="text-subheading italic text-muted-foreground">

@@ -122,7 +122,7 @@ export default async function EventDetailPage({
     <main className="min-h-screen">
       <Navbar />
 
-      <div className="bg-background font-sans text-body text-foreground">
+      <div className="font-sans text-body text-foreground">
         {/* ────────────────────── HERO SECTION ────────────────────── */}
         <section className="mt-20 px-[5%] pb-12 pt-8 md:px-[10%] lg:px-[15%]">
         {/* Back link */}
