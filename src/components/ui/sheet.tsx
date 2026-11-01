@@ -4,6 +4,7 @@ import * as React from "react"
 import { XIcon } from "lucide-react"
 import { Dialog as SheetPrimitive } from "radix-ui"
 
+import { focusContentOnOpen } from "@/components/ui/dialog"
 import { IconButton } from "@/components/ui/icon-button"
 import { cn } from "@/lib/utils"
 
@@ -50,6 +51,7 @@ function SheetContent({
   children,
   side = "right",
   showCloseButton = true,
+  onOpenAutoFocus,
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Content> & {
   side?: "top" | "right" | "bottom" | "left"
@@ -70,8 +72,12 @@ function SheetContent({
             "inset-x-0 top-0 h-auto border-b data-[state=closed]:slide-out-to-top data-[state=open]:slide-in-from-top",
           side === "bottom" &&
             "inset-x-0 bottom-0 h-auto border-t data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom",
+          // The container takes focus on open, so the close button's tooltip and
+          // ring stay hidden until someone tabs to it. It is not a control.
+          "outline-none",
           className
         )}
+        onOpenAutoFocus={(event) => focusContentOnOpen(event, onOpenAutoFocus)}
         {...props}
       >
         {children}

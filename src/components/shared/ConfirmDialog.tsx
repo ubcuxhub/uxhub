@@ -145,6 +145,7 @@ function ConfirmDialogBody({
                   id={inputId}
                   type={confirmation.type ?? "text"}
                   placeholder={confirmation.placeholder}
+                  data-autofocus=""
                   autoComplete="off"
                   autoCapitalize="none"
                   spellCheck={false}
