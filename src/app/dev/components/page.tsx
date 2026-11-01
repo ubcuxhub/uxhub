@@ -23,7 +23,10 @@ export default async function ComponentsPage({
   const density = first(params.density);
 
   const parsed: GalleryParams = {
-    theme: theme === "light" || theme === "dark" ? theme : "split",
+    theme:
+      theme === "light" || theme === "dark" || theme === "split"
+        ? theme
+        : undefined,
     density: density === "compact" ? "compact" : "comfortable",
     section: first(params.section) || undefined,
     open: first(params.open) || undefined,

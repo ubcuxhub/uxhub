@@ -120,6 +120,8 @@ function Section() {
 const section: GallerySection = {
   id: "lists",
   title: "Lists and sponsor logos",
+  group: "Data display",
+  description: "ListRow for people and organizations, and the sponsor logo grid.",
   spec: "§4.1, §4.2",
   layout: "page",
   Component: Section,

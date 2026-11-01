@@ -353,6 +353,8 @@ function Feedback({ open }: SectionProps) {
 const section: GallerySection = {
   id: "feedback",
   title: "Feedback",
+  group: "Feedback",
+  description: "A Toast confirms what just happened, an ActionBanner asks for a next step, an EmptyState fills a list with nothing in it.",
   spec: "§3.8",
   layout: "split",
   openStates: OPEN_STATES,

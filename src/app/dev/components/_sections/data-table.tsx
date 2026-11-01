@@ -397,6 +397,10 @@ function DataTable() {
 const section: GallerySection = {
   id: "data-table",
   title: "Table",
+  group: "Data display",
+  description: "A table of records with search, selection and pagination, such as Manage Users.",
+  importPath: "@/components/ui/table",
+  importNames: ["Table", "TableBody", "TableCell", "TableHead", "TableHeader", "TableRow"],
   spec: "§3.6, §3.16",
   layout: "page",
   Component: DataTable,

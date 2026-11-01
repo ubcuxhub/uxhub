@@ -18,7 +18,11 @@ const sections: readonly NavigatorSection[] = [
 
 function NavigatorGallery({ open }: SectionProps) {
   const observedId = useCurrentSection(sections.map((section) => section.id));
-  return <div className="relative pb-28">
+  // The pill is `position: fixed`. The transform makes this frame its
+  // containing block, so it floats at the bottom of the frame instead of the
+  // window, and the inner div scrolls the mock form underneath it.
+  return <div data-specimen="Event setup form (?open=menu)" className="relative h-[36rem] overflow-hidden rounded-2xl border border-border-subtle bg-background [transform:translateZ(0)]">
+    <div className="h-full overflow-y-auto p-4 pb-28 sm:p-6 sm:pb-28">
     <div className="mb-6 rounded-2xl border border-border bg-card p-6">
       <h3 className="text-title font-semibold text-foreground">Event setup</h3>
       <p className="mt-2 max-w-2xl text-small text-muted-foreground">Scroll through this mock event form to follow the current section. The floating pill shows required-section progress; open it to jump to any section. Use Tab to inspect its focus ring, Enter or Space to open, arrow keys to move, and Escape to return focus.</p>
@@ -33,12 +37,17 @@ function NavigatorGallery({ open }: SectionProps) {
       </div>
     </section>)}</div>
     <SectionNavigator title="Event setup" sections={sections} currentId={observedId} defaultOpen={open === "menu"} />
+    </div>
   </div>;
 }
 
 const section: GallerySection = {
   id: "section-navigator",
   title: "Section navigator",
+  group: "Navigation",
+  description: "A floating pill that tracks progress through a long form and jumps between its sections.",
+  importPath: "@/components/shared/SectionNavigator",
+  importNames: ["SectionNavigator"],
   spec: "§3.14",
   layout: "page",
   openStates: ["menu"],

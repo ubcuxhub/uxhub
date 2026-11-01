@@ -26,7 +26,7 @@ export function SpecimenGroup({
   children: ReactNode;
 }) {
   return (
-    <div data-specimen-group={title} className="flex flex-col gap-3">
+    <div data-specimen-group={title} className="flex scroll-mt-20 flex-col gap-3">
       <div className="flex flex-col gap-0.5">
         <h3 className="flex items-baseline gap-2 text-subheading">
           {title}
@@ -42,7 +42,8 @@ export function SpecimenGroup({
       </div>
       <div
         className={cn(
-          "grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(var(--specimen-min),1fr))]",
+          // One column on phones; elsewhere a column never outgrows its row.
+          "grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(var(--specimen-min),100%),1fr))] max-md:[grid-template-columns:minmax(0,1fr)]",
           className,
         )}
         style={{ "--specimen-min": min } as CSSProperties}
@@ -108,7 +109,7 @@ export function Composition({
   return (
     <div
       data-composition={title}
-      className="flex flex-col gap-3 border-t border-border-subtle pt-6"
+      className="flex scroll-mt-20 flex-col gap-3 border-t border-border-subtle pt-6"
     >
       <div className="flex flex-col gap-0.5">
         <h3 className="text-subheading">

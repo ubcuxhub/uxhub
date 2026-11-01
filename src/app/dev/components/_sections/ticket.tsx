@@ -85,6 +85,10 @@ function Section() {
 const section: GallerySection = {
   id: "ticket",
   title: "Ticket",
+  group: "Data display",
+  description: "The event ticket with its QR code, in each event colour and state.",
+  importPath: "@/components/shared/Ticket",
+  importNames: ["Ticket"],
   spec: "§2.1, §4.3",
   layout: "split",
   Component: Section,

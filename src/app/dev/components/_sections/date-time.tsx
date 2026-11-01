@@ -364,6 +364,8 @@ function DateTime({ open }: SectionProps) {
 const section: GallerySection = {
   id: "date-time",
   title: "Date and time",
+  group: "Forms",
+  description: "Typed date and time fields with their pickers, for event schedules and deadlines.",
   spec: "§3.11",
   layout: "split",
   openStates: OPEN_STATES,

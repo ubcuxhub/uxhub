@@ -815,7 +815,7 @@ function Section({ open }: SectionProps) {
     <div className="flex flex-col gap-10">
       <Composition
         title={`${template.title} (${template.spec}), desktop`}
-        description={`Built from the real components on fixture data: no fetching, no auth. Pick another template with the Open links in the toolbar. Laid out at the width of your window; the page container caps at 1152px.${template.id === "event-builder" ? " The section pill floats at the bottom of the window, as it does on the real page." : ""}`}
+        description={`Built from the real components on fixture data: no fetching, no auth. Pick another template with the Force open links above. Laid out at the width of your window; the page container caps at 1152px.${template.id === "event-builder" ? " The section pill floats at the bottom of the window, as it does on the real page." : ""}`}
       >
         <div className="overflow-hidden rounded-xl border border-border-subtle bg-background">
           <TemplateBody id={template.id} />
@@ -838,6 +838,8 @@ function Section({ open }: SectionProps) {
 const section: GallerySection = {
   id: "templates",
   title: "Templates",
+  group: "Templates",
+  description: "Whole pages assembled from the components on fixture data: the events list, event detail and event builder.",
   spec: "§4.4",
   layout: "page",
   openStates: OPEN_STATES,

@@ -193,6 +193,8 @@ function Navigation() {
 const section: GallerySection = {
   id: "navigation",
   title: "Navigation",
+  group: "Navigation",
+  description: "The app sidebar and its rows, for moving between the main portal and admin pages.",
   spec: "§3.4",
   layout: "split",
   Component: Navigation,

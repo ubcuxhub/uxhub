@@ -237,6 +237,8 @@ function Section() {
 const section: GallerySection = {
   id: "events",
   title: "Event cards and timeline",
+  group: "Data display",
+  description: "EventCard in every status, and the portal's EventTimeline.",
   spec: "§3.5, §3.9",
   layout: "split",
   Component: Section,

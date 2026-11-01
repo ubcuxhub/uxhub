@@ -367,6 +367,8 @@ function FieldExtensions() {
 const section: GallerySection = {
   id: "field-extensions",
   title: "Field extensions and slider",
+  group: "Forms",
+  description: "Add-ons for a field (a leading icon, an action in the label row, a character counter) and the Slider.",
   spec: "§3.2, §3.12, §3.17",
   layout: "split",
   Component: FieldExtensions,

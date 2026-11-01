@@ -409,6 +409,8 @@ function ChoiceControls() {
 const section: GallerySection = {
   id: "choice-controls",
   title: "Choice controls",
+  group: "Forms",
+  description: "Pick from a few options: radios in a form, a SegmentedToggle to switch views, FilterChips to narrow a list.",
   spec: "§3.2, §3.3, §3.12",
   layout: "split",
   Component: ChoiceControls,

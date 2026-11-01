@@ -181,6 +181,8 @@ function AdminDataSection({ open }: SectionProps) {
 const section: GallerySection = {
   id: "admin-data",
   title: "Stats and filters",
+  group: "Data display",
+  description: "StatCards for headline numbers, and the search, sort and filter toolbar above admin lists.",
   spec: "§3.5, §3.16",
   layout: "page",
   openStates: ["sort-filter"],

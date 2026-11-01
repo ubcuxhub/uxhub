@@ -206,6 +206,10 @@ function ColourPickerSection({ open }: SectionProps) {
 const section: GallerySection = {
   id: "colour-picker",
   title: "Colour picker",
+  group: "Forms",
+  description: "Let an admin pick an event colour from the swatches, or a custom one.",
+  importPath: "@/components/ui/colour-picker",
+  importNames: ["ColourPicker"],
   spec: "§3.10",
   layout: "split",
   openStates: ["custom-colour"],

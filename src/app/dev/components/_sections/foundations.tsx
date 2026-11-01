@@ -407,7 +407,7 @@ function Foundations() {
 
       <Composition
         title="Density"
-        description="These tokens change with the toolbar's Compact toggle."
+        description="These tokens change with the Compact density setting."
       >
         <div className="grid gap-3 sm:grid-cols-3">
           {[
@@ -428,6 +428,8 @@ function Foundations() {
 const section: GallerySection = {
   id: "foundations",
   title: "Foundations",
+  group: "Foundations",
+  description: "Colour, type, radius, focus ring, icons, elevation, motion and density: the tokens every component is built from.",
   spec: "§2",
   layout: "split",
   Component: Foundations,

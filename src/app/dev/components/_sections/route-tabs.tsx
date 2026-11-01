@@ -87,6 +87,10 @@ function RouteTabs() {
 const section: GallerySection = {
   id: "route-tabs",
   title: "Route tabs",
+  group: "Navigation",
+  description: "TabNav: tabs that are links, for sibling pages under one object's URL.",
+  importPath: "@/components/ui/tab-nav",
+  importNames: ["TabNav", "TabNavLink"],
   spec: "§3.4",
   layout: "split",
   Component: RouteTabs,

@@ -416,6 +416,8 @@ function Surfaces() {
 const section: GallerySection = {
   id: "surfaces",
   title: "Surfaces",
+  group: "Data display",
+  description: "Cards, badges, status badges, alerts, separators and skeletons: the containers and labels most pages are made of.",
   spec: "§3.3, §3.5, §3.6, §3.8",
   layout: "split",
   Component: Surfaces,

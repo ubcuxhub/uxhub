@@ -485,6 +485,8 @@ function FormControls({ open }: SectionProps) {
 const section: GallerySection = {
   id: "form-controls",
   title: "Form controls",
+  group: "Forms",
+  description: "Inputs, textareas, selects, checkboxes and switches, laid out with Field and Label in any form.",
   spec: "§3.2, §3.11, §3.12",
   layout: "split",
   openStates: ["select"],

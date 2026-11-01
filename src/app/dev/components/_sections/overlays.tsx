@@ -285,6 +285,8 @@ function Overlays({ open }: SectionProps) {
 const section: GallerySection = {
   id: "overlays",
   title: "Overlays",
+  group: "Overlays",
+  description: "A Dialog for a focused task, a Sheet for a side panel, a Popover or Tooltip for small content anchored to a control.",
   spec: "§3.7, §2.6",
   layout: "page",
   openStates: OPEN_STATES,
