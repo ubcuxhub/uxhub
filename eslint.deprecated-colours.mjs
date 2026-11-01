@@ -1,12 +1,11 @@
-// Warns on the deprecated colour utilities that `src/app/globals.css` keeps as
+// Rejects the deprecated colour utilities that `src/app/globals.css` keeps as
 // compatibility aliases until the week of November 16. The key list is read
 // from that file's "DEPRECATED aliases" block, so it cannot drift from the
 // aliases themselves; replacements come from the §2.11 table in
 // docs/design-system.md, indexed by the CSS variable each alias points to.
 //
-// This is a separate rule (not another `no-restricted-syntax` entry) because
-// flat config keeps one severity per rule per file: the stale-colour rule in
-// eslint.config.mjs errors, this one only warns.
+// This is a plugin rule (not another `no-restricted-syntax` entry) so each
+// report can name the replacement class.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -92,14 +91,14 @@ function describe(prefix, key) {
   const hint = suggestion
     ? `use \`${suggestion}\``
     : `see the ${variable} row in docs/design-system.md §2.11`;
-  return `\`${prefix}-${key}\` is deprecated and will be removed the week of November 16; ${hint}.`;
+  return `\`${prefix}-${key}\` is deprecated; ${hint}.`;
 }
 
 const rule = {
   meta: {
     type: "suggestion",
     schema: [],
-    docs: { description: "Warn on deprecated colour utility aliases." },
+    docs: { description: "Reject deprecated colour utility aliases." },
   },
   create(context) {
     function check(node, text) {
