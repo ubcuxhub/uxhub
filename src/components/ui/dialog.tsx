@@ -12,6 +12,34 @@ const DialogTrigger = DialogPrimitive.Trigger;
 const DialogPortal = DialogPrimitive.Portal;
 const DialogClose = DialogPrimitive.Close;
 
+/**
+ * Radix moves focus to the first focusable element when a dialog opens. In
+ * our content that is the close `IconButton`, whose tooltip opens on focus and
+ * which Chrome treats as `:focus-visible`, so the tooltip and a focus ring
+ * appear before anyone has touched it. Focus the content container instead:
+ * it is focusable (`tabIndex=-1`), so assistive tech still announces the
+ * dialog by its title, and Tab moves on to the first control.
+ *
+ * Composes with callers: their own `onOpenAutoFocus` runs first and
+ * `preventDefault()` skips this. Focus already inside the content is kept, and
+ * an element marked `data-autofocus` takes focus instead of the container.
+ * Shared with `ui/sheet`.
+ */
+function focusContentOnOpen(
+  event: Event,
+  onOpenAutoFocus?: (event: Event) => void,
+) {
+  onOpenAutoFocus?.(event);
+  if (event.defaultPrevented) return;
+  const content = event.currentTarget as HTMLElement | null;
+  if (!content) return;
+  event.preventDefault();
+  const active = document.activeElement;
+  if (active && active !== content && content.contains(active)) return;
+  const marked = content.querySelector<HTMLElement>("[data-autofocus]");
+  (marked ?? content).focus({ preventScroll: true });
+}
+
 const DialogOverlay = React.forwardRef<
   React.ComponentRef<typeof DialogPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
@@ -47,6 +75,7 @@ const DialogContent = React.forwardRef<
       closeLabel = "Close",
       mobileFullscreen = false,
       size = "default",
+      onOpenAutoFocus,
       ...props
     },
     ref,
@@ -64,8 +93,12 @@ const DialogContent = React.forwardRef<
             "safe-area-bleed-y h-dvh max-h-none w-screen max-w-none overflow-hidden rounded-none border-0 sm:h-[80vh] sm:max-h-[min(760px,calc(100dvh-80px))] sm:w-[calc(100vw-1rem)] sm:max-w-[1000px] sm:rounded-2xl sm:border",
           mobileFullscreen &&
             "safe-area-bleed-y h-dvh max-h-none w-screen max-w-none gap-0 overflow-hidden rounded-none border-0 p-0 sm:h-auto sm:max-h-[calc(100dvh-80px)] sm:w-full sm:max-w-lg sm:gap-4 sm:overflow-y-auto sm:rounded-2xl sm:border sm:p-6",
+          // The container takes focus on open (see `focusContentOnOpen`). It is
+          // not a control, so it gets no ring.
+          "outline-none",
           className,
         )}
+        onOpenAutoFocus={(event) => focusContentOnOpen(event, onOpenAutoFocus)}
         {...props}
       >
         {children}
@@ -143,6 +176,7 @@ const DialogDescription = React.forwardRef<
 DialogDescription.displayName = DialogPrimitive.Description.displayName;
 
 export {
+  focusContentOnOpen,
   Dialog,
   DialogPortal,
   DialogOverlay,
