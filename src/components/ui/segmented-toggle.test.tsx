@@ -96,4 +96,33 @@ describe("SegmentedToggle", () => {
     fireEvent.click(screen.getByRole("radio", { name: "Drafts" }));
     expect(onValueChange).not.toHaveBeenCalled();
   });
+
+  it("selects as the arrow keys move focus, like a radio group", async () => {
+    const onValueChange = vi.fn();
+    render(<Toggle onValueChange={onValueChange} />);
+    const upcoming = screen.getByRole("radio", { name: "Upcoming" });
+    const past = screen.getByRole("radio", { name: "Past" });
+    upcoming.focus();
+    fireEvent.keyDown(upcoming, { key: "ArrowRight" });
+    await waitFor(() => expect(past.getAttribute("aria-checked")).toBe("true"));
+    expect(onValueChange).toHaveBeenCalledExactlyOnceWith("past");
+
+    fireEvent.keyDown(past, { key: "ArrowLeft" });
+    await waitFor(() => expect(upcoming.getAttribute("aria-checked")).toBe("true"));
+    expect(onValueChange).toHaveBeenLastCalledWith("upcoming");
+  });
+
+  it("doesn't change the selection when focus arrives from outside the group", () => {
+    const onValueChange = vi.fn();
+    render(
+      <>
+        <button type="button">Before</button>
+        <Toggle onValueChange={onValueChange} />
+      </>,
+    );
+    screen.getByRole("button", { name: "Before" }).focus();
+    screen.getByRole("radio", { name: "Past" }).focus();
+    expect(onValueChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("radio", { name: "Upcoming" }).getAttribute("aria-checked")).toBe("true");
+  });
 });

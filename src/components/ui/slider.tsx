@@ -3,6 +3,7 @@
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
+import { joinIds, useFieldControl } from "@/components/ui/field"
 
 type SliderName =
   | { "aria-label": string; "aria-labelledby"?: string }
@@ -32,6 +33,8 @@ const decimals = (n: number) => (String(n).split(".")[1] ?? "").length
 
 /** Rounds to the nearest step from `min`, trimming float noise. */
 function snap(value: number, min: number, max: number, step: number) {
+  if (!Number.isFinite(value)) return min
+  if (!(step > 0)) return Math.min(max, Math.max(min, value))
   const stepped = Math.round((value - min) / step) * step + min
   const places = Math.max(decimals(step), decimals(min))
   return Math.min(max, Math.max(min, Number(stepped.toFixed(places))))
@@ -56,12 +59,18 @@ function Slider({
   id: idProp,
   onKeyDown,
   ref,
+  "aria-describedby": describedByProp,
+  "aria-invalid": invalidProp,
   ...props
 }: SliderProps) {
   const generatedId = React.useId()
   const id = idProp ?? generatedId
+  const field = useFieldControl()
   const [inner, setInner] = React.useState(defaultValue ?? min)
-  const value = valueProp ?? inner
+  // The native range clamps its own thumb; the fill, the readout and
+  // `aria-valuetext` must agree with it, so a value outside the range (or off
+  // the step) is pulled in before anything is drawn from it.
+  const value = snap(valueProp ?? inner, min, max, step)
 
   const commit = (next: number) => {
     if (valueProp === undefined) setInner(next)
@@ -85,6 +94,8 @@ function Slider({
         step={step}
         value={value}
         disabled={disabled}
+        aria-describedby={joinIds(describedByProp, field.describedBy)}
+        aria-invalid={invalidProp ?? field.invalid}
         aria-valuetext={formatValue(value)}
         style={
           {

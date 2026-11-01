@@ -139,7 +139,7 @@ function DatePicker({
           type="button"
           disabled={todayDisabled}
           onClick={() => today && onValueChange(today)}
-          className="cursor-pointer rounded-sm text-small font-medium text-foreground underline underline-offset-2 hover:text-primary-hover focus-visible:focus-ring disabled:pointer-events-none disabled:text-disabled-foreground disabled:no-underline"
+          className="cursor-pointer rounded-sm text-small font-medium text-foreground underline underline-offset-2 hover:text-primary focus-visible:focus-ring disabled:pointer-events-none disabled:text-disabled-foreground disabled:no-underline"
         >
           Today
         </button>

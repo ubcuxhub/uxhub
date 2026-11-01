@@ -3,6 +3,7 @@
 import * as React from "react"
 
 import { cn } from "@/lib/utils"
+import { joinIds, useFieldControl } from "@/components/ui/field"
 
 /** The counter speaks (politely) once this many characters or fewer are left. */
 const LIVE_THRESHOLD = 20
@@ -27,18 +28,51 @@ function Textarea({
   value,
   defaultValue,
   onChange,
-  "aria-describedby": describedBy,
-  "aria-invalid": invalid,
+  "aria-describedby": describedByProp,
+  "aria-invalid": invalidProp,
+  ref,
   ...props
 }: TextareaProps) {
   const counterId = React.useId()
+  const fieldControl = useFieldControl()
+  const describedBy = joinIds(describedByProp, fieldControl.describedBy)
+  const invalid = invalidProp ?? fieldControl.invalid
+  const innerRef = React.useRef<HTMLTextAreaElement | null>(null)
+  const setRef = React.useCallback(
+    (node: HTMLTextAreaElement | null) => {
+      innerRef.current = node
+      if (typeof ref === "function") ref(node)
+      else if (ref) ref.current = node
+    },
+    [ref]
+  )
   const [tracked, setTracked] = React.useState(() =>
     length(String(defaultValue ?? ""))
   )
   const counting = Boolean(showCount && maxLength)
 
+  // `form.reset()` (and React's reset after a `<form action>`) changes the value
+  // without a `change` event, so the uncontrolled count is read again after it.
+  React.useEffect(() => {
+    const textarea = innerRef.current
+    const form = textarea?.form
+    if (!counting || !textarea || !form) return
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const resync = () => {
+      // The event fires before the fields are reset.
+      clearTimeout(timer)
+      timer = setTimeout(() => setTracked(length(textarea.value)), 0)
+    }
+    form.addEventListener("reset", resync)
+    return () => {
+      form.removeEventListener("reset", resync)
+      clearTimeout(timer)
+    }
+  }, [counting])
+
   const field = (
     <textarea
+      ref={setRef}
       data-slot="textarea"
       className={cn(
         "flex field-sizing-content min-h-20 w-full rounded-2xl border border-border bg-background px-5 py-3 text-body text-foreground transition-colors duration-150 placeholder:text-muted-foreground focus-visible:focus-ring aria-invalid:border-destructive disabled:cursor-not-allowed disabled:border-disabled-border disabled:bg-disabled disabled:text-disabled-foreground disabled:placeholder:text-disabled-foreground",
@@ -53,7 +87,7 @@ function Textarea({
       }}
       aria-invalid={invalid}
       aria-describedby={
-        counting ? [describedBy, counterId].filter(Boolean).join(" ") : describedBy
+        counting ? joinIds(describedBy, counterId) : describedBy
       }
       {...props}
     />

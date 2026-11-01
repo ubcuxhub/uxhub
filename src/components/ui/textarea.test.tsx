@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { useState } from "react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { createRef, useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { Textarea } from "./textarea";
@@ -95,5 +95,37 @@ describe("Textarea counter", () => {
 
     rerender(<Textarea aria-label="Bio" maxLength={3} showCount defaultValue="abc" />);
     expect(counter()?.className).toContain("text-destructive");
+  });
+
+  it("resyncs the counter after a form reset", async () => {
+    render(
+      <form>
+        <Textarea aria-label="Bio" maxLength={10} showCount defaultValue="abc" />
+        <button type="reset">Reset</button>
+      </form>,
+    );
+    const count = () => document.querySelector("[data-slot=textarea-count]")?.textContent;
+    const box = screen.getByLabelText("Bio");
+    fireEvent.change(box, { target: { value: "abcdefghij" } });
+    expect(count()).toBe("10/10");
+
+    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+    await waitFor(() => expect(count()).toBe("3/10"));
+  });
+
+  it("resyncs after form.reset() called from script, and still forwards its ref", async () => {
+    const ref = createRef<HTMLTextAreaElement>();
+    const { container } = render(
+      <form>
+        <Textarea ref={ref} aria-label="Bio" maxLength={10} showCount />
+      </form>,
+    );
+    const count = () => document.querySelector("[data-slot=textarea-count]")?.textContent;
+    expect(ref.current).toBe(screen.getByLabelText("Bio"));
+    fireEvent.change(screen.getByLabelText("Bio"), { target: { value: "hello" } });
+    expect(count()).toBe("5/10");
+
+    act(() => container.querySelector("form")!.reset());
+    await waitFor(() => expect(count()).toBe("0/10"));
   });
 });

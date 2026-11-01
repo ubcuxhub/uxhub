@@ -20,12 +20,17 @@ interface SegmentedToggleProps
 /**
  * Pill switch between two or three views of the same list (§3.2). It switches
  * a view and never submits. Radix gives the items `role="radio"` and roving
- * focus (arrows move focus; Space or Enter selects).
+ * focus. As in a radio group, the arrow keys (and Home and End) move focus and
+ * select in one step; Space or Enter on the focused option also selects.
  *
  * The track is 44px on phones and 36px from `sm` (Figma: 3px padding around a
  * 28px option), following `--size-control` so compact density shrinks it too.
  * `className="w-full"` stretches the options to share the width.
  */
+const SelectContext = React.createContext<((value: string) => void) | null>(
+  null,
+);
+
 function SegmentedToggle({
   className,
   value,
@@ -45,29 +50,48 @@ function SegmentedToggle({
   }
 
   return (
-    <ToggleGroupPrimitive.Root
-      data-slot="segmented-toggle"
-      type="single"
-      value={current ?? ""}
-      onValueChange={handleChange}
-      className={cn(
-        "inline-flex h-11 items-stretch gap-0.5 rounded-full border border-border-subtle bg-muted p-[3px] sm:h-[calc(var(--size-control)-4px)]",
-        "[&.w-full>[data-slot=segmented-toggle-item]]:flex-1",
-        className,
-      )}
-      {...props}
-    />
+    <SelectContext.Provider
+      value={(next) => {
+        if (next !== current) handleChange(next);
+      }}
+    >
+      <ToggleGroupPrimitive.Root
+        data-slot="segmented-toggle"
+        type="single"
+        value={current ?? ""}
+        onValueChange={handleChange}
+        className={cn(
+          "inline-flex h-11 items-stretch gap-0.5 rounded-full border border-border-subtle bg-muted p-[3px] sm:h-[calc(var(--size-control)-4px)]",
+          "[&.w-full>[data-slot=segmented-toggle-item]]:flex-1",
+          className,
+        )}
+        {...props}
+      />
+    </SelectContext.Provider>
   );
 }
 
 /** One option. Put an optional 16px icon before the label. */
 function SegmentedToggleItem({
   className,
+  onFocus,
   ...props
 }: React.ComponentProps<typeof ToggleGroupPrimitive.Item>) {
+  const select = React.useContext(SelectContext);
   return (
     <ToggleGroupPrimitive.Item
       data-slot="segmented-toggle-item"
+      onFocus={(event) => {
+        onFocus?.(event);
+        if (event.defaultPrevented) return;
+        // Focus arriving from a sibling option is an arrow, Home or End press
+        // (or a click). Focus from outside the group (Tab in, a programmatic
+        // focus) must not change the selection.
+        const from = event.relatedTarget;
+        if (from instanceof Node && event.currentTarget.parentElement?.contains(from)) {
+          select?.(props.value);
+        }
+      }}
       className={cn(
         "inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-full border border-transparent px-3 text-label whitespace-nowrap text-muted-foreground transition-colors duration-150 select-none hover:text-foreground focus-visible:focus-ring [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
         "data-[state=on]:border-border data-[state=on]:bg-card data-[state=on]:text-foreground",

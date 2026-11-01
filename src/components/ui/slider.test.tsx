@@ -100,4 +100,29 @@ describe("Slider", () => {
     fireEvent.keyDown(screen.getByRole("slider"), { key: "PageUp" });
     expect(onValueChange).not.toHaveBeenCalled();
   });
+
+  it("clamps a value outside the range before drawing anything from it", () => {
+    render(zoom({ defaultValue: 400 }));
+    const slider = screen.getByRole("slider") as HTMLInputElement;
+    expect(slider.value).toBe("300");
+    expect(slider.getAttribute("aria-valuetext")).toBe("300%");
+    expect(document.querySelector("output")?.textContent).toBe("300%");
+    expect(slider.style.getPropertyValue("--fill")).toContain("* 1)");
+  });
+
+  it("clamps up to min, and snaps an off-step value to the step grid", () => {
+    const { rerender } = render(zoom({ value: 20, onValueChange: () => {}, defaultValue: undefined }));
+    expect((screen.getByRole("slider") as HTMLInputElement).value).toBe("100");
+    rerender(zoom({ value: 147, onValueChange: () => {}, defaultValue: undefined }));
+    const slider = screen.getByRole("slider") as HTMLInputElement;
+    expect(slider.value).toBe("150");
+    expect(slider.getAttribute("aria-valuetext")).toBe("150%");
+  });
+
+  it("computes Page Up from the clamped value, not the raw one", () => {
+    const onValueChange = vi.fn();
+    render(zoom({ value: 150 + 500, onValueChange, defaultValue: undefined }));
+    fireEvent.keyDown(screen.getByRole("slider"), { key: "PageDown" });
+    expect(onValueChange).toHaveBeenCalledExactlyOnceWith(200);
+  });
 });
