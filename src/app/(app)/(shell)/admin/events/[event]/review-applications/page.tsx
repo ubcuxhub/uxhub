@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { ReviewApplicationsClient } from "@/features/admin/components/ReviewApplicationsClient";
+import { resolveAdminEventId } from "@/features/admin/lib/resolve-event-param";
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchEventById } from "@/lib/supabase-helpers/events";
@@ -14,8 +15,13 @@ export default async function ReviewApplicationsPage({
   params,
 }: ReviewApplicationsPageProps) {
   await requireAdmin();
-  const { event: eventId } = await params;
+  const { event: eventParam } = await params;
   const supabase = await createClient();
+  const eventId = await resolveAdminEventId(
+    supabase,
+    eventParam,
+    "/review-applications"
+  );
   const [event, applications] = await Promise.all([
     fetchEventById(supabase, eventId),
     fetchEventApplicationSummaries(supabase, eventId),

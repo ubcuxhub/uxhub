@@ -4,6 +4,7 @@ import {
   ApplicationReviewClient,
   type AdminApplicationResponse,
 } from "@/features/admin/components/ApplicationReviewClient";
+import { resolveAdminEventId } from "@/features/admin/lib/resolve-event-param";
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -13,6 +14,7 @@ import {
 import { fetchUserEventTicket } from "@/lib/supabase-helpers/event-tickets";
 import { fetchEventById } from "@/lib/supabase-helpers/events";
 import { fetchUserInfoContactById } from "@/lib/supabase-helpers/users";
+import { isUuid } from "@/lib/uuid";
 
 interface ApplicationReviewPageProps {
   params: Promise<{ event: string; applicationId: string }>;
@@ -22,8 +24,16 @@ export default async function ApplicationReviewPage({
   params,
 }: ApplicationReviewPageProps) {
   await requireAdmin();
-  const { event: eventId, applicationId } = await params;
+  const { event: eventParam, applicationId } = await params;
+  // `applicationId` is queried against a uuid column too, so a malformed one
+  // is a 404 rather than a thrown Postgres error.
+  if (!isUuid(applicationId)) notFound();
   const supabase = await createClient();
+  const eventId = await resolveAdminEventId(
+    supabase,
+    eventParam,
+    `/review-applications/${applicationId}`
+  );
   const application = await fetchEventApplicationById(supabase, applicationId);
 
   if (!application || application.event_id !== eventId) notFound();
