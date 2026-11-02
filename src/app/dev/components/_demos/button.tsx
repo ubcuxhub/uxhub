@@ -11,8 +11,6 @@ import {
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { IconButton } from "@/components/ui/icon-button";
-import { Spinner } from "@/components/ui/spinner";
 
 import { Specimen, SpecimenGroup } from "@/app/dev/_shell/Specimen";
 
@@ -21,7 +19,7 @@ const ICON_VARIANTS = ["primary", "secondary", "destructive", "ghost"] as const;
 const SIZES = ["md", "sm"] as const;
 const ICON_SIZES = ["icon", "icon-sm"] as const;
 
-function Buttons() {
+function ButtonDemo() {
   return (
     <div className="flex flex-col gap-8">
       <SpecimenGroup
@@ -309,20 +307,6 @@ function Buttons() {
             <Link href="/dev/components">Link as button</Link>
           </Button>
         </Specimen>
-        <Specimen label="IconButton (hover for tooltip)">
-          <IconButton label="Edit user">
-            <Pencil />
-          </IconButton>
-          <IconButton label="Close" variant="ghost">
-            <X />
-          </IconButton>
-          <IconButton label="Close" size="icon-sm">
-            <X />
-          </IconButton>
-          <IconButton label="Add" disabled>
-            <Plus />
-          </IconButton>
-        </Specimen>
         <Specimen label="full width (w-full)" wide>
           <Button className="w-full">Continue to payment</Button>
         </Specimen>
@@ -332,23 +316,8 @@ function Buttons() {
           </Button>
         </Specimen>
       </SpecimenGroup>
-
-      <SpecimenGroup
-        title="Spinner"
-        description="Decorative by default (aria-hidden). With a label it is a status region."
-        min="8rem"
-      >
-        {(["sm", "md", "lg"] as const).map((size) => (
-          <Specimen key={size} label={`size=${size}`}>
-            <Spinner size={size} />
-          </Specimen>
-        ))}
-        <Specimen label="label=“Loading events”">
-          <Spinner label="Loading events" />
-        </Specimen>
-      </SpecimenGroup>
     </div>
   );
 }
 
-export default Buttons;
+export default ButtonDemo;
