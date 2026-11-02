@@ -1,7 +1,6 @@
 "use client";
 
 import { useId, useState } from "react";
-import { CalendarClock, History, LayoutList } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -14,12 +13,7 @@ import {
   FieldSet,
   FieldTitle,
 } from "@/components/ui/field";
-import { FilterChip, FilterChipGroup } from "@/components/ui/filter-chip";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import {
-  SegmentedToggle,
-  SegmentedToggleItem,
-} from "@/components/ui/segmented-toggle";
 
 import { Composition, Specimen, SpecimenGroup } from "@/app/dev/_shell/Specimen";
 
@@ -165,77 +159,7 @@ function RadioInForm() {
   );
 }
 
-function ControlledToggle() {
-  const [value, setValue] = useState("upcoming");
-  return (
-    <div className="flex flex-col gap-2">
-      <SegmentedToggle aria-label="Show events" value={value} onValueChange={setValue}>
-        <SegmentedToggleItem value="upcoming">Upcoming</SegmentedToggleItem>
-        <SegmentedToggleItem value="past">Past</SegmentedToggleItem>
-      </SegmentedToggle>
-      <span className="text-label text-muted-foreground">value: {value}</span>
-    </div>
-  );
-}
-
-function StatefulChip({
-  label,
-  count,
-  defaultPressed,
-  disabled,
-}: {
-  label: string;
-  count?: number;
-  defaultPressed?: boolean;
-  disabled?: boolean;
-}) {
-  return (
-    <FilterChip count={count} defaultPressed={defaultPressed} disabled={disabled}>
-      {label}
-    </FilterChip>
-  );
-}
-
-const STATUS_CHIPS = [
-  { key: "pending", label: "Pending", count: 12 },
-  { key: "accepted", label: "Accepted", count: 4 },
-  { key: "waitlisted", label: "Waitlisted", count: 2 },
-  { key: "not-selected", label: "Not selected", count: 9 },
-] as const;
-
-function StatusFilters() {
-  const [active, setActive] = useState<string[]>(["pending"]);
-  return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-      <FilterChipGroup aria-label="Filter applications by status">
-        {STATUS_CHIPS.map((chip) => (
-          <FilterChip
-            key={chip.key}
-            count={chip.count}
-            pressed={active.includes(chip.key)}
-            onPressedChange={(on) =>
-              setActive((prev) =>
-                on ? [...prev, chip.key] : prev.filter((key) => key !== chip.key),
-              )
-            }
-          >
-            {chip.label}
-          </FilterChip>
-        ))}
-      </FilterChipGroup>
-      <Button
-        variant="ghost"
-        size="sm"
-        disabled={active.length === 0}
-        onClick={() => setActive([])}
-      >
-        Clear filters
-      </Button>
-    </div>
-  );
-}
-
-function ChoiceControls() {
+function RadioGroupDemo() {
   return (
     <div className="flex flex-col gap-8">
       <SpecimenGroup
@@ -303,98 +227,6 @@ function ChoiceControls() {
         </Specimen>
       </SpecimenGroup>
 
-      <SpecimenGroup
-        title="SegmentedToggle"
-        spec="§3.2"
-        description="Two or three options that switch a view and never submit. The selected option can’t be deselected. Arrows move focus; Space or Enter selects."
-        min="17rem"
-      >
-        <Specimen label="Upcoming / Past, controlled">
-          <ControlledToggle />
-        </Specimen>
-        <Specimen label="three options">
-          <SegmentedToggle aria-label="Application view" defaultValue="all">
-            <SegmentedToggleItem value="all">All</SegmentedToggleItem>
-            <SegmentedToggleItem value="mine">Assigned to me</SegmentedToggleItem>
-            <SegmentedToggleItem value="done">Reviewed</SegmentedToggleItem>
-          </SegmentedToggle>
-        </Specimen>
-        <Specimen label="with icons">
-          <SegmentedToggle aria-label="Event layout" defaultValue="timeline">
-            <SegmentedToggleItem value="timeline">
-              <CalendarClock aria-hidden />
-              Timeline
-            </SegmentedToggleItem>
-            <SegmentedToggleItem value="list">
-              <LayoutList aria-hidden />
-              List
-            </SegmentedToggleItem>
-            <SegmentedToggleItem value="past">
-              <History aria-hidden />
-              Past
-            </SegmentedToggleItem>
-          </SegmentedToggle>
-        </Specimen>
-        <Specimen label="one option disabled">
-          <SegmentedToggle aria-label="Event layout, one disabled" defaultValue="upcoming">
-            <SegmentedToggleItem value="upcoming">Upcoming</SegmentedToggleItem>
-            <SegmentedToggleItem value="past">Past</SegmentedToggleItem>
-            <SegmentedToggleItem value="drafts" disabled>
-              Drafts
-            </SegmentedToggleItem>
-          </SegmentedToggle>
-        </Specimen>
-        <Specimen label="all disabled">
-          <SegmentedToggle aria-label="Disabled toggle" defaultValue="upcoming" disabled>
-            <SegmentedToggleItem value="upcoming">Upcoming</SegmentedToggleItem>
-            <SegmentedToggleItem value="past">Past</SegmentedToggleItem>
-          </SegmentedToggle>
-        </Specimen>
-        <Specimen label="className=&quot;w-full&quot;: options share the width" wide>
-          <SegmentedToggle
-            aria-label="Full width toggle"
-            defaultValue="upcoming"
-            className="w-full sm:max-w-sm"
-          >
-            <SegmentedToggleItem value="upcoming">Upcoming</SegmentedToggleItem>
-            <SegmentedToggleItem value="past">Past</SegmentedToggleItem>
-          </SegmentedToggle>
-        </Specimen>
-      </SpecimenGroup>
-
-      <SpecimenGroup
-        title="FilterChip"
-        spec="§3.3"
-        description="Toggles a filter on a list; several can be on at once. Selected shows a check as well as the tint. Space or Enter flips aria-pressed."
-        min="14rem"
-      >
-        <Specimen label="off">
-          <StatefulChip label="Workshops" />
-        </Specimen>
-        <Specimen label="on">
-          <StatefulChip label="In person" defaultPressed />
-        </Specimen>
-        <Specimen label="off, with count">
-          <StatefulChip label="Workshops" count={4} />
-        </Specimen>
-        <Specimen label="on, with count">
-          <StatefulChip label="Workshops" count={4} defaultPressed />
-        </Specimen>
-        <Specimen label="disabled">
-          <StatefulChip label="Hybrid" disabled />
-        </Specimen>
-        <Specimen label="disabled, on">
-          <StatefulChip label="Hybrid" defaultPressed disabled />
-        </Specimen>
-      </SpecimenGroup>
-
-      <Composition
-        title="Application status filters"
-        description="A FilterChipGroup with counts, and a ghost “Clear filters” beside it. The chips combine."
-      >
-        <StatusFilters />
-      </Composition>
-
       <Composition
         title="Radio inside a form"
         description="The value reaches FormData through Radix’s hidden input. Nothing auto-submits; the form’s button does."
@@ -405,4 +237,4 @@ function ChoiceControls() {
   );
 }
 
-export default ChoiceControls;
+export default RadioGroupDemo;
