@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { STANDALONE } from "@/app/dev/_shell/standalone";
 
+import { dataEntries } from "./data";
 import { DEMO_LOADERS } from "./demos";
 import { ENTRIES, ENTRY_GROUPS, ORDERED } from "./index";
 import { legacyRedirect, resolveSection } from "./resolve";
@@ -92,24 +93,24 @@ describe("legacyRedirect", () => {
   });
 
   it("takes the first value of a repeated param", () => {
-    expect(legacyRedirect({ section: ["lists", "buttons"], theme: ["dark", "light"] })).toBe(
-      "/dev/components/lists?theme=dark",
-    );
+    expect(
+      legacyRedirect({ section: ["foundations", "templates"], theme: ["dark", "light"] }),
+    ).toBe("/dev/foundations?theme=dark");
   });
 });
 
 describe("aliases", () => {
   it("redirect to the entry that claims them, at its anchor", async () => {
-    const withAlias = await importWithAlias({ id: "old-card", hash: "card" });
-    expect(withAlias.resolveSection("old-card")).toBe(
-      "/dev/components/surfaces#card",
+    const withAlias = await importWithAlias({ id: "old-id", hash: "part" });
+    expect(withAlias.resolveSection("old-id")).toBe(
+      `/dev/components/${ALIAS_TARGET}#part`,
     );
     expect(
-      withAlias.legacyRedirect({ section: "old-card", theme: "dark" }),
-    ).toBe("/dev/components/surfaces?theme=dark#card");
+      withAlias.legacyRedirect({ section: "old-id", theme: "dark" }),
+    ).toBe(`/dev/components/${ALIAS_TARGET}?theme=dark#part`);
 
-    const bare = await importWithAlias({ id: "old-surfaces" });
-    expect(bare.resolveSection("old-surfaces")).toBe("/dev/components/surfaces");
+    const bare = await importWithAlias({ id: "old-bare" });
+    expect(bare.resolveSection("old-bare")).toBe(`/dev/components/${ALIAS_TARGET}`);
   });
 });
 
@@ -163,17 +164,17 @@ describe("registry", () => {
 
 // --- Helpers ------------------------------------------------------------------
 
-/**
- * The registry with one alias added to `surfaces`, for testing the alias path
- * before any real entry has one.
- */
+/** The `data` shard entry the alias tests attach to, so renames there don't break them. */
+const ALIAS_TARGET = dataEntries[0].slug;
+
+/** The registry with one test alias added to `ALIAS_TARGET`. */
 async function importWithAlias(alias: { id: string; hash?: string }) {
   vi.resetModules();
   vi.doMock("./data", async (importOriginal) => {
     const original = await importOriginal<typeof import("./data")>();
     return {
       dataEntries: original.dataEntries.map((entry) =>
-        entry.slug === "surfaces" ? { ...entry, aliases: [alias] } : entry,
+        entry.slug === ALIAS_TARGET ? { ...entry, aliases: [alias] } : entry,
       ),
     };
   });

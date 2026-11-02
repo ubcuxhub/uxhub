@@ -1,5 +1,3 @@
-import { ExternalLink } from "lucide-react";
-
 import { Avatar, AvatarGroup, type AvatarSize } from "@/components/ui/avatar";
 
 import { Composition, Specimen, SpecimenGroup } from "@/app/dev/_shell/Specimen";
@@ -21,7 +19,7 @@ const BROKEN_SRC = "data:image/png;base64,AAAA";
 const GROUP_SIZES = [24, 32, 40] as const;
 const GROUP_COUNTS = [3, 4, 6] as const;
 
-function Section() {
+function AvatarDemo() {
   return (
     <div className="flex flex-col gap-8">
       <SpecimenGroup
@@ -119,30 +117,6 @@ function Section() {
       </SpecimenGroup>
 
       <Composition
-        title="List row (§4.1)"
-        description="64px avatar, 18px name, role · company, and a link labelled with the person."
-      >
-        <div className="flex flex-col gap-3 rounded-lg border border-border-subtle bg-section p-4">
-          <div className="flex items-center gap-4">
-            <Avatar name="Alex Chen" src="/people/david.jpg" size={64} decorative />
-            <div className="flex min-w-0 flex-1 flex-col">
-              <span className="text-subheading">Alex Chen</span>
-              <span className="text-small text-muted-foreground">
-                Senior product designer · Acme
-              </span>
-            </div>
-            <a
-              href="#list-row"
-              className="inline-flex items-center gap-1 text-small text-primary underline-offset-4 hover:underline"
-            >
-              Alex Chen on LinkedIn
-              <ExternalLink className="size-4" aria-hidden />
-            </a>
-          </div>
-        </div>
-      </Composition>
-
-      <Composition
         title="Reviewer note header"
         description="32px avatar, name and time."
       >
@@ -156,4 +130,4 @@ function Section() {
   );
 }
 
-export default Section;
+export default AvatarDemo;

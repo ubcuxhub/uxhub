@@ -1,40 +1,9 @@
+import { ExternalLink } from "lucide-react";
+
 import { ListCard, ListRow } from "@/components/shared/ListRow";
-import { SponsorLogoGrid } from "@/components/shared/SponsorLogoGrid";
+import { Avatar } from "@/components/ui/avatar";
 
 import { Composition } from "@/app/dev/_shell/Specimen";
-
-const SPONSORS = [
-  {
-    name: "Google Cloud",
-    href: "https://cloud.google.com",
-    logoSrc: "/sponsor-logos/googlecloud.png",
-  },
-  {
-    name: "Microsoft",
-    href: "https://microsoft.com",
-    logoSrc: "/sponsor-logos/microsoft.png",
-  },
-  {
-    name: "Notion",
-    href: "https://notion.so",
-    logoSrc: "/sponsor-logos/notion.png",
-  },
-  {
-    name: "Red Bull",
-    href: "https://redbull.com",
-    logoSrc: "/sponsor-logos/redbull.png",
-  },
-  {
-    name: "TD",
-    href: "https://td.com",
-    logoSrc: "/sponsor-logos/td.png",
-  },
-  {
-    name: "WillowTree",
-    href: "https://willowtreeapps.com",
-    logoSrc: "/sponsor-logos/willowtree.png",
-  },
-] as const;
 
 function LinkedInIcon() {
   return (
@@ -44,7 +13,7 @@ function LinkedInIcon() {
   );
 }
 
-function Section() {
+function ListRowDemo() {
   return (
     <div className="flex flex-col gap-8">
       <Composition
@@ -107,13 +76,30 @@ function Section() {
       </Composition>
 
       <Composition
-        title="Sponsor logo grid"
-        description="Five columns on desktop, three from 600px and two on mobile. Brand artwork stays on a white tile in both themes."
+        title="List row (§4.1)"
+        description="64px avatar, 18px name, role · company, and a link labelled with the person."
       >
-        <SponsorLogoGrid sponsors={SPONSORS} />
+        <div className="flex flex-col gap-3 rounded-lg border border-border-subtle bg-section p-4">
+          <div className="flex items-center gap-4">
+            <Avatar name="Alex Chen" src="/people/david.jpg" size={64} decorative />
+            <div className="flex min-w-0 flex-1 flex-col">
+              <span className="text-subheading">Alex Chen</span>
+              <span className="text-small text-muted-foreground">
+                Senior product designer · Acme
+              </span>
+            </div>
+            <a
+              href="#list-row"
+              className="inline-flex items-center gap-1 text-small text-primary underline-offset-4 hover:underline"
+            >
+              Alex Chen on LinkedIn
+              <ExternalLink className="size-4" aria-hidden />
+            </a>
+          </div>
+        </div>
       </Composition>
     </div>
   );
 }
 
-export default Section;
+export default ListRowDemo;

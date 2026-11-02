@@ -1,14 +1,14 @@
 "use client";
 
 import { Download, Ellipsis, ListFilter } from "lucide-react";
-import { useId, useState } from "react";
+import { useState } from "react";
 
 import { TableToolbar } from "@/components/shared/TableToolbar";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { Pagination } from "@/components/ui/pagination";
 import { SearchField } from "@/components/ui/search-field";
-import { StatusBadge, type Status } from "@/components/ui/status-badge";
+import { StatusBadge } from "@/components/ui/status-badge";
 import {
   Table,
   TableBody,
@@ -27,29 +27,7 @@ import { useRowSelection } from "@/hooks/use-row-selection";
 
 import { Composition, Specimen, SpecimenGroup } from "@/app/dev/_shell/Specimen";
 
-interface User {
-  id: string;
-  name: string;
-  email: string;
-  membership: string | null;
-  major: string | null;
-  status: Status;
-}
-
-const USERS: User[] = [
-  { id: "u1", name: "Alex Chen", email: "alex.chen@student.ubc.ca", membership: "Innovator", major: "Cognitive Systems", status: "going" },
-  { id: "u2", name: "Priya Raman", email: "priya.raman@student.ubc.ca", membership: "Innovator", major: "Psychology", status: "checked_in" },
-  { id: "u3", name: "Jordan Lee", email: "jordan.lee@gmail.com", membership: null, major: "Business", status: "waitlisted" },
-  { id: "u4", name: "Sam Okafor", email: "sam.okafor@student.ubc.ca", membership: "Explorer", major: null, status: "pending" },
-  { id: "u5", name: "Mei Tanaka", email: "mei.tanaka@student.ubc.ca", membership: "Explorer", major: "Computer Science", status: "accepted" },
-  { id: "u6", name: "Noah Williams", email: "noah.w@student.ubc.ca", membership: null, major: "Design", status: "not_selected" },
-  { id: "u7", name: "Fatima Hassan", email: "fatima.hassan@student.ubc.ca", membership: "Innovator", major: "Information Design", status: "going" },
-  { id: "u8", name: "Lucas Moreau", email: "lucas.moreau@student.ubc.ca", membership: "Explorer", major: "Cognitive Systems", status: "full" },
-  { id: "u9", name: "Hana Kim", email: "hana.kim@student.ubc.ca", membership: null, major: null, status: "past" },
-  { id: "u10", name: "Omar Aziz", email: "omar.aziz@student.ubc.ca", membership: "Innovator", major: "Psychology", status: "going" },
-  { id: "u11", name: "Ivy Zhang", email: "ivy.zhang@student.ubc.ca", membership: "Explorer", major: "Business", status: "registration_open" },
-  { id: "u12", name: "Diego Alvarez", email: "diego.alvarez@student.ubc.ca", membership: null, major: "Computer Science", status: "waitlisted" },
-];
+import { USERS } from "./_fixtures/users";
 
 const PAGE_SIZE = 5;
 
@@ -243,112 +221,9 @@ function EmptyTable() {
   );
 }
 
-function SearchFieldSpecimens() {
-  const typedId = useId();
-  const [counted, setCounted] = useState("des");
-  const count = counted
-    ? USERS.filter((u) => u.name.toLowerCase().includes(counted.toLowerCase()) || u.major?.toLowerCase().includes(counted.toLowerCase())).length
-    : USERS.length;
-
-  return (
-    <SpecimenGroup
-      title="SearchField"
-      spec="§3.16"
-      description="Fills its container. The clear button appears once there's text; Esc clears too, and only then."
-      min="min(18rem, 100%)"
-    >
-      <Specimen label="Empty">
-        <SearchField label="Search users" placeholder="Search users" />
-      </Specimen>
-      <Specimen label="Typed, with clear button">
-        <SearchField
-          id={typedId}
-          label="Search events"
-          placeholder="Search events"
-          defaultValue="portfolio"
-        />
-      </Specimen>
-      <Specimen label="Disabled">
-        <SearchField label="Search users" placeholder="Search users" disabled />
-      </Specimen>
-      <Specimen label="Announces the result count (screen readers hear “n results”)">
-        <SearchField
-          label="Search people"
-          placeholder="Search people"
-          value={counted}
-          onValueChange={setCounted}
-          resultCount={count}
-        />
-        <p className="text-small text-muted-foreground tabular-nums">{count} results</p>
-      </Specimen>
-    </SpecimenGroup>
-  );
-}
-
-function SelectedToolbar() {
-  return (
-    <TableToolbar
-      search={<SearchField label="Search users" placeholder="Search users" />}
-      selectedCount={2}
-      bulkActions={
-        <Button variant="secondary" size="sm">
-          <Download aria-hidden />
-          Export to CSV
-        </Button>
-      }
-      onClearSelection={() => {}}
-    />
-  );
-}
-
-function DataTable() {
+function TableDemo() {
   return (
     <div className="flex flex-col gap-10">
-      <SearchFieldSpecimens />
-
-      <SpecimenGroup
-        title="TableToolbar"
-        spec="§3.16"
-        description="Search fills the row; Sort and filter sits on the right until rows are selected."
-        min="100%"
-      >
-        <Specimen label="Default" wide bare>
-          <TableToolbar
-            className="w-full"
-            search={<SearchField label="Search users" placeholder="Search users" />}
-            actions={
-              <Button variant="secondary" size="sm">
-                <ListFilter aria-hidden />
-                Sort and filter
-              </Button>
-            }
-          />
-        </Specimen>
-        <Specimen label="Searching" wide bare>
-          <TableToolbar
-            className="w-full"
-            search={
-              <SearchField
-                label="Search users"
-                placeholder="Search users"
-                defaultValue="alex"
-              />
-            }
-            actions={
-              <Button variant="secondary" size="sm">
-                <ListFilter aria-hidden />
-                Sort and filter
-              </Button>
-            }
-          />
-        </Specimen>
-        <Specimen label="Rows selected" wide bare>
-          <div className="w-full">
-            <SelectedToolbar />
-          </div>
-        </Specimen>
-      </SpecimenGroup>
-
       <Composition
         title="Manage Users"
         description="Search, tick rows, page, and open a row. The header checkbox selects every row in the current results, across pages; Export follows the selection."
@@ -393,4 +268,4 @@ function DataTable() {
   );
 }
 
-export default DataTable;
+export default TableDemo;

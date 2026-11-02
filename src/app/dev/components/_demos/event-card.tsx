@@ -3,6 +3,7 @@
 import { EventCard, EventCardDates } from "@/components/shared/EventCard";
 import { STATUSES, type Status } from "@/components/ui/status-badge";
 import { EventTimeline } from "@/features/events/components/EventTimeline";
+import { MarketingEventCard } from "@/features/marketing/components/MarketingEventCard";
 import {
   datetimeLocalToTimestamptz,
   formatEventDateTimeLines,
@@ -12,7 +13,7 @@ import type { EventRow } from "@/lib/supabase/models";
 
 import { Composition, Specimen, SpecimenGroup } from "@/app/dev/_shell/Specimen";
 
-const HREF = "/dev/components/events";
+const HREF = "/dev/components/event-card";
 // Inline art, so the gallery needs no network and the crop is easy to judge.
 const ART_A = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 160'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%233A5FC4'/%3E%3Cstop offset='1' stop-color='%23B67FC6'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='160' height='160' fill='url%28%23g%29'/%3E%3Ccircle cx='118' cy='46' r='26' fill='white' fill-opacity='.25'/%3E%3Crect x='24' y='96' width='88' height='40' rx='12' fill='white' fill-opacity='.2'/%3E%3C/svg%3E";
 const ART_B = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 160'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23325DC4'/%3E%3Cstop offset='1' stop-color='%237C9CE3'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='160' height='160' fill='url%28%23g%29'/%3E%3Ccircle cx='118' cy='46' r='26' fill='white' fill-opacity='.25'/%3E%3Crect x='24' y='96' width='88' height='40' rx='12' fill='white' fill-opacity='.2'/%3E%3C/svg%3E";
@@ -107,11 +108,53 @@ const MEMBER_STATUS: Record<string, Status> = {
   "figma-workshop": "going",
 };
 
+const EVENT: EventRow = {
+  agenda: null,
+  created_at: "2026-09-01T00:00:00Z",
+  description:
+    "A 24-hour design sprint. Teams of four ship a prototype with feedback from industry mentors.",
+  description_images: null,
+  ends_at: "2026-11-15T18:00:00Z",
+  event_type: "flagship",
+  id: "00000000-0000-0000-0000-000000000001",
+  image_url: "/about-us-1.png",
+  location_address_url: null,
+  location_building: "Henry Angus",
+  location_room: "098",
+  max_capacity: 120,
+  member_price: 10,
+  mentors_enabled: true,
+  name: "UXathon 2026",
+  publish_at: null,
+  registration_closes_at: null,
+  registration_opens_at: null,
+  regular_price: 25,
+  requires_application: true,
+  short_description: "A 24-hour design sprint with mentors from industry.",
+  slug: "uxathon-2026",
+  sponsors_enabled: true,
+  starts_at: "2026-11-14T18:00:00Z",
+  status: "active",
+  updated_at: "2026-09-01T00:00:00Z",
+};
+
+const FREE_EVENT: EventRow = {
+  ...EVENT,
+  id: "00000000-0000-0000-0000-000000000002",
+  name: "Portfolio review night with a very long event title that clamps",
+  image_url: null,
+  regular_price: 0,
+  member_price: 0,
+  short_description: null,
+  slug: "portfolio-review",
+  event_type: "regular",
+};
+
 function Dates({ lines }: { lines: readonly EventDateLine[] }) {
   return <EventCardDates lines={lines} />;
 }
 
-function Section() {
+function EventCardDemo() {
   return (
     <div className="flex flex-col gap-8">
       <SpecimenGroup
@@ -201,6 +244,25 @@ function Section() {
         ))}
       </SpecimenGroup>
 
+      <SpecimenGroup
+        title="MarketingEventCard"
+        description="As on the marketing /events page: image or placeholder, priced footer or link. The portal card is EventCard, in Event cards and timeline."
+        min="20rem"
+      >
+        <Specimen label="image, priced (member price)" bare>
+          <MarketingEventCard event={EVENT} className="w-full max-w-sm" />
+        </Specimen>
+        <Specimen label="no image, free, long title" bare>
+          <MarketingEventCard event={FREE_EVENT} className="w-full max-w-sm" />
+        </Specimen>
+        <Specimen label="linked (href)" bare>
+          <MarketingEventCard event={EVENT} href="/dev/components" className="w-full max-w-sm" />
+        </Specimen>
+        <Specimen label="clickable (onClick)" bare>
+          <MarketingEventCard event={FREE_EVENT} onClick={() => {}} className="w-full max-w-sm" />
+        </Specimen>
+      </SpecimenGroup>
+
       <Composition
         title="EventTimeline (the portal's timeline)"
         description="The real portal component on fixture events, with a badge per card from statusFor. Upcoming, grouped by month: a date marker on the dashed rail, then the card. Turn on Show Past Events to see the past list. On phones the rail hides and the date sits above the card."
@@ -233,4 +295,4 @@ function Section() {
   );
 }
 
-export default Section;
+export default EventCardDemo;
