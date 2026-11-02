@@ -12,7 +12,7 @@ import { SidePeekDrawer, SidePeekDrawerBody, SidePeekDrawerContent, SidePeekDraw
 import { DetailList, DetailRow } from "@/components/shared/DetailRow";
 import { TransactionRow } from "@/components/shared/TransactionRow";
 
-import { Composition, Specimen, SpecimenGroup } from "@/app/dev/_shell/Specimen";
+import { Composition } from "@/app/dev/_shell/Specimen";
 import type { SectionProps } from "@/app/dev/_shell/types";
 
 const PEOPLE = [
@@ -20,7 +20,7 @@ const PEOPLE = [
   { name: "Alex Chen", email: "alex.chen@example.com", membership: "Explorer" },
 ] as const;
 
-function Section({ open: initialState }: SectionProps) {
+function SidePeekDrawerDemo({ open: initialState }: SectionProps) {
   const [open, setOpen] = useState(Boolean(initialState));
   const [personIndex, setPersonIndex] = useState(0);
   const [savedNames, setSavedNames] = useState<string[]>(PEOPLE.map((person) => person.name));
@@ -53,22 +53,6 @@ function Section({ open: initialState }: SectionProps) {
 
   return (
     <div className="flex flex-col gap-8">
-      <SpecimenGroup title="Read-only record parts" spec="§3.15" min="min(28rem, 100%)" description="Details are text, not disabled fields. Transactions show a sign, colour and spoken charge or credit cue.">
-        <Specimen label="Detail rows" bare>
-          <DetailList className="rounded-xl border border-border-subtle bg-card px-4">
-            <DetailRow label="Email">jane.smith@example.com</DetailRow>
-            <DetailRow label="Phone" />
-            <DetailRow label="Membership">Innovator</DetailRow>
-          </DetailList>
-        </Specimen>
-        <Specimen label="Payment and credit" bare>
-          <div className="flex w-full flex-col gap-3">
-            <TransactionRow title="2026–27 membership" description="Innovator" amountCents={-1500} date="Sept 27, 2026" media={membershipMedia} />
-            <TransactionRow title="UXathon 2025 · First place" description="Competition award" amountCents={10000} date="Jan 14, 2025" media={awardMedia} />
-          </div>
-        </Specimen>
-      </SpecimenGroup>
-
       <Composition title="Manage Users" description="Open a person, edit their name, or select another row while the panel is open. Escape and Close return focus to the selected row; unsaved edits ask before closing.">
         <div className="max-w-2xl rounded-xl border border-border-subtle bg-card p-4">
           <h3 className="mb-3 text-subheading">Members</h3>
@@ -167,4 +151,4 @@ function Section({ open: initialState }: SectionProps) {
   );
 }
 
-export default Section;
+export default SidePeekDrawerDemo;

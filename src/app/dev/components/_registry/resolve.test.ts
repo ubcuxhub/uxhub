@@ -44,7 +44,7 @@ describe("resolveSection", () => {
   });
 
   it("sends component ids to their component page", () => {
-    expect(resolveSection("buttons")).toBe("/dev/components/buttons");
+    expect(resolveSection("buttons")).toBe("/dev/components/button");
     expect(resolveSection("side-peek-drawer")).toBe(
       "/dev/components/side-peek-drawer",
     );
@@ -79,7 +79,7 @@ describe("legacyRedirect", () => {
         density: "compact",
         open: "dialog",
       }),
-    ).toBe("/dev/components/overlays?theme=split&density=compact&open=dialog");
+    ).toBe("/dev/components/dialog?theme=split&density=compact&open=dialog");
     expect(
       legacyRedirect(new URLSearchParams("section=templates&open=events-frame&theme=dark")),
     ).toBe("/dev/templates?theme=dark&open=events-frame");
@@ -88,7 +88,7 @@ describe("legacyRedirect", () => {
   it("drops invalid and unrelated params, as the pages do", () => {
     expect(
       legacyRedirect({ section: "buttons", theme: "sepia", density: "cosy", x: "1" }),
-    ).toBe("/dev/components/buttons");
+    ).toBe("/dev/components/button");
   });
 
   it("takes the first value of a repeated param", () => {

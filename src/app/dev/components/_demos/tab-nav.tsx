@@ -5,7 +5,7 @@ import { Specimen, SpecimenGroup } from "@/app/dev/_shell/Specimen";
 const EVENT = "/admin/events/uxathon-2026";
 
 /**
- * `usePathname()` is `/dev/components/route-tabs` here, so every specimen pins
+ * `usePathname()` is `/dev/components/tab-nav` here, so every specimen pins
  * the page it pretends to be on through `pathname`. Link clicks navigate away
  * from the gallery, which is expected.
  */
@@ -29,7 +29,7 @@ function EventPages({
   );
 }
 
-function RouteTabs() {
+function TabNavDemo() {
   return (
     <div className="flex flex-col gap-8">
       <SpecimenGroup
@@ -83,4 +83,4 @@ function RouteTabs() {
   );
 }
 
-export default RouteTabs;
+export default TabNavDemo;
