@@ -3,21 +3,13 @@
 import { useId, useState } from "react";
 
 import { DateField, TimeField } from "@/components/ui/date-time-field";
-import { DatePicker } from "@/components/ui/date-picker";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
-import { TimePicker } from "@/components/ui/time-picker";
-import {
-  timeOptions,
-  type IsoDate,
-  type WallTime,
-} from "@/lib/date-input";
+import type { IsoDate, WallTime } from "@/lib/date-input";
 
 import { Composition, Specimen, SpecimenGroup } from "@/app/dev/_shell/Specimen";
 import type { SectionProps } from "@/app/dev/_shell/types";
 
-/** Fixed, so the gallery looks the same on any day. A Sunday, like Figma's. */
-const TODAY: IsoDate = "2026-11-04";
-const DATE: IsoDate = "2026-11-14";
+import { DATE, TODAY } from "./_fixtures/date-time";
 
 /** Room under a field for its popover when that state is forced open. */
 const openRoom = "min-h-[27rem] items-start";
@@ -128,7 +120,7 @@ function EventSchedule({ ids }: { ids: [string, string, string] }) {
   );
 }
 
-function DateTime({ open }: SectionProps) {
+function DateTimeFieldDemo({ open }: SectionProps) {
   const uid = useId();
   const id = (name: string) => `${uid}-${name}`;
   const [picked, setPicked] = useState<IsoDate | null>(DATE);
@@ -316,39 +308,6 @@ function DateTime({ open }: SectionProps) {
         </Specimen>
       </SpecimenGroup>
 
-      <SpecimenGroup
-        title="Pickers"
-        spec="§3.11"
-        description="The popover panels on their own, as they look when open. Today is Nov 4, 2026."
-        min="min(22rem, 100%)"
-      >
-        <Specimen label="DatePicker: today, selected" bare>
-          <div className="overlay-surface w-82 max-w-full rounded-2xl p-4">
-            <DatePicker value={DATE} onValueChange={() => {}} today="2026-11-01" />
-          </div>
-        </Specimen>
-        <Specimen label="DatePicker: out of range (min = today)" bare>
-          <div className="overlay-surface w-82 max-w-full rounded-2xl p-4">
-            <DatePicker value={DATE} onValueChange={() => {}} today={TODAY} min={TODAY} />
-          </div>
-        </Specimen>
-        <Specimen label="TimePicker: start" bare>
-          <div className="overlay-surface w-60 rounded-2xl p-2">
-            <TimePicker options={timeOptions()} value="09:00" onValueChange={() => {}} />
-          </div>
-        </Specimen>
-        <Specimen label="TimePicker: end, after 10:00 AM, with durations" bare>
-          <div className="overlay-surface w-60 rounded-2xl p-2">
-            <TimePicker
-              options={timeOptions({ after: "10:00" })}
-              value="12:00"
-              onValueChange={() => {}}
-              activeIndex={9}
-            />
-          </div>
-        </Specimen>
-      </SpecimenGroup>
-
       <Composition
         title="Event schedule"
         description="Start date, start time and end time on one row. The end time is read after the start: set the start to 9:00 AM and type “11” for 11:00 AM. It starts out before the start time to show the error."
@@ -359,4 +318,4 @@ function DateTime({ open }: SectionProps) {
   );
 }
 
-export default DateTime;
+export default DateTimeFieldDemo;
