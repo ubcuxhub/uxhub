@@ -55,7 +55,7 @@ describe("ListRow", () => {
 
   // jsdom has no layout, so these pin the classes that keep the row inside a
   // 375px card; the overflow itself was checked in the browser (gallery,
-  // /dev/components?section=lists, at 375px).
+  // /dev/components/lists, at 375px).
   it("uses a bounded text track and no fixed-width wrapping link", () => {
     render(
       <ul>
