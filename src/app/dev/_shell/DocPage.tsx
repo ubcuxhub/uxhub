@@ -114,7 +114,11 @@ export function DocPage(
         {importLine || source ? (
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             {importLine ? (
-              <CopyCode code={importLine} label="Copy import line" />
+              // A flex item won't shrink below its content without min-w-0,
+              // so a long import line would widen the page on phones.
+              <div className="min-w-0 max-w-full">
+                <CopyCode code={importLine} label="Copy import line" />
+              </div>
             ) : null}
             {source ? (
               <Button asChild variant="secondary" size="sm">
