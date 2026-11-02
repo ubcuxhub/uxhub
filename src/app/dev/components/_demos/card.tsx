@@ -1,20 +1,6 @@
-"use client";
+import { Pencil } from "lucide-react";
 
-import {
-  CircleAlert,
-  CircleCheck,
-  CircleMinus,
-  Hourglass,
-  Info,
-  Pencil,
-  Tag,
-  TriangleAlert,
-} from "lucide-react";
-
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { IconButton } from "@/components/ui/icon-button";
 import {
   Card,
   CardAction,
@@ -25,37 +11,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
-import { STATUSES, StatusBadge, type Status } from "@/components/ui/status-badge";
+import { IconButton } from "@/components/ui/icon-button";
+import { StatusBadge, type Status } from "@/components/ui/status-badge";
 
 import { Composition, Specimen, SpecimenGroup } from "@/app/dev/_shell/Specimen";
-
-const TONES = ["success", "warning", "error", "info", "neutral", "tag"] as const;
-
-const ALIASES = [
-  { alias: "default", tone: "info" },
-  { alias: "secondary", tone: "neutral" },
-  { alias: "destructive", tone: "error" },
-  { alias: "outline", tone: "tag" },
-] as const;
-
-const TONE_ICONS = {
-  success: CircleCheck,
-  warning: Hourglass,
-  error: CircleAlert,
-  info: Info,
-  neutral: CircleMinus,
-  tag: Tag,
-} as const;
-
-/** Tones callers still compose by hand (AdminEventsTable, EventTicket); their classes win. */
-const CALLER_TONES = [
-  { variant: "outline", label: "outline + bg-success", cls: "border-transparent bg-success text-success-foreground" },
-  { variant: "secondary", label: "secondary + bg-success", cls: "bg-success text-success-foreground" },
-  { variant: "destructive", label: "destructive (Draft)", cls: "" },
-  { variant: "outline", label: "outline + info tag", cls: "border-info-foreground bg-info text-info-foreground" },
-] as const;
 
 const ROWS: {
   name: string;
@@ -164,93 +123,9 @@ function TableInCard({ density }: { density?: "compact" }) {
   );
 }
 
-/** Skeleton rows shaped like the table rows above (§3.6: skeleton rows, never a spinner). */
-function SkeletonRows() {
-  return (
-    <Card className="w-full gap-0 py-0">
-      <ul className="divide-y divide-border-subtle" aria-busy="true" aria-label="Loading attendees">
-        {[0, 1, 2].map((i) => (
-          <li key={i} className="flex h-(--size-table-row) items-center gap-3 px-6">
-            <Skeleton className="size-4 shrink-0 rounded-sm" />
-            <div className="flex flex-1 flex-col gap-1.5">
-              <Skeleton className="h-3.5 w-32" />
-              <Skeleton className="h-3 w-44" />
-            </div>
-            <Skeleton className="hidden h-3.5 w-16 sm:block" />
-            <Skeleton className="h-5 w-20 rounded-full" />
-            <Skeleton className="hidden h-3.5 w-12 sm:block" />
-            <Skeleton className="h-8 w-14 rounded-full" />
-          </li>
-        ))}
-      </ul>
-    </Card>
-  );
-}
-
-function Surfaces() {
+function CardDemo() {
   return (
     <div className="flex flex-col gap-8">
-      <SpecimenGroup
-        title="Badge"
-        spec="§3.3, §3.15"
-        description="One variant prop. Default and large, each with and without a 14px icon."
-        min="12rem"
-      >
-        {TONES.map((tone) => {
-          const Icon = TONE_ICONS[tone];
-          return (
-            <Specimen key={tone} label={tone}>
-              <Badge variant={tone}>Label</Badge>
-              <Badge variant={tone}>
-                <Icon aria-hidden />
-                Label
-              </Badge>
-              <Badge variant={tone} size="large">
-                Label
-              </Badge>
-              <Badge variant={tone} size="large">
-                <Icon aria-hidden />
-                Label
-              </Badge>
-            </Specimen>
-          );
-        })}
-      </SpecimenGroup>
-
-      <SpecimenGroup
-        title="Badge aliases"
-        description="The shadcn names still work and map to a tone, so no call site changes."
-        min="12rem"
-      >
-        {ALIASES.map(({ alias, tone }) => (
-          <Specimen key={alias} label={`${alias} = ${tone}`}>
-            <Badge variant={alias}>Label</Badge>
-            <Badge variant={tone}>Label</Badge>
-          </Specimen>
-        ))}
-        {CALLER_TONES.map(({ variant, label, cls }) => (
-          <Specimen key={label} label={`caller: ${label}`}>
-            <Badge variant={variant} className={cls}>
-              Label
-            </Badge>
-          </Specimen>
-        ))}
-      </SpecimenGroup>
-
-      <SpecimenGroup
-        title="StatusBadge"
-        spec="§3.3, §4.3"
-        description="The nine statuses: tone, icon and label, default and large."
-        min="min(19rem, 100%)"
-      >
-        {STATUSES.map((status) => (
-          <Specimen key={status} label={status}>
-            <StatusBadge status={status} />
-            <StatusBadge status={status} size="large" />
-          </Specimen>
-        ))}
-      </SpecimenGroup>
-
       <SpecimenGroup
         title="Card"
         spec="§3.5"
@@ -310,87 +185,6 @@ function Surfaces() {
         </Specimen>
       </SpecimenGroup>
 
-      <SpecimenGroup
-        title="Alert"
-        spec="§3.8"
-        description="warning, info and destructive, each with a 16px icon and a title."
-        min="min(22rem, 100%)"
-      >
-        <Specimen label="warning" bare>
-          <Alert className="w-full" variant="warning" icon={<TriangleAlert />}>
-            <AlertTitle>Membership ends Apr 30</AlertTitle>
-            <AlertDescription>
-              Your membership expires at the end of the term.
-            </AlertDescription>
-          </Alert>
-        </Specimen>
-        <Specimen label="info" bare>
-          <Alert className="w-full" variant="info" icon={<Info />}>
-            <AlertTitle>Applications close Nov 1</AlertTitle>
-            <AlertDescription>You can edit until then.</AlertDescription>
-          </Alert>
-        </Specimen>
-        <Specimen label="destructive" bare>
-          <Alert className="w-full" variant="destructive" icon={<CircleAlert />}>
-            <AlertTitle>Payment failed</AlertTitle>
-            <AlertDescription>Your card was declined.</AlertDescription>
-          </Alert>
-        </Specimen>
-        <Specimen label="no title (as MembershipCheckout uses it)" bare>
-          <Alert className="w-full" variant="info" icon={<Info />}>
-            A short notice with an icon and no title.
-          </Alert>
-        </Specimen>
-        <Specimen label="no icon" bare>
-          <Alert className="w-full">Draft: only admins can see this.</Alert>
-        </Specimen>
-      </SpecimenGroup>
-
-      <SpecimenGroup title="Separator" spec="§2.1" min="14rem">
-        <Specimen label="horizontal">
-          <Separator />
-        </Specimen>
-        <Specimen label="vertical">
-          <div className="flex h-8 items-center gap-3 text-small">
-            Events
-            <Separator orientation="vertical" />
-            Members
-            <Separator orientation="vertical" />
-            Settings
-          </div>
-        </Specimen>
-      </SpecimenGroup>
-
-      <SpecimenGroup
-        title="Skeleton"
-        spec="§3.6"
-        description="Shapes stay with callers; the primitive is a pulsing, aria-hidden block."
-        min="16rem"
-      >
-        <Specimen label="text lines">
-          <div className="flex w-full flex-col gap-2">
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-1/2" />
-          </div>
-        </Specimen>
-        <Specimen label="avatar + lines">
-          <div className="flex w-full items-center gap-3">
-            <Skeleton className="size-10 shrink-0 rounded-full" />
-            <div className="flex flex-1 flex-col gap-2">
-              <Skeleton className="h-4 w-1/2" />
-              <Skeleton className="h-3 w-3/4" />
-            </div>
-          </div>
-        </Specimen>
-        <Specimen label="card">
-          <Skeleton className="h-24 w-full rounded-xl" />
-        </Specimen>
-        <Specimen label="table rows (same row height and columns as the composition below)" bare wide>
-          <SkeletonRows />
-        </Specimen>
-      </SpecimenGroup>
-
       <Composition
         title="Table in a card"
         description="A raw table in a Card with its pagination line, in both densities."
@@ -412,4 +206,4 @@ function Surfaces() {
   );
 }
 
-export default Surfaces;
+export default CardDemo;
