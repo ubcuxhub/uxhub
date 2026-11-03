@@ -36,7 +36,6 @@ function TabNavDemo() {
         title="TabNav"
         spec="§3.4"
         description="Pages of one object, one route each. It looks like Tabs but is a nav of links: the current one carries aria-current=page, Tab moves between them, and there are no arrow keys. Exact links match only their own path; the others also match anything below them."
-        min="min(22rem, 100%)"
       >
         <Specimen label="Overview active (exact)">
           <EventPages pathname={EVENT} />

@@ -112,9 +112,8 @@ function SortFilterPanelDemo({ open }: SectionProps) {
         title="SortFilterPanel"
         spec="§3.16"
         description="Filters apply immediately; the trigger and footer report the current result."
-        min="20rem"
       >
-        <Specimen label="Sort and filter (?open=sort-filter)" bare>
+        <Specimen label="Sort and filter (?open=sort-filter)">
           <div className="flex min-h-16 items-start">
             <Filters defaultOpen={open === "sort-filter"} />
           </div>

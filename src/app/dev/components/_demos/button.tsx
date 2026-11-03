@@ -26,7 +26,6 @@ function ButtonDemo() {
         title="Button · variant × size"
         spec="§3.1"
         description="md is 40px (44px on phones, matching inputs), sm is 32px. Link has no height or padding. Hover, pressed and focus are checked interactively (or in the forced-state group below)."
-        min="9rem"
       >
         {VARIANTS.flatMap((variant) =>
           SIZES.map((size) => (
@@ -51,7 +50,6 @@ function ButtonDemo() {
       <SpecimenGroup
         title="Button · with icon"
         description="16px icon (14px at sm), 8px gap (6px at sm). Leading and trailing."
-        min="12rem"
       >
         {VARIANTS.filter((v) => v !== "link").flatMap((variant) =>
           SIZES.map((size) => (
@@ -95,7 +93,6 @@ function ButtonDemo() {
       <SpecimenGroup
         title="Button · row alignment"
         description="Every size in one row: edges should line up on the centre line."
-        min="100%"
       >
         <Specimen label="md, sm, icon, icon-sm side by side" wide>
           <Button>Primary</Button>
@@ -131,7 +128,6 @@ function ButtonDemo() {
       <SpecimenGroup
         title="Button · hover and pressed (forced)"
         description="The hover and pressed fills applied by class, so they can be reviewed without a pointer. Real hover and pressed use the same tokens."
-        min="10rem"
       >
         <Specimen label="primary / hover">
           <Button className="bg-primary-hover">Label</Button>
@@ -192,7 +188,6 @@ function ButtonDemo() {
       <SpecimenGroup
         title="Button · disabled"
         description="Disabled fill, edge and label tokens. Ghost and link only grey the label."
-        min="9rem"
       >
         {VARIANTS.flatMap((variant) =>
           SIZES.map((size) => (
@@ -225,7 +220,6 @@ function ButtonDemo() {
       <SpecimenGroup
         title="Button · loading"
         description="The spinner replaces the label in place and the width does not change. The button keeps its colours and is disabled with aria-busy."
-        min="9rem"
       >
         {VARIANTS.filter((v) => v !== "link").flatMap((variant) =>
           SIZES.map((size) => (
@@ -254,7 +248,7 @@ function ButtonDemo() {
         </Specimen>
       </SpecimenGroup>
 
-      <SpecimenGroup title="Button · aliases" min="9rem">
+      <SpecimenGroup title="Button · aliases">
         <Specimen label="default (= primary)">
           <Button variant="default">Label</Button>
         </Specimen>
@@ -276,7 +270,7 @@ function ButtonDemo() {
         </Specimen>
       </SpecimenGroup>
 
-      <SpecimenGroup title="Button · other" min="12rem">
+      <SpecimenGroup title="Button · other">
         <Specimen label="secondary icon / aria-pressed=true">
           <Button
             variant="secondary"

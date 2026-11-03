@@ -15,7 +15,7 @@ import type { SectionProps } from "@/app/dev/_shell/types";
 function TooltipDemo({ open }: SectionProps) {
   return (
     <div className="flex flex-col gap-8">
-      <SpecimenGroup title="Tooltip" spec="§3.7" min="14rem">
+      <SpecimenGroup title="Tooltip" spec="§3.7">
         <Specimen label="Tooltip (?open=tooltip)">
           <div className="flex gap-2">
             <Tooltip defaultOpen={open === "tooltip"}>

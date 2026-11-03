@@ -21,9 +21,8 @@ function SliderDemo() {
         title="Slider"
         spec="§3.17"
         description="A native range input: arrows ±1 step, Page Up/Down ±10 steps, Home/End. The value reads out on the right and as aria-valuetext."
-        min="19rem"
       >
-        <Specimen label="Default · 140%">
+        <Specimen label="Default · 140%" className="w-64">
           <div className="flex w-full items-center gap-4">
             <span id={id("zoom-default")} className="text-label">
               Zoom
@@ -38,7 +37,7 @@ function SliderDemo() {
             />
           </div>
         </Specimen>
-        <Specimen label="Focus (ring forced on)">
+        <Specimen label="Focus (ring forced on)" className="w-64">
           <div className="flex w-full items-center gap-4">
             <span id={id("zoom-focus")} className="text-label">
               Zoom
@@ -54,7 +53,7 @@ function SliderDemo() {
             />
           </div>
         </Specimen>
-        <Specimen label="Disabled">
+        <Specimen label="Disabled" className="w-64">
           <div className="flex w-full items-center gap-4">
             <span id={id("zoom-disabled")} className="text-label text-disabled-foreground">
               Zoom
@@ -70,7 +69,7 @@ function SliderDemo() {
             />
           </div>
         </Specimen>
-        <Specimen label="At min · 100% / at max · 300%">
+        <Specimen label="At min · 100% / at max · 300%" className="w-64">
           <div className="flex w-full flex-col">
             <Slider
               aria-label="Zoom at minimum"

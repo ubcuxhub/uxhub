@@ -43,15 +43,15 @@ function AsyncExample() {
 
 function SearchableDropdownSection({ open }: SectionProps) {
   return <div className="flex flex-col gap-10">
-    <SpecimenGroup title="SearchableDropdown" spec="§3.13" description="A 40px pill field for long lists. Arrow keys keep focus in the input; Enter chooses; Escape closes, then clears the query. The menu announces its result count." min="18rem">
-      <Specimen label="Closed"><Single /></Specimen>
-      <Specimen label="Typing (?open=typing)"><Single forcedQuery={open === "typing" ? "pri" : undefined} /></Specimen>
-      <Specimen label="No results (?open=no-results)"><Single forcedQuery={open === "no-results" ? "xyz" : undefined} /></Specimen>
-      <Specimen label="Chosen"><Single initial="priya" /></Specimen>
-      <Specimen label="Multiple"><Multiple /></Specimen>
-      <Specimen label="Async search"><AsyncExample /></Specimen>
-      <Specimen label="Invalid"><SearchableDropdown options={people} placeholder="Search members" aria-label="Invalid judge" aria-invalid value={null} onValueChange={() => {}} /></Specimen>
-      <Specimen label="Disabled"><SearchableDropdown options={people} placeholder="Search members" aria-label="Disabled judge" disabled value={null} onValueChange={() => {}} /></Specimen>
+    <SpecimenGroup title="SearchableDropdown" spec="§3.13" description="A 40px pill field for long lists. Arrow keys keep focus in the input; Enter chooses; Escape closes, then clears the query. The menu announces its result count.">
+      <Specimen label="Closed" className="w-64"><Single /></Specimen>
+      <Specimen label="Typing (?open=typing)" className="w-64"><Single forcedQuery={open === "typing" ? "pri" : undefined} /></Specimen>
+      <Specimen label="No results (?open=no-results)" className="w-64"><Single forcedQuery={open === "no-results" ? "xyz" : undefined} /></Specimen>
+      <Specimen label="Chosen" className="w-64"><Single initial="priya" /></Specimen>
+      <Specimen label="Multiple" className="w-64"><Multiple /></Specimen>
+      <Specimen label="Async search" className="w-64"><AsyncExample /></Specimen>
+      <Specimen label="Invalid" className="w-64"><SearchableDropdown options={people} placeholder="Search members" aria-label="Invalid judge" aria-invalid value={null} onValueChange={() => {}} /></Specimen>
+      <Specimen label="Disabled" className="w-64"><SearchableDropdown options={people} placeholder="Search members" aria-label="Disabled judge" disabled value={null} onValueChange={() => {}} /></Specimen>
     </SpecimenGroup>
     <Composition title="Judges field" description="Multiple selection keeps chosen judges visible while searching for more."><label className="mb-2 block text-body-medium text-foreground">Judges</label><Multiple /></Composition>
   </div>;

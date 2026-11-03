@@ -10,7 +10,6 @@ function BackButtonDemo() {
         title="BackButton"
         spec="§4.5"
         description="40px pill, 20px side padding, 16px arrow, 8px gap. Rendered by PageContainer and by feature pages with a backHref."
-        min="16rem"
       >
         <Specimen label="BackButton, named parent">
           <BackButton link="/dev/components" label="Back to Events" />
@@ -38,10 +37,9 @@ function BackButtonDemo() {
         title="PageContainer"
         spec="§2.3"
         description="Top 40px on desktop and tablet, 32px on mobile; sides 20 / 24 / 64. The back pill sits 24px above the title. Shown in a frame, so check the mobile preset too."
-        min="100%"
       >
-        <Specimen label="with backHref" bare>
-          <div className="w-full overflow-hidden rounded-xl border border-dashed border-border bg-section">
+        <Specimen label="with backHref" wide>
+          <div className="w-full overflow-hidden rounded-xl border border-dashed border-border bg-background">
             <PageContainer backHref="/dev/components" backLabel="Back to Events">
               <h3 className="text-h2">Page title</h3>
               <p className="mt-2 text-body text-muted-foreground">

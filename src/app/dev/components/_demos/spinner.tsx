@@ -11,7 +11,6 @@ function SpinnerDemo() {
         title="Spinner"
         spec="§3.1"
         description="Decorative by default (aria-hidden). With a label it is a status region."
-        min="8rem"
       >
         {(["sm", "md", "lg"] as const).map((size) => (
           <Specimen key={size} label={`size=${size}`}>

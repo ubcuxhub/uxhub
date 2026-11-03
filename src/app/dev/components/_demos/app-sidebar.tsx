@@ -72,21 +72,21 @@ function AppSidebarDemo() {
   return (
     <div className="flex flex-col gap-8">
       <SpecimenGroup
+        surface="page"
         title="Sidebar"
         spec="§3.4"
         description="AppSidebarNav with fixture flags. Members see Browse; admins add Admin; managers add Club Settings. Collapsed is the 88px icon rail."
-        min="18rem"
       >
-        <Specimen label="Member · Home selected" bare>
+        <Specimen label="Member · Home selected">
           <SidebarOnly isAdmin={false} isManager={false} pathname="/portal" />
         </Specimen>
-        <Specimen label="Admin · Manage Events selected" bare>
+        <Specimen label="Admin · Manage Events selected">
           <SidebarOnly isAdmin isManager={false} pathname="/admin/events/new" />
         </Specimen>
-        <Specimen label="Manager · Club Settings selected" bare>
+        <Specimen label="Manager · Club Settings selected">
           <SidebarOnly isAdmin isManager pathname="/admin/settings" />
         </Specimen>
-        <Specimen label="Admin · collapsed (88px)" bare>
+        <Specimen label="Admin · collapsed (88px)">
           <SidebarOnly
             defaultOpen={false}
             isAdmin
@@ -101,7 +101,7 @@ function AppSidebarDemo() {
         description="The shell: AppSidebarNav beside a page title and a card, expanded and collapsed."
       >
         <div className="grid gap-6">
-          <Specimen label="Expanded" bare>
+          <Specimen label="Expanded">
             <div className="w-full">
               <SidebarFrame>
                 <SidebarProvider defaultOpen>
@@ -111,7 +111,7 @@ function AppSidebarDemo() {
               </SidebarFrame>
             </div>
           </Specimen>
-          <Specimen label="Collapsed (88px icon rail)" bare>
+          <Specimen label="Collapsed (88px icon rail)">
             <div className="w-full">
               <SidebarFrame>
                 <SidebarProvider defaultOpen={false}>

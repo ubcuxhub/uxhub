@@ -29,9 +29,8 @@ function TableToolbarDemo() {
         title="TableToolbar"
         spec="§3.16"
         description="Search fills the row; Sort and filter sits on the right until rows are selected."
-        min="100%"
       >
-        <Specimen label="Default" wide bare>
+        <Specimen label="Default" wide>
           <TableToolbar
             className="w-full"
             search={<SearchField label="Search users" placeholder="Search users" />}
@@ -43,7 +42,7 @@ function TableToolbarDemo() {
             }
           />
         </Specimen>
-        <Specimen label="Searching" wide bare>
+        <Specimen label="Searching" wide>
           <TableToolbar
             className="w-full"
             search={
@@ -61,7 +60,7 @@ function TableToolbarDemo() {
             }
           />
         </Specimen>
-        <Specimen label="Rows selected" wide bare>
+        <Specimen label="Rows selected" wide>
           <div className="w-full">
             <SelectedToolbar />
           </div>

@@ -71,7 +71,6 @@ function FilterChipDemo() {
         title="FilterChip"
         spec="§3.3"
         description="Toggles a filter on a list; several can be on at once. Selected shows a check as well as the tint. Space or Enter flips aria-pressed."
-        min="14rem"
       >
         <Specimen label="off">
           <StatefulChip label="Workshops" />

@@ -65,9 +65,8 @@ function SidebarDemo() {
         title="Sidebar rows"
         spec="§3.4"
         description="Row states: default, selected with a badge, disabled. 44px rows, 20px icons in text/secondary with a 12px gap, no weight change when selected."
-        min="18rem"
       >
-        <Specimen label="Default, selected + badge, disabled" bare>
+        <Specimen label="Default, selected + badge, disabled" className="w-72">
           <RowStates />
         </Specimen>
       </SpecimenGroup>

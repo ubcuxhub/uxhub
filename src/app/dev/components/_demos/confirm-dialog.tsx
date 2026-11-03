@@ -96,7 +96,6 @@ function ConfirmDialogDemo({ open }: SectionProps) {
         title="ConfirmDialog"
         spec="§3.7, §2.9"
         description="Plain, typed challenge, pending and error. In the typed one, type a wrong value for the mismatch state and uxathon-2026 for the match. Portaled, so check each in theme=light and theme=dark, and on the mobile preset for the fullscreen layout."
-        min="14rem"
       >
         <ConfirmDialogs open={open} />
       </SpecimenGroup>

@@ -33,16 +33,15 @@ function SkeletonDemo() {
         title="Skeleton"
         spec="§3.6"
         description="Shapes stay with callers; the primitive is a pulsing, aria-hidden block."
-        min="16rem"
       >
-        <Specimen label="text lines">
+        <Specimen label="text lines" className="w-64">
           <div className="flex w-full flex-col gap-2">
             <Skeleton className="h-4 w-3/4" />
             <Skeleton className="h-4 w-full" />
             <Skeleton className="h-4 w-1/2" />
           </div>
         </Specimen>
-        <Specimen label="avatar + lines">
+        <Specimen label="avatar + lines" className="w-64">
           <div className="flex w-full items-center gap-3">
             <Skeleton className="size-10 shrink-0 rounded-full" />
             <div className="flex flex-1 flex-col gap-2">
@@ -51,10 +50,10 @@ function SkeletonDemo() {
             </div>
           </div>
         </Specimen>
-        <Specimen label="card">
+        <Specimen label="card" className="w-64">
           <Skeleton className="h-24 w-full rounded-xl" />
         </Specimen>
-        <Specimen label="table rows (same row height and columns as the table in a card on the Card page)" bare wide>
+        <Specimen label="table rows (same row height and columns as the table in a card on the Card page)" wide>
           <SkeletonRows />
         </Specimen>
       </SpecimenGroup>

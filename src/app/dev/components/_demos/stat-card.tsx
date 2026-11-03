@@ -9,10 +9,9 @@ function StatCardDemo() {
         title="StatCard"
         spec="§3.5"
         description="A dashboard number, its neutral context, and honest empty and loading states."
-        min="9rem"
-        className="grid-cols-2 lg:grid-cols-4"
+        className="items-stretch"
       >
-        <Specimen label="Value" bare className="h-full">
+        <Specimen label="Value" className="w-56">
           <StatCard
             className="h-full w-full"
             label="Active members"
@@ -21,7 +20,7 @@ function StatCardDemo() {
             change={{ delta: 24, period: "since last term" }}
           />
         </Specimen>
-        <Specimen label="Rate" bare className="h-full">
+        <Specimen label="Rate" className="w-56">
           <StatCard
             className="h-full w-full"
             label="Active members"
@@ -31,7 +30,7 @@ function StatCardDemo() {
             noun="registrants"
           />
         </Specimen>
-        <Specimen label="Not enough data" bare className="h-full">
+        <Specimen label="Not enough data" className="w-56">
           <StatCard
             className="h-full w-full"
             label="Active members"
@@ -39,7 +38,7 @@ function StatCardDemo() {
             reason="Fewer than 3 sponsors this term."
           />
         </Specimen>
-        <Specimen label="Loading" bare className="h-full">
+        <Specimen label="Loading" className="w-56">
           <StatCard
             className="h-full w-full"
             label="Active members"

@@ -33,7 +33,7 @@ function CheckboxDemo() {
 
   return (
     <div className="flex flex-col gap-8">
-      <SpecimenGroup title="Checkbox" spec="§3.2" min="13rem">
+      <SpecimenGroup title="Checkbox" spec="§3.2">
         <Specimen label="unchecked">
           <Checkbox aria-label="Unchecked" />
         </Specimen>

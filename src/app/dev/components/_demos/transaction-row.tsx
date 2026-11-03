@@ -13,12 +13,12 @@ function TransactionRowDemo() {
   return (
     <div className="flex flex-col gap-8">
       <SpecimenGroup
+        surface="page"
         title="Payment and credit"
         spec="§3.15"
-        min="min(28rem, 100%)"
         description="Transactions show a sign, colour and spoken charge or credit cue."
       >
-        <Specimen label="Payment and credit" bare>
+        <Specimen label="Payment and credit" className="w-md">
           <div className="flex w-full flex-col gap-3">
             <TransactionRow
               title="2026–27 membership"

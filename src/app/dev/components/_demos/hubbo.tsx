@@ -14,7 +14,6 @@ function HubboDemo() {
       <SpecimenGroup
         title="Hubbo"
         spec="§5.2"
-        min="min(38rem, 100%)"
         description="Sized by height: hero 240px and card 120px show full-body art; inline 32px and head 40px show head-only art. Each pose keeps its own aspect ratio."
       >
         {HUBBO_EMOTIONS.map((emotion) => (

@@ -12,12 +12,12 @@ function ActionBannerDemo() {
   return (
     <div className="flex flex-col gap-8">
       <SpecimenGroup
+        surface="page"
         title="ActionBanner"
         spec="§3.8, §4.3"
-        min="min(24rem, 100%)"
         description="At the top of Home or an event page, one at a time. The button names the step. Not an alert: it is present at load and does not interrupt."
       >
-        <Specimen label="Accepted, with action" bare wide>
+        <Specimen label="Accepted, with action" wide>
           <ActionBanner
             className="w-full"
             title="You’re accepted to Design Sprint."
@@ -26,7 +26,7 @@ function ActionBannerDemo() {
             Confirm your spot by Nov 14.
           </ActionBanner>
         </Specimen>
-        <Specimen label="Join banner" bare wide>
+        <Specimen label="Join banner" wide>
           <ActionBanner
             className="w-full"
             title="Become a member"
@@ -35,12 +35,12 @@ function ActionBannerDemo() {
             Get member pricing and priority on event applications.
           </ActionBanner>
         </Specimen>
-        <Specimen label="No action" bare wide>
+        <Specimen label="No action" wide>
           <ActionBanner className="w-full" title="Application submitted.">
             We’ll email you when decisions are out.
           </ActionBanner>
         </Specimen>
-        <Specimen label="Long copy" bare>
+        <Specimen label="Long copy" wide>
           <ActionBanner
             className="w-full"
             title="You’re accepted to the UXathon 2026 design sprint with a very long title that wraps"

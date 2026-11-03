@@ -12,14 +12,13 @@ function TimePickerDemo() {
         title="TimePicker"
         spec="§3.11"
         description="The popover list on its own, as it looks when open. TimeField (see Date and time fields) wraps it for typing."
-        min="min(22rem, 100%)"
       >
-        <Specimen label="TimePicker: start" bare>
+        <Specimen label="TimePicker: start">
           <div className="overlay-surface w-60 rounded-2xl p-2">
             <TimePicker options={timeOptions()} value="09:00" onValueChange={() => {}} />
           </div>
         </Specimen>
-        <Specimen label="TimePicker: end, after 10:00 AM, with durations" bare>
+        <Specimen label="TimePicker: end, after 10:00 AM, with durations">
           <div className="overlay-surface w-60 rounded-2xl p-2">
             <TimePicker
               options={timeOptions({ after: "10:00" })}

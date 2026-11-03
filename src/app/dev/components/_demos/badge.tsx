@@ -37,7 +37,6 @@ function BadgeDemo() {
         title="Badge"
         spec="§3.3, §3.15"
         description="One variant prop. Default and large, each with and without a 14px icon."
-        min="12rem"
       >
         {TONES.map((tone) => {
           const Icon = TONE_ICONS[tone];
@@ -63,7 +62,6 @@ function BadgeDemo() {
       <SpecimenGroup
         title="Badge aliases"
         description="The shadcn names still work and map to a tone, so no call site changes."
-        min="12rem"
       >
         {ALIASES.map(({ alias, tone }) => (
           <Specimen key={alias} label={`${alias} = ${tone}`}>

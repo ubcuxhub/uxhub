@@ -21,7 +21,6 @@ function SheetDemo({ open }: SectionProps) {
         title="Sheet"
         spec="§3.15"
         description="Side drawers. The sidebar uses the left sheet on phones."
-        min="14rem"
       >
         <Specimen label="Sheet · right (?open=sheet-right)">
           <Sheet defaultOpen={open === "sheet-right"}>
