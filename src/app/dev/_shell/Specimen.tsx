@@ -46,11 +46,12 @@ export function SpecimenGroup({
         ) : null}
       </div>
       {/* The padding follows the stage's own width, so a Side by side column
-          gets the phone padding. */}
+          gets the phone padding. Specimens stretch to their row's height, so
+          components line up along the top and captions along the bottom. */}
       <div className="@container min-w-0">
         <div
           className={cn(
-            "flex min-w-0 flex-wrap items-end justify-center gap-x-10 gap-y-8 rounded-2xl px-4 py-6 @lg:p-8",
+            "flex min-w-0 flex-wrap items-stretch justify-center gap-x-10 gap-y-8 rounded-2xl px-4 py-6 @lg:p-8",
             surface === "section"
               ? "bg-section"
               : "border border-border-subtle bg-background",
@@ -82,12 +83,12 @@ export function Specimen({
     <figure
       data-specimen={label}
       className={cn(
-        "m-0 flex min-w-0 max-w-full flex-col items-center gap-3",
+        "m-0 flex min-w-0 max-w-full flex-col items-center justify-between gap-3",
         wide && "basis-full",
         className,
       )}
     >
-      <div className="flex w-full min-w-0 flex-1 flex-wrap items-center justify-center gap-3">
+      <div className="flex w-full min-w-0 flex-wrap items-center justify-center gap-3">
         {children}
       </div>
       <figcaption className="max-w-full text-center text-label text-muted-foreground">
