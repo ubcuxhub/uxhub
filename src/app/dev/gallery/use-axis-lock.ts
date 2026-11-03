@@ -47,18 +47,45 @@ export function wheelDelta(
   return { dx, dy };
 }
 
+/**
+ * How far a wheel gesture moves before its axis is final. The first events of
+ * a trackpad swipe are small and noisy, so judging by the first one alone
+ * locks a slightly crooked swipe to the wrong axis.
+ */
+export const DECIDE_PX = 24;
+/**
+ * After the axis is final, the other axis takes over only when the gesture
+ * clearly goes that way: this far, and this many times the locked movement.
+ */
+const SWITCH_PX = 48;
+const SWITCH_RATIO = 2;
+
 export interface WheelLock {
   axis: Axis | null;
   /** Time of the last wheel event, in ms. */
   last: number;
+  /** Whether the gesture has moved far enough for its axis to hold. */
+  settled: boolean;
+  /** Movement since the gesture (or its last switch) began. */
+  x: number;
+  y: number;
 }
 
-export const NO_LOCK: WheelLock = { axis: null, last: -Infinity };
+export const NO_LOCK: WheelLock = {
+  axis: null,
+  last: -Infinity,
+  settled: false,
+  x: 0,
+  y: 0,
+};
+
+const otherAxis = (axis: Axis): Axis => (axis === "x" ? "y" : "x");
 
 /**
  * The lock after one more wheel event. A gesture starts after `idle` ms of
- * quiet and takes the axis of its first movement; within it the axis holds,
- * however the fingers drift.
+ * quiet. Until it has moved `DECIDE_PX` it follows whichever way it mostly
+ * goes so far; then the axis holds through drift and momentum, unless the
+ * other axis clearly takes over.
  */
 export function lockWheel(
   lock: WheelLock,
@@ -67,8 +94,35 @@ export function lockWheel(
   now: number,
   idle = GESTURE_IDLE_MS,
 ): WheelLock {
-  if (lock.axis && now - lock.last < idle) return { axis: lock.axis, last: now };
-  return { axis: dominantAxis(dx, dy), last: now };
+  const fresh = now - lock.last >= idle;
+  const x = (fresh ? 0 : lock.x) + dx;
+  const y = (fresh ? 0 : lock.y) + dy;
+
+  if (fresh || !lock.settled || !lock.axis) {
+    return {
+      axis: dominantAxis(x, y),
+      last: now,
+      settled: Math.hypot(x, y) >= DECIDE_PX,
+      x,
+      y,
+    };
+  }
+
+  const along = Math.abs(lock.axis === "x" ? x : y);
+  const across = Math.abs(lock.axis === "x" ? y : x);
+  if (across >= SWITCH_PX && across >= SWITCH_RATIO * along) {
+    return { axis: otherAxis(lock.axis), last: now, settled: true, x: 0, y: 0 };
+  }
+  return { ...lock, last: now, x, y };
+}
+
+/** Whether `el` can still scroll `amount` along `axis`. */
+function canScroll(el: HTMLElement, axis: Axis, amount: number) {
+  if (amount === 0) return false;
+  const position = axis === "x" ? el.scrollLeft : el.scrollTop;
+  const room =
+    axis === "x" ? el.scrollWidth - el.clientWidth : el.scrollHeight - el.clientHeight;
+  return amount > 0 ? position < room - 1 : position > 0;
 }
 
 /**
@@ -204,11 +258,19 @@ export function useAxisLockedScroll(
       const { dx, dy } = wheelDelta(event, page());
       wheel = lockWheel(wheel, dx, dy, event.timeStamp);
       if (!wheel.axis) return;
-      const amount = wheel.axis === "x" ? dx : dy;
-      if (innerScrollerTakes(event.target, el, wheel.axis, amount)) return;
+      let axis = wheel.axis;
+      let amount = axis === "x" ? dx : dy;
+      if (innerScrollerTakes(event.target, el, axis, amount)) return;
+      // At an edge the locked axis has nowhere to go: rather than a dead
+      // swipe, let the other axis carry the movement it has.
+      const across = axis === "x" ? dy : dx;
+      if (!canScroll(el, axis, amount) && canScroll(el, otherAxis(axis), across)) {
+        axis = otherAxis(axis);
+        amount = across;
+      }
       event.preventDefault();
       stopGlide();
-      move(wheel.axis, amount);
+      move(axis, amount);
     }
 
     function onKeyDown(event: KeyboardEvent) {

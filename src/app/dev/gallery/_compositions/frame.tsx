@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 
 /**
  * The gallery's card: the real `Card`, with a hairline edge and a very soft
- * shadow so it lifts off the dot grid. Compositions that are a surface of
+ * shadow so it lifts off the canvas. Compositions that are a surface of
  * their own (a ticket, the membership card) skip it.
  */
 export function Panel({ className, ...props }: ComponentProps<typeof Card>) {

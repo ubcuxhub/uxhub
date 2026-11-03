@@ -50,16 +50,33 @@ describe("lockWheel", () => {
     expect(lockWheel(NO_LOCK, 30, 2, 0).axis).toBe("x");
   });
 
-  it("holds the axis while the gesture continues, however it drifts", () => {
+  it("holds the axis while the gesture continues and drifts", () => {
     let lock = lockWheel(NO_LOCK, 2, 30, 0);
-    lock = lockWheel(lock, 50, 1, 40);
-    lock = lockWheel(lock, 80, 0, 80);
+    lock = lockWheel(lock, 12, 20, 40);
+    lock = lockWheel(lock, 15, 10, 80);
     expect(lock.axis).toBe("y");
+  });
+
+  it("doesn't let a noisy first event decide the axis", () => {
+    // A vertical swipe that starts with a sideways twitch.
+    let lock = lockWheel(NO_LOCK, 3, 1, 0);
+    expect(lock.axis).toBe("x");
+    lock = lockWheel(lock, 1, 8, 16);
+    lock = lockWheel(lock, 1, 20, 32);
+    expect(lock.axis).toBe("y");
+    expect(lock.settled).toBe(true);
+  });
+
+  it("switches when the other axis clearly takes over", () => {
+    let lock = lockWheel(NO_LOCK, 2, 30, 0);
+    lock = lockWheel(lock, 30, 2, 40);
+    lock = lockWheel(lock, 40, 0, 80);
+    expect(lock.axis).toBe("x");
   });
 
   it("starts a new gesture after the idle gap", () => {
     let lock = lockWheel(NO_LOCK, 2, 30, 0);
-    lock = lockWheel(lock, 40, 2, 100);
+    lock = lockWheel(lock, 20, 2, 100);
     expect(lock.axis).toBe("y");
     lock = lockWheel(lock, 40, 2, 100 + GESTURE_IDLE_MS);
     expect(lock.axis).toBe("x");

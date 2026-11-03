@@ -26,7 +26,7 @@ function useCanvas() {
 }
 
 /**
- * The Gallery: six fixed-width columns of compositions on a dot grid. It
+ * The Gallery: six fixed-width columns of compositions on a plain canvas. It
  * overflows the window both ways, and each gesture scrolls one axis only
  * (`useAxisLockedScroll`). Phones get one column in ordinary page flow.
  */
@@ -52,7 +52,7 @@ function Gallery() {
         role="region"
         aria-label="Gallery canvas. Arrow keys scroll it; Shift with Page Up, Page Down, Home or End moves sideways."
         tabIndex={canvas ? 0 : undefined}
-        className="relative min-h-0 flex-1 bg-section bg-[radial-gradient(var(--color-border)_1px,transparent_1.5px)] bg-size-[20px_20px] bg-local outline-none focus-visible:focus-ring focus-visible:-outline-offset-2 md:cursor-grab md:overflow-auto md:overscroll-contain md:[scrollbar-width:thin] data-panning:cursor-grabbing data-panning:select-none"
+        className="relative min-h-0 flex-1 bg-section outline-none focus-visible:focus-ring focus-visible:-outline-offset-2 md:cursor-grab md:overflow-auto md:overscroll-contain md:[scrollbar-width:thin] data-panning:cursor-grabbing data-panning:select-none"
       >
         <div className="flex flex-col gap-4 px-4 py-6 md:w-max md:flex-row md:items-start md:gap-6 md:p-10">
           {COLUMNS.map((column) => (
