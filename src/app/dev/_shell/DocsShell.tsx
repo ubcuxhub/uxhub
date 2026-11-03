@@ -30,9 +30,10 @@ import { applyTheme, getStoredTheme, subscribeTheme, type Theme } from "@/lib/th
 import { cn } from "@/lib/utils";
 
 import { DocsContext } from "./context";
-import { INDEX_PATH, TOP_LINKS, type NavEntry, type NavGroup } from "./nav";
+import { filterNav, INDEX_PATH, TOP_LINKS, type NavGroup } from "./nav";
 import { OnThisPage } from "./OnThisPage";
 import { docsHref, parseDisplayParams, type DisplayParams } from "./params";
+import { isCanvasPath } from "./standalone";
 
 type Patch = Partial<DisplayParams>;
 
@@ -63,14 +64,6 @@ function useWide() {
     subscribeWide,
     () => window.matchMedia(WIDE_QUERY).matches,
     () => false,
-  );
-}
-
-function matches(entry: NavEntry, query: string) {
-  const needle = query.trim().toLowerCase();
-  if (!needle) return true;
-  return [entry.title, ...entry.keywords].some((text) =>
-    text.toLowerCase().includes(needle),
   );
 }
 
@@ -107,6 +100,7 @@ export function DocsShell({
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const contentRef = useRef<HTMLElement>(null);
+  const canvas = isCanvasPath(pathname);
 
   // Side by side only exists on wide screens; elsewhere it falls back to its
   // light column.
@@ -181,25 +175,37 @@ export function DocsShell({
             </div>
           </header>
 
-          <div
-            data-density={density === "compact" ? "compact" : undefined}
-            className="flex"
-          >
+          {canvas ? (
+            // A canvas page fills the window under its own header: no page
+            // padding, no width cap and no "On this page" rail. On phones it
+            // is ordinary page flow.
             <main
-              ref={contentRef}
-              className="min-w-0 flex-1 px-4 pt-6 pb-16 sm:px-8 md:pt-10 lg:px-12"
+              data-density={density === "compact" ? "compact" : undefined}
+              className="flex min-w-0 flex-col md:h-dvh md:overflow-hidden"
             >
-              <div className={cn("mx-auto", split ? "max-w-[1600px]" : "max-w-[1200px]")}>
-                {children}
-              </div>
+              {children}
             </main>
+          ) : (
+            <div
+              data-density={density === "compact" ? "compact" : undefined}
+              className="flex"
+            >
+              <main
+                ref={contentRef}
+                className="min-w-0 flex-1 px-4 pt-6 pb-16 sm:px-8 md:pt-10 lg:px-12"
+              >
+                <div className={cn("mx-auto", split ? "max-w-[1600px]" : "max-w-[1200px]")}>
+                  {children}
+                </div>
+              </main>
 
-            <OnThisPage
-              rootRef={contentRef}
-              watchKey={`${pathname}:${split}:${open ?? ""}`}
-              className={cn("hidden", split ? "2xl:block" : "xl:block")}
-            />
-          </div>
+              <OnThisPage
+                rootRef={contentRef}
+                watchKey={`${pathname}:${split}:${open ?? ""}`}
+                className={cn("hidden", split ? "2xl:block" : "xl:block")}
+              />
+            </div>
+          )}
         </div>
       </div>
     </DocsContext>
@@ -227,13 +233,11 @@ function Navigator({
   shownTheme: Theme;
   onNavigate: () => void;
 }) {
-  const filtered = groups
-    .map((group) => ({
-      ...group,
-      entries: group.entries.filter((entry) => matches(entry, query)),
-    }))
-    .filter((group) => group.entries.length > 0);
-  const count = filtered.reduce((sum, group) => sum + group.entries.length, 0);
+  const {
+    topLinks,
+    groups: filtered,
+    count,
+  } = filterNav(TOP_LINKS, groups, query);
   const navRef = useRef<HTMLElement>(null);
   const link = (href: string) => docsHref(href, params, { open: undefined });
 
@@ -261,18 +265,20 @@ function Navigator({
         aria-label="Components"
         className="min-h-0 flex-1 overflow-y-auto px-3 pb-4"
       >
-        <ul className="flex flex-col gap-0.5 pt-1">
-          {TOP_LINKS.map((top) => (
-            <NavItem
-              key={top.href}
-              href={link(top.href)}
-              active={pathname === top.href}
-              onNavigate={onNavigate}
-            >
-              {top.title}
-            </NavItem>
-          ))}
-        </ul>
+        {topLinks.length > 0 ? (
+          <ul className="flex flex-col gap-0.5 pt-1">
+            {topLinks.map((top) => (
+              <NavItem
+                key={top.href}
+                href={link(top.href)}
+                active={pathname === top.href}
+                onNavigate={onNavigate}
+              >
+                {top.title}
+              </NavItem>
+            ))}
+          </ul>
+        ) : null}
 
         {filtered.map((group) => (
           <div key={group.id} className="pt-4">
@@ -296,7 +302,7 @@ function Navigator({
 
         {count === 0 ? (
           <p className="px-3 pt-4 text-small text-muted-foreground">
-            No components match “{query.trim()}”.
+            Nothing matches “{query.trim()}”.
           </p>
         ) : null}
       </nav>

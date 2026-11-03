@@ -51,12 +51,15 @@ export interface DocMeta {
    * "split": rendered twice, light | dark columns, when Side by side is on.
    * "page": rendered once, in the page theme (portaled overlays, full-width
    * compositions).
+   * "canvas": rendered once under a slim header, filling the rest of the
+   * window edge to edge with no page padding or "On this page" rail (the
+   * Gallery). Phones get ordinary page flow.
    *
    * A "split" page that is given an `open` state it lists in `openStates`
    * is rendered once as "page" instead: portaled content ignores a column's
    * theme, so those are checked with `theme=light` and `theme=dark`.
    */
-  layout: "split" | "page";
+  layout: "split" | "page" | "canvas";
   /** `?open=` values the demo understands, listed as links on its page. */
   openStates?: readonly string[];
 }
