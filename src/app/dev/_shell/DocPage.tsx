@@ -32,6 +32,7 @@ const REPO_BLOB = "https://github.com/ubcuxhub/uxhub/blob/main";
 
 const PAGE_LOADERS: Record<StandaloneId, DemoLoader> = {
   foundations: () => import("../foundations/demo"),
+  gallery: () => import("../gallery/demo"),
   templates: () => import("../templates/demo"),
 };
 
@@ -82,6 +83,35 @@ export function DocPage(
   const previous = index > 0 ? ORDERED[index - 1] : undefined;
   const next = index >= 0 ? ORDERED[index + 1] : undefined;
   const id = path.split("/").pop()!;
+
+  if (layout === "canvas") {
+    return (
+      <article
+        key={`${path}:${theme ?? ""}:${density}`}
+        id={id}
+        aria-labelledby={`${id}-heading`}
+        className="flex min-h-0 flex-1 flex-col"
+      >
+        <header className="flex min-w-0 flex-col gap-0.5 border-b border-border-subtle bg-background px-4 py-4 sm:px-6 md:flex-row md:items-baseline md:gap-3">
+          <h1 id={`${id}-heading`} className="shrink-0 text-h3">
+            {title}
+          </h1>
+          <p className="min-w-0 text-small text-muted-foreground md:truncate">
+            {description}
+          </p>
+        </header>
+        <Suspense
+          fallback={
+            <div className="flex flex-1 items-center justify-center py-16">
+              <Spinner label="Loading gallery" />
+            </div>
+          }
+        >
+          <Demo open={open} />
+        </Suspense>
+      </article>
+    );
+  }
 
   return (
     <article
