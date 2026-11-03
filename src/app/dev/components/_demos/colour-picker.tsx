@@ -93,7 +93,6 @@ function ColourPickerSection({ open }: SectionProps) {
         title="ColourSwatch"
         spec="§3.10"
         description="44px circle with a hairline edge so white and pale colours show. Selected adds a 2px gap and a 2px ring; custom colours carry a 22px remove button. Focus a swatch to see the outline clear the ring."
-        min="9rem"
       >
         <Specimen label="Default">
           <ColourSwatch colour="#325DC4" name="Blue" onClick={noop} />
@@ -133,7 +132,6 @@ function ColourPickerSection({ open }: SectionProps) {
         title="ColourPicker"
         spec="§3.10"
         description="Presets in order (Blue is the default), custom colours with remove, then the dashed Add. Removing the selected custom colour reverts to Blue. Force the popover with ?open=custom-colour."
-        min="16rem"
       >
         <Specimen label="Event colour · two custom, one selected" wide>
           <StatefulPicker
@@ -166,9 +164,8 @@ function ColourPickerSection({ open }: SectionProps) {
         title="Custom colour popover"
         spec="§3.10"
         description="The panel on its own, inline: a valid hex, then the error. Open the real popover with the Add button, or ?open=custom-colour."
-        min="17.5rem"
       >
-        <Specimen label="Valid hex" bare>
+        <Specimen label="Valid hex">
           <div className="w-[280px] overlay-surface rounded-2xl p-4">
             <CustomColourForm
               initialColour="#2F8F6B"
@@ -177,7 +174,7 @@ function ColourPickerSection({ open }: SectionProps) {
             />
           </div>
         </Specimen>
-        <Specimen label="Invalid hex (error)" bare>
+        <Specimen label="Invalid hex (error)">
           <div className="w-[280px] overlay-surface rounded-2xl p-4">
             <CustomColourForm
               initialColour="#2F8F6B"

@@ -48,7 +48,6 @@ function DropdownMenuDemo({ open }: SectionProps) {
         title="DropdownMenu"
         spec="§3.7"
         description="Every admin action on an object. Enter, Space or Down opens; arrows move, typing jumps, Esc closes and returns focus. Destructive items go last, after a separator, and open a ConfirmDialog. Force a state with ?open=."
-        min="14rem"
       >
         <Specimen label="Actions menu (?open=menu)">
           <EventActionsMenu defaultOpen={open === "menu"} />

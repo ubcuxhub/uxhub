@@ -1,18 +1,19 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
 /**
- * Building blocks for docs demos. Specimens sit in an auto-fill grid so
- * rows line up; each carries a small caption naming the variant/state it shows.
- * `data-specimen` makes them easy to query when measuring in the browser.
+ * Building blocks for docs demos. A group's specimens share one stage: a quiet
+ * panel where each component sits at its natural size with its caption
+ * beneath, in a centred row that wraps. `data-specimen` makes them easy to
+ * query when measuring in the browser.
  */
 
 export function SpecimenGroup({
   title,
   spec,
   description,
-  min = "11rem",
+  surface = "section",
   className,
   children,
 }: {
@@ -20,13 +21,17 @@ export function SpecimenGroup({
   /** Design-system reference, "§3.1". */
   spec?: string;
   description?: ReactNode;
-  /** Minimum column width of the grid. */
-  min?: string;
+  /**
+   * The stage's fill. `page` draws it in the page colour with a hairline edge,
+   * for components that are themselves filled with bg-section.
+   */
+  surface?: "section" | "page";
+  /** Classes for the stage. */
   className?: string;
   children: ReactNode;
 }) {
   return (
-    <div data-specimen-group={title} className="flex scroll-mt-20 flex-col gap-3">
+    <div data-specimen-group={title} className="flex min-w-0 scroll-mt-20 flex-col gap-3">
       <div className="flex flex-col gap-0.5">
         <h3 className="flex items-baseline gap-2 text-subheading">
           {title}
@@ -40,15 +45,20 @@ export function SpecimenGroup({
           </p>
         ) : null}
       </div>
-      <div
-        className={cn(
-          // One column on phones; elsewhere a column never outgrows its row.
-          "grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(min(var(--specimen-min),100%),1fr))] max-md:[grid-template-columns:minmax(0,1fr)]",
-          className,
-        )}
-        style={{ "--specimen-min": min } as CSSProperties}
-      >
-        {children}
+      {/* The padding follows the stage's own width, so a Side by side column
+          gets the phone padding. */}
+      <div className="@container min-w-0">
+        <div
+          className={cn(
+            "flex min-w-0 flex-wrap items-end justify-center gap-x-10 gap-y-8 rounded-2xl px-4 py-6 @lg:p-8",
+            surface === "section"
+              ? "bg-section"
+              : "border border-border-subtle bg-background",
+            className,
+          )}
+        >
+          {children}
+        </div>
       </div>
     </div>
   );
@@ -57,36 +67,30 @@ export function SpecimenGroup({
 export function Specimen({
   label,
   wide = false,
-  bare = false,
   className,
   children,
 }: {
   /** Caption: the variant, size or state shown, e.g. "outline / default". */
   label: string;
-  /** Span the whole row. */
+  /** Take a whole row of the stage; the content may stretch to fill it. */
   wide?: boolean;
-  /** Skip the tile chrome (for specimens that bring their own surface). */
-  bare?: boolean;
-  /** Classes for the tile. */
+  /** Classes for the specimen, usually a width for content that fills its container. */
   className?: string;
   children: ReactNode;
 }) {
   return (
     <figure
       data-specimen={label}
-      className={cn("m-0 flex min-w-0 flex-col gap-1.5", wide && "col-span-full")}
+      className={cn(
+        "m-0 flex min-w-0 max-w-full flex-col items-center gap-3",
+        wide && "basis-full",
+        className,
+      )}
     >
-      <div
-        className={cn(
-          "flex min-h-16 flex-wrap items-center gap-3",
-          !bare &&
-            "rounded-xl border border-border-subtle bg-card p-4",
-          className,
-        )}
-      >
+      <div className="flex w-full min-w-0 flex-1 flex-wrap items-center justify-center gap-3">
         {children}
       </div>
-      <figcaption className="px-1 text-label text-muted-foreground">
+      <figcaption className="max-w-full text-center text-label text-muted-foreground">
         {label}
       </figcaption>
     </figure>
@@ -109,7 +113,7 @@ export function Composition({
   return (
     <div
       data-composition={title}
-      className="flex scroll-mt-20 flex-col gap-3 border-t border-border-subtle pt-6"
+      className="flex min-w-0 scroll-mt-20 flex-col gap-3 border-t border-border-subtle pt-6"
     >
       <div className="flex flex-col gap-0.5">
         <h3 className="text-subheading">

@@ -20,12 +20,11 @@ function SearchFieldDemo() {
       title="SearchField"
       spec="§3.16"
       description="Fills its container. The clear button appears once there's text; Esc clears too, and only then."
-      min="min(18rem, 100%)"
     >
-      <Specimen label="Empty">
+      <Specimen label="Empty" className="w-64">
         <SearchField label="Search users" placeholder="Search users" />
       </Specimen>
-      <Specimen label="Typed, with clear button">
+      <Specimen label="Typed, with clear button" className="w-64">
         <SearchField
           id={typedId}
           label="Search events"
@@ -33,10 +32,10 @@ function SearchFieldDemo() {
           defaultValue="portfolio"
         />
       </Specimen>
-      <Specimen label="Disabled">
+      <Specimen label="Disabled" className="w-64">
         <SearchField label="Search users" placeholder="Search users" disabled />
       </Specimen>
-      <Specimen label="Announces the result count (screen readers hear “n results”)">
+      <Specimen label="Announces the result count (screen readers hear “n results”)" className="w-64">
         <SearchField
           label="Search people"
           placeholder="Search people"

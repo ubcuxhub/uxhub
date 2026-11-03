@@ -166,7 +166,6 @@ function RadioGroupDemo() {
         title="Radio"
         spec="§3.12"
         description="2–5 options compared at a glance. One group per question, the question as its legend. Tab lands on the selected radio; arrows move and select. Focus rings are checked from the keyboard."
-        min="17rem"
       >
         <Specimen label="unchecked">
           <RadioGroup aria-label="Unchecked">

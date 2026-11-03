@@ -146,18 +146,17 @@ function ImageUploadDemo() {
       <SpecimenGroup
         title="ImageUpload · thumbnail"
         spec="§3.12"
-        min="min(16rem, 100%)"
         description="Square JPG or PNG, 600 × 600 px or larger. The states in Figma order: Empty, Dragging, Uploading, Uploaded, Error, then Disabled."
       >
-        <Specimen label="Empty" bare>
+        <Specimen label="Empty" className="w-64">
           <div className="w-full">
             <ImageUpload label="Event thumbnail" requirements={THUMBNAIL} onChange={noop} />
           </div>
         </Specimen>
-        <Specimen label="Dragging (dragenter fired on mount)" bare>
+        <Specimen label="Dragging (dragenter fired on mount)" className="w-64">
           <Dragging requirements={THUMBNAIL} />
         </Specimen>
-        <Specimen label="Uploading, 64% with Cancel upload" bare>
+        <Specimen label="Uploading, 64% with Cancel upload" className="w-64">
           <div className="w-full">
             <ImageUpload
               label="Event thumbnail"
@@ -170,7 +169,7 @@ function ImageUploadDemo() {
             />
           </div>
         </Specimen>
-        <Specimen label="Uploading, no progress" bare>
+        <Specimen label="Uploading, no progress" className="w-64">
           <div className="w-full">
             <ImageUpload
               label="Event thumbnail"
@@ -182,7 +181,7 @@ function ImageUploadDemo() {
             />
           </div>
         </Specimen>
-        <Specimen label="Uploaded, with Replace" bare>
+        <Specimen label="Uploaded, with Replace" className="w-64">
           <div className="w-full">
             <ImageUpload
               label="Event thumbnail"
@@ -193,7 +192,7 @@ function ImageUploadDemo() {
             />
           </div>
         </Specimen>
-        <Specimen label="Error, wrong type" bare>
+        <Specimen label="Error, wrong type" className="w-64">
           <div className="w-full">
             <ImageUpload
               label="Event thumbnail"
@@ -203,7 +202,7 @@ function ImageUploadDemo() {
             />
           </div>
         </Specimen>
-        <Specimen label="Error, with an image already uploaded" bare>
+        <Specimen label="Error, with an image already uploaded" className="w-64">
           <div className="w-full">
             <ImageUpload
               label="Event thumbnail"
@@ -215,12 +214,12 @@ function ImageUploadDemo() {
             />
           </div>
         </Specimen>
-        <Specimen label="Disabled" bare>
+        <Specimen label="Disabled" className="w-64">
           <div className="w-full">
             <ImageUpload label="Event thumbnail" requirements={THUMBNAIL} disabled onChange={noop} />
           </div>
         </Specimen>
-        <Specimen label="Disabled, uploaded" bare>
+        <Specimen label="Disabled, uploaded" className="w-64">
           <div className="w-full">
             <ImageUpload
               label="Event thumbnail"
@@ -237,15 +236,14 @@ function ImageUploadDemo() {
       <SpecimenGroup
         title="ImageUpload · header"
         spec="§3.12"
-        min="min(22rem, 100%)"
         description="JPG or PNG, 1600 × 400 px or larger, not square. A square image is fine; a smaller one is rejected."
       >
-        <Specimen label="Empty" bare>
+        <Specimen label="Empty" className="w-96">
           <div className="w-full">
             <ImageUpload label="Header image" requirements={HEADER} onChange={noop} />
           </div>
         </Specimen>
-        <Specimen label="Uploaded, wide image" bare>
+        <Specimen label="Uploaded, wide image" className="w-96">
           <div className="w-full">
             <ImageUpload
               label="Header image"
@@ -256,7 +254,7 @@ function ImageUploadDemo() {
             />
           </div>
         </Specimen>
-        <Specimen label="Error, too small" bare>
+        <Specimen label="Error, too small" className="w-96">
           <div className="w-full">
             <ImageUpload
               label="Header image"
@@ -266,7 +264,7 @@ function ImageUploadDemo() {
             />
           </div>
         </Specimen>
-        <Specimen label="Custom hint" bare>
+        <Specimen label="Custom hint" className="w-96">
           <div className="w-full">
             <ImageUpload
               label="Header image"
@@ -281,10 +279,9 @@ function ImageUploadDemo() {
       <SpecimenGroup
         title="ImageUpload · live"
         spec="§3.12"
-        min="min(28rem, 100%)"
         description="Pick a real file (JPG or PNG, 1600 × 400 or larger) or use the buttons. Uploading is simulated with a timer. Progress is announced in 25% steps; a failed upload fires a toast. Try a GIF or a small image to see the validation errors."
       >
-        <Specimen label="Pick a file, then watch it upload" bare>
+        <Specimen label="Pick a file, then watch it upload" className="w-md">
           <LiveUpload />
         </Specimen>
       </SpecimenGroup>

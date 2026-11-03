@@ -19,9 +19,8 @@ function SuccessOverlayDemo() {
       <SpecimenGroup
         title="SuccessOverlay"
         description="Full-screen scrim and card, drawn inside a frame."
-        min="100%"
       >
-        <Specimen label="default" bare>
+        <Specimen label="default" wide>
           <SuccessOverlayFrame />
         </Specimen>
       </SpecimenGroup>

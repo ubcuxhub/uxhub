@@ -130,9 +130,8 @@ function CardDemo() {
         title="Card"
         spec="§3.5"
         description="No shadow, border only. Title is subheading; dividers are border-subtle."
-        min="min(22rem, 100%)"
       >
-        <Specimen label="Header, action, content, footer" bare>
+        <Specimen label="Header, action, content, footer" className="w-64">
           <Card className="w-full">
             <CardHeader>
               <CardTitle>UXathon 2026</CardTitle>
@@ -154,7 +153,7 @@ function CardDemo() {
             </CardFooter>
           </Card>
         </Specimen>
-        <Specimen label="Header and footer dividers (border-b / border-t)" bare>
+        <Specimen label="Header and footer dividers (border-b / border-t)" className="w-64">
           <Card className="w-full">
             <CardHeader className="border-b">
               <CardTitle>Order summary</CardTitle>
@@ -168,14 +167,14 @@ function CardDemo() {
             </CardFooter>
           </Card>
         </Specimen>
-        <Specimen label="Title only" bare>
+        <Specimen label="Title only" className="w-64">
           <Card className="w-full">
             <CardHeader>
               <CardTitle>Title only</CardTitle>
             </CardHeader>
           </Card>
         </Specimen>
-        <Specimen label="Interactive (caller border/fill change on hover)" bare>
+        <Specimen label="Interactive (caller border/fill change on hover)" className="w-64">
           <Card className="w-full cursor-pointer transition-colors duration-150 hover:border-muted-foreground hover:bg-accent">
             <CardHeader>
               <CardTitle>Hover me</CardTitle>
@@ -190,12 +189,12 @@ function CardDemo() {
         description="A raw table in a Card with its pagination line, in both densities."
       >
         <div className="grid gap-6">
-          <Specimen label="Comfortable" bare>
+          <Specimen label="Comfortable">
             <div className="w-full">
               <TableInCard />
             </div>
           </Specimen>
-          <Specimen label="Compact (data-density)" bare>
+          <Specimen label="Compact (data-density)">
             <div className="w-full">
               <TableInCard density="compact" />
             </div>

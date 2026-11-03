@@ -5,8 +5,8 @@ import { Specimen, SpecimenGroup } from "@/app/dev/_shell/Specimen";
 function SeparatorDemo() {
   return (
     <div className="flex flex-col gap-8">
-      <SpecimenGroup title="Separator" spec="§2.1" min="14rem">
-        <Specimen label="horizontal">
+      <SpecimenGroup title="Separator" spec="§2.1">
+        <Specimen label="horizontal" className="w-48">
           <Separator />
         </Specimen>
         <Specimen label="vertical">

@@ -13,7 +13,6 @@ function IconButtonDemo() {
         title="IconButton"
         spec="§3.1"
         description="An icon-only Button whose label is both the accessible name and the tooltip, so nobody has to guess what the icon means."
-        min="12rem"
       >
         <Specimen label="IconButton (hover for tooltip)">
           <IconButton label="Edit user">

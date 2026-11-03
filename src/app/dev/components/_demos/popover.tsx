@@ -16,7 +16,7 @@ import type { SectionProps } from "@/app/dev/_shell/types";
 function PopoverDemo({ open }: SectionProps) {
   return (
     <div className="flex flex-col gap-8">
-      <SpecimenGroup title="Popover" spec="§3.7" min="14rem">
+      <SpecimenGroup title="Popover" spec="§3.7">
         <Specimen label="Popover (?open=popover)">
           <Popover defaultOpen={open === "popover"}>
             <PopoverTrigger asChild>

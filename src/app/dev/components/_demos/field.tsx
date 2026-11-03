@@ -45,32 +45,31 @@ function FieldDemo() {
         title="Label, Field and FieldSet"
         spec="§3.2"
         description="Label (src/components/ui/label.tsx) has no page of its own: on its own it is a plain form label, and inside a Field you use FieldLabel instead."
-        min="17rem"
       >
         <Specimen label="Label alone">
           <Label>Full name</Label>
         </Specimen>
-        <Specimen label="Field: label + input + description">
+        <Specimen label="Field: label + input + description" className="w-64">
           <Field>
             <FieldLabel htmlFor={id("name")}>Full name</FieldLabel>
             <Input id={id("name")} placeholder="Jane Doe" />
             <FieldDescription>As it appears on your student card.</FieldDescription>
           </Field>
         </Specimen>
-        <Specimen label="Field: data-invalid + FieldError">
+        <Specimen label="Field: data-invalid + FieldError" className="w-64">
           <Field data-invalid>
             <FieldLabel htmlFor={id("email")}>Email</FieldLabel>
             <Input id={id("email")} defaultValue="jane@" aria-invalid />
             <FieldError>Enter a valid email address.</FieldError>
           </Field>
         </Specimen>
-        <Specimen label="Field: disabled">
+        <Specimen label="Field: disabled" className="w-64">
           <Field data-disabled>
             <FieldLabel htmlFor={id("disabled")}>Student number</FieldLabel>
             <Input id={id("disabled")} defaultValue="12345678" disabled />
           </Field>
         </Specimen>
-        <Specimen label="Field: horizontal switch row">
+        <Specimen label="Field: horizontal switch row" className="w-64">
           <Field orientation="horizontal">
             <FieldContent>
               <FieldLabel htmlFor={id("marketing")}>Marketing emails</FieldLabel>
@@ -79,7 +78,7 @@ function FieldDemo() {
             <Switch id={id("marketing")} />
           </Field>
         </Specimen>
-        <Specimen label="FieldSet: legend + checkboxes">
+        <Specimen label="FieldSet: legend + checkboxes" className="w-64">
           <FieldSet className="w-full">
             <FieldLegend>Interests</FieldLegend>
             <FieldGroup className="gap-3">
@@ -92,13 +91,13 @@ function FieldDemo() {
             </FieldGroup>
           </FieldSet>
         </Specimen>
-        <Specimen label="FieldLegend variant=label">
+        <Specimen label="FieldLegend variant=label" className="w-64">
           <FieldSet className="w-full">
             <FieldLegend variant="label">Pronouns</FieldLegend>
             <Input aria-label="Pronouns" placeholder="she/her" />
           </FieldSet>
         </Specimen>
-        <Specimen label="Radio cards (checked, unchecked)">
+        <Specimen label="Radio cards (checked, unchecked)" className="w-64">
           <FieldGroup className="gap-3">
             {[
               { value: "member", title: "Member", note: "$10 · includes free events", checked: true },
@@ -131,9 +130,8 @@ function FieldDemo() {
         title="Label row with an action"
         spec="§3.2"
         description="Label first in the DOM, then the action: Tab goes label action, then the input. Passwords have no placeholder."
-        min="17rem"
       >
-        <Specimen label="Sign-in password">
+        <Specimen label="Sign-in password" className="w-64">
           <Field>
             <FieldLabelRow
               action={
@@ -154,7 +152,7 @@ function FieldDemo() {
             />
           </Field>
         </Specimen>
-        <Specimen label="No action (label alone)">
+        <Specimen label="No action (label alone)" className="w-64">
           <Field>
             <FieldLabelRow>
               <FieldLabel htmlFor={id("full-name")}>Full name</FieldLabel>

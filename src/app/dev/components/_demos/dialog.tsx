@@ -24,7 +24,6 @@ function DialogDemo({ open }: SectionProps) {
         title="Dialog"
         spec="§3.7"
         description="Default, large (settings and checkout flows), tall content and mobileFullscreen (ConfirmDialog). Open with the buttons, or force one with ?open=. Check each in theme=light and theme=dark, and on the mobile preset."
-        min="14rem"
       >
         <Specimen label="Dialog · default (?open=dialog)">
           <Dialog defaultOpen={open === "dialog"}>

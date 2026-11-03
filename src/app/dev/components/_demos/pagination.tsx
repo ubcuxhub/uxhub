@@ -27,9 +27,8 @@ function PaginationDemo() {
         title="Pagination"
         spec="§3.4, §3.16"
         description="Sits at the foot of a TableCard. Previous and next are disabled at the ends. For server lists pass getPageHref and they render as links."
-        min="min(26rem, 100%)"
       >
-        <Specimen label="First page" bare>
+        <Specimen label="First page" className="w-96">
           <Pagination
             className="w-full rounded-xl border"
             page={1}
@@ -38,7 +37,7 @@ function PaginationDemo() {
             onPageChange={() => {}}
           />
         </Specimen>
-        <Specimen label="Last page" bare>
+        <Specimen label="Last page" className="w-96">
           <Pagination
             className="w-full rounded-xl border"
             page={5}
@@ -47,10 +46,10 @@ function PaginationDemo() {
             onPageChange={() => {}}
           />
         </Specimen>
-        <Specimen label="Interactive" bare>
+        <Specimen label="Interactive" className="w-96">
           <Interactive />
         </Specimen>
-        <Specimen label="One page: both buttons disabled" bare>
+        <Specimen label="One page: both buttons disabled" className="w-96">
           <Pagination
             className="w-full rounded-xl border"
             page={1}

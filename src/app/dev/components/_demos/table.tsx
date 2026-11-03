@@ -248,17 +248,17 @@ function TableDemo() {
       </Composition>
 
       <SpecimenGroup
+        surface="page"
         title="Loading and empty"
         spec="§3.6"
         description="Skeleton rows the shape of the data, never a spinner. An empty result says what's missing in plain words."
-        min="min(22rem, 100%)"
       >
-        <Specimen label="Loading (aria-busy)" bare>
+        <Specimen label="Loading (aria-busy)" wide>
           <div className="w-full">
             <LoadingTable />
           </div>
         </Specimen>
-        <Specimen label="No results" bare>
+        <Specimen label="No results" wide>
           <div className="w-full">
             <EmptyTable />
           </div>

@@ -9,7 +9,6 @@ function StatusBadgeDemo() {
         title="StatusBadge"
         spec="§3.3, §4.3"
         description="The nine statuses: tone, icon and label, default and large."
-        min="min(19rem, 100%)"
       >
         {STATUSES.map((status) => (
           <Specimen key={status} label={status}>

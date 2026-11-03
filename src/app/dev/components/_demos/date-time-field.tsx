@@ -12,7 +12,7 @@ import type { SectionProps } from "@/app/dev/_shell/types";
 import { DATE, TODAY } from "./_fixtures/date-time";
 
 /** Room under a field for its popover when that state is forced open. */
-const openRoom = "min-h-[27rem] items-start";
+const openRoom = "min-h-[27rem]";
 
 function Labelled({
   label,
@@ -133,30 +133,29 @@ function DateTimeFieldDemo({ open }: SectionProps) {
         title="Date field"
         spec="§3.11"
         description="A 40px pill, type or pick. On blur the text is read and tidied to “Sat, Nov 14, 2026”."
-        min="16rem"
       >
-        <Specimen label="placeholder">
+        <Specimen label="placeholder" className="w-64">
           <div className="w-full">
             <Labelled label="Date" htmlFor={id("d-empty")}>
               <DateField id={id("d-empty")} value={null} onValueChange={() => {}} />
             </Labelled>
           </div>
         </Specimen>
-        <Specimen label="filled">
+        <Specimen label="filled" className="w-64">
           <div className="w-full">
             <Labelled label="Date" htmlFor={id("d-filled")}>
               <DateField id={id("d-filled")} value={DATE} onValueChange={() => {}} />
             </Labelled>
           </div>
         </Specimen>
-        <Specimen label="focus">
+        <Specimen label="focus" className="w-64">
           <div className="w-full [&_input]:focus-ring">
             <Labelled label="Date" htmlFor={id("d-focus")}>
               <DateField id={id("d-focus")} value={DATE} onValueChange={() => {}} />
             </Labelled>
           </div>
         </Specimen>
-        <Specimen label="error">
+        <Specimen label="error" className="w-64">
           <div className="w-full">
             <Labelled
               label="Date"
@@ -173,7 +172,7 @@ function DateTimeFieldDemo({ open }: SectionProps) {
             </Labelled>
           </div>
         </Specimen>
-        <Specimen label="disabled">
+        <Specimen label="disabled" className="w-64">
           <div className="w-full">
             <Labelled label="Date" htmlFor={id("d-disabled")}>
               <DateField
@@ -185,17 +184,16 @@ function DateTimeFieldDemo({ open }: SectionProps) {
             </Labelled>
           </div>
         </Specimen>
-        <Specimen label="try it: type “feb 30”, “nov 14” or “tomorrow”, then Tab (min = Nov 4)">
+        <Specimen label="try it: type “feb 30”, “nov 14” or “tomorrow”, then Tab (min = Nov 4)" className="w-64">
           <div className="w-full">
             <LiveDate label="Date" id={id("d-live")} />
           </div>
         </Specimen>
         <Specimen
           label="calendar open (?open=date-open)"
-          wide
-          className={open === "date-open" ? openRoom : undefined}
+          className={open === "date-open" ? `w-64 ${openRoom}` : "w-64"}
         >
-          <div className="w-full max-w-xs">
+          <div className="w-full">
             <Labelled label="Date" htmlFor={id("d-open")}>
               <DateField
                 key={open}
@@ -215,30 +213,29 @@ function DateTimeFieldDemo({ open }: SectionProps) {
         title="Time field"
         spec="§3.11"
         description="A combobox over a list of times. Without AM or PM, a time reads as PM."
-        min="16rem"
       >
-        <Specimen label="placeholder">
+        <Specimen label="placeholder" className="w-64">
           <div className="w-full">
             <Labelled label="Time" htmlFor={id("t-empty")}>
               <TimeField id={id("t-empty")} value={null} onValueChange={() => {}} />
             </Labelled>
           </div>
         </Specimen>
-        <Specimen label="filled">
+        <Specimen label="filled" className="w-64">
           <div className="w-full">
             <Labelled label="Time" htmlFor={id("t-filled")}>
               <TimeField id={id("t-filled")} value="21:00" onValueChange={() => {}} />
             </Labelled>
           </div>
         </Specimen>
-        <Specimen label="focus">
+        <Specimen label="focus" className="w-64">
           <div className="w-full [&_input]:focus-ring">
             <Labelled label="Time" htmlFor={id("t-focus")}>
               <TimeField id={id("t-focus")} value="21:00" onValueChange={() => {}} />
             </Labelled>
           </div>
         </Specimen>
-        <Specimen label="error">
+        <Specimen label="error" className="w-64">
           <div className="w-full">
             <Labelled
               label="Time"
@@ -256,7 +253,7 @@ function DateTimeFieldDemo({ open }: SectionProps) {
             </Labelled>
           </div>
         </Specimen>
-        <Specimen label="disabled">
+        <Specimen label="disabled" className="w-64">
           <div className="w-full">
             <Labelled label="Time" htmlFor={id("t-disabled")}>
               <TimeField
@@ -268,14 +265,14 @@ function DateTimeFieldDemo({ open }: SectionProps) {
             </Labelled>
           </div>
         </Specimen>
-        <Specimen label="try it: type “9” then Tab, or press ↓">
+        <Specimen label="try it: type “9” then Tab, or press ↓" className="w-64">
           <div className="w-full">
             <LiveTime label="Start time" id={id("t-live")} />
           </div>
         </Specimen>
         <Specimen
           label="start time open (?open=time-open)"
-          className={open === "time-open" ? openRoom : undefined}
+          className={open === "time-open" ? `w-64 ${openRoom}` : "w-64"}
         >
           <div className="w-full">
             <Labelled label="Start time" htmlFor={id("t-open")}>
@@ -291,7 +288,7 @@ function DateTimeFieldDemo({ open }: SectionProps) {
         </Specimen>
         <Specimen
           label="end time open, after 10:00 AM (?open=end-time-open)"
-          className={open === "end-time-open" ? openRoom : undefined}
+          className={open === "end-time-open" ? `w-64 ${openRoom}` : "w-64"}
         >
           <div className="w-full">
             <Labelled label="End time" htmlFor={id("t-end")}>

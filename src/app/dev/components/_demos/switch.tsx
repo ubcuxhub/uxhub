@@ -19,7 +19,7 @@ function SwitchDemo() {
 
   return (
     <div className="flex flex-col gap-8">
-      <SpecimenGroup title="Switch" spec="§3.2" min="13rem">
+      <SpecimenGroup title="Switch" spec="§3.2">
         <Specimen label="off">
           <Switch aria-label="Off" />
         </Specimen>
@@ -32,7 +32,7 @@ function SwitchDemo() {
         <Specimen label="disabled, on">
           <Switch aria-label="Disabled on" disabled defaultChecked />
         </Specimen>
-        <Specimen label="with label and description (Figma 3.2)">
+        <Specimen label="with label and description (Figma 3.2)" className="w-80">
           <Field orientation="horizontal">
             <FieldContent>
               <FieldLabel htmlFor={id("waitlist")}>Waitlist</FieldLabel>

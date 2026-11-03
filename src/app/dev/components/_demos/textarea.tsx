@@ -19,20 +19,20 @@ function TextareaDemo() {
 
   return (
     <div className="flex flex-col gap-8">
-      <SpecimenGroup title="Textarea" spec="§3.12" min="15rem">
-        <Specimen label="empty, placeholder">
+      <SpecimenGroup title="Textarea" spec="§3.12">
+        <Specimen label="empty, placeholder" className="w-64">
           <Textarea aria-label="Empty" placeholder="Tell us about the event" />
         </Specimen>
-        <Specimen label="filled">
+        <Specimen label="filled" className="w-64">
           <Textarea
             aria-label="Filled"
             defaultValue="A night of design critique, pizza and portfolio feedback from industry mentors."
           />
         </Specimen>
-        <Specimen label="aria-invalid">
+        <Specimen label="aria-invalid" className="w-64">
           <Textarea aria-label="Invalid" defaultValue="Too short" aria-invalid />
         </Specimen>
-        <Specimen label="disabled">
+        <Specimen label="disabled" className="w-64">
           <Textarea aria-label="Disabled" placeholder="Tell us about the event" disabled />
         </Specimen>
       </SpecimenGroup>
@@ -41,9 +41,8 @@ function TextareaDemo() {
         title="Textarea with a counter"
         spec="§3.12"
         description="showCount with maxLength. The counter goes red on an invalid field and at the limit; the screen-reader line speaks at 20 left or fewer. 120px tall here to match Figma (the default stays min-h-20)."
-        min="19rem"
       >
-        <Specimen label="Filled · 83/280">
+        <Specimen label="Filled · 83/280" className="w-64">
           <Field>
             <FieldLabel htmlFor={id("ta-filled")}>Short description</FieldLabel>
             <Textarea
@@ -55,7 +54,7 @@ function TextareaDemo() {
             />
           </Field>
         </Specimen>
-        <Specimen label="Focus (ring forced on)">
+        <Specimen label="Focus (ring forced on)" className="w-64">
           <Field>
             <FieldLabel htmlFor={id("ta-focus")}>Short description</FieldLabel>
             <Textarea
@@ -67,7 +66,7 @@ function TextareaDemo() {
             />
           </Field>
         </Specimen>
-        <Specimen label="Placeholder · 0/280">
+        <Specimen label="Placeholder · 0/280" className="w-64">
           <Field>
             <FieldLabel htmlFor={id("ta-empty")}>Short description</FieldLabel>
             <Textarea
@@ -79,7 +78,7 @@ function TextareaDemo() {
             />
           </Field>
         </Specimen>
-        <Specimen label="Error · counter red">
+        <Specimen label="Error · counter red" className="w-64">
           <Field>
             <FieldLabel htmlFor={id("ta-error")}>Short description</FieldLabel>
             <Textarea
@@ -92,7 +91,7 @@ function TextareaDemo() {
             <FieldError>Add a short description.</FieldError>
           </Field>
         </Specimen>
-        <Specimen label="Disabled">
+        <Specimen label="Disabled" className="w-64">
           <Field>
             <FieldLabel htmlFor={id("ta-disabled")}>Short description</FieldLabel>
             <Textarea
@@ -105,7 +104,7 @@ function TextareaDemo() {
             />
           </Field>
         </Specimen>
-        <Specimen label="Near the limit · 59/60, type one more character">
+        <Specimen label="Near the limit · 59/60, type one more character" className="w-64">
           <Field>
             <FieldLabel htmlFor={id("ta-limit")}>Tagline</FieldLabel>
             <Textarea

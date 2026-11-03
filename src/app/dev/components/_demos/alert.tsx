@@ -11,9 +11,8 @@ function AlertDemo() {
         title="Alert"
         spec="§3.8"
         description="warning, info and destructive, each with a 16px icon and a title."
-        min="min(22rem, 100%)"
       >
-        <Specimen label="warning" bare>
+        <Specimen label="warning" className="w-96">
           <Alert className="w-full" variant="warning" icon={<TriangleAlert />}>
             <AlertTitle>Membership ends Apr 30</AlertTitle>
             <AlertDescription>
@@ -21,24 +20,24 @@ function AlertDemo() {
             </AlertDescription>
           </Alert>
         </Specimen>
-        <Specimen label="info" bare>
+        <Specimen label="info" className="w-96">
           <Alert className="w-full" variant="info" icon={<Info />}>
             <AlertTitle>Applications close Nov 1</AlertTitle>
             <AlertDescription>You can edit until then.</AlertDescription>
           </Alert>
         </Specimen>
-        <Specimen label="destructive" bare>
+        <Specimen label="destructive" className="w-96">
           <Alert className="w-full" variant="destructive" icon={<CircleAlert />}>
             <AlertTitle>Payment failed</AlertTitle>
             <AlertDescription>Your card was declined.</AlertDescription>
           </Alert>
         </Specimen>
-        <Specimen label="no title (as MembershipCheckout uses it)" bare>
+        <Specimen label="no title (as MembershipCheckout uses it)" className="w-96">
           <Alert className="w-full" variant="info" icon={<Info />}>
             A short notice with an icon and no title.
           </Alert>
         </Specimen>
-        <Specimen label="no icon" bare>
+        <Specimen label="no icon" className="w-96">
           <Alert className="w-full">Draft: only admins can see this.</Alert>
         </Specimen>
       </SpecimenGroup>

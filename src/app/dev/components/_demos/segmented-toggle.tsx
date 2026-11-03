@@ -30,7 +30,6 @@ function SegmentedToggleDemo() {
         title="SegmentedToggle"
         spec="§3.2"
         description="Two or three options that switch a view and never submit. The selected option can’t be deselected. Arrows move focus; Space or Enter selects."
-        min="17rem"
       >
         <Specimen label="Upcoming / Past, controlled">
           <ControlledToggle />

@@ -182,7 +182,7 @@ function Swatch({
   }, []);
 
   return (
-    <div data-specimen={name} className="flex min-w-0 flex-col gap-1.5">
+    <div data-specimen={name} className="flex w-36 min-w-0 max-w-full flex-col gap-1.5">
       <div
         ref={ref}
         style={{ background: `var(${variable})` }}
@@ -216,19 +216,21 @@ function MotionDemo({
   const [moved, setMoved] = useState(false);
 
   return (
-    <Specimen label={label} className="flex-col items-stretch">
-      <div className="relative h-8 w-full rounded-full bg-muted @container">
-        <div
-          className={cn(
-            "absolute top-1 left-1 size-6 rounded-full bg-primary transition-transform ease-out",
-            DURATION_CLASS[duration],
-            moved && "translate-x-[calc(100cqw-2rem)]",
-          )}
-        />
+    <Specimen label={label} className="w-44">
+      <div className="flex w-full flex-col gap-3">
+        <div className="relative h-8 w-full rounded-full bg-muted @container">
+          <div
+            className={cn(
+              "absolute top-1 left-1 size-6 rounded-full bg-primary transition-transform ease-out",
+              DURATION_CLASS[duration],
+              moved && "translate-x-[calc(100cqw-2rem)]",
+            )}
+          />
+        </div>
+        <Button type="button" variant="outline" onClick={() => setMoved((m) => !m)}>
+          Play {duration}ms
+        </Button>
       </div>
-      <Button type="button" variant="outline" onClick={() => setMoved((m) => !m)}>
-        Play {duration}ms
-      </Button>
     </Specimen>
   );
 }
@@ -242,7 +244,6 @@ function Foundations() {
             key={group.title}
             title={`Colour · ${group.title}`}
             spec="§2.1"
-            min="9.5rem"
           >
             {group.tokens.map((token) => (
               <Swatch key={token.name} {...token} />
@@ -255,29 +256,28 @@ function Foundations() {
         title="Bridge utilities"
         spec="shadcn bridge"
         description="Legacy shadcn utilities that resolve through the semantic tokens. They must flip with the column, so every tile in the dark column has to be dark."
-        min="9.5rem"
       >
-        <Specimen label="bg-background / text-foreground" bare>
+        <Specimen label="bg-background / text-foreground" className="w-40">
           <div className="w-full rounded-lg border bg-background p-3 text-small text-foreground">
             Aa
           </div>
         </Specimen>
-        <Specimen label="bg-primary / text-primary-foreground" bare>
+        <Specimen label="bg-primary / text-primary-foreground" className="w-40">
           <div className="w-full rounded-lg bg-primary p-3 text-small text-primary-foreground">
             Aa
           </div>
         </Specimen>
-        <Specimen label="bg-muted / text-muted-foreground" bare>
+        <Specimen label="bg-muted / text-muted-foreground" className="w-40">
           <div className="w-full rounded-lg bg-muted p-3 text-small text-muted-foreground">
             Aa
           </div>
         </Specimen>
-        <Specimen label="bg-card / border" bare>
+        <Specimen label="bg-card / border" className="w-40">
           <div className="w-full rounded-lg border bg-card p-3 text-small text-card-foreground">
             Aa
           </div>
         </Specimen>
-        <Specimen label="text-destructive" bare>
+        <Specimen label="text-destructive" className="w-40">
           <div className="w-full rounded-lg border p-3 text-small text-destructive">
             Error text
           </div>
@@ -288,10 +288,9 @@ function Foundations() {
         title="Typography"
         spec="§2.2"
         description="DM Sans, 13 styles on the 4px grid. No all caps, no letter-spacing."
-        min="100%"
       >
         {TYPE_STYLES.map((t) => (
-          <Specimen key={t.name} label={`${t.name} · ${t.spec} · ${t.cls}`}>
+          <Specimen key={t.name} label={`${t.name} · ${t.spec} · ${t.cls}`} wide>
             <span className={cn(t.cls, "min-w-0")}>{t.sample}</span>
           </Specimen>
         ))}
@@ -301,10 +300,9 @@ function Foundations() {
         title="Radius"
         spec="§2.5"
         description="Everything clickable or typeable is a pill; containers soften as they grow."
-        min="7rem"
       >
         {RADII.map((r) => (
-          <Specimen key={r.name} label={`${r.name} · ${r.px}px`} bare>
+          <Specimen key={r.name} label={`${r.name} · ${r.px}px`} className="w-20">
             <div
               className={cn(
                 "h-16 w-full border border-border bg-muted",
@@ -319,7 +317,6 @@ function Foundations() {
         title="Focus ring"
         spec="§3.7"
         description="2px action-focus outline, 2px offset. Press Tab to focus the real controls."
-        min="12rem"
       >
         <Specimen label="focus-ring utility (static)">
           <div className="focus-ring rounded-full border border-border px-4 py-2 text-button">
@@ -329,7 +326,7 @@ function Foundations() {
         <Specimen label="Button">
           <Button>Tab to me</Button>
         </Specimen>
-        <Specimen label="Native input">
+        <Specimen label="Native input" className="w-48">
           <input
             aria-label="Focus demo"
             placeholder="Tab to me"
@@ -342,7 +339,6 @@ function Foundations() {
         title="Icons"
         spec="§2.7"
         description="Lucide at its default 2px stroke at every size (thicker than Figma's 1.5px, by choice). 16px beside body text with an 8px gap, 14px beside small text, 20px with a 12px gap in sidebar rows."
-        min="16rem"
       >
         {ICON_SIZES.map(({ cls, label }) => (
           <Specimen key={cls} label={label}>
@@ -371,19 +367,18 @@ function Foundations() {
         title="Elevation"
         spec="§2.6"
         description="Borders separate surfaces. Levels 2 and 3 add shadow-overlay."
-        min="12rem"
       >
-        <Specimen label="Level 1 · card, border only" bare>
+        <Specimen label="Level 1 · card, border only" className="w-40">
           <div className="w-full rounded-xl border bg-card p-4 text-small">
             Card
           </div>
         </Specimen>
-        <Specimen label="Level 2 · overlay-surface" bare>
+        <Specimen label="Level 2 · overlay-surface" className="w-40">
           <div className="overlay-surface w-full rounded-2xl p-4 text-small">
             Menu / tooltip
           </div>
         </Specimen>
-        <Specimen label="Level 3 · scrim + overlay-surface" bare>
+        <Specimen label="Level 3 · scrim + overlay-surface" className="w-40">
           <div className="relative w-full overflow-hidden rounded-2xl bg-muted p-4">
             <div className="absolute inset-0 bg-scrim" />
             <div className="overlay-surface relative rounded-2xl p-4 text-small">
@@ -397,7 +392,6 @@ function Foundations() {
         title="Motion"
         spec="§2.8"
         description="One curve, ease-out cubic-bezier(0, 0, 0.2, 1). 150ms for hover and press, 200ms for menus and dialogs, 250ms for toasts."
-        min="14rem"
       >
         <MotionDemo duration={150} label="150ms · hover, press" />
         <MotionDemo duration={200} label="200ms · menus, dialogs" />
@@ -414,7 +408,7 @@ function Foundations() {
             { label: "size-table-row", cls: "h-(--size-table-row)" },
             { label: "size-nav-row", cls: "h-(--size-nav-row)" },
           ].map((t) => (
-            <Specimen key={t.label} label={t.label} bare>
+            <Specimen key={t.label} label={t.label}>
               <div className={cn("w-full rounded-lg bg-muted", t.cls)} />
             </Specimen>
           ))}

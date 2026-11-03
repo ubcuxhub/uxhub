@@ -24,33 +24,33 @@ function Section() {
   return (
     <div className="flex flex-col gap-8">
       <SpecimenGroup
+        surface="page"
         title="Event colour"
         spec="§2.1"
-        min="min(26rem, 100%)"
         description="The fill is the event colour mixed with white at the top. The label is white or near-black, whichever contrasts more."
       >
-        <Specimen label="Blue #325DC4 (default)" bare>
+        <Specimen label="Blue #325DC4 (default)" className="w-96">
           <Ticket {...holder} code={<Qr />} />
         </Specimen>
-        <Specimen label="Orchid #C983C7" bare>
+        <Specimen label="Orchid #C983C7" className="w-96">
           <Ticket {...holder} eventColour="#C983C7" code={<Qr />} />
         </Specimen>
-        <Specimen label="Slate #4A5E8A" bare>
+        <Specimen label="Slate #4A5E8A" className="w-96">
           <Ticket {...holder} eventColour="#4A5E8A" code={<Qr />} />
         </Specimen>
-        <Specimen label="Custom, pale #F3E9C6 (dark label)" bare>
+        <Specimen label="Custom, pale #F3E9C6 (dark label)" className="w-96">
           <Ticket {...holder} eventColour="#F3E9C6" code={<Qr />} />
         </Specimen>
       </SpecimenGroup>
 
-      <SpecimenGroup title="State" spec="§4.3" min="min(26rem, 100%)">
-        <Specimen label="Pending: greyed, no code" bare>
+      <SpecimenGroup title="State" spec="§4.3" surface="page">
+        <Specimen label="Pending: greyed, no code" className="w-96">
           <Ticket {...holder} state="pending" caption="Confirm by Nov 14" />
         </Specimen>
-        <Specimen label="Used: checked in, dimmed code" bare>
+        <Specimen label="Used: checked in, dimmed code" className="w-96">
           <Ticket {...holder} state="used" code={<Qr />} />
         </Specimen>
-        <Specimen label="With action" bare>
+        <Specimen label="With action" className="w-96">
           <Ticket {...holder} code={<Qr />} action={<ViewTicket />} />
         </Specimen>
       </SpecimenGroup>

@@ -158,10 +158,11 @@ function EventCardDemo() {
   return (
     <div className="flex flex-col gap-8">
       <SpecimenGroup
+        surface="page"
         title="EventCard states"
         description="The whole card is one link named by its title. Hover changes the fill only; nothing lifts."
       >
-        <Specimen label="default" wide bare>
+        <Specimen label="default" wide>
           <EventCard
             className="w-full"
             title="UXathon"
@@ -172,7 +173,7 @@ function EventCardDemo() {
             image={IMAGE}
           />
         </Specimen>
-        <Specimen label="hover (forced)" wide bare>
+        <Specimen label="hover (forced)" wide>
           <EventCard
             className="w-full bg-section"
             title="UXathon"
@@ -183,7 +184,7 @@ function EventCardDemo() {
             image={IMAGE}
           />
         </Specimen>
-        <Specimen label="focus (forced)" wide bare className="p-1.5">
+        <Specimen label="focus (forced)" wide className="p-1.5">
           <EventCard
             className="w-full focus-ring"
             title="UXathon"
@@ -194,7 +195,7 @@ function EventCardDemo() {
             image={IMAGE}
           />
         </Specimen>
-        <Specimen label="no image: calendar fallback" wide bare>
+        <Specimen label="no image: calendar fallback" wide>
           <EventCard
             className="w-full"
             title="UX Conference"
@@ -204,7 +205,7 @@ function EventCardDemo() {
             status="waitlisted"
           />
         </Specimen>
-        <Specimen label="long title wraps; long venue wraps" wide bare>
+        <Specimen label="long title wraps; long venue wraps" wide>
           <EventCard
             className="w-full"
             title="The Annual UBC UX Hub Cross-Disciplinary Design, Research and Product Leadership Conference"
@@ -215,7 +216,7 @@ function EventCardDemo() {
             image={IMAGE}
           />
         </Specimen>
-        <Specimen label="no venue, no status" wide bare>
+        <Specimen label="no venue, no status" wide>
           <EventCard
             className="w-full"
             title="Coffee Chat"
@@ -228,10 +229,9 @@ function EventCardDemo() {
       <SpecimenGroup
         title="Every StatusBadge"
         description="One badge per card, always the large size."
-        min="min(26rem, 100%)"
       >
         {STATUSES.map((status) => (
-          <Specimen key={status} label={status} bare>
+          <Specimen key={status} label={status} wide>
             <EventCard
               className="w-full"
               title="UXathon"
@@ -247,18 +247,17 @@ function EventCardDemo() {
       <SpecimenGroup
         title="MarketingEventCard"
         description="As on the marketing /events page: image or placeholder, priced footer or link. The portal card is EventCard, in Event cards and timeline."
-        min="20rem"
       >
-        <Specimen label="image, priced (member price)" bare>
+        <Specimen label="image, priced (member price)" className="w-64">
           <MarketingEventCard event={EVENT} className="w-full max-w-sm" />
         </Specimen>
-        <Specimen label="no image, free, long title" bare>
+        <Specimen label="no image, free, long title" className="w-64">
           <MarketingEventCard event={FREE_EVENT} className="w-full max-w-sm" />
         </Specimen>
-        <Specimen label="linked (href)" bare>
+        <Specimen label="linked (href)" className="w-64">
           <MarketingEventCard event={EVENT} href="/dev/components" className="w-full max-w-sm" />
         </Specimen>
-        <Specimen label="clickable (onClick)" bare>
+        <Specimen label="clickable (onClick)" className="w-64">
           <MarketingEventCard event={FREE_EVENT} onClick={() => {}} className="w-full max-w-sm" />
         </Specimen>
       </SpecimenGroup>

@@ -23,7 +23,6 @@ function CalendarDemo() {
         title="Calendar"
         spec="§3.11"
         description="Single selection, today, range and disabled days."
-        min="19rem"
       >
         <Specimen label="today (current month)">
           <Calendar mode="single" defaultMonth={today} />

@@ -14,9 +14,8 @@ function SelectDemo({ open }: SectionProps) {
         title="Select"
         spec="§3.2"
         description="Trigger states. The menu opens with ?open=select (checked in light and dark)."
-        min="15rem"
       >
-        <Specimen label="placeholder">
+        <Specimen label="placeholder" className="w-56">
           <Select>
             <SelectTrigger aria-label="Year (placeholder)">
               <SelectValue placeholder="Select a year" />
@@ -24,7 +23,7 @@ function SelectDemo({ open }: SectionProps) {
             <YearSelectOptions />
           </Select>
         </Specimen>
-        <Specimen label="with value">
+        <Specimen label="with value" className="w-56">
           <Select defaultValue="3">
             <SelectTrigger aria-label="Year (value)">
               <SelectValue />
@@ -32,7 +31,7 @@ function SelectDemo({ open }: SectionProps) {
             <YearSelectOptions />
           </Select>
         </Specimen>
-        <Specimen label="aria-invalid">
+        <Specimen label="aria-invalid" className="w-56">
           <Select>
             <SelectTrigger aria-label="Year (invalid)" aria-invalid>
               <SelectValue placeholder="Select a year" />
@@ -40,7 +39,7 @@ function SelectDemo({ open }: SectionProps) {
             <YearSelectOptions />
           </Select>
         </Specimen>
-        <Specimen label="disabled">
+        <Specimen label="disabled" className="w-56">
           <Select disabled defaultValue="2">
             <SelectTrigger aria-label="Year (disabled)">
               <SelectValue />
@@ -48,7 +47,7 @@ function SelectDemo({ open }: SectionProps) {
             <YearSelectOptions />
           </Select>
         </Specimen>
-        <Specimen label="Menu (?open=select)">
+        <Specimen label="Menu (?open=select)" className="w-56">
           <Select defaultOpen={open === "select"} defaultValue="3">
             <SelectTrigger aria-label="Year (menu)">
               <SelectValue />

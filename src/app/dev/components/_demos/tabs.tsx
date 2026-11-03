@@ -25,9 +25,8 @@ function TabsDemo() {
         title="Tabs"
         spec="§3.4"
         description="Pill tabs for the sections of one object. Counts are secondary text and part of the accessible name. Left/Right, Home/End; Tab moves into the panel."
-        min="16rem"
       >
-        <Specimen label="Object tabs with counts, in a Card" bare wide>
+        <Specimen label="Object tabs with counts, in a Card" wide>
           <Card className="w-full min-w-0 gap-4">
             <CardHeader>
               <CardTitle>UXathon 2026</CardTitle>

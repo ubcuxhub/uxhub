@@ -19,10 +19,9 @@ function EmptyStateDemo() {
       <SpecimenGroup
         title="EmptyState"
         spec="§3.8, §4.4f"
-        min="min(22rem, 100%)"
         description="Say what goes here and offer the next step. No error colours, no blame, even when loading failed."
       >
-        <Specimen label="card (default), empty" bare>
+        <Specimen label="card (default), empty" className="w-64">
           <Framed>
             <EmptyState
               icon={<Calendar />}
@@ -36,7 +35,7 @@ function EmptyStateDemo() {
             />
           </Framed>
         </Specimen>
-        <Specimen label="card, no results" bare>
+        <Specimen label="card, no results" className="w-64">
           <Framed>
             <EmptyState
               icon={<SearchX />}
@@ -50,7 +49,7 @@ function EmptyStateDemo() {
             />
           </Framed>
         </Specimen>
-        <Specimen label="card, load failed" bare>
+        <Specimen label="card, load failed" className="w-64">
           <Framed>
             <EmptyState
               icon={<CloudOff />}
@@ -64,7 +63,7 @@ function EmptyStateDemo() {
             />
           </Framed>
         </Specimen>
-        <Specimen label="card, not found" bare>
+        <Specimen label="card, not found" className="w-64">
           <Framed>
             <EmptyState
               icon={<CalendarX />}
@@ -78,7 +77,7 @@ function EmptyStateDemo() {
             />
           </Framed>
         </Specimen>
-        <Specimen label="page (py-16), two actions" bare wide>
+        <Specimen label="page (py-16), two actions" wide>
           <Framed>
             <EmptyState
               size="page"
@@ -97,7 +96,7 @@ function EmptyStateDemo() {
             />
           </Framed>
         </Specimen>
-        <Specimen label="inline (no media)" bare>
+        <Specimen label="inline (no media)" className="w-64">
           <Framed>
             <EmptyState
               size="inline"
@@ -106,7 +105,7 @@ function EmptyStateDemo() {
             />
           </Framed>
         </Specimen>
-        <Specimen label="inline, title only" bare>
+        <Specimen label="inline, title only" className="w-64">
           <Framed>
             <EmptyState size="inline" title="No applications yet" />
           </Framed>

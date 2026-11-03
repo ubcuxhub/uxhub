@@ -70,10 +70,9 @@ function ToastDemo({ open }: SectionProps) {
       <SpecimenGroup
         title="Toast"
         spec="§3.8"
-        min="min(22rem, 100%)"
         description="Bottom right, stacked, 380px, dismissed after 5s. Tones are Success, Neutral and Error; one optional action. Hover or focus pauses the timer, Alt+T moves focus into the stack."
       >
-        <Specimen label="Success, with description" bare>
+        <Specimen label="Success, with description" className="w-96">
           <Stage>
             <ToastView
               tone="success"
@@ -83,12 +82,12 @@ function ToastDemo({ open }: SectionProps) {
             />
           </Stage>
         </Specimen>
-        <Specimen label="Neutral, title only" bare>
+        <Specimen label="Neutral, title only" className="w-96">
           <Stage>
             <ToastView tone="neutral" message="Draft saved" onDismiss={noop} />
           </Stage>
         </Specimen>
-        <Specimen label="Error, with action" bare>
+        <Specimen label="Error, with action" className="w-96">
           <Stage>
             <ToastView
               tone="error"
@@ -99,7 +98,7 @@ function ToastDemo({ open }: SectionProps) {
             />
           </Stage>
         </Specimen>
-        <Specimen label="Long copy wraps" bare>
+        <Specimen label="Long copy wraps" className="w-96">
           <Stage>
             <ToastView
               tone="error"

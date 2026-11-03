@@ -25,9 +25,8 @@ function AvatarDemo() {
       <SpecimenGroup
         title="Photo"
         description="Cropped to fill. Sizes 24, 28 (groups), 32, 40, 56 and 64 (list rows)."
-        min="16rem"
       >
-        <Specimen label="Sizes 24–64" wide>
+        <Specimen label="Sizes 24–64">
           {SIZES.map((size) => (
             <Avatar key={size} name="Aubrey Lam" src="/people/aubrey.png" size={size} />
           ))}
@@ -37,29 +36,28 @@ function AvatarDemo() {
       <SpecimenGroup
         title="Initials"
         description="Up to two, SemiBold at about 36% of the avatar."
-        min="16rem"
       >
-        <Specimen label="Two initials" wide>
+        <Specimen label="Two initials">
           {SIZES.map((size) => (
             <Avatar key={size} name="Alex Chen" size={size} />
           ))}
         </Specimen>
-        <Specimen label="Single-word name" wide>
+        <Specimen label="Single-word name">
           {SIZES.map((size) => (
             <Avatar key={size} name="Cher" size={size} />
           ))}
         </Specimen>
-        <Specimen label="Long name: first and last word only" wide>
+        <Specimen label="Long name: first and last word only">
           {SIZES.map((size) => (
             <Avatar key={size} name="Maria de la Cruz Hernández Ortiz" size={size} />
           ))}
         </Specimen>
-        <Specimen label="Wide capitals" wide>
+        <Specimen label="Wide capitals">
           {SIZES.map((size) => (
             <Avatar key={size} name="Wendy Mwangi" size={size} />
           ))}
         </Specimen>
-        <Specimen label="Accented" wide>
+        <Specimen label="Accented">
           {SIZES.map((size) => (
             <Avatar key={size} name="Élodie Durand" size={size} />
           ))}
@@ -69,14 +67,13 @@ function AvatarDemo() {
       <SpecimenGroup
         title="Anonymous and broken photo"
         description="A deleted user gets a person icon. A src that fails to load falls back to initials."
-        min="16rem"
       >
-        <Specimen label="anonymous" wide>
+        <Specimen label="anonymous">
           {SIZES.map((size) => (
             <Avatar key={size} name="Deleted user" anonymous size={size} />
           ))}
         </Specimen>
-        <Specimen label="Broken src" wide>
+        <Specimen label="Broken src">
           {SIZES.map((size) => (
             <Avatar key={size} name="Priya Patel" src={BROKEN_SRC} size={size} />
           ))}
@@ -86,7 +83,6 @@ function AvatarDemo() {
       <SpecimenGroup
         title="AvatarGroup"
         description="Up to four faces, then “+N”, paired with words."
-        min="min(21rem, 100%)"
       >
         {GROUP_SIZES.flatMap((size) =>
           GROUP_COUNTS.map((count) => (

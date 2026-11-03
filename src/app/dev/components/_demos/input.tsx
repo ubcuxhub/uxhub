@@ -25,33 +25,32 @@ function InputDemo() {
         title="Input"
         spec="§3.2"
         description="Default, filled, invalid and disabled. The invalid state is the aria-invalid attribute callers already set."
-        min="15rem"
       >
-        <Specimen label="empty, placeholder">
+        <Specimen label="empty, placeholder" className="w-64">
           <Input aria-label="Empty" placeholder="Enter your name" />
         </Specimen>
-        <Specimen label="filled">
+        <Specimen label="filled" className="w-64">
           <Input aria-label="Filled" defaultValue="Johnny Dong" />
         </Specimen>
-        <Specimen label="aria-invalid">
+        <Specimen label="aria-invalid" className="w-64">
           <Input aria-label="Invalid" defaultValue="not-an-email" aria-invalid />
         </Specimen>
-        <Specimen label="disabled, empty">
+        <Specimen label="disabled, empty" className="w-64">
           <Input aria-label="Disabled" placeholder="Enter your name" disabled />
         </Specimen>
-        <Specimen label="disabled, filled">
+        <Specimen label="disabled, filled" className="w-64">
           <Input aria-label="Disabled filled" defaultValue="Johnny Dong" disabled />
         </Specimen>
-        <Specimen label="type=email">
+        <Specimen label="type=email" className="w-64">
           <Input aria-label="Email" type="email" placeholder="you@student.ubc.ca" />
         </Specimen>
-        <Specimen label="type=password">
+        <Specimen label="type=password" className="w-64">
           <Input aria-label="Password" type="password" defaultValue="hunter2hunter2" />
         </Specimen>
-        <Specimen label="type=number">
+        <Specimen label="type=number" className="w-64">
           <Input aria-label="Number" type="number" defaultValue={40} />
         </Specimen>
-        <Specimen label="type=file">
+        <Specimen label="type=file" className="w-64">
           <Input aria-label="File" type="file" />
         </Specimen>
       </SpecimenGroup>
@@ -60,9 +59,8 @@ function InputDemo() {
         title="Input with a leading icon"
         spec="§3.2"
         description="A 16px icon, 20px in from the edge, text starting at 44px. The icon is decorative; the label names the field."
-        min="17rem"
       >
-        <Specimen label="Mail · default">
+        <Specimen label="Mail · default" className="w-64">
           <Field>
             <FieldLabel htmlFor={id("mail-default")}>Email address</FieldLabel>
             <Input
@@ -72,7 +70,7 @@ function InputDemo() {
             />
           </Field>
         </Specimen>
-        <Specimen label="Mail · filled">
+        <Specimen label="Mail · filled" className="w-64">
           <Field>
             <FieldLabel htmlFor={id("mail-filled")}>Email address</FieldLabel>
             <Input
@@ -82,7 +80,7 @@ function InputDemo() {
             />
           </Field>
         </Specimen>
-        <Specimen label="Mail · focus (ring forced on)">
+        <Specimen label="Mail · focus (ring forced on)" className="w-64">
           <Field>
             <FieldLabel htmlFor={id("mail-focus")}>Email address</FieldLabel>
             <Input
@@ -93,7 +91,7 @@ function InputDemo() {
             />
           </Field>
         </Specimen>
-        <Specimen label="Mail · error">
+        <Specimen label="Mail · error" className="w-64">
           <Field>
             <FieldLabel htmlFor={id("mail-error")}>Email address</FieldLabel>
             <Input
@@ -108,7 +106,7 @@ function InputDemo() {
             </FieldError>
           </Field>
         </Specimen>
-        <Specimen label="Mail · disabled">
+        <Specimen label="Mail · disabled" className="w-64">
           <Field>
             <FieldLabel htmlFor={id("mail-disabled")}>Email address</FieldLabel>
             <Input
@@ -120,7 +118,7 @@ function InputDemo() {
           </Field>
         </Specimen>
 
-        <Specimen label="Search · default">
+        <Specimen label="Search · default" className="w-64">
           <Input
             aria-label="Search users"
             leadingIcon={Search}
@@ -128,7 +126,7 @@ function InputDemo() {
             placeholder="Search users"
           />
         </Specimen>
-        <Specimen label="Search · filled">
+        <Specimen label="Search · filled" className="w-64">
           <Input
             aria-label="Search users"
             leadingIcon={Search}
@@ -136,7 +134,7 @@ function InputDemo() {
             defaultValue="Alex Chen"
           />
         </Specimen>
-        <Specimen label="Search · focus (ring forced on)">
+        <Specimen label="Search · focus (ring forced on)" className="w-64">
           <Input
             aria-label="Search users"
             leadingIcon={Search}
@@ -145,7 +143,7 @@ function InputDemo() {
             className={FORCED_FOCUS}
           />
         </Specimen>
-        <Specimen label="Search · error">
+        <Specimen label="Search · error" className="w-64">
           <Input
             aria-label="Search users"
             leadingIcon={Search}
@@ -154,7 +152,7 @@ function InputDemo() {
             aria-invalid
           />
         </Specimen>
-        <Specimen label="Search · disabled">
+        <Specimen label="Search · disabled" className="w-64">
           <Input
             aria-label="Search users"
             leadingIcon={Search}
@@ -169,7 +167,6 @@ function InputDemo() {
         title="Row alignment"
         spec="§3.2"
         description="Controls in one row share a height: 44px on phones, --size-control (40, or 32 compact) from sm up."
-        min="15rem"
       >
         <Specimen label="Input + Select + Buttons" wide>
           <div className="flex w-full flex-wrap items-center gap-3">
