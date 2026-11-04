@@ -37,6 +37,7 @@ $$;
 \o /dev/null
 select set_config('audit.user_a_id', :'user_a_id', true);
 select set_config('audit.user_b_id', :'user_b_id', true);
+select set_config('audit.event_id', :'event_id', true);
 select set_config('app.audit_actor_id', :'user_b_id', true);
 \o
 update public.user_info set major = 'Audit gate, non-admin' where id = :'user_b_id';
@@ -75,6 +76,126 @@ begin
   end if;
   if logged.actor_id <> current_setting('audit.user_a_id')::uuid then
     raise exception 'the entry names % as the actor', logged.actor_id;
+  end if;
+end;
+$$;
+
+-- An event is edited through its children as much as through its own row, and
+-- those entries have to land on the event or the History tab will not find
+-- them. Insert, update and delete all count: adding a speaker is the edit, and
+-- there is no diff on the event row to see.
+-- Dates of their own: (event_id, date) is unique and rls.sql already gave
+-- this event an agenda for today.
+insert into public.event_agenda_days (event_id, title, date)
+values (:'event_id', 'Audit coverage day', date '2099-03-01')
+returning id \gset audit_day_
+
+insert into public.event_agenda_items (
+  event_agenda_day_id, title, start_time, end_time
+)
+values (:'audit_day_id', 'Audit coverage item', '10:00', '11:00')
+returning id \gset audit_item_
+
+update public.event_agenda_items set room = 'A101' where id = :'audit_item_id';
+delete from public.event_agenda_items where id = :'audit_item_id';
+
+do $$
+declare
+  event_id uuid := current_setting('audit.event_id')::uuid;
+  wrong    text;
+begin
+  -- Every entry this block wrote belongs to the event, the item included:
+  -- it names only its day and has to be resolved through it.
+  select string_agg(action || ' -> ' || coalesce(subject_table, 'null'), ', ')
+  into wrong
+  from public.audit_events
+  where (changes -> 'title' ->> 'to' in ('Audit coverage day', 'Audit coverage item')
+         or changes -> 'title' ->> 'from' = 'Audit coverage item'
+         or changes -> 'room' ->> 'to' = 'A101')
+    and (subject_table is distinct from 'events' or subject_id is distinct from event_id);
+  if wrong is not null then
+    raise exception 'agenda entries landed off the event: %', wrong;
+  end if;
+
+  if not exists (
+    select 1 from public.audit_events
+    where action = 'event_agenda_days.created'
+      and changes -> 'title' ->> 'to' = 'Audit coverage day'
+  ) then
+    raise exception 'adding an agenda day was not logged';
+  end if;
+  if not exists (
+    select 1 from public.audit_events
+    where action = 'event_agenda_items.created'
+      and changes -> 'title' ->> 'to' = 'Audit coverage item'
+  ) then
+    raise exception 'adding an agenda item was not logged';
+  end if;
+  if not exists (
+    select 1 from public.audit_events
+    where action = 'event_agenda_items.updated'
+      and changes -> 'room' ->> 'to' = 'A101'
+  ) then
+    raise exception 'editing an agenda item was not logged';
+  end if;
+  if not exists (
+    select 1 from public.audit_events
+    where action = 'event_agenda_items.deleted'
+      and changes -> 'title' ->> 'from' = 'Audit coverage item'
+      and changes -> 'title' ->> 'to' is null
+  ) then
+    raise exception 'removing an agenda item was not logged as a delete';
+  end if;
+end;
+$$;
+
+-- A member touching a child row is not an admin change.
+\o /dev/null
+select set_config('app.audit_actor_id', :'user_b_id', true);
+\o
+insert into public.event_agenda_days (event_id, title, date)
+values (:'event_id', 'Audit coverage, non-admin', date '2099-03-02');
+
+do $$
+begin
+  if exists (
+    select 1 from public.audit_events
+    where changes -> 'title' ->> 'to' = 'Audit coverage, non-admin'
+  ) then
+    raise exception 'an agenda day added by a non-admin was logged';
+  end if;
+end;
+$$;
+
+-- Club Settings is a single row keyed by a boolean, so it logs with no
+-- subject and `action` carries the meaning. Counted as a delta, because
+-- rls.sql edits app_settings before this file runs.
+\o /dev/null
+select set_config('app.audit_actor_id', :'user_a_id', true);
+select set_config(
+  'audit.settings_before',
+  (select count(*)::text from public.audit_events where action = 'app_settings.updated'),
+  true
+);
+\o
+update public.app_settings set membership_term_ends_at = now() - interval '36 days';
+
+do $$
+declare
+  added integer;
+begin
+  select count(*) - current_setting('audit.settings_before')::integer into added
+  from public.audit_events where action = 'app_settings.updated';
+  if added <> 1 then
+    raise exception 'a Club Settings change added % entries, expected 1', added;
+  end if;
+
+  if exists (
+    select 1 from public.audit_events
+    where action = 'app_settings.updated'
+      and (subject_table is not null or subject_id is not null)
+  ) then
+    raise exception 'a Club Settings entry carries a subject';
   end if;
 end;
 $$;
