@@ -39,24 +39,23 @@ export async function fetchEventAnalytics(db: DbClient, now: string): Promise<Ev
 
 export type DashboardEvent = Pick<EventRow,
   "id" | "name" | "slug" | "image_url" | "short_description" |
-  "start_date" | "location_building" | "location_room" | "location_address_url" | "regular_price" | "member_price"
+  "starts_at" | "location_building" | "location_room" | "location_address_url" | "regular_price" | "member_price"
 >;
 
 export async function fetchNextDashboardEvent(db: DbClient, now: string): Promise<DashboardEvent | null> {
   const { data, error } = await db.from(TABLES.events)
-    .select("id, name, slug, image_url, short_description, start_date, location_building, location_room, location_address_url, regular_price, member_price")
+    .select("id, name, slug, image_url, short_description, starts_at, location_building, location_room, location_address_url, regular_price, member_price")
     .eq("status", "active").not("starts_at", "is", null)
     .or(`ends_at.gt.${now},and(ends_at.is.null,starts_at.gt.${now})`)
-    .or(`publish_at.is.null,publish_at.lte.${now}`)
     .order("starts_at").order("id").limit(1).maybeSingle();
   if (error) throw error;
   return data;
 }
 
 export async function fetchConfirmedEventRegistrationCount(db: DbClient, eventId: string): Promise<number> {
-  const { count, error } = await db.from(TABLES.eventRegistrations)
+  const { count, error } = await db.from(TABLES.eventTickets)
     .select("id", { count: "exact", head: true })
-    .eq("event_id", eventId).eq("attending", true);
+    .eq("event_id", eventId);
   if (error) throw error;
   return count ?? 0;
 }

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { clientAs, withFixtures } from "@/test/integration";
-import { fetchMembershipAnalytics, fetchEventAnalytics, fetchNextDashboardEvent } from "./admin-dashboard";
+import { fetchMembershipAnalytics, fetchEventAnalytics, fetchNextDashboardEvent, fetchConfirmedEventRegistrationCount } from "./admin-dashboard";
 
 const now = "2200-10-01T12:00:00.000Z";
 const future = "2200-11-01T12:00:00.000Z";
@@ -67,11 +67,11 @@ describe("admin dashboard analytics", () => {
     const people = [await fixtures.createUser(), await fixtures.createUser(), await fixtures.createUser()];
     const variants: Parameters<typeof fixtures.createEvent>[0][] = [
       { status: "active", starts_at: "2200-09-01T07:00:00Z" }, // Inclusive Vancouver boundary.
-      { status: "active", starts_at: future, start_date: "2200-11-01", location_building: "AMS Nest", location_room: "101", location_address_url: "https://maps.google.com/?q=AMS+Nest", regular_price: 12, member_price: 5 },
+      { status: "active", starts_at: future, location_building: "AMS Nest", location_room: "101", location_address_url: "https://maps.google.com/?q=AMS+Nest", regular_price: 12, member_price: 5 },
       { status: "active", starts_at: "2201-05-01T07:00:00Z" }, // Exclusive end boundary.
       { status: "draft", starts_at: future },
-      { status: "archived", starts_at: future },
-      { status: "active", starts_at: future, publish_at: future },
+      { status: "draft", starts_at: future, publish_at: now },
+      { status: "draft", starts_at: future, publish_at: future },
       { status: "active", starts_at: null },
       { status: "active", starts_at: "2200-09-01T06:59:59Z" },
       { status: "active", starts_at: "2201-04-30T23:00:00Z" }, // Zero registrations.
@@ -80,30 +80,41 @@ describe("admin dashboard analytics", () => {
     for (const [i, variant] of variants.entries()) events.push(await fixtures.createEvent({ slug: `${fixtures.tag}-${i}`, ...variant }));
     for (const [i, event] of events.entries()) {
       const person = i === 0 || i === 1 ? people[0] : people[2];
-      const registration = await db.from("event_registrations").insert({ event_id: event.id, user_id: person.id, attending: true }).select("id").single();
+      const registration = await db.from("event_tickets").insert({ event_id: event.id, user_id: person.id }).select("id").single();
       check(registration.error);
-      if (i === 8) { check((await db.from("event_registrations").delete().eq("id", registration.data!.id)).error); continue; }
+      if (i === 8) { check((await db.from("event_tickets").delete().eq("id", registration.data!.id)).error); continue; }
       const sessions = await db.from("check_in_sessions").insert([0, 1].map((n) => ({ event_id: event.id, name: `Session ${n}`, start_time: now, end_time: future }))).select("id");
       check(sessions.error);
-      check((await db.from("check_ins").insert(sessions.data!.map((session) => ({ event_registration_id: registration.data!.id, check_in_session_id: session.id, checked_in_at: now })))).error);
+      check((await db.from("check_ins").insert(sessions.data!.map((session) => ({ ticket_id: registration.data!.id, check_in_session_id: session.id, checked_in_at: now })))).error);
       if (i === 1) {
-        const second = await db.from("event_registrations").insert({ event_id: event.id, user_id: people[1].id, attending: true }).select("id").single();
+        const second = await db.from("event_tickets").insert({ event_id: event.id, user_id: people[1].id }).select("id").single();
         check(second.error);
-        check((await db.from("check_ins").insert({ event_registration_id: second.data!.id, check_in_session_id: sessions.data![0].id, checked_in_at: now })).error);
+        check((await db.from("check_ins").insert({ ticket_id: second.data!.id, check_in_session_id: sessions.data![0].id, checked_in_at: now })).error);
       }
     }
-    // Pending registration and a cleared check-in do not inflate either count.
+    // Applications without tickets do not count as RSVPs or attendance.
     const pending = await fixtures.createUser();
-    check((await db.from("event_registrations").insert({ event_id: events[0].id, user_id: pending.id, attending: false })).error);
+    check((await db.from("event_applications").insert({ event_id: events[0].id, user_id: pending.id })).error);
+    // A ticket counts as an RSVP, but a cleared check-in is not attendance.
+    const cleared = await db.from("event_tickets").insert({ event_id: events[0].id, user_id: people[1].id }).select("id").single();
+    check(cleared.error);
+    const session = await db.from("check_in_sessions").select("id").eq("event_id", events[0].id).limit(1).single();
+    check(session.error);
+    check((await db.from("check_ins").insert({ ticket_id: cleared.data!.id, check_in_session_id: session.data!.id, checked_in_at: null })).error);
     const result = await fetchEventAnalytics(clientAs(admin), now);
     expect(result.events.filter((event) => events.some((fixture) => fixture.id === event.id)).map((event) => event.id)).toEqual([events[7].id, events[0].id, events[1].id, events[8].id, events[2].id]);
     expect(result.events.find((event) => event.id === events[1].id)).toMatchObject({ registrations: 2, attendees: 2 });
     expect(result.events.find((event) => event.id === events[8].id)).toMatchObject({ registrations: 0, attendees: 0 });
     expect(result.currentEvent?.id).toBe(events[1].id);
     expect(await fetchNextDashboardEvent(clientAs(admin), now)).toMatchObject({
-      id: result.currentEvent?.id, start_date: "2200-11-01", location_building: "AMS Nest",
+      id: result.currentEvent?.id, starts_at: "2200-11-01T12:00:00+00:00", location_building: "AMS Nest",
       location_room: "101", location_address_url: "https://maps.google.com/?q=AMS+Nest", regular_price: 12, member_price: 5,
     });
+    expect(result.events.find((event) => event.id === events[0].id)).toMatchObject({ registrations: 2, attendees: 1 });
+    for (const user of [admin, manager]) {
+      expect(await fetchConfirmedEventRegistrationCount(clientAs(user), events[1].id)).toBe(2);
+      expect(await fetchConfirmedEventRegistrationCount(clientAs(user), events[8].id)).toBe(0);
+    }
     expect(result.uniqueParticipants).toBe(2);
     expect(result.schoolYearLabel).toBe("2200–2201");
     expect(await fetchEventAnalytics(clientAs(manager), now)).toEqual(result);
@@ -156,11 +167,11 @@ describe("admin dashboard analytics", () => {
     const ends_at = "2300-10-01T14:00:00Z";
     const ids: string[] = [];
     const variants = [
-      { status: "active", publish_at: at },
+      { status: "active", publish_at: null },
       { status: "active", publish_at: null },
       { status: "draft" },
-      { status: "archived" },
-      { status: "active", publish_at: ends_at },
+      { status: "draft", publish_at: at },
+      { status: "draft", publish_at: ends_at },
       { status: "active", starts_at: null },
     ] satisfies Parameters<typeof fixtures.createEvent>[0][];
     for (const [i, variant] of variants.entries()) {
@@ -171,7 +182,7 @@ describe("admin dashboard analytics", () => {
     expect((await fetchNextDashboardEvent(client, at))?.id).toBe(ids[0]);
     expect((await fetchEventAnalytics(client, at)).currentEvent?.id).toBe(ids[0]);
     for (const id of ids) {
-      check((await fixtures.supabase.from("events").update({ status: "archived" }).eq("id", id)).error);
+      check((await fixtures.supabase.from("events").update({ status: "draft" }).eq("id", id)).error);
     }
     expect(await fetchNextDashboardEvent(client, at)).toBeNull();
     expect((await fetchEventAnalytics(client, at)).currentEvent).toBeNull();

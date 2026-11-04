@@ -60,7 +60,7 @@ export function DashboardUpcomingEvent({ event, rsvpCount, showStudentLink }: {
             <CalendarDays aria-hidden="true" className="size-4 text-fg-secondary" />
             <span className="sr-only">Date</span>
           </dt>
-          <dd>{formatEventDate(event.start_date, { weekday: "long" }) || "TBD"}</dd>
+          <dd>{formatEventDate(event.starts_at, { weekday: "long" }) || "TBD"}</dd>
         </div>
         <div className="flex items-center gap-3">
           <dt className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">

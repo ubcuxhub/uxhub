@@ -42,7 +42,7 @@ describe("dashboard states", () => {
     expect(screen.getByText(/Upcoming event unavailable/)).toBeTruthy();
   });
 
-  const event = { id: "event-id", slug: "design-sprint", name: "Design Sprint", image_url: null, short_description: "Design together.", start_date: "2026-11-01", location_building: "AMS Nest", location_room: "Room 101", location_address_url: "https://maps.google.com/?q=AMS+Nest", regular_price: 12, member_price: 5 };
+  const event = { id: "event-id", slug: "design-sprint", name: "Design Sprint", image_url: null, short_description: "Design together.", starts_at: "2026-11-02T01:00:00Z", location_building: "AMS Nest", location_room: "Room 101", location_address_url: "https://maps.google.com/?q=AMS+Nest", regular_price: 12, member_price: 5 };
 
   it("shows event details and quick action destinations, and respects student-event visibility", async () => {
     const { rerender } = render(<DashboardUpcomingEvent event={event} rsvpCount={0} showStudentLink />);
@@ -74,7 +74,7 @@ describe("dashboard states", () => {
   });
 
   it("handles free events, optional member pricing, and missing details", () => {
-    const { rerender } = render(<DashboardUpcomingEvent event={{ ...event, start_date: null, location_building: null, location_room: null, regular_price: 0, member_price: 0 }} rsvpCount={0} showStudentLink />);
+    const { rerender } = render(<DashboardUpcomingEvent event={{ ...event, starts_at: null, location_building: null, location_room: null, regular_price: 0, member_price: 0 }} rsvpCount={0} showStudentLink />);
     expect(screen.getAllByText("TBD")).toHaveLength(2);
     expect(screen.getByText("Free")).toBeTruthy();
     expect(screen.queryByText("Members:")).toBeNull();
