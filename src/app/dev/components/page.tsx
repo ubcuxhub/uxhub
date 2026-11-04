@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
 import { DocsLink } from "@/app/dev/_shell/context";
+import { STANDALONE } from "@/app/dev/_shell/standalone";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
@@ -14,8 +15,8 @@ export const metadata: Metadata = { title: "Components · UX Hub components" };
 type SearchParams = Record<string, string | string[] | undefined>;
 
 /**
- * The components index: every category with its entries, then the app
- * components. `?section=<id>`, the single-page gallery's old address, is
+ * The components index: links to the other docs pages, every category with its
+ * entries, then the app components. `?section=<id>`, the single-page gallery's old address, is
  * redirected to the page that id now lives at.
  */
 export default async function ComponentsIndexPage({
@@ -39,6 +40,8 @@ export default async function ComponentsIndexPage({
           nothing is fetched and nothing needs a sign-in.
         </p>
       </header>
+
+      <PageLinks />
 
       {categories.map((group) => (
         <section
@@ -65,6 +68,29 @@ export default async function ComponentsIndexPage({
         </section>
       ) : null}
     </div>
+  );
+}
+
+/** Foundations, Gallery and Templates, which the categories below leave out. */
+function PageLinks() {
+  return (
+    <nav aria-label="Other docs pages">
+      <ul className="grid gap-4 sm:grid-cols-3">
+        {Object.values(STANDALONE).map((page) => (
+          <li key={page.path} className="flex">
+            <DocsLink
+              href={page.path}
+              className="flex flex-1 flex-col gap-1 rounded-2xl border border-border-subtle p-5 transition-colors hover:bg-accent focus-visible:focus-ring"
+            >
+              <span className="text-body-medium text-primary">{page.title}</span>
+              <span className="text-small text-muted-foreground">
+                {page.description}
+              </span>
+            </DocsLink>
+          </li>
+        ))}
+      </ul>
+    </nav>
   );
 }
 
