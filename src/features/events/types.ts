@@ -1,6 +1,5 @@
 import {
   ResponseType,
-  type ApplicationStatus,
   type EventRow,
   type ResponseType as ResponseTypeValue,
 } from "@/lib/supabase/models";
@@ -44,15 +43,6 @@ export type TicketBadge =
   | "not_selected"
   | "going"
   | "checked_in";
-
-export interface GroupedRegistration {
-  user_id: string;
-  name: string;
-  email: string;
-  applicationDate: string;
-  status: ApplicationStatus;
-  registrationId: string;
-}
 
 export interface EventGroup {
   key: string;

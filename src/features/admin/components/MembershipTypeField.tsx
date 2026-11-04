@@ -22,7 +22,7 @@ export function MembershipTypeField({ value, selectedMembershipTypeId, membershi
     <UserDetailField label="Membership Type" htmlFor={canEdit ? id : undefined}>
       {canEdit ? <>
         <Select value={editValue || "__none__"} onValueChange={(value) => onValueChange(value === "__none__" ? "" : value)} disabled={isSaving}>
-          <SelectTrigger id={id} className="text-small"><SelectValue placeholder="Select membership type" /></SelectTrigger>
+          <SelectTrigger id={id}><SelectValue placeholder="Select membership type" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="__none__">None</SelectItem>
             {selectedMembershipTypeId && !membershipTypes.some((tier) => tier.id === selectedMembershipTypeId) && (

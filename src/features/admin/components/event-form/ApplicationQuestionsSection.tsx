@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
+import { IconButton } from "@/components/ui/icon-button";
 import {
   Field,
   FieldDescription,
@@ -97,11 +98,11 @@ export function ApplicationQuestionsSection({
         <FieldLegend>Application Questions</FieldLegend>
         <div className="flex items-center gap-2">
           <Switch
-            id="applications_enabled"
+            id="requires_application"
             checked={enabled}
             onCheckedChange={onEnabledChange}
           />
-          <FieldLabel htmlFor="applications_enabled">Enabled</FieldLabel>
+          <FieldLabel htmlFor="requires_application">Enabled</FieldLabel>
         </div>
       </div>
 
@@ -119,16 +120,14 @@ export function ApplicationQuestionsSection({
               >
                 <div className="flex items-center justify-between gap-4 pr-8">
                   <h3 className="text-subheading">{type?.label}</h3>
-                  <Button
-                    type="button"
+                  <IconButton
                     variant="ghost"
-                    size="icon"
+                    label={`Remove question ${index + 1}`}
                     className="absolute right-2 top-2"
-                    aria-label={`Remove question ${index + 1}`}
                     onClick={() => onRemove(index)}
                   >
                     <X />
-                  </Button>
+                  </IconButton>
                 </div>
                 <div className="flex items-center gap-2">
                   <Checkbox

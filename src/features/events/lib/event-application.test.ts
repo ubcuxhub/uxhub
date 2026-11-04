@@ -10,30 +10,30 @@ describe("prepareResponseData", () => {
           question_0: "A response",
           question_1: ["Research", "Design"],
         },
-        "registration-1"
+        "application-1"
       )
     ).toEqual([
       {
         event_application_question_id: "q1",
-        event_registration_id: "registration-1",
+        application_id: "application-1",
         response: "A response",
       },
       {
         event_application_question_id: "q2",
-        event_registration_id: "registration-1",
+        application_id: "application-1",
         response: "Research, Design",
       },
       {
         event_application_question_id: "q3",
-        event_registration_id: "registration-1",
+        application_id: "application-1",
         response: "",
       },
     ]);
   });
 
-  it("requires a registration id", () => {
+  it("requires an application id", () => {
     expect(() => prepareResponseData([], {}, "")).toThrow(
-      "Registration ID is required"
+      "Application ID is required"
     );
   });
 });

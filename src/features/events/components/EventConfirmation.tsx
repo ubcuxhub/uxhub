@@ -29,7 +29,7 @@ export function EventConfirmation({
     <div className="text-center">
       <div className="max-w-lg">
         {completed ? (
-          <Check className="mx-auto size-16 rounded-full bg-success/10 p-3 text-success" />
+          <Check className="mx-auto size-16 rounded-full bg-success-foreground/10 p-3 text-success-foreground" />
         ) : failed ? (
           <CircleAlert className="mx-auto size-16 rounded-full bg-destructive/10 p-3 text-destructive" />
         ) : (

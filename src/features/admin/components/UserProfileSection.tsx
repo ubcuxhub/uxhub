@@ -85,7 +85,7 @@ export function UserProfileSection({ section, user, verifierName, canEdit, busy,
 
   if (section === "verification") return (
     <section aria-label="Student Verification" className="space-y-2">
-      <Label htmlFor={verificationId} className="flex items-center gap-2 text-small font-normal">
+      <Label htmlFor={verificationId} className="flex items-center gap-2">
         <Checkbox id={verificationId} checked={canEdit && draft ? draft.verified : !!user.student_verified_at} disabled={!canEdit || busy}
           onCheckedChange={(checked) => onDraftChange({ verified: checked })} />
         Student Verification
@@ -101,25 +101,25 @@ export function UserProfileSection({ section, user, verifierName, canEdit, busy,
     <section aria-label={section === "birthday" ? "Birthday" : "Interests"} className={section === "birthday" ? "flex flex-col gap-2" : "flex flex-col gap-4"}>
       <h3 className="text-body font-medium">{section === "birthday" ? "Birthday" : "Interests"}</h3>
       {canEdit ? <>
-        {section === "birthday" ? <Input className="text-small" aria-label="Birthday" type="date" value={draft?.birthDate ?? ""} max={new Date().toISOString().slice(0, 10)} disabled={busy} onChange={(event) => onDraftChange({ birthDate: event.target.value })} /> : <>
+        {section === "birthday" ? <Input aria-label="Birthday" type="date" value={draft?.birthDate ?? ""} max={new Date().toISOString().slice(0, 10)} disabled={busy} onChange={(event) => onDraftChange({ birthDate: event.target.value })} /> : <>
           <div className="flex flex-wrap gap-4">{(draft?.interests ?? []).map((tag) => (
             <InterestTag key={tag} tag={tag}>
               <button type="button" disabled={busy} aria-label={`Remove interest ${tag}`}
-                className="cursor-pointer rounded-sm p-1 hover:bg-info/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                className="cursor-pointer rounded-full p-1 hover:bg-muted focus-visible:focus-ring disabled:cursor-not-allowed disabled:opacity-50"
                 onClick={() => onDraftChange({ interests: draft?.interests.filter((item) => item !== tag) })}>
                 <X className="size-3" aria-hidden="true" />
               </button>
             </InterestTag>
           ))}</div>
           <div className="flex gap-2">
-            <Input className="text-small" aria-label="New interest" value={draft?.newInterest ?? ""} maxLength={50} disabled={busy} onChange={(event) => onDraftChange({ newInterest: event.target.value })} onKeyDown={(event) => {
+            <Input aria-label="New interest" value={draft?.newInterest ?? ""} maxLength={50} disabled={busy} onChange={(event) => onDraftChange({ newInterest: event.target.value })} onKeyDown={(event) => {
               if (event.key === "Enter") { event.preventDefault(); addTag(); }
             }} />
             <Button variant="outline" disabled={busy} onClick={() => { addTag(); }}>Add tag</Button>
           </div>
           <p className="text-small text-muted-foreground">Up to 20 tags, 50 characters each.</p>
         </>}
-      </> : <div className={section === "interests" ? "flex items-start justify-between gap-3 text-small" : "flex items-center justify-between gap-2 rounded-md border border-input px-3 py-2 text-small"}>
+      </> : <div className={section === "interests" ? "flex items-start justify-between gap-3" : "flex items-center justify-between gap-2 rounded-full border border-input px-5 py-2 text-body"}>
         {section === "interests" ? (
           <div className="flex min-w-0 flex-wrap gap-4">
             {user.interests.length ? user.interests.map((tag) => <InterestTag key={tag} tag={tag} />) : <span className="text-muted-foreground">—</span>}
@@ -133,7 +133,7 @@ export function UserProfileSection({ section, user, verifierName, canEdit, busy,
 
 function InterestTag({ tag, children }: { tag: string; children?: ReactNode }) {
   return (
-    <Badge variant="outline" className="min-h-8 max-w-full gap-1 rounded-lg border-info bg-info-bg px-4 py-1.5 text-small text-info">
+    <Badge variant="tag" size="large" className="max-w-full">
       <span className="min-w-0 break-words">{tag}</span>
       {children}
     </Badge>

@@ -16,20 +16,25 @@ const validFormState = {
   regular_price: "0",
   member_price: "0",
   max_capacity: "10",
-  start_date: "2099-08-01",
-  start_time: "10:00",
-  end_date: "2099-08-01",
-  end_time: "11:00",
+  starts_at: "2099-08-01T10:00",
+  ends_at: "2099-08-01T11:00",
 };
 
 describe("event form schema", () => {
-  it.each(["start_date", "start_time", "end_date", "end_time"])("requires %s", (field) => {
-    expect(validateEventForm({ ...validFormState, [field]: "" }, [], []).error)
+  it.each([
+    ["starts_at", ""],
+    ["starts_at", "2099-08-01T"],
+    ["starts_at", "T10:00"],
+    ["ends_at", ""],
+    ["ends_at", "2099-08-01T"],
+    ["ends_at", "T11:00"],
+  ])("requires a complete %s, not %j", (field, value) => {
+    expect(validateEventForm({ ...validFormState, [field]: value }, [], []).error)
       .toBe("Event start and end dates and times are required.");
   });
 
   it.each(["2099-08-01T", "T10:00"])("rejects incomplete registration date/time %s", (value) => {
-    expect(validateEventForm({ ...validFormState, registration_start_time: value }, [], []).error)
+    expect(validateEventForm({ ...validFormState, registration_opens_at: value }, [], []).error)
       .toBe("Registration dates require both a date and time.");
   });
   it.each([
@@ -65,10 +70,8 @@ describe("event form schema", () => {
     expect(
       isEventScheduleRangeInvalid({
         ...validFormState,
-        start_date: "2026-08-02",
-        start_time: "10:00",
-        end_date: "2026-08-01",
-        end_time: "10:00",
+        starts_at: "2026-08-02T10:00",
+        ends_at: "2026-08-01T10:00",
       })
     ).toBe(true);
   });

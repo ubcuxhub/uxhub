@@ -28,7 +28,7 @@ export function DeleteAccountRow() {
         description="Permanently delete your UX Hub account. This cannot be undone."
       >
         <Button
-          variant="destructive"
+          variant="secondary"
           disabled={!email}
           onClick={() => setDialogOpen(true)}
         >

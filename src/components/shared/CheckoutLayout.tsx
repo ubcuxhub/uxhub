@@ -119,21 +119,21 @@ export function CheckoutLayout({
             <CardContent className="space-y-5">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="font-medium">{item.name}</p>
+                  <p className="text-body-medium">{item.name}</p>
                   {item.details ? (
                     <p className="mt-1 text-small text-muted-foreground">
                       {item.details}
                     </p>
                   ) : null}
                 </div>
-                <p className="font-medium">{formattedPrice}</p>
+                <p className="text-body-medium">{formattedPrice}</p>
               </div>
               {item.description ? (
                 <p className="whitespace-pre-wrap text-small text-muted-foreground">
                   {item.description}
                 </p>
               ) : null}
-              <div className="flex items-center justify-between border-t pt-4 text-subheading">
+              <div className="flex items-center justify-between border-t border-border-subtle pt-4 text-subheading">
                 <span>Total</span>
                 <span>{formattedPrice}</span>
               </div>

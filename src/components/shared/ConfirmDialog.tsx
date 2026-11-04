@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -52,6 +52,13 @@ export interface ConfirmDialogProps {
   pending?: boolean;
   /** Receives the confirmation text, so callers need not mirror it in state. */
   onConfirm: (typed: string) => void;
+  /**
+   * Where focus goes when the dialog closes. Defaults to whatever held focus
+   * when it opened. Pass this when that element goes away first, as a menu
+   * item does when its `onSelect` opens the dialog: point it at the menu's
+   * trigger.
+   */
+  returnFocusRef?: React.RefObject<HTMLElement | null>;
 }
 
 /**
@@ -64,13 +71,19 @@ export interface ConfirmDialogProps {
  * The dialog never closes itself on confirm: some callers navigate away, others
  * stay open to show a server error. Close it from the caller once the action
  * has actually succeeded.
+ *
+ * The dialog has no `DialogTrigger`, so Radix has nothing to hand focus back
+ * to. It remembers the element focused at open (or uses `returnFocusRef`) and
+ * restores focus there on close.
  */
 export function ConfirmDialog({
   open,
   onOpenChange,
   pending = false,
+  returnFocusRef,
   ...body
 }: ConfirmDialogProps) {
+  const openedFrom = useRef<HTMLElement | null>(null);
   return (
     <Dialog
       open={open}
@@ -79,7 +92,25 @@ export function ConfirmDialog({
         onOpenChange(next);
       }}
     >
-      <DialogContent closeDisabled={pending} mobileFullscreen>
+      <DialogContent
+        closeDisabled={pending}
+        mobileFullscreen
+        onOpenAutoFocus={() => {
+          // Runs before focus moves in, so this is still the opener.
+          openedFrom.current =
+            document.activeElement instanceof HTMLElement &&
+            document.activeElement !== document.body
+              ? document.activeElement
+              : null;
+        }}
+        onCloseAutoFocus={(event) => {
+          const target = returnFocusRef?.current ?? openedFrom.current;
+          openedFrom.current = null;
+          if (!target?.isConnected) return;
+          event.preventDefault();
+          target.focus();
+        }}
+      >
         {/* Radix unmounts this while the dialog is closed, so the confirmation
             input below resets on its own — reopening never finds a primed
             button left over from last time. */}
@@ -122,7 +153,7 @@ function ConfirmDialogBody({
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-0 sm:h-auto sm:gap-4">
-      <DialogHeader className="shrink-0 border-b pb-5 pl-5 pr-20 pt-16 text-left sm:border-0 sm:p-0">
+      <DialogHeader className="shrink-0 border-b border-border-subtle pb-5 pl-5 pr-20 pt-16 text-left sm:border-0 sm:p-0">
         <DialogTitle
           className={cn(
             icon &&
@@ -145,6 +176,7 @@ function ConfirmDialogBody({
                   id={inputId}
                   type={confirmation.type ?? "text"}
                   placeholder={confirmation.placeholder}
+                  data-autofocus=""
                   autoComplete="off"
                   autoCapitalize="none"
                   spellCheck={false}
@@ -153,7 +185,6 @@ function ConfirmDialogBody({
                   onChange={(event) => setTyped(event.target.value)}
                   aria-describedby={confirmation.hint ? hintId : undefined}
                   aria-invalid={mismatch || undefined}
-                  className={cn(mismatch && "border-destructive")}
                 />
                 {confirmation.hint ? (
                   <p id={hintId} className="text-small text-muted-foreground">
@@ -177,7 +208,7 @@ function ConfirmDialogBody({
         <div className="flex-1 sm:hidden" />
       )}
 
-      <DialogFooter className="mt-auto shrink-0 gap-3 border-t bg-background p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] [&>button]:w-full sm:mt-0 sm:gap-0 sm:border-0 sm:p-0 sm:[&>button]:w-auto">
+      <DialogFooter className="mt-auto shrink-0 gap-3 border-t border-border-subtle p-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] [&>button]:w-full sm:mt-0 sm:gap-0 sm:border-0 sm:p-0 sm:[&>button]:w-auto">
         <Button
           type="button"
           variant="outline"
@@ -189,7 +220,8 @@ function ConfirmDialogBody({
         <Button
           type="button"
           variant={confirmVariant}
-          disabled={!satisfied || pending}
+          disabled={!satisfied}
+          loading={pending}
           onClick={() => onConfirm(typed)}
         >
           {pending ? (pendingLabel ?? confirmLabel) : confirmLabel}

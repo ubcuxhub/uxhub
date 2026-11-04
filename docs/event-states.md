@@ -14,17 +14,17 @@ releasing a spot.
 | Scheduled | No | `status = draft`, `publish_at` set |
 | Published | Yes | `status = active` |
 
-Draft and Archived events are hidden. Whether an event is upcoming or past
-comes from `starts_at` and `ends_at`, not from its status, so a finished event
-stays Published and members keep their history.
+Draft events are hidden. Whether an event is upcoming or past comes from
+`starts_at` and `ends_at`, not from its status, so a finished event stays
+Published and members keep their history.
 
 ### Scheduling publication
 
 The admin create/edit form has an optional **Publish Date & Time (Pacific)**
 field, available only for Draft events. Choose a future date to schedule the
 change from Draft to Active. Leave it empty to keep the event in Draft.
-Clearing it cancels publication; manually activating or archiving an event also
-clears its schedule.
+Clearing it cancels publication; manually activating an event also clears its
+schedule.
 
 Saving, changing, clearing, deleting, or manually publishing a scheduled draft
 recalculates one shared database job for the earliest pending `publish_at`.
@@ -94,10 +94,11 @@ Preview deploys share the production database (the free plan has no branching),
 so registrations and check-ins made on a test draft are real production rows.
 Keep the event in Draft afterwards, or delete it along with its registrations.
 
-**Not built yet:** today the portal event page and fulfillment
-(`createSquarePaymentForEventTicket`) both require `status = active`, even for
-admins. They move to `reserve_event_ticket` with the rest of the code
-(see [registration-rollout.md](registration-rollout.md)).
+The portal event page and checkout read the event under the viewer's RLS, so
+staff reach drafts and members get a 404. Fulfillment
+(`createSquarePaymentForEventTicket`) uses the service role, so it drops the
+`status = active` filter only for admins and managers, and
+`reserve_event_ticket` checks the role again.
 
 ## Admin: application
 

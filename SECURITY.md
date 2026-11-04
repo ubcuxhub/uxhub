@@ -57,11 +57,12 @@ access, and manager-only powers use the narrower `is_manager()`.
 
 ## Row Level Security
 
-RLS is enabled on **all 15 application tables**. The general shape:
+RLS is enabled on **all 16 application tables**. The general shape:
 
-- **Own-row access.** Members read their own `user_info`, `event_registrations`,
-  `event_application_responses`, and `purchases` — matched on
-  `auth.uid()` or `current_user_info_id()`, never on a value the client sends.
+- **Own-row access.** Members read their own `user_info`, `event_tickets`,
+  `event_applications`, `event_application_responses`, and `purchases` —
+  matched on `auth.uid()` or `current_user_info_id()`, never on a value the
+  client sends.
 - **Admin access** goes through `is_admin()`, evaluated inside Postgres against
   the caller's real session. A client cannot fake it.
 - **Public reads are narrow.** Anonymous visitors can read events only where

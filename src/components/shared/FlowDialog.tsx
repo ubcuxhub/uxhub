@@ -9,6 +9,7 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { getSafeInternalPath } from "@/lib/auth/paths";
 import { cn } from "@/lib/utils";
 
 type FlowDialogMode = "canonical" | "intercepted";
@@ -27,14 +28,6 @@ const FlowDialogContext = createContext<FlowDialogContextValue>({
 
 export function useFlowDialog() {
   return useContext(FlowDialogContext);
-}
-
-function safeReturnPath(value: string | null, fallback: string) {
-  if (!value || !value.startsWith("/") || value.startsWith("//")) {
-    return fallback;
-  }
-
-  return value;
 }
 
 interface FlowDialogProps {
@@ -68,7 +61,7 @@ export function FlowDialog({
     const returnTo = new URLSearchParams(window.location.search).get("returnTo");
 
     if (returnTo) {
-      router.replace(safeReturnPath(returnTo, closeFallback));
+      router.replace(getSafeInternalPath(returnTo, closeFallback));
       return;
     }
 

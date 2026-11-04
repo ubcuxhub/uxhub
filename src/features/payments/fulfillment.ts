@@ -8,12 +8,12 @@ import type { CheckoutActionResult, CheckoutRequestInput } from "./types";
 import type { Database, Json } from "@/lib/supabase/database.types";
 import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
 import { errorFields, log } from "@/lib/log";
-import { fetchApplicationQuestions } from "@/lib/supabase-helpers/event-applications";
 import {
-  fetchEventRegistrationByPurchaseId,
-  fetchUserRegistration,
-  updateEventRegistration,
-} from "@/lib/supabase-helpers/event-registrations";
+  fetchEventTicketByPurchaseId,
+  fetchUserEventTicket,
+  releaseEventTicket,
+  reserveEventTicket,
+} from "@/lib/supabase-helpers/event-tickets";
 import { fetchMembershipTypeBySlug } from "@/lib/supabase-helpers/memberships";
 import {
   createPurchase,
@@ -27,6 +27,7 @@ import {
 } from "@/lib/supabase-helpers/purchases";
 import { updateUserInfoById } from "@/lib/supabase-helpers/users";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { hasAdminAccess } from "@/lib/auth/roles";
 import {
   getSquareLocationId,
   squareClient,
@@ -68,34 +69,6 @@ async function cancelSquarePaymentIfPossible(paymentId: string) {
     // Best effort only. Webhooks and purchase status reconciliation handle the rest.
   }
 }
-async function reserveEventTicketSeat(
-  eventId: string,
-  userId: string,
-  purchaseId: string
-) {
-  const { data, error } = await adminDb.rpc("reserve_paid_event_ticket", {
-    p_event_id: eventId,
-    p_purchase_id: purchaseId,
-    p_user_id: userId,
-  });
-
-  if (error) {
-    throw error;
-  }
-
-  return data?.[0] ?? null;
-}
-
-async function releaseEventTicketSeatReservation(purchaseId: string) {
-  const { error } = await adminDb.rpc("release_paid_event_ticket_reservation", {
-    p_purchase_id: purchaseId,
-  });
-
-  if (error) {
-    throw error;
-  }
-}
-
 async function fulfillMembershipPurchase(purchaseId: string) {
   const purchase = await fetchPurchaseById(adminDb, purchaseId);
 
@@ -143,33 +116,22 @@ async function fulfillEventTicketPurchase(purchaseId: string) {
     throw new Error("Event ticket purchase is missing an event ID.");
   }
 
-  let registration = await fetchEventRegistrationByPurchaseId(adminDb, purchase.id);
+  // Checkout reserves the ticket before capturing, so it is normally there
+  // already. A capture confirmed only by a later webhook may find it released
+  // in between, and then reserves it again.
+  const ticket = await fetchEventTicketByPurchaseId(adminDb, purchase.id);
 
-  if (!registration) {
-    const reservation = await reserveEventTicketSeat(
-      purchase.event_id,
-      purchase.user_id,
-      purchase.id
-    );
+  if (!ticket) {
+    const reservation = await reserveEventTicket(adminDb, {
+      eventId: purchase.event_id,
+      purchaseId: purchase.id,
+      userId: purchase.user_id,
+    });
 
-    if (!reservation?.registration_id || reservation.failure_reason) {
-      throw new Error(
-        formatReservationFailure(reservation?.failure_reason ?? null)
-      );
+    if (!reservation.ticketId || reservation.failureReason) {
+      throw new Error(formatReservationFailure(reservation.failureReason));
     }
-
-    registration = await fetchEventRegistrationByPurchaseId(adminDb, purchase.id);
   }
-
-  if (!registration) {
-    throw new Error("Reserved event registration could not be loaded.");
-  }
-
-  await updateEventRegistration(adminDb, registration.id, {
-    attending: true,
-    purchase_id: purchase.id,
-    status: "accepted",
-  });
 
   const updatedPurchase = await updatePurchase(adminDb, purchase.id, {
     fulfilled_at: new Date().toISOString(),
@@ -216,14 +178,15 @@ async function applyPaymentStateToPurchase(purchaseId: string, payment: Payment)
 
   // A ticket whose hold was voided or failed after its seat was reserved would
   // otherwise keep counting toward capacity and block the buyer from trying
-  // again. The release only removes an unconfirmed reservation, so it is a
-  // no-op when checkout already released it or never reserved one.
+  // again. The release only removes the ticket of a purchase that did not
+  // complete, so it is a no-op when checkout already released it or never
+  // reserved one.
   if (
     updatedPurchase.kind === "event_ticket" &&
     (updatedPurchase.status === "canceled" ||
       updatedPurchase.status === "failed")
   ) {
-    await releaseEventTicketSeatReservation(updatedPurchase.id);
+    await releaseEventTicket(adminDb, updatedPurchase.id);
   }
 
   return updatedPurchase;
@@ -403,31 +366,24 @@ async function createSquarePaymentForEventTicket(
   user: UserInfoRow,
   input: CheckoutRequestInput
 ) {
-  const event = await fetchEventBySlug(adminDb, input.slug, {
-    status: "active",
-  });
+  // The service-role client sees drafts too, so only admins and managers may
+  // reach one, to test it (docs/event-states.md, "Drafts for admins").
+  // reserve_event_ticket checks the same, along with applications and offers.
+  const event = await fetchEventBySlug(
+    adminDb,
+    input.slug,
+    hasAdminAccess(user.role_access) ? {} : { status: "active" },
+  );
 
   if (!event) {
     return { error: "Event not found.", terminal: true } as const;
   }
 
-  const applicationQuestions = event.applications_enabled
-    ? await fetchApplicationQuestions(adminDb, event.id)
-    : [];
+  const existingTicket = await fetchUserEventTicket(adminDb, event.id, user.id);
 
-  if (applicationQuestions.length > 0) {
+  if (existingTicket) {
     return {
-      error:
-        "This event uses an application flow and cannot be purchased directly.",
-      terminal: true,
-    } as const;
-  }
-
-  const existingRegistration = await fetchUserRegistration(adminDb, event.id, user.id);
-
-  if (existingRegistration) {
-    return {
-      error: "You already have a registration for this event.",
+      error: formatReservationFailure("ALREADY_REGISTERED"),
       terminal: true,
     } as const;
   }
@@ -486,17 +442,21 @@ async function createSquarePaymentForEventTicket(
       status: normalizeSquareStatus(payment.status),
     });
 
-    const reservation = await reserveEventTicketSeat(event.id, user.id, purchase.id);
+    const reservation = await reserveEventTicket(adminDb, {
+      eventId: event.id,
+      purchaseId: purchase.id,
+      userId: user.id,
+    });
 
-    if (!reservation?.registration_id || reservation.failure_reason) {
+    if (!reservation.ticketId || reservation.failureReason) {
       await cancelSquarePaymentIfPossible(payment.id);
       await updatePurchase(adminDb, purchase.id, {
-        failure_reason: formatReservationFailure(reservation?.failure_reason),
+        failure_reason: formatReservationFailure(reservation.failureReason),
         status: "canceled",
       });
 
       return {
-        error: formatReservationFailure(reservation?.failure_reason),
+        error: formatReservationFailure(reservation.failureReason),
         terminal: true,
       } as const;
     }
@@ -541,7 +501,7 @@ async function createSquarePaymentForEventTicket(
     }
 
     if (isDefinitiveSquareFailure(error)) {
-      await releaseEventTicketSeatReservation(purchase.id).catch(() => undefined);
+      await releaseEventTicket(adminDb, purchase.id).catch(() => undefined);
       await updatePurchase(adminDb, purchase.id, {
         failure_reason: getSquareErrorMessage(error),
         status: "failed",

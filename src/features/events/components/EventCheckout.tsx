@@ -10,8 +10,6 @@ interface EventCheckoutProps {
   disabledMessage: string | null;
   event: EventRow;
   formattedDate: string | null;
-  hasExistingRegistration: boolean;
-  isDirectPurchaseEvent: boolean;
   returnTo?: string;
   slug: string;
   user: UserInfoRow;
@@ -21,8 +19,6 @@ export function EventCheckout({
   disabledMessage,
   event,
   formattedDate,
-  hasExistingRegistration,
-  isDirectPurchaseEvent,
   returnTo,
   slug,
   user,
@@ -59,7 +55,7 @@ export function EventCheckout({
         description: event.description,
       }}
       payment={{
-        disabled: !isDirectPurchaseEvent || hasExistingRegistration,
+        disabled: disabledMessage !== null,
         disabledMessage,
         kind: "event_ticket",
         slug,

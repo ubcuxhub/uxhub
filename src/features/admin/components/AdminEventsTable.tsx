@@ -3,7 +3,6 @@
 import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
-  Archive,
   ArrowDown,
   ArrowUp,
   Check,
@@ -45,41 +44,24 @@ type RegistrationStatus = "open" | "closed" | "not-applicable";
 type SortDirection = "ascending" | "descending";
 
 const statusConfig = {
-  active: {
-    className: "bg-success-bg text-success",
-    icon: Check,
-    label: "Active",
-  },
-  archived: {
-    className: "",
-    icon: Archive,
-    label: "Archived",
-  },
-  draft: {
-    className: "bg-warning-bg text-warning",
-    icon: FilePen,
-    label: "Draft",
-  },
+  active: { variant: "success", icon: Check, label: "Active" },
+  draft: { variant: "neutral", icon: FilePen, label: "Draft" },
 } satisfies Record<
   EventStatus,
   {
-    className: string;
+    variant: "success" | "neutral";
     icon: typeof Check;
     label: string;
   }
 >;
 
 function EventStatusBadge({ status }: { status: EventStatus }) {
-  const { className, icon: Icon, label } = statusConfig[status];
+  const { variant, icon: Icon, label } = statusConfig[status];
 
   return (
-    <Badge
-      aria-label={label}
-      variant="secondary"
-      className={`size-7 justify-center p-0 sm:h-auto sm:w-auto sm:px-2.5 sm:py-0.5 ${className}`}
-    >
-      <Icon className="size-4 sm:hidden" aria-hidden="true" />
-      <span className="hidden sm:inline">{label}</span>
+    <Badge variant={variant}>
+      <Icon aria-hidden="true" />
+      {label}
     </Badge>
   );
 }
@@ -121,18 +103,17 @@ function DetailItem({
 }) {
   return (
     <div className={wide ? "sm:col-span-2" : undefined}>
-      <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+      <dt className="text-label uppercase tracking-wide text-muted-foreground">
         {label}
       </dt>
-      <dd className="mt-1 whitespace-pre-wrap text-sm">{children || "—"}</dd>
+      <dd className="mt-1 whitespace-pre-wrap text-small">{children || "—"}</dd>
     </div>
   );
 }
 
-function formatSchedule(date: string | null, time: string | null) {
-  const formattedDate = formatEventDate(date, { month: "short" }) ?? "—";
-  const formattedTime = formatEventTime(time);
-  return formattedTime ? `${formattedDate} at ${formattedTime}` : formattedDate;
+function formatSchedule(timestamp: string | null) {
+  if (!timestamp) return "—";
+  return `${formatEventDate(timestamp, { month: "short" })} at ${formatEventTime(timestamp)}`;
 }
 
 function EventDetails({
@@ -152,16 +133,16 @@ function EventDetails({
       <DetailItem label="Status">{statusConfig[event.status].label}</DetailItem>
       <DetailItem label="Event type">{event.event_type}</DetailItem>
       <DetailItem label="Start">
-        {formatSchedule(event.start_date, event.start_time)}
+        {formatSchedule(event.starts_at)}
       </DetailItem>
       <DetailItem label="End">
-        {formatSchedule(event.end_date, event.end_time)}
+        {formatSchedule(event.ends_at)}
       </DetailItem>
       <DetailItem label="Registration opens">
-        {formatTimestamp(event.registration_start_time) ?? "—"}
+        {formatTimestamp(event.registration_opens_at) ?? "—"}
       </DetailItem>
       <DetailItem label="Registration closes">
-        {formatTimestamp(event.registration_end_time) ?? "—"}
+        {formatTimestamp(event.registration_closes_at) ?? "—"}
       </DetailItem>
       <DetailItem label="Registration status">
         {event.status === "draft"
@@ -202,7 +183,7 @@ function EventDetails({
         {event.description}
       </DetailItem>
       <DetailItem label="Applications enabled">
-        {event.applications_enabled ? "Yes" : "No"}
+        {event.requires_application ? "Yes" : "No"}
       </DetailItem>
       <DetailItem label="Mentors enabled">
         {event.mentors_enabled ? "Yes" : "No"}
@@ -232,7 +213,7 @@ function EventDetails({
       </DetailItem>
       <DetailItem label="Agenda" wide>
         {agenda ? (
-          <pre className="overflow-x-auto rounded-md bg-muted p-3 text-xs">
+          <pre className="overflow-x-auto rounded-lg bg-muted p-3 text-label">
             {String(agenda)}
           </pre>
         ) : (
@@ -270,7 +251,7 @@ const eventColumns: AdminDirectoryColumn<AdminEventTableRow>[] = [
     headerClassName: "whitespace-nowrap",
     cellClassName: "whitespace-nowrap text-muted-foreground",
     render: (row) =>
-      formatEventDate(row.event.start_date, { month: "short" }) ?? "—",
+      formatEventDate(row.event.starts_at, { month: "short" }) ?? "—",
   },
   {
     id: "registered",
@@ -287,11 +268,12 @@ const eventColumns: AdminDirectoryColumn<AdminEventTableRow>[] = [
     header: "Registration Status",
     render: (row) => (
       <Badge
-        variant={row.event.status === "draft" ? "destructive" : "secondary"}
-        className={
-          row.event.status !== "draft" && row.registrationOpen
-            ? "bg-success-bg text-success"
-            : undefined
+        variant={
+          row.event.status === "draft"
+            ? "neutral"
+            : row.registrationOpen
+              ? "success"
+              : "neutral"
         }
       >
         {row.event.status === "draft"
@@ -342,14 +324,14 @@ export function AdminEventsTable({
         );
       })
       .sort((a, b) => {
-        const aDate = a.event.start_date;
-        const bDate = b.event.start_date;
+        const aDate = a.event.starts_at;
+        const bDate = b.event.starts_at;
 
         if (!aDate && !bDate) return 0;
         if (!aDate) return 1;
         if (!bDate) return -1;
 
-        const comparison = aDate.localeCompare(bDate);
+        const comparison = Date.parse(aDate) - Date.parse(bDate);
         return sortDirection === "ascending" ? comparison : -comparison;
       });
   }, [
@@ -467,7 +449,7 @@ export function AdminEventsTable({
                   </Link>
                 </Button>
               </div>
-              <div className="border-t px-4 py-5">
+              <div className="border-t border-border-subtle px-4 py-5">
                 <EventDetails row={selectedRow} />
               </div>
             </>

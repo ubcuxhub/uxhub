@@ -1,0 +1,107 @@
+/* Colour Tokens — semantic aliases of the primitives, Light and Dark.
+   Names follow docs/design-system.md 2.11. Dark mode is `data-theme="dark"`
+   on <html>; density is `data-density="compact"` on any ancestor.
+   Semantic `--text-*` colours live here, never in `@theme`, where Tailwind
+   would read `--text-*` as a font size. */
+
+:root {
+  /* Background */
+  --background-default: var(--colour-neutral-0);
+  --background-secondary: var(--colour-neutral-100);
+  --background-surface-subtle: var(--colour-neutral-200);
+  --background-surface-default: var(--colour-neutral-0);
+  --background-surface-card: var(--colour-neutral-0);
+  --background-surface-modal: var(--colour-neutral-0);
+  --background-surface-hover: var(--colour-neutral-50);
+
+  /* Text */
+  --text-primary: var(--colour-neutral-900);
+  --text-secondary: var(--colour-neutral-600);
+  --text-muted: var(--colour-neutral-600);
+  --text-disabled: var(--colour-neutral-700);
+  --text-inverse: var(--colour-neutral-0);
+
+  /* Border */
+  --border-default: var(--colour-neutral-400);
+  --border-subtle: var(--colour-neutral-300);
+
+  /* Action */
+  --action-primary: var(--colour-blue-500);
+  --action-primary-hover: var(--colour-blue-600);
+  --action-primary-strong: var(--colour-blue-700);
+  --action-secondary: var(--colour-neutral-0);
+  --action-focus: var(--colour-blue-300);
+  --action-disabled-border: var(--colour-neutral-400);
+  --action-disabled-background: var(--colour-neutral-300);
+  --action-destructive: var(--colour-red-500);
+  --action-destructive-hover: var(--colour-red-600);
+  --action-destructive-strong: var(--colour-red-700);
+
+  /* Status */
+  --status-success-text: var(--colour-green-600);
+  --status-success-background: var(--colour-green-0);
+  --status-success-active: var(--colour-green-400);
+  --status-warning-text: var(--colour-yellow-900);
+  --status-warning-background: var(--colour-yellow-0);
+  --status-error-text: var(--colour-red-650);
+  --status-error-background: var(--colour-red-0);
+  --status-info-text: var(--colour-blue-400);
+  --status-info-background: var(--colour-blue-100);
+
+  /* Transaction */
+  --transaction-positive: var(--colour-green-400);
+  --transaction-negative: var(--colour-red-650);
+
+  /* Overlay (raw, not an alias) */
+  --overlay-scrim: rgb(17 17 17 / 0.4);
+
+  /* Density — Comfortable */
+  --size-control: 40px;
+  --size-table-row: 56px;
+  --size-nav-row: 44px;
+}
+
+[data-theme="dark"] {
+  --background-default: var(--colour-neutral-900);
+  --background-secondary: var(--colour-dark-100);
+  --background-surface-subtle: var(--colour-dark-200);
+  --background-surface-default: var(--colour-neutral-900);
+  --background-surface-card: var(--colour-neutral-900);
+  --background-surface-modal: var(--colour-dark-100);
+  --background-surface-hover: var(--colour-dark-50);
+
+  --text-primary: var(--colour-dark-900);
+  --text-secondary: var(--colour-dark-600);
+  --text-muted: var(--colour-dark-600);
+  --text-disabled: var(--colour-dark-700);
+
+  --border-default: var(--colour-dark-400);
+  --border-subtle: var(--colour-dark-300);
+
+  --action-primary-hover: var(--colour-blue-450);
+  --action-primary-strong: var(--colour-blue-600);
+  --action-secondary: var(--colour-neutral-900);
+  --action-focus: var(--colour-blue-200);
+  --action-disabled-border: var(--colour-dark-400);
+  --action-disabled-background: var(--colour-dark-300);
+
+  --status-success-text: var(--colour-green-200);
+  --status-success-background: var(--colour-green-900);
+  --status-warning-text: var(--colour-yellow-300);
+  --status-warning-background: var(--colour-yellow-950);
+  --status-error-text: var(--colour-red-300);
+  --status-error-background: var(--colour-red-950);
+  --status-info-text: var(--colour-blue-250);
+  --status-info-background: var(--colour-blue-900);
+
+  --transaction-positive: var(--colour-green-200);
+  --transaction-negative: var(--colour-red-300);
+
+  --overlay-scrim: rgb(0 0 0 / 0.6);
+}
+
+/* Density — Compact (admin tables) */
+[data-density="compact"] {
+  --size-control: 32px;
+  --size-table-row: 40px;
+}

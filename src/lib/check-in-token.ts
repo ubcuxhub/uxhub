@@ -3,10 +3,11 @@ import "server-only";
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 /**
- * A check-in QR code carries `<registration id>.<signature>`.
+ * A check-in QR code carries `<ticket id>.<signature>`.
  *
- * Registration IDs are not secret (they appear in admin URLs), so the HMAC is
- * what proves the server issued the code. A token never expires or changes, so
+ * Ticket IDs are not secret (a backfilled ticket kept its registration's ID,
+ * which appeared in admin URLs), so the HMAC is what proves the server issued
+ * the code. A token never expires or changes, so
  * a screenshot of a ticket scans as well as the live page; repeat entry is
  * stopped by the check-in record, not here.
  */
@@ -36,26 +37,26 @@ function getSecret(): string {
   return secret;
 }
 
-function sign(registrationId: string, secret: string): string {
+function sign(ticketId: string, secret: string): string {
   return createHmac("sha256", secret)
-    .update(SIGNING_CONTEXT + registrationId)
+    .update(SIGNING_CONTEXT + ticketId)
     .digest()
     .subarray(0, SIGNATURE_BYTES)
     .toString("base64url");
 }
 
-export function createCheckInToken(registrationId: string): string {
-  const id = registrationId.toLowerCase();
+export function createCheckInToken(ticketId: string): string {
+  const id = ticketId.toLowerCase();
 
   if (!UUID_PATTERN.test(id)) {
-    throw new Error("A check-in token can only be issued for a registration ID.");
+    throw new Error("A check-in token can only be issued for a ticket ID.");
   }
 
   return `${id}.${sign(id, getSecret())}`;
 }
 
 /**
- * Returns the registration ID a scanned token was issued for, or null when the
+ * Returns the ticket ID a scanned token was issued for, or null when the
  * token is malformed, edited, or was not signed with this server's secret.
  * A missing secret throws rather than rejecting every ticket as invalid.
  */

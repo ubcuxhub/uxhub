@@ -8,7 +8,8 @@ export interface CheckInSessionDraft {
   end_time: string;
 }
 
-export interface AttendingRegistration {
+/** A ticket holder on the check-in page. `id` is the ticket's. */
+export interface CheckInAttendee {
   id: string;
   user_id: string;
   user_name: string;

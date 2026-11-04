@@ -4,6 +4,7 @@ import { PageContainer } from "@/components/shared/PageContainer";
 import {
   EventCreateModify,
 } from "@/features/admin/components/EventCreateModify";
+import { resolveAdminEventId } from "@/features/admin/lib/resolve-event-param";
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchApplicationQuestions } from "@/lib/supabase-helpers/event-applications";
@@ -22,8 +23,9 @@ interface EventViewProps {
 
 export default async function EventView({ params }: EventViewProps) {
   await requireAdmin();
-  const { event: eventId } = await params;
+  const { event: eventParam } = await params;
   const supabase = await createClient();
+  const eventId = await resolveAdminEventId(supabase, eventParam);
   const [
     event,
     checkInSessions,

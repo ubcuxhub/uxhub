@@ -44,7 +44,7 @@ function ReadOnlyField({ label, value, lockedReason }: { label: string; value: s
           <Tooltip>
             <TooltipTrigger asChild>
               <Input id={id} readOnly aria-disabled="true" value={value || "—"}
-                className="cursor-not-allowed bg-surface-subtle text-small text-fg-secondary" />
+                className="cursor-not-allowed" />
             </TooltipTrigger>
             <TooltipContent className="max-w-xs" side="top">{lockedReason}</TooltipContent>
           </Tooltip>
@@ -140,7 +140,7 @@ export function UserDetailsPanel({
             {canEdit ? (
               <Select value={draft?.role ?? selectedUser.role_access}
                 onValueChange={(role) => onDraftChange({ role: role as RoleAccess })} disabled={isSaving}>
-                <SelectTrigger aria-label="Role Access" className="text-small"><SelectValue /></SelectTrigger>
+                <SelectTrigger aria-label="Role Access"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="basic">Basic</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>

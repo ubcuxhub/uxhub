@@ -8,37 +8,78 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { ApplicationStatus } from "@/lib/supabase/models";
-import { Clock, X, Check, User, Mail, Calendar } from "lucide-react";
+import { StatusBadge, type Status } from "@/components/ui/status-badge";
+import {
+  APPLICATION_REVIEW_STATE_LABELS,
+  type ApplicationReviewState,
+} from "@/features/admin/lib/application-review";
+import {
+  Clock,
+  X,
+  Check,
+  CircleMinus,
+  User,
+  Mail,
+  Calendar,
+  Ticket,
+  Hourglass,
+} from "lucide-react";
 import { formatTimestamp } from "@/lib/date";
 
 interface ApplicantInfoCardProps {
   name: string;
   email: string;
   applicationDate: string;
-  status: ApplicationStatus;
+  state: ApplicationReviewState;
+  offerExpiresAt: string | null;
 }
 
-function getStatusIcon(status: ApplicationStatus) {
-  switch (status) {
-    case "pending":
-      return <Clock className="text-warning" />;
-    case "declined":
-      return <X className="text-destructive" />;
+export function ApplicationStateIcon({ state }: { state: ApplicationReviewState }) {
+  switch (state) {
+    case "submitted":
+      return <Clock className="text-warning-foreground" />;
+    case "waitlisted":
+      return <Hourglass className="text-muted-foreground" />;
     case "accepted":
-      return <Check className="text-success" />;
+      return <Check className="text-success-foreground" />;
+    case "registered":
+      return <Ticket className="text-success-foreground" />;
+    case "offer_expired":
+      return <Clock className="text-destructive" />;
+    case "rejected":
+      return <X className="text-destructive" />;
   }
 }
 
-function getStatusText(status: ApplicationStatus) {
-  return status.charAt(0).toUpperCase() + status.slice(1);
+/**
+ * Under review reads as pending and a registered applicant as going. A lapsed
+ * offer and a rejection have no admin-facing status in the design system
+ * ("Not selected" is member wording), so they keep their own labels.
+ */
+const BADGE_STATUS: Partial<Record<ApplicationReviewState, Status>> = {
+  submitted: "pending",
+  waitlisted: "waitlisted",
+  accepted: "accepted",
+  registered: "going",
+};
+
+function ApplicationStateBadge({ state }: { state: ApplicationReviewState }) {
+  const status = BADGE_STATUS[state];
+  if (status) return <StatusBadge status={status} />;
+  return (
+    <Badge variant="neutral">
+      <CircleMinus aria-hidden />
+      {APPLICATION_REVIEW_STATE_LABELS[state]}
+    </Badge>
+  );
 }
 
 export function ApplicantInfoCard({
   name,
   email,
   applicationDate,
-  status,
+  state,
+  offerExpiresAt,
 }: ApplicantInfoCardProps) {
   return (
     <Card>
@@ -54,19 +95,23 @@ export function ApplicantInfoCard({
               {email}
             </CardDescription>
           </div>
-          <div className="flex items-center gap-2">
-            {getStatusIcon(status)}
-            <Badge variant="outline" className="capitalize">
-              {getStatusText(status)}
-            </Badge>
-          </div>
+          <ApplicationStateBadge state={state} />
         </div>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-1">
         <div className="flex items-center gap-2 text-small text-muted-foreground">
           <Calendar />
           <span>Applied: {formatTimestamp(applicationDate)}</span>
         </div>
+        {(state === "accepted" || state === "offer_expired") && offerExpiresAt && (
+          <div className="flex items-center gap-2 text-small text-muted-foreground">
+            <Clock />
+            <span>
+              {state === "accepted" ? "Register by" : "Offer expired"}:{" "}
+              {formatTimestamp(offerExpiresAt)}
+            </span>
+          </div>
+        )}
       </CardContent>
     </Card>
   );

@@ -9,7 +9,7 @@ import {
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchEvents } from "@/lib/supabase-helpers/events";
-import { fetchEventRegistrationCounts } from "@/lib/supabase-helpers/event-registrations";
+import { fetchEventSeatCounts } from "@/lib/supabase-helpers/event-tickets";
 
 export default async function AdminEventsPage() {
   await requireAdmin();
@@ -20,23 +20,23 @@ export default async function AdminEventsPage() {
   });
   // One aggregate call rather than a head-count per event: the per-event form
   // meant a thirty-event dashboard opened thirty concurrent PostgREST requests.
-  const registrationCounts = await fetchEventRegistrationCounts(
+  const seatCounts = await fetchEventSeatCounts(
     supabase,
     events.map((event) => event.id)
   );
 
   const now = new Date();
   const rows: AdminEventTableRow[] = events.map((event) => {
-    const registrationStart = event.registration_start_time
-      ? new Date(event.registration_start_time)
+    const registrationStart = event.registration_opens_at
+      ? new Date(event.registration_opens_at)
       : null;
-    const registrationEnd = event.registration_end_time
-      ? new Date(event.registration_end_time)
+    const registrationEnd = event.registration_closes_at
+      ? new Date(event.registration_closes_at)
       : null;
 
     return {
       event,
-      registrationCount: registrationCounts.get(event.id) ?? 0,
+      registrationCount: seatCounts.get(event.id)?.tickets ?? 0,
       registrationOpen:
         (!registrationStart || now >= registrationStart) &&
         (!registrationEnd || now <= registrationEnd),

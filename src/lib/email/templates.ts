@@ -67,13 +67,12 @@ export function renderEventConfirmationEmail({
 }: {
   event: Pick<
     EventRow,
-    | "end_time"
+    | "ends_at"
     | "location_address_url"
     | "location_building"
     | "location_room"
     | "name"
-    | "start_date"
-    | "start_time"
+    | "starts_at"
   >;
   purchase: Pick<
     PurchaseRow,
@@ -97,13 +96,12 @@ export function renderEventConfirmationEmail({
 function renderEventDetailRows(
   event: Pick<
     EventRow,
-    | "end_time"
+    | "ends_at"
     | "location_address_url"
     | "location_building"
     | "location_room"
     | "name"
-    | "start_date"
-    | "start_time"
+    | "starts_at"
   >,
   purchase: Pick<
     PurchaseRow,
@@ -111,8 +109,8 @@ function renderEventDetailRows(
   >,
 ) {
   const timeRange = [
-    formatEventTime(event.start_time),
-    formatEventTime(event.end_time),
+    formatEventTime(event.starts_at),
+    formatEventTime(event.ends_at),
   ]
     .filter(Boolean)
     .join(" – ");
@@ -121,7 +119,7 @@ function renderEventDetailRows(
     .join(" ");
 
   return [
-    detailRow("Date", formatEventDate(event.start_date)),
+    detailRow("Date", formatEventDate(event.starts_at)),
     detailRow("Time", timeRange),
     detailRow("Location", location),
     detailRow("Address", event.location_address_url),

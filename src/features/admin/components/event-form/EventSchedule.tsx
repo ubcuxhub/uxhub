@@ -1,10 +1,9 @@
 "use client";
 
 import { useState, type ComponentProps } from "react";
-import { CalendarIcon } from "lucide-react";
 
+import { DatePickerButton } from "../DatePickerButton";
 import { Calendar } from "@/components/ui/calendar";
-import { Button } from "@/components/ui/button";
 import {
   Field,
   FieldError,
@@ -17,24 +16,20 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
 
 interface EventScheduleProps {
-  start_date: string;
-  start_time: string;
-  end_date: string;
-  end_time: string;
+  starts_at: string;
+  ends_at: string;
   onFieldChange: <K extends keyof EventScheduleState>(
     field: K,
     value: EventScheduleState[K]
   ) => void;
 }
 
+/** Pacific wall-clock `YYYY-MM-DDTHH:mm` values, edited as a date and a time. */
 export interface EventScheduleState {
-  start_date: string;
-  start_time: string;
-  end_date: string;
-  end_time: string;
+  starts_at: string;
+  ends_at: string;
 }
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
@@ -51,6 +46,18 @@ const dateStringToDate = (value: string) => {
   return new Date(year, month - 1, day);
 };
 
+const splitDateTimeLocal = (value: string) => {
+  const [date = "", time = ""] = value.split("T");
+
+  return { date, time };
+};
+
+const combineDateTimeLocal = (date: string, time: string) => {
+  if (!date && !time) return "";
+
+  return `${date}T${time}`;
+};
+
 const isSameDate = (left: string, right: string) =>
   Boolean(left && right && left === right);
 
@@ -62,21 +69,7 @@ const dateToDateString = (date: Date) => {
   return `${year}-${month}-${day}`;
 };
 
-const isScheduleRangeInvalid = ({
-  start_date,
-  start_time,
-  end_date,
-  end_time,
-}: EventScheduleState) => {
-  if (!start_date || !start_time || !end_date || !end_time) return false;
-
-  return (
-    new Date(`${start_date}T${start_time}`) >=
-    new Date(`${end_date}T${end_time}`)
-  );
-};
-
-const DatePickerButton = ({
+const DatePickerField = ({
   id,
   value,
   placeholder,
@@ -95,18 +88,11 @@ const DatePickerButton = ({
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button
+        <DatePickerButton
           id={id}
-          type="button"
-          variant="outline"
-          className={cn(
-            "w-full justify-start text-left font-normal",
-            !selectedDate && "text-muted-foreground"
-          )}
-        >
-          <CalendarIcon data-icon="inline-start" />
-          {selectedDate ? dateFormatter.format(selectedDate) : placeholder}
-        </Button>
+          label={selectedDate ? dateFormatter.format(selectedDate) : undefined}
+          placeholder={placeholder}
+        />
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
         <Calendar
@@ -127,61 +113,76 @@ const DatePickerButton = ({
 };
 
 export const EventSchedule = ({
-  start_date,
-  start_time,
-  end_date,
-  end_time,
+  starts_at,
+  ends_at,
   onFieldChange,
 }: EventScheduleProps) => {
-  const startDate = dateStringToDate(start_date);
-  const endTimeMin = isSameDate(start_date, end_date) ? start_time : undefined;
-  const hasInvalidRange = isScheduleRangeInvalid({
-    start_date,
-    start_time,
-    end_date,
-    end_time,
-  });
+  const start = splitDateTimeLocal(starts_at);
+  const end = splitDateTimeLocal(ends_at);
+  const startDate = dateStringToDate(start.date);
+  const endTimeMin = isSameDate(start.date, end.date) ? start.time : undefined;
+  const hasInvalidRange = Boolean(
+    start.date &&
+      start.time &&
+      end.date &&
+      end.time &&
+      new Date(starts_at) >= new Date(ends_at)
+  );
 
   return (
     <FieldGroup className="grid gap-4 md:grid-cols-2">
       <Field>
-        <FieldLabel htmlFor="start_date">Start Date <span className="text-destructive">*</span></FieldLabel>
-        <DatePickerButton
-          id="start_date"
-          value={start_date}
+        <FieldLabel htmlFor="starts_at_date">Start Date <span className="text-destructive">*</span></FieldLabel>
+        <DatePickerField
+          id="starts_at_date"
+          value={start.date}
           placeholder="Pick a start date"
-          onChange={(value) => onFieldChange("start_date", value)}
+          onChange={(value) =>
+            onFieldChange("starts_at", combineDateTimeLocal(value, start.time))
+          }
         />
       </Field>
       <Field>
-        <FieldLabel htmlFor="start_time">Start Time <span className="text-destructive">*</span></FieldLabel>
+        <FieldLabel htmlFor="starts_at_time">Start Time <span className="text-destructive">*</span></FieldLabel>
         <Input
-          id="start_time"
+          id="starts_at_time"
           type="time"
           required
-          value={start_time}
-          onChange={(e) => onFieldChange("start_time", e.target.value)}
+          value={start.time}
+          onChange={(e) =>
+            onFieldChange(
+              "starts_at",
+              combineDateTimeLocal(start.date, e.target.value)
+            )
+          }
         />
       </Field>
       <Field>
-        <FieldLabel htmlFor="end_date">End Date <span className="text-destructive">*</span></FieldLabel>
-        <DatePickerButton
-          id="end_date"
-          value={end_date}
+        <FieldLabel htmlFor="ends_at_date">End Date <span className="text-destructive">*</span></FieldLabel>
+        <DatePickerField
+          id="ends_at_date"
+          value={end.date}
           placeholder="Pick an end date"
           disabled={startDate ? { before: startDate } : undefined}
-          onChange={(value) => onFieldChange("end_date", value)}
+          onChange={(value) =>
+            onFieldChange("ends_at", combineDateTimeLocal(value, end.time))
+          }
         />
       </Field>
       <Field>
-        <FieldLabel htmlFor="end_time">End Time <span className="text-destructive">*</span></FieldLabel>
+        <FieldLabel htmlFor="ends_at_time">End Time <span className="text-destructive">*</span></FieldLabel>
         <Input
-          id="end_time"
+          id="ends_at_time"
           type="time"
           required
-          value={end_time}
+          value={end.time}
           min={endTimeMin}
-          onChange={(e) => onFieldChange("end_time", e.target.value)}
+          onChange={(e) =>
+            onFieldChange(
+              "ends_at",
+              combineDateTimeLocal(end.date, e.target.value)
+            )
+          }
         />
         {hasInvalidRange && (
           <FieldError>Event end time must be after the start time.</FieldError>
@@ -190,4 +191,3 @@ export const EventSchedule = ({
     </FieldGroup>
   );
 };
-

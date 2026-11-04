@@ -114,8 +114,8 @@ export function CheckoutPaymentSection({
         {showAmount ? (
           <>
             <div className="flex items-center justify-between text-small">
-              <span className="text-muted-foreground">Total Amount</span>
-              <span className="font-semibold">{amount}</span>
+              <span className="text-muted-foreground">Total amount</span>
+              <span className="text-body-medium">{amount}</span>
             </div>
             <Separator />
           </>

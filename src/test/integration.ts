@@ -204,10 +204,10 @@ export class Fixtures {
 
   /**
    * Deletes the rows the app's code and database functions write on a
-   * fixture's behalf, which a test never tracks: the ticket, application,
-   * purchase and registration behind a seat. They pin their parents from both sides, as
+   * fixture's behalf, which a test never tracks: the ticket, application and
+   * purchase behind a seat. They pin their parents from both sides, as
    * `purchases.event_id` restricts deleting the event and
-   * `event_registrations.user_id` blocks deleting the user, so no order of the
+   * `event_tickets.user_id` blocks deleting the user, so no order of the
    * tracked deletes alone could clear them.
    */
   private async deleteDependents(failures: unknown[]) {
@@ -219,7 +219,6 @@ export class Fixtures {
     for (const table of [
       "event_tickets",
       "event_applications",
-      "event_registrations",
       "purchases",
     ] as const) {
       if (eventIds.length > 0) {

@@ -9,12 +9,10 @@ import type {
 export function prepareResponseData(
   questionRecords: Pick<EventApplicationQuestionRow, "id">[],
   responses: Record<string, string | string[]>,
-  registrationId: string
+  applicationId: string
 ): EventApplicationResponseInsert[] {
-  if (!registrationId) {
-    throw new Error(
-      "Registration ID is required to save application responses"
-    );
+  if (!applicationId) {
+    throw new Error("Application ID is required to save application responses");
   }
 
   return questionRecords.map((questionRecord, index) => {
@@ -31,7 +29,7 @@ export function prepareResponseData(
 
     const responseData: EventApplicationResponseInsert = {
       event_application_question_id: questionRecord.id,
-      event_registration_id: registrationId,
+      application_id: applicationId,
       response: responseText,
     };
 

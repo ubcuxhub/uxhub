@@ -36,19 +36,15 @@ vi.mock("@/lib/supabase-helpers/events", () => ({
   fetchEventBySlug: eventsMocks.fetchEventBySlug,
 }));
 
-const applicationsMocks = vi.hoisted(() => ({
-  fetchApplicationQuestions: vi.fn(),
+// Reserving and releasing stay real so the RPCs they call are asserted.
+const ticketsMocks = vi.hoisted(() => ({
+  fetchEventTicketByPurchaseId: vi.fn(),
+  fetchUserEventTicket: vi.fn(),
 }));
-vi.mock("@/lib/supabase-helpers/event-applications", () => ({
-  fetchApplicationQuestions: applicationsMocks.fetchApplicationQuestions,
+vi.mock("@/lib/supabase-helpers/event-tickets", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/supabase-helpers/event-tickets")>()),
+  ...ticketsMocks,
 }));
-
-const registrationsMocks = vi.hoisted(() => ({
-  fetchEventRegistrationByPurchaseId: vi.fn(),
-  fetchUserRegistration: vi.fn(),
-  updateEventRegistration: vi.fn(),
-}));
-vi.mock("@/lib/supabase-helpers/event-registrations", () => registrationsMocks);
 
 const membershipsMocks = vi.hoisted(() => ({
   fetchMembershipTypeBySlug: vi.fn(),
@@ -180,11 +176,8 @@ beforeEach(() => {
   purchasesMocks.recordSquareWebhookEvent.mockResolvedValue(true);
   purchasesMocks.forgetSquareWebhookEvent.mockResolvedValue(undefined);
 
-  registrationsMocks.fetchUserRegistration.mockResolvedValue(null);
-  registrationsMocks.fetchEventRegistrationByPurchaseId.mockResolvedValue({
-    id: "registration-1",
-  });
-  applicationsMocks.fetchApplicationQuestions.mockResolvedValue([]);
+  ticketsMocks.fetchUserEventTicket.mockResolvedValue(null);
+  ticketsMocks.fetchEventTicketByPurchaseId.mockResolvedValue({ id: "ticket-1" });
 
   customerMocks.ensureSquareCustomerId.mockResolvedValue("customer-1");
   appSettingsMocks.fetchMembershipTermEndsAt.mockResolvedValue(null);
@@ -200,20 +193,19 @@ beforeEach(() => {
 
   eventsMocks.fetchEventBySlug.mockResolvedValue({
     id: "event-1",
-    applications_enabled: false,
     member_price: 10,
     regular_price: 20,
     name: "Design Night",
   });
 
   adminDb.rpc.mockImplementation(async (fn: string) => {
-    if (fn === "reserve_paid_event_ticket") {
+    if (fn === "reserve_event_ticket") {
       return {
-        data: [{ registration_id: "registration-1", failure_reason: null }],
+        data: [{ ticket_id: "ticket-1", failure_reason: null }],
         error: null,
       };
     }
-    if (fn === "release_paid_event_ticket_reservation") {
+    if (fn === "release_event_ticket") {
       return { data: null, error: null };
     }
     throw new Error(`Unexpected RPC: ${fn}`);
@@ -231,9 +223,9 @@ beforeEach(() => {
 describe("event ticket checkout", () => {
   it("cancels the Square payment and marks the purchase canceled when the seat reservation fails", async () => {
     adminDb.rpc.mockImplementation(async (fn: string) => {
-      if (fn === "reserve_paid_event_ticket") {
+      if (fn === "reserve_event_ticket") {
         return {
-          data: [{ registration_id: null, failure_reason: "SOLD_OUT" }],
+          data: [{ ticket_id: null, failure_reason: "SOLD_OUT" }],
           error: null,
         };
       }
@@ -273,7 +265,7 @@ describe("event ticket checkout", () => {
     });
     expect(squareMocks.cancel).toHaveBeenCalledWith({ paymentId: "payment-1" });
     expect(adminDb.rpc).toHaveBeenCalledWith(
-      "release_paid_event_ticket_reservation",
+      "release_event_ticket",
       { p_purchase_id: "purchase-1" }
     );
     expect(purchasesMocks.updatePurchase).toHaveBeenLastCalledWith(
@@ -304,7 +296,7 @@ describe("event ticket checkout", () => {
     });
     expect(squareMocks.cancel).not.toHaveBeenCalled();
     expect(adminDb.rpc).not.toHaveBeenCalledWith(
-      "release_paid_event_ticket_reservation",
+      "release_event_ticket",
       expect.anything()
     );
     // The money state is unclear, so this one alerts.
@@ -324,6 +316,40 @@ describe("event ticket checkout", () => {
         delayDuration: "PT10M",
       })
     );
+  });
+
+  it("sells members only active events and lets staff register for drafts", async () => {
+    await executeCheckoutForUser(user, ticketInput);
+    expect(eventsMocks.fetchEventBySlug).toHaveBeenLastCalledWith(
+      adminDb,
+      ticketInput.slug,
+      { status: "active" }
+    );
+
+    for (const role of ["admin", "manager"] as const) {
+      await executeCheckoutForUser(
+        { ...user, role_access: role } as UserInfoRow,
+        { ...ticketInput, idempotencyKey: `key-${role}` }
+      );
+      expect(eventsMocks.fetchEventBySlug).toHaveBeenLastCalledWith(
+        adminDb,
+        ticketInput.slug,
+        {}
+      );
+    }
+  });
+
+  it("refuses a second ticket before charging", async () => {
+    ticketsMocks.fetchUserEventTicket.mockResolvedValue({ id: "ticket-1" });
+
+    const result = await executeCheckoutForUser(user, ticketInput);
+
+    expect(result).toEqual({
+      ok: false,
+      error: "You already have a ticket for this event.",
+      terminal: true,
+    });
+    expect(squareMocks.create).not.toHaveBeenCalled();
   });
 
   it("charges members the member price", async () => {
@@ -505,7 +531,7 @@ describe("webhook-driven reconciliation", () => {
       expect.objectContaining({ status: "canceled" })
     );
     expect(adminDb.rpc).toHaveBeenCalledWith(
-      "release_paid_event_ticket_reservation",
+      "release_event_ticket",
       { p_purchase_id: "purchase-1" }
     );
   });

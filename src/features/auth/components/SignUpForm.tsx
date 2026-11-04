@@ -25,7 +25,6 @@ import {
 } from "../auth-errors";
 import { setPendingEmail } from "../pending-email";
 import { AuthPanel } from "./AuthPanel";
-import { authInputClassName } from "./auth-styles";
 import { AuthSubmitButton } from "./AuthSubmitButton";
 import { GoogleOAuthButton } from "./GoogleOAuthButton";
 
@@ -180,36 +179,34 @@ export function SignUpForm({
       <form onSubmit={handleSignUp} className="space-y-4">
         <div className="grid gap-6 sm:grid-cols-2">
           <Field>
-            <FieldLabel htmlFor="first-name" className="text-body text-foreground">
+            <FieldLabel htmlFor="first-name">
               First Name *
             </FieldLabel>
             <Input
               id="first-name"
-              placeholder="Enter your first name"
+              placeholder="First name"
               required
               value={formData.firstName}
               onChange={(e) => handleChange("firstName", e.target.value)}
-              className={authInputClassName}
             />
           </Field>
 
           <Field>
-            <FieldLabel htmlFor="last-name" className="text-body text-foreground">
+            <FieldLabel htmlFor="last-name">
               Last Name *
             </FieldLabel>
             <Input
               id="last-name"
-              placeholder="Enter your last name"
+              placeholder="Last name"
               required
               value={formData.lastName}
               onChange={(e) => handleChange("lastName", e.target.value)}
-              className={authInputClassName}
             />
           </Field>
         </div>
 
         <Field>
-          <FieldLabel htmlFor="email" className="text-body text-foreground">
+          <FieldLabel htmlFor="email">
             Email *
           </FieldLabel>
           <Input
@@ -219,12 +216,11 @@ export function SignUpForm({
             required
             value={formData.email}
             onChange={(e) => handleChange("email", e.target.value)}
-            className={authInputClassName}
           />
         </Field>
 
         <Field data-invalid={fieldErrors.password ? true : undefined}>
-          <FieldLabel htmlFor="password" className="text-body text-foreground">
+          <FieldLabel htmlFor="password">
             Password *
           </FieldLabel>
           <Input
@@ -236,7 +232,6 @@ export function SignUpForm({
             aria-invalid={fieldErrors.password ? true : undefined}
             value={formData.password}
             onChange={(e) => handleChange("password", e.target.value)}
-            className={authInputClassName}
           />
           {fieldErrors.password ? (
             <FieldError>{fieldErrors.password}</FieldError>
@@ -248,7 +243,7 @@ export function SignUpForm({
         </Field>
 
         <Field data-invalid={fieldErrors.repeatPassword ? true : undefined}>
-          <FieldLabel htmlFor="repeat-password" className="text-body text-foreground">
+          <FieldLabel htmlFor="repeat-password">
             Confirm password *
           </FieldLabel>
           <Input
@@ -259,7 +254,6 @@ export function SignUpForm({
             aria-invalid={fieldErrors.repeatPassword ? true : undefined}
             value={formData.repeatPassword}
             onChange={(e) => handleChange("repeatPassword", e.target.value)}
-            className={authInputClassName}
           />
           {fieldErrors.repeatPassword ? (
             <FieldError>{fieldErrors.repeatPassword}</FieldError>

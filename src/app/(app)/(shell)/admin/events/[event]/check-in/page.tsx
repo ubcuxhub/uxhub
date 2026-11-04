@@ -1,14 +1,14 @@
 import { notFound } from "next/navigation";
 
 import { CheckInManager } from "@/features/admin/components/CheckInManager";
+import { resolveAdminEventId } from "@/features/admin/lib/resolve-event-param";
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import {
-  fetchAttendingRegistrations,
+  fetchCheckInAttendees,
   fetchCheckInSessions,
   fetchCheckInStatuses,
 } from "@/lib/supabase-helpers/check-ins";
-import { fetchRegistrationsForEvent } from "@/lib/supabase-helpers/event-registrations";
 import { fetchEventById } from "@/lib/supabase-helpers/events";
 
 interface CheckInPageProps {
@@ -17,16 +17,19 @@ interface CheckInPageProps {
 
 export default async function CheckInPage({ params }: CheckInPageProps) {
   await requireAdmin();
-  const { event: eventId } = await params;
+  const { event: eventParam } = await params;
   const supabase = await createClient();
-  const [event, sessions, registrations, statuses, allRegistrations] =
-    await Promise.all([
-      fetchEventById(supabase, eventId),
-      fetchCheckInSessions(supabase, eventId),
-      fetchAttendingRegistrations(supabase, eventId),
-      fetchCheckInStatuses(supabase, eventId),
-      fetchRegistrationsForEvent(supabase, eventId),
-    ]);
+  const eventId = await resolveAdminEventId(
+    supabase,
+    eventParam,
+    "/check-in"
+  );
+  const [event, sessions, attendees, statuses] = await Promise.all([
+    fetchEventById(supabase, eventId),
+    fetchCheckInSessions(supabase, eventId),
+    fetchCheckInAttendees(supabase, eventId),
+    fetchCheckInStatuses(supabase, eventId),
+  ]);
 
   if (!event) notFound();
 
@@ -35,9 +38,8 @@ export default async function CheckInPage({ params }: CheckInPageProps) {
       eventId={eventId}
       event={event}
       initialCheckInSessions={sessions}
-      initialAttendingRegistrations={registrations}
+      initialAttendees={attendees}
       initialCheckInStatuses={Array.from(statuses.entries())}
-      initialAllRegistrations={allRegistrations}
     />
   );
 }

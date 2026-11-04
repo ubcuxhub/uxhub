@@ -9,7 +9,7 @@ interface CheckInTableHeaderProps {
 export function CheckInTableHeader({ sessions }: CheckInTableHeaderProps) {
   return (
     <thead>
-      <tr className="border-b">
+      <tr className="border-b border-border-subtle">
         <th className="px-4 py-3 text-left text-table">Name</th>
         {sessions.map((session) => (
           <th key={session.id} className="px-4 py-3 text-center text-table">

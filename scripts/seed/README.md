@@ -52,8 +52,8 @@ Deletion is scoped by ownership, not by table:
 | Prunable                                                  | Never touched                                       |
 | --------------------------------------------------------- | --------------------------------------------------- |
 | Events and membership tiers matched by slug                | Auth users and profiles created by hand              |
-| Mentors, sponsors, check-in sessions, application questions| Purchases and registrations owned by any other account |
-| Purchases and registrations owned by the fixture accounts  | Covers uploaded through the admin UI (`covers/`)     |
+| Mentors, sponsors, check-in sessions, application questions| Purchases, tickets and applications owned by any other account |
+| Purchases, tickets and applications owned by the fixture accounts | Covers uploaded through the admin UI (`covers/`)     |
 | Cover images under the `seed/covers/` storage prefix       |                                                      |
 
 An extra event survives if a non-fixture purchase points at it —
@@ -67,8 +67,8 @@ which are `restrict` from their link tables.
 each one is for. The biggest group is **purchasable**: upcoming, active,
 registration open, and left unbought by every fixture account so event checkout
 can be run repeatedly. A test fails if a fixture purchase ever lands on one.
-The rest cover archived history, a closed registration window, a not-yet-open
-one, and a draft.
+The rest cover past events, still active so members keep their history, a
+closed registration window, a not-yet-open one, and a draft.
 
 `data/users.ts` — eleven local accounts. **Password is `123456` for all of them.**
 Ten cover every membership state crossed with the basic and admin roles:
@@ -99,7 +99,7 @@ mirroring `completeMembershipProfile`; the validator rejects a fixture that
 mixes them.
 
 Three of the eleven are **deep** fixtures (`fullEventHistory: true`) carrying
-purchased registrations across every phase, applications, and check-ins:
+purchased tickets across every phase, applications, and check-ins:
 `admin-explorer@example.com`, `no-membership@example.com`, and
 `student-innovator@example.com`. The other eight hold a membership purchase at
 most — giving each of them a full timeline would be a lot of fixture data to
@@ -123,7 +123,7 @@ in at run time from the target's own host.
 | `index.ts`               | CLI, orchestration, and the prune pass                       |
 | `lib/targets.ts`         | local vs prod resolution and per-target policy               |
 | `lib/reconcile.ts`       | upsert-by-slug and child reconciliation primitives           |
-| `lib/reconcile-users.ts` | accounts, purchases, registrations, and their prune          |
+| `lib/reconcile-users.ts` | accounts, purchases, tickets, applications, and their prune  |
 | `lib/prune.ts`           | pure delete planning — the ownership rules live here         |
 | `lib/images.ts`          | cover upload, URL building, and stale-image cleanup          |
 | `lib/user-fixtures.ts`   | fixture validation, run before anything is written           |

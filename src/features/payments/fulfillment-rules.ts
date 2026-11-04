@@ -219,13 +219,17 @@ export function getSquareErrorDiagnostic(error: unknown) {
 export function formatReservationFailure(reason: string | null | undefined) {
   switch (reason) {
     case "APPLICATION_REQUIRED":
-      return "This event uses an application flow and cannot be purchased directly.";
+      return "This event takes applications. You can register once your application is accepted.";
+    case "OFFER_EXPIRED":
+      return "Your offer for this event has expired.";
+    case "USER_NOT_FOUND":
+      return "We could not find your account. Sign in again and retry.";
     case "REGISTRATION_NOT_OPEN":
       return "Registration for this event is not open yet.";
     case "REGISTRATION_CLOSED":
       return "Registration for this event has closed.";
     case "ALREADY_REGISTERED":
-      return "You already have a registration for this event.";
+      return "You already have a ticket for this event.";
     case "SOLD_OUT":
       return "This event is sold out.";
     case "EVENT_NOT_FOUND":

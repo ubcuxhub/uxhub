@@ -136,6 +136,31 @@ CREATE TABLE event_sponsors (
   PRIMARY KEY (event_id, sponsor_id)
 );
 
+-- One row per event per date, each holding timed items. Will replace
+-- events.agenda once no code reads that column.
+CREATE TABLE event_agenda_days (
+  id       uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id uuid NOT NULL REFERENCES events (id) ON DELETE CASCADE,
+  date     date NOT NULL,
+  title    text,
+  UNIQUE (event_id, date)
+);
+
+-- Building and room each fall back on their own: a null building means the
+-- event's building, and a null room means the event's room.
+CREATE TABLE event_agenda_items (
+  id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_agenda_day_id uuid NOT NULL REFERENCES event_agenda_days (id) ON DELETE CASCADE,
+  title               text NOT NULL,
+  start_time          time NOT NULL,
+  end_time            time NOT NULL,
+  building            text,
+  room                text,
+  CHECK (end_time > start_time)
+);
+
+CREATE INDEX event_agenda_items_event_agenda_day_id_start_time_idx ON event_agenda_items (event_agenda_day_id, start_time);
+
 CREATE TABLE event_application_questions (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   event_id            uuid NOT NULL REFERENCES events (id) ON DELETE CASCADE,

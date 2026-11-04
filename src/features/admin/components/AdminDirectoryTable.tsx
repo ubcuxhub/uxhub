@@ -31,9 +31,9 @@ export function AdminDirectoryTable<T>({
 }: AdminDirectoryTableProps<T>) {
   return (
     <div className="overflow-x-auto rounded-lg border">
-      <table className="w-full min-w-max text-sm">
+      <table className="w-full min-w-max text-small">
         <thead>
-          <tr className="border-b bg-muted/50">
+          <tr className="border-b border-border-subtle bg-muted/50">
             {columns.map((column) => (
               <th
                 key={column.id}
@@ -54,7 +54,7 @@ export function AdminDirectoryTable<T>({
               role="button"
               tabIndex={0}
               aria-label={getRowLabel(row)}
-              className="cursor-pointer border-b transition-colors last:border-b-0 hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none"
+              className="cursor-pointer border-b border-border-subtle transition-colors last:border-b-0 hover:bg-muted/30 focus-visible:bg-muted/30 focus-visible:outline-none"
               onClick={(event) => onActivate(row, event.currentTarget)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" || event.key === " ") {

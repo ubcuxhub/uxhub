@@ -55,7 +55,7 @@ export function MembershipPlans({
               type="button"
               onClick={() => setSelectedSlug(tier.slug)}
               className={cn(
-                "rounded-lg border p-5 text-left transition-colors hover:bg-accent",
+                "rounded-lg border p-5 text-left transition-colors hover:bg-section",
                 selected && "border-primary bg-primary/5 ring-1 ring-primary",
               )}
             >

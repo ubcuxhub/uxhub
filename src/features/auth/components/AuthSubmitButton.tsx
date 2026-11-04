@@ -12,13 +12,7 @@ export function AuthSubmitButton({
 }: AuthSubmitButtonProps) {
   return (
     <Button
-      className={cn(
-        // The default variant is already bg-primary (--action-primary); only the
-        // hover and disabled tones differ from it, and both are designed tokens.
-        "h-11 w-full shadow-none hover:bg-action-hover sm:h-10",
-        "disabled:bg-action-disabled-bg disabled:text-action-disabled disabled:opacity-100",
-        className,
-      )}
+      className={cn("w-full", className)}
       {...props}
     >
       {children}

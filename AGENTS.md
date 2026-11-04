@@ -61,8 +61,8 @@ the UI is undone by re-running it. Pass `--no-prune` to keep those rows,
 `--dry-run` to preview. Pruning deletes any event or membership tier whose slug
 is not in the seed data, including one created through the admin UI, unless a
 row owned by a hand-made account (a purchase, say) still references it.
-Purchases and registrations are pruned only when they belong to one of the
-fixture accounts, never to an account created by hand.
+Purchases, tickets and applications are pruned only when they belong to one of
+the fixture accounts, never to an account created by hand.
 
 The eleven fixture accounts all sign in with password `123456`; see
 `scripts/seed/README.md` for the membership x role grid.
@@ -139,7 +139,7 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
   into `supabase/templates/*.html` by `pnpm email:templates` — edit the module,
   not the generated HTML. `pnpm test` fails when the two fall out of sync.
 - Marketing typography and colors are scoped by `.marketing-home` in
-  `src/app/globals.css`; keep marketing-only styles inside that boundary.
+  `src/styles/marketing.css`; keep marketing-only styles inside that boundary.
 - Use the `@/*` alias for imports from `src/*`.
 - Server code logs through `log` from `@/lib/log`, which emits one structured
   JSON line per event. Name events as stable dot-paths (`payment.ticket_charge_failed`),
@@ -163,13 +163,16 @@ Read `supabase/README.md` before changing the schema.
   `src/lib/supabase/database.types.ts`. It reads the local database, so the
   types come from the migrations; CI regenerates them and fails on any
   difference.
-- Apply migrations to the hosted project with `pnpm exec supabase db push`
-  before merging. Nothing applies them automatically, and the deploy that
-  follows a merge expects the new schema; `/events/[slug]` is also prerendered
-  against the database at build time. The hosted schema then runs ahead of the
-  deployed code, so keep migrations backward-compatible with the code already
-  in production. `db push` is forward-only; correct a bad migration with a new
-  one.
+- Merging deploys the migration: the Vercel production build
+  (`scripts/vercel-build.sh`) runs `supabase db push` before `next build`, so
+  the schema is in place before `/events/[slug]` is prerendered against it. A
+  failed migration fails the build. The old code serves traffic while the build
+  runs and a rollback does not undo a migration, so keep migrations
+  backward-compatible with the code already in production. `db push` is
+  forward-only; correct a bad migration with a new one.
+- Keep the timestamp `supabase migration new` generates. CI
+  (`scripts/check-migration-order.sh`) fails a PR whose new migration sorts
+  before the newest one on `main`, because `db push` would refuse it.
 - Validate schema changes with `pnpm exec tsc --noEmit`, `pnpm lint`, and
   `pnpm build`.
 
@@ -193,17 +196,24 @@ Local values belong in the git-ignored `.env.local`.
   `SENTRY_AUTH_TOKEN` upload source maps on Vercel builds
 - Check-in: server-only `CHECK_IN_TOKEN_SECRET` signs ticket QR codes
  (`src/lib/check-in-token.ts`); rotating it invalidates every issued ticket
+- Discount codes: server-only `DISCOUNT_CODE_<BUSINESS>`, one per partner in
+  `src/features/memberships/lib/discount-codes.ts`, kept out of the public repo.
+  A code whose variable is unset is not shown
 - Feature flags: `NEXT_PUBLIC_FEATURE_STUDENT_EVENTS` and
   `NEXT_PUBLIC_FEATURE_DARK_MODE` force a flag on or off; unset, both are on
   locally and on preview deploys and off in production (`src/lib/flags.ts`)
 - Seed `prod` target: `SEED_PROD_SUPABASE_URL` and
   `SEED_PROD_SUPABASE_SECRET_KEY`
+- Migrations: secret `SUPABASE_MIGRATIONS_DB_URL`, set in Vercel's Production
+  environment only, is the session-mode pooler connection string the
+  production build pushes migrations through. Never put it in `.env.local`
 
 `SQUARE_ENV` is optional and defaults to the sandbox; set it to `production`
 only for production credentials.
 
-Never expose the Supabase secret keys, Square access token, webhook signature
-key, Resend API key, Sentry auth token, or check-in token secret to client components.
+Never expose the Supabase secret keys, migrations database URL, Square access
+token, webhook signature key, Resend API key, Sentry auth token, or check-in
+token secret to client components.
 
 ## Quality
 
@@ -218,18 +228,66 @@ key, Resend API key, Sentry auth token, or check-in token secret to client compo
   transaction it rolls back, and every assertion is scoped to its own fixtures,
   so it is safe and repeatable against a seeded database. CI runs it in the
   build job against the throwaway database `supabase start` creates.
-- Do not verify changes by driving the app in a browser unless you are
-  explicitly asked to. Never sign in, and never type credentials — including
-  the local seed passwords in `scripts/seed/data/users.ts` — into a form. Take
-  automated verification as far as it goes (lint, types, Vitest, `pnpm build`,
-  direct `psql` queries), then hand the reviewer a list of what still needs
-  checking by hand and why.
+- Never sign in, and never type credentials — including the local seed passwords
+  in `scripts/seed/data/users.ts` — into a form. Take automated verification as
+  far as it goes (lint, types, Vitest, `pnpm build`, direct `psql` queries),
+  then hand the reviewer a list of what still needs checking by hand and why.
 
 ## UI
 
 Reuse `src/components/ui` primitives and `src/components/shared` composites
 before adding new primitives. Follow the existing shadcn conventions and use
-design tokens from `src/app/globals.css` instead of duplicating one-off styles.
+design tokens instead of duplicating one-off styles.
+
+Design tokens live in three layers: `src/styles/tokens/primitives.css` (raw
+colours), `src/styles/tokens/semantic.css` (Light and Dark aliases, plus
+density), and `src/app/globals.css` (maps them to Tailwind utilities and the
+shadcn bridge). CSS variable names follow `docs/design-system.md` (the Figma
+variable name with the slash turned into a hyphen). Dark mode is
+`data-theme="dark"` on `<html>` (`src/lib/theme.ts`), and density is
+`data-density="compact"`.
+
+Colour classes use one shadcn-style vocabulary. Every shadcn slot keeps
+shadcn's meaning: `bg-background`, `bg-card`, `bg-popover`, `bg-primary`,
+`bg-secondary` (subtle grey fill), `bg-muted`, `bg-accent` (hover highlight),
+`bg-destructive`, `border-border`, `border-input`, `ring-ring`. Our other
+tokens follow shadcn's pattern: `X` is a fill, `X-foreground` the text on it,
+`X-hover` / `X-active` its hover and pressed fills, `X-border` its edge
+(`bg-section` for grey section backgrounds, `bg-primary-hover`, `bg-disabled
+text-disabled-foreground border-disabled-border`, `bg-success
+text-success-foreground`, `border-border-subtle`, `bg-scrim`). `destructive`
+is split by property: `bg-destructive` is the action red, while
+`text-destructive` (error copy) and `border-destructive` (invalid edges) are
+the readable error red; an error badge is `bg-error text-destructive`. Code
+names don't match Figma names one to one: `docs/design-system.md` §2.11 maps
+every Figma variable to its class, and each variable's code syntax in Figma
+shows the class. Figma's `text/primary` is `text-foreground`; `text-primary` is
+the blue action colour. Never put a fill in `text-` (`text-muted`,
+`text-secondary`, `text-success`): a lint rule rejects it. The old `fg-*`,
+`action*`, `surface-*`, `*-bg`, `status-*`, `text-text-*`, `background-*` and
+`overlay-scrim` utilities were removed; lint rejects every one of them (with
+any variant prefix or `/opacity`) and names the replacement. The shadcn bridge
+in `globals.css` is permanent.
+
+## Merging pull requests
+
+`main` is protected by the `protect-main` ruleset, which requires one approving
+review. GitHub doesn't let anyone approve their own pull request, so when an
+agent works under the `johnny-581` account (which can bypass the ruleset) and
+that user asks for a merge, merge with the bypass instead of waiting for an
+approval:
+
+```bash
+gh pr ready <number>
+gh pr merge <number> --admin --merge --delete-branch
+```
+
+- Merge only when the user asked for that pull request (or batch), it has been
+  reviewed for correctness, and its CI checks are green.
+- Use a merge commit (`--merge`), not squash or rebase.
+- For stacked pull requests, retarget each dependent one to `main`
+  (`gh pr edit <n> --base main`) before deleting the branch it's based on.
+- Other accounts follow the normal review flow.
 
 ## Epics, responsiblity, and timeline
 

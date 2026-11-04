@@ -533,7 +533,7 @@ export function SquareCheckoutForm({
         <div className="rounded-md border bg-background p-3 text-small">
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">Charge amount</span>
-            <span className="font-medium">{amountLabel}</span>
+            <span className="text-body-medium">{amountLabel}</span>
           </div>
         </div>
       ) : null}

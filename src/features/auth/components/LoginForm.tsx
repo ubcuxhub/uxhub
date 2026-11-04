@@ -15,7 +15,6 @@ import {
   getAuthActionErrorMessage,
 } from "../auth-errors";
 import { AuthPanel } from "./AuthPanel";
-import { authInputClassName } from "./auth-styles";
 import { AuthSubmitButton } from "./AuthSubmitButton";
 import { GoogleOAuthButton } from "./GoogleOAuthButton";
 
@@ -84,7 +83,7 @@ export function LoginForm({
 
       <form onSubmit={handleLogin} className="space-y-6">
         <Field>
-          <FieldLabel htmlFor="email" className="text-body text-foreground">
+          <FieldLabel htmlFor="email">
             Email
           </FieldLabel>
           <Input
@@ -94,13 +93,12 @@ export function LoginForm({
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className={authInputClassName}
           />
         </Field>
 
         <Field>
           <div className="flex items-center justify-between gap-4">
-            <FieldLabel htmlFor="password" className="text-body text-foreground">
+            <FieldLabel htmlFor="password">
               Password
             </FieldLabel>
             <Link
@@ -118,7 +116,6 @@ export function LoginForm({
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className={authInputClassName}
           />
         </Field>
 

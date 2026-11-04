@@ -21,8 +21,8 @@ function seedEvent(slug: string): SeedEvent {
 }
 
 function registrationIsOpen(event: SeedEvent): boolean {
-  const start = new Date(event.event.registration_start_time!).getTime();
-  const end = new Date(event.event.registration_end_time!).getTime();
+  const start = new Date(event.event.registration_opens_at!).getTime();
+  const end = new Date(event.event.registration_closes_at!).getTime();
   return start < fixedNow.getTime() && end > fixedNow.getTime();
 }
 
@@ -44,7 +44,7 @@ describe("relative event seed timeline", () => {
   it("places each declared phase where it belongs on the timeline", () => {
     for (const slug of EVENT_PHASES.past) {
       expect(classifySeedEvent(seedEvent(slug), fixedNow)).toBe("past");
-      expect(seedEvent(slug).event.status).toBe("archived");
+      expect(seedEvent(slug).event.status).toBe("active");
     }
 
     for (const slug of EVENT_PHASES.ongoing) {
@@ -99,7 +99,7 @@ describe("relative event seed timeline", () => {
 
     const longestEnd = Math.max(
       ...EVENT_PHASES.ongoing.map((slug) =>
-        new Date(`${seedEvent(slug).event.end_date}T23:59:59Z`).getTime()
+        new Date(seedEvent(slug).event.ends_at!).getTime()
       )
     );
     expect(longestEnd - fixedNow.getTime()).toBeGreaterThan(
@@ -112,7 +112,7 @@ describe("relative event seed timeline", () => {
       const event = seedEvent(slug);
       expect(event.event.status).toBe("active");
       expect(
-        new Date(event.event.registration_end_time!).getTime()
+        new Date(event.event.registration_closes_at!).getTime()
       ).toBeLessThan(fixedNow.getTime());
     }
 
@@ -120,7 +120,7 @@ describe("relative event seed timeline", () => {
       const event = seedEvent(slug);
       expect(event.event.status).toBe("active");
       expect(
-        new Date(event.event.registration_start_time!).getTime()
+        new Date(event.event.registration_opens_at!).getTime()
       ).toBeGreaterThan(fixedNow.getTime());
     }
   });
@@ -134,7 +134,7 @@ describe("relative event seed timeline", () => {
   it("keeps historical registration windows closed", () => {
     for (const slug of EVENT_PHASES.past) {
       expect(
-        new Date(seedEvent(slug).event.registration_end_time!).getTime()
+        new Date(seedEvent(slug).event.registration_closes_at!).getTime()
       ).toBeLessThan(fixedNow.getTime());
     }
   });
@@ -159,12 +159,12 @@ describe("seed event cover images", () => {
   });
 
   it("does not repeat a cover on adjacent public cards", () => {
-    // `/events` lists active events by `start_date` ascending, so neighbours in
+    // `/events` lists active events by `starts_at` ascending, so neighbours in
     // this order are neighbours on the page.
     const listed = events
       .filter((event) => event.event.status === "active")
       .sort((left, right) =>
-        String(left.event.start_date).localeCompare(String(right.event.start_date))
+        Date.parse(left.event.starts_at!) - Date.parse(right.event.starts_at!)
       );
 
     for (let index = 1; index < listed.length; index += 1) {
@@ -201,5 +201,19 @@ describe("fixture purchases", () => {
       expect(purchase.fulfilledAt).toBeUndefined();
       expect(purchase.failureReason).toBeTruthy();
     }
+  });
+});
+
+describe("pacificTimestamp", () => {
+  it("reads the time as Vancouver wall clock", async () => {
+    const { pacificTimestamp } = await import("./relative-dates.ts");
+    // PST, UTC-8, in a past year so future offset changes can't move it.
+    expect(pacificTimestamp(new Date("2025-01-15T00:00:00Z"), "18:30")).toBe(
+      "2025-01-16T02:30:00.000Z"
+    );
+    // PDT, UTC-7.
+    expect(pacificTimestamp(new Date("2025-07-15T00:00:00Z"), "09:00")).toBe(
+      "2025-07-15T16:00:00.000Z"
+    );
   });
 });

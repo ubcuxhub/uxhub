@@ -2,7 +2,7 @@
 
 import { Input } from "@/components/ui/input";
 import type {
-  AttendingRegistration,
+  CheckInAttendee,
   CheckInSession,
 } from "../types";
 import { CheckInTableHeader } from "./CheckInTableHeader";
@@ -10,10 +10,10 @@ import { CheckInTableRow } from "./CheckInTableRow";
 
 interface CheckInTableProps {
   sessions: CheckInSession[];
-  registrations: AttendingRegistration[];
-  filteredRegistrations: AttendingRegistration[];
+  attendees: CheckInAttendee[];
+  filteredAttendees: CheckInAttendee[];
   checkInStatuses: Map<string, string | null>;
-  onToggle: (registrationId: string, sessionId: string, currentlyChecked: boolean) => void;
+  onToggle: (ticketId: string, sessionId: string, currentlyChecked: boolean) => void;
   updatingCells: Set<string>;
   searchQuery: string;
   onSearchChange: (query: string) => void;
@@ -21,8 +21,8 @@ interface CheckInTableProps {
 
 export function CheckInTable({
   sessions,
-  registrations,
-  filteredRegistrations,
+  attendees,
+  filteredAttendees,
   checkInStatuses,
   onToggle,
   updatingCells,
@@ -40,9 +40,9 @@ export function CheckInTable({
         />
       </div>
 
-      {filteredRegistrations.length === 0 ? (
+      {filteredAttendees.length === 0 ? (
         <div className="text-center py-12 text-muted-foreground">
-          {registrations.length === 0
+          {attendees.length === 0
             ? "No users registered for the event"
             : "No users match your search criteria."}
         </div>
@@ -51,10 +51,10 @@ export function CheckInTable({
           <table className="w-full">
             <CheckInTableHeader sessions={sessions} />
             <tbody>
-              {filteredRegistrations.map((registration) => (
+              {filteredAttendees.map((attendee) => (
                 <CheckInTableRow
-                  key={registration.id}
-                  registration={registration}
+                  key={attendee.id}
+                  attendee={attendee}
                   sessions={sessions}
                   checkInStatuses={checkInStatuses}
                   onToggle={onToggle}

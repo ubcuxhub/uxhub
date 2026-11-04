@@ -1,7 +1,8 @@
 import type { Metadata, Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
-import { DM_Sans, Inter, Lora } from "next/font/google";
+import { DM_Sans, Lora } from "next/font/google";
+import { Toaster } from "@/components/ui/toast";
 import { UserProvider } from "@/lib/auth/user-context";
 import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
@@ -10,11 +11,6 @@ const dmSans = DM_Sans({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
   variable: "--font-dm-sans",
-});
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
 });
 
 const lora = Lora({
@@ -54,13 +50,14 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${inter.variable} ${dmSans.variable} ${lora.variable} text-body antialiased`}
+        className={`${dmSans.variable} ${lora.variable} text-body antialiased`}
       >
         <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
         <UserProvider>
           {children}
           {flow}
         </UserProvider>
+        <Toaster />
         <Analytics />
         <SpeedInsights />
       </body>

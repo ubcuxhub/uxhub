@@ -7,7 +7,7 @@ won't scan. Target: Nov 12, 2026.
 ## What exists
 
 - **Signed token:** [`check-in-token.ts`](../src/lib/check-in-token.ts) turns a
-  registration ID into `<registration id>.<signature>` and checks a scanned one.
+  ticket ID into `<ticket id>.<signature>` and checks a scanned one.
   The signature is an HMAC made with `CHECK_IN_TOKEN_SECRET`, which never
   leaves the server.
 - **Ticket:** [`EventTicket`](../src/features/events/components/EventTicket.tsx)
@@ -16,9 +16,9 @@ won't scan. Target: Nov 12, 2026.
   and Checked in, drawn from the `qrToken` prop. Build its `event` prop with
   [`toTicketEvent`](../src/features/events/lib/ticket.ts).
 - **Check-in data:** `check_in_sessions` (one or more per event) and
-  `check_ins` (one row per registration per session, unique on that pair).
-  `/admin/events/[event]/check-in` already lists attending registrations with a
-  search box and a per-session check-in toggle (`toggleCheckInAction`).
+  `check_ins` (one row per ticket per session, unique on that pair).
+  `/admin/events/[event]/check-in` already lists tickets with a search box and
+  a per-session check-in toggle (`toggleCheckInAction`).
 
 ## Which token
 
@@ -31,10 +31,10 @@ page. Reuse is stopped at the door: the second scan finds the existing
 
 **Decided (2026-10-23): use `qr_token`.** `event_tickets` (see
 [registration-rollout.md](registration-rollout.md)) gives every ticket a unique
-random `qr_token`, and check-in moves from registrations to tickets. The signed
-token is being replaced because:
+random `qr_token`, and check-in has moved from registrations to tickets. The
+signed token is being replaced because:
 
-- it signs a registration ID, and `event_registrations` is being retired;
+- it was built to sign registration IDs, and `event_registrations` is gone;
 - a per-ticket secret can be revoked by regenerating that one token, without
   rotating `CHECK_IN_TOKEN_SECRET` and invalidating every ticket;
 - 32 hex characters make a smaller QR code than an ID plus a signature;
@@ -47,9 +47,9 @@ ticket for another event is rejected. Once check-in uses `qr_token`, delete
 
 ## Who gets a ticket
 
-A registration with `attending = true`, the same set the check-in table lists.
-Paid fulfillment sets this along with `status = 'accepted'`. The states doc
-says a registered person stays registered, so the ticket has no cancelled state.
+Anyone with an `event_tickets` row, the same set the check-in table lists. Paid
+fulfillment issues it through `reserve_event_ticket`. The states doc says a
+registered person stays registered, so the ticket has no cancelled state.
 
 ## Build steps
 
@@ -108,9 +108,9 @@ paths agree.
 
 ### 4. Manual lookup
 
-A "Can't scan?" button on the scanner opens a name/email search over attending
-registrations (reuse the filter in `CheckInManager`). Picking a person calls
-the same check-in function with the registration ID; no token is needed,
+A "Can't scan?" button on the scanner opens a name/email search over the
+event's tickets (reuse the filter in `CheckInManager`). Picking a person calls
+the same check-in function with the ticket ID; no token is needed,
 because the admin is already authorized.
 
 ## Testing
@@ -142,11 +142,11 @@ Before the trial:
   pushes. Turn off Vercel Deployment Protection for the trial, or share a
   bypass link, so testers don't need Vercel access.
 
-Afterwards, leave the event in Draft, or delete it and its registrations.
+Afterwards, leave the event in Draft, or delete it and its tickets.
 
 ## Open questions
 
 - Should managers, not just admins, be able to scan?
-- Free events: do they create an attending registration today, so every attendee
-  has a code? (Proposed schema assumption 3.)
+- Free events: there is no free-ticket path yet, so how does a free attendee
+  get a ticket and a code? (Proposed schema assumption 3.)
 - Do we need an "undo check-in" on the result card for a mis-scan?

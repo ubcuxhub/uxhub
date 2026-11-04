@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { CalendarIcon } from "lucide-react";
 
+import { DatePickerButton } from "../DatePickerButton";
 import { Calendar } from "@/components/ui/calendar";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,11 +17,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
 
 interface RegistrationTimesProps {
-  registration_start_time: string;
-  registration_end_time: string;
+  registration_opens_at: string;
+  registration_closes_at: string;
   onFieldChange: <K extends keyof RegistrationTimesState>(
     field: K,
     value: RegistrationTimesState[K]
@@ -29,8 +28,8 @@ interface RegistrationTimesProps {
 }
 
 export interface RegistrationTimesState {
-  registration_start_time: string;
-  registration_end_time: string;
+  registration_opens_at: string;
+  registration_closes_at: string;
 }
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", {
@@ -104,18 +103,10 @@ const RegistrationDateTimeField = ({
       <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
         <Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
-            <Button
+            <DatePickerButton
               id={`${id}_date`}
-              type="button"
-              variant="outline"
-              className={cn(
-                "w-full justify-start text-left font-normal",
-                !selectedDate && "text-muted-foreground"
-              )}
-            >
-              <CalendarIcon data-icon="inline-start" />
-              {selectedDate ? dateFormatter.format(selectedDate) : "Pick a date"}
-            </Button>
+              label={selectedDate ? dateFormatter.format(selectedDate) : undefined}
+            />
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
             <Calendar
@@ -154,38 +145,38 @@ const RegistrationDateTimeField = ({
 };
 
 export const RegistrationTimes = ({
-  registration_start_time,
-  registration_end_time,
+  registration_opens_at,
+  registration_closes_at,
   onFieldChange,
 }: RegistrationTimesProps) => {
   const { date: startDateString } = splitDateTimeLocal(
-    registration_start_time
+    registration_opens_at
   );
-  const { date: endDateString } = splitDateTimeLocal(registration_end_time);
+  const { date: endDateString } = splitDateTimeLocal(registration_closes_at);
   const startDate = dateStringToDate(startDateString);
   const minEndTime = isSameDate(startDateString, endDateString)
-    ? splitDateTimeLocal(registration_start_time).time
+    ? splitDateTimeLocal(registration_opens_at).time
     : undefined;
   const hasInvalidRange = isDateTimeRangeInvalid(
-    registration_start_time,
-    registration_end_time
+    registration_opens_at,
+    registration_closes_at
   );
 
   return (
     <FieldGroup className="grid gap-4 md:grid-cols-2">
       <RegistrationDateTimeField
-        id="registration_start_time"
+        id="registration_opens_at"
         label="Registration Opens"
-        value={registration_start_time}
-        onChange={(value) => onFieldChange("registration_start_time", value)}
+        value={registration_opens_at}
+        onChange={(value) => onFieldChange("registration_opens_at", value)}
       />
       <RegistrationDateTimeField
-        id="registration_end_time"
+        id="registration_closes_at"
         label="Registration Closes"
-        value={registration_end_time}
+        value={registration_closes_at}
         minDate={startDate}
         minTime={minEndTime}
-        onChange={(value) => onFieldChange("registration_end_time", value)}
+        onChange={(value) => onFieldChange("registration_closes_at", value)}
       />
       {hasInvalidRange && (
         <FieldError className="md:col-span-2">

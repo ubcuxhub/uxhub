@@ -241,10 +241,12 @@ describe("payment fulfillment rules", () => {
   });
 
   it.each([
-    ["APPLICATION_REQUIRED", "This event uses an application flow and cannot be purchased directly."],
+    ["APPLICATION_REQUIRED", "This event takes applications. You can register once your application is accepted."],
+    ["OFFER_EXPIRED", "Your offer for this event has expired."],
+    ["USER_NOT_FOUND", "We could not find your account. Sign in again and retry."],
     ["REGISTRATION_NOT_OPEN", "Registration for this event is not open yet."],
     ["REGISTRATION_CLOSED", "Registration for this event has closed."],
-    ["ALREADY_REGISTERED", "You already have a registration for this event."],
+    ["ALREADY_REGISTERED", "You already have a ticket for this event."],
     ["SOLD_OUT", "This event is sold out."],
     ["EVENT_NOT_FOUND", "This event could not be found."],
     ["EVENT_NOT_ACTIVE", "This event is no longer open for registration."],

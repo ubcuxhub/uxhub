@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import Link from "next/link";
+import { BackPill } from "@/components/shared/BackButton";
 import { FLAGS } from "@/lib/flags";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import {
   fetchEventBySlug,
   fetchEvents,
 } from "@/lib/supabase-helpers/events";
-import { fetchEventRegistrationCount } from "@/lib/supabase-helpers/event-registrations";
+import { fetchEventSeatCounts } from "@/lib/supabase-helpers/event-tickets";
 import {
   fetchEventMentors,
   fetchEventSponsors,
@@ -23,7 +23,6 @@ import Footer from "@/features/marketing/homepage-sections/Footer";
 import {
   Calendar,
   MapPin,
-  ArrowLeft,
   ExternalLink,
   DollarSign,
 } from "lucide-react";
@@ -43,11 +42,11 @@ interface AgendaItem {
 
 function getRegistrationStatus(event: EventRow) {
   const now = new Date();
-  const regStart = event.registration_start_time
-    ? new Date(event.registration_start_time)
+  const regStart = event.registration_opens_at
+    ? new Date(event.registration_opens_at)
     : null;
-  const regEnd = event.registration_end_time
-    ? new Date(event.registration_end_time)
+  const regEnd = event.registration_closes_at
+    ? new Date(event.registration_closes_at)
     : null;
   if (regStart && now < regStart) return "upcoming";
   if (regEnd && now > regEnd) return "closed";
@@ -85,15 +84,16 @@ export default async function EventDetailPage({
   const supabase = createPublicClient();
   const event = await fetchEventBySlug(supabase, slug, { status: "active" });
   if (!event) notFound();
-  const [registrationCount, mentors, sponsors] = await Promise.all([
-    fetchEventRegistrationCount(supabase, event.id),
+  const [seatCounts, mentors, sponsors] = await Promise.all([
+    fetchEventSeatCounts(supabase, [event.id]),
     fetchEventMentors(supabase, event.id),
     fetchEventSponsors(supabase, event.id),
   ]);
 
   /* ── Derived data ── */
   const regStatus = getRegistrationStatus(event);
-  const spotsLeft = event.max_capacity - registrationCount;
+  // Held offers count as taken (docs/event-states.md, "Seats").
+  const spotsLeft = seatCounts.get(event.id)?.seatsLeft ?? event.max_capacity;
   const canRegister = regStatus === "open" && spotsLeft > 0;
   const registerLabel = regStatus === "upcoming"
       ? "Registration Opens Soon"
@@ -106,11 +106,11 @@ export default async function EventDetailPage({
     event.member_price !== undefined &&
     Number(event.member_price) !== Number(event.regular_price);
 
-  const startDateFormatted = formatEventDate(event.start_date, {
+  const startDateFormatted = formatEventDate(event.starts_at, {
     weekday: "long",
   });
-  const startTimeFormatted = formatEventTime(event.start_time);
-  const endTimeFormatted = formatEventTime(event.end_time);
+  const startTimeFormatted = formatEventTime(event.starts_at);
+  const endTimeFormatted = formatEventTime(event.ends_at);
   const locationDisplay = [event.location_building, event.location_room]
     .filter(Boolean)
     .join(", ");
@@ -122,16 +122,11 @@ export default async function EventDetailPage({
     <main className="min-h-screen">
       <Navbar />
 
-      <div className="bg-background font-sans text-body text-foreground">
+      <div className="font-sans text-body text-foreground">
         {/* ────────────────────── HERO SECTION ────────────────────── */}
         <section className="mt-20 px-[5%] pb-12 pt-8 md:px-[10%] lg:px-[15%]">
         {/* Back link */}
-        <Button asChild variant="link" className="mb-6 px-0">
-          <Link href="/events">
-            <ArrowLeft />
-            All Events
-          </Link>
-        </Button>
+        <BackPill href="/events" label="Back to Events" className="mb-6" />
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-start">
           {/* Left: Hero Image */}
@@ -160,7 +155,7 @@ export default async function EventDetailPage({
 
             {/* Price badge */}
             <div className="flex items-center gap-3">
-              <Badge variant="secondary" className="gap-2 px-4 py-2">
+              <Badge variant="neutral" size="large">
                 <DollarSign className="text-muted-foreground" />
                 <span>
                   {isFree
@@ -171,7 +166,7 @@ export default async function EventDetailPage({
               {hasMemberPrice && (
                 <span className="text-small text-muted-foreground">
                   Members:{" "}
-                  <span className="text-success">
+                  <span className="text-success-foreground">
                     {Number(event.member_price) === 0
                       ? "Free"
                       : `$${Number(event.member_price).toFixed(2)}`}
@@ -299,7 +294,7 @@ export default async function EventDetailPage({
                           href={mentor.linkedin_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                            className="shrink-0 text-primary hover:text-action-hover"
+                            className="shrink-0 text-primary hover:text-primary-hover"
                         >
                           <FaLinkedin size={24} />
                         </a>

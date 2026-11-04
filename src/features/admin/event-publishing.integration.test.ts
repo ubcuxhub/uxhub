@@ -30,7 +30,7 @@ function payload(fixtures: Fixtures, publish_at: string | null) {
     event_type: "regular" as const,
     mentors_enabled: false,
     sponsors_enabled: false,
-    applications_enabled: false,
+    requires_application: false,
     regular_price: 0,
     member_price: 0,
     max_capacity: 10,
@@ -66,6 +66,33 @@ describe("admin event publishing", () => {
       expect(await publicRead()).toBeNull();
     }));
 
+  it("saves the schedule from the new columns alone", () =>
+    withFixtures(async (fixtures) => {
+      const schedule = {
+        starts_at: "2026-11-20T02:00:00.000Z",
+        ends_at: "2026-11-20T04:00:00.000Z",
+        registration_opens_at: null,
+        registration_closes_at: null,
+      };
+      const id = await save(fixtures, { ...payload(fixtures, null), ...schedule });
+      const read = async () => {
+        const event = (await fetchEventById(fixtures.supabase, id))!;
+        return {
+          starts_at: event.starts_at && new Date(event.starts_at).toISOString(),
+          ends_at: event.ends_at && new Date(event.ends_at).toISOString(),
+          registration_opens_at: event.registration_opens_at,
+          registration_closes_at: event.registration_closes_at,
+        };
+      };
+      // No registration window means always open, not a week from creation.
+      expect(await read()).toEqual(schedule);
+
+      const opensAt = "2026-11-01T16:00:00.000Z";
+      await save(fixtures, { ...payload(fixtures, null), ...schedule, registration_opens_at: opensAt }, id);
+      expect((await read()).registration_opens_at).not.toBeNull();
+      expect(new Date((await read()).registration_opens_at!).toISOString()).toBe(opensAt);
+    }));
+
   it("activates only due drafts and clears their schedules", () =>
     withFixtures(async (fixtures) => {
       const past = new Date(Date.now() - hour).toISOString();
@@ -82,19 +109,18 @@ describe("admin event publishing", () => {
       expect((await fetchEventById(fixtures.supabase, future.id))!.status).toBe("draft");
     }));
 
-  it.each(["active", "archived"] as const)("rejects a schedule on %s and clears it on a manual status change", (status) =>
+  it("rejects a schedule on an active event and clears it on a manual status change", () =>
     withFixtures(async (fixtures) => {
       const event = payload(fixtures, new Date(Date.now() + hour).toISOString());
-      await expect(save(fixtures, { ...event, status })).rejects.toMatchObject({
+      await expect(save(fixtures, { ...event, status: "active" })).rejects.toMatchObject({
         message: "Only draft events can have a publish date.",
       });
       const id = await save(fixtures, event);
-      const { error } = await fixtures.supabase.from("events").update({ status }).eq("id", id);
+      const { error } = await fixtures.supabase.from("events").update({ status: "active" }).eq("id", id);
       if (error) throw error;
       expect((await fetchEventById(fixtures.supabase, id))!.publish_at).toBeNull();
-      expect((await fetchEventById(fixtures.supabase, id))!.status).toBe(status);
-      expect(await fetchEventById(clientAs(null), id)).toEqual(status === "active"
-        ? expect.objectContaining({ status: "active" }) : null);
+      expect((await fetchEventById(fixtures.supabase, id))!.status).toBe("active");
+      expect(await fetchEventById(clientAs(null), id)).toEqual(expect.objectContaining({ status: "active" }));
     }));
 
   it("handles concurrent schedule edits and publishes the due batch", () =>

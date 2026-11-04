@@ -19,12 +19,11 @@ import {
   type MembershipTypeInput,
 } from "@/features/admin/lib/membership-type";
 import {
-  fetchAttendingRegistrations,
-  fetchCheckInId,
+  deleteCheckIn,
+  fetchCheckInAttendees,
   fetchCheckInSessions,
   fetchCheckInStatuses,
-  insertCheckIn,
-  updateCheckInTimestamp,
+  upsertCheckIn,
 } from "@/lib/supabase-helpers/check-ins";
 import {
   saveMentor,
@@ -32,10 +31,7 @@ import {
   type MentorInput,
   type SponsorInput,
 } from "@/lib/supabase-helpers/event-people";
-import {
-  fetchRegistrationsForEvent,
-  updateEventRegistration,
-} from "@/lib/supabase-helpers/event-registrations";
+import { updateEventApplication } from "@/lib/supabase-helpers/event-applications";
 import {
   fetchEventById,
   fetchEventIdByImageUrl,
@@ -49,10 +45,14 @@ import type {
   SponsorRow,
   UserInfoUpdate,
 } from "@/lib/supabase/models";
-import type { ApplicationStatus, RoleAccess } from "@/lib/supabase/models";
+import type { EventApplicationRow, RoleAccess } from "@/lib/supabase/models";
 import { fetchActiveProfile, saveAdminProfile } from "@/lib/supabase-helpers/admin-user-profile";
 import { fetchMembershipTypeById } from "@/lib/supabase-helpers/memberships";
 import { normalizeInterests, validateBirthDate } from "./lib/user-profile";
+import {
+  buildApplicationDecisionUpdate,
+  type ApplicationDecision,
+} from "./lib/application-review";
 
 const MANAGER_USER_FIELDS = new Set([
   "first_name",
@@ -345,69 +345,53 @@ export async function deleteAdminEventAction(eventId: string) {
   revalidatePath("/admin/events");
 }
 
-export async function updateApplicationStatusAction(
-  registrationId: string,
-  status: ApplicationStatus
-) {
-  const admin = await requireAdmin();
+/**
+ * Records a review decision. Accepting needs a future `offerExpiresAt`
+ * (docs/event-states.md); the database refuses moves the review flow does not
+ * allow, such as taking back an offer the applicant already registered on.
+ */
+export async function updateApplicationDecisionAction(
+  applicationId: string,
+  decision: ApplicationDecision,
+  offerExpiresAt: string | null
+): Promise<EventApplicationRow> {
+  await requireAdmin();
 
-  if (!["pending", "accepted", "declined"].includes(status)) {
-    throw new Error("Invalid application status.");
-  }
+  const result = buildApplicationDecisionUpdate(decision, offerExpiresAt);
+  if (!result.ok) throw new Error(result.error);
 
-  await updateEventRegistration(supabaseAdmin, registrationId, {
-    status,
-    reviewer_id: admin.id,
-  });
+  return updateEventApplication(supabaseAdmin, applicationId, result.update);
 }
 
+/** Checks a ticket in to a session, or removes a mistaken check-in. */
 export async function toggleCheckInAction(
-  registrationId: string,
+  ticketId: string,
   sessionId: string,
   checked: boolean
 ): Promise<string | null> {
   await requireAdmin();
 
-  const existingCheckInId = await fetchCheckInId(
-    supabaseAdmin,
-    registrationId,
-    sessionId
-  );
-  const checkedInAt = checked ? new Date().toISOString() : null;
-
-  if (existingCheckInId) {
-    await updateCheckInTimestamp(
-      supabaseAdmin,
-      existingCheckInId,
-      checkedInAt
-    );
-  } else if (checked) {
-    await insertCheckIn(supabaseAdmin, {
-      event_registration_id: registrationId,
-      check_in_session_id: sessionId,
-      checked_in_at: checkedInAt,
-    });
+  if (!checked) {
+    await deleteCheckIn(supabaseAdmin, ticketId, sessionId);
+    return null;
   }
 
-  return checkedInAt;
+  return upsertCheckIn(supabaseAdmin, ticketId, sessionId);
 }
 
 export async function fetchAdminCheckInSnapshotAction(eventId: string) {
   await requireAdmin();
 
-  const [sessions, registrations, statuses, allRegistrations] =
-    await Promise.all([
-      fetchCheckInSessions(supabaseAdmin, eventId),
-      fetchAttendingRegistrations(supabaseAdmin, eventId),
-      fetchCheckInStatuses(supabaseAdmin, eventId),
-      fetchRegistrationsForEvent(supabaseAdmin, eventId),
-    ]);
+  const [sessions, attendees, statuses] = await Promise.all([
+    fetchCheckInSessions(supabaseAdmin, eventId),
+    fetchCheckInAttendees(supabaseAdmin, eventId),
+    fetchCheckInStatuses(supabaseAdmin, eventId),
+  ]);
 
   return {
     sessions,
-    registrations,
+    attendees,
     statuses: Array.from(statuses.entries()),
-    allRegistrations,
   };
 }
 
