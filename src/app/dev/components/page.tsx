@@ -75,18 +75,16 @@ export default async function ComponentsIndexPage({
 function PageLinks() {
   return (
     <nav aria-label="Other docs pages">
-      <ul className="grid gap-4 sm:grid-cols-3">
+      <ul className="grid gap-x-6 gap-y-4 sm:grid-cols-3">
         {Object.values(STANDALONE).map((page) => (
-          <li key={page.path} className="flex">
+          <li key={page.path} className="flex flex-col gap-1">
             <DocsLink
               href={page.path}
-              className="flex flex-1 flex-col gap-1 rounded-2xl border border-border-subtle p-5 transition-colors hover:bg-accent focus-visible:focus-ring"
+              className="self-start rounded-sm text-body-medium text-primary underline-offset-4 hover:underline focus-visible:focus-ring"
             >
-              <span className="text-body-medium text-primary">{page.title}</span>
-              <span className="text-small text-muted-foreground">
-                {page.description}
-              </span>
+              {page.title}
             </DocsLink>
+            <p className="text-small text-muted-foreground">{page.description}</p>
           </li>
         ))}
       </ul>
