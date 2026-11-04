@@ -887,6 +887,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_event_analytics: { Args: { p_now?: string }; Returns: Json }
+      admin_membership_analytics: { Args: { p_now?: string }; Returns: Json }
       current_user_info_id: {
         Args: Record<PropertyKey, never>
         Returns: string
