@@ -92,14 +92,10 @@ export function DocPage(
         aria-labelledby={`${id}-heading`}
         className="flex min-h-0 flex-1 flex-col"
       >
-        <header className="flex min-w-0 flex-col gap-0.5 border-b border-border-subtle bg-background px-4 py-4 sm:px-6 md:flex-row md:items-baseline md:gap-3">
-          <h1 id={`${id}-heading`} className="shrink-0 text-h3">
-            {title}
-          </h1>
-          <p className="min-w-0 text-small text-muted-foreground md:truncate">
-            {description}
-          </p>
-        </header>
+        {/* No visible header: the canvas runs edge to edge under the shell. */}
+        <h1 id={`${id}-heading`} className="sr-only">
+          {title}
+        </h1>
         <Suspense
           fallback={
             <div className="flex flex-1 items-center justify-center py-16">
