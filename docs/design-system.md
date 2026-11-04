@@ -103,21 +103,25 @@ Status (always text on its own background, always with a word):
 One family, **DM Sans**, weights 400/500/600, 13 text styles; every line
 height on the 4px grid.
 
-| Token | Size / line | Weight | Use |
-| --- | --- | --- | --- |
-| `header-1` | 32 / 40 | 600 | Sign-in heading, member home greeting |
-| `header-2` | 24 / 32 | 600 | Page titles, timeline months |
-| `header-3` | 20 / 28 | 600 | Page sections, dialog titles |
-| `subheading` | 18 / 26 | 500 | Card and panel titles |
-| `body` | 16 / 24 | 400 | Copy, inputs, sidebar items |
-| `body-medium` | 16 / 24 | 500 | Form labels, emphasis |
-| `body-small` | 14 / 20 | 400 | Metadata, helper text |
-| `table-text` | 14 / 20 | 400 | Table cells |
-| `table-heading` | 16 / 24 | 500 | Column headings |
-| `button` | 16 / 24 | 500 | Button labels |
-| `button-small` | 14 / 20 | 500 | Small buttons |
-| `label` | 13 / 18 | 500 | Chips, tags, counts, sidebar group labels |
-| `status-label` | 12 / 16 | 500 | Status badges |
+| Token | Class | Size / line | Weight | Use |
+| --- | --- | --- | --- | --- |
+| `header-1` | `text-h1` | 32 / 40 | 600 | Sign-in heading, member home greeting |
+| `header-2` | `text-h2` | 24 / 32 | 600 | Page titles, timeline months |
+| `header-3` | `text-h3` | 20 / 28 | 600 | Page sections, dialog titles |
+| `subheading` | `text-subheading` | 18 / 26 | 500 | Card and panel titles |
+| `body` | `text-body` | 16 / 24 | 400 | Copy, inputs, sidebar items |
+| `body-medium` | `text-body-medium` | 16 / 24 | 500 | Form labels, emphasis |
+| `body-small` | `text-small` | 14 / 20 | 400 | Metadata, helper text |
+| `table-text` | `text-table` | 14 / 20 | 400 | Table cells |
+| `table-heading` | `text-table-heading` | 16 / 24 | 500 | Column headings |
+| `button` | `text-button` | 16 / 24 | 500 | Button labels |
+| `button-small` | `text-button-small` | 14 / 20 | 500 | Small buttons |
+| `label` | `text-label` | 13 / 18 | 500 | Chips, tags, counts, sidebar group labels |
+| `status-label` | `text-badge` | 12 / 16 | 500 | Status badges |
+
+The token names are the Figma style names; code uses the class column (keys in
+`src/app/globals.css`). Figma's extra weight styles have no class of their own:
+add a weight, e.g. `text-small font-medium`, `text-body font-semibold`.
 
 No all caps or letter-spacing anywhere. Marketing only: `display-xl` 56/64 and
 `display-lg` 40/48, never in the portal.
@@ -142,7 +146,9 @@ No all caps or letter-spacing anywhere. Marketing only: `display-xl` 56/64 and
 ### 2.4 Spacing and density
 
 4px scale: `space-1` 4, `-2` 8, `-3` 12, `-4` 16, `-5` 20, `-6` 24, `-8` 32,
-`-10` 40, `-12` 48, `-16` 64 (CSS `--space-*`).
+`-10` 40, `-12` 48, `-16` 64. Code uses Tailwind's spacing scale, which has
+the same values (`space/4` → `gap-4`, `p-4`); there are no `--space-*`
+variables.
 
 | Density | Where | `size-control` | `size-table-row` | `size-nav-row` |
 | --- | --- | --- | --- | --- |
@@ -169,8 +175,12 @@ Everything clickable or typeable is a pill; containers soften as they grow.
 | `radius-4xl` | 32 | Hero media |
 | `radius-full` | 999 | Buttons, inputs, chips, tabs, avatars, badges, tags |
 
-Stroke: `thin` 1px (default borders), `medium` 1.5px (emphasized outlines,
-all icons), `thick` 2px (focus rings, selected states).
+Code uses Tailwind's default `rounded-*` classes, which have the same values
+(`radius-xl` → `rounded-xl`); there are no `--radius-*` variables.
+
+Stroke: `thin` 1px (default borders, `border`), `medium` 1.5px (emphasized
+outlines, all icons, `border-[1.5px]`), `thick` 2px (focus rings, selected
+states, `border-2`; focus rings use the `focus-ring` utility).
 
 ### 2.6 Elevation
 
@@ -295,14 +305,16 @@ classes use one shadcn-style vocabulary and follow the table below.
 | Colour Primitives | Value | 49 raw colours in Figma (`--colour-<hue>-<step>`): neutral, blue, purple, green, yellow, red, dark. Hide from publishing |
 | Colour Tokens | Light, Dark | 36 semantic tokens, each aliasing a primitive; `overlay/scrim` is raw |
 | Radius Tokens | Value | `radius/none` … `radius/full` |
-| Stroke Tokens | Value | `thickness/thin`, `medium`, `thick` (`--stroke-thickness-*`) |
+| Stroke Tokens | Value | `thickness/thin`, `medium`, `thick` (classes `border`, `border-[1.5px]`, `border-2`) |
 | Spacing Tokens | Value | `space/1` … `space/16` |
 | Density | Comfortable, Compact | `size/control`, `size/table-row`, `size/nav-row` |
 | Icon colour | 10 modes | `icon/colour` → text and status tokens per mode |
 
-Text styles map to classes (`Headers/Header 1` → `.header-1`, …,
-`Badge/Labels/Status Label` → `.status-label`). Effect style `Shadow/Overlay` →
-`--shadow-overlay`.
+Text styles map to the classes in the 2.2 table (`Headers/Header 1` →
+`text-h1`, `Body/Small Body` → `text-small`, `Badge/Labels/Status Label` →
+`text-badge`). Effect style `Shadow/Overlay` → `--shadow-overlay`. Radius,
+Spacing and Stroke map to Tailwind's default classes (2.4, 2.5); only the
+Density variables exist in CSS, used as `h-(--size-control)`.
 
 Rules: bind every fill, stroke, radius, gap and padding to a variable (a raw
 hex or typed number is a bug); screens use Colour Tokens only.
@@ -842,11 +854,25 @@ Organization lead), and Patterns parts (`Ticket`, `Hubbo/Placeholder`,
   `text-secondary`.
 - `text/secondary` and `text/muted` are duplicate aliases in both modes, as
   are `background/default` and `background/surface-default`.
-- The Figma page says there are 49 colour primitives; the committed primitive
-  token sheet contains 48.
+- Figma has 49 colour primitives and code has 48: the extra one is
+  `neutral/500`, which Radio, ColourSwatch, ImageUpload and SectionNavigator
+  bind directly instead of a token. The 2.11 page's own primitive table lists
+  only 32.
 - 1.1 says 3.10–3.16 are drawings not yet in the library, but the Library page
   already has components for all of them.
 - 4.3 still marks the missed-confirmation outcome as TBD in Figma; §3.3 now
   resolves its student badge as Offer expired and needs syncing to Figma.
-- Open placeholders: email templates (4.3), Hubbo illustrations, illustrator
-  name and master-file link (5.2).
+- Open placeholders: email templates (4.3), illustrator name and master-file
+  link (5.2). The Hubbo emotion artwork is drawn; 5.2 still marks it [WIP].
+- Every variable's **Code syntax → Web** shows `var(--…)` instead of the class
+  in the 2.11 table, and Radius, Spacing and Stroke point at `--radius-*`,
+  `--space-*` and `--stroke-thickness-*`, which code doesn't define.
+- Text style descriptions name `.header-1`-style classes that don't exist; the
+  classes are in the 2.2 table.
+- Hover fills use `background/surface-hover` (1.02:1 on white, invisible) or
+  `background/secondary`. Code uses `surface-subtle` (`bg-muted`) for hover and
+  `border-subtle` for pressed (`src/components/ui/button.tsx`).
+- StatusBadge lacks the five student labels code ships (§3.3). IconButton is
+  drawn at 40px (code and its own description: 32px), Toast has an Info tone
+  code can't render, Button lacks Ghost, and the Link label is black (code:
+  `text-info-foreground`).
