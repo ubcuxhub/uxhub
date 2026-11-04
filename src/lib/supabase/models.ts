@@ -6,6 +6,8 @@ import type {
 } from "@/lib/supabase/database.types";
 
 export type AppSettingsRow = Tables<"app_settings">;
+
+export type AuditEventRow = Tables<"audit_events">;
 export type AppSettingsUpdate = TablesUpdate<"app_settings">;
 
 export type EventRow = Tables<"events">;
