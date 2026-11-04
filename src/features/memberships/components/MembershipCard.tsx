@@ -1,5 +1,5 @@
 import Image from "next/image";
-import { Sparkles } from "lucide-react";
+import { IdCard } from "lucide-react";
 
 import { FlowLink } from "@/components/shared/FlowLink";
 import { Button } from "@/components/ui/button";
@@ -70,7 +70,7 @@ export function MembershipCardEmptyState() {
     <section className="max-w-xl rounded-2xl border border-dashed p-6">
       <div className="flex items-start gap-3">
         <div className="rounded-full bg-primary/10 p-2">
-          <Sparkles className="size-5 text-primary" aria-hidden />
+          <IdCard className="size-5 text-primary" aria-hidden />
         </div>
         <div>
           <h2 className="text-subheading">You don&rsquo;t have a membership yet</h2>
