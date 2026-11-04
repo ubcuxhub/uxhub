@@ -66,6 +66,33 @@ begin
 end;
 $$;
 
+-- An event is edited through its children as much as through its own row, and
+-- those entries have to land on the event or the History tab will not find
+-- them.
+\o /dev/null
+select set_config('app.audit_actor_id', :'user_a_id', true);
+select set_config('audit.event_id', :'event_id', true);
+\o
+insert into public.event_agenda_days (event_id, title, date)
+values (:'event_id', 'Audit coverage day', current_date);
+
+do $$
+declare
+  logged public.audit_events%rowtype;
+begin
+  select * into logged from public.audit_events
+  where action = 'event_agenda_days.created';
+  if not found then
+    raise exception 'an agenda day added by an admin was not logged';
+  end if;
+  if logged.subject_table <> 'events'
+     or logged.subject_id <> current_setting('audit.event_id')::uuid then
+    raise exception 'agenda entry landed on % %, not the event',
+      logged.subject_table, logged.subject_id;
+  end if;
+end;
+$$;
+
 \o /dev/null
 select set_config('app.audit_actor_id', '', true);
 select set_config('request.jwt.claims', '{}', true);
