@@ -985,6 +985,69 @@ reset role;
 \o /dev/null
 select set_config('request.jwt.claims', '{}', true);
 \o
+-- A student reads the check-ins on their own ticket, and no one else's. User B
+-- was checked in above; check user A in on their ticket to the first event.
+-- User A stays basic: as a manager, the admin policy would show them every row.
+update public.user_info set role_access = 'basic' where id = :'user_a_id';
+insert into public.check_ins (ticket_id, check_in_session_id, checked_in_at)
+select ticket.id, session.id, now()
+from public.event_tickets ticket
+join public.check_in_sessions session on session.event_id = ticket.event_id
+where ticket.event_id = :'event_id'
+  and ticket.user_id = :'user_a_id'
+  and session.name = 'RLS Session';
+
+\o /dev/null
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'user_a_auth_user_id',
+    'email', :'user_a_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+\o
+
+set local role authenticated;
+
+do $$
+declare
+  visible_count integer;
+  changed_count integer;
+begin
+  select count(*) into visible_count
+  from public.check_ins check_in
+  join public.event_tickets ticket on ticket.id = check_in.ticket_id
+  where ticket.event_id = current_setting('rls.event_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'user A should see their own check-in, saw %', visible_count;
+  end if;
+
+  select count(*) into visible_count
+  from public.check_ins
+  where ticket_id = current_setting('rls.user_b_ticket_id')::uuid;
+  if visible_count <> 0 then
+    raise exception 'user A can read user B check-in';
+  end if;
+
+  update public.check_ins
+  set checked_in_at = now() - interval '1 day'
+  where ticket_id in (
+    select id from public.event_tickets where user_id = public.current_user_info_id()
+  );
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'user A updated their own check-in';
+  end if;
+end;
+$$;
+
+reset role;
+
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
 update public.user_info set role_access = :'user_a_saved_role' where id = :'user_a_id';
 
 -- Scheduled drafts stay hidden until the job actually changes their status.
