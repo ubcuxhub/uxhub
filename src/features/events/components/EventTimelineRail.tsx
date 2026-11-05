@@ -1,5 +1,5 @@
 import { EventCard, EventCardDates } from "@/components/shared/EventCard";
-import type { Status } from "@/components/ui/status-badge";
+import type { Status, StatusBadgeSpec } from "@/components/ui/status-badge";
 import type { EventGroup } from "@/features/events/types";
 import { formatEventDateLabel, formatEventDateTimeLines } from "@/lib/date";
 import { resolveImagePreviewSrc } from "@/lib/event-image";
@@ -9,8 +9,11 @@ import { cn } from "@/lib/utils";
 interface EventTimelineRailProps {
   /** Events already grouped by month, see `groupEventsByMonth`. */
   groups: EventGroup[];
-  /** The badge for an event's card; return `null` for none. */
-  statusFor: (event: EventRow) => Status | null;
+  /**
+   * The badge for an event's card: a status, or a spec for the dated labels
+   * (`{ status: "opens", date: "Oct 12" }`). Return `null` for none.
+   */
+  statusFor: (event: EventRow) => Status | StatusBadgeSpec | null;
   /** Where a card links. Defaults to the portal event page. */
   hrefFor?: (event: EventRow) => string;
   className?: string;
@@ -64,7 +67,7 @@ function EventTimelineRow({
 }: {
   event: EventRow;
   href: string;
-  status: Status | null;
+  status: Status | StatusBadgeSpec | null;
   isLast: boolean;
 }) {
   const venue = [event.location_building, event.location_room]
