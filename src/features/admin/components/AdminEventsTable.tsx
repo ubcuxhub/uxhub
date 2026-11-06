@@ -1,28 +1,10 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
-import Link from "next/link";
-import {
-  ArrowDown,
-  ArrowUp,
-  Check,
-  FilePen,
-} from "lucide-react";
+import { useMemo, useState } from "react";
+import { ArrowDown, ArrowUp } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import {
-  formatEventDate,
-  formatEventTime,
-  formatTimestamp,
-} from "@/lib/date";
+import { formatEventDate } from "@/lib/date";
 import type { EventRow, EventStatus } from "@/lib/supabase/models";
 import { toggleSetValue } from "../lib/directory";
 import { AdminDirectoryLayout } from "./AdminDirectoryLayout";
@@ -33,6 +15,7 @@ import {
 } from "./AdminDirectoryTable";
 import { AdminDirectoryButton } from "./AdminDirectoryControls";
 import { AdminDirectoryFilters } from "./AdminDirectoryFilters";
+import { EVENT_STATUS_LABELS, EventStatusBadge } from "./EventStatusBadge";
 
 export interface AdminEventTableRow {
   event: EventRow;
@@ -43,35 +26,9 @@ export interface AdminEventTableRow {
 type RegistrationStatus = "open" | "closed" | "not-applicable";
 type SortDirection = "ascending" | "descending";
 
-const statusConfig = {
-  active: { variant: "success", icon: Check, label: "Active" },
-  draft: { variant: "neutral", icon: FilePen, label: "Draft" },
-} satisfies Record<
-  EventStatus,
-  {
-    variant: "success" | "neutral";
-    icon: typeof Check;
-    label: string;
-  }
->;
-
-function EventStatusBadge({ status }: { status: EventStatus }) {
-  const { variant, icon: Icon, label } = statusConfig[status];
-
-  return (
-    <Badge variant={variant}>
-      <Icon aria-hidden="true" />
-      {label}
-    </Badge>
-  );
-}
-
 const eventStatusOptions = (
-  Object.entries(statusConfig) as [
-    EventStatus,
-    (typeof statusConfig)[EventStatus],
-  ][]
-).map(([value, config]) => ({ value, label: config.label }));
+  Object.entries(EVENT_STATUS_LABELS) as [EventStatus, string][]
+).map(([value, label]) => ({ value, label }));
 
 const registrationStatusOptions: {
   value: RegistrationStatus;
@@ -92,157 +49,22 @@ function getRegistrationStatus(
   return row.registrationOpen ? "open" : "closed";
 }
 
-function DetailItem({
-  label,
-  children,
-  wide = false,
-}: {
-  label: string;
-  children: ReactNode;
-  wide?: boolean;
-}) {
-  return (
-    <div className={wide ? "sm:col-span-2" : undefined}>
-      <dt className="text-label uppercase tracking-wide text-muted-foreground">
-        {label}
-      </dt>
-      <dd className="mt-1 whitespace-pre-wrap text-small">{children || "—"}</dd>
-    </div>
-  );
-}
-
-function formatSchedule(timestamp: string | null) {
-  if (!timestamp) return "—";
-  return `${formatEventDate(timestamp, { month: "short" })} at ${formatEventTime(timestamp)}`;
-}
-
-function EventDetails({
-  row,
-}: {
-  row: AdminEventTableRow;
-}) {
-  const { event, registrationCount, registrationOpen } = row;
-  const agenda =
-    event.agenda &&
-    (Array.isArray(event.agenda) || typeof event.agenda === "object")
-      ? JSON.stringify(event.agenda, null, 2)
-      : event.agenda;
-
-  return (
-    <dl className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
-      <DetailItem label="Status">{statusConfig[event.status].label}</DetailItem>
-      <DetailItem label="Event type">{event.event_type}</DetailItem>
-      <DetailItem label="Start">
-        {formatSchedule(event.starts_at)}
-      </DetailItem>
-      <DetailItem label="End">
-        {formatSchedule(event.ends_at)}
-      </DetailItem>
-      <DetailItem label="Registration opens">
-        {formatTimestamp(event.registration_opens_at) ?? "—"}
-      </DetailItem>
-      <DetailItem label="Registration closes">
-        {formatTimestamp(event.registration_closes_at) ?? "—"}
-      </DetailItem>
-      <DetailItem label="Registration status">
-        {event.status === "draft"
-          ? "N/A"
-          : registrationOpen
-            ? "Open"
-            : "Closed"}
-      </DetailItem>
-      <DetailItem label="Attendees">
-        {registrationCount} / {event.max_capacity}
-      </DetailItem>
-      <DetailItem label="Regular price">
-        ${Number(event.regular_price).toFixed(2)}
-      </DetailItem>
-      <DetailItem label="Member price">
-        ${Number(event.member_price).toFixed(2)}
-      </DetailItem>
-      <DetailItem label="Building">{event.location_building}</DetailItem>
-      <DetailItem label="Room">{event.location_room}</DetailItem>
-      <DetailItem label="Location URL" wide>
-        {event.location_address_url ? (
-          <a
-            href={event.location_address_url}
-            target="_blank"
-            rel="noreferrer"
-            className="break-all text-primary hover:underline"
-          >
-            {event.location_address_url}
-          </a>
-        ) : (
-          "—"
-        )}
-      </DetailItem>
-      <DetailItem label="Short description" wide>
-        {event.short_description}
-      </DetailItem>
-      <DetailItem label="Description" wide>
-        {event.description}
-      </DetailItem>
-      <DetailItem label="Applications enabled">
-        {event.requires_application ? "Yes" : "No"}
-      </DetailItem>
-      <DetailItem label="Mentors enabled">
-        {event.mentors_enabled ? "Yes" : "No"}
-      </DetailItem>
-      <DetailItem label="Sponsors enabled">
-        {event.sponsors_enabled ? "Yes" : "No"}
-      </DetailItem>
-      <DetailItem label="Slug">{event.slug}</DetailItem>
-      <DetailItem label="Cover image" wide>
-        {event.image_url ? (
-          <a
-            href={event.image_url}
-            target="_blank"
-            rel="noreferrer"
-            className="break-all text-primary hover:underline"
-          >
-            {event.image_url}
-          </a>
-        ) : (
-          "—"
-        )}
-      </DetailItem>
-      <DetailItem label="Description images" wide>
-        {event.description_images?.length
-          ? event.description_images.join("\n")
-          : "—"}
-      </DetailItem>
-      <DetailItem label="Agenda" wide>
-        {agenda ? (
-          <pre className="overflow-x-auto rounded-lg bg-muted p-3 text-label">
-            {String(agenda)}
-          </pre>
-        ) : (
-          "—"
-        )}
-      </DetailItem>
-      <DetailItem label="Created">
-        {formatTimestamp(event.created_at) ?? "—"}
-      </DetailItem>
-      <DetailItem label="Updated">
-        {formatTimestamp(event.updated_at) ?? "—"}
-      </DetailItem>
-      <DetailItem label="Event ID" wide>
-        <span className="break-all">{event.id}</span>
-      </DetailItem>
-    </dl>
-  );
-}
-
 const eventColumns: AdminDirectoryColumn<AdminEventTableRow>[] = [
   {
     id: "status",
     header: "Status",
-    render: (row) => <EventStatusBadge status={row.event.status} />,
+    render: (row) => (
+      <EventStatusBadge
+        status={row.event.status}
+        publishAt={row.event.publish_at}
+      />
+    ),
   },
   {
     id: "name",
     header: "Name",
     cellClassName: "font-medium",
+    rowLink: true,
     render: (row) => row.event.name,
   },
   {
@@ -291,10 +113,6 @@ export function AdminEventsTable({
 }: {
   rows: AdminEventTableRow[];
 }) {
-  const [selectedRow, setSelectedRow] = useState<AdminEventTableRow | null>(
-    null
-  );
-  const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortDirection, setSortDirection] =
     useState<SortDirection>("descending");
@@ -342,120 +160,72 @@ export function AdminEventsTable({
     sortDirection,
   ]);
 
-  const selectRow = (row: AdminEventTableRow) => {
-    setSelectedRow(row);
-    setOpen(true);
-  };
-
   return (
-    <>
-      <AdminDirectoryLayout>
-        <AdminDirectoryToolbar
-          searchQuery={searchQuery}
-          onSearchQueryChange={setSearchQuery}
-          placeholder="Search events by name..."
-          searchLabel="Search events by name"
+    <AdminDirectoryLayout>
+      <AdminDirectoryToolbar
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
+        placeholder="Search events by name..."
+        searchLabel="Search events by name"
+      >
+        <AdminDirectoryButton
+          type="button"
+          onClick={() =>
+            setSortDirection((current) =>
+              current === "descending" ? "ascending" : "descending"
+            )
+          }
+          aria-label={`Sort by date ${
+            sortDirection === "descending" ? "ascending" : "descending"
+          }`}
         >
-          <AdminDirectoryButton
-            type="button"
-            onClick={() =>
-              setSortDirection((current) =>
-                current === "descending" ? "ascending" : "descending"
-              )
-            }
-            aria-label={`Sort by date ${
-              sortDirection === "descending" ? "ascending" : "descending"
-            }`}
-          >
-            Sort by date
-            {sortDirection === "descending" ? (
-              <ArrowDown aria-hidden="true" />
-            ) : (
-              <ArrowUp aria-hidden="true" />
-            )}
-          </AdminDirectoryButton>
-
-          <AdminDirectoryFilters
-            groups={[
-              {
-                id: "event-status-filter-heading",
-                label: "Status",
-                options: eventStatusOptions,
-                selectedValues: eventStatuses,
-                onToggle: (value) =>
-                  setEventStatuses((current) =>
-                    toggleSetValue(current, value as EventStatus)
-                  ),
-              },
-              {
-                id: "registration-status-filter-heading",
-                label: "Registration status",
-                options: registrationStatusOptions,
-                selectedValues: registrationStatuses,
-                onToggle: (value) =>
-                  setRegistrationStatuses((current) =>
-                    toggleSetValue(current, value as RegistrationStatus)
-                  ),
-              },
-            ]}
-            onClear={() => {
-              setEventStatuses(new Set());
-              setRegistrationStatuses(new Set());
-            }}
-          />
-        </AdminDirectoryToolbar>
-
-        <AdminDirectoryTable
-          columns={eventColumns}
-          rows={filteredRows}
-          getRowKey={(row) => row.event.id}
-          getRowLabel={(row) => `View details for ${row.event.name}`}
-          onActivate={selectRow}
-          emptyMessage="No events match your search and filters."
-        />
-
-      </AdminDirectoryLayout>
-
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
-          {selectedRow && (
-            <>
-              <SheetHeader className="pr-10">
-                <SheetTitle className="text-2xl">
-                  {selectedRow.event.name}
-                </SheetTitle>
-                <SheetDescription>
-                  View event details and management actions.
-                </SheetDescription>
-              </SheetHeader>
-              <div className="flex flex-wrap gap-2 px-4">
-                <Button asChild variant="outline">
-                  <Link href={`/admin/events/${selectedRow.event.id}`}>
-                    Edit
-                  </Link>
-                </Button>
-                <Button asChild variant="outline">
-                  <Link
-                    href={`/admin/events/${selectedRow.event.id}/check-in`}
-                  >
-                    Check-In
-                  </Link>
-                </Button>
-                <Button asChild variant="outline">
-                  <Link
-                    href={`/admin/events/${selectedRow.event.id}/review-applications`}
-                  >
-                    Apps
-                  </Link>
-                </Button>
-              </div>
-              <div className="border-t border-border-subtle px-4 py-5">
-                <EventDetails row={selectedRow} />
-              </div>
-            </>
+          Sort by date
+          {sortDirection === "descending" ? (
+            <ArrowDown aria-hidden="true" />
+          ) : (
+            <ArrowUp aria-hidden="true" />
           )}
-        </SheetContent>
-      </Sheet>
-    </>
+        </AdminDirectoryButton>
+
+        <AdminDirectoryFilters
+          groups={[
+            {
+              id: "event-status-filter-heading",
+              label: "Status",
+              options: eventStatusOptions,
+              selectedValues: eventStatuses,
+              onToggle: (value) =>
+                setEventStatuses((current) =>
+                  toggleSetValue(current, value as EventStatus)
+                ),
+            },
+            {
+              id: "registration-status-filter-heading",
+              label: "Registration status",
+              options: registrationStatusOptions,
+              selectedValues: registrationStatuses,
+              onToggle: (value) =>
+                setRegistrationStatuses((current) =>
+                  toggleSetValue(current, value as RegistrationStatus)
+                ),
+            },
+          ]}
+          onClear={() => {
+            setEventStatuses(new Set());
+            setRegistrationStatuses(new Set());
+          }}
+        />
+      </AdminDirectoryToolbar>
+
+      <AdminDirectoryTable
+        columns={eventColumns}
+        rows={filteredRows}
+        getRowKey={(row) => row.event.id}
+        getRowLabel={(row) => `View details for ${row.event.name}`}
+        getRowHref={(row) => `/admin/events/${row.event.id}`}
+        listHref="/admin/events"
+        emptyMessage="No events match your search and filters."
+      />
+    </AdminDirectoryLayout>
   );
 }

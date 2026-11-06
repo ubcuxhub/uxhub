@@ -346,6 +346,8 @@ describe("saveAdminEventAction", () => {
   it.each(["2099-08-01T18:00:00.000Z", null])("saves the publish schedule %s", async (publish_at) => {
     await saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, status: "draft", publish_at } });
     expect(adminRpc.mock.calls[0][1].p_event.publish_at).toBe(publish_at);
+    // The list, and the overview (drawer and page) and builder beneath it.
+    expect(revalidatePath).toHaveBeenCalledWith("/admin/events", "layout");
     expect(revalidatePath).toHaveBeenCalledWith("/events", "layout");
   });
 
@@ -518,7 +520,7 @@ describe("deleteAdminEventAction", () => {
     expect(adminServer.adminDeleteEventImageByUrl).toHaveBeenCalledWith(
       "https://store/cover.png",
     );
-    expect(revalidatePath).toHaveBeenCalledWith("/admin/events");
+    expect(revalidatePath).toHaveBeenCalledWith("/admin/events", "layout");
   });
 
   it("keeps the image when the delete fails", async () => {

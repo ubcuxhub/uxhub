@@ -1,14 +1,31 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { EventStatus } from "@/lib/supabase/models";
 import { AdminEventsTable, type AdminEventTableRow } from "./AdminEventsTable";
 
-afterEach(cleanup);
+let pathname = "/admin/events";
 
-function row(id: string, name: string, starts_at: string | null, status: EventStatus, registrationOpen: boolean): AdminEventTableRow {
+vi.mock("next/navigation", () => ({ usePathname: () => pathname }));
+vi.mock("next/link", () => ({
+  default: ({
+    href,
+    replace,
+    children,
+    ...props
+  }: { href: string; replace?: boolean; children: React.ReactNode } & React.ComponentProps<"a">) => (
+    <a href={href} data-replace={replace ? "" : undefined} {...props}>{children}</a>
+  ),
+}));
+
+afterEach(() => {
+  cleanup();
+  pathname = "/admin/events";
+});
+
+function row(id: string, name: string, starts_at: string | null, status: EventStatus, registrationOpen: boolean, publish_at: string | null = null): AdminEventTableRow {
   return {
     event: {
       id, name, starts_at, status,
@@ -26,7 +43,7 @@ function row(id: string, name: string, starts_at: string | null, status: EventSt
       location_building: null,
       location_room: null,
       mentors_enabled: false,
-      publish_at: null,
+      publish_at,
       registration_closes_at: null,
       registration_opens_at: null,
       requires_application: false,
@@ -48,7 +65,7 @@ const rows = [
 ];
 
 function rowNames() {
-  return screen.getAllByRole("button", { name: /^View details for/ }).map((element) => element.getAttribute("aria-label"));
+  return screen.getAllByRole("link", { name: /^View details for/ }).map((element) => element.getAttribute("aria-label"));
 }
 
 describe("AdminEventsTable regression", () => {
@@ -85,14 +102,29 @@ describe("AdminEventsTable regression", () => {
     expect(rowNames()).toEqual(["View details for Design Meetup", "View details for Undated Meetup"]);
   });
 
-  it.each(["click", "Enter", " "])("opens the existing sheet by %s with the same management links", (activation) => {
+  it("links each event's name to its overview, which opens as a drawer over the list", () => {
     render(<AdminEventsTable rows={rows} />);
-    const target = screen.getByRole("button", { name: "View details for Design Workshop" });
-    if (activation === "click") fireEvent.click(target);
-    else fireEvent.keyDown(target, { key: activation });
-    const sheet = screen.getByRole("dialog", { name: "Design Workshop" });
-    expect(within(sheet).getByRole("link", { name: "Edit" }).getAttribute("href")).toBe("/admin/events/newer");
-    expect(within(sheet).getByRole("link", { name: "Check-In" }).getAttribute("href")).toBe("/admin/events/newer/check-in");
-    expect(within(sheet).getByRole("link", { name: "Apps" }).getAttribute("href")).toBe("/admin/events/newer/review-applications");
+    const link = screen.getByRole("link", { name: "View details for Design Workshop" });
+    expect(link.getAttribute("href")).toBe("/admin/events/newer");
+    expect(link.textContent).toBe("Design Workshop");
+    expect(link.hasAttribute("data-replace")).toBe(false);
+    // Rows are links now, not buttons that open a sheet in place.
+    expect(screen.queryAllByRole("button", { name: /^View details for/ })).toEqual([]);
+  });
+
+  it("marks the open event's row and replaces rather than stacks records", () => {
+    pathname = "/admin/events/newer";
+    render(<AdminEventsTable rows={rows} />);
+    const open = screen.getByRole("link", { name: "View details for Design Workshop" });
+    expect(open.getAttribute("aria-current")).toBe("page");
+    expect(open.closest("tr")?.hasAttribute("data-active")).toBe(true);
+    const other = screen.getByRole("link", { name: "View details for Design Meetup" });
+    expect(other.getAttribute("aria-current")).toBeNull();
+    expect(other.hasAttribute("data-replace")).toBe(true);
+  });
+
+  it("shows a scheduled draft's publish date in its status", () => {
+    render(<AdminEventsTable rows={[row("sched", "Scheduled Social", "2026-12-01T18:00:00+00:00", "draft", false, "2026-11-20T18:00:00+00:00")]} />);
+    expect(screen.getByText("Scheduled Nov 20")).toBeTruthy();
   });
 });

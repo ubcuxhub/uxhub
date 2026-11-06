@@ -299,8 +299,8 @@ export async function saveAdminEventAction(
     await discardEventImage(input.expectedImageUrl);
   }
 
-  revalidatePath("/admin/events");
-  revalidatePath(`/admin/events/${data.id}`);
+  // The list, and the event's overview (page and drawer) and builder below it.
+  revalidatePath("/admin/events", "layout");
   revalidatePath("/events", "layout");
   return { id: data.id };
 }
@@ -313,7 +313,7 @@ export async function saveAdminMentorAction(
     throw new Error("Mentor name is required.");
   }
   const mentor = await saveMentor(supabaseAdmin, input);
-  revalidatePath("/admin/events");
+  revalidatePath("/admin/events", "layout");
   return mentor;
 }
 
@@ -325,7 +325,7 @@ export async function saveAdminSponsorAction(
     throw new Error("Sponsor name is required.");
   }
   const sponsor = await saveSponsor(supabaseAdmin, input);
-  revalidatePath("/admin/events");
+  revalidatePath("/admin/events", "layout");
   return sponsor;
 }
 
@@ -342,7 +342,7 @@ export async function deleteAdminEventAction(eventId: string) {
 
   await discardEventImage(existing?.image_url);
 
-  revalidatePath("/admin/events");
+  revalidatePath("/admin/events", "layout");
 }
 
 /**
