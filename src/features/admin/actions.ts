@@ -14,6 +14,7 @@ import {
   adminUpdateUserInfoById,
 } from "@/lib/supabase-helpers/admin-server";
 import { datetimeLocalToTimestamptz } from "@/lib/date";
+import { assertPublishAt } from "@/features/admin/lib/event-publication";
 import {
   validateMembershipTypeInput,
   type MembershipTypeInput,
@@ -235,23 +236,7 @@ export async function saveAdminEventAction(
 ): Promise<{ id: string }> {
   await requireAdmin();
 
-  if (
-    input.event.publish_at != null &&
-    (typeof input.event.publish_at !== "string" ||
-      !/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(input.event.publish_at) ||
-      !Number.isFinite(Date.parse(input.event.publish_at)))
-  ) {
-    throw new Error("Publish date must be a valid timestamp with a timezone.");
-  }
-
-  if (input.event.publish_at != null) {
-    if (input.event.status !== "draft") {
-      throw new Error("Only draft events can have a publish date.");
-    }
-    if (Date.parse(input.event.publish_at) <= Date.now()) {
-      throw new Error("Publish date must be in the future.");
-    }
-  }
+  assertPublishAt(input.event.status, input.event.publish_at);
 
   let slug: string | null = null;
 
@@ -299,8 +284,8 @@ export async function saveAdminEventAction(
     await discardEventImage(input.expectedImageUrl);
   }
 
-  revalidatePath("/admin/events");
-  revalidatePath(`/admin/events/${data.id}`);
+  // The list, and the event's overview (page and drawer) and builder below it.
+  revalidatePath("/admin/events", "layout");
   revalidatePath("/events", "layout");
   return { id: data.id };
 }
@@ -313,7 +298,7 @@ export async function saveAdminMentorAction(
     throw new Error("Mentor name is required.");
   }
   const mentor = await saveMentor(supabaseAdmin, input);
-  revalidatePath("/admin/events");
+  revalidatePath("/admin/events", "layout");
   return mentor;
 }
 
@@ -325,7 +310,7 @@ export async function saveAdminSponsorAction(
     throw new Error("Sponsor name is required.");
   }
   const sponsor = await saveSponsor(supabaseAdmin, input);
-  revalidatePath("/admin/events");
+  revalidatePath("/admin/events", "layout");
   return sponsor;
 }
 
@@ -342,7 +327,7 @@ export async function deleteAdminEventAction(eventId: string) {
 
   await discardEventImage(existing?.image_url);
 
-  revalidatePath("/admin/events");
+  revalidatePath("/admin/events", "layout");
 }
 
 /**

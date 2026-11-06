@@ -126,6 +126,9 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
   fills `RecordView` and never branches on mode. Every `@flow` page has a
   canonical twin, but not every canonical page has a drawer (`/edit`,
   `/check-in`, `/review-applications` and `create-new` are pages only).
+  Interception rewrites run before the file system, so a soft link to a static
+  page beside the records (`/admin/events/create-new`) lands in the `[event]`
+  drawer: link such pages with a plain `<a>`, which loads the document.
   `@flow` renders outside the `(app)` layouts, so their `requireAuth()` and
   `requireAdmin()` never run for it: every intercepted admin layout and page
   must call `requireAdmin()` itself (or render a route component that does).
@@ -142,7 +145,9 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
   handlers for callbacks, webhooks, uploads, and flows that require an HTTP
   endpoint.
 - Student-facing event and checkout routes use slugs. Admin event routes use
-  event IDs.
+  event IDs (a slug redirects to the ID): `/admin/events/<id>` is the event's
+  overview (the record drawer, with a quick edit of its status and dates) and
+  `/admin/events/<id>/edit` is the full builder.
 - Settings are a hash-driven dialog (`#settings/<tab>`), not standalone portal
   pages. Use `openSettings(tab)` from
   `src/features/settings/components/SettingsDialog`.

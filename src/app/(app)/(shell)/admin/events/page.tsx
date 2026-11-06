@@ -1,15 +1,23 @@
-import Link from "next/link";
-
 import { Button } from "@/components/ui/button";
 import { PageContainer } from "@/components/shared/PageContainer";
 import {
   AdminEventsTable,
   type AdminEventTableRow,
 } from "@/features/admin/components/AdminEventsTable";
+import { registrationWindow } from "@/features/admin/lib/event-registration-window";
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchEvents } from "@/lib/supabase-helpers/events";
 import { fetchEventSeatCounts } from "@/lib/supabase-helpers/event-tickets";
+
+/*
+ * A plain link on purpose: a soft navigation to `/admin/events/create-new`
+ * matches the record drawer's intercepted `[event]` route
+ * (`@flow/(.)admin/events/[event]`) before the static page, so it would open a
+ * drawer over this list instead of the builder. A document load is never
+ * intercepted.
+ */
+const CREATE_EVENT_HREF = "/admin/events/create-new";
 
 export default async function AdminEventsPage() {
   await requireAdmin();
@@ -26,22 +34,11 @@ export default async function AdminEventsPage() {
   );
 
   const now = new Date();
-  const rows: AdminEventTableRow[] = events.map((event) => {
-    const registrationStart = event.registration_opens_at
-      ? new Date(event.registration_opens_at)
-      : null;
-    const registrationEnd = event.registration_closes_at
-      ? new Date(event.registration_closes_at)
-      : null;
-
-    return {
-      event,
-      registrationCount: seatCounts.get(event.id)?.tickets ?? 0,
-      registrationOpen:
-        (!registrationStart || now >= registrationStart) &&
-        (!registrationEnd || now <= registrationEnd),
-    };
-  });
+  const rows: AdminEventTableRow[] = events.map((event) => ({
+    event,
+    registrationCount: seatCounts.get(event.id)?.tickets ?? 0,
+    registrationOpen: registrationWindow(event, now) === "open",
+  }));
 
   return (
     <PageContainer className="flex flex-col gap-8">
@@ -55,7 +52,7 @@ export default async function AdminEventsPage() {
           </p>
         </div>
         <Button asChild>
-          <Link href="/admin/events/create-new">Create Event</Link>
+          <a href={CREATE_EVENT_HREF}>Create Event</a>
         </Button>
       </header>
 
@@ -67,9 +64,7 @@ export default async function AdminEventsPage() {
             your first event and it will show up here.
           </p>
           <Button asChild variant="outline">
-            <Link href="/admin/events/create-new">
-              Create your first event
-            </Link>
+            <a href={CREATE_EVENT_HREF}>Create your first event</a>
           </Button>
         </div>
       ) : (

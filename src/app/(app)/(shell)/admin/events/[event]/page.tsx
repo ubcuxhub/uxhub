@@ -1,64 +1,18 @@
-import { notFound } from "next/navigation";
+import { RecordFrame } from "@/components/shared/RecordDrawer";
+import { AdminEventRecordRoute } from "@/features/admin/components/AdminEventRecordRoute";
 
-import { PageContainer } from "@/components/shared/PageContainer";
-import {
-  EventCreateModify,
-} from "@/features/admin/components/EventCreateModify";
-import { resolveAdminEventId } from "@/features/admin/lib/resolve-event-param";
-import { requireAdmin } from "@/lib/auth/guards";
-import { createClient } from "@/lib/supabase/server";
-import { fetchApplicationQuestions } from "@/lib/supabase-helpers/event-applications";
-import { fetchCheckInSessions } from "@/lib/supabase-helpers/check-ins";
-import { fetchEventById } from "@/lib/supabase-helpers/events";
-import {
-  fetchEventMentors,
-  fetchEventSponsors,
-  searchMentors,
-  searchSponsors,
-} from "@/lib/supabase-helpers/event-people";
-
-interface EventViewProps {
+/**
+ * An event's overview as a page: a refresh, a shared link or "Open as full
+ * page" of the URL the record drawer shows. The builder is at `./edit`.
+ */
+export default async function EventOverviewPage({
+  params,
+}: {
   params: Promise<{ event: string }>;
-}
-
-export default async function EventView({ params }: EventViewProps) {
-  await requireAdmin();
-  const { event: eventParam } = await params;
-  const supabase = await createClient();
-  const eventId = await resolveAdminEventId(supabase, eventParam);
-  const [
-    event,
-    checkInSessions,
-    applicationQuestions,
-    mentors,
-    sponsors,
-    mentorOptions,
-    sponsorOptions,
-  ] =
-    await Promise.all([
-      fetchEventById(supabase, eventId),
-      fetchCheckInSessions(supabase, eventId),
-      fetchApplicationQuestions(supabase, eventId),
-      fetchEventMentors(supabase, eventId),
-      fetchEventSponsors(supabase, eventId),
-      searchMentors(supabase, ""),
-      searchSponsors(supabase, ""),
-    ]);
-
-  if (!event) notFound();
-
+}) {
   return (
-    <PageContainer backHref="/admin/events" backLabel="Back to Events">
-      <EventCreateModify
-        eventId={eventId}
-        initialEvent={event}
-        initialCheckInSessions={checkInSessions}
-        initialApplicationQuestions={applicationQuestions}
-        initialMentors={mentors}
-        initialSponsors={sponsors}
-        mentorOptions={mentorOptions}
-        sponsorOptions={sponsorOptions}
-      />
-    </PageContainer>
+    <RecordFrame mode="canonical" listHref="/admin/events" listLabel="Back to Manage Events">
+      <AdminEventRecordRoute eventParam={(await params).event} mode="canonical" />
+    </RecordFrame>
   );
 }
