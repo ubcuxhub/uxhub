@@ -305,6 +305,7 @@ export type Database = {
           id: string
           offer_expires_at: string | null
           status: Database["public"]["Enums"]["event_application_status"]
+          submitted_at: string | null
           updated_at: string
           user_id: string
         }
@@ -315,6 +316,7 @@ export type Database = {
           id?: string
           offer_expires_at?: string | null
           status?: Database["public"]["Enums"]["event_application_status"]
+          submitted_at?: string | null
           updated_at?: string
           user_id: string
         }
@@ -324,6 +326,7 @@ export type Database = {
           id?: string
           offer_expires_at?: string | null
           status?: Database["public"]["Enums"]["event_application_status"]
+          submitted_at?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -887,6 +890,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_edit_application_response: {
+        Args: { p_application_id: string; p_question_id: string }
+        Returns: boolean
+      }
+      can_read_application_file: { Args: { p_name: string }; Returns: boolean }
+      can_remove_application_file: {
+        Args: { p_name: string }
+        Returns: boolean
+      }
+      can_upload_application_file: {
+        Args: { p_name: string }
+        Returns: boolean
+      }
       current_user_info_id: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -961,10 +977,18 @@ export type Database = {
         }
         Returns: Database["public"]["Enums"]["role_access_enum"]
       }
+      submit_event_application: {
+        Args: { p_application_id: string }
+        Returns: {
+          missing_question_ids: string[]
+          status: string
+        }[]
+      }
       valid_user_interests: { Args: { tags: string[] }; Returns: boolean }
     }
     Enums: {
       event_application_status:
+        | "draft"
         | "submitted"
         | "accepted"
         | "rejected"
@@ -1110,6 +1134,7 @@ export const Constants = {
   public: {
     Enums: {
       event_application_status: [
+        "draft",
         "submitted",
         "accepted",
         "rejected",
