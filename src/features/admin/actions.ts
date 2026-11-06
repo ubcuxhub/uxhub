@@ -115,7 +115,7 @@ export async function updateManagerUserAction(
 
   const payload = assertManagerUserUpdate(field, value);
   await adminUpdateUserInfoById(userId, payload);
-  revalidatePath("/admin/users");
+  revalidatePath("/admin/users", "layout");
 }
 
 /** Save the form's profile fields together; roles retain their separate RPC guard. */
@@ -145,7 +145,7 @@ export async function saveManagerUserDetailsAction(userId: string, changes: Reco
     }
   }
   const user = await saveAdminProfile(supabaseAdmin, userId, patch);
-  revalidatePath("/admin/users");
+  revalidatePath("/admin/users", "layout");
   return user;
 }
 
@@ -171,7 +171,7 @@ export async function updateUserRoleAction(
   if (error) throw error;
   if (!data) throw new Error("The role update returned no role.");
 
-  revalidatePath("/admin/users");
+  revalidatePath("/admin/users", "layout");
   return data;
 }
 

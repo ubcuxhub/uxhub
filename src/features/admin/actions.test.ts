@@ -128,7 +128,7 @@ describe("updateManagerUserAction: the column allowlist", () => {
     expect(adminServer.adminUpdateUserInfoById).toHaveBeenCalledWith("user-1", {
       [field]: "value",
     });
-    expect(revalidatePath).toHaveBeenCalledWith("/admin/users");
+    expect(revalidatePath).toHaveBeenCalledWith("/admin/users", "layout");
   });
 
   it("maps the form's order_date onto the deprecated column", async () => {
@@ -224,7 +224,7 @@ describe("updateUserRoleAction: the role check", () => {
         p_target_user_id: "user-1",
         p_role: role,
       });
-      expect(revalidatePath).toHaveBeenCalledWith("/admin/users");
+      expect(revalidatePath).toHaveBeenCalledWith("/admin/users", "layout");
     },
   );
 

@@ -20,7 +20,12 @@ import { AdminDirectoryLayout } from "./AdminDirectoryLayout";
 import { formatMembershipTypeName } from "@/features/memberships/lib/display";
 
 interface UserDirectoryPanelProps {
+  /** The rows to list, already searched, filtered and sorted. */
   users: UserRecord[];
+  /** Every user, before search and filters. */
+  totalUsers: number;
+  /** Whether a search or filter is applied. */
+  filtering: boolean;
   membershipTypes: MembershipTypeOption[];
   searchQuery: string;
   sortOption: SortOption;
@@ -32,12 +37,14 @@ interface UserDirectoryPanelProps {
   onSortOptionChange: (value: SortOption) => void;
   onMembershipFilterToggle: (value: string) => void;
   onRoleFilterToggle: (value: RoleAccess) => void;
+  /** Clears the filters (the Filters popover). */
   onClearFilters: () => void;
-  onUserSelect: (user: UserRecord, element: HTMLTableRowElement) => void;
+  /** Clears the search and the filters (the row count's Clear filters). */
+  onClearSearchAndFilters: () => void;
 }
 
 const userColumns: AdminDirectoryColumn<UserRecord>[] = [
-  { id: "first-name", header: "First Name", cellClassName: "font-medium", render: (user) => user.first_name },
+  { id: "first-name", header: "First Name", cellClassName: "font-medium", rowLink: true, render: (user) => user.first_name },
   { id: "last-name", header: "Last Name", cellClassName: "font-medium", render: (user) => user.last_name },
   { id: "email", header: "Email", render: (user) => user.email },
   { id: "tier", header: "Tier", render: (user) => user.membership_type_name != null ? formatMembershipTypeName(user.membership_type_name) : "No membership" },
@@ -45,8 +52,12 @@ const userColumns: AdminDirectoryColumn<UserRecord>[] = [
   { id: "major", header: "Major", cellClassName: "max-w-64 whitespace-normal", render: (user) => user.major ?? "—" },
 ];
 
+const USER_NOUN = { one: "user", other: "users" };
+
 export function UserDirectoryPanel({
   users,
+  totalUsers,
+  filtering,
   membershipTypes,
   searchQuery,
   sortOption,
@@ -59,7 +70,7 @@ export function UserDirectoryPanel({
   onMembershipFilterToggle,
   onRoleFilterToggle,
   onClearFilters,
-  onUserSelect,
+  onClearSearchAndFilters,
 }: UserDirectoryPanelProps) {
   return (
     <AdminDirectoryLayout>
@@ -68,6 +79,8 @@ export function UserDirectoryPanel({
         onSearchQueryChange={onSearchQueryChange}
         placeholder="Search users by name or email..."
         searchLabel="Search users by name or email"
+        count={{ shown: users.length, total: totalUsers, noun: USER_NOUN, filtered: filtering }}
+        onClearFilters={onClearSearchAndFilters}
       >
         <Select value={sortOption} onValueChange={(value) => onSortOptionChange(value as SortOption)}>
           <SelectTrigger aria-label="Sort by" className="sm:w-52">
@@ -118,7 +131,8 @@ export function UserDirectoryPanel({
         rows={users}
         getRowKey={(user) => user.id}
         getRowLabel={(user) => `View details for ${formatUserName(user)}`}
-        onActivate={onUserSelect}
+        getRowHref={(user) => `/admin/users/${user.id}`}
+        listHref="/admin/users"
         emptyMessage="No users match your search and filters."
       />
     </AdminDirectoryLayout>
