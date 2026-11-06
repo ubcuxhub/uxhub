@@ -344,6 +344,51 @@ export type Database = {
           },
         ]
       }
+      event_links: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          label: string | null
+          sort_order: number
+          type: Database["public"]["Enums"]["event_link_type"]
+          updated_at: string
+          url: string
+          visibility: Database["public"]["Enums"]["event_link_visibility"]
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          label?: string | null
+          sort_order?: number
+          type: Database["public"]["Enums"]["event_link_type"]
+          updated_at?: string
+          url: string
+          visibility?: Database["public"]["Enums"]["event_link_visibility"]
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          label?: string | null
+          sort_order?: number
+          type?: Database["public"]["Enums"]["event_link_type"]
+          updated_at?: string
+          url?: string
+          visibility?: Database["public"]["Enums"]["event_link_visibility"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_links_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_mentors: {
         Row: {
           event_id: string
@@ -419,6 +464,42 @@ export type Database = {
             foreignKeyName: "event_people_sections_event_id_fkey"
             columns: ["event_id"]
             isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_private_details: {
+        Row: {
+          created_at: string
+          event_id: string
+          meeting_id: string | null
+          meeting_passcode: string | null
+          meeting_url: string
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          event_id: string
+          meeting_id?: string | null
+          meeting_passcode?: string | null
+          meeting_url: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          meeting_id?: string | null
+          meeting_passcode?: string | null
+          meeting_url?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_private_details_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
             referencedRelation: "events"
             referencedColumns: ["id"]
           },
@@ -533,8 +614,10 @@ export type Database = {
           location_type: Database["public"]["Enums"]["event_location_type"]
           marketing_url: string | null
           max_capacity: number
+          max_team_size: number | null
           member_price: number
           mentors_enabled: boolean
+          min_team_size: number | null
           name: string
           publish_at: string | null
           registration_closes_at: string | null
@@ -546,6 +629,8 @@ export type Database = {
           sponsors_enabled: boolean
           starts_at: string | null
           status: Database["public"]["Enums"]["event_status"]
+          team_deadline: string | null
+          teams_enabled: boolean
           updated_at: string | null
         }
         ComputedFields: never
@@ -570,8 +655,10 @@ export type Database = {
           location_type?: Database["public"]["Enums"]["event_location_type"]
           marketing_url?: string | null
           max_capacity: number
+          max_team_size?: number | null
           member_price?: number
           mentors_enabled?: boolean
+          min_team_size?: number | null
           name: string
           publish_at?: string | null
           registration_closes_at?: string | null
@@ -583,6 +670,8 @@ export type Database = {
           sponsors_enabled?: boolean
           starts_at?: string | null
           status?: Database["public"]["Enums"]["event_status"]
+          team_deadline?: string | null
+          teams_enabled?: boolean
           updated_at?: string | null
         }
         Update: {
@@ -606,8 +695,10 @@ export type Database = {
           location_type?: Database["public"]["Enums"]["event_location_type"]
           marketing_url?: string | null
           max_capacity?: number
+          max_team_size?: number | null
           member_price?: number
           mentors_enabled?: boolean
+          min_team_size?: number | null
           name?: string
           publish_at?: string | null
           registration_closes_at?: string | null
@@ -619,6 +710,8 @@ export type Database = {
           sponsors_enabled?: boolean
           starts_at?: string | null
           status?: Database["public"]["Enums"]["event_status"]
+          team_deadline?: string | null
+          teams_enabled?: boolean
           updated_at?: string | null
         }
         Relationships: []
@@ -833,6 +926,89 @@ export type Database = {
         }
         Relationships: []
       }
+      team_members: {
+        Row: {
+          event_id: string
+          joined_at: string
+          team_id: string
+          user_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          event_id: string
+          joined_at?: string
+          team_id: string
+          user_id: string
+        }
+        Update: {
+          event_id?: string
+          joined_at?: string
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_members_team_id_event_id_fkey"
+            columns: ["team_id", "event_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id", "event_id"]
+          },
+          {
+            foreignKeyName: "team_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_info"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teams: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          invite_code: string
+          name: string | null
+          owner_id: string | null
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          invite_code?: string
+          name?: string | null
+          owner_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          invite_code?: string
+          name?: string | null
+          owner_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teams_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teams_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "user_info"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_info: {
         Row: {
           auth_user_id: string | null
@@ -963,14 +1139,29 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_team: {
+        Args: { p_event_id: string; p_name?: string; p_user_id: string }
+        Returns: {
+          failure_reason: string
+          team_id: string
+        }[]
+      }
       current_user_info_id: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      current_user_team_ids: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
       }
       delete_account: { Args: { p_auth_user_id: string }; Returns: undefined }
       delete_event_atomically: {
         Args: { target_event_id: string }
         Returns: undefined
+      }
+      delete_team: {
+        Args: { p_team_id: string; p_user_id: string }
+        Returns: string
       }
       event_is_public: {
         Args: {
@@ -1001,6 +1192,17 @@ export type Database = {
       is_admin: { Args: Record<PropertyKey, never>; Returns: boolean }
       is_authenticated: { Args: Record<PropertyKey, never>; Returns: boolean }
       is_manager: { Args: Record<PropertyKey, never>; Returns: boolean }
+      join_team: {
+        Args: { p_invite_code: string; p_user_id: string }
+        Returns: {
+          failure_reason: string
+          team_id: string
+        }[]
+      }
+      leave_team: {
+        Args: { p_event_id: string; p_user_id: string }
+        Returns: string
+      }
       publish_due_events: { Args: Record<PropertyKey, never>; Returns: number }
       release_event_ticket: {
         Args: { p_purchase_id: string }
@@ -1037,6 +1239,10 @@ export type Database = {
         }
         Returns: Database["public"]["Enums"]["role_access_enum"]
       }
+      team_change_blocked: {
+        Args: { p_event_id: string; p_user_id: string }
+        Returns: string
+      }
       valid_user_interests: { Args: { tags: string[] }; Returns: boolean }
     }
     Enums: {
@@ -1045,6 +1251,12 @@ export type Database = {
         | "accepted"
         | "rejected"
         | "waitlisted"
+      event_link_type:
+        | "slack_workspace"
+        | "participant_package"
+        | "event_recap"
+        | "other"
+      event_link_visibility: "everyone" | "going" | "after_event"
       event_location_type: "in_person" | "online" | "hybrid"
       event_status: "draft" | "active"
       event_type: "regular" | "flagship"
@@ -1192,6 +1404,13 @@ export const Constants = {
         "rejected",
         "waitlisted",
       ],
+      event_link_type: [
+        "slack_workspace",
+        "participant_package",
+        "event_recap",
+        "other",
+      ],
+      event_link_visibility: ["everyone", "going", "after_event"],
       event_location_type: ["in_person", "online", "hybrid"],
       event_status: ["draft", "active"],
       event_type: ["regular", "flagship"],

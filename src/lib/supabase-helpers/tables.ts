@@ -25,6 +25,10 @@ export const TABLES = {
   squareWebhookEvents: "square_webhook_events",
   eventAgendaDays: "event_agenda_days",
   eventAgendaItems: "event_agenda_items",
+  teams: "teams",
+  teamMembers: "team_members",
+  eventLinks: "event_links",
+  eventPrivateDetails: "event_private_details",
 } as const;
 
 export type TableName = (typeof TABLES)[keyof typeof TABLES];

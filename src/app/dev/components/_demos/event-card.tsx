@@ -130,7 +130,9 @@ const EVENT: EventRow = {
   location_type: "in_person",
   marketing_url: null,
   max_capacity: 120,
+  max_team_size: null,
   member_price: 10,
+  min_team_size: null,
   mentors_enabled: true,
   name: "UXathon 2026",
   publish_at: null,
@@ -143,6 +145,8 @@ const EVENT: EventRow = {
   sponsors_enabled: true,
   starts_at: "2026-11-14T18:00:00Z",
   status: "active",
+  team_deadline: null,
+  teams_enabled: false,
   updated_at: "2026-09-01T00:00:00Z",
 };
 
