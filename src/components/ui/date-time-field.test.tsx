@@ -11,7 +11,13 @@ import {
   type WallTime,
 } from "@/lib/date-input";
 
-import { DateField, TimeField } from "./date-time-field";
+import {
+  DateField,
+  DateTimeField,
+  TIME_INPUT_ERROR as TIME_ERROR,
+  TimeField,
+  type DateTimeValue,
+} from "./date-time-field";
 
 beforeAll(() => {
   globalThis.ResizeObserver = class ResizeObserver {
@@ -632,5 +638,100 @@ describe("Tab out of the calendar", () => {
 
     expect(fireEvent.keyDown(selected, { key: "Tab" })).toBe(true);
     expect(screen.queryByRole("grid")).not.toBeNull();
+  });
+});
+
+describe("DateTimeField", () => {
+  function Moment({
+    initial = { date: null, time: null },
+    onValidityChange,
+    onChange,
+    min,
+    after,
+  }: {
+    initial?: DateTimeValue;
+    onValidityChange?: (error: string | null) => void;
+    onChange?: (value: DateTimeValue) => void;
+    min?: IsoDate;
+    after?: WallTime;
+  }) {
+    const [value, setValue] = useState<DateTimeValue>(initial);
+    return (
+      <>
+        <label htmlFor="starts">Starts</label>
+        <DateTimeField
+          id="starts"
+          dateLabel="Start date"
+          timeLabel="Start time"
+          today={today}
+          value={value}
+          onValueChange={(next) => {
+            setValue(next);
+            onChange?.(next);
+          }}
+          onValidityChange={onValidityChange}
+          min={min}
+          after={after}
+        />
+        <button type="button" onClick={() => setValue({ date: null, time: null })}>
+          Clear
+        </button>
+      </>
+    );
+  }
+
+  it("names each half and keeps the date on the label's id", () => {
+    render(<Moment initial={{ date: "2026-11-14", time: "21:00" }} />);
+    const date = screen.getByLabelText("Start date") as HTMLInputElement;
+    const time = screen.getByLabelText("Start time") as HTMLInputElement;
+    expect(date.id).toBe("starts");
+    expect(time.id).toBe("starts-time");
+    expect(date.value).toBe("Sat, Nov 14, 2026");
+    expect(time.value).toBe("9:00 PM");
+  });
+
+  it("changes one half and keeps the other", () => {
+    const onChange = vi.fn();
+    render(<Moment initial={{ date: "2026-11-14", time: "21:00" }} onChange={onChange} />);
+    typeAndBlur(screen.getByLabelText("Start time"), "10:30 AM");
+    expect(onChange).toHaveBeenLastCalledWith({ date: "2026-11-14", time: "10:30" });
+    typeAndBlur(screen.getByLabelText("Start date"), "nov 20");
+    expect(onChange).toHaveBeenLastCalledWith({ date: "2026-11-20", time: "10:30" });
+  });
+
+  it("reports either half's error, the date's first, and clears when both are fine", () => {
+    const onValidityChange = vi.fn();
+    render(<Moment onValidityChange={onValidityChange} />);
+    typeAndBlur(screen.getByLabelText("Start time"), "teatime");
+    expect(onValidityChange).toHaveBeenLastCalledWith(TIME_ERROR);
+    typeAndBlur(screen.getByLabelText("Start date"), "feb 30");
+    expect(onValidityChange).toHaveBeenLastCalledWith(DATE_INPUT_ERROR);
+    typeAndBlur(screen.getByLabelText("Start date"), "nov 20");
+    expect(onValidityChange).toHaveBeenLastCalledWith(TIME_ERROR);
+    typeAndBlur(screen.getByLabelText("Start time"), "9 AM");
+    expect(onValidityChange).toHaveBeenLastCalledWith(null);
+  });
+
+  it("passes min to the date and after to the time", () => {
+    const onValidityChange = vi.fn();
+    render(
+      <Moment
+        initial={{ date: "2026-11-14", time: "21:00" }}
+        min="2026-11-14"
+        after="20:00"
+        onValidityChange={onValidityChange}
+      />,
+    );
+    typeAndBlur(screen.getByLabelText("Start time"), "7:00 PM");
+    expect(onValidityChange).toHaveBeenLastCalledWith(END_TIME_ERROR);
+    typeAndBlur(screen.getByLabelText("Start date"), "Nov 13, 2026");
+    expect(onValidityChange).toHaveBeenLastCalledWith("Pick a date on or after Sat, Nov 14, 2026.");
+  });
+
+  it("empties both halves when the value is cleared from outside", () => {
+    render(<Moment initial={{ date: "2026-11-14", time: "21:00" }} />);
+    fireEvent.click(screen.getByRole("button", { name: "Clear" }));
+    expect((screen.getByLabelText("Start date") as HTMLInputElement).value).toBe("");
+    expect((screen.getByLabelText("Start time") as HTMLInputElement).value).toBe("");
   });
 });
