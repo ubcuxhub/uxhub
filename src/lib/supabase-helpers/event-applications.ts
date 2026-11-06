@@ -357,11 +357,12 @@ export async function fetchApplicationResponses(
 
 /** How many of an event's applications are in each review state. */
 export type EventApplicationStatusCounts = Record<
-  EventApplicationRow["status"],
+  SubmittedApplicationStatus,
   number
 > & { total: number };
 
-const APPLICATION_STATUSES = ["submitted", "accepted", "rejected", "waitlisted"] as const satisfies readonly EventApplicationRow["status"][];
+// Drafts are the applicant's alone, so they are never counted.
+const APPLICATION_STATUSES = ["submitted", "accepted", "rejected", "waitlisted"] as const satisfies readonly SubmittedApplicationStatus[];
 
 /**
  * Counts an event's applications by status, for the admin overview. Every
