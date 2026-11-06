@@ -32,7 +32,9 @@ import {
   startApplicationDraft,
   submitApplication,
 } from "../actions";
+import type { WriteOutcome } from "../lib/autosave";
 import {
+  emptyAnswer,
   unansweredRequiredIds,
   validateAnswer,
   type AnswerErrors,
@@ -41,9 +43,11 @@ import {
   type ApplicationQuestion,
   type ApplicationWindow,
 } from "../lib/application-form";
+import { useAutosave } from "../hooks/use-autosave";
 import { ApplicationAnswersReadOnly } from "./ApplicationAnswersReadOnly";
 import { ApplicationSection } from "./ApplicationSection";
 import { ApplicationSubmittedDialog } from "./ApplicationSubmittedDialog";
+import { AutosaveStatus } from "./AutosaveStatus";
 import { QuestionField } from "./fields/QuestionField";
 import { questionAnchorId } from "./fields/shared";
 
@@ -93,11 +97,16 @@ function focusQuestion(questionId: string) {
 const sameAnswer = (a: AnswerValue | undefined, b: AnswerValue | undefined) =>
   JSON.stringify(a ?? "") === JSON.stringify(b ?? "");
 
+/** Typed answers wait for a pause before saving; every other kind saves at once. */
+const TYPED = new Set<ApplicationQuestion["response_type"]>(["short_text", "long_text"]);
+
 /**
  * The member's application to one event (Figma A.1 to A.9): About you, the
- * questions, a review that lists what is left, and Delete for a draft. Save
- * draft writes the answers; Submit saves, then submits through the RPC. Once
- * submitted, the answers are read-only and the page says it is Pending.
+ * questions, a review that lists what is left, and Delete for a draft.
+ * Answers save as they change (`useAutosave`; the first save starts the
+ * draft), and file answers when their upload finishes. Submit saves anything
+ * waiting, then submits through the RPC. Once submitted, the answers are
+ * read-only and the page says it is Pending.
  */
 export function ApplicationForm({
   event,
@@ -115,11 +124,14 @@ export function ApplicationForm({
   const router = useRouter();
   const eventHref = `/portal/events/${event.slug}`;
   const [answers, setAnswers] = useState(initialAnswers);
-  const [saved, setSaved] = useState(initialAnswers);
+  // What the form holds and what the database holds, for the autosave to
+  // compare outside render. A save records only what it sent, so an edit made
+  // while it was in flight stays unsaved and is sent next.
+  const answersRef = useRef(initialAnswers);
+  const savedRef = useRef(initialAnswers);
   const [errors, setErrors] = useState<AnswerErrors>({});
   const [applicationId, setApplicationId] = useState(initialApplicationId);
-  const [pending, setPending] = useState<"save" | "submit" | null>(null);
-  const [savedNote, setSavedNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [submittedNow, setSubmittedNow] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -130,9 +142,53 @@ export function ApplicationForm({
 
   const readOnly = status === "submitted" || submittedNow;
   const editable = !readOnly && applicationWindow === "open";
-  const dirty =
-    editable && questions.some((question) => !sameAnswer(answers[question.id], saved[question.id]));
-  useUnsavedChangesGuard(dirty, bypassGuard);
+
+  /** Records that `values` are now what the database holds. */
+  const markSaved = (values: ApplicationAnswers) => {
+    savedRef.current = { ...savedRef.current, ...values };
+  };
+
+  /** The typed and chosen answers that differ from the database, or null. */
+  const unsavedAnswers = (): ApplicationAnswers | null => {
+    const changed: ApplicationAnswers = {};
+    for (const question of questions) {
+      // A file answer is saved by its upload, never from here.
+      if (question.response_type === "file_upload") continue;
+      const value = answersRef.current[question.id];
+      if (!sameAnswer(value, savedRef.current[question.id])) {
+        changed[question.id] = value ?? emptyAnswer(question);
+      }
+    }
+    return Object.keys(changed).length > 0 ? changed : null;
+  };
+
+  const writeDraft = async (values: ApplicationAnswers): Promise<WriteOutcome> => {
+    const result = await saveApplicationDraft(event.id, values);
+    if (result.ok) {
+      setApplicationId(result.applicationId);
+      markSaved(values);
+      return "saved";
+    }
+    if (result.applicationId) setApplicationId(result.applicationId);
+    if (result.reason === "invalid") {
+      const fieldErrors = result.fieldErrors;
+      if (fieldErrors) setErrors((current) => ({ ...current, ...fieldErrors }));
+      return "invalid";
+    }
+    if (result.reason === "failed" || result.reason === undefined) return "transient";
+    // The window closed or the application was submitted elsewhere: the
+    // refreshed page shows it read-only.
+    toast.error(result.error);
+    router.refresh();
+    return "refused";
+  };
+
+  const [saveState, autosave] = useAutosave({ read: unsavedAnswers, write: writeDraft });
+  useUnsavedChangesGuard(
+    editable &&
+      (saveState.kind === "pending" || saveState.kind === "saving" || saveState.kind === "failed"),
+    bypassGuard
+  );
 
   const unanswered = unansweredRequiredIds(questions, answers);
   const errorIds = questions.filter((question) => errors[question.id]).map((q) => q.id);
@@ -168,8 +224,10 @@ export function ApplicationForm({
   }));
 
   const setAnswer = (question: ApplicationQuestion, value: AnswerValue) => {
-    setAnswers((current) => ({ ...current, [question.id]: value }));
-    setSavedNote("");
+    const next = { ...answersRef.current, [question.id]: value };
+    answersRef.current = next;
+    setAnswers(next);
+    autosave.schedule(TYPED.has(question.response_type) ? undefined : 0);
     if (errors[question.id]) {
       const message = validateAnswer(question, value, "submit");
       setErrors((current) => {
@@ -181,37 +239,15 @@ export function ApplicationForm({
     }
   };
 
-  /** Records that `values` are now what the database holds. */
-  const markSaved = (values: ApplicationAnswers) =>
-    setSaved((current) => ({ ...current, ...values }));
-
-  const save = async () => {
-    setPending("save");
-    const snapshot = answers;
-    try {
-      const result = await saveApplicationDraft(event.id, snapshot);
-      if (result.ok) {
-        setApplicationId(result.applicationId);
-        markSaved(snapshot);
-        setSavedNote("Saved");
-        return;
-      }
-      if (result.applicationId) setApplicationId(result.applicationId);
-      if (result.fieldErrors) setErrors(result.fieldErrors);
-      toast.error(result.error);
-    } catch {
-      toast.error("Your answers couldn't be saved. Try again.");
-    } finally {
-      setPending(null);
-    }
-  };
-
   const submit = async () => {
-    setPending("submit");
-    const snapshot = answers;
+    setSubmitting(true);
     try {
-      const result = await submitApplication(event.id, snapshot);
+      // Anything waiting saves first, so no autosave runs beside the submit.
+      if ((await autosave.flush()).kind === "stopped") return;
+      const snapshot = answersRef.current;
+      const result = await autosave.exclusive(() => submitApplication(event.id, snapshot));
       if (result.ok) {
+        autosave.stop();
         markSaved(snapshot);
         setErrors({});
         setSubmittedNow(true);
@@ -220,7 +256,10 @@ export function ApplicationForm({
         return;
       }
       if (result.applicationId) setApplicationId(result.applicationId);
-      if (result.saved) markSaved(snapshot);
+      if (result.saved) {
+        markSaved(snapshot);
+        autosave.schedule(0);
+      }
       if (result.fieldErrors && Object.keys(result.fieldErrors).length > 0) {
         setErrors(result.fieldErrors);
         document
@@ -232,17 +271,21 @@ export function ApplicationForm({
     } catch {
       toast.error("Your application couldn't be submitted. Try again.");
     } finally {
-      setPending(null);
+      setSubmitting(false);
     }
   };
 
-  const uploadFile = async (question: ApplicationQuestion, file: File) => {
+  const uploadFile = (question: ApplicationQuestion, file: File) =>
+    autosave.exclusive(() => upload(question, file));
+
+  const upload = async (question: ApplicationQuestion, file: File) => {
     const draft = await startApplicationDraft(event.id);
     if (!draft.ok) return draft.error;
     setApplicationId(draft.applicationId);
 
     const supabase = createClient();
-    const previous = typeof saved[question.id] === "string" ? (saved[question.id] as string) : "";
+    const saved = savedRef.current[question.id];
+    const previous = typeof saved === "string" ? saved : "";
     const path = applicationFilePath({
       userInfoId: draft.userInfoId,
       applicationId: draft.applicationId,
@@ -264,8 +307,12 @@ export function ApplicationForm({
     return null;
   };
 
-  const removeFile = async (question: ApplicationQuestion) => {
-    const path = typeof answers[question.id] === "string" ? (answers[question.id] as string) : "";
+  const removeFile = (question: ApplicationQuestion) =>
+    autosave.exclusive(() => remove(question));
+
+  const remove = async (question: ApplicationQuestion) => {
+    const answer = answersRef.current[question.id];
+    const path = typeof answer === "string" ? answer : "";
     const result = await saveApplicationDraft(event.id, { [question.id]: "" });
     if (!result.ok) return result.error;
     // The answer no longer names the file, so a failed removal only leaves an
@@ -280,17 +327,22 @@ export function ApplicationForm({
     if (!applicationId) return;
     setDeleting(true);
     setDeleteError(null);
+    // No save may land after the delete, where it would start a new draft.
+    await autosave.pause();
     try {
       const result = await deleteApplication(applicationId);
       if (!result.ok) {
         setDeleteError(result.error);
+        autosave.resume();
         return;
       }
+      autosave.stop();
       bypassGuard.current = true;
       toast.success("Application deleted");
       router.push(eventHref);
     } catch {
       setDeleteError("Your application couldn't be deleted. Try again.");
+      autosave.resume();
     } finally {
       setDeleting(false);
     }
@@ -305,7 +357,15 @@ export function ApplicationForm({
         : `${closesAt ? `Applications close ${closesAt}. ` : ""}The UX Hub team reviews every application, and you’ll be notified on the portal and by email once a decision is made.`;
 
   return (
-    <div className="flex flex-col pb-32">
+    <div
+      className="flex flex-col pb-32"
+      onBlur={(blur) => {
+        // Leaving a text field saves what was typed without waiting.
+        if (blur.target instanceof HTMLInputElement || blur.target instanceof HTMLTextAreaElement) {
+          autosave.schedule(0);
+        }
+      }}
+    >
       <div className="mx-auto w-full max-w-6xl px-5 pt-8 sm:px-6 sm:pt-10 lg:px-12">
         <BackPill href={eventHref} label={`Back to ${event.name}`} />
       </div>
@@ -325,29 +385,22 @@ export function ApplicationForm({
             )}
           </div>
           {readOnly ? null : (
-            <div className="grid grid-cols-2 items-center gap-3 sm:flex">
-              <span
-                aria-live="polite"
-                className="col-span-2 text-small text-muted-foreground empty:hidden sm:col-span-1"
-              >
-                {savedNote}
-              </span>
+            <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+              {editable ? (
+                <AutosaveStatus
+                  state={saveState}
+                  onRetry={autosave.retry}
+                  className="flex-1 sm:flex-none"
+                />
+              ) : null}
               <Button
                 type="button"
-                variant="secondary"
-                onClick={() => void save()}
-                loading={pending === "save"}
-                disabled={!editable || pending !== null}
-              >
-                {pending === "save" ? "Saving…" : "Save draft"}
-              </Button>
-              <Button
-                type="button"
+                className="ml-auto"
                 onClick={() => void submit()}
-                loading={pending === "submit"}
-                disabled={!editable || pending !== null}
+                loading={submitting}
+                disabled={!editable || submitting}
               >
-                {pending === "submit" ? "Submitting…" : "Submit"}
+                {submitting ? "Submitting…" : "Submit"}
               </Button>
             </div>
           )}
@@ -424,7 +477,7 @@ export function ApplicationForm({
                     number={index + 1}
                     value={answers[question.id] ?? ""}
                     error={errors[question.id]}
-                    disabled={!editable || pending !== null}
+                    disabled={!editable || submitting}
                     onChange={(value) => setAnswer(question, value)}
                     onUpload={(file) => uploadFile(question, file)}
                     onRemove={() => removeFile(question)}
@@ -473,7 +526,7 @@ export function ApplicationForm({
                   type="button"
                   variant="destructive"
                   className="self-start sm:self-auto"
-                  disabled={pending !== null}
+                  disabled={submitting || deleting}
                   onClick={() => {
                     setDeleteError(null);
                     setDeleteOpen(true);

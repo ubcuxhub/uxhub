@@ -29,11 +29,27 @@ import {
   type ApplicationQuestion,
 } from "./lib/application-form";
 
+/**
+ * Why an action stopped. The refusals (`not_accepting`, `not_open`, `closed`,
+ * `submitted`) won't change on a retry, so autosave stops on them; `invalid`
+ * needs the member to change an answer; `failed` is worth retrying.
+ */
+export type ApplicationFailureReason =
+  | "not_accepting"
+  | "not_open"
+  | "closed"
+  | "submitted"
+  | "invalid"
+  | "failed";
+
+type Refusal = Exclude<ApplicationFailureReason, "invalid" | "failed">;
+
 export type ApplicationActionResult =
   | { ok: true; applicationId: string }
   | {
       ok: false;
       error: string;
+      reason?: ApplicationFailureReason;
       /** Per-question messages, keyed by question id. */
       fieldErrors?: AnswerErrors;
       /** Whether the answers were saved as a draft before it stopped. */
@@ -44,7 +60,7 @@ export type ApplicationActionResult =
 
 export type StartDraftResult =
   | { ok: true; applicationId: string; userInfoId: string }
-  | { ok: false; error: string };
+  | { ok: false; error: string; reason: Refusal };
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -65,7 +81,15 @@ const MESSAGES = {
   saveFailed: "Your answers couldn't be saved. Try again.",
 } as const;
 
-const WINDOW_MESSAGE = { not_open: MESSAGES.notOpen, closed: MESSAGES.closed } as const;
+const REFUSAL_MESSAGE: Record<Refusal, string> = {
+  not_accepting: MESSAGES.notAccepting,
+  not_open: MESSAGES.notOpen,
+  closed: MESSAGES.closed,
+  submitted: MESSAGES.submitted,
+};
+
+const refuse = (reason: Refusal) =>
+  ({ ok: false, error: REFUSAL_MESSAGE[reason], reason }) as const;
 
 function pathsFor(slug: string | null) {
   return slug ? [`/portal/events/${slug}`, `/portal/events/${slug}/apply`] : [];
@@ -78,43 +102,40 @@ function pathsFor(slug: string | null) {
  */
 async function loadContext(
   eventId: unknown
-): Promise<{ ok: true; context: Context } | { ok: false; error: string }> {
+): Promise<{ ok: true; context: Context } | ReturnType<typeof refuse>> {
   const user = await requireAuth();
-  if (typeof eventId !== "string" || !eventId) {
-    return { ok: false, error: MESSAGES.notAccepting };
-  }
+  if (typeof eventId !== "string" || !eventId) return refuse("not_accepting");
   const supabase = await createClient();
   const event = await fetchEventById(supabase, eventId);
-  if (!event?.requires_application) {
-    return { ok: false, error: MESSAGES.notAccepting };
-  }
+  if (!event?.requires_application) return refuse("not_accepting");
   const questions = await fetchApplicationQuestions(supabase, event.id);
   return { ok: true, context: { user, supabase, event, questions } };
 }
 
-/** The member's draft, started now if they have none. */
+/**
+ * The member's draft, started now if they have none. Outside the window a
+ * draft is read-only, as the page shows it: RLS would still take the write,
+ * but the draft could never be submitted.
+ */
 async function ensureDraft(
   context: Context
-): Promise<{ ok: true; applicationId: string } | { ok: false; error: string }> {
+): Promise<{ ok: true; applicationId: string } | ReturnType<typeof refuse>> {
   const { supabase, event, user } = context;
   const existing = await fetchUserEventApplication(supabase, event.id, user.id);
-  if (existing) {
-    return existing.status === "draft"
-      ? { ok: true, applicationId: existing.id }
-      : { ok: false, error: MESSAGES.submitted };
-  }
+  if (existing && existing.status !== "draft") return refuse("submitted");
 
   const state = applicationWindow(event);
-  if (state !== "open") return { ok: false, error: WINDOW_MESSAGE[state] };
+  if (state !== "open") return refuse(state);
+  if (existing) return { ok: true, applicationId: existing.id };
 
   try {
     const draft = await createDraftApplication(supabase, event.id, user.id);
-    if (draft.status !== "draft") return { ok: false, error: MESSAGES.submitted };
+    if (draft.status !== "draft") return refuse("submitted");
     return { ok: true, applicationId: draft.id };
   } catch (error) {
     // RLS refuses the insert when the window shuts between the check and now.
     log.warn("application.draft_start_refused", { eventId: event.id, ...errorFields(error) });
-    return { ok: false, error: MESSAGES.closed };
+    return refuse("closed");
   }
 }
 
@@ -127,12 +148,12 @@ async function saveAnswers(
   input: unknown
 ): Promise<ApplicationActionResult & { answers?: ApplicationAnswers }> {
   const answers = parseAnswers(context.questions, input);
-  if (!answers) return { ok: false, error: MESSAGES.unreadable };
+  if (!answers) return { ok: false, error: MESSAGES.unreadable, reason: "invalid" };
 
   const given = context.questions.filter((question) => question.id in answers);
   const fieldErrors = validateAnswers(given, answers, "draft");
   if (Object.keys(fieldErrors).length > 0) {
-    return { ok: false, error: MESSAGES.fix, fieldErrors };
+    return { ok: false, error: MESSAGES.fix, reason: "invalid", fieldErrors };
   }
 
   const draft = await ensureDraft(context);
@@ -154,7 +175,13 @@ async function saveAnswers(
     }
   }
   if (Object.keys(fieldErrors).length > 0) {
-    return { ok: false, error: MESSAGES.fix, fieldErrors, applicationId: draft.applicationId };
+    return {
+      ok: false,
+      error: MESSAGES.fix,
+      reason: "invalid",
+      fieldErrors,
+      applicationId: draft.applicationId,
+    };
   }
 
   try {
@@ -171,7 +198,12 @@ async function saveAnswers(
       applicationId: draft.applicationId,
       ...errorFields(error),
     });
-    return { ok: false, error: MESSAGES.saveFailed, applicationId: draft.applicationId };
+    return {
+      ok: false,
+      error: MESSAGES.saveFailed,
+      reason: "failed",
+      applicationId: draft.applicationId,
+    };
   }
 
   return { ok: true, applicationId: draft.applicationId, answers };
@@ -190,7 +222,17 @@ export async function saveApplicationDraft(
   if (!loaded.ok) return loaded;
 
   const saved = await saveAnswers(loaded.context, answers);
-  if (!saved.ok) return saved;
+  if (!saved.ok) {
+    if (saved.reason && saved.reason !== "invalid" && saved.reason !== "failed") {
+      // Expected: the window closed or the draft was submitted (in another
+      // tab, say) while the form was open. Autosave stops on it.
+      log.warn("application.draft_save_refused", {
+        eventId: loaded.context.event.id,
+        reason: saved.reason,
+      });
+    }
+    return saved;
+  }
   for (const path of pathsFor(loaded.context.event.slug)) revalidatePath(path);
   return { ok: true, applicationId: saved.applicationId };
 }
