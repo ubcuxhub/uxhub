@@ -190,6 +190,39 @@ describe("event_people_sections", () => {
     }));
 });
 
+describe("a mentor link inserted without a section", () => {
+  it("goes in the event's Mentors section, made on first use and then reused", () =>
+    withFixtures(async (fixtures) => {
+      const [ada, grace, alan] = await createMentors(fixtures, "Ada", "Grace", "Alan");
+      const eventId = await save(fixtures, []);
+      await addSection(fixtures, eventId, "Judges");
+
+      // As an older seed writes them: several rows at once, no section_id.
+      const { error } = await fixtures.supabase.from("event_mentors").insert([
+        { event_id: eventId, mentor_id: ada.id, sort_order: 0 } as never,
+        { event_id: eventId, mentor_id: grace.id, sort_order: 1 } as never,
+      ]);
+      if (error) throw error;
+      const later = await fixtures.supabase
+        .from("event_mentors")
+        .insert({ event_id: eventId, mentor_id: alan.id, sort_order: 2 } as never);
+      if (later.error) throw later.error;
+
+      expect(await sectionsOf(fixtures, eventId)).toEqual([
+        { title: "Judges", sort_order: 0, event_mentors: [] },
+        {
+          title: "Mentors",
+          sort_order: 1,
+          event_mentors: [
+            { mentor_id: ada.id, sort_order: 0 },
+            { mentor_id: grace.id, sort_order: 1 },
+            { mentor_id: alan.id, sort_order: 2 },
+          ],
+        },
+      ]);
+    }));
+});
+
 describe("fetchEventMentors", () => {
   it("lists only the Mentors section, in order", () =>
     withFixtures(async (fixtures) => {

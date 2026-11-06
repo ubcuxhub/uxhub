@@ -281,6 +281,56 @@ describe("deleteTeam", () => {
     }));
 });
 
+describe("deleting an account", () => {
+  async function deleteAccount(user: { auth_user_id: string | null }) {
+    const { error } = await db.rpc("delete_account", { p_auth_user_id: user.auth_user_id! });
+    if (error) throw error;
+  }
+
+  it("frees a member's spot on their team", () =>
+    withFixtures(async (fixtures) => {
+      const event = await teamEvent(fixtures, { max_team_size: 2 });
+      const owner = await going(fixtures, event.id);
+      const member = await going(fixtures, event.id);
+      const next = await going(fixtures, event.id);
+      const { inviteCode } = await ownTeam(event.id, owner.id);
+      await joinTeam(db, { inviteCode, userId: member.id });
+
+      await deleteAccount(member);
+      expect((await fetchUserTeam(db, event.id, owner.id))?.members).toHaveLength(1);
+      expect((await joinTeam(db, { inviteCode, userId: next.id })).failureReason).toBeNull();
+    }));
+
+  it("passes an owner's team to the teammate who joined first", () =>
+    withFixtures(async (fixtures) => {
+      const event = await teamEvent(fixtures);
+      const owner = await going(fixtures, event.id);
+      const first = await going(fixtures, event.id);
+      const second = await going(fixtures, event.id);
+      const { teamId, inviteCode } = await ownTeam(event.id, owner.id);
+      await joinTeam(db, { inviteCode, userId: first.id });
+      await joinTeam(db, { inviteCode, userId: second.id });
+
+      await deleteAccount(owner);
+      const team = await fetchUserTeam(db, event.id, first.id);
+      expect(team?.id).toBe(teamId);
+      expect(team?.owner_id).toBe(first.id);
+      expect(team?.members.map((m) => m.userId)).toEqual([first.id, second.id]);
+      // The new owner can manage it.
+      expect(await deleteTeam(db, { teamId, userId: first.id })).toBeNull();
+    }));
+
+  it("deletes a team the owner was alone on", () =>
+    withFixtures(async (fixtures) => {
+      const event = await teamEvent(fixtures);
+      const owner = await going(fixtures, event.id);
+      const { inviteCode } = await ownTeam(event.id, owner.id);
+
+      await deleteAccount(owner);
+      expect(await fetchTeamByInviteCode(db, inviteCode)).toBeNull();
+    }));
+});
+
 describe("team tables", () => {
   it("refuse a member row whose event isn't its team's", () =>
     withFixtures(async (fixtures) => {
