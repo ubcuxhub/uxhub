@@ -175,6 +175,27 @@ So a student who's going to an event that has since filled up still sees
 "Going", not "Full".
 As well, "Registration closed" beats "Full" so that students can't register even if spots open up.  
 
+## Students: teams
+
+Only for events with `teams_enabled`. Teams form after registering: every
+team action needs a ticket to the event.
+
+- A student creates a team, which gets an invite link, or joins one with a
+  teammate's link. They're on at most one team per event.
+- A team holds up to `max_team_size` people; its link stops working when full.
+- The owner can delete the team, which removes everyone on it. Anyone else can
+  leave. The owner can't leave without deleting it.
+- At `team_deadline` teams lock: nobody creates, joins, leaves or deletes, and
+  admins place anyone without a team. A team admins make has no owner.
+- `min_team_size` isn't enforced: admins sort out small teams at the deadline.
+- Deleting an account frees the student's team spots. A team they owned passes
+  to the teammate who joined first, or is deleted if nobody else is on it.
+  Their ticket stays, as for any deleted account.
+
+The server makes these changes through `create_team`, `join_team`,
+`leave_team` and `delete_team`, which return why a change was refused
+(`NO_TICKET`, `TEAMS_LOCKED`, `TEAM_FULL`, ...) instead of failing.
+
 ## Seats
 
 Seats taken = tickets + accepted offers that haven't expired and have no ticket

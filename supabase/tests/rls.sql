@@ -68,8 +68,16 @@ insert into public.mentors (full_name)
 values ('RLS Mentor')
 returning id \gset mentor_
 
-insert into public.event_mentors (event_id, mentor_id)
-values (:'event_id', :'mentor_id');
+insert into public.event_people_sections (event_id, title)
+values (:'event_id', 'Mentors')
+returning id \gset mentor_section_
+
+insert into public.event_people_sections (event_id, title)
+values (:'draft_event_id', 'Judges')
+returning id \gset draft_section_
+
+insert into public.event_mentors (event_id, section_id, mentor_id)
+values (:'event_id', :'mentor_section_id', :'mentor_id');
 
 insert into public.sponsors (name)
 values ('RLS Sponsor')
@@ -124,6 +132,32 @@ returning id \gset draft_agenda_item_
 insert into public.event_tickets (event_id, user_id)
 values (:'event_id', :'user_a_id'), (:'event_id', :'user_b_id');
 
+-- User A owns a team with user B on it; another team on the event has neither.
+insert into public.teams (event_id, owner_id)
+values (:'event_id', :'user_a_id')
+returning id \gset team_a_
+
+insert into public.teams (event_id)
+values (:'event_id')
+returning id \gset other_team_
+
+insert into public.team_members (event_id, team_id, user_id)
+values (:'event_id', :'team_a_id', :'user_a_id'), (:'event_id', :'team_a_id', :'user_b_id');
+
+-- One link per visibility, and meeting details. The event has no dates, so it
+-- never ends and its after-event link stays hidden.
+insert into public.event_links (event_id, type, url, visibility)
+values
+  (:'event_id', 'slack_workspace', 'https://slack.example.test', 'everyone'),
+  (:'event_id', 'participant_package', 'https://package.example.test', 'going'),
+  (:'event_id', 'event_recap', 'https://recap.example.test', 'after_event');
+
+insert into public.event_links (event_id, type, url)
+values (:'draft_event_id', 'slack_workspace', 'https://draft-slack.example.test');
+
+insert into public.event_private_details (event_id, meeting_url)
+values (:'event_id', 'https://zoom.example.test/j/1');
+
 set local role anon;
 do $$
 declare
@@ -158,6 +192,10 @@ select set_config('rls.agenda_day_id', :'agenda_day_id', true);
 select set_config('rls.agenda_item_id', :'agenda_item_id', true);
 select set_config('rls.draft_agenda_day_id', :'draft_agenda_day_id', true);
 select set_config('rls.draft_agenda_item_id', :'draft_agenda_item_id', true);
+select set_config('rls.mentor_section_id', :'mentor_section_id', true);
+select set_config('rls.draft_section_id', :'draft_section_id', true);
+select set_config('rls.team_a_id', :'team_a_id', true);
+select set_config('rls.other_team_id', :'other_team_id', true);
 \o
 
 -- Agenda visibility for anonymous visitors. This runs after the settings above
@@ -186,6 +224,131 @@ begin
   where id = current_setting('rls.draft_agenda_item_id')::uuid;
   if visible_count <> 0 then
     raise exception 'anon can read a draft event agenda item';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_people_sections
+  where id = current_setting('rls.mentor_section_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'anon cannot read an active event people section';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_mentors
+  where section_id = current_setting('rls.mentor_section_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'anon cannot read an active event section''s people';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_people_sections
+  where id = current_setting('rls.draft_section_id')::uuid;
+  if visible_count <> 0 then
+    raise exception 'anon can read a draft event people section';
+  end if;
+
+  if has_table_privilege('anon', 'public.event_people_sections', 'INSERT')
+     or has_table_privilege('authenticated', 'public.event_people_sections', 'INSERT')
+     or has_table_privilege('authenticated', 'public.event_people_sections', 'UPDATE')
+     or has_table_privilege('authenticated', 'public.event_people_sections', 'DELETE') then
+    raise exception 'browser roles can write people sections';
+  end if;
+
+  if has_table_privilege('anon', 'public.teams', 'SELECT')
+     or has_table_privilege('anon', 'public.team_members', 'SELECT') then
+    raise exception 'anon can read teams';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_links
+  where event_id = current_setting('rls.event_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'anon should see only the everyone link, saw %', visible_count;
+  end if;
+
+  select count(*) into visible_count
+  from public.event_links
+  where event_id = current_setting('rls.draft_event_id')::uuid;
+  if visible_count <> 0 then
+    raise exception 'anon can read a draft event link';
+  end if;
+
+  if has_table_privilege('anon', 'public.event_private_details', 'SELECT') then
+    raise exception 'anon can read private event details';
+  end if;
+
+  if has_table_privilege('anon', 'public.event_links', 'INSERT')
+     or has_table_privilege('authenticated', 'public.event_links', 'INSERT')
+     or has_table_privilege('authenticated', 'public.event_private_details', 'INSERT')
+     or has_table_privilege('authenticated', 'public.event_private_details', 'UPDATE') then
+    raise exception 'browser roles can write event links or private details';
+  end if;
+end;
+$$;
+reset role;
+
+-- Teams for a student: their own team and teammates, nobody else's, and no
+-- writes except through the server's team functions.
+set local role authenticated;
+do $$
+declare
+  visible_count integer;
+begin
+  select count(*) into visible_count
+  from public.teams
+  where id = current_setting('rls.team_a_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'user A cannot read their own team';
+  end if;
+
+  select count(*) into visible_count
+  from public.teams
+  where id = current_setting('rls.other_team_id')::uuid;
+  if visible_count <> 0 then
+    raise exception 'user A can read a team they are not on';
+  end if;
+
+  select count(*) into visible_count
+  from public.team_members
+  where team_id = current_setting('rls.team_a_id')::uuid;
+  if visible_count <> 2 then
+    raise exception 'user A should see both members of their team, saw %', visible_count;
+  end if;
+
+  begin
+    insert into public.team_members (event_id, team_id, user_id)
+    values (
+      current_setting('rls.event_id')::uuid,
+      current_setting('rls.other_team_id')::uuid,
+      current_setting('rls.user_a_id')::uuid
+    );
+    raise exception 'user A wrote a team member row';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  if has_function_privilege('authenticated', 'public.create_team(uuid, uuid, text)', 'execute')
+     or has_function_privilege('authenticated', 'public.join_team(text, uuid)', 'execute')
+     or has_function_privilege('authenticated', 'public.leave_team(uuid, uuid)', 'execute')
+     or has_function_privilege('authenticated', 'public.delete_team(uuid, uuid)', 'execute')
+     or has_function_privilege('anon', 'public.join_team(text, uuid)', 'execute') then
+    raise exception 'browser roles can call the team functions';
+  end if;
+
+  -- User A holds a ticket: the going link too, but not the recap before the
+  -- event ends, and the meeting details.
+  select count(*) into visible_count
+  from public.event_links
+  where event_id = current_setting('rls.event_id')::uuid;
+  if visible_count <> 2 then
+    raise exception 'ticket holder should see the everyone and going links, saw %', visible_count;
+  end if;
+
+  select count(*) into visible_count
+  from public.event_private_details
+  where event_id = current_setting('rls.event_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'ticket holder cannot read the meeting details';
   end if;
 end;
 $$;
@@ -560,6 +723,13 @@ begin
     raise exception 'admin cannot read a draft event agenda item';
   end if;
 
+  select count(*) into visible_count
+  from public.event_people_sections
+  where id = current_setting('rls.draft_section_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'admin cannot read a draft event people section';
+  end if;
+
   update public.user_info
   set first_name = 'Admin tried to edit'
   where id = current_setting('rls.user_b_id')::uuid;
@@ -630,6 +800,13 @@ begin
   where id = current_setting('rls.draft_agenda_item_id')::uuid;
   if changed_count <> 1 then
     raise exception 'manager cannot read a draft event agenda item';
+  end if;
+
+  select count(*) into changed_count
+  from public.event_people_sections
+  where id = current_setting('rls.draft_section_id')::uuid;
+  if changed_count <> 1 then
+    raise exception 'manager cannot read a draft event people section';
   end if;
 
   update public.user_info

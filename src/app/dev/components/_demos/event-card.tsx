@@ -111,19 +111,29 @@ const MEMBER_BADGES: Record<string, EventBadge> = {
 
 const EVENT: EventRow = {
   agenda: null,
+  agenda_enabled: true,
   created_at: "2026-09-01T00:00:00Z",
   description:
     "A 24-hour design sprint. Teams of four ship a prototype with feedback from industry mentors.",
   description_images: null,
   ends_at: "2026-11-15T18:00:00Z",
+  event_colour: null,
   event_type: "flagship",
+  header_colour: null,
+  header_image_url: null,
   id: "00000000-0000-0000-0000-000000000001",
   image_url: "/about-us-1.png",
+  is_featured: false,
+  location_address: null,
   location_address_url: null,
   location_building: "Henry Angus",
   location_room: "098",
+  location_type: "in_person",
+  marketing_url: null,
   max_capacity: 120,
+  max_team_size: null,
   member_price: 10,
+  min_team_size: null,
   mentors_enabled: true,
   name: "UXathon 2026",
   publish_at: null,
@@ -136,6 +146,8 @@ const EVENT: EventRow = {
   sponsors_enabled: true,
   starts_at: "2026-11-14T18:00:00Z",
   status: "active",
+  team_deadline: null,
+  teams_enabled: false,
   updated_at: "2026-09-01T00:00:00Z",
 };
 
