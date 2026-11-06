@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RecordFrame } from "@/components/shared/RecordDrawer";
 import type { EventRow } from "@/lib/supabase/models";
@@ -84,9 +84,28 @@ function renderRecord(props: Partial<AdminEventRecordProps> = {}) {
   );
 }
 
+beforeAll(() => {
+  // The date and time fields' popovers measure themselves.
+  globalThis.ResizeObserver ??= class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+  HTMLElement.prototype.scrollIntoView ??= vi.fn();
+});
+
 beforeEach(() => {
   updateEventScheduleAction.mockReset();
 });
+
+/** Types into a date or time field and leaves it, which is when it reads the text. */
+function typeAndBlur(input: HTMLElement, text: string) {
+  fireEvent.focus(input);
+  fireEvent.change(input, { target: { value: text } });
+  fireEvent.blur(input);
+}
+
+const field = (name: string) => screen.getByLabelText(name) as HTMLInputElement;
 
 afterEach(() => {
   cleanup();
@@ -157,11 +176,16 @@ describe("AdminEventRecord quick edit", () => {
   }
 
   it("swaps the schedule for its controls and the Edit link for Cancel / Save", () => {
-    renderRecord();
+    const { container } = renderRecord();
     startEditing();
 
-    expect(screen.getByLabelText(/^Event Status/)).toBeTruthy();
-    expect((screen.getByLabelText(/^Start Time/) as HTMLInputElement).value).toBe("19:00");
+    expect(screen.getByLabelText("Status")).toBeTruthy();
+    expect(screen.getByRole("group", { name: "Starts" })).toBeTruthy();
+    expect(field("Start date").value).toBe("Thu, Nov 19, 2026");
+    expect(field("Start time").value).toBe("7:00 PM");
+    expect(field("End time").value).toBe("9:00 PM");
+    // The library's typed fields, never the browser's own date and time inputs.
+    expect(container.ownerDocument.querySelector('input[type="time"], input[type="date"]')).toBeNull();
     expect(screen.getByRole("button", { name: "Save schedule" })).toBeTruthy();
     expect(screen.queryByRole("link", { name: "Edit event" })).toBeNull();
 
@@ -170,13 +194,80 @@ describe("AdminEventRecord quick edit", () => {
     expect(screen.getByRole("link", { name: "Edit event" })).toBeTruthy();
   });
 
+  it("asks for a publish date only while the event is a draft", () => {
+    renderRecord({ event: event({ status: "draft", publish_at: "2026-11-12T18:00:00.000Z" }) });
+    startEditing();
+
+    expect(field("Publish date").value).toBe("Thu, Nov 12, 2026");
+    expect(field("Publish time").value).toBe("11:00 AM");
+    expect(
+      screen.getByText("Draft events become Active at this time. Leave empty to keep in Draft.")
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear publish date" }));
+    expect(field("Publish date").value).toBe("");
+    expect(field("Publish time").value).toBe("");
+    expect(screen.queryByRole("button", { name: "Clear publish date" })).toBeNull();
+  });
+
+  it("hides the publish date for an active event", () => {
+    renderRecord();
+    startEditing();
+    expect(screen.queryByLabelText("Publish date")).toBeNull();
+  });
+
+  it("clears an optional registration date with its own button", async () => {
+    updateEventScheduleAction.mockResolvedValue({ ok: true, event: event() });
+    renderRecord({
+      event: event({
+        registration_opens_at: "2026-11-10T17:00:00.000Z",
+        registration_closes_at: "2026-11-19T06:00:00.000Z",
+      }),
+    });
+    startEditing();
+
+    expect(field("Registration opening date").value).toBe("Tue, Nov 10, 2026");
+    expect(screen.queryByRole("button", { name: "Clear publish date" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Clear registration closes" }));
+    expect(field("Registration closing date").value).toBe("");
+    fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
+
+    await waitFor(() => expect(updateEventScheduleAction).toHaveBeenCalled());
+    expect(updateEventScheduleAction.mock.calls[0][1]).toMatchObject({
+      registration_opens_at: "2026-11-10T17:00:00.000Z",
+      registration_closes_at: null,
+    });
+  });
+
+  it("marks an end before the start under the end field", () => {
+    renderRecord();
+    startEditing();
+
+    typeAndBlur(field("End date"), "Nov 18, 2026");
+
+    const ends = screen.getByRole("group", { name: "Ends" });
+    expect(within(ends).getByText("Pick a date on or after Thu, Nov 19, 2026.")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
+    expect(updateEventScheduleAction).not.toHaveBeenCalled();
+  });
+
+  it("marks an end time before the start on the same day", () => {
+    renderRecord();
+    startEditing();
+
+    typeAndBlur(field("End time"), "6:00 PM");
+
+    const ends = screen.getByRole("group", { name: "Ends" });
+    expect(within(ends).getByText("End time is before the start time.")).toBeTruthy();
+  });
+
   it("saves the dates as Pacific timestamps and shows what was saved", async () => {
     const saved = event({ starts_at: "2026-11-20T02:30:00.000Z" });
     updateEventScheduleAction.mockResolvedValue({ ok: true, event: saved });
     renderRecord();
     startEditing();
 
-    fireEvent.change(screen.getByLabelText(/^Start Time/), { target: { value: "19:30" } });
+    typeAndBlur(field("Start time"), "7:30 PM");
     fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
 
     await waitFor(() => expect(router.refresh).toHaveBeenCalled());
@@ -199,12 +290,14 @@ describe("AdminEventRecord quick edit", () => {
     });
     renderRecord({ event: event({ status: "draft" }) });
     startEditing();
-    fireEvent.change(screen.getByLabelText(/^Start Time/), { target: { value: "19:15" } });
+    typeAndBlur(field("Start time"), "7:15 PM");
     fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
 
-    expect((await screen.findByRole("alert")).textContent).toBe(
-      "Finish the event in Edit before publishing. Short description is required."
-    );
+    expect(
+      (await screen.findByText(
+        "Finish the event in Edit before publishing. Short description is required."
+      )).getAttribute("role")
+    ).toBe("alert");
     expect(screen.getByRole("button", { name: "Save schedule" })).toBeTruthy();
     expect(router.refresh).not.toHaveBeenCalled();
   });
@@ -213,7 +306,7 @@ describe("AdminEventRecord quick edit", () => {
     renderRecord();
     startEditing();
 
-    fireEvent.change(screen.getByLabelText(/^End Time/), { target: { value: "" } });
+    typeAndBlur(field("End time"), "");
     fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
 
     expect(screen.getByRole("alert").textContent).toBe(
@@ -222,15 +315,26 @@ describe("AdminEventRecord quick edit", () => {
     expect(updateEventScheduleAction).not.toHaveBeenCalled();
   });
 
+  it("won't save text a field couldn't read", () => {
+    renderRecord();
+    startEditing();
+
+    typeAndBlur(field("Start time"), "teatime");
+    fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
+
+    expect(screen.getByText("Fix the dates and times marked above.")).toBeTruthy();
+    expect(updateEventScheduleAction).not.toHaveBeenCalled();
+  });
+
   it("shows a generic error when the action itself fails", async () => {
     updateEventScheduleAction.mockRejectedValue(new Error("network"));
     renderRecord();
     startEditing();
-    fireEvent.change(screen.getByLabelText(/^Start Time/), { target: { value: "19:00" } });
+    typeAndBlur(field("Start time"), "7:30 PM");
     fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
 
-    expect((await screen.findByRole("alert")).textContent).toBe(
-      "Couldn’t save the schedule. Try again."
-    );
+    expect(
+      (await screen.findByText("Couldn’t save the schedule. Try again.")).getAttribute("role")
+    ).toBe("alert");
   });
 });

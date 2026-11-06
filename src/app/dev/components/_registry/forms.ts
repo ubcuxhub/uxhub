@@ -185,9 +185,9 @@ export const formsEntries: readonly RegistryEntry[] = [
     category: "Forms",
     tier: "primitive",
     description:
-      "Typed date and time fields with their pickers, for event schedules and deadlines.",
+      "Typed date and time fields with their pickers, and the two together as one moment, for event schedules and deadlines.",
     importPath: "@/components/ui/date-time-field",
-    importNames: ["DateField", "TimeField"],
+    importNames: ["DateField", "TimeField", "DateTimeField"],
     source: "src/components/ui/date-time-field.tsx",
     spec: "§3.11",
     layout: "split",
