@@ -30,7 +30,7 @@ function Change({ delta, period }: { delta: number; period: string }) {
       className="flex min-w-0 items-center gap-1 text-label text-foreground"
     >
       <span aria-hidden className="inline-flex min-w-0 items-center gap-1">
-        <Icon className="size-3.5 shrink-0" />
+        <Icon className="size-4 shrink-0" />
         <span className="font-semibold tabular-nums">{amount}</span>
         <span className="truncate font-normal text-muted-foreground">
           {period}

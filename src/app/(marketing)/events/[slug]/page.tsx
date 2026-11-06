@@ -140,7 +140,7 @@ export default async function EventDetailPage({
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center bg-muted">
-                <Calendar className="text-muted-foreground" />
+                <Calendar className="size-5 text-muted-foreground" />
               </div>
             )}
           </div>
@@ -178,7 +178,7 @@ export default async function EventDetailPage({
             {/* Date & Time */}
             <div className="flex items-center gap-3 text-table">
               <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted">
-                <Calendar className="text-muted-foreground" />
+                <Calendar className="size-4 text-muted-foreground" />
               </div>
               <div>
                 <p>{startDateFormatted || "TBD"}</p>
@@ -194,7 +194,7 @@ export default async function EventDetailPage({
             {/* Location */}
             <div className="flex items-center gap-3 text-table">
               <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted">
-                <MapPin className="text-muted-foreground" />
+                <MapPin className="size-4 text-muted-foreground" />
               </div>
               <div>
                 <p>{locationDisplay || "TBD"}</p>
@@ -405,7 +405,7 @@ export default async function EventDetailPage({
                 />
               ) : (
                 <div className="absolute inset-0 flex h-full w-full items-center justify-center text-muted-foreground">
-                  <MapPin />
+                  <MapPin className="size-5" />
                 </div>
               )}
             </div>

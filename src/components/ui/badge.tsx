@@ -12,12 +12,12 @@ import { cn } from "@/lib/utils";
  *
  * Every variant carries a 1px border (transparent unless it is a tag) so all
  * badges share one height, and callers' `border-*` tones keep working.
- * Put a lucide icon first; it is sized to 14px.
+ * Put a lucide icon first; it is sized to 16px.
  *
  * A `span`, so it is valid inside a paragraph, a button or a label.
  */
 const badgeVariants = cva(
-  "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-transparent text-badge [&_svg]:pointer-events-none [&_svg]:size-3.5 [&_svg]:shrink-0",
+  "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-transparent text-badge [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:size-4 [&_svg]:shrink-0",
   {
     variants: {
       variant: {

@@ -157,7 +157,7 @@ function ConfirmDialogBody({
         <DialogTitle
           className={cn(
             icon &&
-              "flex items-center gap-3 text-destructive [&_svg]:size-6 sm:gap-2 sm:[&_svg]:size-4",
+              "flex items-center gap-3 text-destructive [&_svg]:size-5 sm:gap-2 sm:[&_svg]:size-4",
           )}
         >
           {icon}

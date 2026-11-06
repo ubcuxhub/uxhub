@@ -376,7 +376,7 @@ export const ImageUpload = ({
 
         {view === "dragging" && (
           <>
-            <Upload className="size-6 text-info-foreground" aria-hidden />
+            <Upload className="size-5 text-info-foreground" aria-hidden />
             <p className="text-body-medium text-info-foreground">
               Drop to upload
             </p>
@@ -487,7 +487,7 @@ export const ImageUpload = ({
           <>
             <ImageIcon
               className={cn(
-                "size-6",
+                "size-5",
                 disabled ? "text-disabled-foreground" : "text-muted-foreground",
               )}
               aria-hidden

@@ -36,7 +36,7 @@ function BadgeDemo() {
       <SpecimenGroup
         title="Badge"
         spec="§3.3, §3.15"
-        description="One variant prop. Default and large, each with and without a 14px icon."
+        description="One variant prop. Default and large, each with and without a 16px icon."
       >
         {TONES.map((tone) => {
           const Icon = TONE_ICONS[tone];

@@ -93,7 +93,7 @@ function PersonRecord({ person, start, onSaved }: { person: Person; start: Start
       title={person.name}
       titleAdornment={
         <>
-          <ShieldCheck className="size-5 text-primary" aria-label="Verified student" />
+          <ShieldCheck className="size-4 text-primary" aria-label="Verified student" />
           <span className="text-small text-muted-foreground">{person.pronouns}</span>
         </>
       }
