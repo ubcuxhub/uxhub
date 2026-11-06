@@ -468,16 +468,24 @@ export type Database = {
       events: {
         Row: {
           agenda: Json | null
+          agenda_enabled: boolean
           created_at: string | null
           description: string
           description_images: string[] | null
           ends_at: string | null
+          event_colour: string | null
           event_type: Database["public"]["Enums"]["event_type"]
+          header_colour: string | null
+          header_image_url: string | null
           id: string
           image_url: string | null
+          is_featured: boolean
+          location_address: string | null
           location_address_url: string | null
           location_building: string | null
           location_room: string | null
+          location_type: Database["public"]["Enums"]["event_location_type"]
+          marketing_url: string | null
           max_capacity: number
           member_price: number
           mentors_enabled: boolean
@@ -497,16 +505,24 @@ export type Database = {
         ComputedFields: never
         Insert: {
           agenda?: Json | null
+          agenda_enabled?: boolean
           created_at?: string | null
           description: string
           description_images?: string[] | null
           ends_at?: string | null
+          event_colour?: string | null
           event_type?: Database["public"]["Enums"]["event_type"]
+          header_colour?: string | null
+          header_image_url?: string | null
           id?: string
           image_url?: string | null
+          is_featured?: boolean
+          location_address?: string | null
           location_address_url?: string | null
           location_building?: string | null
           location_room?: string | null
+          location_type?: Database["public"]["Enums"]["event_location_type"]
+          marketing_url?: string | null
           max_capacity: number
           member_price?: number
           mentors_enabled?: boolean
@@ -525,16 +541,24 @@ export type Database = {
         }
         Update: {
           agenda?: Json | null
+          agenda_enabled?: boolean
           created_at?: string | null
           description?: string
           description_images?: string[] | null
           ends_at?: string | null
+          event_colour?: string | null
           event_type?: Database["public"]["Enums"]["event_type"]
+          header_colour?: string | null
+          header_image_url?: string | null
           id?: string
           image_url?: string | null
+          is_featured?: boolean
+          location_address?: string | null
           location_address_url?: string | null
           location_building?: string | null
           location_room?: string | null
+          location_type?: Database["public"]["Enums"]["event_location_type"]
+          marketing_url?: string | null
           max_capacity?: number
           member_price?: number
           mentors_enabled?: boolean
@@ -711,24 +735,30 @@ export type Database = {
         Row: {
           brand_logo_path: string | null
           created_at: string
+          description: string | null
           id: string
           name: string
           updated_at: string
+          website_url: string | null
         }
         ComputedFields: never
         Insert: {
           brand_logo_path?: string | null
           created_at?: string
+          description?: string | null
           id?: string
           name: string
           updated_at?: string
+          website_url?: string | null
         }
         Update: {
           brand_logo_path?: string | null
           created_at?: string
+          description?: string | null
           id?: string
           name?: string
           updated_at?: string
+          website_url?: string | null
         }
         Relationships: []
       }
@@ -969,6 +999,7 @@ export type Database = {
         | "accepted"
         | "rejected"
         | "waitlisted"
+      event_location_type: "in_person" | "online" | "hybrid"
       event_status: "draft" | "active"
       event_type: "regular" | "flagship"
       response_type:
@@ -1115,6 +1146,7 @@ export const Constants = {
         "rejected",
         "waitlisted",
       ],
+      event_location_type: ["in_person", "online", "hybrid"],
       event_status: ["draft", "active"],
       event_type: ["regular", "flagship"],
       response_type: [

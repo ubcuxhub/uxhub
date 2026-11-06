@@ -68,6 +68,7 @@ export type CheckInInsert = TablesInsert<"check_ins">;
 export type CheckInUpdate = TablesUpdate<"check_ins">;
 
 export type EventApplicationStatus = Enums<"event_application_status">;
+export type EventLocationType = Enums<"event_location_type">;
 export type ResponseType = Enums<"response_type">;
 export type UserType = Enums<"user_type">;
 export type RoleAccess = Enums<"role_access_enum">;
