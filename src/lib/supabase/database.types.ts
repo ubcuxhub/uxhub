@@ -974,6 +974,10 @@ export type Database = {
         Args: { p_event_id: string; p_questions: Json }
         Returns: Json
       }
+      save_event_check_in_sessions: {
+        Args: { p_event_id: string; p_sessions: Json }
+        Returns: Json
+      }
       set_user_role: {
         Args: {
           p_role: Database["public"]["Enums"]["role_access_enum"]
