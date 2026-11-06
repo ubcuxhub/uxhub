@@ -15,6 +15,7 @@ import { formatEventDate, formatEventTime, pacificDate } from "@/lib/date";
 import { resolveImagePreviewSrc } from "@/lib/event-image";
 import { fetchEventMentors, fetchEventSponsors } from "@/lib/supabase-helpers/event-people";
 import { EventPeopleCard } from "@/features/events/components/EventPeopleCard";
+import { ApplicationStatusCallout } from "@/features/applications/components/ApplicationStatusCallout";
 
 interface PortalEventPageProps {
   params: Promise<{ event: string }>;
@@ -26,7 +27,7 @@ export default async function PortalEventPage({
   if (!FLAGS.studentEvents) notFound();
 
   const { event: slug } = await params;
-  await requireAuth();
+  const user = await requireAuth();
   const supabase = await createClient();
   // No status filter: RLS returns drafts to admins and managers only, who
   // can open one to test it (docs/event-states.md, "Drafts for admins").
@@ -53,6 +54,8 @@ export default async function PortalEventPage({
       {event.status !== "active" && (
         <Alert>Draft: only admins can see this.</Alert>
       )}
+      {/* Application status and entry point; renders nothing without applications. */}
+      <ApplicationStatusCallout event={event} userId={user.id} />
       
       <div className="border-border-subtle rounded-md border">
         <div className="w-full h-51 bg-brand-blue-200 relative rounded-t-md">
