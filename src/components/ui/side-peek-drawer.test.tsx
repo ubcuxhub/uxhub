@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { createRef, useState } from "react";
+import Link from "next/link";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -9,18 +10,22 @@ import { SearchField } from "@/components/ui/search-field";
 import { SidePeekDrawer, SidePeekDrawerBody, SidePeekDrawerContent, SidePeekDrawerHeader, SidePeekDrawerTitle } from "./side-peek-drawer";
 
 const push = vi.fn();
+const loadDocument = vi.fn();
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 vi.mock("next/link", () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode } & React.ComponentProps<"a">) => (
-    <a href={href} {...props}>{children}</a>
+    <a href={href} data-next-link="" {...props}>{children}</a>
   ),
 }));
+vi.mock("@/lib/load-document", () => ({ loadDocument: (href: string) => loadDocument(href) }));
 
 afterEach(() => {
   cleanup();
   push.mockReset();
+  loadDocument.mockReset();
   vi.unstubAllGlobals();
+  window.history.replaceState(null, "", "/");
 });
 
 function Example({
@@ -28,12 +33,18 @@ function Example({
   onOpenChange = () => {},
   withReturnRef = true,
   fullPageHref,
+  fullPageNavigation,
+  onNavigate,
+  guardNavigation,
   inDrawer,
 }: {
   dirty?: boolean;
   onOpenChange?: (open: boolean) => void;
   withReturnRef?: boolean;
   fullPageHref?: string;
+  fullPageNavigation?: "client" | "document";
+  onNavigate?: (href: string) => void;
+  guardNavigation?: boolean;
   inDrawer?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(true);
@@ -41,9 +52,10 @@ function Example({
   return (
     <>
       <button ref={rowRef} type="button" onClick={() => setOpen(true)}>Jane row</button>
-      <SidePeekDrawer open={open} onOpenChange={(next) => { onOpenChange(next); setOpen(next); }} dirty={dirty} returnFocusRef={withReturnRef ? rowRef : undefined}>
+      <Link href="/admin/events">Manage events</Link>
+      <SidePeekDrawer open={open} onOpenChange={(next) => { onOpenChange(next); setOpen(next); }} dirty={dirty} returnFocusRef={withReturnRef ? rowRef : undefined} onNavigate={onNavigate} guardNavigation={guardNavigation}>
         <SidePeekDrawerContent aria-describedby={undefined}>
-          <SidePeekDrawerHeader fullPageHref={fullPageHref} />
+          <SidePeekDrawerHeader fullPageHref={fullPageHref} fullPageNavigation={fullPageNavigation} />
           <SidePeekDrawerBody><SidePeekDrawerTitle>Jane Smith</SidePeekDrawerTitle>{inDrawer}<button type="button">Last action</button></SidePeekDrawerBody>
         </SidePeekDrawerContent>
       </SidePeekDrawer>
@@ -122,6 +134,83 @@ describe("SidePeekDrawer", () => {
       cleanup();
       render(<Example dirty fullPageHref="/admin/users/1" />);
       expect(fireEvent.click(screen.getByRole("link", { name: "Open as full page" }), { ctrlKey: true })).toBe(true);
+      expect(screen.queryByRole("heading", { name: "Discard changes?" })).toBeNull();
+    });
+  });
+
+  describe("onNavigate", () => {
+    it("leaves through onNavigate after Discard, without closing first", () => {
+      const onOpenChange = vi.fn();
+      const onNavigate = vi.fn();
+      render(<Example dirty fullPageHref="/admin/users/1" onOpenChange={onOpenChange} onNavigate={onNavigate} />);
+      fireEvent.click(screen.getByRole("link", { name: "Open as full page" }));
+      fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
+      expect(onNavigate).toHaveBeenCalledWith("/admin/users/1");
+      expect(onOpenChange).not.toHaveBeenCalled();
+      expect(push).not.toHaveBeenCalled();
+    });
+
+    it("still closes through onOpenChange when Discard follows a close", () => {
+      const onOpenChange = vi.fn();
+      const onNavigate = vi.fn();
+      render(<Example dirty onOpenChange={onOpenChange} onNavigate={onNavigate} />);
+      fireEvent.click(screen.getByRole("button", { name: "Close panel (Esc)" }));
+      fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
+      expect(onOpenChange).toHaveBeenCalledWith(false);
+      expect(onNavigate).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("document full page", () => {
+    it("is a plain link, not a Next Link", () => {
+      render(<Example fullPageHref="/admin/users/1" fullPageNavigation="document" />);
+      const link = screen.getByRole("link", { name: "Open as full page" });
+      expect(link.getAttribute("href")).toBe("/admin/users/1");
+      expect(link.hasAttribute("data-next-link")).toBe(false);
+    });
+
+    it("asks first when dirty, then loads the page from scratch", () => {
+      const onNavigate = vi.fn();
+      render(<Example dirty fullPageHref="/admin/users/1" fullPageNavigation="document" onNavigate={onNavigate} />);
+      expect(fireEvent.click(screen.getByRole("link", { name: "Open as full page" }))).toBe(false);
+      expect(loadDocument).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
+      expect(loadDocument).toHaveBeenCalledWith("/admin/users/1");
+      expect(onNavigate).not.toHaveBeenCalled();
+      expect(push).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("guardNavigation", () => {
+    it("routes a link click elsewhere on the page through the discard confirmation", () => {
+      const onNavigate = vi.fn();
+      render(<Example dirty guardNavigation onNavigate={onNavigate} />);
+      expect(fireEvent.click(screen.getByRole("link", { name: "Manage events" }))).toBe(false);
+      expect(screen.getByRole("heading", { name: "Discard changes?" })).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
+      expect(onNavigate).toHaveBeenCalledWith("/admin/events");
+    });
+
+    it("warns before unload while dirty, and stops once changes are discarded", () => {
+      render(<Example dirty guardNavigation fullPageHref="/admin/users/1" fullPageNavigation="document" />);
+      const unload = () => {
+        const event = new Event("beforeunload", { cancelable: true });
+        window.dispatchEvent(event);
+        return event.defaultPrevented;
+      };
+      expect(unload()).toBe(true);
+      fireEvent.click(screen.getByRole("link", { name: "Open as full page" }));
+      fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
+      expect(loadDocument).toHaveBeenCalledWith("/admin/users/1");
+      expect(unload()).toBe(false);
+    });
+
+    it("leaves links alone when clean, or when not asked to guard", () => {
+      render(<Example guardNavigation />);
+      expect(fireEvent.click(screen.getByRole("link", { name: "Manage events" }))).toBe(true);
+      cleanup();
+      render(<Example dirty />);
+      expect(fireEvent.click(screen.getByRole("link", { name: "Manage events" }))).toBe(true);
       expect(screen.queryByRole("heading", { name: "Discard changes?" })).toBeNull();
     });
   });

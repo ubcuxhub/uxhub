@@ -10,6 +10,8 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { IconButton } from "@/components/ui/icon-button";
 import { buttonVariants } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useNavigationGuard } from "@/hooks/use-navigation-guard";
+import { loadDocument } from "@/lib/load-document";
 import { cn } from "@/lib/utils";
 
 interface SidePeekDrawerProps {
@@ -18,13 +20,30 @@ interface SidePeekDrawerProps {
   dirty?: boolean;
   /** Where focus goes on close. Falls back to whatever had focus when the panel opened. */
   returnFocusRef?: React.RefObject<HTMLElement | null>;
+  /**
+   * Leaves for `href` once the person has chosen to discard their changes.
+   * Without it the panel closes and then pushes `href`, which races a close
+   * that is itself a navigation (`router.back()` on an intercepted route):
+   * pass it there and navigate however the route needs. A `document`
+   * full-page link never comes here; it loads the page with `loadDocument`.
+   */
+  onNavigate?: (href: string) => void;
+  /**
+   * While dirty, also hold back link clicks anywhere on the page (the list
+   * behind, the sidebar) and warn before reload or close, routing the clicks
+   * through the same "Discard changes?" confirmation (`useNavigationGuard`).
+   */
+  guardNavigation?: boolean;
   children: React.ReactNode;
 }
 
+/** How a pending navigation leaves: a client-side route change, or a full document load. */
+type NavigationKind = "client" | "document";
+
 interface SidePeekDrawerContextValue {
   requestClose: () => void;
-  /** Leaves for `href`, asking first when there are unsaved changes. */
-  requestNavigate: (href: string) => void;
+  /** Leaves for `href`, asking first. */
+  requestNavigate: (href: string, kind?: NavigationKind) => void;
   dirty: boolean;
   /** Below `sm` the panel covers the screen, so it is modal there. */
   phone: boolean;
@@ -40,6 +59,16 @@ function useSidePeekDrawer() {
   const context = React.useContext(SidePeekDrawerContext);
   if (!context) throw new Error("SidePeekDrawer parts must be inside SidePeekDrawer");
   return context;
+}
+
+/**
+ * The panel's close and navigate requests, for content that leaves on its own
+ * (a "Back to list" button, a link built by hand). Both ask first when dirty;
+ * `requestNavigate` always asks, so call it only when there is something to lose.
+ */
+function useSidePeekDrawerControls() {
+  const { requestClose, requestNavigate, dirty } = useSidePeekDrawer();
+  return { requestClose, requestNavigate, dirty };
 }
 
 /** Matches the `sm:` breakpoint the panel's width switches at. */
@@ -70,12 +99,14 @@ function SidePeekDrawer({
   onOpenChange,
   dirty = false,
   returnFocusRef,
+  onNavigate,
+  guardNavigation = false,
   children,
 }: SidePeekDrawerProps) {
   const router = useRouter();
   const phone = usePhone();
   const [confirmOpen, setConfirmOpen] = React.useState(false);
-  const [pendingHref, setPendingHref] = React.useState<string | null>(null);
+  const [pending, setPending] = React.useState<{ href: string; kind: NavigationKind } | null>(null);
   const openerRef = React.useRef<HTMLElement | null>(null);
   const contentRef = React.useRef<HTMLElement | null>(null);
   const restoreRef = React.useRef<HTMLElement | null>(null);
@@ -90,22 +121,41 @@ function SidePeekDrawer({
   const requestClose = () => {
     if (dirty) {
       rememberFocus();
-      setPendingHref(null);
+      setPending(null);
       setConfirmOpen(true);
     } else {
       onOpenChange(false);
     }
   };
 
-  const requestNavigate = (href: string) => {
+  const requestNavigate = (href: string, kind: NavigationKind = "client") => {
     rememberFocus();
-    setPendingHref(href);
+    setPending({ href, kind });
     setConfirmOpen(true);
+  };
+
+  const guard = useNavigationGuard({
+    when: guardNavigation && open && dirty,
+    onBlocked: (href) => requestNavigate(href),
+  });
+
+  const discard = () => {
+    setConfirmOpen(false);
+    setPending(null);
+    // The person chose to lose their changes: don't ask again on the way out.
+    guard.release();
+    if (!pending) onOpenChange(false);
+    else if (pending.kind === "document") loadDocument(pending.href);
+    else if (onNavigate) onNavigate(pending.href);
+    else {
+      onOpenChange(false);
+      router.push(pending.href);
+    }
   };
 
   const keepEditing = () => {
     setConfirmOpen(false);
-    setPendingHref(null);
+    setPending(null);
     // The confirmation's own focus return has nowhere to go (it has no trigger),
     // so put focus back in the panel once it has let go.
     const restore = restoreRef.current?.isConnected
@@ -138,12 +188,7 @@ function SidePeekDrawer({
         description="Your unsaved changes will be lost."
         cancelLabel="Keep editing"
         confirmLabel="Discard changes"
-        onConfirm={() => {
-          setConfirmOpen(false);
-          onOpenChange(false);
-          if (pendingHref) router.push(pendingHref);
-          setPendingHref(null);
-        }}
+        onConfirm={discard}
       />
     </SidePeekDrawerContext.Provider>
   );
@@ -270,13 +315,28 @@ const SidePeekDrawerContent = React.forwardRef<
 });
 SidePeekDrawerContent.displayName = "SidePeekDrawerContent";
 
+interface SidePeekDrawerHeaderProps extends React.ComponentProps<"div"> {
+  /** Shows "Open as full page", linking here. */
+  fullPageHref?: string;
+  /**
+   * How "Open as full page" leaves. `client` (default) is a Next `Link`.
+   * `document` is a plain link that loads the page from scratch: use it when
+   * a client navigation would be intercepted again (a record drawer whose
+   * full page is the URL it is already on).
+   */
+  fullPageNavigation?: NavigationKind;
+  actions?: React.ReactNode;
+}
+
 function SidePeekDrawerHeader({
   fullPageHref,
+  fullPageNavigation = "client",
   actions,
   className,
   ...props
-}: React.ComponentProps<"div"> & { fullPageHref?: string; actions?: React.ReactNode }) {
+}: SidePeekDrawerHeaderProps) {
   const { requestClose, requestNavigate, dirty } = useSidePeekDrawer();
+  const FullPageLink = fullPageNavigation === "document" ? "a" : Link;
   return (
     <div
       data-slot="side-peek-drawer-header"
@@ -290,20 +350,22 @@ function SidePeekDrawerHeader({
         {fullPageHref ? (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Link
+              <FullPageLink
                 href={fullPageHref}
                 aria-label="Open as full page"
+                // Asks for itself below, keeping its own navigation kind.
+                data-navigation-guard="ignore"
                 onClick={(event) => {
                   // A new-tab click keeps this tab's edits, so only plain clicks ask first.
                   if (!dirty || event.defaultPrevented || event.button !== 0) return;
                   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
                   event.preventDefault();
-                  requestNavigate(fullPageHref);
+                  requestNavigate(fullPageHref, fullPageNavigation);
                 }}
                 className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "rounded-lg text-muted-foreground")}
               >
                 <Maximize2 className="size-[18px]" aria-hidden />
-              </Link>
+              </FullPageLink>
             </TooltipTrigger>
             <TooltipContent>Open as full page</TooltipContent>
           </Tooltip>
@@ -330,4 +392,13 @@ function SidePeekDrawerFooter({ className, ...props }: React.ComponentProps<"div
   return <div data-slot="side-peek-drawer-footer" className={cn("flex shrink-0 justify-end gap-2 border-t border-border-subtle bg-popover px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-8", className)} {...props} />;
 }
 
-export { SidePeekDrawer, SidePeekDrawerContent, SidePeekDrawerHeader, SidePeekDrawerBody, SidePeekDrawerTitle, SidePeekDrawerFooter };
+export {
+  SidePeekDrawer,
+  SidePeekDrawerContent,
+  SidePeekDrawerHeader,
+  SidePeekDrawerBody,
+  SidePeekDrawerTitle,
+  SidePeekDrawerFooter,
+  useSidePeekDrawerControls,
+};
+export type { SidePeekDrawerProps, SidePeekDrawerHeaderProps };
