@@ -128,3 +128,29 @@ describe("AdminEventsTable regression", () => {
     expect(screen.getByText("Scheduled Nov 20")).toBeTruthy();
   });
 });
+
+describe("Manage events row count", () => {
+  function count() {
+    return screen.getByRole("status").textContent;
+  }
+  const rows = [
+    row("1", "Spring Workshop", "2026-04-01T17:00:00.000Z", "active", true),
+    row("2", "Draft Workshop", "2026-05-01T17:00:00.000Z", "draft", false),
+    row("3", "Portfolio Night", "2026-06-01T17:00:00.000Z", "active", false),
+  ];
+
+  it("counts every event until a search or filter applies", () => {
+    render(<AdminEventsTable rows={rows} />);
+    expect(count()).toBe("3 events");
+    expect(screen.queryByRole("button", { name: "Show all" })).toBeNull();
+  });
+
+  it("counts the shown events out of all, and Show all clears search and filters", () => {
+    render(<AdminEventsTable rows={rows} />);
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "workshop" } });
+    expect(count()).toBe("2 of 3 events");
+    fireEvent.click(screen.getByRole("button", { name: "Show all" }));
+    expect(count()).toBe("3 events");
+    expect((screen.getByRole("searchbox") as HTMLInputElement).value).toBe("");
+  });
+});

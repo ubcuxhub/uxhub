@@ -28,7 +28,7 @@ function SelectedToolbar() {
 const USERS = { one: "user", other: "users" };
 const NAMES = ["Alex Chen", "Jordan Lee", "Priya Raman", "Sam Patel", "Taylor Kim", "Morgan Wu"];
 
-/** Type to filter: the count follows, and Clear filters resets the search. */
+/** Type to filter: the count follows, and Show all resets the search. */
 function CountedToolbar() {
   const [query, setQuery] = useState("a");
   const shown = NAMES.filter((name) => name.toLowerCase().includes(query.trim().toLowerCase())).length;
@@ -93,7 +93,7 @@ function TableToolbarDemo() {
       </SpecimenGroup>
       <SpecimenGroup
         title="Row count"
-        description="Pass count (and onClearFilters) to say how many rows are listed: “142 users”, or “38 of 142 users” plus Clear filters while a search or filter hides some. The line is a polite live region, announced on change. Lists with their own toolbar use TableRowCount."
+        description="Pass count (and onClearFilters) to say how many rows are listed: “142 users”, or “38 of 142 users” plus Show all while a search or filter hides some. The line is a polite live region, announced on change. Lists with their own toolbar use TableRowCount."
       >
         <Specimen label="All rows" wide>
           <div className="w-full">

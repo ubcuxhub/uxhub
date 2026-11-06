@@ -39,7 +39,7 @@ interface UserDirectoryPanelProps {
   onRoleFilterToggle: (value: RoleAccess) => void;
   /** Clears the filters (the Filters popover). */
   onClearFilters: () => void;
-  /** Clears the search and the filters (the row count's Clear filters). */
+  /** Clears the search and the filters (the row count's Show all). */
   onClearSearchAndFilters: () => void;
 }
 

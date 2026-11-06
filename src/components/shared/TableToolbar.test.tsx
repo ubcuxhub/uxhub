@@ -127,7 +127,7 @@ describe("TableToolbar row count", () => {
   it("counts every row by default", () => {
     render(<TableToolbar search={search} actions={actions} count={count(142, 142)} />);
     expect(countRegion().textContent).toBe("142 users");
-    expect(screen.queryByRole("button", { name: "Clear filters" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Show all" })).toBeNull();
   });
 
   it("uses the singular noun for one row and groups thousands", () => {
@@ -161,11 +161,11 @@ describe("TableToolbar row count", () => {
       );
     }
     render(<Filtered />);
-    const clear = screen.getByRole("button", { name: "Clear filters" });
+    const clear = screen.getByRole("button", { name: "Show all" });
     clear.focus();
     fireEvent.click(clear);
     expect(countRegion().textContent).toBe("142 users");
-    expect(screen.queryByRole("button", { name: "Clear filters" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Show all" })).toBeNull();
     expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Search users" }));
   });
 

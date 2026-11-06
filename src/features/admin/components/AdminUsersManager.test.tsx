@@ -173,7 +173,7 @@ describe("Manage users row count", () => {
   it("counts every user until a search or filter applies", () => {
     renderManager();
     expect(count()).toBe("4 users");
-    expect(screen.queryByRole("button", { name: "Clear filters" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Show all" })).toBeNull();
   });
 
   it("uses the singular noun for one user", () => {
@@ -199,7 +199,7 @@ describe("Manage users row count", () => {
     fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
     fireEvent.change(screen.getByRole("searchbox"), { target: { value: "zed" } });
     expect(count()).toBe("1 of 4 users");
-    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    fireEvent.click(screen.getByRole("button", { name: "Show all" }));
     expect(count()).toBe("4 users");
     expect((screen.getByRole("searchbox") as HTMLInputElement).value).toBe("");
     expect(screen.getByRole("button", { name: "Filters" })).toBeTruthy();

@@ -32,7 +32,7 @@ interface BaseProps<T> {
  * Rows are links to each record's URL. Each record opens in a drawer over
  * this list (an intercepted route) or as its own page in a new tab.
  */
-interface LinkRowsProps<T> extends BaseProps<T> {
+interface AdminDirectoryTableProps<T> extends BaseProps<T> {
   getRowHref: (row: T) => string;
   /**
    * The list's own URL, e.g. `/admin/users`. While a record below it is open,
@@ -40,17 +40,7 @@ interface LinkRowsProps<T> extends BaseProps<T> {
    * through every record looked at.
    */
   listHref: string;
-  onActivate?: never;
 }
-
-/** Rows are buttons that call `onActivate`. */
-interface ButtonRowsProps<T> extends BaseProps<T> {
-  onActivate: (row: T, element: HTMLTableRowElement) => void;
-  getRowHref?: never;
-  listHref?: never;
-}
-
-type AdminDirectoryTableProps<T> = LinkRowsProps<T> | ButtonRowsProps<T>;
 
 const ROW =
   "border-b border-border-subtle transition-colors last:border-b-0 hover:bg-muted/30";
@@ -76,11 +66,7 @@ export function AdminDirectoryTable<T>(props: AdminDirectoryTableProps<T>) {
           </tr>
         </thead>
         <tbody>
-          {props.getRowHref ? (
-            <LinkRows {...props} />
-          ) : (
-            <ButtonRows {...(props as ButtonRowsProps<T>)} />
-          )}
+          <LinkRows {...props} />
           {rows.length === 0 && (
             <tr>
               <td
@@ -97,40 +83,6 @@ export function AdminDirectoryTable<T>(props: AdminDirectoryTableProps<T>) {
   );
 }
 
-function ButtonRows<T>({
-  columns,
-  rows,
-  getRowKey,
-  getRowLabel,
-  onActivate,
-}: ButtonRowsProps<T>) {
-  return rows.map((row) => (
-    <tr
-      key={getRowKey(row)}
-      role="button"
-      tabIndex={0}
-      aria-label={getRowLabel(row)}
-      className={cn(
-        ROW,
-        "cursor-pointer focus-visible:bg-muted/30 focus-visible:outline-none"
-      )}
-      onClick={(event) => onActivate(row, event.currentTarget)}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onActivate(row, event.currentTarget);
-        }
-      }}
-    >
-      {columns.map((column) => (
-        <td key={column.id} className={cn("px-4 py-3", column.cellClassName)}>
-          {column.render(row)}
-        </td>
-      ))}
-    </tr>
-  ));
-}
-
 /** The path part of an href, for comparing against `usePathname()`. */
 function pathOf(href: string) {
   return href.split(/[?#]/, 1)[0].replace(/(.)\/$/, "$1");
@@ -143,7 +95,7 @@ function LinkRows<T>({
   getRowLabel,
   getRowHref,
   listHref,
-}: LinkRowsProps<T>) {
+}: AdminDirectoryTableProps<T>) {
   const pathname = usePathname();
   const linkRefs = useRef(new Map<string, HTMLAnchorElement>());
   const lastActiveRef = useRef<string | null>(null);

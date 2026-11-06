@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AdminDirectoryTable, type AdminDirectoryColumn } from "./AdminDirectoryTable";
@@ -154,24 +154,3 @@ describe("AdminDirectoryTable with row links", () => {
   });
 });
 
-describe("AdminDirectoryTable with button rows", () => {
-  it("still activates rows by click and keyboard", () => {
-    const onActivate = vi.fn();
-    render(
-      <AdminDirectoryTable
-        columns={columns}
-        rows={PEOPLE}
-        getRowKey={(person) => person.id}
-        getRowLabel={(person) => `View details for ${person.name}`}
-        onActivate={onActivate}
-        emptyMessage="No users match."
-      />,
-    );
-    const jane = screen.getByRole("button", { name: "View details for Jane Smith" });
-    fireEvent.click(jane);
-    expect(onActivate).toHaveBeenCalledWith(PEOPLE[0], jane);
-    fireEvent.keyDown(screen.getByRole("button", { name: "View details for Alex Chen" }), { key: "Enter" });
-    expect(onActivate).toHaveBeenLastCalledWith(PEOPLE[1], expect.any(HTMLTableRowElement));
-    expect(screen.queryByRole("link")).toBeNull();
-  });
-});

@@ -17,7 +17,7 @@ interface AdminDirectoryToolbarProps {
    * "38 of 142 users" while searching or filtering.
    */
   count?: TableRowCountValue;
-  /** With `count`, a "Clear filters" button while filtering. Clear the search too. */
+  /** With `count`, a "Show all" button while filtering. Clear the search too. */
   onClearFilters?: () => void;
 }
 

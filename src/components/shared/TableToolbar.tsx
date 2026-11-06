@@ -21,7 +21,7 @@ export interface TableToolbarProps {
    * "38 of 142 users" while a search or filter hides some.
    */
   count?: TableRowCountValue;
-  /** With `count`, a "Clear filters" button while filtering. Clear the search too. */
+  /** With `count`, a "Show all" button while filtering. Clear the search too. */
   onClearFilters?: () => void;
   /** The toolbar row's classes. */
   className?: string;
@@ -171,7 +171,7 @@ function TableRowCount({
       </p>
       {filtered && onClearFilters ? (
         <Button type="button" variant="link" size="sm" onClick={onClearFilters}>
-          Clear filters
+          Show all
         </Button>
       ) : null}
     </div>

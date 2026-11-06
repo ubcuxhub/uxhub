@@ -108,6 +108,8 @@ const eventColumns: AdminDirectoryColumn<AdminEventTableRow>[] = [
   },
 ];
 
+const EVENT_NOUN = { one: "event", other: "events" };
+
 export function AdminEventsTable({
   rows,
 }: {
@@ -160,6 +162,11 @@ export function AdminEventsTable({
     sortDirection,
   ]);
 
+  const filtering =
+    searchQuery.trim() !== "" ||
+    eventStatuses.size > 0 ||
+    registrationStatuses.size > 0;
+
   return (
     <AdminDirectoryLayout>
       <AdminDirectoryToolbar
@@ -167,6 +174,17 @@ export function AdminEventsTable({
         onSearchQueryChange={setSearchQuery}
         placeholder="Search events by name..."
         searchLabel="Search events by name"
+        count={{
+          shown: filteredRows.length,
+          total: rows.length,
+          noun: EVENT_NOUN,
+          filtered: filtering,
+        }}
+        onClearFilters={() => {
+          setSearchQuery("");
+          setEventStatuses(new Set());
+          setRegistrationStatuses(new Set());
+        }}
       >
         <AdminDirectoryButton
           type="button"
