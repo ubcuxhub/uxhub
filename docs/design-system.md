@@ -639,11 +639,13 @@ scrolls there and closes. Enter/Space opens, arrows move, Esc returns focus.
   action and shortcut); the record's actions on the right (Edit user, Edit
   event).
 - Users open only in the drawer: no full page, no expand. An event's "Edit
-  event" opens its builder, a full page that keeps the portal's page width and
-  margins and wears the same top bar in place of a back pill: close returns to
-  the list (tooltip names it), collapse ("Collapse to drawer") to the list with
-  the event's drawer open. The builder's unsaved-changes guard asks before
-  either. Below `sm` the drawer fills the screen and the page shows close only.
+  event", and the expand button beside close ("Open as full page"), open its
+  builder, a full page that keeps the portal's page width and margins and
+  wears the same top bar in place of a back pill: close returns to the list
+  (tooltip names it), collapse ("Collapse to drawer") to the list with the
+  event's drawer open. The builder's unsaved-changes guard asks before either.
+  Below `sm` the drawer fills the screen and the page shows close only, and on
+  phones the builder hides the app header, as the drawer covers it.
 - Viewing: label/value text rows, not disabled inputs. Editing: fields with a
   pinned Cancel / Save changes footer; closing with unsaved changes asks first.
 - Profile header: name in 24/32 with verified icon and pronouns. Interests are

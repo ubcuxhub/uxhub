@@ -255,6 +255,7 @@ export function AdminEventRecord({
           <RegistrationBadge state={registration} opensAt={event.registration_opens_at} />
         </>
       }
+      fullPageHref={`${base}/edit`}
       actions={
         <Button asChild variant="secondary" size="sm">
           <Link href={`${base}/edit`}>

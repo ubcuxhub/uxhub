@@ -228,7 +228,9 @@ export interface RecordPageTopBarProps {
  * The drawer's top bar for a record's full page (an event's builder): close
  * returns to the list, collapse to the list with this record's drawer open.
  * Both are plain links, so the page's own unsaved-changes guard sees them.
- * Collapse is hidden below `sm`, as expand is in the drawer.
+ * Collapse is hidden below `sm`, as expand is in the drawer. The shell's
+ * phone header hides while this bar is on the page, so the page opens like
+ * the drawer: close is the way out.
  */
 export function RecordPageTopBar({ listHref, listLabel, recordHref, actions }: RecordPageTopBarProps) {
   return (
@@ -237,6 +239,7 @@ export function RecordPageTopBar({ listHref, listLabel, recordHref, actions }: R
       closeLabel="Close"
       closeTooltip={listLabel}
       actions={actions}
+      data-hides-app-header=""
       resize={
         <Tooltip>
           <TooltipTrigger asChild>
@@ -274,6 +277,11 @@ export interface RecordViewProps {
   status?: React.ReactNode;
   /** Top bar buttons ("Edit user", "Edit event"). Hidden while editing, when the footer takes over. */
   actions?: React.ReactNode;
+  /**
+   * The record's full page (an event's builder). Shows an expand button
+   * beside close, the twin of the page's collapse; hidden below `sm`.
+   */
+  fullPageHref?: string;
   /** The Details tab: `RecordSection`s. */
   details: React.ReactNode;
   /** The History tab. Defaults to an empty state. */
@@ -310,6 +318,7 @@ export function RecordView({
   cover,
   status,
   actions,
+  fullPageHref,
   details,
   history,
   editing = false,
@@ -398,7 +407,7 @@ export function RecordView({
 
   return (
     <RecordViewContext.Provider value={{ editing }}>
-      <SidePeekDrawerHeader actions={showActions ? actions : undefined} />
+      <SidePeekDrawerHeader fullPageHref={fullPageHref} actions={showActions ? actions : undefined} />
       <SidePeekDrawerBody className="flex flex-col gap-8">
         {identity}
         {tabs}

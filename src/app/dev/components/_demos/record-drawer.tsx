@@ -178,7 +178,7 @@ function Demo({ state }: { state: string | undefined }) {
     return (
       <Composition
         title="Full page: the event builder"
-        description="Users only ever open in the drawer. An event’s “Edit event” opens its builder, a page of its own at /admin/events/<id>/edit that wears the drawer’s top bar in place of a back pill: close returns to the list, collapse returns to the list with the event’s drawer open. Both are links, so the builder’s unsaved-changes guard asks before either. The builder keeps the portal’s page width and margins. Below sm only close shows. Here close goes to this page and collapse to ?open=drawer."
+        description="Users only ever open in the drawer. An event’s “Edit event”, and the expand button beside close, open its builder, a page of its own at /admin/events/<id>/edit that wears the drawer’s top bar in place of a back pill: close returns to the list, collapse returns to the list with the event’s drawer open. Both are links, so the builder’s unsaved-changes guard asks before either. The builder keeps the portal’s page width and margins. Below sm only close shows, and on phones the builder hides the app header. Here close goes to this page and collapse to ?open=drawer."
       >
         <div className="flex flex-col overflow-hidden rounded-xl border border-border-subtle bg-background">
           <RecordPageTopBar listHref={PATH} listLabel="Back to Manage Events" recordHref={`${PATH}?open=drawer`} />
