@@ -39,9 +39,11 @@ import {
   fetchEventIdByImageUrl,
   fetchEventSlugsByPrefix,
 } from "@/lib/supabase-helpers/events";
-import type { ApplicationQuestionInput } from "@/features/admin/types";
 import type {
-  CheckInSessionInsert,
+  ApplicationQuestionInput,
+  CheckInSessionInput,
+} from "@/features/admin/types";
+import type {
   EventUpdate,
   MentorRow,
   SponsorRow,
@@ -185,18 +187,18 @@ export interface SaveAdminEventInput {
    */
   expectedImageUrl: string | null;
   event: EventUpdate;
-  checkInSessions: Omit<CheckInSessionInsert, "event_id">[];
+  checkInSessions: CheckInSessionInput[];
   mentorIds: string[];
   sponsorIds: string[];
   applicationQuestions: ApplicationQuestionInput[];
 }
 
 /**
- * The saved event's id and its application questions' ids, in the order they
- * were sent, or why the save was refused.
+ * The saved event's id and the ids of its check-in sessions and application
+ * questions, each in the order they were sent, or why the save was refused.
  */
 export type SaveAdminEventResult =
-  | { id: string; questionIds: string[] }
+  | { id: string; checkInSessionIds: string[]; questionIds: string[] }
   | { error: string };
 
 // Not exported: a "use server" module may only export async functions, and the
@@ -207,11 +209,15 @@ const IMAGE_CONFLICT_SENTINEL = "EVENT_IMAGE_CONFLICT";
 const SAVE_CONFLICT_ERROR =
   "This event's cover image was changed somewhere else since this page loaded. Reload the page and apply your changes again.";
 
-// The hint save_admin_event_atomically gives a refusal over application
-// questions (removing or retyping answered ones, or a stale question id). Its
+// The hints save_admin_event_atomically gives a refusal over application
+// questions (removing or retyping answered ones, or a stale question id) or
+// check-in sessions (removing one with check-ins, or a stale session id). Its
 // message is written for the admin, and is returned rather than thrown, since
 // production builds withhold a thrown error's message from the client.
-const QUESTIONS_CONFLICT_HINT = "APPLICATION_QUESTIONS_CONFLICT";
+const REFUSAL_EVENTS = new Map([
+  ["APPLICATION_QUESTIONS_CONFLICT", "admin.event_questions_save_refused"],
+  ["CHECK_IN_SESSIONS_CONFLICT", "admin.event_check_in_sessions_save_refused"],
+]);
 
 /**
  * Removes a cover image that is no longer referenced by any event.
@@ -304,16 +310,16 @@ export async function saveAdminEventAction(
     if (error.message.includes(IMAGE_CONFLICT_SENTINEL)) {
       throw new Error(SAVE_CONFLICT_ERROR);
     }
-    if (error.hint === QUESTIONS_CONFLICT_HINT) {
-      log.warn("admin.event_questions_save_refused", {
-        eventId: input.eventId ?? null,
-      });
+    const refusal = REFUSAL_EVENTS.get(error.hint);
+    if (refusal) {
+      log.warn(refusal, { eventId: input.eventId ?? null });
       return { error: error.message };
     }
     throw error;
   }
   const saved = data as {
     id?: string;
+    check_in_session_ids?: string[];
     question_ids?: string[];
     removed_files?: string[];
   } | null;
@@ -331,7 +337,11 @@ export async function saveAdminEventAction(
   // The list, and the event's overview (page and drawer) and builder below it.
   revalidatePath("/admin/events", "layout");
   revalidatePath("/events", "layout");
-  return { id: saved.id, questionIds: saved.question_ids ?? [] };
+  return {
+    id: saved.id,
+    checkInSessionIds: saved.check_in_session_ids ?? [],
+    questionIds: saved.question_ids ?? [],
+  };
 }
 
 export async function saveAdminMentorAction(

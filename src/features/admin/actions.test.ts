@@ -425,15 +425,24 @@ describe("saveAdminEventAction", () => {
     ).rejects.toThrow(/cover image was changed somewhere else/);
   });
 
-  it("returns the question ids the save gave, in the order sent", async () => {
+  it("returns the session and question ids the save gave, in the order sent", async () => {
     adminRpc.mockResolvedValue({
-      data: { id: "event-1", question_ids: ["q-1", "q-2"], removed_files: [] },
+      data: {
+        id: "event-1",
+        check_in_session_ids: ["s-1"],
+        question_ids: ["q-1", "q-2"],
+        removed_files: [],
+      },
       error: null,
     });
 
     await expect(
       saveAdminEventAction({ ...saveInput, eventId: "event-1" }),
-    ).resolves.toEqual({ id: "event-1", questionIds: ["q-1", "q-2"] });
+    ).resolves.toEqual({
+      id: "event-1",
+      checkInSessionIds: ["s-1"],
+      questionIds: ["q-1", "q-2"],
+    });
     expect(applicationFiles.removeApplicationFiles).not.toHaveBeenCalled();
   });
 
@@ -443,6 +452,20 @@ describe("saveAdminEventAction", () => {
     adminRpc.mockResolvedValue({
       data: null,
       error: { message, hint: "APPLICATION_QUESTIONS_CONFLICT" },
+    });
+
+    await expect(
+      saveAdminEventAction({ ...saveInput, eventId: "event-1" }),
+    ).resolves.toEqual({ error: message });
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("returns a refused check-in session change as a message for the admin", async () => {
+    const message =
+      'Attendees have already checked in to "Doors", so it cannot be removed.';
+    adminRpc.mockResolvedValue({
+      data: null,
+      error: { message, hint: "CHECK_IN_SESSIONS_CONFLICT" },
     });
 
     await expect(
@@ -465,7 +488,7 @@ describe("saveAdminEventAction", () => {
 
     await expect(
       saveAdminEventAction({ ...saveInput, eventId: "event-1" }),
-    ).resolves.toEqual({ id: "event-1", questionIds: [] });
+    ).resolves.toEqual({ id: "event-1", checkInSessionIds: [], questionIds: [] });
     expect(applicationFiles.removeApplicationFiles).toHaveBeenCalledWith(
       expect.anything(),
       ["u/a/q/cv.pdf"],
@@ -539,7 +562,7 @@ describe("saveAdminEventAction", () => {
         expectedImageUrl: "https://store/old.png",
         event: { name: "Design Sprint", image_url: "https://store/new.png" },
       }),
-    ).resolves.toEqual({ id: "event-1", questionIds: [] });
+    ).resolves.toEqual({ id: "event-1", checkInSessionIds: [], questionIds: [] });
 
     consoleError.mockRestore();
   });
