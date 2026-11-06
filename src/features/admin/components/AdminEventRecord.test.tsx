@@ -51,6 +51,18 @@ function event(overrides: Partial<EventRow> = {}): EventRow {
     sponsors_enabled: false,
     requires_application: false,
     slug: "portfolio-night",
+    agenda_enabled: false,
+    event_colour: null,
+    header_colour: null,
+    header_image_url: null,
+    is_featured: false,
+    location_address: null,
+    location_type: "in_person",
+    marketing_url: null,
+    max_team_size: null,
+    min_team_size: null,
+    team_deadline: null,
+    teams_enabled: false,
     ...overrides,
   };
 }
