@@ -491,7 +491,6 @@ export function ApplicationForm({
         title={`${event.name} application`}
         sections={navigatorSections}
         currentId={currentId}
-        className="sm:right-8 sm:bottom-8 sm:left-auto sm:translate-x-0"
       />
 
       <ConfirmDialog
