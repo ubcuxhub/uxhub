@@ -7,9 +7,11 @@ import {
 import { resolveAdminEventId } from "@/features/admin/lib/resolve-event-param";
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
+import { createApplicationFileUrl } from "@/lib/supabase-helpers/application-files";
 import {
   fetchApplicationResponses,
   fetchEventApplicationById,
+  isSubmittedApplication,
 } from "@/lib/supabase-helpers/event-applications";
 import { fetchUserEventTicket } from "@/lib/supabase-helpers/event-tickets";
 import { fetchEventById } from "@/lib/supabase-helpers/events";
@@ -36,7 +38,14 @@ export default async function ApplicationReviewPage({
   );
   const application = await fetchEventApplicationById(supabase, applicationId);
 
-  if (!application || application.event_id !== eventId) notFound();
+  // Drafts are the applicant's alone; RLS hides them from admins as well.
+  if (
+    !application ||
+    application.event_id !== eventId ||
+    !isSubmittedApplication(application)
+  ) {
+    notFound();
+  }
 
   const [userInfo, event, responses, ticket] = await Promise.all([
     fetchUserInfoContactById(supabase, application.user_id),
@@ -47,6 +56,23 @@ export default async function ApplicationReviewPage({
 
   if (!userInfo || !event) notFound();
 
+  const fileUrls = Object.fromEntries(
+    (
+      await Promise.all(
+        responses
+          .filter(
+            (response) =>
+              response.event_application_questions?.response_type ===
+                "file_upload" && response.response
+          )
+          .map(async (response) => [
+            response.id,
+            await createApplicationFileUrl(supabase, response.response),
+          ])
+      )
+    ).filter((entry): entry is [string, string] => Boolean(entry[1]))
+  );
+
   return (
     <ApplicationReviewClient
       application={application}
@@ -54,6 +80,7 @@ export default async function ApplicationReviewPage({
       userInfo={userInfo}
       event={event}
       responses={responses as AdminApplicationResponse[]}
+      fileUrls={fileUrls}
     />
   );
 }

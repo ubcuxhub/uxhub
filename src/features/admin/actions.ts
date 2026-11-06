@@ -45,7 +45,7 @@ import type {
   SponsorRow,
   UserInfoUpdate,
 } from "@/lib/supabase/models";
-import type { EventApplicationRow, RoleAccess } from "@/lib/supabase/models";
+import type { RoleAccess, SubmittedApplicationRow } from "@/lib/supabase/models";
 import { fetchActiveProfile, saveAdminProfile } from "@/lib/supabase-helpers/admin-user-profile";
 import { fetchMembershipTypeById } from "@/lib/supabase-helpers/memberships";
 import { normalizeInterests, validateBirthDate } from "./lib/user-profile";
@@ -354,13 +354,23 @@ export async function updateApplicationDecisionAction(
   applicationId: string,
   decision: ApplicationDecision,
   offerExpiresAt: string | null
-): Promise<EventApplicationRow> {
+): Promise<SubmittedApplicationRow> {
   await requireAdmin();
 
   const result = buildApplicationDecisionUpdate(decision, offerExpiresAt);
   if (!result.ok) throw new Error(result.error);
 
-  return updateEventApplication(supabaseAdmin, applicationId, result.update);
+  // The database refuses to decide a draft, so the row that comes back has
+  // been submitted.
+  const updated = await updateEventApplication(
+    supabaseAdmin,
+    applicationId,
+    result.update
+  );
+  if (updated.status === "draft") {
+    throw new Error("A draft application cannot be decided.");
+  }
+  return { ...updated, status: updated.status };
 }
 
 /** Checks a ticket in to a session, or removes a mistaken check-in. */

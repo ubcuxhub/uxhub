@@ -229,7 +229,9 @@ describe("event_applications", () => {
       });
       const client = clientAs(member);
       const insert = (eventId: string, userId = member.id) =>
-        client.from("event_applications").insert({ event_id: eventId, user_id: userId });
+        client
+          .from("event_applications")
+          .insert({ event_id: eventId, user_id: userId, status: "draft" });
 
       expect((await insert(plain.id)).error).toBeTruthy();
       expect((await insert(closed.id)).error).toBeTruthy();
@@ -239,10 +241,16 @@ describe("event_applications", () => {
           .from("event_applications")
           .insert({ event_id: event.id, user_id: member.id, status: "accepted" })).error
       ).toBeTruthy();
+      // Submitting goes through submit_event_application, never an insert.
+      expect(
+        (await client
+          .from("event_applications")
+          .insert({ event_id: event.id, user_id: member.id })).error
+      ).toBeTruthy();
       expect((await insert(event.id)).error).toBeNull();
 
       const { data: own } = await client.from("event_applications").select("status");
-      expect(own).toEqual([{ status: "submitted" }]);
+      expect(own).toEqual([{ status: "draft" }]);
       const decided = await client
         .from("event_applications")
         .update({ status: "accepted", offer_expires_at: at(hour) })
