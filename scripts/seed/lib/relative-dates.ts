@@ -11,6 +11,14 @@ export function addDays(value: Date, days: number): Date {
   return new Date(value.getTime() + days * DAY_MS);
 }
 
+/**
+ * The first UTC day on or after `value` that falls on `weekday` (0 Sunday to
+ * 6 Saturday), so a weekend event always starts on a Saturday.
+ */
+export function onOrAfterWeekday(value: Date, weekday: number): Date {
+  return addDays(value, (weekday - value.getUTCDay() + 7) % 7);
+}
+
 export function addMonths(value: Date, months: number): Date {
   const result = new Date(value);
   const originalDay = result.getUTCDate();
