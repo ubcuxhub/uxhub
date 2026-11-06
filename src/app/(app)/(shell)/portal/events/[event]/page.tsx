@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { FlowLink } from "@/components/shared/FlowLink";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { EventAgendaTable } from "@/features/events/components/EventAgendaTable";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { requireAuth } from "@/lib/auth/guards";
@@ -15,6 +16,7 @@ import { formatEventDate, formatEventTime, pacificDate } from "@/lib/date";
 import { resolveImagePreviewSrc } from "@/lib/event-image";
 import { fetchEventMentors, fetchEventSponsors } from "@/lib/supabase-helpers/event-people";
 import { EventPeopleCard } from "@/features/events/components/EventPeopleCard";
+import { loadEventBadges } from "@/features/events/lib/event-badge";
 import { ApplicationStatusCallout } from "@/features/applications/components/ApplicationStatusCallout";
 
 interface PortalEventPageProps {
@@ -37,12 +39,14 @@ export default async function PortalEventPage({
     notFound();
   }
   
-  const [agenda, mentors, sponsors] = await Promise.all([
+  const [agenda, mentors, sponsors, badges] = await Promise.all([
     fetchEventAgenda(supabase, event.id),
     // Admins switch these sections off per event, as the public event page does.
     event.mentors_enabled ? fetchEventMentors(supabase, event.id) : [],
     event.sponsors_enabled ? fetchEventSponsors(supabase, event.id) : [],
+    loadEventBadges(supabase, user.id, [event]),
   ]);
+  const badge = badges[event.id];
 
   const startTime = formatEventTime(event.starts_at);
   const endTime = formatEventTime(event.ends_at);
@@ -71,7 +75,10 @@ export default async function PortalEventPage({
         </div>
         <div className="px-6 pb-6">
           <div className="my-10 flex flex-col gap-6">
-            <h1 className="text-h1">{event.name}</h1>
+            <div className="flex flex-col items-start gap-3">
+              <h1 className="text-h1">{event.name}</h1>
+              {badge && <StatusBadge {...badge} size="large" />}
+            </div>
 
             <hr className="w-full border-border-subtle" />
 
