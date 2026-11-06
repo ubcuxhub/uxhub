@@ -1,6 +1,9 @@
 import Link from "next/link";
+import { CalendarPlus } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
+import { TableCard } from "@/components/ui/table";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { RecordFrame } from "@/components/shared/RecordDrawer";
 import {
@@ -62,16 +65,19 @@ export default async function AdminEventsLayout({ children }: { children: React.
       </header>
 
       {events.length === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed p-12 text-center">
-          <div className="text-2xl font-semibold">No events yet</div>
-          <p className="max-w-md text-sm text-muted-foreground">
-            You haven&apos;t created any events. Use the create button to add
-            your first event and it will show up here.
-          </p>
-          <Button asChild variant="outline">
-            <Link href={CREATE_EVENT_HREF}>Create your first event</Link>
-          </Button>
-        </div>
+        <TableCard>
+          <EmptyState
+            size="page"
+            icon={<CalendarPlus aria-hidden />}
+            title="No events yet"
+            description="Events you create show up here."
+            actions={
+              <Button asChild variant="secondary" size="sm">
+                <Link href={CREATE_EVENT_HREF}>Create your first event</Link>
+              </Button>
+            }
+          />
+        </TableCard>
       ) : (
         <AdminEventsTable rows={rows} />
       )}

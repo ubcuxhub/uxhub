@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import type { EventStatus } from "@/lib/supabase/models";
 import { AdminEventsTable, type AdminEventTableRow } from "./AdminEventsTable";
@@ -20,6 +20,17 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+beforeAll(() => {
+  globalThis.ResizeObserver = class ResizeObserver {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  };
+  HTMLElement.prototype.scrollIntoView = vi.fn();
+  HTMLElement.prototype.hasPointerCapture = vi.fn(() => false);
+  HTMLElement.prototype.setPointerCapture = vi.fn();
+  HTMLElement.prototype.releasePointerCapture = vi.fn();
+});
 afterEach(() => {
   cleanup();
   pathname = "/admin/events";
@@ -65,60 +76,97 @@ const rows = [
 ];
 
 function rowNames() {
-  return screen.getAllByRole("link", { name: /^View details for/ }).map((element) => element.getAttribute("aria-label"));
+  return within(screen.getByRole("table")).queryAllByRole("link").map((element) => element.textContent);
+}
+function count() {
+  return document.querySelector("[data-slot=table-row-count] [role=status]")?.textContent;
+}
+function search(value: string) {
+  fireEvent.change(screen.getByRole("searchbox", { name: "Search events" }), { target: { value } });
+}
+/** Opens the Sort and filter panel, unless it is open already. */
+function openPanel() {
+  const open = screen.queryByRole("dialog");
+  if (open) return open;
+  fireEvent.click(screen.getByRole("button", { name: /^Sort and filter/ }));
+  return screen.getByRole("dialog");
+}
+function chooseSort(option: string) {
+  const panel = openPanel();
+  fireEvent.keyDown(within(panel).getByRole("combobox", { name: "Sort by" }), { key: "Enter" });
+  fireEvent.click(screen.getByRole("option", { name: option }));
+}
+function toggleChip(name: string) {
+  fireEvent.click(within(openPanel()).getByRole("button", { name }));
 }
 
-describe("AdminEventsTable regression", () => {
+describe("AdminEventsTable", () => {
+  it("lists events in the library table with the name first and pinned", () => {
+    render(<AdminEventsTable rows={rows} />);
+    expect(screen.getByRole("table").closest("[data-slot=table-card]")).not.toBeNull();
+    expect(screen.getByRole("table").hasAttribute("data-sticky")).toBe(true);
+    expect(screen.getAllByRole("columnheader").map((element) => element.textContent)).toEqual([
+      "Name", "Date", "Status", "Registration", "Registered",
+    ]);
+    const workshop = screen.getByRole("link", { name: "Design Workshop" }).closest("tr")!;
+    expect(within(workshop).getByText("Active")).toBeTruthy();
+    expect(within(workshop).getByText("Open")).toBeTruthy();
+    expect(workshop.textContent).toContain("7 / 30");
+    // An undated event reads None, not a dash.
+    const undated = screen.getByRole("link", { name: "Undated Meetup" }).closest("tr")!;
+    expect(within(undated).getByText("None")).toBeTruthy();
+    // No checkbox column: nothing to act on in bulk yet.
+    expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+
   it("retains date ordering and leaves undated events last in both directions", () => {
     render(<AdminEventsTable rows={rows} />);
-    expect(rowNames()).toEqual(["View details for Draft Workshop", "View details for Design Workshop", "View details for Design Meetup", "View details for Undated Meetup"]);
-    fireEvent.click(screen.getByRole("button", { name: "Sort by date ascending" }));
-    expect(rowNames()).toEqual(["View details for Design Meetup", "View details for Design Workshop", "View details for Draft Workshop", "View details for Undated Meetup"]);
+    expect(rowNames()).toEqual(["Draft Workshop", "Design Workshop", "Design Meetup", "Undated Meetup"]);
+    chooseSort("Date, oldest first");
+    expect(rowNames()).toEqual(["Design Meetup", "Design Workshop", "Draft Workshop", "Undated Meetup"]);
+    expect(screen.getByRole("button", { name: "Sort and filter, 1 active" })).toBeTruthy();
   });
 
   it("combines trimmed name search with status and registration filters, including draft N/A", () => {
     render(<AdminEventsTable rows={rows} />);
-    fireEvent.change(screen.getByRole("searchbox"), { target: { value: " WORKSHOP " } });
+    search(" WORKSHOP ");
     expect(rowNames()).toHaveLength(2);
-    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
-    fireEvent.click(screen.getByRole("checkbox", { name: "Draft" }));
-    fireEvent.click(screen.getByRole("checkbox", { name: "N/A" }));
-    expect(rowNames()).toEqual(["View details for Draft Workshop"]);
-    expect(screen.getByRole("button", { name: "Filters 2" })).toBeTruthy();
-    fireEvent.click(screen.getByRole("checkbox", { name: "N/A" }));
-    fireEvent.click(screen.getByRole("checkbox", { name: "Open" }));
+    toggleChip("Draft");
+    toggleChip("N/A");
+    expect(rowNames()).toEqual(["Draft Workshop"]);
+    expect(screen.getByRole("button", { name: "Sort and filter, 2 active" })).toBeTruthy();
+    toggleChip("N/A");
+    toggleChip("Open");
     expect(screen.getByText("No events match your search and filters.")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Clear filters" }));
+    fireEvent.click(within(openPanel()).getByRole("button", { name: "Clear all" }));
     expect(rowNames()).toHaveLength(2);
     expect((screen.getByRole("searchbox") as HTMLInputElement).value).toBe(" WORKSHOP ");
   });
 
   it("matches any selected status while intersecting registration status", () => {
     render(<AdminEventsTable rows={rows} />);
-    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
-    fireEvent.click(screen.getByRole("checkbox", { name: "Active" }));
-    fireEvent.click(screen.getByRole("checkbox", { name: "Draft" }));
-    fireEvent.click(screen.getByRole("checkbox", { name: "Closed" }));
-    expect(rowNames()).toEqual(["View details for Design Meetup", "View details for Undated Meetup"]);
+    toggleChip("Active");
+    toggleChip("Draft");
+    toggleChip("Closed");
+    expect(rowNames()).toEqual(["Design Meetup", "Undated Meetup"]);
   });
 
   it("links each event's name to its overview, which opens as a drawer over the list", () => {
     render(<AdminEventsTable rows={rows} />);
-    const link = screen.getByRole("link", { name: "View details for Design Workshop" });
+    const link = screen.getByRole("link", { name: "Design Workshop" });
     expect(link.getAttribute("href")).toBe("/admin/events/newer");
-    expect(link.textContent).toBe("Design Workshop");
+    expect(link.getAttribute("data-slot")).toBe("table-row-link");
     expect(link.hasAttribute("data-replace")).toBe(false);
-    // Rows are links now, not buttons that open a sheet in place.
-    expect(screen.queryAllByRole("button", { name: /^View details for/ })).toEqual([]);
+    expect(document.querySelectorAll("[data-record-row]")).toHaveLength(4);
   });
 
   it("marks the open event's row and replaces rather than stacks records", () => {
     pathname = "/admin/events/newer";
     render(<AdminEventsTable rows={rows} />);
-    const open = screen.getByRole("link", { name: "View details for Design Workshop" });
+    const open = screen.getByRole("link", { name: "Design Workshop" });
     expect(open.getAttribute("aria-current")).toBe("page");
     expect(open.closest("tr")?.hasAttribute("data-active")).toBe(true);
-    const other = screen.getByRole("link", { name: "View details for Design Meetup" });
+    const other = screen.getByRole("link", { name: "Design Meetup" });
     expect(other.getAttribute("aria-current")).toBeNull();
     expect(other.hasAttribute("data-replace")).toBe(true);
   });
@@ -129,28 +177,62 @@ describe("AdminEventsTable regression", () => {
   });
 });
 
+describe("Manage events pagination", () => {
+  /** 27 events, a day apart, so the list has two pages. */
+  const many = Array.from({ length: 27 }, (_, index) => {
+    const n = String(index + 1).padStart(2, "0");
+    return row(`e${n}`, `Event ${n}`, `2026-10-${n}T17:00:00.000Z`, "active", true);
+  });
+
+  it("shows 25 events a page, resets to page 1 on a search, and keeps the page when a record opens", () => {
+    const { rerender } = render(<AdminEventsTable rows={many} />);
+    expect(rowNames()).toHaveLength(25);
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    // Newest first, so page 2 holds the two oldest.
+    expect(rowNames()).toEqual(["Event 02", "Event 01"]);
+    expect(count()).toBe("Showing 26–27 of 27 events");
+
+    pathname = "/admin/events/e01";
+    rerender(<AdminEventsTable rows={many} />);
+    expect(screen.getByText("Page 2 of 2")).toBeTruthy();
+
+    search("event");
+    expect(screen.getByText("Page 1 of 2")).toBeTruthy();
+    expect(count()).toBe("Showing 1–25 of 27 events · filtered from 27");
+  });
+
+  it("opens on the page of the event in the URL", () => {
+    pathname = "/admin/events/e02";
+    render(<AdminEventsTable rows={many} />);
+    expect(screen.getByText("Page 2 of 2")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Event 02" }).getAttribute("aria-current")).toBe("page");
+  });
+});
+
 describe("Manage events row count", () => {
-  function count() {
-    return screen.getByRole("status").textContent;
-  }
   const rows = [
     row("1", "Spring Workshop", "2026-04-01T17:00:00.000Z", "active", true),
     row("2", "Draft Workshop", "2026-05-01T17:00:00.000Z", "draft", false),
     row("3", "Portfolio Night", "2026-06-01T17:00:00.000Z", "active", false),
   ];
 
-  it("counts every event until a search or filter applies", () => {
+  it("shows the range and total until a search or filter applies", () => {
     render(<AdminEventsTable rows={rows} />);
-    expect(count()).toBe("3 events");
+    expect(count()).toBe("Showing 1–3 of 3 events");
     expect(screen.queryByRole("button", { name: "Show all" })).toBeNull();
   });
 
-  it("counts the shown events out of all, and Show all clears search and filters", () => {
+  it("says how many of all are shown, and Show all clears search and filters", () => {
     render(<AdminEventsTable rows={rows} />);
-    fireEvent.change(screen.getByRole("searchbox"), { target: { value: "workshop" } });
-    expect(count()).toBe("2 of 3 events");
+    search("workshop");
+    expect(count()).toBe("Showing 1–2 of 2 events · filtered from 3");
+    toggleChip("Draft");
+    expect(count()).toBe("Showing 1 of 1 event · filtered from 3");
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
     fireEvent.click(screen.getByRole("button", { name: "Show all" }));
-    expect(count()).toBe("3 events");
+    expect(count()).toBe("Showing 1–3 of 3 events");
     expect((screen.getByRole("searchbox") as HTMLInputElement).value).toBe("");
+    expect(screen.getByRole("button", { name: "Sort and filter" })).toBeTruthy();
+    expect(document.activeElement).toBe(screen.getByRole("searchbox"));
   });
 });

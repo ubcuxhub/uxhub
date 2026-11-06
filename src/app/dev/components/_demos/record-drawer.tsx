@@ -15,6 +15,17 @@ import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCard,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableNone,
+  TableRow,
+  TableRowButton,
+} from "@/components/ui/table";
 
 import { Composition } from "@/app/dev/_shell/Specimen";
 import type { SectionProps } from "@/app/dev/_shell/types";
@@ -187,34 +198,40 @@ function Demo({ state }: { state: string | undefined }) {
     <div className="flex flex-col gap-8">
       <Composition
         title="Manage Users"
-        description="Open a person, then edit their phone number or area of study. Another row swaps the record without replaying the slide-in; Escape and the chevron close it. With unsaved edits, closing or following any link on this page (the docs sidebar too) asks first. In the app the list is a route layout and each record a child route, so the drawer is the URL (a refresh shows the list with the drawer open) and rows are links (AdminDirectoryTable); here they are buttons."
+        description="Open a person, then edit their phone number or area of study. Another row swaps the record without replaying the slide-in; Escape and the chevron close it. With unsaved edits, closing or following any link on this page (the docs sidebar too) asks first. In the app the list is a route layout and each record a child route, so the drawer is the URL (a refresh shows the list with the drawer open) and rows are TableRowLinks wired by useRecordRows; here they are TableRowButtons. The open record's row carries aria-current, which fills it."
       >
-        <div className="max-w-2xl rounded-xl border border-border-subtle bg-card p-4">
-          <h3 className="mb-3 text-subheading">Members</h3>
-          <div className="divide-y divide-border-subtle">
-            {people.map((person, index) => (
-              <button
-                key={person.id}
-                type="button"
-                aria-current={(open && personIndex === index) || undefined}
-                onClick={() => {
-                  if (!open) setSession((current) => current + 1);
-                  setStart("view");
-                  setPersonIndex(index);
-                  setOpen(true);
-                }}
-                className="flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left hover:bg-accent focus-visible:focus-ring aria-[current=true]:bg-muted"
-              >
-                <Avatar name={person.name} size={40} decorative />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-body-medium">{person.name}</span>
-                  <span className="block text-small text-muted-foreground">{person.email}</span>
-                </span>
-                <span className="text-small text-muted-foreground">{person.membership ?? "No membership"}</span>
-              </button>
-            ))}
-          </div>
-        </div>
+        <TableCard className="max-w-2xl">
+          <Table stickyFirstColumn className="min-w-[32rem]">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead>
+                <TableHead>Email</TableHead>
+                <TableHead>Membership</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {people.map((person, index) => (
+                <TableRow key={person.id}>
+                  <TableCell className="whitespace-nowrap">
+                    <TableRowButton
+                      aria-current={(open && personIndex === index) || undefined}
+                      onClick={() => {
+                        if (!open) setSession((current) => current + 1);
+                        setStart("view");
+                        setPersonIndex(index);
+                        setOpen(true);
+                      }}
+                    >
+                      {person.name}
+                    </TableRowButton>
+                  </TableCell>
+                  <TableCell className="max-w-64 truncate text-muted-foreground">{person.email}</TableCell>
+                  <TableCell className="text-muted-foreground">{person.membership ?? <TableNone />}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableCard>
       </Composition>
 
       <RecordFrame listHref={PATH} open={open} onClose={() => setOpen(false)}>
