@@ -194,3 +194,27 @@ describe("Pagination", () => {
     });
   });
 });
+
+describe("Pagination summary", () => {
+  const summary = <p role="status">Showing 1–10 of 48 users</p>;
+
+  it("replaces the range text and leaves the announcing to the summary", () => {
+    const { container } = render(
+      <Pagination page={1} pageSize={10} total={48} onPageChange={() => {}} summary={summary} />,
+    );
+    expect(screen.getByRole("status").textContent).toBe("Showing 1–10 of 48 users");
+    expect(container.querySelectorAll("[aria-live], [role=status]")).toHaveLength(1);
+    expect(screen.queryByText("Showing 1–10 of 48")).toBeNull();
+    // The page label is readable, not only announced.
+    expect(screen.getByText("Page 1 of 5").getAttribute("aria-hidden")).toBeNull();
+    expect(screen.getByRole("button", { name: "Next page" })).not.toBeNull();
+  });
+
+  it("still shows the summary with no rows, without the page buttons", () => {
+    render(<Pagination page={1} pageSize={10} total={0} onPageChange={() => {}} summary={summary} />);
+    expect(screen.getByRole("navigation", { name: "Pagination" })).not.toBeNull();
+    expect(screen.getByRole("status")).not.toBeNull();
+    expect(screen.queryByRole("button", { name: "Next page" })).toBeNull();
+    expect(screen.queryByText("Page 1 of 1")).toBeNull();
+  });
+});

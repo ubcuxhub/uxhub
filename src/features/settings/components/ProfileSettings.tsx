@@ -224,17 +224,17 @@ function SaveStatus({
     >
       {status === "saving" ? (
         <>
-          <Loader2 className="size-3.5 animate-spin" />
+          <Loader2 className="size-4 animate-spin" />
           Saving…
         </>
       ) : status === "saved" ? (
         <>
-          <Check className="size-3.5" />
+          <Check className="size-4" />
           Saved
         </>
       ) : status === "error" ? (
         <>
-          <CircleAlert className="size-3.5 shrink-0" />
+          <CircleAlert className="size-4 shrink-0" />
           {error ?? "Couldn't save — check your connection."}
         </>
       ) : null}

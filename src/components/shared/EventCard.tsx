@@ -116,7 +116,7 @@ function EventCard({
             className="size-full object-cover"
           />
         ) : (
-          <Calendar className="size-6 text-muted-foreground" aria-hidden />
+          <Calendar className="size-5 text-muted-foreground" aria-hidden />
         )}
       </div>
     </article>

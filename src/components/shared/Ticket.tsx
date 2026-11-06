@@ -160,7 +160,7 @@ function Ticket({
                 data-slot="ticket-caption"
                 className="inline-flex items-center gap-1 text-label"
               >
-                {pending ? <Hourglass className="size-3.5" aria-hidden /> : null}
+                {pending ? <Hourglass className="size-4" aria-hidden /> : null}
                 {captionContent}
               </span>
             ) : null}

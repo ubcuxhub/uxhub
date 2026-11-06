@@ -269,9 +269,9 @@ function PagerLink({
       )}
     >
       <span className="flex items-center gap-1 text-label text-muted-foreground">
-        {isNext ? null : <ArrowLeft aria-hidden className="size-3.5" />}
+        {isNext ? null : <ArrowLeft aria-hidden className="size-4" />}
         {isNext ? "Next" : "Previous"}
-        {isNext ? <ArrowRight aria-hidden className="size-3.5" /> : null}
+        {isNext ? <ArrowRight aria-hidden className="size-4" /> : null}
       </span>
       <span className="max-w-full truncate text-body-medium text-primary">{title}</span>
     </Link>
