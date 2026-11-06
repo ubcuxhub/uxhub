@@ -6,7 +6,9 @@ import {
   isDateTimeRangeInvalid,
   isEventScheduleRangeInvalid,
   toApplicationQuestionInputs,
+  toCheckInSessionInputs,
   validateEventForm,
+  withSavedCheckInSessionIds,
   withSavedQuestionIds,
 } from "./event-form-schema";
 import type { ApplicationQuestionTemplate } from "@/features/events/types";
@@ -267,5 +269,47 @@ describe("application question payload", () => {
     expect(
       withSavedQuestionIds([question({ id: "question-1" })], [])[0].id
     ).toBe("question-1");
+  });
+});
+
+describe("event form check-in sessions", () => {
+  it("sends each session's id, or null for a new one, with its times in UTC", () => {
+    expect(
+      toCheckInSessionInputs([
+        {
+          id: "session-1",
+          name: "Doors",
+          start_time: "2024-08-01T10:00",
+          end_time: "2024-08-01T11:00",
+        },
+        { name: "Lunch", start_time: "2024-08-01T12:00", end_time: "2024-08-01T13:00" },
+      ])
+    ).toEqual([
+      {
+        id: "session-1",
+        name: "Doors",
+        start_time: "2024-08-01T17:00:00.000Z",
+        end_time: "2024-08-01T18:00:00.000Z",
+      },
+      {
+        id: null,
+        name: "Lunch",
+        start_time: "2024-08-01T19:00:00.000Z",
+        end_time: "2024-08-01T20:00:00.000Z",
+      },
+    ]);
+  });
+
+  it("adopts the ids a save returns, in the order it was sent", () => {
+    const session = { name: "Doors", start_time: "", end_time: "" };
+    const saved = withSavedCheckInSessionIds(
+      [{ ...session, id: "session-1" }, { ...session, name: "Lunch" }],
+      ["session-1", "session-2"]
+    );
+
+    expect(saved.map((item) => item.id)).toEqual(["session-1", "session-2"]);
+    expect(
+      withSavedCheckInSessionIds([{ ...session, id: "session-1" }], [])[0].id
+    ).toBe("session-1");
   });
 });

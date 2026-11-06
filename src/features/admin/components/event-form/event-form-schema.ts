@@ -7,6 +7,7 @@ import type { ApplicationQuestionTemplate } from "@/features/events/types";
 import type {
   ApplicationQuestionInput,
   CheckInSessionDraft,
+  CheckInSessionInput,
 } from "@/features/admin/types";
 import { APPLICATION_FILE_MAX_BYTES } from "@/lib/supabase-helpers/application-files";
 import {
@@ -302,5 +303,37 @@ export function withSavedQuestionIds(
   return applicationTemplate.map((question, index) => ({
     ...question,
     id: questionIds[index] ?? question.id,
+  }));
+}
+
+/**
+ * The builder's check-in sessions as the save sends them, in order. A saved
+ * session keeps its id so the save updates it, and keeps the check-ins to it;
+ * a new one has a null id. Only call this on a validated form: every time is
+ * complete.
+ */
+export function toCheckInSessionInputs(
+  checkInEvents: CheckInSessionDraft[]
+): CheckInSessionInput[] {
+  return checkInEvents.map((session) => ({
+    id: session.id ?? null,
+    name: session.name,
+    start_time: datetimeLocalToTimestamptz(session.start_time)!,
+    end_time: datetimeLocalToTimestamptz(session.end_time)!,
+  }));
+}
+
+/**
+ * The builder's check-in sessions after a save, each with the id the save gave
+ * it (`sessionIds` is in the order the sessions were sent), so the next save
+ * updates them rather than adding them again.
+ */
+export function withSavedCheckInSessionIds(
+  checkInEvents: CheckInSessionDraft[],
+  sessionIds: string[]
+): CheckInSessionDraft[] {
+  return checkInEvents.map((session, index) => ({
+    ...session,
+    id: sessionIds[index] ?? session.id,
   }));
 }

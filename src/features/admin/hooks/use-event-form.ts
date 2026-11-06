@@ -17,13 +17,18 @@ import type {
   MentorRow,
   SponsorRow,
 } from "@/lib/supabase/models";
-import type { CheckInSessionDraft } from "@/features/admin/types";
+import type {
+  CheckInSessionDraft,
+  CheckInSessionField,
+} from "@/features/admin/types";
 import {
   createFormSnapshot,
   EMPTY_CHECK_IN_SESSION,
   getInitialFormState,
   toApplicationQuestionInputs,
+  toCheckInSessionInputs,
   validateEventForm,
+  withSavedCheckInSessionIds,
   withSavedQuestionIds,
   type EventFormState,
   type MentorDraft,
@@ -109,6 +114,7 @@ export function useEventForm({
     () =>
       initialCheckInSessions.length
         ? initialCheckInSessions.map((session) => ({
+            id: session.id,
             name: session.name ?? "",
             start_time: timestamptzToDatetimeLocal(session.start_time),
             end_time: timestamptzToDatetimeLocal(session.end_time),
@@ -212,7 +218,7 @@ export function useEventForm({
 
   const updateCheckInEvent = (
     index: number,
-    field: keyof CheckInSessionDraft,
+    field: CheckInSessionField,
     value: string
   ) => {
     resetSuccessMessage();
@@ -351,11 +357,7 @@ export function useEventForm({
           formState.registration_closes_at
         ),
       };
-      const checkInSessions = checkInEvents.map((session) => ({
-        name: session.name,
-        start_time: datetimeLocalToTimestamptz(session.start_time)!,
-        end_time: datetimeLocalToTimestamptz(session.end_time)!,
-      }));
+      const checkInSessions = toCheckInSessionInputs(checkInEvents);
       const applicationQuestions = toApplicationQuestionInputs(
         questions.applicationTemplate
       );
@@ -369,8 +371,14 @@ export function useEventForm({
         applicationQuestions,
       });
       // A refusal the admin can act on, such as removing a question people
-      // have applied with. Nothing was saved, so the image cleanup below runs.
+      // have applied with or a session people have checked in to. Nothing was
+      // saved, so the image cleanup below runs.
       if ("error" in result) throw new Error(result.error);
+      const savedCheckIns = withSavedCheckInSessionIds(
+        checkInEvents,
+        result.checkInSessionIds
+      );
+      setCheckInEvents(savedCheckIns);
       const savedTemplate = withSavedQuestionIds(
         questions.applicationTemplate,
         result.questionIds
@@ -383,7 +391,7 @@ export function useEventForm({
       setCleanSnapshot(
         createFormSnapshot(
           savedFormState,
-          checkInEvents,
+          savedCheckIns,
           mentors,
           sponsors,
           savedTemplate
