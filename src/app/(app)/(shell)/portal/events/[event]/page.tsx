@@ -17,6 +17,7 @@ import { resolveImagePreviewSrc } from "@/lib/event-image";
 import { fetchEventMentors, fetchEventSponsors } from "@/lib/supabase-helpers/event-people";
 import { EventPeopleCard } from "@/features/events/components/EventPeopleCard";
 import { loadEventBadges } from "@/features/events/lib/event-badge";
+import { ApplicationStatusCallout } from "@/features/applications/components/ApplicationStatusCallout";
 
 interface PortalEventPageProps {
   params: Promise<{ event: string }>;
@@ -57,6 +58,8 @@ export default async function PortalEventPage({
       {event.status !== "active" && (
         <Alert>Draft: only admins can see this.</Alert>
       )}
+      {/* Application status and entry point; renders nothing without applications. */}
+      <ApplicationStatusCallout event={event} userId={user.id} />
       
       <div className="border-border-subtle rounded-md border">
         <div className="w-full h-51 bg-brand-blue-200 relative rounded-t-md">

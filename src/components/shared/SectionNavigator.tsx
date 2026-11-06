@@ -59,7 +59,7 @@ export function SectionNavigator({ title, sections, currentId, onNavigate, class
 
   return <DropdownMenu open={open} onOpenChange={setOpen}>
     <DropdownMenuTrigger asChild>
-      <button type="button" aria-label={accessibleName} className={cn("fixed bottom-6 left-1/2 z-50 flex h-14 max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-full border border-border bg-popover py-2 pr-4 pl-2 text-foreground shadow-lg hover:bg-accent focus-visible:focus-ring", className)}>
+      <button type="button" aria-label={accessibleName} className={cn("fixed bottom-6 left-1/2 z-50 flex transition-[left] duration-200 ease-out md:group-has-[[data-slot=sidebar][data-state=expanded]]/sidebar-wrapper:left-[calc(50%+var(--sidebar-width)/2)] md:group-has-[[data-slot=sidebar][data-state=collapsed]]/sidebar-wrapper:left-[calc(50%+var(--sidebar-width-icon)/2)] h-14 max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-full border border-border bg-popover py-2 pr-4 pl-2 text-foreground shadow-lg hover:bg-accent focus-visible:focus-ring", className)}>
         <span className="relative flex size-10 shrink-0 items-center justify-center" aria-hidden>
           <svg className="absolute inset-0 size-10 -rotate-90" viewBox="0 0 40 40">
             <circle cx="20" cy="20" r="16" fill="none" stroke="currentColor" strokeWidth="3" className="text-border" />
