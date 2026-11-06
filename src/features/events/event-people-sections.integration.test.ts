@@ -5,7 +5,6 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { fetchEventMentors } from "@/lib/supabase-helpers/event-people";
 import { withFixtures, type Fixtures } from "@/test/integration";
 
 /** Postgres's unique_violation and foreign_key_violation. */
@@ -220,22 +219,5 @@ describe("a mentor link inserted without a section", () => {
           ],
         },
       ]);
-    }));
-});
-
-describe("fetchEventMentors", () => {
-  it("lists only the Mentors section, in order", () =>
-    withFixtures(async (fixtures) => {
-      const [ada, grace, alan] = await createMentors(fixtures, "Ada", "Grace", "Alan");
-      const eventId = await save(fixtures, [grace.id, ada.id]);
-      const judges = await addSection(fixtures, eventId, "Judges", 1);
-      const { error } = await fixtures.supabase.from("event_mentors").insert([
-        { event_id: eventId, section_id: judges.id, mentor_id: alan.id },
-        { event_id: eventId, section_id: judges.id, mentor_id: ada.id },
-      ]);
-      if (error) throw error;
-
-      const mentors = await fetchEventMentors(fixtures.supabase, eventId);
-      expect(mentors.map((mentor) => mentor.id)).toEqual([grace.id, ada.id]);
     }));
 });

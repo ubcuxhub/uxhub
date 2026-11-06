@@ -60,8 +60,10 @@ export async function saveSponsor(
 }
 
 /**
- * The people in an event's Mentors section, in order. Other sections (Judges,
- * Speakers, ...) are left out, so nobody is listed as a mentor twice.
+ * Every person linked to the event, in order. Until the builder adds other
+ * people sections, an event's only section is Mentors. This reads no section
+ * columns on purpose: preview deploys run against production's schema, which
+ * has none until the people-sections migration is merged.
  */
 export async function fetchEventMentors(
   supabase: DbClient,
@@ -69,9 +71,8 @@ export async function fetchEventMentors(
 ): Promise<MentorRow[]> {
   const { data: links, error: linksError } = await supabase
     .from(TABLES.eventMentors)
-    .select("mentor_id, sort_order, event_people_sections!inner(title)")
+    .select("mentor_id, sort_order")
     .eq("event_id", eventId)
-    .ilike("event_people_sections.title", "mentors")
     .order("sort_order", { ascending: true });
 
   if (linksError) throw linksError;
