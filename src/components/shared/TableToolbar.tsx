@@ -18,7 +18,8 @@ export interface TableToolbarProps {
   onClearSelection?: () => void;
   /**
    * How many rows are listed, on a line under the toolbar: "142 users", or
-   * "38 of 142 users" while a search or filter hides some.
+   * "38 of 142 users" while a search or filter hides some. A paged list puts
+   * its count in the Pagination footer instead (`TableRowCount`).
    */
   count?: TableRowCountValue;
   /** With `count`, a "Show all" button while filtering. Clear the search too. */
@@ -32,10 +33,15 @@ export interface TableRowCountValue {
   shown: number;
   /** Rows before search and filters. */
   total: number;
-  /** "user" and "users". Picked by `total`. */
+  /** "user" and "users". Picked by the number it follows. */
   noun: { one: string; other: string };
   /** Whether a search or filter is applied. Defaults to `shown !== total`. */
   filtered?: boolean;
+  /**
+   * The rows on this page, 1-based and inclusive, for a paged list:
+   * "Showing 1–25 of 142 users". Ignored when nothing is shown.
+   */
+  range?: { from: number; to: number };
 }
 
 const FOCUSABLE = "button:not(:disabled), a[href], [tabindex]:not([tabindex='-1'])";
@@ -141,18 +147,44 @@ function TableToolbar({
 
 const NUMBER = new Intl.NumberFormat("en-CA");
 
-/** "142 users", or "38 of 142 users" while filtered. */
-function formatRowCount({ shown, total, noun, filtered = shown !== total }: TableRowCountValue) {
-  const word = total === 1 ? noun.one : noun.other;
+/**
+ * The row count's wording, for every list (§3.16):
+ *
+ * - "142 users"; "38 of 142 users" while a search or filter hides some.
+ * - With a page `range`: "Showing 1–25 of 142 users", and while filtered
+ *   "Showing 1–25 of 38 users · filtered from 142", so the full list's size
+ *   is always in view.
+ * - A filter that leaves nothing reads "0 of 142 users".
+ */
+function formatRowCount({
+  shown,
+  total,
+  noun,
+  filtered = shown !== total,
+  range,
+}: TableRowCountValue) {
+  const word = (n: number) => (n === 1 ? noun.one : noun.other);
+  if (range && shown > 0) {
+    const span =
+      shown === 1
+        ? `Showing 1 of 1 ${noun.one}`
+        : `Showing ${NUMBER.format(range.from)}–${NUMBER.format(range.to)} of ${NUMBER.format(shown)} ${word(shown)}`;
+    return filtered ? `${span} · filtered from ${NUMBER.format(total)}` : span;
+  }
   return filtered
-    ? `${NUMBER.format(shown)} of ${NUMBER.format(total)} ${word}`
-    : `${NUMBER.format(total)} ${word}`;
+    ? `${NUMBER.format(shown)} of ${NUMBER.format(total)} ${word(total)}`
+    : `${NUMBER.format(total)} ${word(total)}`;
 }
 
 /**
- * The row count line under a table toolbar (`TableToolbar`'s `count`), for a
- * toolbar of its own. The count is a polite live region that stays mounted,
- * so a change is announced and the first render is not.
+ * The row count line (§3.16): under a table toolbar (`TableToolbar`'s
+ * `count`), or in a paged list's footer as `Pagination`'s `summary`, with the
+ * page's `range`. While a search or filter hides rows it offers "Show all";
+ * the caller clears the search and filters, and moves focus (the button goes
+ * with them).
+ *
+ * The count is a polite live region that stays mounted, so a change (a
+ * filter, a search, a page) is announced and the first render is not.
  */
 function TableRowCount({
   count,

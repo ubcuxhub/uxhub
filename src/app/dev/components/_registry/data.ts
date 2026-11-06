@@ -99,6 +99,7 @@ export const dataEntries: readonly RegistryEntry[] = [
       "TableNone",
       "TableRow",
       "TableRowButton",
+      "TableRowLink",
       "TableSkeleton",
     ],
     source: "src/components/ui/table.tsx",
