@@ -1,5 +1,6 @@
 import type { TablesInsert } from "../../../src/lib/supabase/database.types.ts";
 import { addDays, startOfUtcDay, timestamp } from "../lib/relative-dates.ts";
+import { encodeCheckboxResponse } from "../../../src/lib/application-response.ts";
 import { seedEvents, type SeedEvent } from "./events.ts";
 
 export interface SeedPurchase {
@@ -16,7 +17,8 @@ export interface SeedPurchase {
 }
 
 export interface SeedApplication {
-  status: "submitted" | "waitlisted" | "accepted" | "rejected";
+  /** A draft may leave required questions unanswered. */
+  status: "draft" | "submitted" | "waitlisted" | "accepted" | "rejected";
   /** Required when accepted (docs/event-states.md). */
   offerExpiresAt?: string;
 }
@@ -104,6 +106,8 @@ const uxathonQuestions = {
   experience: "Have you participated in a hackathon or design sprint before?",
   problem: "Tell us about a design problem you have worked on recently. What was hard about it?",
   teammates: "Are you applying with teammates? List their names and we will keep you together.",
+  heardFrom: "How did you hear about UXathon?",
+  portfolio: "Attach a resume or portfolio if you have one (PDF, up to 5 MB).",
 } as const;
 
 function requireEvent(events: SeedEvent[], slug: string): SeedEvent {
@@ -281,6 +285,7 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
   const mentorshipOngoing = requireEvent(events, "mentorship-program");
   const industryTalkUpcoming = requireEvent(events, "industry-talk-design-systems");
   const researchWorkshopDraft = requireEvent(events, "ux-research-workshop");
+  const uxathonUpcoming = requireEvent(events, "uxathon-upcoming");
 
   const industryCheckIn = industryTalkPast.checkInSessions[0]?.start_time;
   const getToKnowCheckIn = getToKnowPast.checkInSessions[0]?.start_time;
@@ -395,7 +400,7 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
           [designSprintQuestions.figma]: "Comfortable building screens",
           [designSprintQuestions.goal]:
             "I want to practice turning research into a focused prototype and get more confident presenting design decisions.",
-          [designSprintQuestions.dietary]: "Vegetarian",
+          [designSprintQuestions.dietary]: encodeCheckboxResponse(["Vegetarian"]),
         },
         checkIns: {
           "Morning Check-in": afterTimestamp(
@@ -414,8 +419,11 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
         application: { status: "rejected" },
         responses: {
           [uxathonQuestions.year]: "3",
+          // Comma-joined, as answers were stored before drafts: the admin
+          // review page still has to read this form.
           [uxathonQuestions.contribution]: "User research, Prototyping",
           [uxathonQuestions.experience]: "Once or twice",
+          [uxathonQuestions.heardFrom]: "A friend or classmate",
           [uxathonQuestions.problem]:
             "I worked on a campus wayfinding concept. The hardest part was separating navigation problems from gaps in the underlying signage system.",
           [uxathonQuestions.teammates]: "",
@@ -433,7 +441,7 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
             "I build components and use auto-layout daily",
           [designSprintQuestions.goal]:
             "I want to mentor newer teammates while sharpening how I scope research under a tight deadline.",
-          [designSprintQuestions.dietary]: "Vegetarian",
+          [designSprintQuestions.dietary]: encodeCheckboxResponse(["Vegetarian"]),
         },
       },
     ],
@@ -527,9 +535,12 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
         application: { status: "rejected" },
         responses: {
           [uxathonQuestions.year]: "2",
-          [uxathonQuestions.contribution]:
-            "Visual and UI design, Content and copy",
+          [uxathonQuestions.contribution]: encodeCheckboxResponse([
+            "Visual and UI design",
+            "Content and copy",
+          ]),
           [uxathonQuestions.experience]: "No, this is my first",
+          [uxathonQuestions.heardFrom]: "UX Hub newsletter",
           [uxathonQuestions.problem]:
             "I redesigned a course-registration flow. The difficult part was showing prerequisite conflicts without overwhelming students.",
           [uxathonQuestions.teammates]: "Jordan Lee",
@@ -545,7 +556,7 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
           [designSprintQuestions.figma]: "I can follow a tutorial",
           [designSprintQuestions.goal]:
             "I want to experience an end-to-end design process and leave with a project I can keep developing.",
-          [designSprintQuestions.dietary]: "None",
+          [designSprintQuestions.dietary]: encodeCheckboxResponse(["None"]),
         },
       },
     ],
@@ -635,6 +646,22 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
         ticket: true,
         checkIns: {
           "Door Check-in": afterTimestamp(getToKnowCheckIn, 5),
+        },
+      },
+      {
+        // A half-finished application to the upcoming UXathon: the member
+        // application form resumes it. Drafts are never shown to admins.
+        eventSlug: uxathonUpcoming.event.slug,
+        ticket: false,
+        application: { status: "draft" },
+        responses: {
+          [uxathonQuestions.year]: "4",
+          [uxathonQuestions.contribution]: encodeCheckboxResponse([
+            "Prototyping",
+            "Front-end development",
+          ]),
+          [uxathonQuestions.problem]:
+            "I am redesigning our club's event check-in so volunteers can",
         },
       },
     ],

@@ -391,6 +391,28 @@ const applicationQuestions = {
       is_required: false,
       max_char_limit: 200,
     },
+    {
+      question: "How did you hear about UXathon?",
+      response_type: "dropdown" as const,
+      is_required: true,
+      response_options: [
+        "Instagram",
+        "UX Hub newsletter",
+        "A friend or classmate",
+        "A class or professor",
+        "Somewhere else",
+      ],
+    },
+    {
+      // UXathon asks one question of every type, so the member form shows
+      // them all. Matches the application-files bucket: PDF, 5 MB.
+      question: "Attach a resume or portfolio if you have one (PDF, up to 5 MB).",
+      response_type: "file_upload" as const,
+      is_required: false,
+      restrict_file_types: true,
+      allowed_file_types: ["pdf"],
+      max_file_size_bytes: 5_242_880,
+    },
   ],
 };
 

@@ -181,6 +181,7 @@ helper file, and fix it in one place.
 | `app_settings`                | `src/lib/supabase-helpers/app-settings.ts`        |
 | `user_info` (service-role)    | `src/lib/supabase-helpers/admin-server.ts`        |
 | `event-images` (storage)      | `src/lib/supabase-helpers/admin-server.ts`        |
+| `application-files` (storage) | `src/lib/supabase-helpers/application-files.ts`   |
 
 Supporting files:
 
@@ -255,6 +256,18 @@ Seed covers use the separate `seed/covers/<file>` prefix and stable keys, since
 the seed wants idempotency more than cache-busting (they carry a short
 `cache-control` instead). The split prefix is also what lets `pnpm seed` clear
 stale seed images without ever deleting a cover somebody uploaded by hand.
+
+Application files live in the private `application-files` bucket (PDF, 5 MB),
+keyed `<user_info_id>/<application_id>/<question_id>/<file name>`; the answer
+to a file question stores that key. Unlike the two public buckets, members
+upload and remove these themselves with their own session, so this bucket
+**does** have `storage.objects` policies
+(`20261106193115_application_files_bucket.sql`): members write only into their
+own draft, under a file question of its event, and remove only while it is a
+draft; they read their own files, and admins read those of submitted
+applications. Downloads use short-lived signed URLs
+(`createApplicationFileUrl`). Deleting a draft removes its files first
+(`deleteDraftApplication`), since the database cannot reach Storage.
 
 ## Type-safety gaps to watch (these do NOT fail `tsc`)
 

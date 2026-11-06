@@ -1,6 +1,10 @@
 import type { SeedUser } from "../data/users.ts";
 import type { SeedEvent } from "../data/events.ts";
 import type { TablesInsert } from "../../../src/lib/supabase/database.types.ts";
+import {
+  decodeCheckboxResponse,
+  hasApplicationAnswer,
+} from "../../../src/lib/application-response.ts";
 
 export interface UserFixtureTotals {
   authUsers: number;
@@ -330,8 +334,14 @@ export function validateUserFixtures(
       );
       const responses = registration.responses ?? {};
 
+      // A draft is still being filled in; submitting checks its answers.
+      const isDraft = registration.application?.status === "draft";
       for (const question of event.applicationQuestions) {
-        if (question.is_required && !responses[question.question]?.trim()) {
+        if (
+          !isDraft &&
+          question.is_required &&
+          !hasApplicationAnswer(question.response_type, responses[question.question])
+        ) {
           throw new Error(
             `Registration for "${registration.eventSlug}" is missing required response "${question.question}"`
           );
@@ -349,7 +359,7 @@ export function validateUserFixtures(
         if (question.response_options && response) {
           const selected =
             question.response_type === "checkbox"
-              ? response.split(",").map((value) => value.trim())
+              ? decodeCheckboxResponse(response, question.response_options)
               : [response];
           const invalid = selected.find(
             (value) => !question.response_options?.includes(value)
