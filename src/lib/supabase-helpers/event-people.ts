@@ -59,14 +59,19 @@ export async function saveSponsor(
   return data;
 }
 
+/**
+ * The people in an event's Mentors section, in order. Other sections (Judges,
+ * Speakers, ...) are left out, so nobody is listed as a mentor twice.
+ */
 export async function fetchEventMentors(
   supabase: DbClient,
   eventId: string
 ): Promise<MentorRow[]> {
   const { data: links, error: linksError } = await supabase
     .from(TABLES.eventMentors)
-    .select("mentor_id, sort_order")
+    .select("mentor_id, sort_order, event_people_sections!inner(title)")
     .eq("event_id", eventId)
+    .ilike("event_people_sections.title", "mentors")
     .order("sort_order", { ascending: true });
 
   if (linksError) throw linksError;

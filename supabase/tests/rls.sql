@@ -68,8 +68,16 @@ insert into public.mentors (full_name)
 values ('RLS Mentor')
 returning id \gset mentor_
 
-insert into public.event_mentors (event_id, mentor_id)
-values (:'event_id', :'mentor_id');
+insert into public.event_people_sections (event_id, title)
+values (:'event_id', 'Mentors')
+returning id \gset mentor_section_
+
+insert into public.event_people_sections (event_id, title)
+values (:'draft_event_id', 'Judges')
+returning id \gset draft_section_
+
+insert into public.event_mentors (event_id, section_id, mentor_id)
+values (:'event_id', :'mentor_section_id', :'mentor_id');
 
 insert into public.sponsors (name)
 values ('RLS Sponsor')
@@ -158,6 +166,8 @@ select set_config('rls.agenda_day_id', :'agenda_day_id', true);
 select set_config('rls.agenda_item_id', :'agenda_item_id', true);
 select set_config('rls.draft_agenda_day_id', :'draft_agenda_day_id', true);
 select set_config('rls.draft_agenda_item_id', :'draft_agenda_item_id', true);
+select set_config('rls.mentor_section_id', :'mentor_section_id', true);
+select set_config('rls.draft_section_id', :'draft_section_id', true);
 \o
 
 -- Agenda visibility for anonymous visitors. This runs after the settings above
@@ -186,6 +196,34 @@ begin
   where id = current_setting('rls.draft_agenda_item_id')::uuid;
   if visible_count <> 0 then
     raise exception 'anon can read a draft event agenda item';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_people_sections
+  where id = current_setting('rls.mentor_section_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'anon cannot read an active event people section';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_mentors
+  where section_id = current_setting('rls.mentor_section_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'anon cannot read an active event section''s people';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_people_sections
+  where id = current_setting('rls.draft_section_id')::uuid;
+  if visible_count <> 0 then
+    raise exception 'anon can read a draft event people section';
+  end if;
+
+  if has_table_privilege('anon', 'public.event_people_sections', 'INSERT')
+     or has_table_privilege('authenticated', 'public.event_people_sections', 'INSERT')
+     or has_table_privilege('authenticated', 'public.event_people_sections', 'UPDATE')
+     or has_table_privilege('authenticated', 'public.event_people_sections', 'DELETE') then
+    raise exception 'browser roles can write people sections';
   end if;
 end;
 $$;
@@ -560,6 +598,13 @@ begin
     raise exception 'admin cannot read a draft event agenda item';
   end if;
 
+  select count(*) into visible_count
+  from public.event_people_sections
+  where id = current_setting('rls.draft_section_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'admin cannot read a draft event people section';
+  end if;
+
   update public.user_info
   set first_name = 'Admin tried to edit'
   where id = current_setting('rls.user_b_id')::uuid;
@@ -630,6 +675,13 @@ begin
   where id = current_setting('rls.draft_agenda_item_id')::uuid;
   if changed_count <> 1 then
     raise exception 'manager cannot read a draft event agenda item';
+  end if;
+
+  select count(*) into changed_count
+  from public.event_people_sections
+  where id = current_setting('rls.draft_section_id')::uuid;
+  if changed_count <> 1 then
+    raise exception 'manager cannot read a draft event people section';
   end if;
 
   update public.user_info

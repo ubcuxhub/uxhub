@@ -21,6 +21,8 @@ export type SponsorRow = Tables<"sponsors">;
 export type SponsorInsert = TablesInsert<"sponsors">;
 export type SponsorUpdate = TablesUpdate<"sponsors">;
 export type EventMentorInsert = TablesInsert<"event_mentors">;
+export type EventPeopleSectionRow = Tables<"event_people_sections">;
+export type EventPeopleSectionInsert = TablesInsert<"event_people_sections">;
 export type EventSponsorInsert = TablesInsert<"event_sponsors">;
 
 export type UserInfoRow = Tables<"user_info">;

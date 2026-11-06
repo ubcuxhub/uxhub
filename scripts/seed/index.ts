@@ -95,6 +95,7 @@ const TABLE = {
   mentors: "mentors",
   sponsors: "sponsors",
   eventMentors: "event_mentors",
+  eventPeopleSections: "event_people_sections",
   eventSponsors: "event_sponsors",
 } as const;
 
@@ -621,9 +622,31 @@ async function main(): Promise<void> {
           .eq("event_id", eventId);
         if (clearMentorsError) throw clearMentorsError;
         if (mentorIds.length) {
+          // Seed mentors fill the event's Mentors section, as the builder's
+          // save does.
+          const { data: existingSection, error: sectionReadError } =
+            await supabase
+              .from(TABLE.eventPeopleSections)
+              .select("id")
+              .eq("event_id", eventId)
+              .eq("title", "Mentors")
+              .maybeSingle();
+          if (sectionReadError) throw sectionReadError;
+          let sectionId = existingSection?.id;
+          if (!sectionId) {
+            const { data, error } = await supabase
+              .from(TABLE.eventPeopleSections)
+              .insert({ event_id: eventId, title: "Mentors", sort_order: 0 })
+              .select("id")
+              .single();
+            if (error) throw error;
+            sectionId = data.id;
+          }
+
           const { error } = await supabase.from(TABLE.eventMentors).insert(
             mentorIds.map((mentorId, sortOrder) => ({
               event_id: eventId,
+              section_id: sectionId,
               mentor_id: mentorId,
               sort_order: sortOrder,
             }))

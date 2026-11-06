@@ -348,17 +348,20 @@ export type Database = {
         Row: {
           event_id: string
           mentor_id: string
+          section_id: string
           sort_order: number
         }
         ComputedFields: never
         Insert: {
           event_id: string
           mentor_id: string
+          section_id: string
           sort_order?: number
         }
         Update: {
           event_id?: string
           mentor_id?: string
+          section_id?: string
           sort_order?: number
         }
         Relationships: [
@@ -374,6 +377,49 @@ export type Database = {
             columns: ["mentor_id"]
             isOneToOne: false
             referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_mentors_section_id_fkey"
+            columns: ["event_id", "section_id"]
+            isOneToOne: false
+            referencedRelation: "event_people_sections"
+            referencedColumns: ["event_id", "id"]
+          },
+        ]
+      }
+      event_people_sections: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          sort_order: number
+          title: string
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          sort_order?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          sort_order?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_people_sections_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
             referencedColumns: ["id"]
           },
         ]

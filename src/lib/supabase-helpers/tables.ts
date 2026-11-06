@@ -18,6 +18,7 @@ export const TABLES = {
   mentors: "mentors",
   sponsors: "sponsors",
   eventMentors: "event_mentors",
+  eventPeopleSections: "event_people_sections",
   eventSponsors: "event_sponsors",
   membershipTypes: "membership_types",
   purchases: "purchases",
