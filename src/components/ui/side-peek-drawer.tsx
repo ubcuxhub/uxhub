@@ -10,7 +10,6 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigationGuard } from "@/hooks/use-navigation-guard";
-import { loadDocument } from "@/lib/load-document";
 import { cn } from "@/lib/utils";
 
 interface SidePeekDrawerProps {
@@ -22,9 +21,8 @@ interface SidePeekDrawerProps {
   /**
    * Leaves for `href` once the person has chosen to discard their changes.
    * Without it the panel closes and then pushes `href`, which races a close
-   * that is itself a navigation (`router.back()` on an intercepted route):
-   * pass it there and navigate however the route needs. A `document`
-   * full-page link never comes here; it loads the page with `loadDocument`.
+   * that is itself a navigation (a drawer whose open state is the URL): pass
+   * it there and navigate however the route needs.
    */
   onNavigate?: (href: string) => void;
   /**
@@ -36,13 +34,10 @@ interface SidePeekDrawerProps {
   children: React.ReactNode;
 }
 
-/** How a pending navigation leaves: a client-side route change, or a full document load. */
-type NavigationKind = "client" | "document";
-
 interface SidePeekDrawerContextValue {
   requestClose: () => void;
   /** Leaves for `href`, asking first. */
-  requestNavigate: (href: string, kind?: NavigationKind) => void;
+  requestNavigate: (href: string) => void;
   dirty: boolean;
   /** Below `sm` the panel covers the screen, so it is modal there. */
   phone: boolean;
@@ -105,7 +100,7 @@ function SidePeekDrawer({
   const router = useRouter();
   const phone = usePhone();
   const [confirmOpen, setConfirmOpen] = React.useState(false);
-  const [pending, setPending] = React.useState<{ href: string; kind: NavigationKind } | null>(null);
+  const [pending, setPending] = React.useState<string | null>(null);
   const openerRef = React.useRef<HTMLElement | null>(null);
   const contentRef = React.useRef<HTMLElement | null>(null);
   const restoreRef = React.useRef<HTMLElement | null>(null);
@@ -127,9 +122,9 @@ function SidePeekDrawer({
     }
   };
 
-  const requestNavigate = (href: string, kind: NavigationKind = "client") => {
+  const requestNavigate = (href: string) => {
     rememberFocus();
-    setPending({ href, kind });
+    setPending(href);
     setConfirmOpen(true);
   };
 
@@ -144,11 +139,10 @@ function SidePeekDrawer({
     // The person chose to lose their changes: don't ask again on the way out.
     guard.release();
     if (!pending) onOpenChange(false);
-    else if (pending.kind === "document") loadDocument(pending.href);
-    else if (onNavigate) onNavigate(pending.href);
+    else if (onNavigate) onNavigate(pending);
     else {
       onOpenChange(false);
-      router.push(pending.href);
+      router.push(pending);
     }
   };
 
@@ -315,7 +309,10 @@ const SidePeekDrawerContent = React.forwardRef<
 SidePeekDrawerContent.displayName = "SidePeekDrawerContent";
 
 interface SidePeekDrawerTopBarProps extends Omit<React.ComponentProps<"div">, "children"> {
-  onClose: () => void;
+  /** What close does. Pass this or `closeHref`. */
+  onClose?: () => void;
+  /** Makes close a link instead, for a page that closes by navigating (a record's full page). */
+  closeHref?: string;
   /** The close button's name. Defaults to "Close panel (Esc)". */
   closeLabel?: string;
   /** The close button's tooltip, when it should say more than its name. Defaults to `closeLabel`. */
@@ -332,11 +329,12 @@ interface SidePeekDrawerTopBarProps extends Omit<React.ComponentProps<"div">, "c
  * The drawer's top bar, without the drawer: close and an optional
  * expand/collapse control on the left, actions on the right. 40px from the
  * top on `sm`+ (level with the page title), compact on phones.
- * `SidePeekDrawerHeader` wires it to the panel; a page that shows the same
- * record (`RecordFrame` canonical) renders it directly.
+ * `SidePeekDrawerHeader` wires it to the panel; a record's full page
+ * (`RecordPageTopBar`) renders it directly, with `closeHref`.
  */
 function SidePeekDrawerTopBar({
   onClose,
+  closeHref,
   closeLabel = "Close panel (Esc)",
   closeTooltip,
   resize,
@@ -356,16 +354,26 @@ function SidePeekDrawerTopBar({
       <div className="flex items-center gap-1">
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label={closeLabel}
-              onClick={onClose}
-              className="rounded-lg text-muted-foreground"
-            >
-              <ChevronsRight className="size-[18px]" aria-hidden />
-            </Button>
+            {closeHref ? (
+              <Link
+                href={closeHref}
+                aria-label={closeLabel}
+                className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "rounded-lg text-muted-foreground")}
+              >
+                <ChevronsRight className="size-[18px]" aria-hidden />
+              </Link>
+            ) : (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label={closeLabel}
+                onClick={onClose}
+                className="rounded-lg text-muted-foreground"
+              >
+                <ChevronsRight className="size-[18px]" aria-hidden />
+              </Button>
+            )}
           </TooltipTrigger>
           <TooltipContent>{closeTooltip ?? closeLabel}</TooltipContent>
         </Tooltip>
@@ -383,24 +391,11 @@ function SidePeekDrawerTopBar({
 interface SidePeekDrawerHeaderProps extends Omit<React.ComponentProps<"div">, "children"> {
   /** Shows "Open as full page", linking here. */
   fullPageHref?: string;
-  /**
-   * How "Open as full page" leaves. `client` (default) is a Next `Link`.
-   * `document` is a plain link that loads the page from scratch: use it when
-   * a client navigation would be intercepted again (a record drawer whose
-   * full page is the URL it is already on).
-   */
-  fullPageNavigation?: NavigationKind;
   actions?: React.ReactNode;
 }
 
-function SidePeekDrawerHeader({
-  fullPageHref,
-  fullPageNavigation = "client",
-  actions,
-  ...props
-}: SidePeekDrawerHeaderProps) {
+function SidePeekDrawerHeader({ fullPageHref, actions, ...props }: SidePeekDrawerHeaderProps) {
   const { requestClose, requestNavigate, dirty } = useSidePeekDrawer();
-  const FullPageLink = fullPageNavigation === "document" ? "a" : Link;
   return (
     <SidePeekDrawerTopBar
       onClose={requestClose}
@@ -409,22 +404,22 @@ function SidePeekDrawerHeader({
         fullPageHref ? (
           <Tooltip>
             <TooltipTrigger asChild>
-              <FullPageLink
+              <Link
                 href={fullPageHref}
                 aria-label="Open as full page"
-                // Asks for itself below, keeping its own navigation kind.
+                // Asks for itself below.
                 data-navigation-guard="ignore"
                 onClick={(event) => {
                   // A new-tab click keeps this tab's edits, so only plain clicks ask first.
                   if (!dirty || event.defaultPrevented || event.button !== 0) return;
                   if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
                   event.preventDefault();
-                  requestNavigate(fullPageHref, fullPageNavigation);
+                  requestNavigate(fullPageHref);
                 }}
                 className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "rounded-lg text-muted-foreground")}
               >
                 <Maximize2 className="size-[18px]" aria-hidden />
-              </FullPageLink>
+              </Link>
             </TooltipTrigger>
             <TooltipContent>Open as full page</TooltipContent>
           </Tooltip>

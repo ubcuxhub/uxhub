@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { PageContainer } from "@/components/shared/PageContainer";
+import { RecordPageTopBar } from "@/components/shared/RecordDrawer";
 import { EventCreateModify } from "@/features/admin/components/EventCreateModify";
 import { resolveAdminEventId } from "@/features/admin/lib/resolve-event-param";
 import { requireAdmin } from "@/lib/auth/guards";
@@ -20,9 +21,10 @@ interface EditEventPageProps {
 }
 
 /**
- * The event builder. `/admin/events/<id>` is the event's overview (and its
- * record drawer); this page holds every section of the event for editing.
- * Never a drawer: nothing under `@flow` matches it.
+ * The event builder: every section of the event, for editing. A page of its
+ * own beside the list (outside `(browse)`), reached from the overview
+ * drawer's "Edit event". It wears the drawer's top bar: close returns to the
+ * list, collapse to the list with this event's drawer open.
  */
 export default async function EditEventPage({ params }: EditEventPageProps) {
   await requireAdmin();
@@ -51,17 +53,24 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
   if (!event) notFound();
 
   return (
-    <PageContainer backHref="/admin/events" backLabel="Back to Events">
-      <EventCreateModify
-        eventId={eventId}
-        initialEvent={event}
-        initialCheckInSessions={checkInSessions}
-        initialApplicationQuestions={applicationQuestions}
-        initialMentors={mentors}
-        initialSponsors={sponsors}
-        mentorOptions={mentorOptions}
-        sponsorOptions={sponsorOptions}
+    <>
+      <RecordPageTopBar
+        listHref="/admin/events"
+        listLabel="Back to Manage Events"
+        recordHref={`/admin/events/${eventId}`}
       />
-    </PageContainer>
+      <PageContainer>
+        <EventCreateModify
+          eventId={eventId}
+          initialEvent={event}
+          initialCheckInSessions={checkInSessions}
+          initialApplicationQuestions={applicationQuestions}
+          initialMentors={mentors}
+          initialSponsors={sponsors}
+          mentorOptions={mentorOptions}
+          sponsorOptions={sponsorOptions}
+        />
+      </PageContainer>
+    </>
   );
 }

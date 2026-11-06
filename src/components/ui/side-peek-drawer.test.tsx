@@ -17,7 +17,6 @@ import {
 } from "./side-peek-drawer";
 
 const push = vi.fn();
-const loadDocument = vi.fn();
 
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
 vi.mock("next/link", () => ({
@@ -25,12 +24,10 @@ vi.mock("next/link", () => ({
     <a href={href} data-next-link="" {...props}>{children}</a>
   ),
 }));
-vi.mock("@/lib/load-document", () => ({ loadDocument: (href: string) => loadDocument(href) }));
 
 afterEach(() => {
   cleanup();
   push.mockReset();
-  loadDocument.mockReset();
   vi.unstubAllGlobals();
   window.history.replaceState(null, "", "/");
 });
@@ -40,7 +37,6 @@ function Example({
   onOpenChange = () => {},
   withReturnRef = true,
   fullPageHref,
-  fullPageNavigation,
   onNavigate,
   guardNavigation,
   inDrawer,
@@ -49,7 +45,6 @@ function Example({
   onOpenChange?: (open: boolean) => void;
   withReturnRef?: boolean;
   fullPageHref?: string;
-  fullPageNavigation?: "client" | "document";
   onNavigate?: (href: string) => void;
   guardNavigation?: boolean;
   inDrawer?: React.ReactNode;
@@ -62,7 +57,7 @@ function Example({
       <Link href="/admin/events">Manage events</Link>
       <SidePeekDrawer open={open} onOpenChange={(next) => { onOpenChange(next); setOpen(next); }} dirty={dirty} returnFocusRef={withReturnRef ? rowRef : undefined} onNavigate={onNavigate} guardNavigation={guardNavigation}>
         <SidePeekDrawerContent aria-describedby={undefined}>
-          <SidePeekDrawerHeader fullPageHref={fullPageHref} fullPageNavigation={fullPageNavigation} />
+          <SidePeekDrawerHeader fullPageHref={fullPageHref} />
           <SidePeekDrawerBody><SidePeekDrawerTitle>Jane Smith</SidePeekDrawerTitle>{inDrawer}<button type="button">Last action</button></SidePeekDrawerBody>
         </SidePeekDrawerContent>
       </SidePeekDrawer>
@@ -156,7 +151,7 @@ describe("SidePeekDrawer", () => {
       expect(screen.getByRole("button", { name: "Close panel (Esc)" }).closest('[data-slot="side-peek-drawer-resize"]')).toBeNull();
     });
 
-    it("renders without a drawer, for a page showing the same record", () => {
+    it("renders without a drawer, for a record's full page", () => {
       const onClose = vi.fn();
       render(
         <SidePeekDrawerTopBar
@@ -171,6 +166,12 @@ describe("SidePeekDrawer", () => {
       expect(onClose).toHaveBeenCalledTimes(1);
       expect(screen.getByRole("button", { name: "Collapse to drawer" }).closest('[data-slot="side-peek-drawer-resize"]')?.className).toContain("max-sm:hidden");
       expect(screen.getByRole("button", { name: "Edit user" })).toBeTruthy();
+    });
+
+    it("makes close a link with closeHref", () => {
+      render(<SidePeekDrawerTopBar closeHref="/admin/events" closeLabel="Close" closeTooltip="Back to Manage Events" />);
+      expect(screen.getByRole("link", { name: "Close" }).getAttribute("href")).toBe("/admin/events");
+      expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
     });
   });
 
@@ -197,26 +198,6 @@ describe("SidePeekDrawer", () => {
     });
   });
 
-  describe("document full page", () => {
-    it("is a plain link, not a Next Link", () => {
-      render(<Example fullPageHref="/admin/users/1" fullPageNavigation="document" />);
-      const link = screen.getByRole("link", { name: "Open as full page" });
-      expect(link.getAttribute("href")).toBe("/admin/users/1");
-      expect(link.hasAttribute("data-next-link")).toBe(false);
-    });
-
-    it("asks first when dirty, then loads the page from scratch", () => {
-      const onNavigate = vi.fn();
-      render(<Example dirty fullPageHref="/admin/users/1" fullPageNavigation="document" onNavigate={onNavigate} />);
-      expect(fireEvent.click(screen.getByRole("link", { name: "Open as full page" }))).toBe(false);
-      expect(loadDocument).not.toHaveBeenCalled();
-      fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
-      expect(loadDocument).toHaveBeenCalledWith("/admin/users/1");
-      expect(onNavigate).not.toHaveBeenCalled();
-      expect(push).not.toHaveBeenCalled();
-    });
-  });
-
   describe("guardNavigation", () => {
     it("routes a link click elsewhere on the page through the discard confirmation", () => {
       const onNavigate = vi.fn();
@@ -228,16 +209,17 @@ describe("SidePeekDrawer", () => {
     });
 
     it("warns before unload while dirty, and stops once changes are discarded", () => {
-      render(<Example dirty guardNavigation fullPageHref="/admin/users/1" fullPageNavigation="document" />);
+      const onNavigate = vi.fn();
+      render(<Example dirty guardNavigation onNavigate={onNavigate} />);
       const unload = () => {
         const event = new Event("beforeunload", { cancelable: true });
         window.dispatchEvent(event);
         return event.defaultPrevented;
       };
       expect(unload()).toBe(true);
-      fireEvent.click(screen.getByRole("link", { name: "Open as full page" }));
+      fireEvent.click(screen.getByRole("link", { name: "Manage events" }));
       fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
-      expect(loadDocument).toHaveBeenCalledWith("/admin/users/1");
+      expect(onNavigate).toHaveBeenCalledWith("/admin/events");
       expect(unload()).toBe(false);
     });
 

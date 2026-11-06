@@ -157,9 +157,9 @@ function RegistrationBadge({
 }
 
 /**
- * An event's admin overview, in the record drawer or on its own page: who's
+ * An event's admin overview, in the drawer over Manage events: who's
  * coming, the links to run the event, its details, and a quick edit of its
- * status and dates. Everything else is edited in the builder (`/edit`).
+ * status and dates. "Edit event" opens the builder (`/edit`) for the rest.
  */
 export function AdminEventRecord({
   event: loaded,
@@ -237,7 +237,6 @@ export function AdminEventRecord({
 
   return (
     <RecordView
-      recordHref={base}
       title={event.name}
       subtitle={formatEventDateTimeRange(event.starts_at, event.ends_at) ?? "No date set"}
       cover={

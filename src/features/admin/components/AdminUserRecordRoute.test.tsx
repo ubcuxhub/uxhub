@@ -14,9 +14,6 @@ const mocks = vi.hoisted(() => ({
   fetchRecord: vi.fn(),
   fetchTiers: vi.fn(),
   fetchPurchases: vi.fn(),
-  notFound: vi.fn(() => {
-    throw new Error("NEXT_NOT_FOUND");
-  }),
   logError: vi.fn(),
 }));
 
@@ -26,7 +23,6 @@ vi.mock("@/lib/supabase-helpers/users", () => ({ fetchAdminUserRecordById: mocks
 vi.mock("@/lib/supabase-helpers/memberships", () => ({ fetchMembershipTypeOptions: mocks.fetchTiers }));
 vi.mock("@/lib/supabase-helpers/purchases", () => ({ fetchPurchasesForUser: mocks.fetchPurchases }));
 vi.mock("@/lib/log", () => ({ log: { error: mocks.logError }, errorFields: () => ({ errorType: "Error" }) }));
-vi.mock("next/navigation", () => ({ notFound: mocks.notFound }));
 // The record itself is covered by its own tests; here only its props matter.
 vi.mock("./AdminUserRecord", () => ({ AdminUserRecord: () => null }));
 
@@ -51,8 +47,8 @@ beforeEach(() => {
   mocks.fetchPurchases.mockResolvedValue([]);
 });
 
-async function route(mode: "intercepted" | "canonical" = "intercepted") {
-  return (await AdminUserRecordRoute({ userId: row.id, mode })) as ReactElement<Record<string, unknown>>;
+async function route() {
+  return (await AdminUserRecordRoute({ userId: row.id })) as ReactElement<Record<string, unknown>>;
 }
 
 describe("AdminUserRecordRoute", () => {
@@ -92,16 +88,9 @@ describe("AdminUserRecordRoute", () => {
 
   it("shows Not found in the drawer for a missing user", async () => {
     mocks.fetchRecord.mockResolvedValue(null);
-    const element = await route("intercepted");
+    const element = await route();
     expect(element.type).toBe(RecordNotFound);
     expect(element.props.noun).toBe("user");
-    expect(mocks.notFound).not.toHaveBeenCalled();
-  });
-
-  it("returns the 404 page for a missing user's full page", async () => {
-    mocks.fetchRecord.mockResolvedValue(null);
-    await expect(route("canonical")).rejects.toThrow("NEXT_NOT_FOUND");
-    expect(mocks.notFound).toHaveBeenCalledOnce();
   });
 
   describe("recent transactions", () => {

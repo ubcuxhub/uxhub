@@ -31,8 +31,8 @@ export async function resolveAdminEventId(
 
 /**
  * `resolveAdminEventId`, but returns null for a param that matches no event
- * instead of a 404: for the intercepted record drawer, which shows its own
- * "Event not found" inside the drawer.
+ * instead of a 404: for the record drawer, which shows its own "Event not
+ * found" over the list.
  */
 export async function findAdminEventId(
   supabase: DbClient,

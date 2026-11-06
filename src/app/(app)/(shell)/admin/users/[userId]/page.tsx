@@ -1,11 +1,6 @@
-import { RecordFrame } from "@/components/shared/RecordDrawer";
 import { AdminUserRecordRoute } from "@/features/admin/components/AdminUserRecordRoute";
 
-/** A user's record as its own page: a refresh, a shared link, or "Open as full page". */
+/** A user's record, in the drawer the users layout opens over the list. */
 export default async function AdminUserPage({ params }: { params: Promise<{ userId: string }> }) {
-  return (
-    <RecordFrame mode="canonical" listHref="/admin/users" listLabel="Back to Manage Users">
-      <AdminUserRecordRoute userId={(await params).userId} mode="canonical" />
-    </RecordFrame>
-  );
+  return <AdminUserRecordRoute userId={(await params).userId} />;
 }

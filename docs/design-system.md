@@ -632,15 +632,18 @@ scrolls there and closes. Enter/Space opens, arrows move, Esc returns focus.
   over the page at 560px; the row stays highlighted; the table stays
   scrollable; another row swaps the content. Doesn't dim the page (use a Dialog
   when a decision is required).
+- The drawer is the record's URL: the list is the route's layout, so a refresh
+  shows the list with the drawer open. Close (chevron, Esc, browser Back)
+  returns to the list.
 - Top bar at 40px (12px on phones): double-chevron close first (tooltip names
-  action and shortcut; Esc closes), then expand ("Open as full page"); the
-  record's actions (Edit user) on the right.
-- Full page: the same record surface (top bar, 24/32 name, tabs, footer) in a
-  column about 760px wide, centred in the content area; no back pill. Close
-  returns to the list (tooltip names it), and collapse ("Collapse to drawer")
-  returns to the list with the drawer open on the record. Unsaved edits ask
-  before either. Below `sm` the two look the same: close and actions only, no
-  expand or collapse.
+  action and shortcut); the record's actions on the right (Edit user, Edit
+  event).
+- Users open only in the drawer: no full page, no expand. An event's "Edit
+  event" opens its builder, a full page that keeps the portal's page width and
+  margins and wears the same top bar in place of a back pill: close returns to
+  the list (tooltip names it), collapse ("Collapse to drawer") to the list with
+  the event's drawer open. The builder's unsaved-changes guard asks before
+  either. Below `sm` the drawer fills the screen and the page shows close only.
 - Viewing: label/value text rows, not disabled inputs. Editing: fields with a
   pinned Cancel / Save changes footer; closing with unsaved changes asks first.
 - Profile header: name in 24/32 with verified icon and pronouns. Interests are

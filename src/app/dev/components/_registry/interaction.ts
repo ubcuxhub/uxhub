@@ -198,9 +198,9 @@ export const interactionEntries: readonly RegistryEntry[] = [
     category: "Overlays",
     tier: "composite",
     description:
-      "One record (a user, an event) at its own URL: a side peek drawer over its list when opened from the app, the same surface as a centred page on refresh or expand. Feature code fills RecordView once; RecordFrame picks the container.",
+      "One record (a user, an event) at its own URL: a side peek drawer over its list, which is the route's layout, so a refresh keeps both. Feature code fills RecordView; the list layout renders RecordFrame. An event's builder is a page with the drawer's top bar (RecordPageTopBar).",
     importPath: "@/components/shared/RecordDrawer",
-    importNames: ["RecordFrame", "RecordView", "RecordSection", "RecordField"],
+    importNames: ["RecordFrame", "RecordView", "RecordSection", "RecordField", "RecordPageTopBar"],
     source: "src/components/shared/RecordDrawer.tsx",
     spec: "§3.15",
     layout: "page",

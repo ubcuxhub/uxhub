@@ -42,11 +42,6 @@ vi.mock("@/features/admin/components/AdminEventRecord", () => ({
     return null;
   },
 }));
-vi.mock("@/features/admin/components/LoadAsDocument", () => ({
-  LoadAsDocument: function LoadAsDocument() {
-    return null;
-  },
-}));
 vi.mock("@/components/shared/RecordDrawer", () => ({
   RecordNotFound: function RecordNotFound() {
     return null;
@@ -61,8 +56,8 @@ function event(overrides: Partial<EventRow> = {}) {
   return { id: EVENT_ID, max_capacity: 40, ...overrides } as EventRow;
 }
 
-async function route(eventParam: string, mode: "intercepted" | "canonical") {
-  const element = await AdminEventRecordRoute({ eventParam, mode });
+async function route(eventParam: string) {
+  const element = await AdminEventRecordRoute({ eventParam });
   expect(isValidElement(element)).toBe(true);
   return element as ReactElement<Record<string, unknown>> & { type: { name: string } };
 }
@@ -85,25 +80,22 @@ beforeEach(() => {
 });
 
 describe("AdminEventRecordRoute", () => {
-  it.each(["intercepted", "canonical"] as const)(
-    "guards before fetching, then renders the record (%s)",
-    async (mode) => {
-      const element = await route(EVENT_ID, mode);
+  it("guards before fetching, then renders the record", async () => {
+    const element = await route(EVENT_ID);
 
-      expect(calls).toEqual(["guard", "fetch"]);
-      expect(element.type.name).toBe("AdminEventRecord");
-      expect(element.props).toMatchObject({
-        event: { id: EVENT_ID },
-        seats: { tickets: 12, seatsLeft: 27 },
-        applications: counts,
-      });
-    }
-  );
+    expect(calls).toEqual(["guard", "fetch"]);
+    expect(element.type.name).toBe("AdminEventRecord");
+    expect(element.props).toMatchObject({
+      event: { id: EVENT_ID },
+      seats: { tickets: 12, seatsLeft: 27 },
+      applications: counts,
+    });
+  });
 
   it("stops at the guard for someone who isn't an admin", async () => {
     mocks.requireAdmin.mockRejectedValue(new Error("NEXT_REDIRECT /401"));
 
-    await expect(AdminEventRecordRoute({ eventParam: EVENT_ID, mode: "intercepted" })).rejects.toThrow("/401");
+    await expect(AdminEventRecordRoute({ eventParam: EVENT_ID })).rejects.toThrow("/401");
     expect(mocks.fetchEventById).not.toHaveBeenCalled();
     expect(mocks.fetchEventBySlug).not.toHaveBeenCalled();
   });
@@ -111,37 +103,28 @@ describe("AdminEventRecordRoute", () => {
   it("falls back to the capacity when the seat count has no row", async () => {
     mocks.fetchEventSeatCounts.mockResolvedValue(new Map());
 
-    const element = await route(EVENT_ID, "canonical");
+    const element = await route(EVENT_ID);
 
     expect(element.props.seats).toEqual({ tickets: 0, seatsLeft: 40 });
   });
 
-  it("404s on the page and shows not found in the drawer for a missing event", async () => {
+  it("shows not found in the drawer for a missing event", async () => {
     mocks.fetchEventById.mockResolvedValue(null);
 
-    await expect(route(EVENT_ID, "canonical")).rejects.toThrow("NEXT_NOT_FOUND");
-    expect((await route(EVENT_ID, "intercepted")).type).toBe(RecordNotFound);
+    expect((await route(EVENT_ID)).type).toBe(RecordNotFound);
+    expect(mocks.notFound).not.toHaveBeenCalled();
   });
 
   it("handles an unknown slug the same way, without a uuid query", async () => {
-    await expect(route("nope", "canonical")).rejects.toThrow("NEXT_NOT_FOUND");
-    expect((await route("nope", "intercepted")).type).toBe(RecordNotFound);
+    expect((await route("nope")).type).toBe(RecordNotFound);
     expect(mocks.fetchEventById).not.toHaveBeenCalled();
   });
 
-  it.each(["intercepted", "canonical"] as const)("redirects a slug to the id (%s)", async (mode) => {
+  it("redirects a slug to the id", async () => {
     mocks.fetchEventBySlug.mockResolvedValue({ id: EVENT_ID });
 
-    await expect(AdminEventRecordRoute({ eventParam: "portfolio-night", mode })).rejects.toThrow(
+    await expect(AdminEventRecordRoute({ eventParam: "portfolio-night" })).rejects.toThrow(
       `NEXT_REDIRECT /admin/events/${EVENT_ID}`
     );
-  });
-
-  it("loads create-new as its own page when a soft navigation reaches the drawer", async () => {
-    const element = await route("create-new", "intercepted");
-
-    expect(element.type.name).toBe("LoadAsDocument");
-    expect(element.props.href).toBe("/admin/events/create-new");
-    expect(mocks.fetchEventBySlug).not.toHaveBeenCalled();
   });
 });

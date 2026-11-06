@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import { notFound } from "next/navigation";
 
 import { RecordNotFound } from "@/components/shared/RecordDrawer";
 import { Spinner } from "@/components/ui/spinner";
@@ -18,19 +17,14 @@ import { AdminUserRecord } from "./AdminUserRecord";
 import { UserTransactionList } from "./UserTransactionList";
 
 /**
- * One user's record, for both `/admin/users/[userId]` routes: the drawer
- * opened from the list (`intercepted`) and the full page (`canonical`).
+ * One user's record, for `/admin/users/[userId]`: the content of the drawer
+ * the users layout opens over the list.
  *
- * Guards before it fetches: the intercepted route renders in `@flow`, outside
- * the admin layout and its guard.
+ * Guards before it fetches, although the admin layout already has: layouts
+ * and pages render in parallel, so the layout's guard doesn't stop this
+ * page's queries from starting.
  */
-export async function AdminUserRecordRoute({
-  userId,
-  mode,
-}: {
-  userId: string;
-  mode: "intercepted" | "canonical";
-}) {
+export async function AdminUserRecordRoute({ userId }: { userId: string }) {
   const currentUser = await requireAdmin();
   const supabase = await createClient();
   const [result, membershipTypes] = await Promise.all([
@@ -38,10 +32,7 @@ export async function AdminUserRecordRoute({
     fetchMembershipTypeOptions(supabase),
   ]);
 
-  if (!result) {
-    if (mode === "canonical") notFound();
-    return <RecordNotFound noun="user" />;
-  }
+  if (!result) return <RecordNotFound noun="user" />;
 
   const record = toUserRecord(result.row);
   return (

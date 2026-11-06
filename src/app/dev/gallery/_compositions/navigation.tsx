@@ -401,35 +401,27 @@ function EventRecordPeek() {
       >
         <ActionRow icon={<CalendarDays aria-hidden />}>Open event overview</ActionRow>
       </Button>
-      {session > 0 ? (
-        <RecordFrame
+      <RecordFrame listHref="/dev/gallery" open={open} onClose={() => setOpen(false)}>
+        <RecordView
           key={session}
-          mode="intercepted"
-          listHref="/dev/gallery"
-          listLabel="Back to Gallery"
-          onClose={() => setOpen(false)}
-        >
-          <RecordView
-            recordHref="/dev/components/record-drawer?open=page"
-            title="UXathon 2027"
-            subtitle="Saturday, January 16, 2027 · 9:00 AM"
-            status={<StatusBadge status="registration_open" />}
-            details={
-              <>
-                <RecordSection title="Venue">
-                  <RecordField label="Location" value="AMS Nest, Room 2306" />
-                  <RecordField label="Capacity" value="150" />
-                </RecordSection>
-                <RecordSection title="Tickets">
-                  <RecordField label="Members" value="Free" />
-                  <RecordField label="Non-members" value="$10.00" />
-                  <RecordField label="Applications" value="Required" />
-                </RecordSection>
-              </>
-            }
-          />
-        </RecordFrame>
-      ) : null}
+          title="UXathon 2027"
+          subtitle="Saturday, January 16, 2027 · 9:00 AM"
+          status={<StatusBadge status="registration_open" />}
+          details={
+            <>
+              <RecordSection title="Venue">
+                <RecordField label="Location" value="AMS Nest, Room 2306" />
+                <RecordField label="Capacity" value="150" />
+              </RecordSection>
+              <RecordSection title="Tickets">
+                <RecordField label="Members" value="Free" />
+                <RecordField label="Non-members" value="$10.00" />
+                <RecordField label="Applications" value="Required" />
+              </RecordSection>
+            </>
+          }
+        />
+      </RecordFrame>
     </>
   );
 }

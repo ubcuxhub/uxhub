@@ -1,5 +1,8 @@
+import Link from "next/link";
+
 import { Button } from "@/components/ui/button";
 import { PageContainer } from "@/components/shared/PageContainer";
+import { RecordFrame } from "@/components/shared/RecordDrawer";
 import {
   AdminEventsTable,
   type AdminEventTableRow,
@@ -10,16 +13,18 @@ import { createClient } from "@/lib/supabase/server";
 import { fetchEvents } from "@/lib/supabase-helpers/events";
 import { fetchEventSeatCounts } from "@/lib/supabase-helpers/event-tickets";
 
-/*
- * A plain link on purpose: a soft navigation to `/admin/events/create-new`
- * matches the record drawer's intercepted `[event]` route
- * (`@flow/(.)admin/events/[event]`) before the static page, so it would open a
- * drawer over this list instead of the builder. A document load is never
- * intercepted.
- */
 const CREATE_EVENT_HREF = "/admin/events/create-new";
 
-export default async function AdminEventsPage() {
+/**
+ * Manage events. A layout, so the list stays mounted while an event's
+ * overview (`[event]/page.tsx`) opens in a drawer over it and while events are
+ * swapped; a refresh of an event's URL shows the list with its drawer too.
+ *
+ * In the `(browse)` group so it wraps the overview but not the pages beside
+ * it (`[event]/edit`, `check-in`, `review-applications`, `create-new`), which
+ * are full pages.
+ */
+export default async function AdminEventsLayout({ children }: { children: React.ReactNode }) {
   await requireAdmin();
   const supabase = await createClient();
   const events = await fetchEvents(supabase, {
@@ -52,7 +57,7 @@ export default async function AdminEventsPage() {
           </p>
         </div>
         <Button asChild>
-          <a href={CREATE_EVENT_HREF}>Create Event</a>
+          <Link href={CREATE_EVENT_HREF}>Create Event</Link>
         </Button>
       </header>
 
@@ -64,12 +69,13 @@ export default async function AdminEventsPage() {
             your first event and it will show up here.
           </p>
           <Button asChild variant="outline">
-            <a href={CREATE_EVENT_HREF}>Create your first event</a>
+            <Link href={CREATE_EVENT_HREF}>Create your first event</Link>
           </Button>
         </div>
       ) : (
         <AdminEventsTable rows={rows} />
       )}
+      <RecordFrame listHref="/admin/events">{children}</RecordFrame>
     </PageContainer>
   );
 }

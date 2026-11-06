@@ -15,8 +15,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatMembershipTypeName } from "@/features/memberships/lib/display";
+import { useUser } from "@/lib/auth/user-context";
 import { formatEventDate } from "@/lib/date";
-import { loadDocument } from "@/lib/load-document";
 import type { RoleAccess, UserInfoRow } from "@/lib/supabase/models";
 import { formatUserName } from "@/lib/user-name";
 
@@ -55,7 +55,7 @@ interface AdminUserRecordProps {
   membershipTypes: MembershipTypeOption[];
   /** Managers edit; admins only look. */
   canManage: boolean;
-  /** The signed-in admin's `user_info.id`: changing their own role reloads the page. */
+  /** The signed-in admin's `user_info.id`: changing their own role also refreshes the signed-in user. */
   currentUserId: string;
   /** Recent transactions, streamed in by the route. */
   transactions: ReactNode;
@@ -74,7 +74,7 @@ function roleLabel(role: RoleAccess) {
 }
 
 /**
- * One user, in the drawer beside Manage users or as its own page. Managers
+ * One user, in the drawer over Manage users. Managers
  * edit everything in one draft and save it together; the role changes last,
  * after a confirmation, so a manager editing their own role keeps access
  * until the rest has saved.
@@ -88,6 +88,7 @@ export function AdminUserRecord({
   transactions,
 }: AdminUserRecordProps) {
   const router = useRouter();
+  const { refreshUser } = useUser();
   const ids = useId();
   const id = (name: string) => `${ids}-${name}`;
 
@@ -184,12 +185,9 @@ export function AdminUserRecord({
       }
       setDraft(null);
       setPendingRole(null);
-      if (roleChanged && updated.id === currentUserId) {
-        // The drawer reads the root UserProvider, not the one the sidebar
-        // reads; only a fresh document shows the new role everywhere.
-        loadDocument(window.location.href);
-        return;
-      }
+      // Your own role: the sidebar reads it from the signed-in user, which the
+      // refresh below doesn't reload.
+      if (roleChanged && updated.id === currentUserId) await refreshUser();
       if (savedAny) router.refresh();
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : "Unable to save changes. Try again.";
@@ -243,7 +241,6 @@ export function AdminUserRecord({
   return (
     <>
       <RecordView
-        recordHref={`/admin/users/${user.id}`}
         title={name}
         titleAdornment={
           <>
@@ -393,7 +390,7 @@ export function AdminUserRecord({
                 label="Role"
                 value={roleLabel(user.role_access)}
                 htmlFor={id("role")}
-                description={editing && user.id === currentUserId ? "This is your account. Changing your role reloads the page." : undefined}
+                description={editing && user.id === currentUserId ? "This is your account. Your access changes as soon as you save." : undefined}
               >
                 {draft ? (
                   <Select

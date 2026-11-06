@@ -20,7 +20,6 @@ vi.mock("next/link", () => ({
     <a href={href} {...props}>{children}</a>
   ),
 }));
-vi.mock("@/lib/load-document", () => ({ loadDocument: vi.fn() }));
 vi.mock("../event-overview-actions", () => ({ updateEventScheduleAction }));
 
 function event(overrides: Partial<EventRow> = {}): EventRow {
@@ -60,7 +59,7 @@ const counts = { submitted: 3, accepted: 1, rejected: 0, waitlisted: 0, total: 4
 
 function renderRecord(props: Partial<AdminEventRecordProps> = {}) {
   return render(
-    <RecordFrame mode="canonical" listHref="/admin/events" listLabel="Back to Manage Events">
+    <RecordFrame listHref="/admin/events">
       <AdminEventRecord
         event={event()}
         seats={{ tickets: 10, seatsLeft: 30 }}
@@ -86,7 +85,7 @@ describe("AdminEventRecord overview", () => {
   it("shows the event, its state and who's coming", () => {
     renderRecord();
 
-    expect(screen.getByRole("heading", { level: 1, name: "Portfolio Night" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Portfolio Night" })).toBeTruthy();
     expect(screen.getByText("Thu, Nov 19 7:00 PM–9:00 PM")).toBeTruthy();
     expect(screen.getAllByText("Active").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Registration open").length).toBeGreaterThan(0);

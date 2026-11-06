@@ -29,8 +29,9 @@ interface BaseProps<T> {
 }
 
 /**
- * Rows are links to each record's URL. Each record opens in a drawer over
- * this list (an intercepted route) or as its own page in a new tab.
+ * Rows are links to each record's URL, a child route of the list that opens
+ * in a drawer over it (`RecordFrame` in the list's layout); a new-tab click
+ * opens the list with that record's drawer.
  */
 interface AdminDirectoryTableProps<T> extends BaseProps<T> {
   getRowHref: (row: T) => string;

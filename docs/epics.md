@@ -73,13 +73,13 @@ src/
 ├── app/
 │   ├── (app)/(shell)/admin/
 │   │   ├── page.tsx                   dashboard
-│   │   ├── events/                    list, edit, create-new
-│   │   ├── users/ (+ [+] [userId]/)
+│   │   ├── events/(browse)/           list layout + [event]/ overview drawer
+│   │   ├── events/[event]/edit/, create-new/   event builder pages
+│   │   ├── users/                     list layout + [userId]/ record drawer (+ History tab)
 │   │   └── settings/                  Club Settings
-│   ├── @flow/[+] (.)admin/            edit-event and edit-user drawers (+ History tab)
 │   └── api/upload-event-image/, [+] export/   CSV export
 ├── features/admin/                    except Application* / ReviewApplications* / CheckIn*
-├── components/shared/RecordDrawer     drawer/page shell for user and event records
+├── components/shared/RecordDrawer     drawer shell for user and event records
 └── lib/supabase-helpers/
     └── users, app-settings, admin-server
 ```

@@ -14,12 +14,12 @@ const mocks = vi.hoisted(() => ({
   saveDetails: vi.fn(),
   updateRole: vi.fn(),
   router: { refresh: vi.fn(), push: vi.fn(), replace: vi.fn(), back: vi.fn() },
-  loadDocument: vi.fn(),
+  refreshUser: vi.fn(async () => {}),
 }));
 vi.mock("../user-profile-actions", () => ({ setStudentVerificationAction: mocks.verifyStudent, removeUserProfilePhotoAction: mocks.removePhoto }));
 vi.mock("../actions", () => ({ saveManagerUserDetailsAction: mocks.saveDetails, updateUserRoleAction: mocks.updateRole }));
 vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({ storage: { from: () => ({ getPublicUrl: (path: string) => ({ data: { publicUrl: `http://localhost/${path}` } }) }) } }) }));
-vi.mock("@/lib/load-document", () => ({ loadDocument: mocks.loadDocument }));
+vi.mock("@/lib/auth/user-context", () => ({ useUser: () => ({ refreshUser: mocks.refreshUser }) }));
 vi.mock("next/navigation", () => ({ useRouter: () => mocks.router, usePathname: () => "/admin/users/dora" }));
 vi.mock("next/link", () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode } & React.ComponentProps<"a">) => (
@@ -92,7 +92,7 @@ function renderRecord(props: Partial<Props> = {}) {
     ...props,
   };
   const view = render(
-    <RecordFrame mode="canonical" listHref="/admin/users" listLabel="Back to Manage Users">
+    <RecordFrame listHref="/admin/users">
       <AdminUserRecord {...all} />
     </RecordFrame>
   );
@@ -100,7 +100,7 @@ function renderRecord(props: Partial<Props> = {}) {
     ...view,
     rerenderRecord: (next: Partial<Props>) =>
       view.rerender(
-        <RecordFrame mode="canonical" listHref="/admin/users" listLabel="Back to Manage Users">
+        <RecordFrame listHref="/admin/users">
           <AdminUserRecord {...all} {...next} />
         </RecordFrame>
       ),
@@ -130,7 +130,7 @@ async function saveAndFinish() {
 describe("AdminUserRecord: viewing", () => {
   it("shows the user's identity, details and transactions without editing for an admin", () => {
     renderRecord({ canManage: false });
-    expect(screen.getByRole("heading", { level: 1, name: "Dora Hu" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Dora Hu" })).toBeTruthy();
     expect(screen.getByText("She/Her")).toBeTruthy();
     expect(screen.getByText("User since July 21, 2026")).toBeTruthy();
     expect(screen.getByText("Innovator", { selector: "[data-slot=badge]" })).toBeTruthy();
@@ -160,9 +160,9 @@ describe("AdminUserRecord: viewing", () => {
     expect(shown("Verification")).toContain("by a former or unavailable manager");
   });
 
-  it("renders the same record in the drawer, titled by an h2", async () => {
+  it("renders in the drawer, titled by an h2, with no full page to open", async () => {
     render(
-      <RecordFrame mode="intercepted" listHref="/admin/users" listLabel="Back to Manage Users">
+      <RecordFrame listHref="/admin/users">
         <AdminUserRecord record={user()} verifierName={null} membershipTypes={membershipTypes} canManage currentUserId="me" transactions={null} />
       </RecordFrame>
     );
@@ -170,13 +170,13 @@ describe("AdminUserRecord: viewing", () => {
     expect(within(drawer).getByRole("heading", { level: 2, name: "Dora Hu" })).toBeTruthy();
     expect(within(drawer).getByRole("heading", { level: 3, name: "Contact" })).toBeTruthy();
     expect(within(drawer).getByRole("button", { name: "Edit user" })).toBeTruthy();
-    expect(within(drawer).getByRole("link", { name: /Open as full page/ }).getAttribute("href")).toBe("/admin/users/dora");
+    expect(within(drawer).queryByRole("link", { name: /Open as full page/ })).toBeNull();
   });
 
   it("adopts a fresh record from the server", () => {
     const { rerenderRecord } = renderRecord();
     rerenderRecord({ record: user({ first_name: "Dorothy" }) });
-    expect(screen.getByRole("heading", { level: 1, name: "Dorothy Hu" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Dorothy Hu" })).toBeTruthy();
   });
 });
 
@@ -211,7 +211,7 @@ describe("AdminUserRecord: editing", () => {
     expect(mocks.verifyStudent).toHaveBeenCalledWith("dora", true);
     expect(mocks.updateRole).not.toHaveBeenCalled();
     expect(mocks.router.refresh).toHaveBeenCalledOnce();
-    expect(screen.getByRole("heading", { level: 1, name: "Dorothy Hu" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Dorothy Hu" })).toBeTruthy();
     expect(shown("Verification")).toBe("Verified · Oct 14, 2026 · by you");
     expect(shown("Birthday")).toBe("Jan 1, 2001");
   });
@@ -293,9 +293,10 @@ describe("AdminUserRecord: editing", () => {
     renderRecord();
     edit();
     fireEvent.change(textbox("First name"), { target: { value: "Unsaved" } });
-    fireEvent.click(screen.getByRole("button", { name: "Close" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close panel (Esc)" }));
     expect(screen.getByRole("dialog", { name: "Discard changes?" })).toBeTruthy();
-    expect(mocks.router.push).not.toHaveBeenCalled();
+    expect(mocks.router.replace).not.toHaveBeenCalled();
+    expect(mocks.router.back).not.toHaveBeenCalled();
   });
 
   it("disables the form while saving and shows the saved values after", async () => {
@@ -310,7 +311,7 @@ describe("AdminUserRecord: editing", () => {
     expect((screen.getByRole("button", { name: "Cancel" }) as HTMLButtonElement).disabled).toBe(true);
     expect(textbox("First name").disabled).toBe(true);
     await act(async () => { finish(user({ first_name: "Dorothy" })); });
-    expect(screen.getByRole("heading", { level: 1, name: "Dorothy Hu" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Dorothy Hu" })).toBeTruthy();
     expect(screen.getByRole("button", { name: "Edit user" })).toBeTruthy();
   });
 
@@ -369,7 +370,7 @@ describe("AdminUserRecord: role changes", () => {
     expect(mocks.updateRole).toHaveBeenCalledWith("iris", "manager");
     expect(mocks.saveDetails.mock.invocationCallOrder[0]).toBeLessThan(mocks.updateRole.mock.invocationCallOrder[0]);
     expect(mocks.router.refresh).toHaveBeenCalledOnce();
-    expect(mocks.loadDocument).not.toHaveBeenCalled();
+    expect(mocks.refreshUser).not.toHaveBeenCalled();
     expect(shown("Role")).toBe("Manager");
   });
 
@@ -384,21 +385,22 @@ describe("AdminUserRecord: role changes", () => {
     fireEvent.click(within(confirmation).getByRole("button", { name: "Change role" }));
     await waitFor(() => expect(within(confirmation).getByText(/Some changes were saved\. You can't remove the last manager\./)).toBeTruthy());
     // The confirmation is modal, so the record behind it is hidden from the tree.
-    expect(screen.getByRole("heading", { level: 1, name: "Irene Chan", hidden: true })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Irene Chan", hidden: true })).toBeTruthy();
     fireEvent.click(within(confirmation).getByRole("button", { name: "Cancel" }));
     expect(screen.getByRole("combobox", { name: "Role" }).textContent).toBe("Basic");
   });
 
-  it("reloads the page after a manager changes their own role", async () => {
+  it("refreshes the signed-in user after a manager changes their own role", async () => {
     renderRecord({ currentUserId: "dora" });
     edit();
-    expect(screen.getByText("This is your account. Changing your role reloads the page.")).toBeTruthy();
+    expect(screen.getByText("This is your account. Your access changes as soon as you save.")).toBeTruthy();
     chooseSelect("Role", "Admin");
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
     fireEvent.click(within(screen.getByRole("dialog", { name: "Change role access?" })).getByRole("button", { name: "Change role" }));
-    await waitFor(() => expect(mocks.loadDocument).toHaveBeenCalledWith(window.location.href));
+    await waitFor(() => expect(mocks.router.refresh).toHaveBeenCalledOnce());
     expect(mocks.updateRole).toHaveBeenCalledWith("dora", "admin");
-    expect(mocks.router.refresh).not.toHaveBeenCalled();
+    expect(mocks.refreshUser).toHaveBeenCalledOnce();
+    expect(mocks.refreshUser.mock.invocationCallOrder[0]).toBeLessThan(mocks.router.refresh.mock.invocationCallOrder[0]);
   });
 });
 

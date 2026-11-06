@@ -3,13 +3,18 @@
 import { useId, useState } from "react";
 import { Pencil, ShieldCheck } from "lucide-react";
 
-import { RecordField, RecordFrame, RecordSection, RecordView } from "@/components/shared/RecordDrawer";
+import {
+  RecordField,
+  RecordFrame,
+  RecordPageTopBar,
+  RecordSection,
+  RecordView,
+} from "@/components/shared/RecordDrawer";
 import { TransactionRow } from "@/components/shared/TransactionRow";
 import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { loadDocument } from "@/lib/load-document";
 
 import { Composition } from "@/app/dev/_shell/Specimen";
 import type { SectionProps } from "@/app/dev/_shell/types";
@@ -38,7 +43,7 @@ type Start = "view" | "edit" | "error";
 
 /**
  * What a feature's record component looks like: it owns the draft and the
- * save, and hands RecordView the state. It never asks which mode it is in.
+ * save, and hands RecordView the state.
  */
 function PersonRecord({ person, start, onSaved }: { person: Person; start: Start; onSaved: (person: Person) => void }) {
   const ids = useId();
@@ -74,7 +79,6 @@ function PersonRecord({ person, start, onSaved }: { person: Person; start: Start
 
   return (
     <RecordView
-      recordHref={`${PATH}?open=page`}
       title={person.name}
       titleAdornment={
         <>
@@ -140,15 +144,20 @@ function PersonRecord({ person, start, onSaved }: { person: Person; start: Start
   );
 }
 
-function RecordDrawerDemo({ open: state }: SectionProps) {
+function RecordDrawerDemo({ open }: SectionProps) {
+  // A fresh demo per `?open=` state, as each chip starts from scratch.
+  return <Demo key={open ?? "none"} state={open} />;
+}
+
+function Demo({ state }: { state: string | undefined }) {
   const drawerStart: Start | null =
     state === "drawer" ? "view" : state === "drawer-edit" ? "edit" : state === "drawer-error" ? "error" : null;
   const [people, setPeople] = useState(PEOPLE);
   const [open, setOpen] = useState(Boolean(drawerStart));
   // Stays set after closing, so the drawer slides out with its content.
   const [personIndex, setPersonIndex] = useState(0);
-  // Each opening is a fresh frame, as each soft navigation to a record is.
-  const [session, setSession] = useState(drawerStart ? 1 : 0);
+  // Each opening is a fresh record, as each navigation from the list is.
+  const [session, setSession] = useState(0);
   const [start, setStart] = useState<Start>(drawerStart ?? "view");
 
   const saved = (person: Person) =>
@@ -157,20 +166,18 @@ function RecordDrawerDemo({ open: state }: SectionProps) {
   if (state === "page") {
     return (
       <Composition
-        title="Full page"
-        description="The same surface at the record’s own URL, for a refresh, a shared link or “Open as full page”: the drawer’s top bar, title and tabs in a centred column. Close returns to the list (its tooltip names it); collapse returns to the list with the drawer open on this record. Unsaved edits ask before either. Below sm only close shows, as in the drawer."
+        title="Full page: the event builder"
+        description="Users only ever open in the drawer. An event’s “Edit event” opens its builder, a page of its own at /admin/events/<id>/edit that wears the drawer’s top bar in place of a back pill: close returns to the list, collapse returns to the list with the event’s drawer open. Both are links, so the builder’s unsaved-changes guard asks before either. The builder keeps the portal’s page width and margins. Below sm only close shows. Here close goes to this page and collapse to ?open=drawer."
       >
-        <div className="flex overflow-hidden rounded-xl border border-border-subtle bg-background">
-          <RecordFrame
-            mode="canonical"
-            listHref={PATH}
-            listLabel="Back to Manage Users"
-            // In the app this replaces the page with the list and opens the
-            // record over it; the demo's list and page share a URL.
-            onCollapse={() => loadDocument(`${PATH}?open=drawer`)}
-          >
-            <PersonRecord person={people[0]} start="view" onSaved={saved} />
-          </RecordFrame>
+        <div className="flex flex-col overflow-hidden rounded-xl border border-border-subtle bg-background">
+          <RecordPageTopBar listHref={PATH} listLabel="Back to Manage Events" recordHref={`${PATH}?open=drawer`} />
+          <div className="flex flex-col gap-4 px-5 pb-10 pt-8 sm:px-6 sm:pt-10 lg:px-16">
+            <div>
+              <h2 className="text-subheading">Modify Event</h2>
+              <p className="text-small text-muted-foreground">Update the details for this event.</p>
+            </div>
+            <div className="h-40 rounded-lg border border-dashed border-border" aria-hidden />
+          </div>
         </div>
       </Composition>
     );
@@ -180,7 +187,7 @@ function RecordDrawerDemo({ open: state }: SectionProps) {
     <div className="flex flex-col gap-8">
       <Composition
         title="Manage Users"
-        description="Open a person, then edit their phone number or area of study. Another row swaps the record; Escape and the chevron close it, and the expand icon opens it as a full page. With unsaved edits, closing or following any link on this page (the docs sidebar too) asks first. These rows are buttons; in the app they are links (AdminDirectoryTable), so they ask too."
+        description="Open a person, then edit their phone number or area of study. Another row swaps the record without replaying the slide-in; Escape and the chevron close it. With unsaved edits, closing or following any link on this page (the docs sidebar too) asks first. In the app the list is a route layout and each record a child route, so the drawer is the URL (a refresh shows the list with the drawer open) and rows are links (AdminDirectoryTable); here they are buttons."
       >
         <div className="max-w-2xl rounded-xl border border-border-subtle bg-card p-4">
           <h3 className="mb-3 text-subheading">Members</h3>
@@ -210,11 +217,14 @@ function RecordDrawerDemo({ open: state }: SectionProps) {
         </div>
       </Composition>
 
-      {session > 0 ? (
-        <RecordFrame key={session} mode="intercepted" listHref={PATH} listLabel="Back to Manage Users" onClose={() => setOpen(false)}>
-          <PersonRecord key={people[personIndex].id} person={people[personIndex]} start={start} onSaved={saved} />
-        </RecordFrame>
-      ) : null}
+      <RecordFrame listHref={PATH} open={open} onClose={() => setOpen(false)}>
+        <PersonRecord
+          key={`${session}-${people[personIndex].id}`}
+          person={people[personIndex]}
+          start={start}
+          onSaved={saved}
+        />
+      </RecordFrame>
     </div>
   );
 }
