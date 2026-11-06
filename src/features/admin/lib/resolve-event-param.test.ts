@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { DbClient } from "@/lib/supabase-helpers/types";
-import { resolveAdminEventId } from "./resolve-event-param";
+import { findAdminEventId, resolveAdminEventId } from "./resolve-event-param";
 
 const EVENT_ID = "123e4567-e89b-12d3-a456-426614174000";
 
@@ -61,12 +61,43 @@ describe("resolveAdminEventId", () => {
     );
   });
 
+  it("keeps the builder's /edit suffix on a slug redirect", async () => {
+    mocks.fetchEventBySlug.mockResolvedValue({ id: EVENT_ID });
+
+    await expect(
+      resolveAdminEventId(supabase, "uxathon-2026", "/edit")
+    ).rejects.toThrow(`NEXT_REDIRECT /admin/events/${EVENT_ID}/edit`);
+  });
+
   it("404s when no event has the slug", async () => {
     mocks.fetchEventBySlug.mockResolvedValue(null);
 
     await expect(
       resolveAdminEventId(supabase, "nope", "/check-in")
     ).rejects.toThrow("NEXT_NOT_FOUND");
+    expect(mocks.redirect).not.toHaveBeenCalled();
+  });
+});
+
+describe("findAdminEventId", () => {
+  it("returns a UUID unchanged without querying", async () => {
+    await expect(findAdminEventId(supabase, EVENT_ID)).resolves.toBe(EVENT_ID);
+    expect(mocks.fetchEventBySlug).not.toHaveBeenCalled();
+  });
+
+  it("redirects a matching slug like resolveAdminEventId", async () => {
+    mocks.fetchEventBySlug.mockResolvedValue({ id: EVENT_ID });
+
+    await expect(findAdminEventId(supabase, "uxathon-2026")).rejects.toThrow(
+      `NEXT_REDIRECT /admin/events/${EVENT_ID}`
+    );
+  });
+
+  it("returns null instead of a 404 when no event has the slug", async () => {
+    mocks.fetchEventBySlug.mockResolvedValue(null);
+
+    await expect(findAdminEventId(supabase, "nope")).resolves.toBeNull();
+    expect(mocks.notFound).not.toHaveBeenCalled();
     expect(mocks.redirect).not.toHaveBeenCalled();
   });
 });

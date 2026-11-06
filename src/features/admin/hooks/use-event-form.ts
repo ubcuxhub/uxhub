@@ -7,7 +7,6 @@ import {
   discardUnusedEventImageAction,
   saveAdminEventAction,
 } from "@/features/admin/actions";
-import type { ApplicationQuestionTemplate } from "@/features/events/types";
 import { EVENT_IMAGE_ERRORS } from "@/lib/event-image";
 import type {
   CheckInSessionRow,
@@ -22,11 +21,14 @@ import type {
   CheckInSessionField,
 } from "@/features/admin/types";
 import {
+  checkInDraftsFromRows,
   createFormSnapshot,
   EMPTY_CHECK_IN_SESSION,
+  formStateFromEvent,
   getInitialFormState,
   toApplicationQuestionInputs,
   toCheckInSessionInputs,
+  questionsFromRows,
   validateEventForm,
   withSavedCheckInSessionIds,
   withSavedQuestionIds,
@@ -34,10 +36,7 @@ import {
   type MentorDraft,
   type SponsorDraft,
 } from "../components/event-form/event-form-schema";
-import {
-  datetimeLocalToTimestamptz,
-  timestamptzToDatetimeLocal,
-} from "@/lib/date";
+import { datetimeLocalToTimestamptz } from "@/lib/date";
 import { useApplicationQuestions } from "./use-application-questions";
 import { useEventFormDraft } from "./use-event-form-draft";
 import { useUnsavedChangesGuard } from "./use-unsaved-changes-guard";
@@ -50,50 +49,6 @@ interface UseEventFormOptions {
   initialMentors?: MentorRow[];
   initialSponsors?: SponsorRow[];
   onSuccess?: (id: string) => void;
-}
-
-function formStateFromEvent(event: EventRow): EventFormState {
-  return {
-    name: event.name ?? "",
-    short_description: event.short_description ?? "",
-    description: event.description ?? "",
-    status: event.status,
-    publish_at: timestamptzToDatetimeLocal(event.publish_at),
-    event_type: event.event_type,
-    regular_price: String(event.regular_price ?? ""),
-    member_price: String(event.member_price ?? ""),
-    location_building: event.location_building ?? "",
-    location_room: event.location_room ?? "",
-    location_address_url: event.location_address_url ?? "",
-    starts_at: timestamptzToDatetimeLocal(event.starts_at),
-    ends_at: timestamptzToDatetimeLocal(event.ends_at),
-    max_capacity: String(event.max_capacity ?? ""),
-    image_url: event.image_url ?? "",
-    registration_opens_at: timestamptzToDatetimeLocal(
-      event.registration_opens_at
-    ),
-    registration_closes_at: timestamptzToDatetimeLocal(
-      event.registration_closes_at
-    ),
-    created_at: event.created_at ?? "",
-    mentors_enabled: event.mentors_enabled,
-    sponsors_enabled: event.sponsors_enabled,
-    requires_application: event.requires_application,
-  };
-}
-
-function questionsFromRows(
-  questions: EventApplicationQuestionRow[]
-): ApplicationQuestionTemplate[] {
-  return questions.map((question) => ({
-    id: question.id,
-    question: question.question ?? "",
-    description: question.description ?? "",
-    response: question.response_type,
-    is_required: question.is_required,
-    max_char_limit: question.max_char_limit ?? "",
-    response_options: question.response_options ?? [],
-  }));
 }
 
 export function useEventForm({
@@ -113,12 +68,7 @@ export function useEventForm({
   const startingCheckIns = useMemo(
     () =>
       initialCheckInSessions.length
-        ? initialCheckInSessions.map((session) => ({
-            id: session.id,
-            name: session.name ?? "",
-            start_time: timestamptzToDatetimeLocal(session.start_time),
-            end_time: timestamptzToDatetimeLocal(session.end_time),
-          }))
+        ? checkInDraftsFromRows(initialCheckInSessions)
         : [{ ...EMPTY_CHECK_IN_SESSION }],
     [initialCheckInSessions]
   );

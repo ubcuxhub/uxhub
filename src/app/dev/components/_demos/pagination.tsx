@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 
+import { TableRowCount } from "@/components/shared/TableToolbar";
 import { Pagination } from "@/components/ui/pagination";
 
 import { Specimen, SpecimenGroup } from "@/app/dev/_shell/Specimen";
@@ -26,7 +27,7 @@ function PaginationDemo() {
       <SpecimenGroup
         title="Pagination"
         spec="§3.4, §3.16"
-        description="Sits at the foot of a TableCard. Previous and next are disabled at the ends. For server lists pass getPageHref and they render as links."
+        description="Sits at the foot of a TableCard. Previous and next are disabled at the ends. For server lists pass getPageHref and they render as links. A summary (TableRowCount with the page's range) replaces the range text and announces itself."
       >
         <Specimen label="First page" className="w-96">
           <Pagination
@@ -48,6 +49,26 @@ function PaginationDemo() {
         </Specimen>
         <Specimen label="Interactive" className="w-96">
           <Interactive />
+        </Specimen>
+        <Specimen label="Summary: a row count" className="w-[32rem] max-w-full">
+          <Pagination
+            className="w-full rounded-xl border"
+            page={1}
+            pageSize={25}
+            total={38}
+            onPageChange={() => {}}
+            summary={
+              <TableRowCount
+                count={{
+                  shown: 38,
+                  total: 142,
+                  noun: { one: "user", other: "users" },
+                  range: { from: 1, to: 25 },
+                }}
+                onClearFilters={() => {}}
+              />
+            }
+          />
         </Specimen>
         <Specimen label="One page: both buttons disabled" className="w-96">
           <Pagination

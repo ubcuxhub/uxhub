@@ -1,5 +1,8 @@
 import {
   ResponseType,
+  type CheckInSessionRow,
+  type EventApplicationQuestionRow,
+  type EventRow,
   type EventStatus,
   type EventType,
 } from "@/lib/supabase/models";
@@ -92,6 +95,64 @@ export function getInitialFormState(): EventFormState {
     ...defaultFormState,
     starts_at: timestamptzToDatetimeLocal(new Date().toISOString()),
   };
+}
+
+/** The builder's form state for a stored event. */
+export function formStateFromEvent(event: EventRow): EventFormState {
+  return {
+    name: event.name ?? "",
+    short_description: event.short_description ?? "",
+    description: event.description ?? "",
+    status: event.status,
+    publish_at: timestamptzToDatetimeLocal(event.publish_at),
+    event_type: event.event_type,
+    regular_price: String(event.regular_price ?? ""),
+    member_price: String(event.member_price ?? ""),
+    location_building: event.location_building ?? "",
+    location_room: event.location_room ?? "",
+    location_address_url: event.location_address_url ?? "",
+    starts_at: timestamptzToDatetimeLocal(event.starts_at),
+    ends_at: timestamptzToDatetimeLocal(event.ends_at),
+    max_capacity: String(event.max_capacity ?? ""),
+    image_url: event.image_url ?? "",
+    registration_opens_at: timestamptzToDatetimeLocal(
+      event.registration_opens_at
+    ),
+    registration_closes_at: timestamptzToDatetimeLocal(
+      event.registration_closes_at
+    ),
+    created_at: event.created_at ?? "",
+    mentors_enabled: event.mentors_enabled,
+    sponsors_enabled: event.sponsors_enabled,
+    requires_application: event.requires_application,
+  };
+}
+
+/** The builder's application question drafts for stored questions. */
+export function questionsFromRows(
+  questions: EventApplicationQuestionRow[]
+): ApplicationQuestionTemplate[] {
+  return questions.map((question) => ({
+    id: question.id,
+    question: question.question ?? "",
+    description: question.description ?? "",
+    response: question.response_type,
+    is_required: question.is_required,
+    max_char_limit: question.max_char_limit ?? "",
+    response_options: question.response_options ?? [],
+  }));
+}
+
+/** The builder's check-in session drafts for stored sessions. */
+export function checkInDraftsFromRows(
+  sessions: (Pick<CheckInSessionRow, "name" | "start_time" | "end_time"> & { id?: string })[]
+): CheckInSessionDraft[] {
+  return sessions.map((session) => ({
+    id: session.id,
+    name: session.name ?? "",
+    start_time: timestamptzToDatetimeLocal(session.start_time),
+    end_time: timestamptzToDatetimeLocal(session.end_time),
+  }));
 }
 
 export function isFreePricing(regularPrice: string, memberPrice: string) {

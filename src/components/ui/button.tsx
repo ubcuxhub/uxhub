@@ -63,14 +63,14 @@ const buttonVariants = cva(
         link: "rounded-sm text-info-foreground underline-offset-4 hover:underline disabled:not-aria-busy:text-disabled-foreground aria-disabled:text-disabled-foreground",
       },
       size: {
-        md: "h-11 gap-2 px-4 text-button sm:h-10 pointer-coarse:after:inset-0 pointer-coarse:sm:after:-inset-y-[3px] [&_svg]:size-4",
+        md: "h-11 gap-2 px-4 text-button sm:h-10 pointer-coarse:after:inset-0 pointer-coarse:sm:after:-inset-y-[3px] [&_svg:not([class*='size-'])]:size-4",
         /** @deprecated Use `md`. */
         default:
-          "h-11 gap-2 px-4 text-button sm:h-10 pointer-coarse:after:inset-0 pointer-coarse:sm:after:-inset-y-[3px] [&_svg]:size-4",
-        sm: "h-8 gap-1.5 px-3 text-button-small pointer-coarse:after:-inset-[7px] [&_svg]:size-3.5",
-        icon: "size-8 p-0 pointer-coarse:after:-inset-[7px] [&_svg]:size-4",
+          "h-11 gap-2 px-4 text-button sm:h-10 pointer-coarse:after:inset-0 pointer-coarse:sm:after:-inset-y-[3px] [&_svg:not([class*='size-'])]:size-4",
+        sm: "h-8 gap-1.5 px-3 text-button-small pointer-coarse:after:-inset-[7px] [&_svg:not([class*='size-'])]:size-4",
+        icon: "size-8 p-0 pointer-coarse:after:-inset-[7px] [&_svg:not([class*='size-'])]:size-4",
         "icon-sm":
-          "size-7 p-0 pointer-coarse:after:-inset-[9px] [&_svg]:size-3.5",
+          "size-7 p-0 pointer-coarse:after:-inset-[9px] [&_svg:not([class*='size-'])]:size-4",
       },
     },
     compoundVariants: [
