@@ -53,7 +53,9 @@ Deletion is scoped by ownership, not by table:
 | --------------------------------------------------------- | --------------------------------------------------- |
 | Events and membership tiers matched by slug                | Auth users and profiles created by hand              |
 | Mentors, sponsors, check-in sessions, application questions| Purchases, tickets and applications owned by any other account |
+| People sections, links, meeting details and agenda days of seed events | Teams owned by any other account                   |
 | Purchases, tickets and applications owned by the fixture accounts | Covers uploaded through the admin UI (`covers/`)     |
+| Teams the fixture accounts own or joined, other than `data/teams.ts`'s |                                               |
 | Cover images under the `seed/covers/` storage prefix       |                                                      |
 
 An extra event survives if a non-fixture purchase points at it —
@@ -69,6 +71,31 @@ registration open, and left unbought by every fixture account so event checkout
 can be run repeatedly. A test fails if a fixture purchase ever lands on one.
 The rest cover past events, still active so members keep their history, a
 closed registration window, a not-yet-open one, and a draft.
+
+Beyond dates and prices, the fixtures fill in the event page:
+
+| Event | Dates | Also seeds |
+| --- | --- | --- |
+| `design-sprint-past`, `design-sprint-upcoming` | Monday to the next week's Friday | 6-day agenda, Mentors, teams of 3–4, Slack and participant package links |
+| `uxathon-past`, `uxathon-upcoming` | Saturday to Sunday | 2-day agenda, Mentors, teams of 2–4, links (the past one has a recap). The upcoming one is featured |
+| `thinkbox-office-tour`, `portfolio-review-night`, `student-panel` | One day | A one-day agenda |
+| `mentorship-program` | Ongoing | Teams open for two weeks, with going-only links |
+| `industry-talk-ai-and-ux`, `student-panel` | — | Online, with meeting details |
+| `industry-talk-design-systems` | — | Hybrid, with meeting details the three deep fixtures can see |
+
+People sections are Mentors only until the builder reads other sections: it
+saves every person on an event back as a mentor.
+
+Agendas live in `event_agenda_days` and `event_agenda_items`, not the legacy
+`events.agenda` column, which the fixtures still fill for the public page.
+
+`data/teams.ts` — teams, made through `create_team` and `join_team` after the
+accounts' tickets exist, so they follow the app's rules. The purchasable events
+can't hold fixture tickets, so the one team lives on `mentorship-program`:
+`admin-explorer@example.com` owns Pixel Pushers with `no-membership@example.com`,
+and `student-innovator@example.com` holds a ticket with no team. A run keeps the
+team's invite code and undoes team changes made through the app. Local only:
+`--target=prod` writes no accounts, so no teams.
 
 `data/users.ts` — eleven local accounts. **Password is `123456` for all of them.**
 Ten cover every membership state crossed with the basic and admin roles:

@@ -7,7 +7,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Label } from "@/components/ui/label";
 import { SearchField } from "@/components/ui/search-field";
 import { Switch } from "@/components/ui/switch";
-import type { Status } from "@/components/ui/status-badge";
+import type { EventBadge } from "@/features/events/types";
 import type { EventRow } from "@/lib/supabase/models";
 import { groupEventsByMonth, normalizeString } from "@/features/events/lib/event-timeline";
 import { EventTimelineRail } from "./EventTimelineRail";
@@ -16,16 +16,16 @@ interface EventTimelineProps {
   upcomingEvents: EventRow[];
   pastEvents: EventRow[];
   /**
-   * The badge for an event's card, e.g. the member's own status ("going",
-   * "waitlisted"). Defaults to "past" for past events and no badge otherwise.
+   * Each event's badge, keyed by event id; build it with `loadEventBadges`.
+   * An event without one shows "past" in the past list and no badge otherwise.
    */
-  statusFor?: (event: EventRow) => Status | null;
+  badges?: Record<string, EventBadge>;
 }
 
 export function EventTimeline({
   upcomingEvents,
   pastEvents,
-  statusFor,
+  badges = {},
 }: EventTimelineProps) {
   const showPastId = useId();
   const searchRef = useRef<HTMLInputElement>(null);
@@ -102,10 +102,8 @@ export function EventTimeline({
         <EventTimelineRail
           className="mb-8"
           groups={filteredGroups}
-          // Without a `statusFor`, only "past" is known: the member's own
-          // status (going, waitlisted, ...) isn't loaded here.
           statusFor={(event) =>
-            statusFor ? statusFor(event) : showPastEvents ? "past" : null
+            badges[event.id] ?? (showPastEvents ? "past" : null)
           }
         />
       )}

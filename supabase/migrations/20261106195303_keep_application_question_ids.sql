@@ -329,6 +329,7 @@ set search_path = ''
 as $$
 declare
   v_event_id uuid;
+  v_mentor_section_id uuid;
   v_columns text;
   v_image_changed boolean;
   v_questions jsonb;
@@ -424,18 +425,40 @@ begin
     raise exception 'A selected mentor was not found.';
   end if;
 
-  insert into public.event_mentors (event_id, mentor_id, sort_order)
+  -- This form knows only mentors, so p_mentors is the event's Mentors
+  -- section, made on first use and placed after any other. Sections it
+  -- doesn't know, like Judges, are left alone.
+  select section.id
+  into v_mentor_section_id
+  from public.event_people_sections section
+  where section.event_id = v_event_id
+    and lower(btrim(section.title)) = 'mentors';
+
+  if v_mentor_section_id is null
+    and jsonb_array_length(coalesce(p_mentors, '[]'::jsonb)) > 0 then
+    insert into public.event_people_sections (event_id, title, sort_order)
+    select
+      v_event_id,
+      'Mentors',
+      coalesce(max(section.sort_order) + 1, 0)
+    from public.event_people_sections section
+    where section.event_id = v_event_id
+    returning id into v_mentor_section_id;
+  end if;
+
+  insert into public.event_mentors (event_id, section_id, mentor_id, sort_order)
   select
     v_event_id,
+    v_mentor_section_id,
     selected.mentor_id::uuid,
     selected.ordinality - 1
   from jsonb_array_elements_text(coalesce(p_mentors, '[]'::jsonb))
     with ordinality as selected(mentor_id, ordinality)
-  on conflict (event_id, mentor_id)
+  on conflict (section_id, mentor_id)
   do update set sort_order = excluded.sort_order;
 
   delete from public.event_mentors event_mentor
-  where event_mentor.event_id = v_event_id
+  where event_mentor.section_id = v_mentor_section_id
     and not exists (
       select 1
       from jsonb_array_elements_text(coalesce(p_mentors, '[]'::jsonb))

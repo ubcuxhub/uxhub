@@ -21,7 +21,16 @@ export type SponsorRow = Tables<"sponsors">;
 export type SponsorInsert = TablesInsert<"sponsors">;
 export type SponsorUpdate = TablesUpdate<"sponsors">;
 export type EventMentorInsert = TablesInsert<"event_mentors">;
+export type EventPeopleSectionRow = Tables<"event_people_sections">;
+export type EventPeopleSectionInsert = TablesInsert<"event_people_sections">;
 export type EventSponsorInsert = TablesInsert<"event_sponsors">;
+
+export type TeamRow = Tables<"teams">;
+export type TeamMemberRow = Tables<"team_members">;
+
+export type EventLinkRow = Tables<"event_links">;
+export type EventLinkInsert = TablesInsert<"event_links">;
+export type EventPrivateDetailsRow = Tables<"event_private_details">;
 
 export type UserInfoRow = Tables<"user_info">;
 export type UserInfoInsert = TablesInsert<"user_info">;
@@ -74,6 +83,9 @@ export type SubmittedApplicationStatus = Exclude<EventApplicationStatus, "draft"
 export type SubmittedApplicationRow = EventApplicationRow & {
   status: SubmittedApplicationStatus;
 };
+export type EventLocationType = Enums<"event_location_type">;
+export type EventLinkType = Enums<"event_link_type">;
+export type EventLinkVisibility = Enums<"event_link_visibility">;
 export type ResponseType = Enums<"response_type">;
 export type UserType = Enums<"user_type">;
 export type RoleAccess = Enums<"role_access_enum">;
