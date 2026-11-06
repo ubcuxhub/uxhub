@@ -1,8 +1,9 @@
 "use client";
 
 import { EventCard, EventCardDates } from "@/components/shared/EventCard";
-import { STATUSES, type Status } from "@/components/ui/status-badge";
+import { STATUSES } from "@/components/ui/status-badge";
 import { EventTimeline } from "@/features/events/components/EventTimeline";
+import type { EventBadge } from "@/features/events/types";
 import { MarketingEventCard } from "@/features/marketing/components/MarketingEventCard";
 import {
   datetimeLocalToTimestamptz,
@@ -102,10 +103,10 @@ const PAST = [
   ),
 ];
 
-const MEMBER_STATUS: Record<string, Status> = {
-  uxathon: "registration_open",
-  "ux-conference": "waitlisted",
-  "figma-workshop": "going",
+const MEMBER_BADGES: Record<string, EventBadge> = {
+  uxathon: { status: "registration_open" },
+  "ux-conference": { status: "waitlisted" },
+  "figma-workshop": { status: "going" },
 };
 
 const EVENT: EventRow = {
@@ -264,13 +265,13 @@ function EventCardDemo() {
 
       <Composition
         title="EventTimeline (the portal's timeline)"
-        description="The real portal component on fixture events, with a badge per card from statusFor. Upcoming, grouped by month: a date marker on the dashed rail, then the card. Turn on Show Past Events to see the past list. On phones the rail hides and the date sits above the card."
+        description="The real portal component on fixture events, with a badge per card from its badges map. Upcoming, grouped by month: a date marker on the dashed rail, then the card. Turn on Show Past Events to see the past list. On phones the rail hides and the date sits above the card."
       >
         <div className="mx-auto w-full max-w-5xl">
           <EventTimeline
             upcomingEvents={[UXATHON, CONFERENCE, WORKSHOP, PORTFOLIO, MIXER]}
             pastEvents={PAST}
-            statusFor={(event) => MEMBER_STATUS[event.id] ?? null}
+            badges={MEMBER_BADGES}
           />
         </div>
       </Composition>

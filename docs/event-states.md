@@ -173,9 +173,13 @@ Use the first rule that matches:
 
 So a student who's going to an event that has since filled up still sees
 "Going", not "Full".
+As well, "Registration closed" beats "Full" so that students can't register even if spots open up.  
 
 ## Seats
 
 Seats taken = tickets + accepted offers that haven't expired and have no ticket
 yet. Since nobody gives a spot back, a full event only reopens when an offer
 expires.
+
+## Check-in status for multi-day events
+Currently, if an event spans multiple days and requires check-in for multiple days, the badge will show 'Checked-in' from the first day they check in until the end of the event, regardless of whether they need to check in again at a later day in the event. 
