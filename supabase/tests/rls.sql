@@ -414,10 +414,24 @@ begin
       null;
   end;
 
-  insert into public.event_applications (event_id, user_id)
+  -- Members start a draft; only submit_event_application submits it.
+  begin
+    insert into public.event_applications (event_id, user_id)
+    values (
+      current_setting('rls.event_id')::uuid,
+      public.current_user_info_id()
+    );
+    raise exception 'user A inserted a submitted application directly';
+  exception
+    when insufficient_privilege then
+      null;
+  end;
+
+  insert into public.event_applications (event_id, user_id, status)
   values (
     current_setting('rls.event_id')::uuid,
-    public.current_user_info_id()
+    public.current_user_info_id(),
+    'draft'
   );
 
   update public.event_applications
@@ -987,9 +1001,14 @@ begin
      or has_table_privilege('anon', 'public.event_applications', 'SELECT') then
     raise exception 'anon can read tickets or applications';
   end if;
-  if has_column_privilege('authenticated', 'public.event_applications', 'status', 'INSERT')
-     or has_column_privilege('authenticated', 'public.event_applications', 'offer_expires_at', 'INSERT') then
+  -- Members name a status on insert, which "applications: insert own draft"
+  -- holds to draft; the decision columns stay out of reach.
+  if has_column_privilege('authenticated', 'public.event_applications', 'offer_expires_at', 'INSERT')
+     or has_column_privilege('authenticated', 'public.event_applications', 'submitted_at', 'INSERT') then
     raise exception 'members can choose their own application decision';
+  end if;
+  if has_function_privilege('anon', 'public.submit_event_application(uuid)', 'execute') then
+    raise exception 'anon can submit applications';
   end if;
   if not has_function_privilege('anon', 'public.event_seat_counts(uuid[])', 'execute') then
     raise exception 'anon lost execute on event_seat_counts';
@@ -1051,8 +1070,8 @@ declare
   visible_count integer;
   changed_count integer;
 begin
-  insert into public.event_applications (event_id, user_id)
-  values (current_setting('rls.application_event_id')::uuid, public.current_user_info_id())
+  insert into public.event_applications (event_id, user_id, status)
+  values (current_setting('rls.application_event_id')::uuid, public.current_user_info_id(), 'draft')
   returning id into v_application_id;
 
   insert into public.event_application_responses (
@@ -1065,6 +1084,36 @@ begin
   where application_id = v_application_id;
   if visible_count <> 1 then
     raise exception 'user A should see their response by application, saw %', visible_count;
+  end if;
+
+  if (select status from public.submit_event_application(v_application_id)) <> 'SUBMITTED' then
+    raise exception 'user A could not submit a complete draft';
+  end if;
+
+  -- Submitted answers are final.
+  update public.event_application_responses
+  set response = 'Edited'
+  where application_id = v_application_id;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'user A edited an answer after submitting';
+  end if;
+
+  delete from public.event_application_responses
+  where application_id = v_application_id;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'user A deleted an answer after submitting';
+  end if;
+
+  delete from public.event_applications where id = v_application_id;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'user A deleted a submitted application';
+  end if;
+
+  if (select status from public.submit_event_application(v_application_id)) <> 'NOT_DRAFT' then
+    raise exception 'user A submitted an application twice';
   end if;
 
   update public.event_applications
@@ -1226,6 +1275,456 @@ reset role;
 select set_config('request.jwt.claims', '{}', true);
 \o
 update public.user_info set role_access = :'user_a_saved_role' where id = :'user_a_id';
+
+-- Application drafts and their files (20261106193112, 20261106193115). User A
+-- works on their own draft; user C owns a draft A must not touch, and later a
+-- submitted application whose file an admin may read.
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+select role_access as user_a_drafts_saved_role from public.user_info where id = :'user_a_id' \gset
+update public.user_info set role_access = 'basic' where id = :'user_a_id';
+
+insert into auth.users (
+  id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+)
+values (
+  gen_random_uuid(), 'authenticated', 'authenticated',
+  'rls-user-c@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()
+)
+returning id as auth_user_id, email
+\gset user_c_
+
+insert into public.user_info (auth_user_id, email, first_name, last_name, role_access)
+values (:'user_c_auth_user_id', :'user_c_email', 'RLS', 'User C', 'basic')
+returning id \gset user_c_
+
+insert into public.events (
+  name, description, regular_price, member_price, max_capacity, slug,
+  registration_opens_at, registration_closes_at, status, requires_application
+)
+values
+  ('RLS Drafts Event', 'RLS drafts event', 0, 0, 10, 'rls-drafts-event',
+   now() - interval '1 hour', now() + interval '1 hour', 'active', true)
+returning id \gset drafts_event_
+
+insert into public.events (
+  name, description, regular_price, member_price, max_capacity, slug,
+  registration_opens_at, registration_closes_at, status, requires_application
+)
+values
+  ('RLS Second Drafts Event', 'RLS second drafts event', 0, 0, 10, 'rls-drafts-event-2',
+   now() - interval '1 hour', now() + interval '1 hour', 'active', true)
+returning id \gset drafts_event_2_
+
+insert into public.events (
+  name, description, regular_price, member_price, max_capacity, slug,
+  registration_opens_at, registration_closes_at, status, requires_application
+)
+values
+  ('RLS Closed Drafts Event', 'RLS closed drafts event', 0, 0, 10, 'rls-drafts-closed',
+   now() - interval '2 hours', now() - interval '1 hour', 'active', true)
+returning id \gset drafts_closed_event_
+
+insert into public.event_application_questions (event_id, question, response_type, sort_order)
+values (:'drafts_event_id', 'Why?', 'long_text', 0)
+returning id \gset drafts_text_question_
+
+insert into public.event_application_questions (
+  event_id, question, response_type, sort_order, response_options
+)
+values (:'drafts_event_id', 'Pick any', 'checkbox', 1, array['A', 'B, C'])
+returning id \gset drafts_checkbox_question_
+
+insert into public.event_application_questions (event_id, question, response_type, sort_order)
+values (:'drafts_event_id', 'Resume', 'file_upload', 2)
+returning id \gset drafts_file_question_
+
+insert into public.event_application_questions (
+  event_id, question, response_type, sort_order, is_required
+)
+values (:'drafts_event_id', 'Anything else?', 'short_text', 3, false);
+
+insert into public.event_application_questions (event_id, question, response_type)
+values (:'drafts_event_2_id', 'Why this one?', 'long_text')
+returning id \gset drafts_2_question_
+
+insert into public.event_application_questions (event_id, question, response_type)
+values (:'drafts_event_2_id', 'Portfolio', 'file_upload')
+returning id \gset drafts_2_file_question_
+
+insert into public.event_applications (event_id, user_id, status)
+values (:'drafts_event_id', :'user_c_id', 'draft')
+returning id \gset user_c_draft_
+
+insert into public.event_application_responses (
+  application_id, event_application_question_id, response
+)
+values (:'user_c_draft_id', :'drafts_text_question_id', 'User C draft answer');
+
+-- Started while registration was open; it has since closed.
+insert into public.event_applications (event_id, user_id, status)
+values (:'drafts_closed_event_id', :'user_a_id', 'draft')
+returning id \gset user_a_closed_draft_
+
+\o /dev/null
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'user_a_auth_user_id',
+    'email', :'user_a_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+select set_config('rls.user_c_id', :'user_c_id', true);
+select set_config('rls.drafts_event_id', :'drafts_event_id', true);
+select set_config('rls.drafts_event_2_id', :'drafts_event_2_id', true);
+select set_config('rls.drafts_text_question_id', :'drafts_text_question_id', true);
+select set_config('rls.drafts_checkbox_question_id', :'drafts_checkbox_question_id', true);
+select set_config('rls.drafts_file_question_id', :'drafts_file_question_id', true);
+select set_config('rls.drafts_2_question_id', :'drafts_2_question_id', true);
+select set_config('rls.user_c_draft_id', :'user_c_draft_id', true);
+select set_config('rls.user_a_closed_draft_id', :'user_a_closed_draft_id', true);
+-- storage.protect_delete refuses SQL deletes unless this is set.
+select set_config('storage.allow_delete_query', 'true', true);
+\o
+
+set local role authenticated;
+
+do $$
+declare
+  v_application_id uuid;
+  v_second_id uuid;
+  v_result record;
+  v_prefix text;
+  visible_count integer;
+  changed_count integer;
+begin
+  insert into public.event_applications (event_id, user_id, status)
+  values (current_setting('rls.drafts_event_id')::uuid, public.current_user_info_id(), 'draft')
+  returning id into v_application_id;
+
+  -- Answers belong to questions of the application's own event.
+  begin
+    insert into public.event_application_responses (
+      application_id, event_application_question_id, response
+    )
+    values (v_application_id, current_setting('rls.drafts_2_question_id')::uuid, 'Wrong event');
+    raise exception 'user A answered another event''s question';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  -- Someone else's draft is out of reach.
+  select count(*) into visible_count
+  from public.event_applications
+  where id = current_setting('rls.user_c_draft_id')::uuid;
+  if visible_count <> 0 then
+    raise exception 'user A can read user C draft';
+  end if;
+
+  begin
+    insert into public.event_application_responses (
+      application_id, event_application_question_id, response
+    )
+    values (
+      current_setting('rls.user_c_draft_id')::uuid,
+      current_setting('rls.drafts_checkbox_question_id')::uuid,
+      '["A"]'
+    );
+    raise exception 'user A answered user C draft';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  delete from public.event_applications where id = current_setting('rls.user_c_draft_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'user A deleted user C draft';
+  end if;
+
+  if (select status from public.submit_event_application(current_setting('rls.user_c_draft_id')::uuid))
+     <> 'NOT_FOUND' then
+    raise exception 'user A could submit user C draft';
+  end if;
+
+  if (select status from public.submit_event_application(current_setting('rls.user_a_closed_draft_id')::uuid))
+     <> 'REGISTRATION_CLOSED' then
+    raise exception 'user A submitted after registration closed';
+  end if;
+
+  -- Blank text and an empty checkbox selection count as missing.
+  insert into public.event_application_responses (
+    application_id, event_application_question_id, response
+  )
+  values
+    (v_application_id, current_setting('rls.drafts_text_question_id')::uuid, '   '),
+    (v_application_id, current_setting('rls.drafts_checkbox_question_id')::uuid, '[]');
+
+  select * into v_result from public.submit_event_application(v_application_id);
+  if v_result.status <> 'INCOMPLETE'
+     or v_result.missing_question_ids <> array[
+       current_setting('rls.drafts_text_question_id')::uuid,
+       current_setting('rls.drafts_checkbox_question_id')::uuid,
+       current_setting('rls.drafts_file_question_id')::uuid
+     ] then
+    raise exception 'incomplete draft reported %', row_to_json(v_result);
+  end if;
+
+  -- A file answer has to name an upload of this applicant's for that question.
+  update public.event_application_responses
+  set response = 'Because'
+  where application_id = v_application_id
+    and event_application_question_id = current_setting('rls.drafts_text_question_id')::uuid;
+  update public.event_application_responses
+  set response = '["B, C"]'
+  where application_id = v_application_id
+    and event_application_question_id = current_setting('rls.drafts_checkbox_question_id')::uuid;
+  insert into public.event_application_responses (
+    application_id, event_application_question_id, response
+  )
+  values (
+    v_application_id,
+    current_setting('rls.drafts_file_question_id')::uuid,
+    'someone/else/entirely.pdf'
+  );
+
+  select * into v_result from public.submit_event_application(v_application_id);
+  if v_result.status <> 'INCOMPLETE'
+     or v_result.missing_question_ids <> array[current_setting('rls.drafts_file_question_id')::uuid] then
+    raise exception 'unuploaded file answer reported %', row_to_json(v_result);
+  end if;
+
+  -- Uploads go only into the member's own draft, under a file question.
+  v_prefix := public.current_user_info_id()::text || '/' || v_application_id::text || '/';
+
+  begin
+    insert into storage.objects (bucket_id, name)
+    values (
+      'application-files',
+      current_setting('rls.user_c_id') || '/' || current_setting('rls.user_c_draft_id') || '/'
+        || current_setting('rls.drafts_file_question_id') || '/cv.pdf'
+    );
+    raise exception 'user A uploaded into user C draft';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    insert into storage.objects (bucket_id, name)
+    values (
+      'application-files',
+      v_prefix || current_setting('rls.drafts_text_question_id') || '/cv.pdf'
+    );
+    raise exception 'user A uploaded under a text question';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  insert into storage.objects (bucket_id, name)
+  values
+    ('application-files', v_prefix || current_setting('rls.drafts_file_question_id') || '/old.pdf'),
+    ('application-files', v_prefix || current_setting('rls.drafts_file_question_id') || '/cv.pdf');
+
+  -- Replacing a file while drafting: the old one can be removed.
+  delete from storage.objects
+  where bucket_id = 'application-files'
+    and name = v_prefix || current_setting('rls.drafts_file_question_id') || '/old.pdf';
+  get diagnostics changed_count = row_count;
+  if changed_count <> 1 then
+    raise exception 'user A could not remove a file from their draft';
+  end if;
+
+  select count(*) into visible_count
+  from storage.objects
+  where bucket_id = 'application-files' and starts_with(name, v_prefix);
+  if visible_count <> 1 then
+    raise exception 'user A should see their one upload, saw %', visible_count;
+  end if;
+
+  update public.event_application_responses
+  set response = v_prefix || current_setting('rls.drafts_file_question_id') || '/cv.pdf'
+  where application_id = v_application_id
+    and event_application_question_id = current_setting('rls.drafts_file_question_id')::uuid;
+
+  select * into v_result from public.submit_event_application(v_application_id);
+  if v_result.status <> 'SUBMITTED' or cardinality(v_result.missing_question_ids) <> 0 then
+    raise exception 'complete draft reported %', row_to_json(v_result);
+  end if;
+
+  if (select submitted_at from public.event_applications where id = v_application_id) is null then
+    raise exception 'submitting did not record submitted_at';
+  end if;
+
+  -- After submitting, the files are as final as the answers.
+  delete from storage.objects
+  where bucket_id = 'application-files' and starts_with(name, v_prefix);
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'user A removed a file after submitting';
+  end if;
+
+  begin
+    insert into storage.objects (bucket_id, name)
+    values (
+      'application-files',
+      v_prefix || current_setting('rls.drafts_file_question_id') || '/late.pdf'
+    );
+    raise exception 'user A uploaded after submitting';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  -- A member deletes their own draft, and its answers go with it.
+  insert into public.event_applications (event_id, user_id, status)
+  values (current_setting('rls.drafts_event_2_id')::uuid, public.current_user_info_id(), 'draft')
+  returning id into v_second_id;
+  insert into public.event_application_responses (
+    application_id, event_application_question_id, response
+  )
+  values (v_second_id, current_setting('rls.drafts_2_question_id')::uuid, 'Changed my mind');
+
+  delete from public.event_applications where id = v_second_id;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 1 then
+    raise exception 'user A could not delete their own draft';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_application_responses
+  where application_id = v_second_id;
+  if visible_count <> 0 then
+    raise exception 'deleting a draft left % answers', visible_count;
+  end if;
+end;
+$$;
+
+reset role;
+
+-- No decision moves a draft, and nothing goes back to being one.
+do $$
+begin
+  begin
+    update public.event_applications
+    set status = 'submitted'
+    where id = current_setting('rls.user_c_draft_id')::uuid;
+    raise exception 'a draft was submitted without submit_event_application';
+  exception
+    when check_violation then null;
+  end;
+
+  begin
+    update public.event_applications
+    set status = 'accepted', offer_expires_at = now() + interval '1 day'
+    where id = current_setting('rls.user_c_draft_id')::uuid;
+    raise exception 'a draft was accepted';
+  exception
+    when check_violation then null;
+  end;
+
+  begin
+    update public.event_applications
+    set status = 'draft'
+    where user_id = current_setting('rls.user_a_id')::uuid
+      and event_id = current_setting('rls.drafts_event_id')::uuid;
+    raise exception 'a submitted application went back to draft';
+  exception
+    when check_violation then null;
+  end;
+end;
+$$;
+
+-- User C: a submitted application with a file on the second event, beside
+-- their draft. Written as the superuser, which Storage's policies do not bind.
+insert into public.event_applications (event_id, user_id)
+values (:'drafts_event_2_id', :'user_c_id')
+returning id \gset user_c_submitted_
+
+insert into storage.objects (bucket_id, name)
+values
+  ('application-files',
+   :'user_c_id' || '/' || :'user_c_submitted_id' || '/' || :'drafts_2_file_question_id' || '/c.pdf'),
+  ('application-files',
+   :'user_c_id' || '/' || :'user_c_draft_id' || '/' || :'drafts_file_question_id' || '/c-draft.pdf');
+
+-- A member cannot read someone else's files.
+set local role authenticated;
+do $$
+declare
+  visible_count integer;
+begin
+  select count(*) into visible_count
+  from storage.objects
+  where bucket_id = 'application-files'
+    and starts_with(name, current_setting('rls.user_c_id') || '/');
+  if visible_count <> 0 then
+    raise exception 'user A can read user C files, saw %', visible_count;
+  end if;
+end;
+$$;
+reset role;
+
+-- Admins see submitted applications, their answers and files, never drafts.
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+update public.user_info set role_access = 'admin' where id = :'user_a_id';
+\o /dev/null
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'user_a_auth_user_id',
+    'email', :'user_a_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+\o
+set local role authenticated;
+do $$
+declare
+  visible_count integer;
+  changed_count integer;
+begin
+  select count(*) into visible_count
+  from public.event_applications
+  where user_id = current_setting('rls.user_c_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'admin should see only user C submitted application, saw %', visible_count;
+  end if;
+
+  select count(*) into visible_count
+  from public.event_application_responses
+  where application_id = current_setting('rls.user_c_draft_id')::uuid;
+  if visible_count <> 0 then
+    raise exception 'admin can read draft answers';
+  end if;
+
+  update public.event_applications
+  set status = 'rejected'
+  where id = current_setting('rls.user_c_draft_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'admin decided a draft';
+  end if;
+
+  select count(*) into visible_count
+  from storage.objects
+  where bucket_id = 'application-files'
+    and starts_with(name, current_setting('rls.user_c_id') || '/');
+  if visible_count <> 1 then
+    raise exception 'admin should read only the submitted file, saw %', visible_count;
+  end if;
+end;
+$$;
+reset role;
+
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+update public.user_info set role_access = :'user_a_drafts_saved_role' where id = :'user_a_id';
 
 -- Scheduled drafts stay hidden until the job actually changes their status.
 update public.events set status = 'draft', publish_at = now() + interval '1 day'

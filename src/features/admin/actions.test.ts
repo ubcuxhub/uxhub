@@ -630,6 +630,23 @@ describe("fetchAdminCheckInSnapshotAction", () => {
 describe("updateApplicationDecisionAction", () => {
   const tomorrow = () => new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
 
+  beforeEach(() => {
+    applications.updateEventApplication.mockImplementation(
+      async (_client: unknown, id: string, update: object) => ({ id, ...update }),
+    );
+  });
+
+  it("refuses to report a draft as decided", async () => {
+    applications.updateEventApplication.mockResolvedValue({
+      id: "application-1",
+      status: "draft",
+    });
+
+    await expect(
+      updateApplicationDecisionAction("application-1", "reject", null),
+    ).rejects.toThrow("A draft application cannot be decided.");
+  });
+
   it("accepts with the offer deadline", async () => {
     const deadline = tomorrow();
     await updateApplicationDecisionAction("application-1", "accept", deadline);

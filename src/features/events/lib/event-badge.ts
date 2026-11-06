@@ -54,6 +54,9 @@ export function eventBadgeFor(
 
   if (application) {
     switch (application.status) {
+      // Unsubmitted: the event's availability, as for anyone who hasn't applied.
+      case "draft":
+        break;
       case "submitted":
         return { status: "under_review" };
       case "waitlisted":

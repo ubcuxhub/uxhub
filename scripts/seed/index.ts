@@ -69,11 +69,14 @@ import {
 } from "./lib/targets.ts";
 
 /**
- * Mirrors BUCKETS in src/lib/supabase-helpers/buckets.ts, and the migration at
- * supabase/migrations/20260821120000_create_event_images_bucket.sql. Remote
- * environments get this bucket from that migration, so `--target=prod` expects
- * it to exist already and says so if it does not. Locally the seed provisions
- * it, which keeps a fresh database usable without a migration run.
+ * Mirrors BUCKETS in src/lib/supabase-helpers/buckets.ts, and the migrations
+ * that create each bucket (20260821120000_create_event_images_bucket.sql,
+ * 20261014090000_add_user_profile_photos.sql and
+ * 20261106193115_application_files_bucket.sql). Remote environments get them
+ * from those migrations, so `--target=prod` expects them to exist already and
+ * says so if one does not. Locally the seed provisions them, which keeps a
+ * fresh database usable without a migration run. The application-files
+ * policies live only in its migration.
  */
 const BUCKET = {
   profilePhotos: {
@@ -85,6 +88,12 @@ const BUCKET = {
     public: true,
     fileSizeLimit: 4194304,
     allowedMimeTypes: ["image/jpeg", "image/png"],
+  },
+  applicationFiles: {
+    id: "application-files",
+    public: false,
+    fileSizeLimit: 5242880,
+    allowedMimeTypes: ["application/pdf"],
   },
 } as const;
 

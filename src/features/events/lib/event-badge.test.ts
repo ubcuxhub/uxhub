@@ -38,6 +38,11 @@ describe("eventBadgeFor", () => {
       expect(eventBadgeFor(event, state, now)).toEqual({ status: badge });
     });
 
+    it("shows the event's availability for an unsubmitted draft", () => {
+      const state = { ...nothing, application: application("draft") };
+      expect(eventBadgeFor(event, state, now)).toEqual(eventBadgeFor(event, nothing, now));
+    });
+
     it("asks an accepted student to register by the offer deadline", () => {
       const state = {
         ...nothing,

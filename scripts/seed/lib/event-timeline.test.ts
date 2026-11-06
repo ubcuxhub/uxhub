@@ -185,7 +185,16 @@ describe("fixture purchases", () => {
       for (const purchase of user.purchases) {
         expect(purchasable.has(purchase.eventSlug ?? "")).toBe(false);
       }
+      // A draft application holds no seat and buys nothing, so it leaves the
+      // event checkout-ready; anything else on one does not.
       for (const registration of user.registrations) {
+        if (
+          !registration.ticket &&
+          !registration.purchaseKey &&
+          registration.application?.status === "draft"
+        ) {
+          continue;
+        }
         expect(purchasable.has(registration.eventSlug)).toBe(false);
       }
     }

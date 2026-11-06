@@ -77,6 +77,12 @@ export type CheckInInsert = TablesInsert<"check_ins">;
 export type CheckInUpdate = TablesUpdate<"check_ins">;
 
 export type EventApplicationStatus = Enums<"event_application_status">;
+/** Every status but `draft`: what admins review and decide. */
+export type SubmittedApplicationStatus = Exclude<EventApplicationStatus, "draft">;
+/** An application its applicant has submitted. */
+export type SubmittedApplicationRow = EventApplicationRow & {
+  status: SubmittedApplicationStatus;
+};
 export type EventLocationType = Enums<"event_location_type">;
 export type EventLinkType = Enums<"event_link_type">;
 export type EventLinkVisibility = Enums<"event_link_visibility">;

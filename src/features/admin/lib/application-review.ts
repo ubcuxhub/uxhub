@@ -1,11 +1,12 @@
 import type {
   EventApplicationRow,
-  EventApplicationStatus,
+  SubmittedApplicationStatus,
 } from "@/lib/supabase/models";
 
 /**
  * What admins see for an application (docs/event-states.md, "Admin:
  * application"). `accepted` splits three ways by its deadline and ticket.
+ * Drafts have no review state: admins never see them.
  */
 export type ApplicationReviewState =
   | "submitted"
@@ -28,7 +29,9 @@ export const APPLICATION_REVIEW_STATE_LABELS: Record<
 };
 
 export function getApplicationReviewState(
-  application: Pick<EventApplicationRow, "status" | "offer_expires_at">,
+  application: Pick<EventApplicationRow, "offer_expires_at"> & {
+    status: SubmittedApplicationStatus;
+  },
   hasTicket: boolean,
   now: Date = new Date()
 ): ApplicationReviewState {
@@ -65,7 +68,7 @@ export function getApplicationDecisions(
   }
 }
 
-const DECISION_STATUS: Record<ApplicationDecision, EventApplicationStatus> = {
+const DECISION_STATUS: Record<ApplicationDecision, SubmittedApplicationStatus> = {
   accept: "accepted",
   waitlist: "waitlisted",
   reject: "rejected",
@@ -81,7 +84,12 @@ export function buildApplicationDecisionUpdate(
   offerExpiresAt: string | null,
   now: Date = new Date()
 ):
-  | { ok: true; update: Pick<EventApplicationRow, "status" | "offer_expires_at"> }
+  | {
+      ok: true;
+      update: Pick<EventApplicationRow, "offer_expires_at"> & {
+        status: SubmittedApplicationStatus;
+      };
+    }
   | { ok: false; error: string } {
   if (!Object.hasOwn(DECISION_STATUS, decision)) {
     return { ok: false, error: "Invalid application decision." };

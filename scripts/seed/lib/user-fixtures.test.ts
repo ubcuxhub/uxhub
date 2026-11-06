@@ -26,8 +26,8 @@ describe("user seed fixtures", () => {
       profiles: 11,
       purchases: 18,
       tickets: 11,
-      applications: 5,
-      responses: 22,
+      applications: 6,
+      responses: 27,
       checkIns: 6,
     });
   });
@@ -96,6 +96,33 @@ describe("user seed fixtures", () => {
 
       expect(phases).toEqual(new Set(["past", "ongoing", "upcoming"]));
     }
+  });
+
+  it("lets only a draft leave required questions unanswered", () => {
+    const draft = seedUsers
+      .flatMap((user) => user.registrations)
+      .find((registration) => registration.application?.status === "draft");
+    expect(draft?.eventSlug).toBe("uxathon-upcoming");
+
+    const submitted = structuredClone(seedUsers);
+    submitted
+      .flatMap((user) => user.registrations)
+      .find((registration) => registration.application?.status === "draft")!
+      .application = { status: "submitted" };
+    expect(() =>
+      validateUserFixtures(submitted, seedEvents, membershipTypes, fixedNow)
+    ).toThrow("is missing required response");
+  });
+
+  it("checks each option of a checkbox answer, in either stored form", () => {
+    const invalid = structuredClone(seedUsers);
+    invalid[0].registrations.find(
+      (registration) => registration.eventSlug === "design-sprint-past"
+    )!.responses!["Any dietary restrictions we should know about for lunch?"] =
+      '["Vegetarian","Pescatarian"]';
+    expect(() =>
+      validateUserFixtures(invalid, seedEvents, membershipTypes, fixedNow)
+    ).toThrow('Response "Pescatarian" is invalid');
   });
 
   it("keeps applications to events that take them, with a deadline when accepted", () => {
