@@ -45,10 +45,6 @@ export interface UserPurchaseSummary {
   created_at: string | null;
 }
 
-export type SortOption = "name" | "created_at";
-
-export type SortDirection = "ascending" | "descending";
-
 export interface MembershipTypeOption {
   id: string;
   name: string;

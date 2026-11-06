@@ -87,7 +87,7 @@ function SidePeekDrawerDemo({ open: initialState }: SectionProps) {
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <SidePeekDrawerTitle>{person.name}</SidePeekDrawerTitle>
-                  <ShieldCheck className="size-5 text-primary" aria-label="Verified student" />
+                  <ShieldCheck className="size-4 text-primary" aria-label="Verified student" />
                   <span className="text-small text-muted-foreground">she/her</span>
                 </div>
                 <p className="text-small text-muted-foreground">Member since July 21, 2026</p>
@@ -122,7 +122,7 @@ function SidePeekDrawerDemo({ open: initialState }: SectionProps) {
                 <section>
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <h3 className="text-subheading">Recent transactions</h3>
-                    <a href="#transactions" className="inline-flex items-center gap-1 text-small text-info-foreground hover:underline">View all <ExternalLink className="size-3.5" aria-hidden /></a>
+                    <a href="#transactions" className="inline-flex items-center gap-1 text-small text-info-foreground hover:underline">View all <ExternalLink className="size-4" aria-hidden /></a>
                   </div>
                   <div className="space-y-3">
                     <TransactionRow title="2026–27 membership" description="Innovator" amountCents={-1500} date="Sept 27, 2026" media={membershipMedia} />

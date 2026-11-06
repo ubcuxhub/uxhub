@@ -175,7 +175,7 @@ export const MANIFEST = [
   {
     id: "event-actions",
     column: 6,
-    uses: ["card", "dropdown-menu", "confirm-dialog", "icon-button", "button", "dialog", "field", "input", "sheet", "filter-chip", "side-peek-drawer", "detail-row", "popover", "copy-code"],
+    uses: ["card", "dropdown-menu", "confirm-dialog", "icon-button", "button", "dialog", "field", "input", "sheet", "filter-chip", "side-peek-drawer", "record-drawer", "detail-row", "popover", "copy-code"],
   },
   {
     id: "registration-window",
