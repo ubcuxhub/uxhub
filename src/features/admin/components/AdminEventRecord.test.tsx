@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { RecordFrame } from "@/components/shared/RecordDrawer";
 import type { EventRow } from "@/lib/supabase/models";
@@ -9,6 +9,7 @@ import { AdminEventRecord, type AdminEventRecordProps } from "./AdminEventRecord
 
 const EVENT_ID = "123e4567-e89b-12d3-a456-426614174000";
 const router = { push: vi.fn(), replace: vi.fn(), back: vi.fn(), refresh: vi.fn() };
+const updateEventScheduleAction = vi.hoisted(() => vi.fn());
 
 vi.mock("next/navigation", () => ({
   useRouter: () => router,
@@ -20,6 +21,7 @@ vi.mock("next/link", () => ({
   ),
 }));
 vi.mock("@/lib/load-document", () => ({ loadDocument: vi.fn() }));
+vi.mock("../event-overview-actions", () => ({ updateEventScheduleAction }));
 
 function event(overrides: Partial<EventRow> = {}): EventRow {
   return {
@@ -70,6 +72,10 @@ function renderRecord(props: Partial<AdminEventRecordProps> = {}) {
     </RecordFrame>
   );
 }
+
+beforeEach(() => {
+  updateEventScheduleAction.mockReset();
+});
 
 afterEach(() => {
   cleanup();
@@ -131,5 +137,89 @@ describe("AdminEventRecord overview", () => {
     expect(screen.getAllByText("Scheduled Nov 12").length).toBeGreaterThan(0);
     expect(screen.getByText("Nov 12, 2026, 11:00 AM")).toBeTruthy();
     expect(screen.getByText("Opens once the event is active")).toBeTruthy();
+  });
+});
+
+describe("AdminEventRecord quick edit", () => {
+  function startEditing() {
+    fireEvent.click(screen.getByRole("button", { name: "Change status and schedule" }));
+  }
+
+  it("swaps the schedule for its controls and the Edit link for Cancel / Save", () => {
+    renderRecord();
+    startEditing();
+
+    expect(screen.getByLabelText(/^Event Status/)).toBeTruthy();
+    expect((screen.getByLabelText(/^Start Time/) as HTMLInputElement).value).toBe("19:00");
+    expect(screen.getByRole("button", { name: "Save schedule" })).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Edit event" })).toBeNull();
+
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("button", { name: "Save schedule" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Edit event" })).toBeTruthy();
+  });
+
+  it("saves the dates as Pacific timestamps and shows what was saved", async () => {
+    const saved = event({ starts_at: "2026-11-20T02:30:00.000Z" });
+    updateEventScheduleAction.mockResolvedValue({ ok: true, event: saved });
+    renderRecord();
+    startEditing();
+
+    fireEvent.change(screen.getByLabelText(/^Start Time/), { target: { value: "19:30" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
+
+    await waitFor(() => expect(router.refresh).toHaveBeenCalled());
+    expect(updateEventScheduleAction).toHaveBeenCalledWith(EVENT_ID, {
+      status: "active",
+      publish_at: null,
+      starts_at: "2026-11-20T02:30:00.000Z",
+      ends_at: "2026-11-20T04:00:00.000Z",
+      registration_opens_at: null,
+      registration_closes_at: null,
+    });
+    expect(screen.queryByRole("button", { name: "Save schedule" })).toBeNull();
+    expect(screen.getByText("Thu, Nov 19 7:30 PM–9:00 PM")).toBeTruthy();
+  });
+
+  it("keeps editing and announces why the server refused", async () => {
+    updateEventScheduleAction.mockResolvedValue({
+      ok: false,
+      error: "Finish the event in Edit before publishing. Short description is required.",
+    });
+    renderRecord({ event: event({ status: "draft" }) });
+    startEditing();
+    fireEvent.change(screen.getByLabelText(/^Start Time/), { target: { value: "19:15" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "Finish the event in Edit before publishing. Short description is required."
+    );
+    expect(screen.getByRole("button", { name: "Save schedule" })).toBeTruthy();
+    expect(router.refresh).not.toHaveBeenCalled();
+  });
+
+  it("catches a half-filled date before asking the server", () => {
+    renderRecord();
+    startEditing();
+
+    fireEvent.change(screen.getByLabelText(/^End Time/), { target: { value: "" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
+
+    expect(screen.getByRole("alert").textContent).toBe(
+      "Event start and end dates and times are required."
+    );
+    expect(updateEventScheduleAction).not.toHaveBeenCalled();
+  });
+
+  it("shows a generic error when the action itself fails", async () => {
+    updateEventScheduleAction.mockRejectedValue(new Error("network"));
+    renderRecord();
+    startEditing();
+    fireEvent.change(screen.getByLabelText(/^Start Time/), { target: { value: "19:00" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
+
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "Couldn’t save the schedule. Try again."
+    );
   });
 });

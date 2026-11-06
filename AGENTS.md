@@ -146,8 +146,8 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
   endpoint.
 - Student-facing event and checkout routes use slugs. Admin event routes use
   event IDs (a slug redirects to the ID): `/admin/events/<id>` is the event's
-  overview (the record drawer) and `/admin/events/<id>/edit` is the full
-  builder.
+  overview (the record drawer, with a quick edit of its status and dates) and
+  `/admin/events/<id>/edit` is the full builder.
 - Settings are a hash-driven dialog (`#settings/<tab>`), not standalone portal
   pages. Use `openSettings(tab)` from
   `src/features/settings/components/SettingsDialog`.
