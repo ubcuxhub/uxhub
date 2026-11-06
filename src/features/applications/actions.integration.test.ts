@@ -150,8 +150,29 @@ describe("saveApplicationDraft", () => {
       expect(await saveApplicationDraft(event.id, { [q.why]: "Late" })).toEqual({
         ok: false,
         error: "Applications for this event have closed.",
+        reason: "closed",
       });
       expect(await applicationOf(event.id, member.id)).toBeNull();
+    }));
+
+  it("stops saving a draft once the window closes", () =>
+    withFixtures(async (fixtures) => {
+      const { member, event, q } = await setUp(fixtures);
+      expect((await saveApplicationDraft(event.id, { [q.why]: "Before" })).ok).toBe(true);
+      const application = await applicationOf(event.id, member.id);
+
+      const { error } = await db
+        .from("events")
+        .update({ registration_opens_at: at(-2 * hour), registration_closes_at: at(-hour) })
+        .eq("id", event.id);
+      if (error) throw error;
+
+      expect(await saveApplicationDraft(event.id, { [q.why]: "After" })).toEqual({
+        ok: false,
+        error: "Applications for this event have closed.",
+        reason: "closed",
+      });
+      expect(await responsesOf(application!.id)).toEqual({ [q.why]: "Before" });
     }));
 
   it("refuses an event that takes no applications", () =>
@@ -160,6 +181,7 @@ describe("saveApplicationDraft", () => {
       expect(await saveApplicationDraft(event.id, { [q.why]: "Hi" })).toEqual({
         ok: false,
         error: "This event doesn't take applications.",
+        reason: "not_accepting",
       });
     }));
 });
@@ -220,6 +242,7 @@ describe("submitApplication", () => {
       expect(await saveApplicationDraft(event.id, { [q.why]: "Edited" })).toEqual({
         ok: false,
         error: "You've already submitted this application.",
+        reason: "submitted",
       });
       expect(await deleteApplication(draft.applicationId)).toMatchObject({ ok: false });
       expect((await applicationOf(event.id, member.id))?.status).toBe("submitted");
