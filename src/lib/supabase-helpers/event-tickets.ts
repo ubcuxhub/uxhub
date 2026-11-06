@@ -1,6 +1,11 @@
 import type { DbClient } from "./types";
 import { TABLES } from "./tables";
-import type { EventTicketRow } from "@/lib/supabase/models";
+import type { CheckInRow, EventTicketRow } from "@/lib/supabase/models";
+
+/** A ticket with its check-ins, one per session scanned. Empty until scanned. */
+export type EventTicketWithCheckIns = EventTicketRow & {
+  check_ins: Pick<CheckInRow, "checked_in_at">[];
+};
 
 export interface EventSeatCount {
   tickets: number;
@@ -37,6 +42,27 @@ export async function fetchUserEventTicket(
 
   if (error) throw error;
   return data;
+}
+
+/**
+ * A user's tickets to many events in one round trip, keyed by event id, each
+ * with its check-ins. An event the user has no ticket to is absent.
+ */
+export async function fetchUserEventTickets(
+  supabase: DbClient,
+  userId: string,
+  eventIds: string[]
+): Promise<Map<string, EventTicketWithCheckIns>> {
+  if (eventIds.length === 0) return new Map();
+
+  const { data, error } = await supabase
+    .from(TABLES.eventTickets)
+    .select("*, check_ins(checked_in_at)")
+    .eq("user_id", userId)
+    .in("event_id", eventIds);
+
+  if (error) throw error;
+  return new Map((data ?? []).map((ticket) => [ticket.event_id, ticket]));
 }
 
 /**

@@ -26,6 +26,7 @@ import {
   addDays,
   addMonths,
   eventYear,
+  onOrAfterWeekday,
   pacificTimestamp,
   startOfUtcDay,
   timestamp,
@@ -55,12 +56,47 @@ type AgendaItem = {
   room?: string;
 };
 
+/** A card of people on the event page; `people` become `mentors` rows. */
+type PeopleSection = { title: string; people: Mentor[] };
+
+/** A sponsor, keyed by its logo URL. */
+type SeedSponsor = {
+  name: string;
+  logo: string;
+  description: string;
+  website_url: string;
+};
+
+/** One agenda day (`event_agenda_days`) and its items, in Vancouver wall-clock times. */
+type SeedAgendaDay = {
+  date: Date;
+  title?: string;
+  items: {
+    title: string;
+    start: string;
+    end: string;
+    building?: string;
+    room?: string;
+  }[];
+};
+
 export interface SeedEvent {
   event: Omit<TablesInsert<"events">, "image_url"> & { slug: string };
   /** File name in `scripts/seed/data/images`, uploaded and used as the cover. */
   imageKey: string;
-  mentors?: Mentor[];
-  sponsors?: string[];
+  /**
+   * In page order. Mentors only for now: the builder still loads every person
+   * on the event as a mentor and saves them back as `p_mentors`, so a Judges
+   * or Speakers section would turn into mentors, or fail the save when one
+   * person is in two sections. Add other sections once the builder and the
+   * event page read them.
+   */
+  peopleSections?: PeopleSection[];
+  sponsors?: SeedSponsor[];
+  links?: Omit<TablesInsert<"event_links">, "event_id">[];
+  /** Online meeting details, readable only by ticket holders and admins. */
+  privateDetails?: Omit<TablesInsert<"event_private_details">, "event_id">;
+  agendaDays?: SeedAgendaDay[];
   checkInSessions: Omit<TablesInsert<"check_in_sessions">, "event_id">[];
   applicationQuestions: Omit<
     TablesInsert<"event_application_questions">,
@@ -435,11 +471,94 @@ const uxathonDescriptionImages = [
   "https://images.unsplash.com/photo-1531482615713-2afd69097998?auto=format&fit=crop&q=80&w=800",
 ];
 
-const seedSponsorLogos = [
-  "https://images.unsplash.com/photo-1611162616475-46b635cb6868?auto=format&fit=crop&q=80&w=300",
-  "https://images.unsplash.com/photo-1614680376593-902f74cf0d41?auto=format&fit=crop&q=80&w=300",
-  "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?auto=format&fit=crop&q=80&w=300",
+const seedSponsors: SeedSponsor[] = [
+  {
+    name: "Harvest & Co.",
+    logo: "https://images.unsplash.com/photo-1611162616475-46b635cb6868?auto=format&fit=crop&q=80&w=300",
+    description: "Artisanal food sponsor",
+    website_url: "https://example.com/harvest-and-co",
+  },
+  {
+    name: "Northwind Studio",
+    logo: "https://images.unsplash.com/photo-1614680376593-902f74cf0d41?auto=format&fit=crop&q=80&w=300",
+    description: "Prize and mentorship sponsor",
+    website_url: "https://example.com/northwind-studio",
+  },
+  {
+    name: "Pixel Supply",
+    logo: "https://images.unsplash.com/photo-1599305445671-ac291c95aaa9?auto=format&fit=crop&q=80&w=300",
+    description: "Swag and hardware sponsor",
+    website_url: "https://example.com/pixel-supply",
+  },
 ];
+
+/** A Slack workspace link, on every event that has a community channel. */
+const slackLink = (channel: string) => ({
+  type: "slack_workspace" as const,
+  url: `https://ubcuxhub.slack.com/archives/${channel}`,
+  visibility: "everyone" as const,
+});
+
+/** The two weeks of a design sprint, Monday to Friday, three days a week. */
+function designSprintAgendaDays(start: Date): SeedAgendaDay[] {
+  const day = (offset: number, title: string, items: SeedAgendaDay["items"]) => ({
+    date: addDays(start, offset),
+    title,
+    items,
+  });
+  return [
+    day(0, "Kickoff", [
+      { title: "Check-in and welcome", start: "10:00", end: "10:30", room: "Lobby" },
+      { title: "Brief and problem framing", start: "10:30", end: "12:00" },
+      { title: "Team formation", start: "13:00", end: "14:00" },
+    ]),
+    day(2, "Research", [
+      { title: "Interview planning", start: "17:30", end: "18:30" },
+      { title: "Guerrilla research", start: "18:30", end: "20:00", building: "AMS Nest", room: "Main Floor" },
+    ]),
+    day(4, "Synthesis", [
+      { title: "Affinity mapping", start: "17:30", end: "19:00" },
+      { title: "How might we", start: "19:00", end: "20:00" },
+    ]),
+    day(7, "Sketching", [
+      { title: "Crazy eights and storyboards", start: "17:30", end: "19:30" },
+    ]),
+    day(9, "Prototyping", [
+      { title: "Prototype studio", start: "17:30", end: "20:00", room: "Studio B" },
+    ]),
+    day(11, "Final critique", [
+      { title: "Final presentations", start: "13:00", end: "15:30" },
+      { title: "Critique and awards", start: "15:30", end: "17:00" },
+    ]),
+  ];
+}
+
+/** A Saturday-to-Sunday UXathon. */
+function uxathonAgendaDays(saturday: Date): SeedAgendaDay[] {
+  return [
+    {
+      date: saturday,
+      title: "Day one",
+      items: [
+        { title: "Doors open and opening ceremony", start: "09:00", end: "10:30" },
+        { title: "Team formation and kickoff", start: "10:30", end: "12:30", room: "Room 204" },
+        { title: "Lunch and mentor speed-dating", start: "12:30", end: "14:00" },
+        { title: "Component workshop", start: "16:00", end: "17:30", room: "Room 202" },
+        { title: "Dinner and late-night critique", start: "19:00", end: "22:00" },
+      ],
+    },
+    {
+      date: addDays(saturday, 1),
+      title: "Day two",
+      items: [
+        { title: "Breakfast and polish clinic", start: "09:00", end: "11:30" },
+        { title: "Submissions close", start: "12:00", end: "12:30" },
+        { title: "Final presentations", start: "13:00", end: "15:30" },
+        { title: "Awards and closing", start: "16:00", end: "17:00" },
+      ],
+    },
+  ];
+}
 
 const portfolioReviewAgenda: AgendaItem[] = [
   {
@@ -464,8 +583,10 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
   const schedule = {
     /* Past — finished, still active. */
     getToKnow: addMonths(today, -12),
-    designSprintPast: addMonths(today, -10),
-    uxathonPast: addMonths(today, -8),
+    // Runs Monday to Friday of the following week.
+    designSprintPast: onOrAfterWeekday(addMonths(today, -10), 1),
+    // Saturday to Sunday.
+    uxathonPast: onOrAfterWeekday(addMonths(today, -8), 6),
     industryTalkPast: addMonths(today, -2),
     /* Ongoing — started already, running for a long while yet. */
     openStudioStart: addMonths(today, -6),
@@ -476,9 +597,9 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
     mentorshipEnd: addMonths(today, 18),
     /* Upcoming and purchasable — the core of the seed. */
     thinkboxTour: addDays(today, 21),
-    uxathonUpcoming: addDays(today, 42),
+    uxathonUpcoming: onOrAfterWeekday(addDays(today, 42), 6),
     portfolioReview: addMonths(today, 2),
-    designSprintUpcoming: addMonths(today, 4),
+    designSprintUpcoming: onOrAfterWeekday(addMonths(today, 4), 1),
     studentPanel: addMonths(today, 5),
     /* Upcoming, deliberately not purchasable. */
     industryTalkDesignSystems: addMonths(today, 3),
@@ -558,15 +679,31 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       location_room: "Room 100",
       location_address_url: "https://maps.app.goo.gl/vNq7CkS3Wm2hZr4A9",
       starts_at: pacificTimestamp(schedule.designSprintPast, "10:00"),
-      ends_at: pacificTimestamp(schedule.designSprintPast, "17:00"),
+      ends_at: pacificTimestamp(addDays(schedule.designSprintPast, 11), "17:00"),
       max_capacity: 60,
+      location_address: "2125 Main Mall, Vancouver, BC",
+      header_colour: "#4A5E8A",
+      event_colour: "#4A5E8A",
+      teams_enabled: true,
+      min_team_size: 3,
+      max_team_size: 4,
+      team_deadline: timestamp(addDays(schedule.designSprintPast, -1), 23, 59),
       ...closedHistoricalRegistration(schedule.designSprintPast),
       agenda: designSprintAgenda,
       description_images: designSprintDescriptionImages,
     },
     imageKey: "6.png",
-    mentors: designSprintMentors,
-    sponsors: seedSponsorLogos.slice(0, 2),
+    peopleSections: [{ title: "Mentors", people: designSprintMentors }],
+    sponsors: seedSponsors.slice(0, 2),
+    links: [
+      slackLink("design-sprint"),
+      {
+        type: "participant_package",
+        url: "https://example.com/design-sprint/participant-package.pdf",
+        visibility: "going",
+      },
+    ],
+    agendaDays: designSprintAgendaDays(schedule.designSprintPast),
     checkInSessions: [
       {
         name: "Morning Check-in",
@@ -597,13 +734,29 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       starts_at: pacificTimestamp(schedule.uxathonPast, "09:00"),
       ends_at: pacificTimestamp(addDays(schedule.uxathonPast, 1), "17:00"),
       max_capacity: 80,
+      location_address: "2366 Main Mall, Vancouver, BC",
+      header_colour: "#C983C7",
+      event_colour: "#C983C7",
+      teams_enabled: true,
+      min_team_size: 2,
+      max_team_size: 4,
+      team_deadline: timestamp(addDays(schedule.uxathonPast, -2), 23, 59),
       ...closedHistoricalRegistration(schedule.uxathonPast),
       agenda: [...uxathonAgendaDayOne, ...uxathonAgendaDayTwo],
       description_images: uxathonDescriptionImages,
     },
     imageKey: "4.png",
-    mentors: uxathonMentors,
-    sponsors: seedSponsorLogos,
+    peopleSections: [{ title: "Mentors", people: uxathonMentors }],
+    sponsors: seedSponsors,
+    links: [
+      slackLink("uxathon"),
+      {
+        type: "event_recap",
+        url: "https://example.com/uxathon/recap",
+        visibility: "after_event",
+      },
+    ],
+    agendaDays: uxathonAgendaDays(schedule.uxathonPast),
     checkInSessions: [
       {
         name: "Opening Ceremony Check-in",
@@ -632,15 +785,25 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
         "A working product designer walks through what actually changed in their day job once generative tooling landed in the workflow — what it sped up, what it made worse, and which parts of the craft still have to be done by hand. Short talk, long Q&A.",
       regular_price: 5.0,
       member_price: 0,
-      location_building: "Henry Angus Building",
-      location_room: "Room 098",
-      location_address_url: "https://maps.app.goo.gl/Xk4mP2rT8wQ6nB3v1",
+      location_type: "online",
       starts_at: pacificTimestamp(schedule.industryTalkPast, "18:00"),
       ends_at: pacificTimestamp(schedule.industryTalkPast, "19:30"),
       max_capacity: 90,
       ...closedHistoricalRegistration(schedule.industryTalkPast),
     },
     imageKey: "5.png",
+    links: [
+      {
+        type: "event_recap",
+        url: "https://example.com/industry-talk-ai-and-ux/recording",
+        visibility: "after_event",
+      },
+    ],
+    privateDetails: {
+      meeting_url: "https://ubc.zoom.us/j/1234567890",
+      meeting_id: "123 456 7890",
+      meeting_passcode: "uxhub",
+    },
     checkInSessions: [
       {
         name: "Door Check-in",
@@ -721,11 +884,28 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       starts_at: pacificTimestamp(schedule.mentorshipStart, "18:00"),
       ends_at: pacificTimestamp(schedule.mentorshipEnd, "20:00"),
       max_capacity: 100,
+      location_address: "2350 Health Sciences Mall, Vancouver, BC",
+      event_colour: "#325DC4",
+      // Mentorship pods. Fixture accounts hold tickets here, so the seed
+      // puts two of them on a pod (data/teams.ts) and leaves a third without.
+      teams_enabled: true,
+      min_team_size: 2,
+      max_team_size: 4,
+      team_deadline: timestamp(addDays(today, 14), 23, 59),
       ...openThroughout(schedule.mentorshipStart, schedule.mentorshipEnd),
       agenda: panelAgenda,
     },
     imageKey: "3.png",
-    mentors: panelMentors,
+    peopleSections: [{ title: "Mentors", people: panelMentors }],
+    links: [
+      { ...slackLink("mentorship"), visibility: "going" },
+      {
+        type: "other",
+        label: "Book a mentor chat",
+        url: "https://example.com/mentorship/book",
+        visibility: "going",
+      },
+    ],
     checkInSessions: [
       {
         name: "Door Check-in",
@@ -757,6 +937,16 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       ...openRegistration(schedule.thinkboxTour),
     },
     imageKey: "4.png",
+    agendaDays: [
+      {
+        date: schedule.thinkboxTour,
+        items: [
+          { title: "Bus leaves campus", start: "13:00", end: "13:30", building: "UBC Bus Loop", room: "Bay 7" },
+          { title: "Studio walkthrough", start: "14:00", end: "15:00" },
+          { title: "Q&A with the design team", start: "15:00", end: "16:00", room: "Boardroom" },
+        ],
+      },
+    ],
     checkInSessions: [
       {
         name: "Campus Departure",
@@ -787,13 +977,37 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       starts_at: pacificTimestamp(schedule.uxathonUpcoming, "09:00"),
       ends_at: pacificTimestamp(addDays(schedule.uxathonUpcoming, 1), "17:00"),
       max_capacity: 80,
+      location_address: "2366 Main Mall, Vancouver, BC",
+      header_colour: "#C983C7",
+      event_colour: "#C983C7",
+      is_featured: true,
+      marketing_url: "https://uxathon.example.com",
+      teams_enabled: true,
+      min_team_size: 2,
+      max_team_size: 4,
+      team_deadline: timestamp(addDays(schedule.uxathonUpcoming, -2), 23, 59),
       ...openRegistration(schedule.uxathonUpcoming),
       agenda: [...uxathonAgendaDayOne, ...uxathonAgendaDayTwo],
       description_images: uxathonDescriptionImages,
     },
     imageKey: "5.png",
-    mentors: uxathonMentors,
-    sponsors: seedSponsorLogos,
+    peopleSections: [{ title: "Mentors", people: uxathonMentors }],
+    sponsors: seedSponsors,
+    links: [
+      slackLink("uxathon"),
+      {
+        type: "participant_package",
+        url: "https://example.com/uxathon/participant-package.pdf",
+        visibility: "going",
+      },
+      {
+        type: "other",
+        label: "Submit on Devpost",
+        url: "https://uxathon.devpost.example.com",
+        visibility: "going",
+      },
+    ],
+    agendaDays: uxathonAgendaDays(schedule.uxathonUpcoming),
     checkInSessions: [
       {
         name: "Opening Ceremony Check-in",
@@ -828,10 +1042,21 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       starts_at: pacificTimestamp(schedule.portfolioReview, "18:00"),
       ends_at: pacificTimestamp(schedule.portfolioReview, "20:30"),
       max_capacity: 45,
+      location_address: "6133 University Blvd, Vancouver, BC",
       ...openRegistration(schedule.portfolioReview),
       agenda: portfolioReviewAgenda,
     },
     imageKey: "6.png",
+    agendaDays: [
+      {
+        date: schedule.portfolioReview,
+        items: [
+          { title: "Check-in and reviewer matching", start: "18:00", end: "18:20" },
+          { title: "Rapid review rounds", start: "18:20", end: "20:00" },
+          { title: "Action planning and networking", start: "20:00", end: "20:30" },
+        ],
+      },
+    ],
     checkInSessions: [
       {
         name: "Door Check-in",
@@ -854,15 +1079,31 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       location_room: "Room 100",
       location_address_url: "https://maps.app.goo.gl/vNq7CkS3Wm2hZr4A9",
       starts_at: pacificTimestamp(schedule.designSprintUpcoming, "10:00"),
-      ends_at: pacificTimestamp(schedule.designSprintUpcoming, "17:00"),
+      ends_at: pacificTimestamp(addDays(schedule.designSprintUpcoming, 11), "17:00"),
       max_capacity: 60,
+      location_address: "2125 Main Mall, Vancouver, BC",
+      header_image_url: designSprintDescriptionImages[0],
+      event_colour: "#325DC4",
+      teams_enabled: true,
+      min_team_size: 3,
+      max_team_size: 4,
+      team_deadline: timestamp(addDays(schedule.designSprintUpcoming, -1), 23, 59),
       ...openRegistration(schedule.designSprintUpcoming),
       agenda: designSprintAgenda,
       description_images: designSprintDescriptionImages,
     },
     imageKey: "2.png",
-    mentors: designSprintMentors,
-    sponsors: seedSponsorLogos.slice(0, 2),
+    peopleSections: [{ title: "Mentors", people: designSprintMentors }],
+    sponsors: seedSponsors.slice(0, 2),
+    links: [
+      slackLink("design-sprint"),
+      {
+        type: "participant_package",
+        url: "https://example.com/design-sprint/participant-package.pdf",
+        visibility: "going",
+      },
+    ],
+    agendaDays: designSprintAgendaDays(schedule.designSprintUpcoming),
     checkInSessions: [
       {
         name: "Morning Check-in",
@@ -886,9 +1127,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
         "Four students and recent grads talk through how they actually got into UX — the switched majors, the rejected portfolios, the co-op that changed everything. Honest answers rather than a polished career-fair pitch, followed by open Q&A and networking.",
       regular_price: 0,
       member_price: 0,
-      location_building: "Life Sciences Centre",
-      location_room: "Atrium",
-      location_address_url: "https://maps.app.goo.gl/T4wR8bLp1Vz6Yn3H8",
+      location_type: "online",
       starts_at: pacificTimestamp(schedule.studentPanel, "18:00"),
       ends_at: pacificTimestamp(schedule.studentPanel, "20:00"),
       max_capacity: 100,
@@ -896,7 +1135,21 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       agenda: panelAgenda,
     },
     imageKey: "3.png",
-    mentors: panelMentors,
+    peopleSections: [{ title: "Mentors", people: panelMentors }],
+    privateDetails: {
+      meeting_url: "https://meet.google.com/abc-defg-hij",
+    },
+    agendaDays: [
+      {
+        date: schedule.studentPanel,
+        items: [
+          { title: "Doors and refreshments", start: "18:00", end: "18:20" },
+          { title: "Panel discussion", start: "18:20", end: "19:15" },
+          { title: "Audience Q&A", start: "19:15", end: "19:40" },
+          { title: "Open networking", start: "19:40", end: "20:00" },
+        ],
+      },
+    ],
     checkInSessions: [
       {
         name: "Door Check-in",
@@ -924,9 +1177,18 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       starts_at: pacificTimestamp(schedule.industryTalkDesignSystems, "18:00"),
       ends_at: pacificTimestamp(schedule.industryTalkDesignSystems, "19:30"),
       max_capacity: 90,
+      // Fixture accounts hold tickets here, so they see the stream details.
+      location_type: "hybrid",
+      location_address: "2053 Main Mall, Vancouver, BC",
       ...alreadyClosedRegistration(),
     },
     imageKey: "1.png",
+    links: [slackLink("design-systems")],
+    privateDetails: {
+      meeting_url: "https://ubc.zoom.us/j/9876543210",
+      meeting_id: "987 654 3210",
+      meeting_passcode: "systems",
+    },
     checkInSessions: [
       {
         name: "Door Check-in",

@@ -118,6 +118,27 @@ export async function fetchUserEventApplication(
 }
 
 /**
+ * A user's applications to many events in one round trip, keyed by event id.
+ * An event the user hasn't applied to is absent.
+ */
+export async function fetchUserEventApplications(
+  supabase: DbClient,
+  userId: string,
+  eventIds: string[]
+): Promise<Map<string, EventApplicationRow>> {
+  if (eventIds.length === 0) return new Map();
+
+  const { data, error } = await supabase
+    .from(TABLES.eventApplications)
+    .select("*")
+    .eq("user_id", userId)
+    .in("event_id", eventIds);
+
+  if (error) throw error;
+  return new Map((data ?? []).map((application) => [application.event_id, application]));
+}
+
+/**
  * An event's submitted applications, most recently submitted first, with who
  * applied and whether they hold a ticket, which an accepted application needs
  * to show as Registered. Drafts are the applicant's alone and never listed;
