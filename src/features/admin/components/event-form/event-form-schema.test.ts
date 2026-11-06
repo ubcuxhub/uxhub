@@ -5,8 +5,11 @@ import {
   isFreePricing,
   isDateTimeRangeInvalid,
   isEventScheduleRangeInvalid,
+  toApplicationQuestionInputs,
   validateEventForm,
+  withSavedQuestionIds,
 } from "./event-form-schema";
+import type { ApplicationQuestionTemplate } from "@/features/events/types";
 
 const validFormState = {
   ...defaultFormState,
@@ -102,9 +105,6 @@ describe("event form schema", () => {
           is_required: false,
           max_char_limit: "",
           response_options: [],
-          restrict_file_types: false,
-          allowed_file_types: [],
-          max_file_size_bytes: "",
         },
       ]
     );
@@ -182,5 +182,90 @@ describe("event form schema", () => {
 
     expect(edited).toBe(initial);
     expect(relinked).not.toBe(initial);
+  });
+});
+
+describe("application question payload", () => {
+  const question = (
+    overrides: Partial<ApplicationQuestionTemplate>
+  ): ApplicationQuestionTemplate => ({
+    question: "Why?",
+    description: "",
+    response: "long_text",
+    is_required: true,
+    max_char_limit: "",
+    response_options: [],
+    ...overrides,
+  });
+
+  it("sends saved questions with their ids and new ones with null", () => {
+    const inputs = toApplicationQuestionInputs([
+      question({ id: "question-1" }),
+      question({ question: "New" }),
+    ]);
+
+    expect(inputs.map(({ id, sort_order }) => ({ id, sort_order }))).toEqual([
+      { id: "question-1", sort_order: 0 },
+      { id: null, sort_order: 1 },
+    ]);
+  });
+
+  it("gives file questions the bucket's rule: one PDF, at most 5 MB", () => {
+    const [file] = toApplicationQuestionInputs([
+      question({ response: "file_upload", max_char_limit: 300 }),
+    ]);
+
+    expect(file).toMatchObject({
+      response_type: "file_upload",
+      restrict_file_types: true,
+      allowed_file_types: ["pdf"],
+      max_file_size_bytes: 5 * 1024 * 1024,
+      max_char_limit: null,
+      response_options: null,
+    });
+  });
+
+  it("keeps type-specific settings to the types they apply to", () => {
+    const [text, choice] = toApplicationQuestionInputs([
+      question({ response: "short_text", max_char_limit: "" }),
+      question({
+        response: "dropdown",
+        max_char_limit: 300,
+        response_options: ["A", "B"],
+      }),
+    ]);
+
+    expect(text).toMatchObject({
+      max_char_limit: 5000,
+      response_options: null,
+      restrict_file_types: false,
+      allowed_file_types: null,
+      max_file_size_bytes: null,
+    });
+    expect(choice).toMatchObject({
+      max_char_limit: null,
+      response_options: ["A", "B"],
+    });
+  });
+
+  it("accepts a file question with no file settings to fill in", () => {
+    const result = validateEventForm(validFormState, [], [
+      question({ response: "file_upload", is_required: false }),
+    ]);
+
+    expect(result.questionErrors).toEqual({});
+    expect(result.error).toBeNull();
+  });
+
+  it("adopts the ids a save returns, in the order it was sent", () => {
+    const saved = withSavedQuestionIds(
+      [question({ id: "question-1" }), question({ question: "New" })],
+      ["question-1", "question-2"]
+    );
+
+    expect(saved.map((item) => item.id)).toEqual(["question-1", "question-2"]);
+    expect(
+      withSavedQuestionIds([question({ id: "question-1" })], [])[0].id
+    ).toBe("question-1");
   });
 });

@@ -1,6 +1,20 @@
-import type { CheckInSessionRow, UserInfoRow } from "@/lib/supabase/models";
+import type {
+  CheckInSessionRow,
+  EventApplicationQuestionInsert,
+  UserInfoRow,
+} from "@/lib/supabase/models";
 
 export type CheckInSession = CheckInSessionRow;
+
+/**
+ * One application question as an admin event save sends it. `id` names the
+ * saved question to update, or is null for a new one; a saved question the
+ * save leaves out is removed.
+ */
+export type ApplicationQuestionInput = Omit<
+  EventApplicationQuestionInsert,
+  "event_id" | "id"
+> & { id: string | null };
 
 export interface CheckInSessionDraft {
   name: string;
