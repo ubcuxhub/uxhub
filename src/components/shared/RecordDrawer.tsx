@@ -353,7 +353,7 @@ export function RecordPageTopBar({ listHref, listLabel, recordHref, actions }: R
               aria-label="Collapse to drawer"
               className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "rounded-lg text-muted-foreground")}
             >
-              <Minimize2 className="size-[18px]" aria-hidden />
+              <Minimize2 className="size-5" aria-hidden />
             </Link>
           </TooltipTrigger>
           <TooltipContent>Collapse to drawer</TooltipContent>

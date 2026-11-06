@@ -377,7 +377,7 @@ function SidePeekDrawerTopBar({
                 aria-label={closeLabel}
                 className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "rounded-lg text-muted-foreground")}
               >
-                <ChevronsRight className="size-[18px]" aria-hidden />
+                <ChevronsRight className="size-5" aria-hidden />
               </Link>
             ) : (
               <Button
@@ -388,7 +388,7 @@ function SidePeekDrawerTopBar({
                 onClick={onClose}
                 className="rounded-lg text-muted-foreground"
               >
-                <ChevronsRight className="size-[18px]" aria-hidden />
+                <ChevronsRight className="size-5" aria-hidden />
               </Button>
             )}
           </TooltipTrigger>
@@ -438,7 +438,7 @@ function SidePeekDrawerHeader({ fullPageHref, fullPageTransitionTypes, actions, 
                 }}
                 className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "rounded-lg text-muted-foreground")}
               >
-                <Maximize2 className="size-[18px]" aria-hidden />
+                <Maximize2 className="size-5" aria-hidden />
               </Link>
             </TooltipTrigger>
             <TooltipContent>Open as full page</TooltipContent>

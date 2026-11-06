@@ -246,7 +246,7 @@ export function AdminUserRecord({
           <>
             {user.student_verified_at ? (
               <span className="inline-flex text-primary" title="Verified student">
-                <BadgeCheck className="size-5" aria-hidden />
+                <BadgeCheck className="size-4" aria-hidden />
                 <span className="sr-only">Verified student</span>
               </span>
             ) : null}

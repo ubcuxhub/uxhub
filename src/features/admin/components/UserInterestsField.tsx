@@ -58,7 +58,7 @@ export function UserInterestsField({ value, draft, disabled, onChange }: UserInt
                   className="-mr-1 cursor-pointer rounded-full p-0.5 hover:bg-muted focus-visible:focus-ring disabled:cursor-not-allowed disabled:opacity-50"
                   onClick={() => onChange?.({ interests: draft.interests.filter((item) => item !== tag) })}
                 >
-                  <X aria-hidden />
+                  <X aria-hidden className="size-4" />
                 </button>
               )}
             />
