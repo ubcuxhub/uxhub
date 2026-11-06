@@ -76,12 +76,15 @@ Beyond dates and prices, the fixtures fill in the event page:
 
 | Event | Dates | Also seeds |
 | --- | --- | --- |
-| `design-sprint-past`, `design-sprint-upcoming` | Monday to the next week's Friday | 6-day agenda, Mentors and Judges (Mei Lin Chow is in both), teams of 3–4, Slack and participant package links |
-| `uxathon-past`, `uxathon-upcoming` | Saturday to Sunday | 2-day agenda, Judges and Mentors, teams of 2–4, links (the past one has a recap). The upcoming one is featured |
+| `design-sprint-past`, `design-sprint-upcoming` | Monday to the next week's Friday | 6-day agenda, Mentors, teams of 3–4, Slack and participant package links |
+| `uxathon-past`, `uxathon-upcoming` | Saturday to Sunday | 2-day agenda, Mentors, teams of 2–4, links (the past one has a recap). The upcoming one is featured |
 | `thinkbox-office-tour`, `portfolio-review-night`, `student-panel` | One day | A one-day agenda |
 | `mentorship-program` | Ongoing | Teams open for two weeks, with going-only links |
-| `industry-talk-ai-and-ux`, `student-panel` | — | Online, with meeting details and Speakers or Panelists |
+| `industry-talk-ai-and-ux`, `student-panel` | — | Online, with meeting details |
 | `industry-talk-design-systems` | — | Hybrid, with meeting details the three deep fixtures can see |
+
+People sections are Mentors only until the builder reads other sections: it
+saves every person on an event back as a mentor.
 
 Agendas live in `event_agenda_days` and `event_agenda_items`, not the legacy
 `events.agenda` column, which the fixtures still fill for the public page.

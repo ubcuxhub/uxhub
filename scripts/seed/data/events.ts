@@ -84,7 +84,13 @@ export interface SeedEvent {
   event: Omit<TablesInsert<"events">, "image_url"> & { slug: string };
   /** File name in `scripts/seed/data/images`, uploaded and used as the cover. */
   imageKey: string;
-  /** In page order. The first section titled Mentors is the builder's own. */
+  /**
+   * In page order. Mentors only for now: the builder still loads every person
+   * on the event as a mentor and saves them back as `p_mentors`, so a Judges
+   * or Speakers section would turn into mentors, or fail the save when one
+   * person is in two sections. Add other sections once the builder and the
+   * event page read them.
+   */
   peopleSections?: PeopleSection[];
   sponsors?: SeedSponsor[];
   links?: Omit<TablesInsert<"event_links">, "event_id">[];
@@ -464,47 +470,6 @@ const seedSponsors: SeedSponsor[] = [
   },
 ];
 
-const seedJudges: Mentor[] = [
-  {
-    name: "Sarah Jenkins",
-    role: "Senior Product Designer",
-    company: "Stripe",
-    linkedin_url: "https://www.linkedin.com/in/example-sarah-jenkins",
-    bio: "Judges on craft and on how well a team defends its decisions.",
-  },
-  {
-    name: "Omar Haddad",
-    role: "Head of Design",
-    company: "Clio",
-    linkedin_url: "https://www.linkedin.com/in/example-omar-haddad",
-    bio: "Looks for the research behind the screens.",
-  },
-];
-
-const designSystemsSpeakers: Mentor[] = [
-  {
-    name: "Elena Vasquez",
-    role: "Staff Designer, Design Systems",
-    company: "Shopify",
-    linkedin_url: "https://www.linkedin.com/in/example-elena-vasquez",
-  },
-  {
-    name: "Kenji Watanabe",
-    role: "Design Systems Engineer",
-    company: "Atlassian",
-    linkedin_url: "https://www.linkedin.com/in/example-kenji-watanabe",
-  },
-];
-
-const aiTalkSpeakers: Mentor[] = [
-  {
-    name: "Nadia Petrov",
-    role: "Principal Product Designer",
-    company: "Figma",
-    linkedin_url: "https://www.linkedin.com/in/example-nadia-petrov",
-  },
-];
-
 /** A Slack workspace link, on every event that has a community channel. */
 const slackLink = (channel: string) => ({
   type: "slack_workspace" as const,
@@ -706,11 +671,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       description_images: designSprintDescriptionImages,
     },
     imageKey: "6.png",
-    peopleSections: [
-      { title: "Mentors", people: designSprintMentors },
-      // Mei Lin mentors and judges: one person, two sections.
-      { title: "Judges", people: [designSprintMentors[2], seedJudges[1]] },
-    ],
+    peopleSections: [{ title: "Mentors", people: designSprintMentors }],
     sponsors: seedSponsors.slice(0, 2),
     links: [
       slackLink("design-sprint"),
@@ -763,10 +724,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       description_images: uxathonDescriptionImages,
     },
     imageKey: "4.png",
-    peopleSections: [
-      { title: "Judges", people: seedJudges },
-      { title: "Mentors", people: uxathonMentors },
-    ],
+    peopleSections: [{ title: "Mentors", people: uxathonMentors }],
     sponsors: seedSponsors,
     links: [
       slackLink("uxathon"),
@@ -812,7 +770,6 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       ...closedHistoricalRegistration(schedule.industryTalkPast),
     },
     imageKey: "5.png",
-    peopleSections: [{ title: "Speakers", people: aiTalkSpeakers }],
     links: [
       {
         type: "event_recap",
@@ -1012,10 +969,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       description_images: uxathonDescriptionImages,
     },
     imageKey: "5.png",
-    peopleSections: [
-      { title: "Judges", people: seedJudges },
-      { title: "Mentors", people: uxathonMentors },
-    ],
+    peopleSections: [{ title: "Mentors", people: uxathonMentors }],
     sponsors: seedSponsors,
     links: [
       slackLink("uxathon"),
@@ -1117,11 +1071,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       description_images: designSprintDescriptionImages,
     },
     imageKey: "2.png",
-    peopleSections: [
-      { title: "Mentors", people: designSprintMentors },
-      // Mei Lin mentors and judges: one person, two sections.
-      { title: "Judges", people: [designSprintMentors[2], seedJudges[1]] },
-    ],
+    peopleSections: [{ title: "Mentors", people: designSprintMentors }],
     sponsors: seedSponsors.slice(0, 2),
     links: [
       slackLink("design-sprint"),
@@ -1163,7 +1113,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       agenda: panelAgenda,
     },
     imageKey: "3.png",
-    peopleSections: [{ title: "Panelists", people: panelMentors }],
+    peopleSections: [{ title: "Mentors", people: panelMentors }],
     privateDetails: {
       meeting_url: "https://meet.google.com/abc-defg-hij",
     },
@@ -1211,7 +1161,6 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       ...alreadyClosedRegistration(),
     },
     imageKey: "1.png",
-    peopleSections: [{ title: "Speakers", people: designSystemsSpeakers }],
     links: [slackLink("design-systems")],
     privateDetails: {
       meeting_url: "https://ubc.zoom.us/j/9876543210",
