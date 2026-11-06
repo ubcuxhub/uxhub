@@ -131,7 +131,10 @@ export function RecordFrame({ listHref, open: openProp, onClose, children }: Rec
   const [seenPath, setSeenPath] = React.useState(pathname);
   if (seenPath !== pathname) {
     setSeenPath(pathname);
-    setClosing(false);
+    // Keep `closing` until a record opens again: clearing it as the URL
+    // reaches the list would mark the panel instant mid-slide-out, and the
+    // dialog would never finish unmounting (an empty panel stays on screen).
+    if (atRecord) setClosing(false);
   }
   React.useEffect(() => {
     const last = lastPath.current;
