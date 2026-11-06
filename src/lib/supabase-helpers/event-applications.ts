@@ -107,6 +107,27 @@ export async function fetchUserEventApplication(
 }
 
 /**
+ * A user's applications to many events in one round trip, keyed by event id.
+ * An event the user hasn't applied to is absent.
+ */
+export async function fetchUserEventApplications(
+  supabase: DbClient,
+  userId: string,
+  eventIds: string[]
+): Promise<Map<string, EventApplicationRow>> {
+  if (eventIds.length === 0) return new Map();
+
+  const { data, error } = await supabase
+    .from(TABLES.eventApplications)
+    .select("*")
+    .eq("user_id", userId)
+    .in("event_id", eventIds);
+
+  if (error) throw error;
+  return new Map((data ?? []).map((application) => [application.event_id, application]));
+}
+
+/**
  * An event's applications, newest first, with who applied and whether they
  * hold a ticket, which an accepted application needs to show as Registered.
  */
@@ -246,32 +267,34 @@ export type EventApplicationStatusCounts = Record<
   number
 > & { total: number };
 
+const APPLICATION_STATUSES = ["submitted", "accepted", "rejected", "waitlisted"] as const satisfies readonly EventApplicationRow["status"][];
+
 /**
  * Counts an event's applications by status, for the admin overview. Every
- * status is present, at zero when none are in it. Under RLS a caller who can't
- * see the applications gets zeros, so pass an admin's client.
+ * status is present, at zero when none are in it. Exact counts from the
+ * database, one per status, so no row limit applies. Under RLS a caller who
+ * can't see the applications gets zeros, so pass an admin's client.
  */
 export async function fetchEventApplicationStatusCounts(
   supabase: DbClient,
   eventId: string
 ): Promise<EventApplicationStatusCounts> {
-  const { data, error } = await supabase
-    .from(TABLES.eventApplications)
-    .select("status")
-    .eq("event_id", eventId);
+  const results = await Promise.all(
+    APPLICATION_STATUSES.map(async (status) => {
+      const { count, error } = await supabase
+        .from(TABLES.eventApplications)
+        .select("id", { count: "exact", head: true })
+        .eq("event_id", eventId)
+        .eq("status", status);
+      if (error) throw error;
+      return [status, count ?? 0] as const;
+    })
+  );
 
-  if (error) throw error;
-
-  const counts: EventApplicationStatusCounts = {
-    submitted: 0,
-    accepted: 0,
-    rejected: 0,
-    waitlisted: 0,
-    total: 0,
-  };
-  for (const { status } of data ?? []) {
-    counts[status] += 1;
-    counts.total += 1;
+  const counts = { total: 0 } as EventApplicationStatusCounts;
+  for (const [status, count] of results) {
+    counts[status] = count;
+    counts.total += count;
   }
   return counts;
 }

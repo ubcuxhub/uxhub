@@ -379,16 +379,20 @@ export function AdminEventRecord({
                     onChange={(value) => update("publish_at", value)}
                   />
                 </div>
-                <EventSchedule
-                  starts_at={draft.starts_at}
-                  ends_at={draft.ends_at}
-                  onFieldChange={update}
-                />
-                <RegistrationTimes
-                  registration_opens_at={draft.registration_opens_at}
-                  registration_closes_at={draft.registration_closes_at}
-                  onFieldChange={update}
-                />
+                {/* Locked while saving: the save sends the values as they were
+                    when it started, and closes the editor when it finishes. */}
+                <fieldset disabled={saving} className="contents">
+                  <EventSchedule
+                    starts_at={draft.starts_at}
+                    ends_at={draft.ends_at}
+                    onFieldChange={update}
+                  />
+                  <RegistrationTimes
+                    registration_opens_at={draft.registration_opens_at}
+                    registration_closes_at={draft.registration_closes_at}
+                    onFieldChange={update}
+                  />
+                </fieldset>
               </FieldGroup>
             ) : (
               <>

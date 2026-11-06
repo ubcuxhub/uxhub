@@ -49,6 +49,8 @@ import {
 } from "./lib/images.ts";
 import { membershipTypes } from "./data/membership-types.ts";
 import { buildSeedEvents, type SeedEvent } from "./data/events.ts";
+import { seedTeams } from "./data/teams.ts";
+import { dateString } from "./lib/relative-dates.ts";
 import {
   buildSeedUsers,
   RETIRED_FIXTURE_EMAILS,
@@ -95,7 +97,14 @@ const TABLE = {
   mentors: "mentors",
   sponsors: "sponsors",
   eventMentors: "event_mentors",
+  eventPeopleSections: "event_people_sections",
   eventSponsors: "event_sponsors",
+  eventLinks: "event_links",
+  eventPrivateDetails: "event_private_details",
+  eventAgendaDays: "event_agenda_days",
+  eventAgendaItems: "event_agenda_items",
+  teams: "teams",
+  teamMembers: "team_members",
 } as const;
 
 interface Options extends ReconcileOptions {
@@ -341,9 +350,13 @@ async function prunePass(
   /* ── Mentors and sponsors ── */
   if (shouldRun(options, "events")) {
     const desiredMentors = seedEvents.flatMap((seed) =>
-      (seed.mentors ?? []).map((mentor) => mentor.name)
+      (seed.peopleSections ?? []).flatMap((section) =>
+        section.people.map((person) => person.name)
+      )
     );
-    const desiredSponsors = seedEvents.flatMap((seed) => seed.sponsors ?? []);
+    const desiredSponsors = seedEvents.flatMap((seed) =>
+      (seed.sponsors ?? []).map((sponsor) => sponsor.logo)
+    );
 
     for (const [table, column, desired, label] of [
       [TABLE.mentors, "full_name", desiredMentors, "Mentors"],
@@ -438,6 +451,418 @@ async function prunePass(
   return lines;
 }
 
+type SeedPerson = NonNullable<SeedEvent["peopleSections"]>[number]["people"][number];
+
+/** The mentors row for a seeded person, matched by name, kept up to date. */
+async function upsertMentor(
+  supabase: SupabaseClient,
+  person: SeedPerson
+): Promise<string> {
+  const { data: existing, error: readError } = await supabase
+    .from(TABLE.mentors)
+    .select("id")
+    .eq("full_name", person.name)
+    .maybeSingle();
+  if (readError) throw readError;
+
+  const payload = {
+    full_name: person.name,
+    position: [person.role, person.company].filter(Boolean).join(" at "),
+    linkedin_url: person.linkedin_url ?? null,
+    description: person.bio ?? null,
+    profile_image_path: person.image_url ?? null,
+  };
+  if (existing) {
+    const { error } = await supabase
+      .from(TABLE.mentors)
+      .update(payload)
+      .eq("id", existing.id);
+    if (error) throw error;
+    return existing.id as string;
+  }
+  const { data, error } = await supabase
+    .from(TABLE.mentors)
+    .insert(payload)
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data.id as string;
+}
+
+/**
+ * The event's people sections, in page order, and the people in each. The
+ * links are rewritten whole each run, as the sponsors are.
+ */
+async function reconcilePeopleSections(
+  supabase: SupabaseClient,
+  eventId: string,
+  seed: SeedEvent,
+  options: Options
+): Promise<Counts> {
+  const sections = seed.peopleSections ?? [];
+  const counts = await reconcileChildren(
+    supabase,
+    TABLE.eventPeopleSections,
+    "event_id",
+    eventId,
+    "title",
+    sections.map((section, sortOrder) => ({
+      title: section.title,
+      sort_order: sortOrder,
+    })),
+    options
+  );
+  if (options.dryRun) return counts;
+
+  const { data: rows, error: readError } = await supabase
+    .from(TABLE.eventPeopleSections)
+    .select("id, title")
+    .eq("event_id", eventId);
+  if (readError) throw readError;
+  const sectionIds = new Map(
+    (rows ?? []).map((row) => [row.title as string, row.id as string])
+  );
+
+  const { error: clearError } = await supabase
+    .from(TABLE.eventMentors)
+    .delete()
+    .eq("event_id", eventId);
+  if (clearError) throw clearError;
+
+  for (const section of sections) {
+    const sectionId = sectionIds.get(section.title);
+    if (!sectionId) throw new Error(`No id for section "${section.title}"`);
+    const links = [];
+    for (const [sortOrder, person] of section.people.entries()) {
+      links.push({
+        event_id: eventId,
+        section_id: sectionId,
+        mentor_id: await upsertMentor(supabase, person),
+        sort_order: sortOrder,
+      });
+    }
+    if (links.length > 0) {
+      const { error } = await supabase.from(TABLE.eventMentors).insert(links);
+      if (error) throw error;
+    }
+  }
+  return counts;
+}
+
+/** The event's sponsors, matched by logo, with their details kept up to date. */
+async function reconcileSponsors(
+  supabase: SupabaseClient,
+  eventId: string,
+  seed: SeedEvent
+): Promise<void> {
+  const sponsorIds: string[] = [];
+  for (const sponsor of seed.sponsors ?? []) {
+    const { data: existing, error: readError } = await supabase
+      .from(TABLE.sponsors)
+      .select("id")
+      .eq("brand_logo_path", sponsor.logo)
+      .maybeSingle();
+    if (readError) throw readError;
+
+    const payload = {
+      name: sponsor.name,
+      brand_logo_path: sponsor.logo,
+      description: sponsor.description,
+      website_url: sponsor.website_url,
+    };
+    if (existing) {
+      const { error } = await supabase
+        .from(TABLE.sponsors)
+        .update(payload)
+        .eq("id", existing.id);
+      if (error) throw error;
+      sponsorIds.push(existing.id as string);
+    } else {
+      const { data, error } = await supabase
+        .from(TABLE.sponsors)
+        .insert(payload)
+        .select("id")
+        .single();
+      if (error) throw error;
+      sponsorIds.push(data.id as string);
+    }
+  }
+
+  const { error: clearError } = await supabase
+    .from(TABLE.eventSponsors)
+    .delete()
+    .eq("event_id", eventId);
+  if (clearError) throw clearError;
+  if (sponsorIds.length > 0) {
+    const { error } = await supabase.from(TABLE.eventSponsors).insert(
+      sponsorIds.map((sponsorId, sortOrder) => ({
+        event_id: eventId,
+        sponsor_id: sponsorId,
+        sort_order: sortOrder,
+      }))
+    );
+    if (error) throw error;
+  }
+}
+
+/** The event's links, keyed by URL, in order. */
+function reconcileEventLinks(
+  supabase: SupabaseClient,
+  eventId: string,
+  seed: SeedEvent,
+  options: Options
+): Promise<Counts> {
+  return reconcileChildren(
+    supabase,
+    TABLE.eventLinks,
+    "event_id",
+    eventId,
+    "url",
+    (seed.links ?? []).map((link, sortOrder) => ({
+      ...link,
+      label: link.label ?? null,
+      visibility: link.visibility ?? "everyone",
+      sort_order: sortOrder,
+    })),
+    options
+  );
+}
+
+/** The event's online meeting details: one row, or none. */
+async function reconcilePrivateDetails(
+  supabase: SupabaseClient,
+  eventId: string,
+  seed: SeedEvent,
+  options: Options
+): Promise<Counts> {
+  const counts = emptyCounts();
+  if (seed.privateDetails) {
+    counts.updated += 1;
+    if (options.dryRun) return counts;
+    const { error } = await supabase.from(TABLE.eventPrivateDetails).upsert({
+      event_id: eventId,
+      meeting_id: null,
+      meeting_passcode: null,
+      ...seed.privateDetails,
+    });
+    if (error) throw error;
+    return counts;
+  }
+
+  if (!options.prune || options.dryRun) return counts;
+  const { count, error } = await supabase
+    .from(TABLE.eventPrivateDetails)
+    .delete({ count: "exact" })
+    .eq("event_id", eventId);
+  if (error) throw error;
+  counts.pruned += count ?? 0;
+  return counts;
+}
+
+/** The event's agenda days, keyed by date, and each day's items, keyed by title. */
+async function reconcileAgenda(
+  supabase: SupabaseClient,
+  eventId: string,
+  seed: SeedEvent,
+  options: Options
+): Promise<Counts> {
+  const days = seed.agendaDays ?? [];
+  const counts = await reconcileChildren(
+    supabase,
+    TABLE.eventAgendaDays,
+    "event_id",
+    eventId,
+    "date",
+    days.map((day) => ({ date: dateString(day.date), title: day.title ?? null })),
+    options
+  );
+  if (options.dryRun || days.length === 0) return counts;
+
+  const { data: rows, error } = await supabase
+    .from(TABLE.eventAgendaDays)
+    .select("id, date")
+    .eq("event_id", eventId);
+  if (error) throw error;
+  const dayIds = new Map(
+    (rows ?? []).map((row) => [row.date as string, row.id as string])
+  );
+
+  for (const day of days) {
+    const dayId = dayIds.get(dateString(day.date));
+    if (!dayId) throw new Error(`No id for agenda day ${dateString(day.date)}`);
+    await reconcileChildren(
+      supabase,
+      TABLE.eventAgendaItems,
+      "event_agenda_day_id",
+      dayId,
+      "title",
+      day.items.map((item) => ({
+        title: item.title,
+        start_time: item.start,
+        end_time: item.end,
+        building: item.building ?? null,
+        room: item.room ?? null,
+      })),
+      options
+    );
+  }
+  return counts;
+}
+
+/**
+ * The fixture teams in `data/teams.ts`, made and joined through create_team
+ * and join_team so they obey the same rules as a student's. A run also undoes
+ * team changes fixtures made through the app, as it undoes their purchases.
+ */
+async function reconcileTeams(
+  supabase: SupabaseClient,
+  profileIds: Map<string, string>,
+  options: Options
+): Promise<Counts> {
+  const counts = emptyCounts();
+  if (options.dryRun) {
+    counts.created += seedTeams.length;
+    return counts;
+  }
+
+  const fixtureIds = [...profileIds.values()];
+  const idOf = (email: string) => {
+    const id = profileIds.get(email);
+    if (!id) throw new Error(`No profile for team fixture ${email}`);
+    return id;
+  };
+
+  const { data: events, error: eventsError } = await supabase
+    .from(TABLE.events)
+    .select("id, slug")
+    .in("slug", seedTeams.map((team) => team.eventSlug));
+  if (eventsError) throw eventsError;
+  const eventIds = new Map(
+    (events ?? []).map((event) => [event.slug as string, event.id as string])
+  );
+
+  // Who should be on which team: event id and user id, to the owner's id.
+  const desired = new Map<string, string>();
+  for (const team of seedTeams) {
+    const eventId = eventIds.get(team.eventSlug);
+    if (!eventId) throw new Error(`No event "${team.eventSlug}" for a team fixture`);
+    const ownerId = idOf(team.ownerEmail);
+    for (const email of [team.ownerEmail, ...team.memberEmails]) {
+      desired.set(`${eventId}:${idOf(email)}`, ownerId);
+    }
+  }
+
+  if (options.prune && fixtureIds.length > 0) {
+    // Teams fixtures own that the data doesn't describe go, with their members.
+    const { data: owned, error } = await supabase
+      .from(TABLE.teams)
+      .select("id, event_id, owner_id")
+      .in("owner_id", fixtureIds);
+    if (error) throw error;
+    for (const team of owned ?? []) {
+      if (desired.get(`${team.event_id}:${team.owner_id}`) === team.owner_id) continue;
+      const { error: deleteError } = await supabase
+        .from(TABLE.teams)
+        .delete()
+        .eq("id", team.id);
+      if (deleteError) throw deleteError;
+      counts.pruned += 1;
+    }
+  }
+
+  for (const team of seedTeams) {
+    const eventId = eventIds.get(team.eventSlug)!;
+    const ownerId = idOf(team.ownerEmail);
+    const memberIds = team.memberEmails.map(idOf);
+
+    const { data: existing, error: readError } = await supabase
+      .from(TABLE.teams)
+      .select("id, invite_code")
+      .eq("event_id", eventId)
+      .eq("owner_id", ownerId)
+      .maybeSingle();
+    if (readError) throw readError;
+
+    let teamId = existing?.id as string | undefined;
+    let inviteCode = existing?.invite_code as string | undefined;
+    if (teamId) {
+      counts.updated += 1;
+      const { error } = await supabase
+        .from(TABLE.teams)
+        .update({ name: team.name })
+        .eq("id", teamId);
+      if (error) throw error;
+    } else {
+      // The owner may be on someone else's team from an earlier run.
+      await supabase
+        .from(TABLE.teamMembers)
+        .delete()
+        .eq("event_id", eventId)
+        .eq("user_id", ownerId);
+      const { data, error } = await supabase.rpc("create_team", {
+        p_event_id: eventId,
+        p_user_id: ownerId,
+        p_name: team.name ?? undefined,
+      });
+      if (error) throw error;
+      const row = data?.[0];
+      if (row?.failure_reason) {
+        throw new Error(`Creating team "${team.name}" failed: ${row.failure_reason}`);
+      }
+      teamId = row.team_id as string;
+      const { data: created, error: codeError } = await supabase
+        .from(TABLE.teams)
+        .select("invite_code")
+        .eq("id", teamId)
+        .single();
+      if (codeError) throw codeError;
+      inviteCode = created.invite_code as string;
+      counts.created += 1;
+    }
+
+    // Fixture members not listed here leave; listed ones join if they aren't on it.
+    const { data: members, error: membersError } = await supabase
+      .from(TABLE.teamMembers)
+      .select("user_id, team_id")
+      .eq("event_id", eventId)
+      .in("user_id", fixtureIds);
+    if (membersError) throw membersError;
+    for (const member of members ?? []) {
+      const wantedOwner = desired.get(`${eventId}:${member.user_id}`);
+      // Already where they belong.
+      if (wantedOwner === ownerId && member.team_id === teamId) continue;
+      // Belongs on another seeded team: that team's pass sorts it out.
+      if (wantedOwner !== undefined && wantedOwner !== ownerId) continue;
+      // On no seeded team: a team joined through the app, kept by --no-prune.
+      if (wantedOwner === undefined && !options.prune) continue;
+      const { error } = await supabase
+        .from(TABLE.teamMembers)
+        .delete()
+        .eq("event_id", eventId)
+        .eq("user_id", member.user_id);
+      if (error) throw error;
+    }
+    for (const memberId of memberIds) {
+      const { data: current } = await supabase
+        .from(TABLE.teamMembers)
+        .select("team_id")
+        .eq("event_id", eventId)
+        .eq("user_id", memberId)
+        .maybeSingle();
+      if (current?.team_id === teamId) continue;
+      const { data, error } = await supabase.rpc("join_team", {
+        p_invite_code: inviteCode,
+        p_user_id: memberId,
+      });
+      if (error) throw error;
+      if (data?.[0]?.failure_reason) {
+        throw new Error(`Joining team "${team.name}" failed: ${data[0].failure_reason}`);
+      }
+    }
+  }
+  return counts;
+}
+
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
   const seedNow = new Date();
@@ -523,13 +948,21 @@ async function main(): Promise<void> {
         // anon API even while the studentEvents flag hides every page for it.
         status: policy.forceDraft ? ("draft" as const) : seed.event.status,
         event_type: seed.event.event_type ?? "regular",
+        // One upsert writes every event, and PostgREST fills a column only some
+        // rows name with null, not its default: spell the defaults out.
+        is_featured: seed.event.is_featured ?? false,
+        location_type: seed.event.location_type ?? "in_person",
+        agenda_enabled: seed.event.agenda_enabled ?? true,
+        teams_enabled: seed.event.teams_enabled ?? false,
         short_description:
           seed.event.short_description ??
           seed.event.description.slice(0, 180),
         // Built from the target's own host rather than uploaded here, so
         // `--only=events` still resolves images a previous run wrote.
         image_url: seedImageUrl(supabase, BUCKET.eventImages.id, seed.imageKey),
-        mentors_enabled: Boolean(seed.mentors?.length),
+        mentors_enabled: Boolean(
+          seed.peopleSections?.some((section) => section.people.length > 0)
+        ),
         sponsors_enabled: Boolean(seed.sponsors?.length),
         requires_application: seed.applicationQuestions.length > 0,
       })),
@@ -539,6 +972,10 @@ async function main(): Promise<void> {
 
     const sessionCounts = emptyCounts();
     const questionCounts = emptyCounts();
+    const sectionCounts = emptyCounts();
+    const linkCounts = emptyCounts();
+    const privateDetailCounts = emptyCounts();
+    const agendaCounts = emptyCounts();
 
     for (const seed of seedEvents) {
       const eventId = idsBySlug.get(seed.event.slug);
@@ -580,103 +1017,27 @@ async function main(): Promise<void> {
         )
       );
 
+      addCounts(
+        sectionCounts,
+        await reconcilePeopleSections(supabase, eventId, seed, options)
+      );
       if (!options.dryRun) {
-        const mentorIds: string[] = [];
-        for (const mentor of seed.mentors ?? []) {
-          const { data: existingMentor, error: mentorReadError } = await supabase
-            .from(TABLE.mentors)
-            .select("id")
-            .eq("full_name", mentor.name)
-            .maybeSingle();
-          if (mentorReadError) throw mentorReadError;
-
-          const mentorPayload = {
-            full_name: mentor.name,
-            position: [mentor.role, mentor.company].filter(Boolean).join(" at "),
-            linkedin_url: mentor.linkedin_url ?? null,
-            description: mentor.bio ?? null,
-            profile_image_path: mentor.image_url ?? null,
-          };
-          if (existingMentor) {
-            const { error } = await supabase
-              .from(TABLE.mentors)
-              .update(mentorPayload)
-              .eq("id", existingMentor.id);
-            if (error) throw error;
-            mentorIds.push(existingMentor.id);
-          } else {
-            const { data, error } = await supabase
-              .from(TABLE.mentors)
-              .insert(mentorPayload)
-              .select("id")
-              .single();
-            if (error) throw error;
-            mentorIds.push(data.id);
-          }
-        }
-
-        const { error: clearMentorsError } = await supabase
-          .from(TABLE.eventMentors)
-          .delete()
-          .eq("event_id", eventId);
-        if (clearMentorsError) throw clearMentorsError;
-        if (mentorIds.length) {
-          const { error } = await supabase.from(TABLE.eventMentors).insert(
-            mentorIds.map((mentorId, sortOrder) => ({
-              event_id: eventId,
-              mentor_id: mentorId,
-              sort_order: sortOrder,
-            }))
-          );
-          if (error) throw error;
-        }
-
-        const sponsorIds: string[] = [];
-        for (const [index, logo] of (seed.sponsors ?? []).entries()) {
-          const { data: existingSponsor, error: sponsorReadError } =
-            await supabase
-              .from(TABLE.sponsors)
-              .select("id")
-              .eq("brand_logo_path", logo)
-              .maybeSingle();
-          if (sponsorReadError) throw sponsorReadError;
-
-          if (existingSponsor) {
-            sponsorIds.push(existingSponsor.id);
-          } else {
-            const { data, error } = await supabase
-              .from(TABLE.sponsors)
-              .insert({
-                name: `Seed Sponsor ${index + 1}`,
-                brand_logo_path: logo,
-              })
-              .select("id")
-              .single();
-            if (error) throw error;
-            sponsorIds.push(data.id);
-          }
-        }
-
-        const { error: clearSponsorsError } = await supabase
-          .from(TABLE.eventSponsors)
-          .delete()
-          .eq("event_id", eventId);
-        if (clearSponsorsError) throw clearSponsorsError;
-        if (sponsorIds.length) {
-          const { error } = await supabase.from(TABLE.eventSponsors).insert(
-            sponsorIds.map((sponsorId, sortOrder) => ({
-              event_id: eventId,
-              sponsor_id: sponsorId,
-              sort_order: sortOrder,
-            }))
-          );
-          if (error) throw error;
-        }
+        await reconcileSponsors(supabase, eventId, seed);
       }
+      addCounts(linkCounts, await reconcileEventLinks(supabase, eventId, seed, options));
+      addCounts(
+        privateDetailCounts,
+        await reconcilePrivateDetails(supabase, eventId, seed, options)
+      );
+      addCounts(agendaCounts, await reconcileAgenda(supabase, eventId, seed, options));
     }
 
     summary.push(format("Check-in sessions", sessionCounts));
     summary.push(format("Application questions", questionCounts));
+    summary.push(format("People sections", sectionCounts));
+    summary.push(format("Event links", linkCounts));
+    summary.push(format("Meeting details", privateDetailCounts));
+    summary.push(format("Agenda days", agendaCounts));
   }
 
   let profileIds = new Map<string, string>();
@@ -710,6 +1071,7 @@ async function main(): Promise<void> {
     summary.push(format("Event applications", userSummary.applications));
     summary.push(format("Application responses", userSummary.responses));
     summary.push(format("Check-ins", userSummary.checkIns));
+    summary.push(format("Teams", await reconcileTeams(supabase, profileIds, options)));
   }
 
   if (options.prune) {
