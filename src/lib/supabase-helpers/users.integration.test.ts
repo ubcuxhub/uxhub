@@ -7,12 +7,19 @@ import { fetchAdminUserRecordById } from "./users";
 describe("fetchAdminUserRecordById against local Supabase", () => {
   it("reads one user with their tier name and verifier, as an admin under RLS", () =>
     withFixtures(async (fixtures) => {
+      // Its own tier: CI's database is unseeded.
       const { data: tier, error } = await fixtures.supabase
         .from("membership_types")
+        .insert({
+          name: `Integration tier ${fixtures.tag}`,
+          slug: `integration-tier-${fixtures.tag}`,
+          description: "Created by an integration test.",
+          price: 10,
+        })
         .select("id, name")
-        .limit(1)
         .single();
       if (error) throw error;
+      fixtures.track("membership_types", tier.id);
 
       const admin = await fixtures.createUser({ role_access: "admin" });
       const manager = await fixtures.createUser({ role_access: "manager", first_name: "Iris", last_name: "Chan" });
