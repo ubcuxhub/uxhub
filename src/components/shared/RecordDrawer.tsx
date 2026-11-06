@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { ViewTransition } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { History, Minimize2, SearchX } from "lucide-react";
@@ -34,11 +35,94 @@ import { cn } from "@/lib/utils";
  * one of the list's records, on a row click and on a refresh alike, and the
  * list stays mounted behind it while records are swapped. Users have no other
  * view of a record; an event's "Edit event" opens its builder, a page of its
- * own that wears the drawer's top bar (`RecordPageTopBar`).
+ * own that wears the drawer's top bar (`RecordPage`).
  *
  * The content (`RecordView` and its sections and fields) fills the drawer and
  * never needs to know how it was opened.
+ *
+ * Expanding the drawer into its record's page, and collapsing the page back,
+ * morph one panel into the other: the drawer's panel (in `RecordFrame`) and
+ * the page (`RecordPage`) are a named `<ViewTransition>` pair, and the list
+ * (`RecordList`) fades out or in behind them. Only navigations from the
+ * expand, "Edit event" and collapse links carry the transition types that
+ * switch the pair on (`useRecordMorphTypes`); every other way in or out
+ * (opening from a row, closing, swapping rows, Back) keeps the drawer's own
+ * slide, or none.
  */
+
+// --- Expand and collapse ----------------------------------------------------
+
+/** The shared name of the drawer's panel and its record's full page. */
+const RECORD_PANEL = "record-panel";
+/** Transition types on the links between a drawer and its record's page. */
+const RECORD_EXPAND = "record-expand";
+const RECORD_COLLAPSE = "record-collapse";
+/** The CSS classes the morph and the list's fade animate (`globals.css`). */
+const MORPH = { [RECORD_EXPAND]: "record-morph", [RECORD_COLLAPSE]: "record-morph", default: "none" };
+const LIST_ENTER = { [RECORD_COLLAPSE]: "record-fade", default: "none" };
+const LIST_EXIT = { [RECORD_EXPAND]: "record-fade", default: "none" };
+
+/**
+ * Where the morph plays: `sm`+ (below it the drawer already fills the
+ * screen, and expand and collapse are hidden), without reduced motion.
+ */
+const MORPH_QUERY = "(min-width: 640px) and (prefers-reduced-motion: no-preference)";
+
+function subscribeMorph(onChange: () => void) {
+  if (typeof window.matchMedia !== "function") return () => {};
+  const query = window.matchMedia(MORPH_QUERY);
+  query.addEventListener("change", onChange);
+  return () => query.removeEventListener("change", onChange);
+}
+
+function getMorphSnapshot() {
+  return (
+    typeof window.matchMedia === "function" &&
+    window.matchMedia(MORPH_QUERY).matches &&
+    "startViewTransition" in document
+  );
+}
+
+/**
+ * The `transitionTypes` for a link from a record's drawer to its full page
+ * (`expand`) or back (`collapse`), so the panel morphs between them. None on
+ * phones, with reduced motion, or without view transitions: the page then
+ * swaps instantly, as any other navigation does.
+ */
+export function useRecordMorphTypes(direction: "expand" | "collapse"): string[] | undefined {
+  const morph = React.useSyncExternalStore(subscribeMorph, getMorphSnapshot, () => false);
+  if (!morph) return undefined;
+  return [direction === "expand" ? RECORD_EXPAND : RECORD_COLLAPSE];
+}
+
+/** Whether the panel is mounting as the end of a collapse's morph. */
+function isCollapsing() {
+  try {
+    return document.documentElement.matches(`:active-view-transition-type(${RECORD_COLLAPSE})`);
+  } catch {
+    // No view transition types in this browser, so no morph either.
+    return false;
+  }
+}
+
+/**
+ * A list whose records have a full page (`RecordPage`): it fades out while a
+ * record expands into its page, and back in while the page collapses into
+ * the drawer. Wrap the one element holding the list and its `RecordFrame`:
+ *
+ * ```tsx
+ * <RecordList>
+ *   <PageContainer>…list… <RecordFrame listHref="/admin/events">{children}</RecordFrame></PageContainer>
+ * </RecordList>
+ * ```
+ */
+export function RecordList({ children }: { children: React.ReactNode }) {
+  return (
+    <ViewTransition enter={LIST_ENTER} exit={LIST_EXIT} default="none">
+      {children}
+    </ViewTransition>
+  );
+}
 
 interface RecordFrameContextValue {
   /** Reports unsaved changes. `RecordView` does this from its `dirty` prop. */
@@ -159,8 +243,21 @@ export function RecordFrame({ listHref, open: openProp, onClose, children }: Rec
     [list, router],
   );
 
+  // The panel, while it is mounted.
+  const panel = React.useRef<HTMLDivElement | null>(null);
+  const setPanel = React.useCallback((node: HTMLDivElement | null) => {
+    panel.current = node;
+    // Mounting as a page collapses into it: the morph brings the panel in,
+    // so skip the slide-in (it would also move the morph's target off
+    // screen). Set on the element, not in state, to be in place before the
+    // morph snapshots it.
+    if (node && isCollapsing()) node.setAttribute("data-morphed", "");
+  }, []);
+
   const close = () => {
     if (onClose) return onClose();
+    // Let a panel that reopens mid-slide-out slide in again.
+    panel.current?.removeAttribute("data-morphed");
     setClosing(true);
     // Slide out first, while the record is still the route's content.
     window.clearTimeout(closeTimer.current);
@@ -180,17 +277,22 @@ export function RecordFrame({ listHref, open: openProp, onClose, children }: Rec
       onNavigate={leave}
       guardNavigation
     >
-      <SidePeekDrawerContent
-        aria-describedby={undefined}
-        // Closed by the URL (Back, a link), the record is already gone: don't
-        // slide out an empty panel.
-        data-instant={!open && !closing && openProp === undefined ? "" : undefined}
-        className="data-[instant]:animate-none!"
-      >
-        <FrameContext setDirty={setDirty} leave={leave}>
-          {children}
-        </FrameContext>
-      </SidePeekDrawerContent>
+      {/* The panel's half of the expand/collapse morph. Opening, closing and
+          swapping records don't animate it: they keep the drawer's own slide. */}
+      <ViewTransition name={RECORD_PANEL} share={MORPH} default="none">
+        <SidePeekDrawerContent
+          ref={setPanel}
+          aria-describedby={undefined}
+          // Closed by the URL (Back, a link), the record is already gone: don't
+          // slide out an empty panel.
+          data-instant={!open && !closing && openProp === undefined ? "" : undefined}
+          className="data-[instant]:animate-none! data-[morphed]:data-[state=open]:animate-none!"
+        >
+          <FrameContext setDirty={setDirty} leave={leave}>
+            {children}
+          </FrameContext>
+        </SidePeekDrawerContent>
+      </ViewTransition>
     </SidePeekDrawer>
   );
 }
@@ -230,9 +332,11 @@ export interface RecordPageTopBarProps {
  * Both are plain links, so the page's own unsaved-changes guard sees them.
  * Collapse is hidden below `sm`, as expand is in the drawer. The shell's
  * phone header hides while this bar is on the page, so the page opens like
- * the drawer: close is the way out.
+ * the drawer: close is the way out. `RecordPage` renders it; use it alone
+ * only where the page shouldn't morph.
  */
 export function RecordPageTopBar({ listHref, listLabel, recordHref, actions }: RecordPageTopBarProps) {
+  const collapseTypes = useRecordMorphTypes("collapse");
   return (
     <SidePeekDrawerTopBar
       closeHref={listHref}
@@ -245,6 +349,7 @@ export function RecordPageTopBar({ listHref, listLabel, recordHref, actions }: R
           <TooltipTrigger asChild>
             <Link
               href={recordHref}
+              transitionTypes={collapseTypes}
               aria-label="Collapse to drawer"
               className={cn(buttonVariants({ variant: "ghost", size: "icon" }), "rounded-lg text-muted-foreground")}
             >
@@ -255,6 +360,30 @@ export function RecordPageTopBar({ listHref, listLabel, recordHref, actions }: R
         </Tooltip>
       }
     />
+  );
+}
+
+export interface RecordPageProps extends RecordPageTopBarProps {
+  className?: string;
+  /** The page's content, under the top bar: a `PageContainer`. */
+  children: React.ReactNode;
+}
+
+/**
+ * A record's full page (an event's builder): `RecordPageTopBar` over the
+ * content, as one panel that the record's drawer grows into on expand and
+ * shrinks back into on collapse.
+ */
+export function RecordPage({ className, children, ...topBar }: RecordPageProps) {
+  return (
+    <ViewTransition name={RECORD_PANEL} share={MORPH} default="none">
+      {/* One element, so the morph has one panel to move. Opaque, so the
+          drawer and the page cross-fade cleanly over the list. */}
+      <div data-slot="record-page" className={cn("flex flex-1 flex-col bg-background", className)}>
+        <RecordPageTopBar {...topBar} />
+        {children}
+      </div>
+    </ViewTransition>
   );
 }
 
@@ -279,7 +408,9 @@ export interface RecordViewProps {
   actions?: React.ReactNode;
   /**
    * The record's full page (an event's builder). Shows an expand button
-   * beside close, the twin of the page's collapse; hidden below `sm`.
+   * beside close, the twin of the page's collapse; hidden below `sm`. Another
+   * link to the page (an "Edit event" action) morphs into it too when it
+   * passes `useRecordMorphTypes("expand")` as its `transitionTypes`.
    */
   fullPageHref?: string;
   /** The Details tab: `RecordSection`s. */
@@ -330,6 +461,7 @@ export function RecordView({
   saveLabel = "Save changes",
 }: RecordViewProps) {
   const { setDirty } = useRecordFrame();
+  const expandTypes = useRecordMorphTypes("expand");
   const formId = React.useId();
   const titleRef = React.useRef<HTMLHeadingElement>(null);
   const [tab, setTab] = React.useState("details");
@@ -407,7 +539,11 @@ export function RecordView({
 
   return (
     <RecordViewContext.Provider value={{ editing }}>
-      <SidePeekDrawerHeader fullPageHref={fullPageHref} actions={showActions ? actions : undefined} />
+      <SidePeekDrawerHeader
+        fullPageHref={fullPageHref}
+        fullPageTransitionTypes={expandTypes}
+        actions={showActions ? actions : undefined}
+      />
       <SidePeekDrawerBody className="flex flex-col gap-8">
         {identity}
         {tabs}

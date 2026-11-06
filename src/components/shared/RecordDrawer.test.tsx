@@ -12,6 +12,7 @@ import {
   RecordField,
   RecordFrame,
   RecordNotFound,
+  RecordPage,
   RecordPageTopBar,
   RecordSection,
   RecordView,
@@ -279,6 +280,21 @@ describe("RecordPageTopBar", () => {
     // Collapse is hidden below sm, as expand is in the drawer; close stays.
     expect(collapse.closest('[data-slot="side-peek-drawer-resize"]')?.classList).toContain("max-sm:hidden");
     expect(screen.getByRole("link", { name: "Close" }).closest('[data-slot="side-peek-drawer-resize"]')).toBeNull();
+  });
+});
+
+describe("RecordPage", () => {
+  it("puts the top bar and the page in one panel, the drawer's morph partner", () => {
+    render(
+      <RecordPage listHref="/admin/events" listLabel="Back to Manage Events" recordHref="/admin/events/1">
+        <h1>Modify Event</h1>
+      </RecordPage>,
+    );
+    const page = screen.getByRole("heading", { name: "Modify Event" }).parentElement;
+    expect(page?.getAttribute("data-slot")).toBe("record-page");
+    expect(within(page as HTMLElement).getByRole("link", { name: "Collapse to drawer" }).getAttribute("href")).toBe(
+      "/admin/events/1",
+    );
   });
 });
 

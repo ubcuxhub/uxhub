@@ -10,6 +10,7 @@ import {
   RecordField,
   RecordSection,
   RecordView,
+  useRecordMorphTypes,
 } from "@/components/shared/RecordDrawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -181,6 +182,8 @@ export function AdminEventRecord({
   const dirty = draft !== null && !sameDraft(draft, draftFrom(event));
 
   const base = `/admin/events/${event.id}`;
+  // "Edit event" grows the drawer into the builder, as expand does.
+  const expandTypes = useRecordMorphTypes("expand");
   const registration = registrationWindow(event, new Date(now));
 
   const startEditing = () => {
@@ -258,7 +261,7 @@ export function AdminEventRecord({
       fullPageHref={`${base}/edit`}
       actions={
         <Button asChild variant="secondary" size="sm">
-          <Link href={`${base}/edit`}>
+          <Link href={`${base}/edit`} transitionTypes={expandTypes}>
             <Pencil aria-hidden />
             Edit event
           </Link>

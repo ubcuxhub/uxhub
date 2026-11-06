@@ -83,6 +83,22 @@ function usePhone() {
   return React.useSyncExternalStore(subscribePhone, getPhoneSnapshot, () => false);
 }
 
+function subscribeNothing() {
+  return () => {};
+}
+
+/**
+ * The portal's container, from the first client render on. Radix's Portal
+ * finds `document.body` itself only in an effect, a commit after the panel
+ * mounts, so a panel that opens as it mounts would be missing from that
+ * commit: the one a navigation's view transition snapshots (a record's full
+ * page collapsing back into its drawer). Null on the server and while
+ * hydrating, where Radix's own fallback takes over.
+ */
+function usePortalContainer() {
+  return React.useSyncExternalStore(subscribeNothing, () => document.body, () => null);
+}
+
 /**
  * A panel beside its list: the page stays scrollable and a row click swaps the
  * record. At phone width it fills the screen, so it becomes modal there (focus
@@ -215,6 +231,7 @@ const SidePeekDrawerContent = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
 >(({ className, onOpenAutoFocus, onCloseAutoFocus, onKeyDownCapture, onEscapeKeyDown, onInteractOutside, onPointerDownOutside, children, ...props }, ref) => {
   const { returnFocusRef, openerRef, contentRef, phone } = useSidePeekDrawer();
+  const container = usePortalContainer();
   const setRefs = (node: HTMLDivElement | null) => {
     contentRef.current = node;
     if (typeof ref === "function") ref(node);
@@ -227,7 +244,7 @@ const SidePeekDrawerContent = React.forwardRef<
     return opener?.isConnected ? opener : null;
   };
   return (
-    <DialogPrimitive.Portal>
+    <DialogPrimitive.Portal container={container ?? undefined}>
       <DialogPrimitive.Content
         ref={setRefs}
         data-slot="side-peek-drawer-content"
@@ -391,10 +408,12 @@ function SidePeekDrawerTopBar({
 interface SidePeekDrawerHeaderProps extends Omit<React.ComponentProps<"div">, "children"> {
   /** Shows "Open as full page", linking here. */
   fullPageHref?: string;
+  /** The expand link's `transitionTypes`, for a view transition into the full page. */
+  fullPageTransitionTypes?: string[];
   actions?: React.ReactNode;
 }
 
-function SidePeekDrawerHeader({ fullPageHref, actions, ...props }: SidePeekDrawerHeaderProps) {
+function SidePeekDrawerHeader({ fullPageHref, fullPageTransitionTypes, actions, ...props }: SidePeekDrawerHeaderProps) {
   const { requestClose, requestNavigate, dirty } = useSidePeekDrawer();
   return (
     <SidePeekDrawerTopBar
@@ -406,6 +425,7 @@ function SidePeekDrawerHeader({ fullPageHref, actions, ...props }: SidePeekDrawe
             <TooltipTrigger asChild>
               <Link
                 href={fullPageHref}
+                transitionTypes={fullPageTransitionTypes}
                 aria-label="Open as full page"
                 // Asks for itself below.
                 data-navigation-guard="ignore"

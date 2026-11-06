@@ -6,7 +6,7 @@ import { Pencil, ShieldCheck } from "lucide-react";
 import {
   RecordField,
   RecordFrame,
-  RecordPageTopBar,
+  RecordPage,
   RecordSection,
   RecordView,
 } from "@/components/shared/RecordDrawer";
@@ -178,10 +178,14 @@ function Demo({ state }: { state: string | undefined }) {
     return (
       <Composition
         title="Full page: the event builder"
-        description="Users only ever open in the drawer. An event’s “Edit event”, and the expand button beside close, open its builder, a page of its own at /admin/events/<id>/edit that wears the drawer’s top bar in place of a back pill: close returns to the list, collapse returns to the list with the event’s drawer open. Both are links, so the builder’s unsaved-changes guard asks before either. The builder keeps the portal’s page width and margins. Below sm only close shows, and on phones the builder hides the app header. Here close goes to this page and collapse to ?open=drawer."
+        description="Users only ever open in the drawer. An event’s “Edit event”, and the expand button beside close, open its builder, a page of its own at /admin/events/<id>/edit (RecordPage) that wears the drawer’s top bar in place of a back pill: close returns to the list, collapse returns to the list with the event’s drawer open. Both are links, so the builder’s unsaved-changes guard asks before either. Expand and collapse morph: the drawer’s panel grows into the page, or the page shrinks back into the drawer, while the list (RecordList) fades out or in; not on phones, with reduced motion, or in browsers without view transitions, where the page swaps instantly. Opening, closing and swapping records keep the drawer’s own slide. The builder keeps the portal’s page width and margins. Below sm only close shows, and on phones the builder hides the app header. Here close goes to this page and collapse to ?open=drawer, which morphs this box into the drawer."
       >
-        <div className="flex flex-col overflow-hidden rounded-xl border border-border-subtle bg-background">
-          <RecordPageTopBar listHref={PATH} listLabel="Back to Manage Events" recordHref={`${PATH}?open=drawer`} />
+        <RecordPage
+          className="overflow-hidden rounded-xl border border-border-subtle"
+          listHref={PATH}
+          listLabel="Back to Manage Events"
+          recordHref={`${PATH}?open=drawer`}
+        >
           <div className="flex flex-col gap-4 px-5 pb-10 pt-8 sm:px-6 sm:pt-10 lg:px-16">
             <div>
               <h2 className="text-subheading">Modify Event</h2>
@@ -189,7 +193,7 @@ function Demo({ state }: { state: string | undefined }) {
             </div>
             <div className="h-40 rounded-lg border border-dashed border-border" aria-hidden />
           </div>
-        </div>
+        </RecordPage>
       </Composition>
     );
   }

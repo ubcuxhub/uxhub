@@ -646,6 +646,15 @@ scrolls there and closes. Enter/Space opens, arrows move, Esc returns focus.
   event's drawer open. The builder's unsaved-changes guard asks before either.
   Below `sm` the drawer fills the screen and the page shows close only, and on
   phones the builder hides the app header, as the drawer covers it.
+- Expand (and "Edit event") and collapse are one panel resizing: the drawer
+  grows leftward into the builder's page, or the page shrinks back into the
+  drawer, the two cross-fading inside it, while the list fades out or in
+  behind (200ms ease-out, §2.8). It is a React `<ViewTransition>` pair
+  (`RecordFrame` ↔ `RecordPage`, list in `RecordList`), switched on only by
+  those links' transition types: opening from a row still slides in, close
+  slides out, swapping records doesn't animate, and close from the builder
+  is instant. No morph on phones, with reduced motion, or without View
+  Transitions support; the page swaps instantly there.
 - Viewing: label/value text rows, not disabled inputs. Editing: fields with a
   pinned Cancel / Save changes footer; closing with unsaved changes asks first.
 - Profile header: name in 24/32 with verified icon and pronouns. Interests are
