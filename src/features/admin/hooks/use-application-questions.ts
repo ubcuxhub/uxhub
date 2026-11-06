@@ -20,9 +20,6 @@ const createQuestion = (
   is_required: false,
   max_char_limit: "",
   response_options: isChoiceType(response) ? [""] : [],
-  restrict_file_types: false,
-  allowed_file_types: [],
-  max_file_size_bytes: response === ResponseType.file_upload ? 10_485_760 : "",
 });
 
 export function useApplicationQuestions(
@@ -52,9 +49,7 @@ export function useApplicationQuestions(
       field === "question" ||
       field === "description" ||
       field === "max_char_limit" ||
-      field === "response_options" ||
-      field === "allowed_file_types" ||
-      field === "max_file_size_bytes"
+      field === "response_options"
     )
       clearError(index);
     setApplicationTemplate((current) =>
@@ -63,12 +58,11 @@ export function useApplicationQuestions(
           ? {
               ...question,
               [field]:
-                field === "max_char_limit" || field === "max_file_size_bytes"
+                field === "max_char_limit"
                   ? value === ""
                     ? ""
                     : Number(value)
-                  : field === "response_options" ||
-                      field === "allowed_file_types"
+                  : field === "response_options"
                     ? (value as string[])
                     : value,
             }

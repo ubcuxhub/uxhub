@@ -2,7 +2,7 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FormEvent } from "react";
-import type { EventRow } from "@/lib/supabase/models";
+import type { EventApplicationQuestionRow, EventRow } from "@/lib/supabase/models";
 import { useEventForm } from "./use-event-form";
 
 vi.mock("next/navigation", () => ({
@@ -137,5 +137,81 @@ describe("event form publishing schedule", () => {
       "requires_application", "short_description", "sponsors_enabled",
       "starts_at", "status",
     ]);
+  });
+});
+
+describe("event form application questions", () => {
+  const checkIn = {
+    id: "check-in-1",
+    created_at: null,
+    updated_at: null,
+    event_id: event.id,
+    name: "Doors",
+    start_time: "2024-07-01T17:00:00Z",
+    end_time: "2024-07-01T18:00:00Z",
+  };
+  const saved = {
+    id: "question-1",
+    event_id: event.id,
+    question: "Why?",
+    description: null,
+    response_type: "long_text",
+    is_required: true,
+    sort_order: 0,
+    max_char_limit: 500,
+    response_options: null,
+    restrict_file_types: false,
+    allowed_file_types: null,
+    max_file_size_bytes: null,
+    created_at: null,
+    updated_at: null,
+  } as EventApplicationQuestionRow;
+  const submit = (result: { current: ReturnType<typeof useEventForm> }) =>
+    act(async () => {
+      await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as FormEvent<HTMLFormElement>);
+    });
+  const sentIds = (call: number) =>
+    vi.mocked(saveAdminEventAction).mock.calls[call][0].applicationQuestions.map(
+      (question) => question.id
+    );
+
+  it("sends saved question ids and adopts the ids of new ones", async () => {
+    vi.mocked(saveAdminEventAction).mockResolvedValue({
+      id: event.id,
+      questionIds: ["question-1", "question-2"],
+    });
+    const { result } = renderHook(() => useEventForm({
+      eventId: event.id,
+      initialEvent: { ...event, publish_at: null },
+      initialCheckInSessions: [checkIn],
+      initialApplicationQuestions: [saved],
+    }));
+    act(() => result.current.addApplicationQuestion("short_text"));
+    act(() => result.current.updateApplicationQuestion(1, "question", "Team?"));
+
+    await submit(result);
+    expect(result.current.error).toBeNull();
+    expect(sentIds(0)).toEqual(["question-1", null]);
+
+    // Saving again updates the new question rather than adding it twice.
+    await submit(result);
+    expect(sentIds(1)).toEqual(["question-1", "question-2"]);
+  });
+
+  it("shows a refused question change", async () => {
+    vi.mocked(saveAdminEventAction).mockResolvedValue({
+      error: '"Why?" has answers on submitted applications, so it cannot be removed.',
+    });
+    const { result } = renderHook(() => useEventForm({
+      eventId: event.id,
+      initialEvent: { ...event, publish_at: null },
+      initialCheckInSessions: [checkIn],
+      initialApplicationQuestions: [saved],
+    }));
+    act(() => result.current.removeApplicationQuestion(0));
+
+    await submit(result);
+    expect(result.current.error).toMatch(/cannot be removed/);
+    expect(result.current.successMessage).toBeNull();
   });
 });

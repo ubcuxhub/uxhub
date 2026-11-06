@@ -29,6 +29,9 @@ const checkIns = vi.hoisted(() => ({
 const applications = vi.hoisted(() => ({
   updateEventApplication: vi.fn(),
 }));
+const applicationFiles = vi.hoisted(() => ({
+  removeApplicationFiles: vi.fn(),
+}));
 const eventPeople = vi.hoisted(() => ({
   saveMentor: vi.fn(),
   saveSponsor: vi.fn(),
@@ -49,6 +52,7 @@ vi.mock("@/lib/supabase-helpers/admin-server", () => adminServer);
 vi.mock("@/lib/supabase-helpers/events", () => events);
 vi.mock("@/lib/supabase-helpers/check-ins", () => checkIns);
 vi.mock("@/lib/supabase-helpers/event-applications", () => applications);
+vi.mock("@/lib/supabase-helpers/application-files", () => applicationFiles);
 vi.mock("@/lib/supabase-helpers/event-people", () => eventPeople);
 vi.mock("@/lib/supabase/admin", () => ({ supabaseAdmin: { rpc: adminRpc } }));
 vi.mock("@/lib/supabase/server", () => ({
@@ -419,6 +423,55 @@ describe("saveAdminEventAction", () => {
     ).rejects.toThrow(/cover image was changed somewhere else/);
   });
 
+  it("returns the question ids the save gave, in the order sent", async () => {
+    adminRpc.mockResolvedValue({
+      data: { id: "event-1", question_ids: ["q-1", "q-2"], removed_files: [] },
+      error: null,
+    });
+
+    await expect(
+      saveAdminEventAction({ ...saveInput, eventId: "event-1" }),
+    ).resolves.toEqual({ id: "event-1", questionIds: ["q-1", "q-2"] });
+    expect(applicationFiles.removeApplicationFiles).not.toHaveBeenCalled();
+  });
+
+  it("returns a refused question change as a message for the admin", async () => {
+    const message =
+      '"Why?" has answers on submitted applications, so it cannot be removed.';
+    adminRpc.mockResolvedValue({
+      data: null,
+      error: { message, hint: "APPLICATION_QUESTIONS_CONFLICT" },
+    });
+
+    await expect(
+      saveAdminEventAction({ ...saveInput, eventId: "event-1" }),
+    ).resolves.toEqual({ error: message });
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("removes the files of removed questions, and keeps the save if that fails", async () => {
+    adminRpc.mockResolvedValue({
+      data: { id: "event-1", question_ids: [], removed_files: ["u/a/q/cv.pdf"] },
+      error: null,
+    });
+    applicationFiles.removeApplicationFiles.mockRejectedValue(
+      new Error("storage down"),
+    );
+    const consoleLog = vi
+      .spyOn(console, "log")
+      .mockImplementation(() => undefined);
+
+    await expect(
+      saveAdminEventAction({ ...saveInput, eventId: "event-1" }),
+    ).resolves.toEqual({ id: "event-1", questionIds: [] });
+    expect(applicationFiles.removeApplicationFiles).toHaveBeenCalledWith(
+      expect.anything(),
+      ["u/a/q/cv.pdf"],
+    );
+
+    consoleLog.mockRestore();
+  });
+
   it("passes through an unrelated database error", async () => {
     const failure = new Error("null value in column");
     adminRpc.mockResolvedValue({ data: null, error: failure });
@@ -484,7 +537,7 @@ describe("saveAdminEventAction", () => {
         expectedImageUrl: "https://store/old.png",
         event: { name: "Design Sprint", image_url: "https://store/new.png" },
       }),
-    ).resolves.toEqual({ id: "event-1" });
+    ).resolves.toEqual({ id: "event-1", questionIds: [] });
 
     consoleError.mockRestore();
   });

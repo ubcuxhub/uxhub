@@ -4,7 +4,11 @@ import {
   type EventType,
 } from "@/lib/supabase/models";
 import type { ApplicationQuestionTemplate } from "@/features/events/types";
-import type { CheckInSessionDraft } from "@/features/admin/types";
+import type {
+  ApplicationQuestionInput,
+  CheckInSessionDraft,
+} from "@/features/admin/types";
+import { APPLICATION_FILE_MAX_BYTES } from "@/lib/supabase-helpers/application-files";
 import {
   datetimeLocalToTimestamptz,
   timestamptzToDatetimeLocal,
@@ -234,19 +238,6 @@ export function validateEventForm(
     ) {
       questionErrors[index] =
         "Select response questions require at least one option.";
-    } else if (
-      item.response === ResponseType.file_upload &&
-      item.restrict_file_types &&
-      item.allowed_file_types.length === 0
-    ) {
-      questionErrors[index] =
-        "File upload questions require at least one allowed file type.";
-    } else if (
-      item.response === ResponseType.file_upload &&
-      item.max_file_size_bytes !== "" &&
-      item.max_file_size_bytes <= 0
-    ) {
-      questionErrors[index] = "Maximum file size must be greater than zero.";
     }
   });
   invalidSections.applications = Object.keys(questionErrors).length > 0;
@@ -256,4 +247,60 @@ export function validateEventForm(
   }
 
   return { error, questionErrors, invalidSections };
+}
+
+const isTextType = (response: ApplicationQuestionTemplate["response"]) =>
+  response === ResponseType.short_text || response === ResponseType.long_text;
+
+const isChoiceType = (response: ApplicationQuestionTemplate["response"]) =>
+  response === ResponseType.checkbox ||
+  response === ResponseType.multiple_choice ||
+  response === ResponseType.dropdown;
+
+/**
+ * The builder's questions as the save sends them, in order. A saved question
+ * keeps its id so the save updates it, and with it the answers to it, in
+ * place; a new one has a null id. File questions carry the upload bucket's
+ * fixed rule (one PDF, at most 5 MB), which the save applies regardless.
+ */
+export function toApplicationQuestionInputs(
+  applicationTemplate: ApplicationQuestionTemplate[]
+): ApplicationQuestionInput[] {
+  return applicationTemplate.map((question, sortOrder) => {
+    const isFile = question.response === ResponseType.file_upload;
+    return {
+      id: question.id ?? null,
+      question: question.question,
+      description: question.description || null,
+      response_type: question.response,
+      is_required: question.is_required,
+      sort_order: sortOrder,
+      max_char_limit: isTextType(question.response)
+        ? question.max_char_limit === ""
+          ? 5000
+          : question.max_char_limit
+        : null,
+      response_options: isChoiceType(question.response)
+        ? question.response_options || []
+        : null,
+      restrict_file_types: isFile,
+      allowed_file_types: isFile ? ["pdf"] : null,
+      max_file_size_bytes: isFile ? APPLICATION_FILE_MAX_BYTES : null,
+    };
+  });
+}
+
+/**
+ * The builder's questions after a save, each with the id the save gave it
+ * (`questionIds` is in the order the questions were sent), so the next save
+ * updates them rather than adding them again.
+ */
+export function withSavedQuestionIds(
+  applicationTemplate: ApplicationQuestionTemplate[],
+  questionIds: string[]
+): ApplicationQuestionTemplate[] {
+  return applicationTemplate.map((question, index) => ({
+    ...question,
+    id: questionIds[index] ?? question.id,
+  }));
 }

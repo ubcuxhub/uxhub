@@ -31,15 +31,16 @@ import {
   type MentorInput,
   type SponsorInput,
 } from "@/lib/supabase-helpers/event-people";
+import { removeApplicationFiles } from "@/lib/supabase-helpers/application-files";
 import { updateEventApplication } from "@/lib/supabase-helpers/event-applications";
 import {
   fetchEventById,
   fetchEventIdByImageUrl,
   fetchEventSlugsByPrefix,
 } from "@/lib/supabase-helpers/events";
+import type { ApplicationQuestionInput } from "@/features/admin/types";
 import type {
   CheckInSessionInsert,
-  EventApplicationQuestionInsert,
   EventUpdate,
   MentorRow,
   SponsorRow,
@@ -186,8 +187,16 @@ export interface SaveAdminEventInput {
   checkInSessions: Omit<CheckInSessionInsert, "event_id">[];
   mentorIds: string[];
   sponsorIds: string[];
-  applicationQuestions: Omit<EventApplicationQuestionInsert, "event_id">[];
+  applicationQuestions: ApplicationQuestionInput[];
 }
+
+/**
+ * The saved event's id and its application questions' ids, in the order they
+ * were sent, or why the save was refused.
+ */
+export type SaveAdminEventResult =
+  | { id: string; questionIds: string[] }
+  | { error: string };
 
 // Not exported: a "use server" module may only export async functions, and the
 // form surfaces this by displaying the thrown error's message.
@@ -196,6 +205,12 @@ const IMAGE_CONFLICT_SENTINEL = "EVENT_IMAGE_CONFLICT";
 
 const SAVE_CONFLICT_ERROR =
   "This event's cover image was changed somewhere else since this page loaded. Reload the page and apply your changes again.";
+
+// The hint save_admin_event_atomically gives a refusal over application
+// questions (removing or retyping answered ones, or a stale question id). Its
+// message is written for the admin, and is returned rather than thrown, since
+// production builds withhold a thrown error's message from the client.
+const QUESTIONS_CONFLICT_HINT = "APPLICATION_QUESTIONS_CONFLICT";
 
 /**
  * Removes a cover image that is no longer referenced by any event.
@@ -211,6 +226,20 @@ async function discardEventImage(imageUrl: string | null | undefined) {
     await adminDeleteEventImageByUrl(imageUrl);
   } catch (error) {
     log.error("admin.event_image_delete_failed", errorFields(error));
+  }
+}
+
+/**
+ * Removes uploaded application files nothing answers with any more. Best
+ * effort, like `discardEventImage`: the save has already committed.
+ */
+async function discardApplicationFiles(paths: string[]) {
+  if (paths.length === 0) return;
+
+  try {
+    await removeApplicationFiles(supabaseAdmin, paths);
+  } catch (error) {
+    log.warn("admin.application_files_delete_failed", errorFields(error));
   }
 }
 
@@ -232,7 +261,7 @@ export async function discardUnusedEventImageAction(imageUrl: string) {
 
 export async function saveAdminEventAction(
   input: SaveAdminEventInput
-): Promise<{ id: string }> {
+): Promise<SaveAdminEventResult> {
   await requireAdmin();
 
   if (
@@ -290,19 +319,34 @@ export async function saveAdminEventAction(
     if (error.message.includes(IMAGE_CONFLICT_SENTINEL)) {
       throw new Error(SAVE_CONFLICT_ERROR);
     }
+    if (error.hint === QUESTIONS_CONFLICT_HINT) {
+      log.warn("admin.event_questions_save_refused", {
+        eventId: input.eventId ?? null,
+      });
+      return { error: error.message };
+    }
     throw error;
   }
-  if (!data?.id) throw new Error("The event save returned no event id.");
+  const saved = data as {
+    id?: string;
+    question_ids?: string[];
+    removed_files?: string[];
+  } | null;
+  if (!saved?.id) throw new Error("The event save returned no event id.");
 
   // The save landed, so the image it replaced is unreferenced.
   if (input.eventId && (input.event.image_url ?? null) !== input.expectedImageUrl) {
     await discardEventImage(input.expectedImageUrl);
   }
 
+  // Files answering questions the save removed, from drafts only: a question
+  // with submitted answers cannot be removed.
+  await discardApplicationFiles(saved.removed_files ?? []);
+
   revalidatePath("/admin/events");
-  revalidatePath(`/admin/events/${data.id}`);
+  revalidatePath(`/admin/events/${saved.id}`);
   revalidatePath("/events", "layout");
-  return { id: data.id };
+  return { id: saved.id, questionIds: saved.question_ids ?? [] };
 }
 
 export async function saveAdminMentorAction(

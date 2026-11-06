@@ -7,10 +7,7 @@ import {
   discardUnusedEventImageAction,
   saveAdminEventAction,
 } from "@/features/admin/actions";
-import {
-  ResponseType,
-  type ApplicationQuestionTemplate,
-} from "@/features/events/types";
+import type { ApplicationQuestionTemplate } from "@/features/events/types";
 import { EVENT_IMAGE_ERRORS } from "@/lib/event-image";
 import type {
   CheckInSessionRow,
@@ -25,7 +22,9 @@ import {
   createFormSnapshot,
   EMPTY_CHECK_IN_SESSION,
   getInitialFormState,
+  toApplicationQuestionInputs,
   validateEventForm,
+  withSavedQuestionIds,
   type EventFormState,
   type MentorDraft,
   type SponsorDraft,
@@ -82,15 +81,13 @@ function questionsFromRows(
   questions: EventApplicationQuestionRow[]
 ): ApplicationQuestionTemplate[] {
   return questions.map((question) => ({
+    id: question.id,
     question: question.question ?? "",
     description: question.description ?? "",
     response: question.response_type,
     is_required: question.is_required,
     max_char_limit: question.max_char_limit ?? "",
     response_options: question.response_options ?? [],
-    restrict_file_types: question.restrict_file_types,
-    allowed_file_types: question.allowed_file_types ?? [],
-    max_file_size_bytes: question.max_file_size_bytes ?? "",
   }));
 }
 
@@ -359,41 +356,8 @@ export function useEventForm({
         start_time: datetimeLocalToTimestamptz(session.start_time)!,
         end_time: datetimeLocalToTimestamptz(session.end_time)!,
       }));
-      const applicationQuestions = questions.applicationTemplate.map(
-        (question, sortOrder) => ({
-          question: question.question,
-          description: question.description || null,
-          response_type: question.response,
-          is_required: question.is_required,
-          sort_order: sortOrder,
-          max_char_limit:
-            question.response === ResponseType.short_text ||
-            question.response === ResponseType.long_text
-              ? question.max_char_limit === ""
-                ? 5000
-                : question.max_char_limit
-              : null,
-          response_options:
-            question.response === ResponseType.checkbox ||
-            question.response === ResponseType.multiple_choice ||
-            question.response === ResponseType.dropdown
-              ? question.response_options || []
-              : null,
-          restrict_file_types:
-            question.response === ResponseType.file_upload
-              ? question.restrict_file_types
-              : false,
-          allowed_file_types:
-            question.response === ResponseType.file_upload &&
-            question.restrict_file_types
-              ? question.allowed_file_types
-              : null,
-          max_file_size_bytes:
-            question.response === ResponseType.file_upload &&
-            question.max_file_size_bytes !== ""
-              ? question.max_file_size_bytes
-              : null,
-        })
+      const applicationQuestions = toApplicationQuestionInputs(
+        questions.applicationTemplate
       );
       const result = await saveAdminEventAction({
         eventId,
@@ -404,6 +368,14 @@ export function useEventForm({
         sponsorIds: sponsors.map((sponsor) => sponsor.id!),
         applicationQuestions,
       });
+      // A refusal the admin can act on, such as removing a question people
+      // have applied with. Nothing was saved, so the image cleanup below runs.
+      if ("error" in result) throw new Error(result.error);
+      const savedTemplate = withSavedQuestionIds(
+        questions.applicationTemplate,
+        result.questionIds
+      );
+      questions.setApplicationTemplate(savedTemplate);
       const savedFormState = { ...formState, image_url: imageUrl };
       persistedImageUrl.current = imageUrl || null;
       setFormState(savedFormState);
@@ -414,7 +386,7 @@ export function useEventForm({
           checkInEvents,
           mentors,
           sponsors,
-          questions.applicationTemplate
+          savedTemplate
         )
       );
       setSuccessMessage(
