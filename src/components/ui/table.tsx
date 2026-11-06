@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { Slot } from "@radix-ui/react-slot";
 
 import { Checkbox } from "@/components/ui/checkbox";
@@ -10,8 +11,8 @@ import { cn } from "@/lib/utils";
 /**
  * Admin lists (§3.6, §3.16). A native `<table>` inside a card that scrolls
  * sideways, so rows keep their cell semantics: a clickable row holds a real
- * button (`TableRowButton`) stretched over the row instead of `role="button"`
- * on the `<tr>`.
+ * button (`TableRowButton`) or link (`TableRowLink`) stretched over the row
+ * instead of `role="button"` on the `<tr>`.
  *
  * Rows are `--size-table-row` tall (56px, 40px compact). Cells are 20px from
  * the edge, as in Figma.
@@ -140,11 +141,19 @@ function TableCaption({ className, ...props }: React.ComponentProps<"caption">) 
 
 const INTERACTIVE = "a,button,input,select,textarea,label,[role='button'],[role='menuitem']";
 
+/** What `TableRowButton` and `TableRowLink` both carry: the control that opens the row. */
+const OPENER = "[data-table-row-opener]";
+
 /**
- * A pinned cell holds the stretched button's positioning context, so it can
+ * A pinned cell holds the stretched opener's positioning context, so it can
  * only cover its own cell. In a sticky table the row forwards a click anywhere
- * else to the row button; keyboard and assistive tech still use the button.
- * `onClick` runs once per user click, never for the forwarded one.
+ * else to the row's button or link, modifier keys included (so Cmd-click on a
+ * link row still opens a new tab); keyboard and assistive tech still use the
+ * control itself. `onClick` runs once per user click, never for the forwarded
+ * one.
+ *
+ * The row whose opener has `aria-current` (the record that is open) is filled
+ * like a selected row.
  */
 function TableRow({ className, onClick, ...props }: React.ComponentProps<"tr">) {
   const sticky = React.useContext(StickyContext);
@@ -156,8 +165,9 @@ function TableRow({ className, onClick, ...props }: React.ComponentProps<"tr">) 
       className={cn(
         "relative border-b border-border-subtle bg-card transition-colors duration-150 last:border-b-0",
         "data-[state=selected]:bg-muted",
-        "has-[[data-slot=table-row-button]]:cursor-pointer has-[[data-slot=table-row-button]]:hover:bg-accent has-[[data-slot=table-row-button]]:data-[state=selected]:hover:bg-muted",
-        "has-[[data-slot=table-row-button]:focus-visible]:outline-2 has-[[data-slot=table-row-button]:focus-visible]:-outline-offset-2 has-[[data-slot=table-row-button]:focus-visible]:outline-ring",
+        "has-[[data-table-row-opener]]:cursor-pointer has-[[data-table-row-opener]]:hover:bg-accent has-[[data-table-row-opener]]:data-[state=selected]:hover:bg-muted",
+        "has-[[data-table-row-opener][aria-current]]:bg-muted has-[[data-table-row-opener][aria-current]]:hover:bg-muted",
+        "has-[[data-table-row-opener]:focus-visible]:outline-2 has-[[data-table-row-opener]:focus-visible]:-outline-offset-2 has-[[data-table-row-opener]:focus-visible]:outline-ring",
         className,
       )}
       onClick={(event) => {
@@ -168,13 +178,21 @@ function TableRow({ className, onClick, ...props }: React.ComponentProps<"tr">) 
         if (!sticky || event.defaultPrevented) return;
         const target = event.target as HTMLElement;
         if (target.closest(INTERACTIVE)) return;
-        const button = event.currentTarget.querySelector<HTMLElement>(
-          "[data-slot=table-row-button]",
-        );
-        if (!button) return;
+        const opener = event.currentTarget.querySelector<HTMLElement>(OPENER);
+        if (!opener) return;
         forwarding.current = true;
         try {
-          button.click();
+          opener.dispatchEvent(
+            new MouseEvent("click", {
+              bubbles: true,
+              cancelable: true,
+              button: event.button,
+              metaKey: event.metaKey,
+              ctrlKey: event.ctrlKey,
+              shiftKey: event.shiftKey,
+              altKey: event.altKey,
+            }),
+          );
         } finally {
           forwarding.current = false;
         }
@@ -204,10 +222,10 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
       data-slot="table-cell"
       className={cn(
         "h-(--size-table-row) bg-inherit px-5 align-middle text-table text-foreground",
-        // The row button's `::after` covers the row, and a plain link or control
+        // The row opener's `::after` covers the row, and a plain link or control
         // is not positioned, so it would paint underneath. Lift them above it.
-        "[&_:is(a,button,input,select,textarea,[role=button],[role=menuitem]):not([data-slot=table-row-button])]:relative",
-        "[&_:is(a,button,input,select,textarea,[role=button],[role=menuitem]):not([data-slot=table-row-button])]:z-10",
+        "[&_:is(a,button,input,select,textarea,[role=button],[role=menuitem]):not([data-table-row-opener])]:relative",
+        "[&_:is(a,button,input,select,textarea,[role=button],[role=menuitem]):not([data-table-row-opener])]:z-10",
         className,
       )}
       {...props}
@@ -215,10 +233,15 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
   );
 }
 
+/** The opener's `::after` stretches over the row (or, when pinned, its own cell). */
+const OPENER_CLASSES =
+  "cursor-pointer text-left outline-none after:absolute after:inset-0 after:content-['']";
+
 /**
- * The control that opens a row. A real `<button>` (or `asChild` for a `Link`)
- * whose `::after` covers the row, so a click anywhere on it activates while
- * Tab and Enter work from the name.
+ * The control that opens a row in place (a drawer driven by state). A real
+ * `<button>` whose `::after` covers the row, so a click anywhere on it
+ * activates while Tab and Enter work from the name. A row that opens a URL
+ * uses `TableRowLink`.
  */
 function TableRowButton({
   className,
@@ -229,11 +252,30 @@ function TableRowButton({
   return (
     <Comp
       data-slot="table-row-button"
+      data-table-row-opener=""
       {...(asChild ? {} : { type: "button" as const })}
-      className={cn(
-        "cursor-pointer text-left outline-none after:absolute after:inset-0 after:content-['']",
-        className,
-      )}
+      className={cn(OPENER_CLASSES, className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * The link twin of `TableRowButton`, for a row that opens a URL (a record's
+ * page or drawer route). A `next/link` stretched over the row the same way, so
+ * the row keeps its cell semantics, Cmd- and middle-click open a new tab, and
+ * a checkbox column's 44px hit area still sits above it.
+ *
+ * Takes everything `Link` does: `replace` to swap the current history entry,
+ * and `aria-current="page"` on the row whose record is open, which fills the
+ * row like a selected one.
+ */
+function TableRowLink({ className, ...props }: React.ComponentProps<typeof Link>) {
+  return (
+    <Link
+      data-slot="table-row-link"
+      data-table-row-opener=""
+      className={cn(OPENER_CLASSES, className)}
       {...props}
     />
   );
@@ -381,5 +423,6 @@ export {
   TableNone,
   TableRow,
   TableRowButton,
+  TableRowLink,
   TableSkeleton,
 };

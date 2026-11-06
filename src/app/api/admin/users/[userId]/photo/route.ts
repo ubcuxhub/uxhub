@@ -25,7 +25,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ userId
   }
   try {
     const user = await replaceProfilePhoto(supabaseAdmin, userId, previous || null, { body, ...parsed });
-    revalidatePath("/admin/users");
+    revalidatePath("/admin/users", "layout");
     return NextResponse.json({ user });
   } catch (error) {
     if (error instanceof ProfilePhotoConflictError) {

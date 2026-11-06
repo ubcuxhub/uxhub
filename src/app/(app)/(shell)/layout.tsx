@@ -19,8 +19,9 @@ export default async function ShellLayout({
   return (
     <SidebarProvider defaultOpen={defaultOpen}>
       <AppSidebar />
-      <SidebarInset>
-        <header className="flex h-14 shrink-0 items-center gap-3 px-5 md:hidden">
+      <SidebarInset className="group/shell">
+        {/* A record's full page (RecordPageTopBar) brings its own top bar. */}
+        <header className="flex h-14 shrink-0 items-center gap-3 px-5 group-has-[[data-hides-app-header]]/shell:hidden md:hidden">
           <SidebarTrigger aria-label="Open menu" />
           <span className="text-body-medium">UBC UX Hub</span>
         </header>

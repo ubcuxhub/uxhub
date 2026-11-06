@@ -14,9 +14,7 @@ import { cn } from "@/lib/utils";
  * badges share one height, and callers' `border-*` tones keep working.
  * Put a lucide icon first; it is sized to 14px.
  *
- * Still a `div` (not a `span`): `AdminDirectoryFilters` nests one in a button
- * and the admin tests read its accessible name ("Filters 2"), which needs the
- * block boundary. Switch to `span` when that call site adopts it.
+ * A `span`, so it is valid inside a paragraph, a button or a label.
  */
 const badgeVariants = cva(
   "inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-transparent text-badge [&_svg]:pointer-events-none [&_svg]:size-3.5 [&_svg]:shrink-0",
@@ -53,12 +51,12 @@ const badgeVariants = cva(
 );
 
 export interface BadgeProps
-  extends React.HTMLAttributes<HTMLDivElement>,
+  extends React.HTMLAttributes<HTMLSpanElement>,
     VariantProps<typeof badgeVariants> {}
 
 function Badge({ className, variant, size, ...props }: BadgeProps) {
   return (
-    <div
+    <span
       data-slot="badge"
       className={cn(badgeVariants({ variant, size }), className)}
       {...props}

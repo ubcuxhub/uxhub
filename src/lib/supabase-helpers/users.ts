@@ -112,3 +112,53 @@ export async function fetchAdminUserRecords(supabase: DbClient) {
   if (error) throw error;
   return data ?? [];
 }
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Who marked a student verified, when that profile still exists. */
+export interface StudentVerifier {
+  id: string;
+  first_name: string;
+  last_name: string;
+}
+
+/**
+ * One admin user record by `user_info.id`: the row with its membership tier
+ * name (as `fetchAdminUserRecords` joins it) and the manager who verified the
+ * student, or null when that manager's profile is gone.
+ *
+ * Returns null for an id that isn't a UUID, an unknown id, or a row left
+ * behind by account deletion, which the directory doesn't list either.
+ */
+export async function fetchAdminUserRecordById(supabase: DbClient, id: string) {
+  if (!UUID.test(id)) return null;
+
+  const { data: row, error } = await supabase
+    .from(TABLES.userInfo)
+    .select(
+      `
+      *,
+      membership_types!membership_type_id(name)
+    `
+    )
+    .eq("id", id)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!row) return null;
+
+  let verifier: StudentVerifier | null = null;
+  if (row.student_verified_by) {
+    const { data, error: verifierError } = await supabase
+      .from(TABLES.userInfo)
+      .select("id, first_name, last_name")
+      .eq("id", row.student_verified_by)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (verifierError) throw verifierError;
+    verifier = data;
+  }
+
+  return { row, verifier };
+}
