@@ -293,7 +293,7 @@ describe("AdminUserRecord: editing", () => {
     renderRecord();
     edit();
     fireEvent.change(textbox("First name"), { target: { value: "Unsaved" } });
-    fireEvent.click(screen.getByRole("link", { name: /Back to Manage Users/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.getByRole("dialog", { name: "Discard changes?" })).toBeTruthy();
     expect(mocks.router.push).not.toHaveBeenCalled();
   });

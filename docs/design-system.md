@@ -138,8 +138,9 @@ No all caps or letter-spacing anywhere. Marketing only: `display-xl` 56/64 and
   starts 40px from the top. Page actions like Publish sit in the title row,
   never above it. No header bar fills the space. Sidebar-less screens (Sign in)
   centre content.
-- Side peek drawer top bars start at 40px too. Dialogs centre but stay ≥40px
-  from the top; taller ones scroll inside.
+- Side peek drawer top bars (and a record's full page, which uses the same
+  bar) start at 40px too from `sm` up; on phones the bar is compact (12px).
+  Dialogs centre but stay ≥40px from the top; taller ones scroll inside.
 - Content blocks span whole columns. Tables scroll sideways inside their card
   on small screens.
 
@@ -631,8 +632,15 @@ scrolls there and closes. Enter/Space opens, arrows move, Esc returns focus.
   over the page at 560px; the row stays highlighted; the table stays
   scrollable; another row swaps the content. Doesn't dim the page (use a Dialog
   when a decision is required).
-- Top bar at 40px: double-chevron close first (tooltip names action and
-  shortcut; Esc closes), "Open as full page" (own page with back pill).
+- Top bar at 40px (12px on phones): double-chevron close first (tooltip names
+  action and shortcut; Esc closes), then expand ("Open as full page"); the
+  record's actions (Edit user) on the right.
+- Full page: the same record surface (top bar, 24/32 name, tabs, footer) in a
+  column about 760px wide, centred in the content area; no back pill. Close
+  returns to the list (tooltip names it), and collapse ("Collapse to drawer")
+  returns to the list with the drawer open on the record. Unsaved edits ask
+  before either. Below `sm` the two look the same: close and actions only, no
+  expand or collapse.
 - Viewing: label/value text rows, not disabled inputs. Editing: fields with a
   pinned Cancel / Save changes footer; closing with unsaved changes asks first.
 - Profile header: name in 24/32 with verified icon and pronouns. Interests are

@@ -32,6 +32,7 @@ vi.mock("@/lib/load-document", () => ({ loadDocument: (href: string) => loadDocu
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  router.replace.mockReset();
   pathname = "/admin/users/1";
   window.history.replaceState(null, "", "/");
 });
@@ -188,26 +189,63 @@ describe("RecordFrame intercepted", () => {
 });
 
 describe("RecordFrame canonical", () => {
-  it("renders a page with a back pill and an h1 title", () => {
+  it("renders the drawer's chrome as a page: close, collapse and actions in the top bar, an h1 title, no back pill", () => {
     render(<Frame mode="canonical" />);
     expect(screen.queryByRole("dialog")).toBeNull();
-    expect(screen.getByRole("link", { name: "Back to Manage Users" }).getAttribute("href")).toBe("/admin/users");
+    expect(screen.queryByRole("link", { name: "Back to Manage Users" })).toBeNull();
+    const bar = document.querySelector<HTMLElement>('[data-slot="side-peek-drawer-header"]')!;
+    expect(within(bar).getByRole("button", { name: "Close" })).toBeTruthy();
+    expect(within(bar).getByRole("button", { name: "Collapse to drawer" })).toBeTruthy();
+    expect(within(bar).getByRole("button", { name: "Edit user" })).toBeTruthy();
+    expect(within(bar).queryByRole("link", { name: "Open as full page" })).toBeNull();
     expect(screen.getByRole("heading", { name: "Jane Smith", level: 1 })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Contact", level: 2 })).toBeTruthy();
-    expect(screen.getByRole("button", { name: "Edit user" })).toBeTruthy();
   });
 
-  it("asks before following the back pill with unsaved changes", () => {
+  it("closes to the list, asking first with unsaved changes", () => {
     window.history.replaceState(null, "", "/admin/users/1");
     render(<Frame mode="canonical" />);
     startEditing();
-    expect(fireEvent.click(screen.getByRole("link", { name: "Back to Manage Users" }))).toBe(false);
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.getByRole("heading", { name: "Discard changes?" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));
     expect(router.push).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("link", { name: "Back to Manage Users" }));
+    fireEvent.click(screen.getByRole("button", { name: "Close" }));
     fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
     expect(router.push).toHaveBeenCalledWith("/admin/users");
+  });
+
+  it("collapses by replacing itself with the list, then opening the record over it", async () => {
+    window.history.replaceState(null, "", "/admin/users/1");
+    router.replace.mockImplementation((href: string) => window.history.replaceState(null, "", href));
+    render(<Frame mode="canonical" />);
+    fireEvent.click(screen.getByRole("button", { name: "Collapse to drawer" }));
+    expect(router.replace).toHaveBeenCalledWith("/admin/users");
+    expect(router.push).not.toHaveBeenCalled();
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/admin/users/1"));
+    expect(router.replace.mock.invocationCallOrder[0]).toBeLessThan(router.push.mock.invocationCallOrder[0]);
+  });
+
+  it("doesn't open the drawer if the list never shows", async () => {
+    window.history.replaceState(null, "", "/admin/users/1");
+    router.replace.mockImplementation(() => window.history.replaceState(null, "", "/admin/events"));
+    render(<Frame mode="canonical" />);
+    fireEvent.click(screen.getByRole("button", { name: "Collapse to drawer" }));
+    await new Promise((resolve) => setTimeout(resolve, 120));
+    expect(router.push).not.toHaveBeenCalled();
+  });
+
+  it("asks before collapsing with unsaved changes", async () => {
+    window.history.replaceState(null, "", "/admin/users/1");
+    router.replace.mockImplementation((href: string) => window.history.replaceState(null, "", href));
+    render(<Frame mode="canonical" />);
+    startEditing();
+    fireEvent.click(screen.getByRole("button", { name: "Collapse to drawer" }));
+    expect(screen.getByRole("heading", { name: "Discard changes?" })).toBeTruthy();
+    expect(router.replace).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Discard changes" }));
+    expect(router.replace).toHaveBeenCalledWith("/admin/users");
+    await waitFor(() => expect(router.push).toHaveBeenCalledWith("/admin/users/1"));
   });
 
   it("loads another record's page instead of opening a drawer over this one", () => {
@@ -238,6 +276,33 @@ describe("RecordFrame canonical", () => {
   });
 });
 
+describe("one surface in both modes", () => {
+  function titleClasses(mode: "intercepted" | "canonical") {
+    render(<Frame mode={mode} />);
+    const classes = [...screen.getByRole("heading", { name: "Jane Smith" }).classList].sort();
+    cleanup();
+    return classes;
+  }
+
+  it("styles the title identically in the drawer and on the page", () => {
+    const drawer = titleClasses("intercepted");
+    expect(drawer).toContain("text-h2");
+    expect(titleClasses("canonical")).toEqual(drawer);
+  });
+
+  it("hides expand and collapse below sm, keeping close", () => {
+    render(<Frame mode="intercepted" />);
+    const expand = screen.getByRole("link", { name: "Open as full page" });
+    expect(expand.closest('[data-slot="side-peek-drawer-resize"]')?.classList).toContain("max-sm:hidden");
+    expect(screen.getByRole("button", { name: "Close panel (Esc)" }).closest('[data-slot="side-peek-drawer-resize"]')).toBeNull();
+    cleanup();
+    render(<Frame mode="canonical" />);
+    const collapse = screen.getByRole("button", { name: "Collapse to drawer" });
+    expect(collapse.closest('[data-slot="side-peek-drawer-resize"]')?.classList).toContain("max-sm:hidden");
+    expect(screen.getByRole("button", { name: "Close" }).closest('[data-slot="side-peek-drawer-resize"]')).toBeNull();
+  });
+});
+
 describe("loading and not found", () => {
   it("keeps the drawer closable while loading", () => {
     render(<Frame mode="intercepted"><RecordDrawerSkeleton /></Frame>);
@@ -253,6 +318,9 @@ describe("loading and not found", () => {
     cleanup();
     render(<Frame mode="canonical"><RecordNotFound noun="event" /></Frame>);
     expect(screen.getByRole("heading", { name: "Event not found", level: 1 })).toBeTruthy();
+    // The page keeps its close, with nothing to collapse into.
+    expect(screen.getByRole("button", { name: "Close" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Collapse to drawer" })).toBeNull();
   });
 
   it("refuses record parts outside a frame", () => {

@@ -9,6 +9,7 @@ import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { loadDocument } from "@/lib/load-document";
 
 import { Composition } from "@/app/dev/_shell/Specimen";
 import type { SectionProps } from "@/app/dev/_shell/types";
@@ -157,10 +158,17 @@ function RecordDrawerDemo({ open: state }: SectionProps) {
     return (
       <Composition
         title="Full page"
-        description="The same content at the record’s own URL, for a refresh, a shared link or “Open as full page”. The back pill names the list; unsaved edits ask before it leaves."
+        description="The same surface at the record’s own URL, for a refresh, a shared link or “Open as full page”: the drawer’s top bar, title and tabs in a centred column. Close returns to the list (its tooltip names it); collapse returns to the list with the drawer open on this record. Unsaved edits ask before either. Below sm only close shows, as in the drawer."
       >
-        <div className="overflow-hidden rounded-xl border border-border-subtle bg-background">
-          <RecordFrame mode="canonical" listHref={PATH} listLabel="Back to Manage Users">
+        <div className="flex overflow-hidden rounded-xl border border-border-subtle bg-background">
+          <RecordFrame
+            mode="canonical"
+            listHref={PATH}
+            listLabel="Back to Manage Users"
+            // In the app this replaces the page with the list and opens the
+            // record over it; the demo's list and page share a URL.
+            onCollapse={() => loadDocument(`${PATH}?open=drawer`)}
+          >
             <PersonRecord person={people[0]} start="view" onSaved={saved} />
           </RecordFrame>
         </div>
@@ -172,7 +180,7 @@ function RecordDrawerDemo({ open: state }: SectionProps) {
     <div className="flex flex-col gap-8">
       <Composition
         title="Manage Users"
-        description="Open a person, then edit their phone number or area of study. Another row swaps the record; Escape and the chevron close it. With unsaved edits, closing or following any link on this page (the docs sidebar too) asks first. These rows are buttons; in the app they are links (AdminDirectoryTable), so they ask too."
+        description="Open a person, then edit their phone number or area of study. Another row swaps the record; Escape and the chevron close it, and the expand icon opens it as a full page. With unsaved edits, closing or following any link on this page (the docs sidebar too) asks first. These rows are buttons; in the app they are links (AdminDirectoryTable), so they ask too."
       >
         <div className="max-w-2xl rounded-xl border border-border-subtle bg-card p-4">
           <h3 className="mb-3 text-subheading">Members</h3>

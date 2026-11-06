@@ -7,8 +7,7 @@ import { ChevronsRight, Maximize2 } from "lucide-react";
 import { Dialog as DialogPrimitive } from "radix-ui";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { IconButton } from "@/components/ui/icon-button";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigationGuard } from "@/hooks/use-navigation-guard";
 import { loadDocument } from "@/lib/load-document";
@@ -315,7 +314,73 @@ const SidePeekDrawerContent = React.forwardRef<
 });
 SidePeekDrawerContent.displayName = "SidePeekDrawerContent";
 
-interface SidePeekDrawerHeaderProps extends React.ComponentProps<"div"> {
+interface SidePeekDrawerTopBarProps extends Omit<React.ComponentProps<"div">, "children"> {
+  onClose: () => void;
+  /** The close button's name. Defaults to "Close panel (Esc)". */
+  closeLabel?: string;
+  /** The close button's tooltip, when it should say more than its name. Defaults to `closeLabel`. */
+  closeTooltip?: string;
+  /**
+   * Beside close: expand to a full page, or collapse a page back into the
+   * drawer. Hidden below `sm`, where the drawer already fills the screen.
+   */
+  resize?: React.ReactNode;
+  actions?: React.ReactNode;
+}
+
+/**
+ * The drawer's top bar, without the drawer: close and an optional
+ * expand/collapse control on the left, actions on the right. 40px from the
+ * top on `sm`+ (level with the page title), compact on phones.
+ * `SidePeekDrawerHeader` wires it to the panel; a page that shows the same
+ * record (`RecordFrame` canonical) renders it directly.
+ */
+function SidePeekDrawerTopBar({
+  onClose,
+  closeLabel = "Close panel (Esc)",
+  closeTooltip,
+  resize,
+  actions,
+  className,
+  ...props
+}: SidePeekDrawerTopBarProps) {
+  return (
+    <div
+      data-slot="side-peek-drawer-header"
+      className={cn(
+        "flex shrink-0 items-center justify-between gap-3 border-b border-border-subtle px-5 pb-3 pt-3 sm:px-6 sm:pb-4 sm:pt-10",
+        className,
+      )}
+      {...props}
+    >
+      <div className="flex items-center gap-1">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label={closeLabel}
+              onClick={onClose}
+              className="rounded-lg text-muted-foreground"
+            >
+              <ChevronsRight className="size-[18px]" aria-hidden />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{closeTooltip ?? closeLabel}</TooltipContent>
+        </Tooltip>
+        {resize ? (
+          <div data-slot="side-peek-drawer-resize" className="flex max-sm:hidden">
+            {resize}
+          </div>
+        ) : null}
+      </div>
+      {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
+    </div>
+  );
+}
+
+interface SidePeekDrawerHeaderProps extends Omit<React.ComponentProps<"div">, "children"> {
   /** Shows "Open as full page", linking here. */
   fullPageHref?: string;
   /**
@@ -332,22 +397,16 @@ function SidePeekDrawerHeader({
   fullPageHref,
   fullPageNavigation = "client",
   actions,
-  className,
   ...props
 }: SidePeekDrawerHeaderProps) {
   const { requestClose, requestNavigate, dirty } = useSidePeekDrawer();
   const FullPageLink = fullPageNavigation === "document" ? "a" : Link;
   return (
-    <div
-      data-slot="side-peek-drawer-header"
-      className={cn("flex shrink-0 items-center justify-between border-b border-border-subtle px-6 pb-4 pt-10", className)}
-      {...props}
-    >
-      <div className="flex items-center gap-1">
-        <IconButton variant="ghost" label="Close panel (Esc)" onClick={requestClose} className="rounded-lg text-muted-foreground">
-          <ChevronsRight className="size-[18px]" />
-        </IconButton>
-        {fullPageHref ? (
+    <SidePeekDrawerTopBar
+      onClose={requestClose}
+      actions={actions}
+      resize={
+        fullPageHref ? (
           <Tooltip>
             <TooltipTrigger asChild>
               <FullPageLink
@@ -369,15 +428,15 @@ function SidePeekDrawerHeader({
             </TooltipTrigger>
             <TooltipContent>Open as full page</TooltipContent>
           </Tooltip>
-        ) : null}
-      </div>
-      {actions ? <div className="flex items-center gap-2">{actions}</div> : null}
-    </div>
+        ) : null
+      }
+      {...props}
+    />
   );
 }
 
 function SidePeekDrawerBody({ className, ...props }: React.ComponentProps<"div">) {
-  return <div data-slot="side-peek-drawer-body" className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain px-6 py-8 sm:px-8", className)} {...props} />;
+  return <div data-slot="side-peek-drawer-body" className={cn("min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-8 sm:px-8", className)} {...props} />;
 }
 
 const SidePeekDrawerTitle = React.forwardRef<
@@ -389,16 +448,17 @@ const SidePeekDrawerTitle = React.forwardRef<
 SidePeekDrawerTitle.displayName = "SidePeekDrawerTitle";
 
 function SidePeekDrawerFooter({ className, ...props }: React.ComponentProps<"div">) {
-  return <div data-slot="side-peek-drawer-footer" className={cn("flex shrink-0 justify-end gap-2 border-t border-border-subtle bg-popover px-6 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-8", className)} {...props} />;
+  return <div data-slot="side-peek-drawer-footer" className={cn("flex shrink-0 justify-end gap-2 border-t border-border-subtle bg-popover px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-8", className)} {...props} />;
 }
 
 export {
   SidePeekDrawer,
   SidePeekDrawerContent,
   SidePeekDrawerHeader,
+  SidePeekDrawerTopBar,
   SidePeekDrawerBody,
   SidePeekDrawerTitle,
   SidePeekDrawerFooter,
   useSidePeekDrawerControls,
 };
-export type { SidePeekDrawerProps, SidePeekDrawerHeaderProps };
+export type { SidePeekDrawerProps, SidePeekDrawerHeaderProps, SidePeekDrawerTopBarProps };

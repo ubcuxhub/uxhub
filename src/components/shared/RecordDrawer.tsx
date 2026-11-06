@@ -2,14 +2,14 @@
 
 import * as React from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { History, SearchX } from "lucide-react";
+import { History, Minimize2, SearchX } from "lucide-react";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { DetailList, DetailRow } from "@/components/shared/DetailRow";
-import { PageContainer } from "@/components/shared/PageContainer";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Field, FieldDescription, FieldError } from "@/components/ui/field";
+import { IconButton } from "@/components/ui/icon-button";
 import { Label } from "@/components/ui/label";
 import {
   SidePeekDrawer,
@@ -18,6 +18,7 @@ import {
   SidePeekDrawerFooter,
   SidePeekDrawerHeader,
   SidePeekDrawerTitle,
+  SidePeekDrawerTopBar,
   useSidePeekDrawerControls,
 } from "@/components/ui/side-peek-drawer";
 import { Spinner } from "@/components/ui/spinner";
@@ -33,7 +34,14 @@ import { cn } from "@/lib/utils";
  *   `src/app/@flow/(.)admin/...`. The record opens in a SidePeekDrawer beside
  *   the list, which stays mounted behind it. Closing is `router.back()`.
  * - `canonical`: a direct load or refresh of the same URL, served by
- *   `src/app/(app)/(shell)/admin/...`. The record is a page with a back pill.
+ *   `src/app/(app)/(shell)/admin/...`. The record is a page.
+ *
+ * Both render the same surface: a top bar (close, expand or collapse, the
+ * record's actions), the identity, Details | History tabs and the editing
+ * footer. Only the container differs: the 560px drawer, or a column about
+ * 760px wide centred in the page's content area. In the drawer, expand opens
+ * the record's page; on the page, close returns to the list and collapse
+ * returns to the list with the drawer open on this record.
  *
  * The route picks the mode by wrapping its content in `RecordFrame`; the
  * content (`RecordView` and its sections and fields) is the same in both and
@@ -107,17 +115,49 @@ function useLeave(mode: RecordFrameMode, listHref: string) {
   );
 }
 
+/**
+ * From the record's page back to its list with the drawer open on the record:
+ * replace this page with the list, then, once the list is showing, soft
+ * navigate to the record so the intercepted route opens it in a drawer over
+ * the list (Back then closes the drawer, as if it had opened from there).
+ *
+ * The two can't be fired together: Next drops a navigation still in flight
+ * when the next one starts, and a push from this page would open the drawer
+ * over the record's page instead of the list. The frame unmounts as soon as
+ * the list shows, so the push waits on the URL (which Next updates when the
+ * list commits) rather than on React state, and gives up if the person goes
+ * somewhere else first.
+ */
+function collapseToDrawer(router: ReturnType<typeof useRouter>, listHref: string, recordHref: string) {
+  const list = new URL(listHref, window.location.href);
+  const from = window.location.pathname;
+  router.replace(`${list.pathname}${list.search}${list.hash}`);
+  const deadline = Date.now() + 15_000;
+  const poll = () => {
+    const at = window.location.pathname;
+    if (at === list.pathname) return router.push(recordHref);
+    if (at !== from || Date.now() > deadline) return;
+    window.setTimeout(poll, 50);
+  };
+  window.setTimeout(poll, 0);
+}
+
 export interface RecordFrameProps {
   mode: RecordFrameMode;
   /** The list the record belongs to, e.g. `/admin/users`. Records are its direct children. */
   listHref: string;
-  /** The list's name for the back pill: "Back to Manage Users". */
+  /** Where the page's close goes, for its tooltip: "Back to Manage Users". */
   listLabel: string;
   /**
    * Replaces the default close: `router.back()` in a drawer, the list in a
    * page. For demos and tests; routes leave it unset.
    */
   onClose?: () => void;
+  /**
+   * Replaces the page's default collapse (the list, with the drawer open on
+   * the record). For demos and tests; routes leave it unset.
+   */
+  onCollapse?: () => void;
   children: React.ReactNode;
 }
 
@@ -127,7 +167,7 @@ export interface RecordFrameProps {
  * replaying its slide-in) and around the canonical page's content.
  *
  * While the content reports unsaved changes, leaving any way the app can see
- * (closing, a link anywhere on the page, the back pill, reload) asks
+ * (close, expand or collapse, a link anywhere on the page, reload) asks
  * "Discard changes?" first. Browser Back can't be held back.
  */
 export function RecordFrame({ mode, ...props }: RecordFrameProps) {
@@ -136,7 +176,7 @@ export function RecordFrame({ mode, ...props }: RecordFrameProps) {
 
 type FrameProps = Omit<RecordFrameProps, "mode">;
 
-function InterceptedFrame({ listHref, onClose, children }: FrameProps) {
+function InterceptedFrame({ listHref, onClose, children }: Omit<FrameProps, "onCollapse">) {
   const router = useRouter();
   const [open, setOpen] = React.useState(true);
   const [dirty, setDirty] = React.useState(false);
@@ -187,9 +227,22 @@ function InterceptedFrameContext({
   return <RecordFrameContext.Provider value={value}>{children}</RecordFrameContext.Provider>;
 }
 
-type PendingLeave = { kind: "close" } | { kind: "navigate"; href: string };
+/** What the page's top bar needs beyond `useRecordFrame`. */
+interface RecordPageContextValue {
+  listLabel: string;
+  /** Back to the list with the drawer open on `recordHref`, asking first when dirty. */
+  collapse: (recordHref: string) => void;
+}
 
-function CanonicalFrame({ listHref, listLabel, onClose, children }: FrameProps) {
+const RecordPageContext = React.createContext<RecordPageContextValue | null>(null);
+
+type PendingLeave = { kind: "close" } | { kind: "collapse"; href: string } | { kind: "navigate"; href: string };
+
+/** The page's column: the record surface at about 760px, centred in the content area. */
+const PAGE_COLUMN = "mx-auto flex w-full max-w-[760px] flex-1 flex-col";
+
+function CanonicalFrame({ listHref, listLabel, onClose, onCollapse, children }: FrameProps) {
+  const router = useRouter();
   const [dirty, setDirty] = React.useState(false);
   const [pending, setPending] = React.useState<PendingLeave | null>(null);
   const leave = useLeave("canonical", listHref);
@@ -203,6 +256,11 @@ function CanonicalFrame({ listHref, listLabel, onClose, children }: FrameProps) 
     else leave(listHref);
   };
 
+  const collapseNow = (recordHref: string) => {
+    if (onCollapse) onCollapse();
+    else collapseToDrawer(router, listHref, recordHref);
+  };
+
   const value: RecordFrameContextValue = {
     mode: "canonical",
     setDirty,
@@ -210,11 +268,18 @@ function CanonicalFrame({ listHref, listLabel, onClose, children }: FrameProps) 
     navigate: (href) => (dirty ? setPending({ kind: "navigate", href }) : leave(href)),
   };
 
+  const page: RecordPageContextValue = {
+    listLabel,
+    collapse: (href) => (dirty ? setPending({ kind: "collapse", href }) : collapseNow(href)),
+  };
+
   return (
     <RecordFrameContext.Provider value={value}>
-      <PageContainer backHref={listHref} backLabel={listLabel}>
-        {children}
-      </PageContainer>
+      <RecordPageContext.Provider value={page}>
+        <div data-slot="record-page" className={PAGE_COLUMN}>
+          {children}
+        </div>
+      </RecordPageContext.Provider>
       <ConfirmDialog
         open={pending !== null}
         onOpenChange={(next) => {
@@ -226,6 +291,7 @@ function CanonicalFrame({ listHref, listLabel, onClose, children }: FrameProps) 
           setPending(null);
           guard.release();
           if (leaving?.kind === "navigate") leave(leaving.href);
+          else if (leaving?.kind === "collapse") collapseNow(leaving.href);
           else if (leaving) closeNow();
         }}
       />
@@ -237,8 +303,45 @@ function CanonicalFrame({ listHref, listLabel, onClose, children }: FrameProps) 
 
 const RecordViewContext = React.createContext<{ editing: boolean }>({ editing: false });
 
+/** The record's name: the same 24/32 in both modes (an h2 in the drawer, the page's h1). */
+const TITLE = "min-w-0 break-words text-h2 text-foreground outline-none";
+
+/** Matches `SidePeekDrawerBody`'s padding, so the page lines up with the drawer. */
+const PAGE_BODY = "px-5 py-8 sm:px-8";
+
+/**
+ * The page's top bar: the drawer's, with close going to the list (its tooltip
+ * names it) and collapse in place of "Open as full page". No collapse
+ * without `recordHref` (loading, not found).
+ */
+function RecordPageBar({ recordHref, actions }: { recordHref?: string; actions?: React.ReactNode }) {
+  const { close } = useRecordFrame();
+  const page = React.useContext(RecordPageContext);
+  if (!page) throw new Error("RecordPageBar must be inside a canonical RecordFrame");
+  return (
+    <SidePeekDrawerTopBar
+      onClose={close}
+      closeLabel="Close"
+      closeTooltip={page.listLabel}
+      actions={actions}
+      resize={
+        recordHref ? (
+          <IconButton
+            variant="ghost"
+            label="Collapse to drawer"
+            onClick={() => page.collapse(recordHref)}
+            className="rounded-lg text-muted-foreground"
+          >
+            <Minimize2 className="size-[18px]" aria-hidden />
+          </IconButton>
+        ) : null
+      }
+    />
+  );
+}
+
 export interface RecordViewProps {
-  /** The record's own URL: "Open as full page" in the drawer. */
+  /** The record's own URL: "Open as full page" in the drawer, and where collapse reopens it from the page. */
   recordHref: string;
   /** The record's name. The drawer focuses it on open. */
   title: React.ReactNode;
@@ -252,7 +355,7 @@ export interface RecordViewProps {
   cover?: React.ReactNode;
   /** Under the subtitle: status Badges. */
   status?: React.ReactNode;
-  /** Header buttons ("Edit user"). Hidden while editing, when the footer takes over. */
+  /** Top bar buttons ("Edit user"). Hidden while editing, when the footer takes over. */
   actions?: React.ReactNode;
   /** The Details tab: `RecordSection`s. */
   details: React.ReactNode;
@@ -274,9 +377,10 @@ export interface RecordViewProps {
 }
 
 /**
- * One record's content: header, identity, Details | History tabs and, while
- * editing, a pinned Cancel / Save changes footer. Renders as a drawer or a
- * page from the surrounding `RecordFrame`.
+ * One record's content: top bar, identity, Details | History tabs and, while
+ * editing, a Cancel / Save changes footer (pinned in the drawer, sticky on the
+ * page). The same surface in a drawer or a page, from the surrounding
+ * `RecordFrame`.
  *
  * The Details tab sits inside a `<form>` (Enter saves), so don't nest
  * another form in it; a control that needs one can point at it with the
@@ -332,30 +436,24 @@ export function RecordView({
   const identity = (
     <div className="flex flex-col gap-6">
       {cover ? <div className="overflow-hidden rounded-xl">{cover}</div> : null}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="flex min-w-0 flex-1 items-start gap-4 sm:gap-5">
-          {media ? <div className="shrink-0">{media}</div> : null}
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              {intercepted ? (
-                <SidePeekDrawerTitle ref={titleRef} className="min-w-0 break-words">
-                  {title}
-                </SidePeekDrawerTitle>
-              ) : (
-                <h1 ref={titleRef} tabIndex={-1} className="min-w-0 break-words text-h1 tracking-tight text-foreground outline-none">
-                  {title}
-                </h1>
-              )}
-              {titleAdornment}
-            </div>
-            {subtitle ? <p className="text-small text-muted-foreground">{subtitle}</p> : null}
-            {status ? <div className="flex flex-wrap items-center gap-2 pt-1">{status}</div> : null}
+      <div className="flex min-w-0 items-start gap-4 sm:gap-5">
+        {media ? <div className="shrink-0">{media}</div> : null}
+        <div className="flex min-w-0 flex-1 flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            {intercepted ? (
+              <SidePeekDrawerTitle ref={titleRef} className={TITLE}>
+                {title}
+              </SidePeekDrawerTitle>
+            ) : (
+              <h1 ref={titleRef} tabIndex={-1} data-slot="record-title" className={TITLE}>
+                {title}
+              </h1>
+            )}
+            {titleAdornment}
           </div>
+          {subtitle ? <p className="text-small text-muted-foreground">{subtitle}</p> : null}
+          {status ? <div className="flex flex-wrap items-center gap-2 pt-1">{status}</div> : null}
         </div>
-        {/* In a drawer the actions sit in its top bar instead. */}
-        {!intercepted && showActions ? (
-          <div className="flex shrink-0 flex-wrap items-center gap-2">{actions}</div>
-        ) : null}
       </div>
     </div>
   );
@@ -395,6 +493,8 @@ export function RecordView({
     <RecordFooter formId={formId} saving={saving} error={error} onCancel={onCancel} saveLabel={saveLabel} />
   ) : null;
 
+  const barActions = showActions ? actions : undefined;
+
   return (
     <RecordViewContext.Provider value={{ editing }}>
       {intercepted ? (
@@ -403,7 +503,7 @@ export function RecordView({
             fullPageHref={recordHref}
             // A soft link to this URL would be intercepted back into the drawer.
             fullPageNavigation="document"
-            actions={showActions ? actions : undefined}
+            actions={barActions}
           />
           <SidePeekDrawerBody className="flex flex-col gap-8">
             {identity}
@@ -414,18 +514,21 @@ export function RecordView({
           ) : null}
         </>
       ) : (
-        <div className="flex max-w-3xl flex-col gap-8">
-          {identity}
-          {tabs}
+        <>
+          <RecordPageBar recordHref={recordHref} actions={barActions} />
+          <div className={cn("flex flex-col gap-8", PAGE_BODY)}>
+            {identity}
+            {tabs}
+          </div>
           {footer ? (
             <div
               data-slot="record-page-footer"
-              className="sticky bottom-0 z-10 flex flex-wrap items-center justify-end gap-2 border-t border-border-subtle bg-background py-4 pb-[max(1rem,env(safe-area-inset-bottom))]"
+              className="sticky bottom-0 z-10 mt-auto flex flex-wrap items-center justify-end gap-2 border-t border-border-subtle bg-background px-5 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-8"
             >
               {footer}
             </div>
           ) : null}
-        </div>
+        </>
       )}
     </RecordViewContext.Provider>
   );
@@ -589,7 +692,14 @@ export function RecordDrawerSkeleton({ label = "Loading record" }: { label?: str
       <Spinner size="lg" label={label} />
     </div>
   );
-  if (mode === "canonical") return spinner;
+  if (mode === "canonical") {
+    return (
+      <>
+        <RecordPageBar />
+        {spinner}
+      </>
+    );
+  }
   return (
     <>
       <SidePeekDrawerHeader />
@@ -624,7 +734,14 @@ export function RecordNotFound({ noun }: { noun: string }) {
       </p>
     </div>
   );
-  if (!intercepted) return content;
+  if (!intercepted) {
+    return (
+      <>
+        <RecordPageBar />
+        <div className={PAGE_BODY}>{content}</div>
+      </>
+    );
+  }
   return (
     <>
       <SidePeekDrawerHeader />

@@ -7,7 +7,14 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { SearchField } from "@/components/ui/search-field";
 
-import { SidePeekDrawer, SidePeekDrawerBody, SidePeekDrawerContent, SidePeekDrawerHeader, SidePeekDrawerTitle } from "./side-peek-drawer";
+import {
+  SidePeekDrawer,
+  SidePeekDrawerBody,
+  SidePeekDrawerContent,
+  SidePeekDrawerHeader,
+  SidePeekDrawerTitle,
+  SidePeekDrawerTopBar,
+} from "./side-peek-drawer";
 
 const push = vi.fn();
 const loadDocument = vi.fn();
@@ -135,6 +142,35 @@ describe("SidePeekDrawer", () => {
       render(<Example dirty fullPageHref="/admin/users/1" />);
       expect(fireEvent.click(screen.getByRole("link", { name: "Open as full page" }), { ctrlKey: true })).toBe(true);
       expect(screen.queryByRole("heading", { name: "Discard changes?" })).toBeNull();
+    });
+  });
+
+  describe("top bar", () => {
+    it("starts 40px down from sm up and is compact on phones, hiding expand there but not close", () => {
+      render(<Example fullPageHref="/admin/users/1" />);
+      const bar = document.querySelector<HTMLElement>('[data-slot="side-peek-drawer-header"]')!;
+      expect(bar.className).toContain("pt-3");
+      expect(bar.className).toContain("sm:pt-10");
+      const expand = screen.getByRole("link", { name: "Open as full page" });
+      expect(expand.closest('[data-slot="side-peek-drawer-resize"]')?.className).toContain("max-sm:hidden");
+      expect(screen.getByRole("button", { name: "Close panel (Esc)" }).closest('[data-slot="side-peek-drawer-resize"]')).toBeNull();
+    });
+
+    it("renders without a drawer, for a page showing the same record", () => {
+      const onClose = vi.fn();
+      render(
+        <SidePeekDrawerTopBar
+          onClose={onClose}
+          closeLabel="Close"
+          closeTooltip="Back to Manage Users"
+          resize={<button type="button">Collapse to drawer</button>}
+          actions={<button type="button">Edit user</button>}
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Close" }));
+      expect(onClose).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole("button", { name: "Collapse to drawer" }).closest('[data-slot="side-peek-drawer-resize"]')?.className).toContain("max-sm:hidden");
+      expect(screen.getByRole("button", { name: "Edit user" })).toBeTruthy();
     });
   });
 
