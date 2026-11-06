@@ -83,7 +83,8 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
   - `(app)` - shared authenticated boundary and `UserProvider`
     - `(shell)` - sidebar-backed student and admin pages
     - `(confirmation)` - sidebar-free, full-viewport post-purchase pages
-  - `@flow` - parallel slot holding intercepted `(.)portal/*` routes
+  - `@flow` - parallel slot holding intercepted `(.)portal/*` routes and
+    `(.)admin/*` record drawers
   - `api` - Square webhook and event-image upload handlers
 - `src/features` - domain UI and behavior
   - `admin`, `auth`, `events`, `marketing`, `memberships`, `payments`, and
@@ -117,6 +118,18 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
   the app). Both layouts wrap children in `MembershipFlowDialog`, differing only
   by `mode`. Add a page to one tree and you must add it to the other; put shared
   behavior in the feature component so both pick it up.
+- Admin records (a user, an event) follow the same pattern: soft navigation to
+  the record's URL opens it in a side peek drawer over its list
+  (`@flow/(.)admin/*`), and a direct load or refresh renders it as a page under
+  `(shell)/admin/*`. Both wrap one feature component in `RecordFrame` from
+  `src/components/shared/RecordDrawer`, differing only by `mode`; the feature
+  fills `RecordView` and never branches on mode. Every `@flow` page has a
+  canonical twin, but not every canonical page has a drawer (`/edit`,
+  `/check-in`, `/review-applications` and `create-new` are pages only).
+  `@flow` renders outside the `(app)` layouts, so their `requireAuth()` and
+  `requireAdmin()` never run for it: every intercepted admin layout and page
+  must call `requireAdmin()` itself (or render a route component that does).
+  `src/app/flow-routes.test.ts` enforces both rules.
 - Prefer the typed helpers in `src/lib/supabase-helpers` over scattering raw
   `.from(...)` calls. Use `TABLES` for table names. Keep RLS-bypassing
   service-role work server-only in `src/lib/supabase/admin.ts` and

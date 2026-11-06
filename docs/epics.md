@@ -79,7 +79,7 @@ src/
 │   ├── @flow/[+] (.)admin/            edit-event and edit-user drawers (+ History tab)
 │   └── api/upload-event-image/, [+] export/   CSV export
 ├── features/admin/                    except Application* / ReviewApplications* / CheckIn*
-├── components/shared/[+] FlowDrawer
+├── components/shared/RecordDrawer     drawer/page shell for user and event records
 └── lib/supabase-helpers/
     └── users, app-settings, admin-server
 ```
