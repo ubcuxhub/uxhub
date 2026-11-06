@@ -135,10 +135,8 @@ const ICONS = [
 ];
 
 const ICON_SIZES = [
-  { cls: "size-3.5", label: "14px · small buttons, badges" },
-  { cls: "size-4", label: "16px · buttons, fields" },
-  { cls: "size-5", label: "20px · sidebar nav, 12px gap" },
-  { cls: "size-6", label: "24px" },
+  { cls: "size-4", label: "16px · beside text, buttons, badges, menus, fields" },
+  { cls: "size-5", label: "20px · app chrome: sidebar nav, drawer top bar, empty states" },
 ];
 
 function toHex(rgb: string) {
@@ -338,7 +336,7 @@ function Foundations() {
       <SpecimenGroup
         title="Icons"
         spec="§2.7"
-        description="Lucide at its default 2px stroke at every size (thicker than Figma's 1.5px, by choice). 16px beside body text with an 8px gap, 14px beside small text, 20px with a 12px gap in sidebar rows."
+        description="Lucide at its default 2px stroke at every size (thicker than Figma's 1.5px, by choice). Two sizes: 16px for everything beside text (8px gap), 20px for app chrome (12px gap in sidebar rows)."
       >
         {ICON_SIZES.map(({ cls, label }) => (
           <Specimen key={cls} label={label}>
@@ -355,9 +353,9 @@ function Foundations() {
             Fri, Nov 14
           </span>
         </Specimen>
-        <Specimen label="Icon + small label, 14px">
+        <Specimen label="Icon + small label, 16px">
           <span className="inline-flex items-center gap-2 text-small">
-            <Ticket className="size-3.5 text-muted-foreground" aria-hidden />2
+            <Ticket className="size-4 text-muted-foreground" aria-hidden />2
             tickets
           </span>
         </Specimen>

@@ -354,3 +354,41 @@ export async function fetchApplicationResponses(
   if (error) throw error;
   return (data ?? []) as unknown as ApplicationResponseWithQuestion[];
 }
+
+/** How many of an event's applications are in each review state. */
+export type EventApplicationStatusCounts = Record<
+  EventApplicationRow["status"],
+  number
+> & { total: number };
+
+const APPLICATION_STATUSES = ["submitted", "accepted", "rejected", "waitlisted"] as const satisfies readonly EventApplicationRow["status"][];
+
+/**
+ * Counts an event's applications by status, for the admin overview. Every
+ * status is present, at zero when none are in it. Exact counts from the
+ * database, one per status, so no row limit applies. Under RLS a caller who
+ * can't see the applications gets zeros, so pass an admin's client.
+ */
+export async function fetchEventApplicationStatusCounts(
+  supabase: DbClient,
+  eventId: string
+): Promise<EventApplicationStatusCounts> {
+  const results = await Promise.all(
+    APPLICATION_STATUSES.map(async (status) => {
+      const { count, error } = await supabase
+        .from(TABLES.eventApplications)
+        .select("id", { count: "exact", head: true })
+        .eq("event_id", eventId)
+        .eq("status", status);
+      if (error) throw error;
+      return [status, count ?? 0] as const;
+    })
+  );
+
+  const counts = { total: 0 } as EventApplicationStatusCounts;
+  for (const [status, count] of results) {
+    counts[status] = count;
+    counts.total += count;
+  }
+  return counts;
+}
