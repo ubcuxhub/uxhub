@@ -1,8 +1,9 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { Search } from "lucide-react";
 
+import { TableRowCount, type TableRowCountValue } from "@/components/shared/TableToolbar";
 import { Input } from "@/components/ui/input";
 
 interface AdminDirectoryToolbarProps {
@@ -11,6 +12,13 @@ interface AdminDirectoryToolbarProps {
   searchLabel: string;
   placeholder: string;
   children: ReactNode;
+  /**
+   * How many rows are listed, on a line under the toolbar: "142 users", or
+   * "38 of 142 users" while searching or filtering.
+   */
+  count?: TableRowCountValue;
+  /** With `count`, a "Clear filters" button while filtering. Clear the search too. */
+  onClearFilters?: () => void;
 }
 
 export function AdminDirectoryToolbar({
@@ -19,8 +27,11 @@ export function AdminDirectoryToolbar({
   searchLabel,
   placeholder,
   children,
+  count,
+  onClearFilters,
 }: AdminDirectoryToolbarProps) {
-  return (
+  const searchRef = useRef<HTMLInputElement>(null);
+  const toolbar = (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
       <div className="relative min-w-0 flex-1">
         <Search
@@ -28,6 +39,7 @@ export function AdminDirectoryToolbar({
           aria-hidden="true"
         />
         <Input
+          ref={searchRef}
           type="search"
           value={searchQuery}
           onChange={(event) => onSearchQueryChange(event.target.value)}
@@ -37,6 +49,25 @@ export function AdminDirectoryToolbar({
         />
       </div>
       {children}
+    </div>
+  );
+
+  if (!count) return toolbar;
+  return (
+    <div className="flex flex-col gap-3">
+      {toolbar}
+      <TableRowCount
+        count={count}
+        onClearFilters={
+          onClearFilters
+            ? () => {
+                onClearFilters();
+                // The button goes with the filters; keep focus nearby.
+                searchRef.current?.focus();
+              }
+            : undefined
+        }
+      />
     </div>
   );
 }

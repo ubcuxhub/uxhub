@@ -16,7 +16,26 @@ export interface TableToolbarProps {
   /** E.g. `<Button variant="secondary" size="sm"><Download />Export to CSV</Button>`. */
   bulkActions?: React.ReactNode;
   onClearSelection?: () => void;
+  /**
+   * How many rows are listed, on a line under the toolbar: "142 users", or
+   * "38 of 142 users" while a search or filter hides some.
+   */
+  count?: TableRowCountValue;
+  /** With `count`, a "Clear filters" button while filtering. Clear the search too. */
+  onClearFilters?: () => void;
+  /** The toolbar row's classes. */
   className?: string;
+}
+
+export interface TableRowCountValue {
+  /** Rows listed after search and filters. */
+  shown: number;
+  /** Rows before search and filters. */
+  total: number;
+  /** "user" and "users". Picked by `total`. */
+  noun: { one: string; other: string };
+  /** Whether a search or filter is applied. Defaults to `shown !== total`. */
+  filtered?: boolean;
 }
 
 const FOCUSABLE = "button:not(:disabled), a[href], [tabindex]:not([tabindex='-1'])";
@@ -37,6 +56,8 @@ function TableToolbar({
   selectedCount = 0,
   bulkActions,
   onClearSelection,
+  count,
+  onClearFilters,
   className,
 }: TableToolbarProps) {
   const selecting = selectedCount > 0;
@@ -58,7 +79,7 @@ function TableToolbar({
     target?.focus();
   }, [selecting]);
 
-  return (
+  const toolbar = (
     <div
       ref={rootRef}
       data-slot="table-toolbar"
@@ -97,6 +118,64 @@ function TableToolbar({
       ) : null}
     </div>
   );
+
+  if (!count) return toolbar;
+  return (
+    <div className="flex flex-col gap-3">
+      {toolbar}
+      <TableRowCount
+        count={count}
+        onClearFilters={
+          onClearFilters
+            ? () => {
+                onClearFilters();
+                // The button goes with the filters; keep focus in the toolbar.
+                rootRef.current?.querySelector<HTMLElement>("input")?.focus();
+              }
+            : undefined
+        }
+      />
+    </div>
+  );
 }
 
-export { TableToolbar };
+const NUMBER = new Intl.NumberFormat("en-CA");
+
+/** "142 users", or "38 of 142 users" while filtered. */
+function formatRowCount({ shown, total, noun, filtered = shown !== total }: TableRowCountValue) {
+  const word = total === 1 ? noun.one : noun.other;
+  return filtered
+    ? `${NUMBER.format(shown)} of ${NUMBER.format(total)} ${word}`
+    : `${NUMBER.format(total)} ${word}`;
+}
+
+/**
+ * The row count line under a table toolbar (`TableToolbar`'s `count`), for a
+ * toolbar of its own. The count is a polite live region that stays mounted,
+ * so a change is announced and the first render is not.
+ */
+function TableRowCount({
+  count,
+  onClearFilters,
+  className,
+}: {
+  count: TableRowCountValue;
+  onClearFilters?: () => void;
+  className?: string;
+}) {
+  const filtered = count.filtered ?? count.shown !== count.total;
+  return (
+    <div data-slot="table-row-count" className={cn("flex flex-wrap items-center gap-x-3 gap-y-1", className)}>
+      <p role="status" className="text-small text-muted-foreground tabular-nums">
+        {formatRowCount(count)}
+      </p>
+      {filtered && onClearFilters ? (
+        <Button type="button" variant="link" size="sm" onClick={onClearFilters}>
+          Clear filters
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+export { formatRowCount, TableRowCount, TableToolbar };

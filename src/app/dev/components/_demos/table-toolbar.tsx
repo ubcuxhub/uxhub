@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { Download, ListFilter } from "lucide-react";
 
 import { TableToolbar } from "@/components/shared/TableToolbar";
@@ -18,6 +21,28 @@ function SelectedToolbar() {
         </Button>
       }
       onClearSelection={() => {}}
+    />
+  );
+}
+
+const USERS = { one: "user", other: "users" };
+const NAMES = ["Alex Chen", "Jordan Lee", "Priya Raman", "Sam Patel", "Taylor Kim", "Morgan Wu"];
+
+/** Type to filter: the count follows, and Clear filters resets the search. */
+function CountedToolbar() {
+  const [query, setQuery] = useState("a");
+  const shown = NAMES.filter((name) => name.toLowerCase().includes(query.trim().toLowerCase())).length;
+  return (
+    <TableToolbar
+      search={<SearchField label="Search users" placeholder="Search users" value={query} onValueChange={setQuery} />}
+      actions={
+        <Button variant="secondary" size="sm">
+          <ListFilter aria-hidden />
+          Sort and filter
+        </Button>
+      }
+      count={{ shown, total: NAMES.length, noun: USERS, filtered: query.trim() !== "" }}
+      onClearFilters={() => setQuery("")}
     />
   );
 }
@@ -63,6 +88,30 @@ function TableToolbarDemo() {
         <Specimen label="Rows selected" wide>
           <div className="w-full">
             <SelectedToolbar />
+          </div>
+        </Specimen>
+      </SpecimenGroup>
+      <SpecimenGroup
+        title="Row count"
+        description="Pass count (and onClearFilters) to say how many rows are listed: “142 users”, or “38 of 142 users” plus Clear filters while a search or filter hides some. The line is a polite live region, announced on change. Lists with their own toolbar use TableRowCount."
+      >
+        <Specimen label="All rows" wide>
+          <div className="w-full">
+            <TableToolbar
+              search={<SearchField label="Search users" placeholder="Search users" />}
+              actions={
+                <Button variant="secondary" size="sm">
+                  <ListFilter aria-hidden />
+                  Sort and filter
+                </Button>
+              }
+              count={{ shown: 142, total: 142, noun: USERS }}
+            />
+          </div>
+        </Specimen>
+        <Specimen label="Filtered (type to try it)" wide>
+          <div className="w-full">
+            <CountedToolbar />
           </div>
         </Specimen>
       </SpecimenGroup>
