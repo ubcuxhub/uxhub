@@ -18,10 +18,8 @@ export default async function AdminCreateEventPage() {
   ]);
 
   return (
-    <PageContainer backHref="/admin/events" backLabel="Back to Events">
+    <PageContainer className="max-w-none min-[821px]:px-12 lg:px-12">
       <EventCreateModify
-        title="Create a New Event"
-        description="Complete the form below to add a new event to the gallery."
         mentorOptions={mentorOptions}
         sponsorOptions={sponsorOptions}
       />

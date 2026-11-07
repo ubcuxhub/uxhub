@@ -385,3 +385,15 @@ describe("describeImageRequirements", () => {
     ).toBe("Square JPG or PNG, 600 \u00d7 600 px or larger, up to 4 MB");
   });
 });
+
+
+describe("separate event image kinds", () => {
+  it("accepts rectangular headers without weakening icon checks", () => {
+    const image = { fileType: "image/png", size: 100, buffer: pngHeader(1600, 400) };
+    expect(parseEventImageUpload({ ...image, kind: "header" }).dimensions).toEqual({ width: 1600, height: 400 });
+    expect(() => parseEventImageUpload({ ...image, kind: "icon" })).toThrow(/square/);
+  });
+  it.each([["header", 1599, 400], ["header", 1600, 399], ["icon", 599, 599]] as const)("enforces %s minimum dimensions", (kind, width, height) => {
+    expect(() => parseEventImageUpload({ kind, fileType: "image/png", size: 100, buffer: pngHeader(width, height) })).toThrow(/at least/);
+  });
+});

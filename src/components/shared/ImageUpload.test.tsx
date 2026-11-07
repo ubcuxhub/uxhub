@@ -48,6 +48,15 @@ describe("ImageUpload", () => {
     expect(click).toHaveBeenCalled();
   });
 
+  it("opens the header picker from its named button and retains the 4 MB guidance", () => {
+    render(<ImageUpload presentation="header" label="Header image" requirements={{ minWidth: 1600, minHeight: 400 }} onChange={noop} />);
+    const click = vi.fn();
+    input("Header image").addEventListener("click", click);
+    fireEvent.click(screen.getByRole("button", { name: "Upload header image" }));
+    expect(click).toHaveBeenCalledOnce();
+    expect(screen.getByText(/1600 × 400 px or larger, up to 4 MB/)).toBeTruthy();
+  });
+
   it("builds the requirements line from props", () => {
     const { rerender } = render(<ImageUpload onChange={noop} />);
     expect(screen.getByText(/Square JPG or PNG, up to 4 MB/)).toBeTruthy();
@@ -236,9 +245,9 @@ describe("ImageUpload picks", () => {
   const pick = (f: File) =>
     fireEvent.change(input(), { target: { files: [f] } });
 
-  it("previews a valid pick and reports the file", async () => {
+  it.each(["default", "icon", "header"] as const)("previews a valid pick and reports the file in %s presentation", async (presentation) => {
     const onFileChange = vi.fn();
-    render(<ImageUpload onChange={noop} onFileChange={onFileChange} />);
+    render(<ImageUpload presentation={presentation} onChange={noop} onFileChange={onFileChange} />);
     const png = file("cover.png", "image/png");
     pick(png);
     decode(0, 400);

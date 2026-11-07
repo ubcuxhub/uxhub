@@ -1,12 +1,23 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { EventStatus } from "@/lib/supabase/models";
 import { AdminEventsTable, type AdminEventTableRow } from "./AdminEventsTable";
+import { buildAdminEventTableRows } from "../lib/admin-event-table";
+import { defaultFormState } from "./event-form/event-form-schema";
+import type { EventWorkingDocument } from "../lib/event-working-document";
 
-afterEach(cleanup);
+const { push } = vi.hoisted(() => ({ push: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+
+afterEach(() => { cleanup(); vi.clearAllMocks(); });
+
+function draft(id: string, event_id: string | null, name = "", starts_at = "") {
+  const document: EventWorkingDocument = { version: 1, formState: { ...defaultFormState, name, starts_at }, checkInEvents: [], mentors: [], sponsors: [], applicationTemplate: [] };
+  return { id, event_id, document };
+}
 
 function row(id: string, name: string, starts_at: string | null, status: EventStatus, registrationOpen: boolean): AdminEventTableRow {
   return {
@@ -19,6 +30,7 @@ function row(id: string, name: string, starts_at: string | null, status: EventSt
       agenda_enabled: true,
       description_images: [],
       created_at: null,
+      description_rich: null,
       description: "Event description",
       ends_at: null,
       event_colour: null,
@@ -60,10 +72,50 @@ const rows = [
 ];
 
 function rowNames() {
-  return screen.getAllByRole("button", { name: /^View details for/ }).map((element) => element.getAttribute("aria-label"));
+  return screen.getAllByRole("button", { name: /^(View details|Resume draft) for/ }).map((element) => element.getAttribute("aria-label"));
 }
 
 describe("AdminEventsTable regression", () => {
+  it("includes incomplete drafts in the existing table and filters without duplicating their source event", () => {
+    const combined = buildAdminEventTableRows(rows, [draft("working", "draft", "Working Workshop", "2026-12-02T10:00"), draft("empty", null)]);
+    render(<AdminEventsTable rows={combined} />);
+    expect(rowNames()).toHaveLength(rows.length + 1);
+    expect(screen.queryByRole("button", { name: "View details for Draft Workshop" })).toBeNull();
+    const empty = screen.getByRole("button", { name: "Resume draft for Untitled event" });
+    expect(within(empty).getByText("Draft")).toBeTruthy();
+    expect(within(empty).getAllByText("—")).toHaveLength(2);
+    expect(within(empty).getByText("N/A")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Filters" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Draft" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "N/A" }));
+    expect(rowNames()).toEqual(["Resume draft for Working Workshop", "Resume draft for Untitled event"]);
+    fireEvent.change(screen.getByRole("searchbox"), { target: { value: " working " } });
+    expect(rowNames()).toEqual(["Resume draft for Working Workshop"]);
+  });
+
+  it.each(["click", "Enter", " "])("resumes standalone and existing-event drafts by %s", activation => {
+    render(<AdminEventsTable rows={buildAdminEventTableRows([rows[2]], [draft("new-draft", null, "New work"), draft("existing-draft", "draft", "Existing work")])} />);
+    for (const [name, href] of [["New work", "/admin/events/drafts/new-draft"], ["Existing work", "/admin/events/draft"]]) {
+      const target = screen.getByRole("button", { name: `Resume draft for ${name}` });
+      if (activation === "click") fireEvent.click(target);
+      else fireEvent.keyDown(target, { key: activation });
+      expect(push).toHaveBeenLastCalledWith(href);
+      expect(screen.queryByRole("dialog")).toBeNull();
+    }
+  });
+
+  it("sorts draft dates with event dates, keeping missing dates last in either direction", () => {
+    render(<AdminEventsTable rows={buildAdminEventTableRows([rows[0]], [draft("dated", null, "Earlier draft", "2026-08-01T10:00"), draft("undated-draft", null)])} />);
+    expect(rowNames()).toEqual(["View details for Design Meetup", "Resume draft for Earlier draft", "Resume draft for Untitled event"]);
+    fireEvent.click(screen.getByRole("button", { name: "Sort by date ascending" }));
+    expect(rowNames()).toEqual(["Resume draft for Earlier draft", "View details for Design Meetup", "Resume draft for Untitled event"]);
+  });
+
+  it("keeps published and scheduled events visible if an obsolete working document remains", () => {
+    const scheduled = { ...rows[2], event: { ...rows[2].event, publish_at: "2026-12-01T17:00:00Z" } };
+    expect(buildAdminEventTableRows([rows[0], scheduled], [draft("old-live", "older", "Outdated live"), draft("old-scheduled", "draft", "Outdated schedule")])).toEqual([rows[0], scheduled]);
+  });
+
   it("retains date ordering and leaves undated events last in both directions", () => {
     render(<AdminEventsTable rows={rows} />);
     expect(rowNames()).toEqual(["View details for Draft Workshop", "View details for Design Workshop", "View details for Design Meetup", "View details for Undated Meetup"]);

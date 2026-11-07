@@ -213,6 +213,7 @@ export interface EventImageUploadInput {
   fileType: string;
   size: number;
   buffer: Buffer;
+  kind?: "icon" | "header";
 }
 
 export interface ParsedEventImageUpload {
@@ -230,6 +231,7 @@ export function parseEventImageUpload({
   fileType,
   size,
   buffer,
+  kind,
 }: EventImageUploadInput): ParsedEventImageUpload {
   const { contentType, extension } = resolveEventImageType(fileType);
 
@@ -243,10 +245,14 @@ export function parseEventImageUpload({
     throw new Error(EVENT_IMAGE_ERRORS.dimensions);
   }
 
-  if (dimensions.width !== dimensions.height) {
+  if (kind !== "header" && dimensions.width !== dimensions.height) {
     throw new Error(EVENT_IMAGE_ERRORS.square);
   }
 
+  if (kind) {
+    const [width, height] = kind === "header" ? [1600, 400] : [600, 600];
+    if (dimensions.width < width || dimensions.height < height) throw new Error(describeMinSize(width, height));
+  }
   return { contentType, extension, dimensions };
 }
 

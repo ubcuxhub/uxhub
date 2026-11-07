@@ -1,3 +1,4 @@
+import { fetchEventDraftForEvent } from "@/lib/supabase-helpers/event-drafts";
 import { notFound } from "next/navigation";
 
 import { PageContainer } from "@/components/shared/PageContainer";
@@ -46,11 +47,13 @@ export default async function EventView({ params }: EventViewProps) {
     ]);
 
   if (!event) notFound();
+  const workingDraft = event.status === "draft" && !event.publish_at ? await fetchEventDraftForEvent(supabase, eventId) : null;
 
   return (
-    <PageContainer backHref="/admin/events" backLabel="Back to Events">
+    <PageContainer className="max-w-none min-[821px]:px-12 lg:px-12">
       <EventCreateModify
         eventId={eventId}
+        initialDraft={workingDraft}
         initialEvent={event}
         initialCheckInSessions={checkInSessions}
         initialApplicationQuestions={applicationQuestions}

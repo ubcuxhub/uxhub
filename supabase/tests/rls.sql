@@ -1264,5 +1264,6 @@ $$;
 reset role;
 
 \ir event-publication.sql
+\ir event-drafts.sql
 
 rollback;

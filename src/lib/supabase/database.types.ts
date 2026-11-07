@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_event_drafts: {
+        Row: {
+          document: NonNullable<Json>
+          event_id: string | null
+          id: string
+          materialized: boolean
+          revision: number
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          document: NonNullable<Json>
+          event_id?: string | null
+          id: string
+          materialized?: boolean
+          revision?: number
+          updated_at?: string
+        }
+        Update: {
+          document?: NonNullable<Json>
+          event_id?: string | null
+          id?: string
+          materialized?: boolean
+          revision?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_event_drafts_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       app_settings: {
         Row: {
           id: boolean
@@ -599,6 +635,7 @@ export type Database = {
           created_at: string | null
           description: string
           description_images: string[] | null
+          description_rich: Json | null
           ends_at: string | null
           event_colour: string | null
           event_type: Database["public"]["Enums"]["event_type"]
@@ -640,6 +677,7 @@ export type Database = {
           created_at?: string | null
           description: string
           description_images?: string[] | null
+          description_rich?: Json | null
           ends_at?: string | null
           event_colour?: string | null
           event_type?: Database["public"]["Enums"]["event_type"]
@@ -680,6 +718,7 @@ export type Database = {
           created_at?: string | null
           description?: string
           description_images?: string[] | null
+          description_rich?: Json | null
           ends_at?: string | null
           event_colour?: string | null
           event_type?: Database["public"]["Enums"]["event_type"]
@@ -1229,6 +1268,31 @@ export type Database = {
           p_mentors: Json
           p_slug: string
           p_sponsors: Json
+        }
+        Returns: Json
+      }
+      save_admin_event_builder: {
+        Args: {
+          p_application_questions: Json
+          p_check_in_sessions: Json
+          p_draft_id: string
+          p_draft_revision: number
+          p_event: Json
+          p_event_id: string
+          p_expected_header_image_url: string
+          p_expected_image_url: string
+          p_mentors: Json
+          p_slug: string
+          p_sponsors: Json
+        }
+        Returns: Json
+      }
+      save_admin_event_draft: {
+        Args: {
+          p_document: Json
+          p_event_id: string
+          p_id: string
+          p_revision: number
         }
         Returns: Json
       }

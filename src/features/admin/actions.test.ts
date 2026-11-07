@@ -16,9 +16,10 @@ const adminServer = vi.hoisted(() => ({
 }));
 const events = vi.hoisted(() => ({
   fetchEventById: vi.fn(),
-  fetchEventIdByImageUrl: vi.fn(),
   fetchEventSlugsByPrefix: vi.fn(),
 }));
+const eventImageIsReferenced = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/supabase-helpers/event-drafts", () => ({ eventImageIsReferenced, saveEventDraft: vi.fn(), fetchEventDraft: vi.fn() }));
 const checkIns = vi.hoisted(() => ({
   deleteCheckIn: vi.fn(),
   fetchCheckInAttendees: vi.fn(),
@@ -79,6 +80,7 @@ const admin = { id: "admin-1" } as UserInfoRow;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  eventImageIsReferenced.mockResolvedValue(false);
   fetchMembershipTypeById.mockResolvedValue(null);
   guards.requireManager.mockResolvedValue(manager);
   guards.requireAdmin.mockResolvedValue(admin);
@@ -276,7 +278,7 @@ describe("updateUserRoleAction: the role check", () => {
 
 describe("discardUnusedEventImageAction: the reference check", () => {
   it("leaves an image that an event still references", async () => {
-    events.fetchEventIdByImageUrl.mockResolvedValue("event-9");
+    eventImageIsReferenced.mockResolvedValue(true);
 
     await discardUnusedEventImageAction("https://store/img.png");
 
@@ -286,7 +288,7 @@ describe("discardUnusedEventImageAction: the reference check", () => {
   });
 
   it("deletes an image no event references", async () => {
-    events.fetchEventIdByImageUrl.mockResolvedValue(null);
+    eventImageIsReferenced.mockResolvedValue(false);
 
     await discardUnusedEventImageAction("https://store/orphan.png");
 
@@ -298,12 +300,12 @@ describe("discardUnusedEventImageAction: the reference check", () => {
   it("ignores an empty url without querying", async () => {
     await discardUnusedEventImageAction("");
 
-    expect(events.fetchEventIdByImageUrl).not.toHaveBeenCalled();
+    expect(eventImageIsReferenced).not.toHaveBeenCalled();
     expect(adminServer.adminDeleteEventImageByUrl).not.toHaveBeenCalled();
   });
 
   it("swallows a storage failure", async () => {
-    events.fetchEventIdByImageUrl.mockResolvedValue(null);
+    eventImageIsReferenced.mockResolvedValue(false);
     adminServer.adminDeleteEventImageByUrl.mockRejectedValue(
       new Error("storage down"),
     );
@@ -325,7 +327,7 @@ describe("discardUnusedEventImageAction: the reference check", () => {
     await expect(
       discardUnusedEventImageAction("https://store/orphan.png"),
     ).rejects.toBe(redirect);
-    expect(events.fetchEventIdByImageUrl).not.toHaveBeenCalled();
+    expect(eventImageIsReferenced).not.toHaveBeenCalled();
   });
 });
 
@@ -869,5 +871,14 @@ describe("saveManagerUserDetailsAction", () => {
     guards.requireManager.mockRejectedValueOnce(new Error("Forbidden"));
     await expect(saveManagerUserDetailsAction("user-1", { first_name: "Jamie" })).rejects.toThrow("Forbidden");
     expect(saveAdminProfile).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("overview write validation", () => {
+  it.each([{ short_description: "x".repeat(51) }, { description: "x".repeat(3001) }])("enforces the same limits on the server", fields => expect(saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, ...fields } })).rejects.toThrow(/character limit/));
+  it("rejects unsafe rich links before persistence", async () => {
+    await expect(saveAdminEventAction({ ...saveInput, event: { description: "Link", description_rich: [{ type: "paragraph", spans: [{ text: "Link", href: "javascript:alert(1)" }] }] } })).rejects.toThrow(/formatting/);
+    expect(adminRpc).not.toHaveBeenCalled();
   });
 });

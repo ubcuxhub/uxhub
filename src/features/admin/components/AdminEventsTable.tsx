@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowDown,
   ArrowUp,
@@ -23,7 +24,9 @@ import {
   formatEventTime,
   formatTimestamp,
 } from "@/lib/date";
-import type { EventRow, EventStatus } from "@/lib/supabase/models";
+import type { EventStatus } from "@/lib/supabase/models";
+import type { AdminEventTableRow, AdminEventDirectoryRow } from "../lib/admin-event-table";
+export type { AdminEventTableRow } from "../lib/admin-event-table";
 import { toggleSetValue } from "../lib/directory";
 import { AdminDirectoryLayout } from "./AdminDirectoryLayout";
 import { AdminDirectoryToolbar } from "./AdminDirectoryToolbar";
@@ -33,12 +36,6 @@ import {
 } from "./AdminDirectoryTable";
 import { AdminDirectoryButton } from "./AdminDirectoryControls";
 import { AdminDirectoryFilters } from "./AdminDirectoryFilters";
-
-export interface AdminEventTableRow {
-  event: EventRow;
-  registrationCount: number;
-  registrationOpen: boolean;
-}
 
 type RegistrationStatus = "open" | "closed" | "not-applicable";
 type SortDirection = "ascending" | "descending";
@@ -83,7 +80,7 @@ const registrationStatusOptions: {
 ];
 
 function getRegistrationStatus(
-  row: AdminEventTableRow
+  row: AdminEventDirectoryRow
 ): RegistrationStatus {
   if (row.event.status === "draft") {
     return "not-applicable";
@@ -233,7 +230,7 @@ function EventDetails({
   );
 }
 
-const eventColumns: AdminDirectoryColumn<AdminEventTableRow>[] = [
+const eventColumns: AdminDirectoryColumn<AdminEventDirectoryRow>[] = [
   {
     id: "status",
     header: "Status",
@@ -256,10 +253,10 @@ const eventColumns: AdminDirectoryColumn<AdminEventTableRow>[] = [
   {
     id: "registered",
     header: "Registered",
-    render: (row) => (
+    render: (row) => "draftId" in row && !row.eventId ? "—" : (
       <>
         {row.registrationCount}{" "}
-        <span className="text-muted-foreground">/ {row.event.max_capacity}</span>
+        <span className="text-muted-foreground">/ {row.event.max_capacity ?? "—"}</span>
       </>
     ),
   },
@@ -289,8 +286,9 @@ const eventColumns: AdminDirectoryColumn<AdminEventTableRow>[] = [
 export function AdminEventsTable({
   rows,
 }: {
-  rows: AdminEventTableRow[];
+  rows: AdminEventDirectoryRow[];
 }) {
+  const router = useRouter();
   const [selectedRow, setSelectedRow] = useState<AdminEventTableRow | null>(
     null
   );
@@ -342,7 +340,11 @@ export function AdminEventsTable({
     sortDirection,
   ]);
 
-  const selectRow = (row: AdminEventTableRow) => {
+  const selectRow = (row: AdminEventDirectoryRow) => {
+    if ("draftId" in row) {
+      router.push(row.eventId ? `/admin/events/${row.eventId}` : `/admin/events/drafts/${row.draftId}`);
+      return;
+    }
     setSelectedRow(row);
     setOpen(true);
   };
@@ -408,8 +410,8 @@ export function AdminEventsTable({
         <AdminDirectoryTable
           columns={eventColumns}
           rows={filteredRows}
-          getRowKey={(row) => row.event.id}
-          getRowLabel={(row) => `View details for ${row.event.name}`}
+          getRowKey={(row) => "draftId" in row ? `draft:${row.draftId}` : row.event.id}
+          getRowLabel={(row) => `${"draftId" in row ? "Resume draft" : "View details"} for ${row.event.name}`}
           onActivate={selectRow}
           emptyMessage="No events match your search and filters."
         />

@@ -1,3 +1,4 @@
+import { fetchEventDrafts } from "@/lib/supabase-helpers/event-drafts";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
@@ -6,6 +7,7 @@ import {
   AdminEventsTable,
   type AdminEventTableRow,
 } from "@/features/admin/components/AdminEventsTable";
+import { buildAdminEventTableRows } from "@/features/admin/lib/admin-event-table";
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchEvents } from "@/lib/supabase-helpers/events";
@@ -14,6 +16,7 @@ import { fetchEventSeatCounts } from "@/lib/supabase-helpers/event-tickets";
 export default async function AdminEventsPage() {
   await requireAdmin();
   const supabase = await createClient();
+  const drafts = await fetchEventDrafts(supabase);
   const events = await fetchEvents(supabase, {
     orderBy: "created_at",
     ascending: false,
@@ -59,7 +62,7 @@ export default async function AdminEventsPage() {
         </Button>
       </header>
 
-      {events.length === 0 ? (
+      {events.length === 0 && drafts.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-4 rounded-lg border border-dashed p-12 text-center">
           <div className="text-2xl font-semibold">No events yet</div>
           <p className="max-w-md text-sm text-muted-foreground">
@@ -73,7 +76,7 @@ export default async function AdminEventsPage() {
           </Button>
         </div>
       ) : (
-        <AdminEventsTable rows={rows} />
+        <AdminEventsTable rows={buildAdminEventTableRows(rows, drafts)} />
       )}
     </PageContainer>
   );

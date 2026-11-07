@@ -20,6 +20,7 @@ export interface ApplicationQuestionTemplate {
 
 /** Display-ready event details for a ticket; build one with `toTicketEvent`. */
 export interface TicketEvent {
+  eventColour?: string;
   name: string;
   date: string | null;
   time: string | null;

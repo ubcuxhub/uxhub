@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { TableToolbar } from "@/components/shared/TableToolbar";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { IconButton } from "@/components/ui/icon-button";
 import { Pagination } from "@/components/ui/pagination";
 import { SearchField } from "@/components/ui/search-field";
@@ -229,6 +230,22 @@ function TableDemo() {
         description="Search, tick rows, page, and open a row. The header checkbox selects every row in the current results, across pages; Export follows the selection."
       >
         <ManageUsers />
+      </Composition>
+
+      <Composition
+        title="Event drafts in the events table"
+        description="Manage Events includes saved working drafts in the same table, search, Draft filter and date sort as events. Selecting a working draft resumes its editor; saved events retain their details drawer. A working draft replaces its source event's row, and missing dates or registration counts show a dash."
+      >
+        <TableCard>
+          <Table>
+            <TableHeader>
+              <TableRow><TableHead>Status</TableHead><TableHead>Name</TableHead><TableHead>Date</TableHead><TableHead>Registered</TableHead><TableHead>Registration Status</TableHead></TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow><TableCell><Badge variant="neutral">Draft</Badge></TableCell><TableCell>Untitled event</TableCell><TableCell><TableNone /></TableCell><TableCell><TableNone /></TableCell><TableCell><Badge variant="neutral">N/A</Badge></TableCell></TableRow>
+            </TableBody>
+          </Table>
+        </TableCard>
       </Composition>
 
       <Composition

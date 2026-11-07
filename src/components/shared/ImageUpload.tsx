@@ -84,6 +84,8 @@ interface ImageUploadProps {
   fileName?: string;
   /** A server error, shown in place of any local validation message. */
   error?: string | null;
+  /** Builder icon tile or shallow header picker; default retains existing sizing. */
+  presentation?: "default" | "icon" | "header";
 }
 
 /**
@@ -111,6 +113,7 @@ export const ImageUpload = ({
   onCancelUpload,
   fileName,
   error: externalError,
+  presentation = "default",
 }: ImageUploadProps) => {
   const generatedId = useId();
   const inputId = id ?? `${generatedId}-image-upload`;
@@ -315,7 +318,7 @@ export const ImageUpload = ({
         ? "uploaded"
         : "empty";
 
-  const requirementsLine = hint ?? `Or drag one here. ${describeImageRequirements(requirements)}.`;
+  const requirementsLine = hint ?? `${presentation === "default" ? "Or drag one here. " : ""}${describeImageRequirements(requirements)}.`;
   const hasError = !!error;
   const showHint = view === "empty" && !hasError;
   // The hint gives way to the error, so the controls point at whichever shows.
@@ -326,14 +329,16 @@ export const ImageUpload = ({
       data-invalid={hasError}
       data-disabled={disabled}
       aria-labelledby={labelId}
+      className={presentation === "icon" ? "w-55 max-w-full" : undefined}
     >
-      <FieldLabel id={labelId} htmlFor={inputId}>
+      <FieldLabel id={labelId} htmlFor={inputId} className={presentation === "header" ? "sr-only" : presentation === "icon" ? "text-small font-medium" : undefined}>
         {label}
       </FieldLabel>
 
       <div
         data-slot="image-upload"
         data-state={view}
+        data-presentation={presentation}
         className={cn(
           "relative flex min-h-[200px] w-full flex-col rounded-xl transition-colors",
           view === "empty" &&
@@ -355,6 +360,9 @@ export const ImageUpload = ({
               "overflow-hidden border",
               hasError ? "border-destructive" : "border-border",
             ),
+          presentation === "icon" && "min-h-55 w-55 max-w-full",
+          presentation === "header" && view !== "uploaded" && "min-h-30",
+          presentation !== "default" && view === "empty" && !disabled && "bg-section",
         )}
         onDragEnter={handleDragEnter}
         onDragOver={handleDragOver}
@@ -485,13 +493,13 @@ export const ImageUpload = ({
 
         {view === "empty" && (
           <>
-            <ImageIcon
+            {presentation !== "header" && <ImageIcon
               className={cn(
                 "size-6",
                 disabled ? "text-disabled-foreground" : "text-muted-foreground",
               )}
               aria-hidden
-            />
+            />}
             <Button
               type="button"
               variant="secondary"
@@ -501,13 +509,14 @@ export const ImageUpload = ({
               aria-invalid={hasError || undefined}
               onClick={openPicker}
             >
-              Upload image
+              {presentation === "header" ? "Upload header image" : "Upload image"}
             </Button>
             {showHint && (
               <p
                 id={hintId}
                 className={cn(
                   "max-w-64 text-center text-xs text-pretty",
+                  presentation !== "default" && "max-w-none text-small",
                   disabled ? "text-disabled-foreground" : "text-muted-foreground",
                 )}
               >

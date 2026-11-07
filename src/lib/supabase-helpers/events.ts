@@ -151,19 +151,3 @@ export async function updateEventIfImageMatches(
   if (error) throw error;
   return data ?? null;
 }
-
-/** Finds an event still referencing `imageUrl`, if any. */
-export async function fetchEventIdByImageUrl(
-  supabase: DbClient,
-  imageUrl: string
-): Promise<string | null> {
-  const { data, error } = await supabase
-    .from(TABLES.events)
-    .select("id")
-    .eq("image_url", imageUrl)
-    .limit(1)
-    .maybeSingle();
-
-  if (error) throw error;
-  return data?.id ?? null;
-}

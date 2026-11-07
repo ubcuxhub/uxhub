@@ -1,3 +1,4 @@
+import { ticketAppearance } from "@/components/shared/Ticket";
 import type { ReactNode } from "react";
 import { Calendar, Clock, MapPin } from "lucide-react";
 
@@ -39,8 +40,10 @@ export function EventTicket({
   return (
     <article
       aria-label={`Ticket for ${event.name}`}
+      style={event.eventColour ? { background: ticketAppearance(event.eventColour).fill, color: ticketAppearance(event.eventColour).label } : undefined}
       className={cn(
         "w-full max-w-sm overflow-hidden rounded-xl border bg-card text-card-foreground",
+        event.eventColour && "[&_.text-muted-foreground]:text-inherit [&_.text-muted-foreground]:opacity-85",
         className
       )}
     >

@@ -130,7 +130,7 @@ export const EventSchedule = ({
   );
 
   return (
-    <FieldGroup className="grid gap-4 md:grid-cols-2">
+    <FieldGroup className="grid gap-4 @min-[36rem]/field-group:grid-cols-2">
       <Field>
         <FieldLabel htmlFor="starts_at_date">Start Date <span className="text-destructive">*</span></FieldLabel>
         <DatePickerField

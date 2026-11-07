@@ -97,6 +97,8 @@ interface DialogContentProps
    * Use it while a save is in flight.
    */
   closeDisabled?: boolean;
+  /** Hide the X when the visible actions already offer dismissal. Esc still closes. */
+  showCloseButton?: boolean;
   closeLabel?: string;
   mobileFullscreen?: boolean;
   size?: "default" | "large";
@@ -111,6 +113,7 @@ const DialogContent = React.forwardRef<
       className,
       children,
       closeDisabled = false,
+      showCloseButton = true,
       closeLabel = "Close",
       mobileFullscreen = false,
       size = "default",
@@ -150,7 +153,7 @@ const DialogContent = React.forwardRef<
         {...props}
       >
         {children}
-        <DialogPrimitive.Close asChild>
+        {showCloseButton && <DialogPrimitive.Close asChild>
           <IconButton
             variant="ghost"
             label={closeLabel}
@@ -164,7 +167,7 @@ const DialogContent = React.forwardRef<
           >
             <X />
           </IconButton>
-        </DialogPrimitive.Close>
+        </DialogPrimitive.Close>}
       </DialogPrimitive.Content>
     </DialogPortal>
   ),
