@@ -1,3 +1,5 @@
+import Image from "next/image";
+import { EventDescription } from "@/components/shared/EventDescription";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { FlowLink } from "@/components/shared/FlowLink";
@@ -62,7 +64,8 @@ export default async function PortalEventPage({
       <ApplicationStatusCallout event={event} userId={user.id} />
       
       <div className="border-border-subtle rounded-md border">
-        <div className="w-full h-51 bg-brand-blue-200 relative rounded-t-md">
+        <div className="w-full h-51 bg-muted relative rounded-t-md" style={{ backgroundColor: event.header_colour || undefined }}>
+          {event.header_image_url && <Image src={resolveImagePreviewSrc(event.header_image_url)} alt="" fill className="object-cover" unoptimized />}
           {/* cover image placeholder */}
           {event.image_url && (
             // eslint-disable-next-line @next/next/no-img-element
@@ -121,7 +124,7 @@ export default async function PortalEventPage({
               </div>
             </div>
           </div>
-          <p className="whitespace-pre-wrap">{event.description}</p>
+          <EventDescription rich={event.description_rich} text={event.description} />
           {/* The public page shows active events only. */}
           <Button asChild className="mt-6">
             {event.status === "active" ? (

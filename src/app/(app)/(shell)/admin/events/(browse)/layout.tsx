@@ -10,6 +10,8 @@ import {
   AdminEventsTable,
   type AdminEventTableRow,
 } from "@/features/admin/components/AdminEventsTable";
+import { buildAdminEventTableRows } from "@/features/admin/lib/admin-event-table";
+import { fetchEventDrafts } from "@/lib/supabase-helpers/event-drafts";
 import { registrationWindow } from "@/features/admin/lib/event-registration-window";
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
@@ -32,10 +34,13 @@ const CREATE_EVENT_HREF = "/admin/events/create-new";
 export default async function AdminEventsLayout({ children }: { children: React.ReactNode }) {
   await requireAdmin();
   const supabase = await createClient();
-  const events = await fetchEvents(supabase, {
-    orderBy: "created_at",
-    ascending: false,
-  });
+  const [events, drafts] = await Promise.all([
+    fetchEvents(supabase, {
+      orderBy: "created_at",
+      ascending: false,
+    }),
+    fetchEventDrafts(supabase),
+  ]);
   // One aggregate call rather than a head-count per event: the per-event form
   // meant a thirty-event dashboard opened thirty concurrent PostgREST requests.
   const seatCounts = await fetchEventSeatCounts(
@@ -74,7 +79,7 @@ export default async function AdminEventsLayout({ children }: { children: React.
           </Button>
         </header>
 
-        {events.length === 0 ? (
+        {events.length === 0 && drafts.length === 0 ? (
           <TableCard>
             <EmptyState
               size="page"
@@ -89,7 +94,7 @@ export default async function AdminEventsLayout({ children }: { children: React.
             />
           </TableCard>
         ) : (
-          <AdminEventsTable rows={rows} />
+          <AdminEventsTable rows={buildAdminEventTableRows(rows, drafts)} />
         )}
         <RecordFrame listHref="/admin/events">{children}</RecordFrame>
       </PageContainer>

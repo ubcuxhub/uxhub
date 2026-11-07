@@ -1,3 +1,4 @@
+import { parseEventDescription, type EventDescription } from "@/lib/event-description";
 import {
   ResponseType,
   type CheckInSessionRow,
@@ -22,6 +23,10 @@ export interface EventFormState {
   name: string;
   short_description: string;
   description: string;
+  description_rich: EventDescription | null;
+  header_image_url: string;
+  header_colour: string;
+  event_colour: string;
   status: EventStatus;
   publish_at: string;
   event_type: EventType;
@@ -70,6 +75,10 @@ export const defaultFormState: EventFormState = {
   name: "",
   short_description: "",
   description: "",
+  description_rich: null,
+  header_image_url: "",
+  header_colour: "#325DC4",
+  event_colour: "#325DC4",
   status: "draft",
   publish_at: "",
   event_type: "regular",
@@ -103,6 +112,10 @@ export function formStateFromEvent(event: EventRow): EventFormState {
     name: event.name ?? "",
     short_description: event.short_description ?? "",
     description: event.description ?? "",
+    description_rich: parseEventDescription(event.description_rich),
+    header_image_url: event.header_image_url ?? "",
+    header_colour: event.header_colour ?? (event.header_image_url ? "" : "#325DC4"),
+    event_colour: event.event_colour ?? "#325DC4",
     status: event.status,
     publish_at: timestamptzToDatetimeLocal(event.publish_at),
     event_type: event.event_type,
@@ -186,14 +199,16 @@ export function createFormSnapshot(
   mentors: MentorDraft[],
   sponsors: SponsorDraft[],
   applicationTemplate: ApplicationQuestionTemplate[],
-  pendingImageFile: File | null = null
+  pendingImageFile: File | null = null,
+  pendingHeaderFile: File | null = null
 ) {
   return JSON.stringify({
     formState,
     checkInEvents,
-    mentorIds: mentors.map((mentor) => mentor.id ?? null),
-    sponsorIds: sponsors.map((sponsor) => sponsor.id ?? null),
+    mentors,
+    sponsors,
     applicationTemplate,
+    pendingHeaderFile: pendingHeaderFile ? { name: pendingHeaderFile.name, size: pendingHeaderFile.size, lastModified: pendingHeaderFile.lastModified } : null,
     pendingImageFile: pendingImageFile
       ? {
           name: pendingImageFile.name,
@@ -220,6 +235,8 @@ export function validateEventForm(
   if (!formState.name.trim()) error = "Event name is required.";
   else if (!formState.short_description.trim())
     error = "Short description is required.";
+  else if (formState.short_description.length > 50) error = "Short overview must be 50 characters or fewer.";
+  else if (formState.description.length > 3000) error = "Long overview must be 3,000 characters or fewer.";
   else if (!formState.description.trim()) error = "Description is required.";
   else if (!formState.regular_price.trim()) error = "Regular price is required.";
   else if (Number.isNaN(Number(formState.regular_price)))

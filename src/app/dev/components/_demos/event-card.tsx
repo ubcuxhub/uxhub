@@ -113,6 +113,7 @@ const EVENT: EventRow = {
   agenda: null,
   agenda_enabled: true,
   created_at: "2026-09-01T00:00:00Z",
+  description_rich: null,
   description:
     "A 24-hour design sprint. Teams of four ship a prototype with feedback from industry mentors.",
   description_images: null,

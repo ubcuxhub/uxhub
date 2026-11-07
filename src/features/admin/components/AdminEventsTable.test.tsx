@@ -3,6 +3,9 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { buildAdminEventTableRows } from "../lib/admin-event-table";
+import type { EventWorkingDocument } from "../lib/event-working-document";
+import { defaultFormState } from "./event-form/event-form-schema";
 import type { EventStatus } from "@/lib/supabase/models";
 import { AdminEventsTable, type AdminEventTableRow } from "./AdminEventsTable";
 
@@ -48,6 +51,7 @@ function row(id: string, name: string, starts_at: string | null, status: EventSt
       description_images: [],
       created_at: null,
       description: "Event description",
+      description_rich: null,
       ends_at: null,
       event_colour: null,
       event_type: "regular",
@@ -285,5 +289,103 @@ describe("application signals", () => {
       />,
     );
     expect(screen.queryByText(/to review/)).toBeNull();
+  });
+});
+
+function draft(id: string, event_id: string | null, name = "", starts_at = "") {
+  const document: EventWorkingDocument = { version: 1, formState: { ...defaultFormState, name, starts_at }, checkInEvents: [], mentors: [], sponsors: [], applicationTemplate: [] };
+  return { id, event_id, document };
+}
+
+describe("working drafts in Manage Events", () => {
+  it("includes incomplete drafts without duplicating their source event and combines search and filters", () => {
+    const combined = buildAdminEventTableRows(rows, [draft("working", "draft", "Working Workshop", "2026-12-02T10:00"), draft("empty", null)]);
+    render(<AdminEventsTable rows={combined} />);
+    expect(rowNames()).toHaveLength(rows.length + 1);
+    expect(screen.queryByRole("link", { name: "Draft Workshop" })).toBeNull();
+    const empty = screen.getByRole("link", { name: "Untitled event" }).closest("tr")!;
+    expect(within(empty).getByText("Draft")).toBeTruthy();
+    expect(within(empty).getAllByText("None")).toHaveLength(2);
+    expect(within(empty).getByText("N/A")).toBeTruthy();
+    toggleChip("Draft");
+    toggleChip("N/A");
+    expect(rowNames()).toEqual(["Working Workshop", "Untitled event"]);
+    search(" working ");
+    expect(rowNames()).toEqual(["Working Workshop"]);
+  });
+
+  it("links standalone and existing-event drafts directly to their editors, including while a drawer is open", () => {
+    pathname = "/admin/events/newer";
+    render(<AdminEventsTable rows={buildAdminEventTableRows(rows, [draft("new-draft", null, "New work"), draft("existing-draft", "draft", "Existing work")])} />);
+    for (const [name, href] of [["New work", "/admin/events/drafts/new-draft"], ["Existing work", "/admin/events/draft/edit"]]) {
+      const link = screen.getByRole("link", { name });
+      expect(link.getAttribute("href")).toBe(href);
+      expect(link.getAttribute("data-slot")).toBe("table-row-link");
+      expect(link.hasAttribute("data-replace")).toBe(false);
+    }
+    expect(screen.getByRole("link", { name: "Design Meetup" }).hasAttribute("data-replace")).toBe(true);
+  });
+
+  it("sorts draft dates with event dates and leaves missing dates last in either direction", () => {
+    render(<AdminEventsTable rows={buildAdminEventTableRows([rows[0]], [draft("dated", null, "Earlier draft", "2026-08-01T10:00"), draft("undated-draft", null)])} />);
+    expect(rowNames()).toEqual(["Design Meetup", "Earlier draft", "Untitled event"]);
+    chooseSort("Date, oldest first");
+    expect(rowNames()).toEqual(["Earlier draft", "Design Meetup", "Untitled event"]);
+  });
+
+  it("keeps published and scheduled events visible when obsolete working documents remain", () => {
+    const scheduled = { ...rows[2], event: { ...rows[2].event, publish_at: "2026-12-01T17:00:00Z" } };
+    expect(buildAdminEventTableRows([rows[0], scheduled], [draft("old-live", "older", "Outdated live"), draft("old-scheduled", "draft", "Outdated schedule")])).toEqual([rows[0], scheduled]);
+  });
+
+  it("retains counts and review links when saved events share the table with working drafts", () => {
+    const application = { ...rows[1], event: { ...rows[1].event, requires_application: true }, applicationsToReview: 2 };
+    render(<AdminEventsTable rows={buildAdminEventTableRows([application, rows[2]], [draft("working", "draft", "Working workshop")])} />);
+    expect(screen.getByRole("link", { name: "2 applications to review for Design Workshop" }).getAttribute("href"))
+      .toBe("/admin/events/newer/review-applications?status=submitted");
+    expect(screen.getByRole("link", { name: "Design Workshop" }).closest("tr")?.textContent).toContain("7 / 30");
+    const existingDraft = screen.getByRole("link", { name: "Working workshop" }).closest("tr")!;
+    expect(existingDraft.textContent).toContain("7 /");
+    expect(within(existingDraft).getAllByText("None")).toHaveLength(2);
+  });
+
+  it("retains application review signals when a working document replaces its source event", () => {
+    const source = { ...rows[2], event: { ...rows[2].event, requires_application: true }, applicationsToReview: 3 };
+    render(<AdminEventsTable rows={buildAdminEventTableRows([source], [draft("working", "draft", "Working application event")])} />);
+    const editor = screen.getByRole("link", { name: "Working application event" });
+    expect(editor.getAttribute("href")).toBe("/admin/events/draft/edit");
+    const tableRow = editor.closest("tr")!;
+    expect(within(tableRow).getByText("By application")).toBeTruthy();
+    expect(tableRow.textContent).toContain("7 /");
+    const review = within(tableRow).getByRole("link", { name: "3 applications to review for Working application event" });
+    expect(review.getAttribute("href")).toBe("/admin/events/draft/review-applications?status=submitted");
+    expect(review.parentElement?.closest("a")).toBeNull();
+  });
+
+  it("keeps the source event's drawer on its table page when its row resumes a working draft", () => {
+    const many = Array.from({ length: 27 }, (_, index) => {
+      const n = String(index + 1).padStart(2, "0");
+      return row(`e${n}`, `Event ${n}`, `2026-10-${n}T17:00:00.000Z`, "draft", false);
+    });
+    pathname = "/admin/events/e02";
+    render(<AdminEventsTable rows={buildAdminEventTableRows(many, [draft("working", "e02", "Working Event 02", "2026-10-02T10:00")])} />);
+    expect(screen.getByText("Page 2 of 2")).toBeTruthy();
+    const editor = screen.getByRole("link", { name: "Working Event 02" });
+    expect(editor.getAttribute("href")).toBe("/admin/events/e02/edit");
+    expect(editor.closest("tr")?.hasAttribute("data-active")).toBe(true);
+    // The active record is the overview; the editor link is a different page.
+    expect(editor.getAttribute("aria-current")).toBeNull();
+  });
+
+  it("paginates drafts with saved events and keeps the total accurate", () => {
+    const drafts = Array.from({ length: 26 }, (_, index) => draft(`draft-${index}`, null, `Work ${index}`));
+    render(<AdminEventsTable rows={buildAdminEventTableRows([rows[1]], drafts)} />);
+    expect(rowNames()).toHaveLength(25);
+    expect(count()).toBe("Showing 1–25 of 27 events");
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(rowNames()).toEqual(["Work 24", "Work 25"]);
+    search("Work 25");
+    expect(rowNames()).toEqual(["Work 25"]);
+    expect(count()).toBe("Showing 1 of 1 event · filtered from 27");
   });
 });

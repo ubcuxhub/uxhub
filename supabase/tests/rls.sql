@@ -2193,5 +2193,6 @@ end;
 $$;
 
 \ir event-publication.sql
+\ir event-drafts.sql
 
 rollback;

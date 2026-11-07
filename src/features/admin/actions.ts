@@ -1,5 +1,8 @@
 "use server";
 
+import { saveEventDraft, fetchEventDraft, eventImageIsReferenced } from "@/lib/supabase-helpers/event-drafts";
+import type { EventWorkingDocument } from "./lib/event-working-document";
+import { parseEventDescription, descriptionText } from "@/lib/event-description";
 import { revalidatePath } from "next/cache";
 
 import { requireAdmin, requireManager } from "@/lib/auth/guards";
@@ -36,7 +39,6 @@ import { removeApplicationFiles } from "@/lib/supabase-helpers/application-files
 import { updateEventApplication } from "@/lib/supabase-helpers/event-applications";
 import {
   fetchEventById,
-  fetchEventIdByImageUrl,
   fetchEventSlugsByPrefix,
 } from "@/lib/supabase-helpers/events";
 import type {
@@ -186,6 +188,9 @@ export interface SaveAdminEventInput {
    * an update. Ignored when creating.
    */
   expectedImageUrl: string | null;
+  expectedHeaderImageUrl?: string | null;
+  draftId?: string;
+  draftRevision?: number;
   event: EventUpdate;
   checkInSessions: CheckInSessionInput[];
   mentorIds: string[];
@@ -230,6 +235,7 @@ async function discardEventImage(imageUrl: string | null | undefined) {
   if (!imageUrl) return;
 
   try {
+    if (await eventImageIsReferenced(supabaseAdmin, imageUrl)) return;
     await adminDeleteEventImageByUrl(imageUrl);
   } catch (error) {
     log.error("admin.event_image_delete_failed", errorFields(error));
@@ -261,9 +267,24 @@ export async function discardUnusedEventImageAction(imageUrl: string) {
   await requireAdmin();
 
   if (!imageUrl) return;
-  if (await fetchEventIdByImageUrl(supabaseAdmin, imageUrl)) return;
+  if (await eventImageIsReferenced(supabaseAdmin, imageUrl)) return;
 
   await discardEventImage(imageUrl);
+}
+
+export async function saveAdminEventDraftAction(input: { id: string; eventId: string | null; revision: number; document: EventWorkingDocument }) {
+  await requireAdmin();
+  // Live edits remain local until the deliberate Update action.
+  if (input.eventId) {
+    const event = await fetchEventById(supabaseAdmin, input.eventId);
+    if (!event || event.status !== "draft" || event.publish_at) throw new Error("Only unscheduled drafts can save working documents.");
+  }
+  const previous = await fetchEventDraft(supabaseAdmin, input.id);
+  const saved = await saveEventDraft(supabaseAdmin, input.id, input.eventId, input.revision, input.document);
+  await discardEventImage(previous?.document.formState.image_url);
+  await discardEventImage(previous?.document.formState.header_image_url);
+  revalidatePath("/admin/events", "layout");
+  return { id: saved.id, revision: saved.revision };
 }
 
 export async function saveAdminEventAction(
@@ -273,6 +294,11 @@ export async function saveAdminEventAction(
 
   assertPublishAt(input.event.status, input.event.publish_at);
 
+  if ((input.event.short_description?.length ?? 0) > 50 || (input.event.description?.length ?? 0) > 3000) throw new Error("Overview exceeds its character limit.");
+  if (input.event.description_rich != null) {
+    const rich = parseEventDescription(input.event.description_rich);
+    if (!rich || descriptionText(rich) !== input.event.description) throw new Error("Invalid long overview formatting.");
+  }
   let slug: string | null = null;
 
   if (!input.eventId) {
@@ -294,9 +320,12 @@ export async function saveAdminEventAction(
   // writes the row, so a stale tab cannot overwrite a replacement made
   // elsewhere between this form loading and saving.
   const { data, error } = await supabaseAdmin.rpc(
-    "save_admin_event_atomically",
+    "save_admin_event_builder",
     {
       p_event_id: input.eventId ?? null,
+      p_draft_id: input.draftId ?? null,
+      p_draft_revision: input.draftRevision ?? 0,
+      p_expected_header_image_url: input.expectedHeaderImageUrl ?? null,
       p_event: input.event,
       p_slug: slug,
       p_expected_image_url: input.expectedImageUrl,
@@ -328,6 +357,14 @@ export async function saveAdminEventAction(
   // The save landed, so the image it replaced is unreferenced.
   if (input.eventId && (input.event.image_url ?? null) !== input.expectedImageUrl) {
     await discardEventImage(input.expectedImageUrl);
+  }
+
+  if (
+    input.eventId &&
+    input.event.header_image_url !== undefined &&
+    (input.event.header_image_url ?? null) !== (input.expectedHeaderImageUrl ?? null)
+  ) {
+    await discardEventImage(input.expectedHeaderImageUrl);
   }
 
   // Files answering questions the save removed, from drafts only: a question
@@ -380,6 +417,7 @@ export async function deleteAdminEventAction(eventId: string) {
   if (error) throw error;
 
   await discardEventImage(existing?.image_url);
+  await discardEventImage(existing?.header_image_url);
 
   revalidatePath("/admin/events", "layout");
 }

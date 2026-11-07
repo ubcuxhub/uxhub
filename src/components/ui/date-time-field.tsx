@@ -636,5 +636,21 @@ function localToday(): IsoDate {
   return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}` as IsoDate
 }
 
-export { DateField, DateTimeField, TimeField, TIME_INPUT_ERROR }
+/** A date/time pair stacks below 24rem of available space, even in a wide shell. */
+function DateTimeFieldPair({ date, time, className }: {
+  date: React.ReactNode
+  time: React.ReactNode
+  className?: string
+}) {
+  return (
+    <div data-slot="date-time-field-pair" className={cn("@container/date-time-pair min-w-0 w-full", className)}>
+      <div className="grid min-w-0 gap-2 @min-[24rem]/date-time-pair:grid-cols-[minmax(0,1fr)_8rem]">
+        <div className="min-w-0">{date}</div>
+        <div className="min-w-0">{time}</div>
+      </div>
+    </div>
+  )
+}
+
+export { DateField, DateTimeField, DateTimeFieldPair, TimeField, TIME_INPUT_ERROR }
 export type { DateFieldProps, DateTimeFieldProps, DateTimeValue, TimeFieldProps }

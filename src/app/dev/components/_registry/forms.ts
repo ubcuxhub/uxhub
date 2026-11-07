@@ -187,7 +187,7 @@ export const formsEntries: readonly RegistryEntry[] = [
     description:
       "Typed date and time fields with their pickers, and the two together as one moment, for event schedules and deadlines.",
     importPath: "@/components/ui/date-time-field",
-    importNames: ["DateField", "TimeField", "DateTimeField"],
+    importNames: ["DateField", "TimeField", "DateTimeField", "DateTimeFieldPair"],
     source: "src/components/ui/date-time-field.tsx",
     spec: "§3.11",
     layout: "split",
@@ -200,7 +200,7 @@ export const formsEntries: readonly RegistryEntry[] = [
     category: "Forms",
     tier: "primitive",
     description:
-      "Let an admin pick an event colour from the swatches, or a custom one.",
+      "Pick an event colour from swatches or a custom value, with an optional hidden label for composed sections.",
     importPath: "@/components/ui/colour-picker",
     importNames: ["ColourPicker", "ColourSwatch", "CustomColourForm"],
     source: "src/components/ui/colour-picker.tsx",
@@ -254,7 +254,7 @@ export const formsEntries: readonly RegistryEntry[] = [
     category: "Forms",
     tier: "app",
     description:
-      "A dropzone for an event thumbnail or header image, with progress, replace and validation errors.",
+      "A dropzone with default, icon-tile and shallow header presentations, progress, replacement and validation errors.",
     importPath: "@/components/shared/ImageUpload",
     importNames: ["ImageUpload"],
     source: "src/components/shared/ImageUpload.tsx",

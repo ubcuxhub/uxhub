@@ -205,3 +205,20 @@ describe("DialogContent Esc and [data-escape-clears] fields", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 });
+
+
+describe("dialogs with explicit dismissal actions", () => {
+  it("omits the X but keeps focus and Escape dismissal", () => {
+    const onOpenChange = renderControlled({ showCloseButton: false });
+    expect(screen.queryByRole("button", { name: "Close" })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("dialog"));
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("still blocks Escape while pending without an X", () => {
+    const onOpenChange = renderControlled({ showCloseButton: false, closeDisabled: true });
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+});

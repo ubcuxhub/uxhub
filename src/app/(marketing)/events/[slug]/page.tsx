@@ -1,3 +1,5 @@
+import Image from "next/image";
+import { EventDescription } from "@/components/shared/EventDescription";
 import { notFound, redirect } from "next/navigation";
 import { BackPill } from "@/components/shared/BackButton";
 import { FLAGS } from "@/lib/flags";
@@ -125,6 +127,7 @@ export default async function EventDetailPage({
       <div className="font-sans text-body text-foreground">
         {/* ────────────────────── HERO SECTION ────────────────────── */}
         <section className="mt-20 px-[5%] pb-12 pt-8 md:px-[10%] lg:px-[15%]">
+        {(event.header_image_url || event.header_colour) && <div className="relative mb-6 h-48 overflow-hidden rounded-xl" style={{ backgroundColor: event.header_colour || undefined }}>{event.header_image_url && <Image src={event.header_image_url} alt="" fill className="object-cover" unoptimized />}</div>}
         {/* Back link */}
         <BackPill href="/events" label="Back to Events" className="mb-6" />
 
@@ -150,7 +153,7 @@ export default async function EventDetailPage({
             <h1 className="text-h1">{event.name}</h1>
 
             <p className="line-clamp-4 text-muted-foreground">
-              {event.description}
+              {event.short_description || event.description}
             </p>
 
             {/* Price badge */}
@@ -226,9 +229,7 @@ export default async function EventDetailPage({
         <Separator />
         <section className="px-[5%] py-12 md:px-[10%] lg:px-[15%]">
         <h2 className="mb-6 text-h2">Event Description</h2>
-        <p className="mb-8 max-w-3xl whitespace-pre-wrap text-muted-foreground">
-          {event.description}
-        </p>
+        <div className="mb-8 max-w-3xl"><EventDescription rich={event.description_rich} text={event.description} /></div>
 
         {/* Description gallery */}
         {descriptionImages.length > 0 && (

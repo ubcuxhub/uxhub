@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { TableRowCount, TableToolbar } from "@/components/shared/TableToolbar";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { IconButton } from "@/components/ui/icon-button";
 import { Pagination } from "@/components/ui/pagination";
 import { SearchField } from "@/components/ui/search-field";
@@ -302,6 +303,26 @@ function TableDemo() {
         description="The link twin of TableRowButton: a next/link stretched over the row, so Cmd-click opens a new tab and the cells keep their semantics. aria-current marks the open record's row and fills it; pass replace while a record is open so Back returns to the list. In the admin lists useRecordRows wires both, and returns focus to the row when its record closes."
       >
         <LinkRows />
+      </Composition>
+
+      <Composition
+        title="Event drafts in the events table"
+        description="Manage Events includes saved working drafts in the same table, search, Draft filter and date sort as events. Working-draft links open /admin/events/drafts/<draft> or /admin/events/<event>/edit; saved-event links retain their overview drawer. A working draft replaces its source event's row, and missing dates or registration counts show a dash."
+      >
+        <TableCard>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead><TableHead>Registration</TableHead><TableHead>Registered</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow>
+                <TableCell>Untitled event</TableCell><TableCell><TableNone /></TableCell><TableCell><Badge variant="neutral">Draft</Badge></TableCell><TableCell><Badge variant="neutral">N/A</Badge></TableCell><TableCell><TableNone /></TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </TableCard>
       </Composition>
 
       <Composition

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DateTimeFieldPair } from "@/components/ui/date-time-field";
 import { Button } from "@/components/ui/button";
 import { DatePickerButton } from "../DatePickerButton";
 import { Calendar } from "@/components/ui/calendar";
@@ -24,8 +25,8 @@ export function PublicationPicker({ value, disabled, onChange }: PublicationPick
   return (
     <Field>
       <FieldLabel htmlFor="publish_date">Publish Date &amp; Time (Pacific)</FieldLabel>
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-        <Popover open={open && !disabled} onOpenChange={setOpen}>
+      <DateTimeFieldPair
+        date={<Popover open={open && !disabled} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
             <DatePickerButton
               id="publish_date"
@@ -47,16 +48,16 @@ export function PublicationPicker({ value, disabled, onChange }: PublicationPick
               }}
             />
           </PopoverContent>
-        </Popover>
-        <Input
+        </Popover>}
+        time={<Input
           type="time"
           aria-label="Publish time (Pacific)"
           aria-describedby="publish_at_description"
           disabled={disabled}
           value={time}
           onChange={(event) => onChange(`${date}T${event.target.value}`)}
-        />
-      </div>
+        />}
+      />
       {value && (
         <Button type="button" variant="ghost" className="w-fit" disabled={disabled} onClick={() => onChange("")}>
           Clear publish schedule

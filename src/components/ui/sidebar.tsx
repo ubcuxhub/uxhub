@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { isEventBuilderPath } from "@/features/admin/lib/event-builder-route";
 import { cva, type VariantProps } from "class-variance-authority";
 import { PanelLeftIcon } from "lucide-react";
 import { Slot } from "radix-ui";
@@ -92,7 +93,8 @@ function SidebarProvider({
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
 }) {
-  const isMobile = useIsMobile();
+  const currentPath = usePathname();
+  const isMobile = useIsMobile(isEventBuilderPath(currentPath) ? 640 : 768);
   const [openMobile, setOpenMobile] = React.useState(false);
   const triggerRef = React.useRef<HTMLElement | null>(null);
 
@@ -212,6 +214,7 @@ function Sidebar({
   variant?: "sidebar" | "floating" | "inset";
   collapsible?: "offcanvas" | "icon" | "none";
 }) {
+  const builderShell = isEventBuilderPath(usePathname());
   const { isMobile, state, openMobile, setOpenMobile, triggerRef } =
     useSidebar();
 
@@ -264,7 +267,7 @@ function Sidebar({
 
   return (
     <div
-      className="group peer hidden text-sidebar-foreground md:block"
+      className={cn("group peer hidden text-sidebar-foreground", builderShell ? "sm:block" : "md:block")}
       data-state={state}
       data-collapsible={state === "collapsed" ? collapsible : ""}
       data-variant={variant}
@@ -286,7 +289,8 @@ function Sidebar({
       <div
         data-slot="sidebar-container"
         className={cn(
-          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-out md:flex",
+          "fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-200 ease-out",
+          builderShell ? "sm:flex" : "md:flex",
           side === "left"
             ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
             : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",

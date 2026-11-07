@@ -25,6 +25,16 @@ function DialogDemo({ open }: SectionProps) {
         spec="§3.7"
         description="Default, large (settings and checkout flows), tall content and mobileFullscreen (ConfirmDialog). Open with the buttons, or force one with ?open=. Check each in theme=light and theme=dark, and on the mobile preset."
       >
+        <Specimen label="Dialog · explicit actions without X (?open=dialog-actions)">
+          <Dialog defaultOpen={open === "dialog-actions"}>
+            <DialogTrigger asChild><Button variant="outline">Open action-only dialog</Button></DialogTrigger>
+            <DialogContent showCloseButton={false}>
+              <DialogHeader><DialogTitle>Leave without saving?</DialogTitle><DialogDescription>Save a draft to keep your changes, or leave and lose them. Esc and outside clicks still dismiss this dialog.</DialogDescription></DialogHeader>
+              <DialogFooter><DialogClose asChild><Button variant="outline">Keep editing</Button></DialogClose><DialogClose asChild><Button>Save draft and leave</Button></DialogClose></DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </Specimen>
+
         <Specimen label="Dialog · default (?open=dialog)">
           <Dialog defaultOpen={open === "dialog"}>
             <DialogTrigger asChild>

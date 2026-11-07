@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DateTimeFieldPair } from "@/components/ui/date-time-field";
 import { CalendarIcon, Plus, X } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -104,8 +105,8 @@ const CheckInDateTimeField = ({
       <FieldLabel htmlFor={`${id}_date`}>
         {label} <span className="text-destructive">*</span>
       </FieldLabel>
-      <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-        <Popover open={open} onOpenChange={setOpen}>
+      <DateTimeFieldPair
+        date={<Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
             <Button
               id={`${id}_date`}
@@ -134,8 +135,8 @@ const CheckInDateTimeField = ({
               }}
             />
           </PopoverContent>
-        </Popover>
-        <Input
+        </Popover>}
+        time={<Input
           id={`${id}_time`}
           type="time"
           value={time}
@@ -144,10 +145,9 @@ const CheckInDateTimeField = ({
             onChange(combineDateTimeLocal(date, event.target.value))
           }
           aria-label={`${label} time`}
-          className="sm:w-32"
           required
-        />
-      </div>
+        />}
+      />
     </Field>
   );
 };
@@ -206,7 +206,7 @@ export const CheckInEventsSection = ({
                   required
                 />
               </Field>
-              <div className="grid gap-3 md:grid-cols-2">
+              <div className="grid gap-3 @min-[36rem]/field-group:grid-cols-2">
                 <CheckInDateTimeField
                   id={`check_start_time_${index}`}
                   label="Start Time"
