@@ -550,6 +550,10 @@ and error meanings for the other rows.
   `background-surface-subtle` at `radius-md`, no underline, bar or bold-only.
   20px icon in `text-secondary`, 12px gap. Group labels use `label`, sentence
   case.
+- **Phone shell header:** `AppShellHeader` provides sticky menu access below
+  the sidebar's mobile breakpoint (768px, or 640px on event-builder routes). Its `SidebarInset` uses `group/shell`; pages with a
+  `data-hides-app-header` top bar hide the shell header to avoid duplicate
+  navigation. The app-sidebar gallery shows browsing and record-page examples.
 - **Tabs:** sections of one object (Overview, Registrations 128, Teams 32,
   Judges); counts in `text-secondary`.
 - **Pagination:** inside the Table's Card, "Showing 1–10 of 48 · Page 1 of 5".
@@ -583,6 +587,9 @@ Border + `shadow-overlay`, enter in 200ms.
 - **Dialog:** confirms destructive or blocking steps. Title asks the question
   ("Delete UXathon?"), buttons name both outcomes ("Keep event" / "Delete
   event"). Esc closes.
+  `DialogContent showCloseButton={false}` omits the X when visible actions already
+  provide dismissal; focus trapping, Escape and outside-click behavior remain.
+  `closeDisabled` still blocks every dismissal while a mutation is pending.
 - Keyboard: Enter opens, arrows move, Esc closes and returns focus. One overlay
   at a time. Outlines survive high-contrast mode.
 
@@ -609,6 +616,10 @@ Border + `shadow-overlay`, enter in 200ms.
 
 Sets an event's header and event colours in the event builder.
 
+`ColourPicker hideLabel` retains its accessible group name while hiding the
+visible label when the surrounding section already supplies a heading. Its
+default label and keyboard behavior are unchanged.
+
 - Swatch: 44px circle, 1px rgba(17,17,17,.12) edge. Selected: 2px white gap +
   2px `text-primary` ring, `aria-pressed`. Custom colours join after the
   presets with a 22px remove button. Dashed "Add" circle opens the custom
@@ -631,6 +642,11 @@ Sets an event's header and event colours in the event builder.
 - 40px pill like TextInput; popovers `radius-2xl`, `border-default`,
   `shadow-overlay`. Enter accepts, Esc closes, focus returns.
 
+`DateTimeFieldPair` composes existing date/time controls, preserving their labels
+and date-then-time tab order. It stacks below 24rem (384px) of its own available
+width and uses a flexible date plus an 8rem time column above that threshold.
+Use it inside cards and sidebar layouts instead of viewport-based paired grids.
+
 ### 3.12 Textarea, radio buttons and image upload
 
 - **Textarea:** TextInput styling with `radius-2xl`; counter ("84/280") only
@@ -641,6 +657,10 @@ Sets an event's header and event colours in the event builder.
 - **ImageUpload:** states Empty ("Upload image · Or drag one here. JPG or PNG,
   1600 × 400 px or larger"), Dragging, Uploading (progress %, Cancel upload),
   Uploaded (Replace), Error ("That file is a GIF. Upload a JPG or PNG.").
+- `ImageUpload presentation="icon"` uses a 220px tile capped to the available
+  width; `presentation="header"` uses a shallow picker with “Upload header
+  image” and a visually hidden, associated file label. Both keep the 4 MB limit and existing validation, progress and replace
+  behavior. Omitting the prop preserves existing presentation.
 - Nothing auto-submits; the page's Save or Publish does.
 
 ### 3.13 Searchable dropdown
@@ -938,3 +958,14 @@ Organization lead), and Patterns parts (`Ticket`, `Hubbo/Placeholder`,
   side peek drawer and record page top bar icons 20; the 24px and 18px icons
   (ConfirmDialog title on phones, image upload and event-card placeholders,
   section navigator marks) redrawn at 16 or 20.
+
+
+### Partial section navigation
+
+`SectionNavigator` accepts an optional `number` on each section to retain the
+original section number while later feature sections are absent. The pill,
+accessible name and menu agree; the displayed total is the greatest section
+number or the rendered section count. Required progress counts rendered required
+sections only. Existing callers without explicit numbers keep sequential labels.
+`numberFormat="plain"` displays builder numbers as `7/10` and `7` in the menu;
+the default `"padded"` preserves `07/10` and `07` for existing consumers.

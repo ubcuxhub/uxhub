@@ -118,6 +118,7 @@ export const interactionEntries: readonly RegistryEntry[] = [
       "dialog-mobile",
       "dialog-tall",
       "dialog-delete",
+      "dialog-actions",
     ],
     aliases: [{ id: "overlays" }],
   },
@@ -280,7 +281,7 @@ export const interactionEntries: readonly RegistryEntry[] = [
     category: "Navigation",
     tier: "composite",
     description:
-      "A floating pill that tracks progress through a long form and jumps between its sections.",
+      "A floating pill with plain or padded section numbers that tracks progress through a long form and jumps between sections.",
     importPath: "@/components/shared/SectionNavigator",
     importNames: ["SectionNavigator"],
     source: "src/components/shared/SectionNavigator.tsx",

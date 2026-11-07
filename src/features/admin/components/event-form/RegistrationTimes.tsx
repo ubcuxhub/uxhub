@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { DateTimeFieldPair } from "@/components/ui/date-time-field";
 
 import { DatePickerButton } from "../DatePickerButton";
 import { Calendar } from "@/components/ui/calendar";
@@ -100,8 +101,8 @@ const RegistrationDateTimeField = ({
   return (
     <Field>
       <FieldLabel htmlFor={`${id}_date`}>{label}</FieldLabel>
-      <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-        <Popover open={open} onOpenChange={setOpen}>
+      <DateTimeFieldPair
+        date={<Popover open={open} onOpenChange={setOpen}>
           <PopoverTrigger asChild>
             <DatePickerButton
               id={`${id}_date`}
@@ -122,8 +123,8 @@ const RegistrationDateTimeField = ({
               }}
             />
           </PopoverContent>
-        </Popover>
-        <Input
+        </Popover>}
+        time={<Input
           id={`${id}_time`}
           type="time"
           value={time}
@@ -132,9 +133,8 @@ const RegistrationDateTimeField = ({
             onChange(combineDateTimeLocal(date, event.target.value))
           }
           aria-label={`${label} time`}
-          className="sm:w-32"
-        />
-      </div>
+        />}
+      />
       {value && (
         <Button type="button" variant="ghost" className="w-fit" onClick={() => onChange("")}>
           Clear {label.toLowerCase()}
@@ -163,7 +163,7 @@ export const RegistrationTimes = ({
   );
 
   return (
-    <FieldGroup className="grid gap-4 md:grid-cols-2">
+    <FieldGroup className="grid gap-4 @min-[36rem]/field-group:grid-cols-2">
       <RegistrationDateTimeField
         id="registration_opens_at"
         label="Registration Opens"
@@ -179,7 +179,7 @@ export const RegistrationTimes = ({
         onChange={(value) => onFieldChange("registration_closes_at", value)}
       />
       {hasInvalidRange && (
-        <FieldError className="md:col-span-2">
+        <FieldError className="@min-[36rem]/field-group:col-span-2">
           Registration end time must be after the start time.
         </FieldError>
       )}

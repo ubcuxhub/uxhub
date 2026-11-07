@@ -54,6 +54,15 @@ describe("ColourSwatch", () => {
 });
 
 describe("ColourPicker", () => {
+  it("retains its accessible name and selection when the visible heading is supplied by its caller", () => {
+    const onValueChange = vi.fn();
+    render(<ColourPicker label="Header colour" hideLabel value="#325DC4" onValueChange={onValueChange} customColours={[]} onCustomColoursChange={() => {}} />);
+    const group = screen.getByRole("group", { name: "Header colour" });
+    expect(screen.getByText("Header colour").className).toBe("sr-only");
+    fireEvent.click(within(group).getByRole("button", { name: "Orchid" }));
+    expect(onValueChange).toHaveBeenCalledWith("#C983C7");
+  });
+
   it("is a group named by its label, with presets in order then Add", () => {
     render(<Harness />);
     const group = screen.getByRole("group", { name: "Event colour" });

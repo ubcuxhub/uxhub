@@ -24,6 +24,24 @@ describe("SectionNavigator", () => {
     expect(screen.getByRole("img", { name: "Optional" })).toBeTruthy()
   })
 
+  it("keeps original numbers in the pill, menu and accessible name when sections are omitted", () => {
+    render(<SectionNavigator title="Event setup" sections={[
+      { id: "basics", title: "Basics", number: 1, state: "complete", required: true },
+      { id: "people", title: "People and sponsors", number: 7, state: "optional", required: false },
+      { id: "settings", title: "Other settings", number: 10, state: "optional", required: false },
+    ]} currentId="people" defaultOpen />)
+    expect(screen.getByRole("menu", { name: "People and sponsors, section 7 of 10. 1 of 1 required sections done" })).toBeTruthy()
+    expect(screen.getByRole("menuitem", { name: /07\s*People and sponsors/ })).toBeTruthy()
+    expect(screen.getByRole("menuitem", { name: /10\s*Other settings/ })).toBeTruthy()
+  })
+
+  it("uses plain builder numbers consistently in the pill and menu", () => {
+    render(<SectionNavigator title="Event setup" sections={sections} currentId="registration" numberFormat="plain" defaultOpen />)
+    expect(screen.getByText("2/4")).toBeTruthy()
+    expect(screen.getByRole("menuitem", { name: /^2\s*Registration/ })).toBeTruthy()
+    expect(screen.queryByText("02/04")).toBeNull()
+  })
+
   it("calls onNavigate when a menu item is selected", () => {
     const onNavigate = vi.fn()
     render(<SectionNavigator title="Event setup" sections={sections} currentId="basics" onNavigate={onNavigate} defaultOpen />)

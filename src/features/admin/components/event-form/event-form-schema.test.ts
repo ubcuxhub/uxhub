@@ -151,7 +151,7 @@ describe("event form schema", () => {
     expect(result.invalidSections.sponsors).toBe(true);
   });
 
-  it("tracks event-person links without tracking catalog field edits", () => {
+  it("tracks links and unfinished person-card edits in the working document", () => {
     const mentor = {
       id: "mentor-1",
       full_name: "Mentor",
@@ -182,7 +182,7 @@ describe("event form schema", () => {
       []
     );
 
-    expect(edited).toBe(initial);
+    expect(edited).not.toBe(initial);
     expect(relinked).not.toBe(initial);
   });
 });

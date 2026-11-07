@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import {
   DateField,
   DateTimeField,
+  DateTimeFieldPair,
   TimeField,
   type DateTimeValue,
 } from "@/components/ui/date-time-field";
@@ -393,6 +394,14 @@ function DateTimeFieldDemo({ open }: SectionProps) {
           />
         </Specimen>
       </SpecimenGroup>
+      <Composition title="Responsive date/time pair" description="DateTimeFieldPair responds to its own available width: stacked below 24rem (384px), a date plus an 8rem time column at 24rem and above. Resize the gallery or place it inside a narrow card; labels and tab order stay date then time. Check phone, sidebar-expanded and collapsed layouts, both themes and densities.">
+        <div className="w-full max-w-xl resize-x overflow-auto p-1">
+          <DateTimeFieldPair
+            date={<Labelled label="Date" htmlFor={id("pair-date")}><DateField id={id("pair-date")} value={picked} onValueChange={setPicked} /></Labelled>}
+            time={<Labelled label="Time" htmlFor={id("pair-time")}><TimeField id={id("pair-time")} value={time} onValueChange={setTime} /></Labelled>}
+          />
+        </div>
+      </Composition>
 
       <Composition
         title="Event schedule"

@@ -20,6 +20,7 @@ function event(overrides: Partial<EventRow> = {}): EventRow {
     name: "Portfolio Night",
     short_description: "Show your work.",
     description: "A night of portfolio reviews.",
+    description_rich: null,
     status: "draft",
     publish_at: null,
     event_type: "regular",
