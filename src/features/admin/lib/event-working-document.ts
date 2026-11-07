@@ -18,12 +18,19 @@ export function parseWorkingDocument(input: unknown): EventWorkingDocument {
   const document = input as EventWorkingDocument;
   if (document.version !== 1 || !document.formState || JSON.stringify(input).length > 500000) throw new Error("Invalid draft document.");
   const state = { ...defaultFormState, ...document.formState };
+  // Version-one documents predate configuration. Preserve both old amounts
+  // until staff deliberately select the new pricing policy.
+  if (!("pricing_mode" in document.formState)) {
+    state.pricing_mode = "legacy";
+    state.configuration_initialized = false;
+  }
   for (const [key, initial] of Object.entries(defaultFormState)) {
     const value = state[key as keyof EventFormState];
     if (key === "description_rich") {
       if (value !== null && !parseEventDescription(value)) throw new Error("Invalid long overview formatting.");
     } else if (typeof value !== typeof initial) throw new Error("Invalid draft field.");
   }
+  if (!["disabled", "hosted", "external"].includes(state.marketing_mode) || !["legacy", "free", "paid"].includes(state.pricing_mode)) throw new Error("Invalid draft configuration.");
   if (state.short_description.length > 50 || state.description.length > 3000) throw new Error("Overview exceeds its character limit.");
   if (state.description_rich && descriptionText(state.description_rich) !== state.description) throw new Error("Invalid long overview formatting.");
   for (const key of ["image_url", "header_image_url"] as const) {

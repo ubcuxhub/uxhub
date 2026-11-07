@@ -3,7 +3,7 @@ import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FormEvent } from "react";
 import type { EventRow } from "@/lib/supabase/models";
-import { getInitialFormState } from "../components/event-form/event-form-schema";
+import { defaultFormState, getInitialFormState } from "../components/event-form/event-form-schema";
 import { useEventForm } from "./use-event-form";
 import { toast } from "@/components/ui/toast";
 vi.mock("@/components/ui/toast", () => ({ toast: { error: vi.fn(), dismiss: vi.fn() } }));
@@ -46,12 +46,13 @@ it("retries a failed draft save with the latest edited values and preserves leav
 describe("legacy browser draft recovery", () => {
   const key = "event_create_form_draft";
   it("restores incomplete work as dirty and keeps the browser copy until a durable save succeeds", async () => {
-    const legacy = { formState: { name: "Recovered draft", description: "Old overview" }, checkInEvents: [], mentors: [], sponsors: [], applicationTemplate: [] };
+    const legacy = { formState: { name: "Recovered draft", description: "Old overview", regular_price: "12.50", member_price: "5" }, checkInEvents: [], mentors: [], sponsors: [], applicationTemplate: [] };
     localStorage.setItem(key, JSON.stringify(legacy));
     const { result } = renderHook(() => useEventForm({}));
     await act(async () => { await Promise.resolve(); });
     expect(result.current.formState.name).toBe("Recovered draft");
     expect(result.current.formState.description).toBe("Old overview");
+    expect(result.current.formState).toMatchObject({ pricing_mode: "legacy", regular_price: "12.50", member_price: "5", page_slug: "recovered-draft" });
     expect(result.current.hasUnsavedChanges).toBe(true);
     vi.mocked(saveAdminEventDraftAction).mockRejectedValueOnce(new Error("Offline"));
     await act(async () => { await result.current.handleSaveDraft(); });
@@ -94,6 +95,7 @@ afterEach(() => {
 const event = {
   id: "event-1",
   name: "Scheduled event",
+  slug: "scheduled-event",
   short_description: "Preview",
   description: "Description",
   status: "draft",
@@ -192,10 +194,10 @@ describe("event form publishing schedule", () => {
     // save_admin_event_atomically writes every events column the payload
     // names, so this is exactly what a save can change.
     expect(Object.keys(payload).sort()).toEqual([
-      "created_at", "description", "description_rich", "ends_at", "event_colour", "event_type", "header_colour", "header_image_url", "image_url",
+      "configured_marketing_mode", "configured_marketing_url", "configured_slug", "configured_slug_edited", "created_at", "description", "description_rich", "ends_at", "event_colour", "event_type", "header_colour", "header_image_url", "image_url", "is_featured",
       "location_address_url", "location_building", "location_room",
-      "max_capacity", "member_price", "mentors_enabled", "name", "publish_at",
-      "registration_closes_at", "registration_opens_at", "regular_price",
+      "max_capacity", "mentors_enabled", "name", "publish_at",
+      "registration_closes_at", "registration_opens_at",
       "requires_application", "short_description", "sponsors_enabled",
       "starts_at", "status",
     ]);
@@ -242,4 +244,33 @@ it("preserves untouched legacy question defaults during a branding save", async 
   await act(async () => { await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as FormEvent<HTMLFormElement>); });
   expect(result.current.error).toBeNull();
   expect(saveAdminEventAction).toHaveBeenCalledWith(expect.objectContaining({ applicationQuestions: [expect.objectContaining({ max_char_limit: null, response_options: [], allowed_file_types: [] })] }));
+});
+
+
+describe("event configuration editing", () => {
+  it("follows the name until the URL is deliberately edited, including after draft save", async () => {
+    const { result } = renderHook(() => useEventForm({}));
+    act(() => result.current.handleFieldChange("name", "Design Sprint"));
+    expect(result.current.formState.page_slug).toBe("design-sprint");
+    await act(async () => { await result.current.handleSaveDraft(false); });
+    act(() => result.current.handleFieldChange("name", "New Name"));
+    expect(result.current.formState.page_slug).toBe("new-name");
+    act(() => result.current.handleFieldChange("page_slug", "custom-url"));
+    act(() => result.current.handleFieldChange("name", "Another Name"));
+    expect(result.current.formState.page_slug).toBe("custom-url");
+  });
+  it("does not reset source-event settings when resuming an older working document", () => {
+    const source = { ...event, slug: "original-url", marketing_url: "https://existing.example.com", is_featured: true };
+    const { result } = renderHook(() => useEventForm({ eventId: event.id, initialEvent: source, initialDraft: { id: "old-draft", revision: 1, document: { version: 1, formState: { ...defaultFormState, name: "Old document name", pricing_mode: "legacy", configuration_initialized: false }, checkInEvents: [], mentors: [], sponsors: [], applicationTemplate: [] } } }));
+    expect(result.current.formState).toMatchObject({ name: "Old document name", page_slug: "original-url", marketing_mode: "external", marketing_url: "https://existing.example.com", is_featured: true });
+  });
+  it("keeps a saved automatic URL following the name after reloading an event", () => {
+    const { result } = renderHook(() => useEventForm({ eventId: event.id, initialEvent: { ...event, configured_slug: "scheduled-event", configured_slug_edited: false } }));
+    act(() => result.current.handleFieldChange("name", "Renamed Event"));
+    expect(result.current.formState.page_slug).toBe("renamed-event");
+  });
+  it("hydrates saved configuration and preserves both legacy effective amounts", () => {
+    const { result } = renderHook(() => useEventForm({ eventId: event.id, initialEvent: { ...event, slug: "original", regular_price: 20, member_price: 5, configured_pricing_mode: "paid", configured_price: 12.5, configured_marketing_mode: "external", configured_marketing_url: "https://devpost.com/design", configured_slug: "saved-url", is_featured: true } }));
+    expect(result.current.formState).toMatchObject({ pricing_mode: "paid", pricing_amount: "12.5", regular_price: "20", member_price: "5", marketing_mode: "external", marketing_url: "https://devpost.com/design", page_slug: "saved-url", is_featured: true });
+  });
 });

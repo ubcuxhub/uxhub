@@ -8,6 +8,7 @@
 export const TABLES = {
   appSettings: "app_settings",
   events: "events",
+  eventUrlClaims: "event_url_claims",
   adminEventDrafts: "admin_event_drafts",
   userInfo: "user_info",
   eventTickets: "event_tickets",

@@ -1,3 +1,4 @@
+import { eventSlugError, priceError, suggestedEventSlug, websiteUrlError } from "../../lib/event-configuration";
 import type { EventDescription } from "@/lib/event-description";
 import {
   ResponseType,
@@ -12,6 +13,14 @@ import {
 } from "@/lib/date";
 
 export interface EventFormState {
+  configuration_initialized: boolean;
+  marketing_mode: "disabled" | "hosted" | "external";
+  marketing_url: string;
+  page_slug: string;
+  slug_edited: boolean;
+  is_featured: boolean;
+  pricing_mode: "legacy" | "free" | "paid";
+  pricing_amount: string;
   name: string;
   short_description: string;
   description: string;
@@ -64,6 +73,14 @@ export const EMPTY_CHECK_IN_SESSION: CheckInSessionDraft = {
 };
 
 export const defaultFormState: EventFormState = {
+  configuration_initialized: true,
+  marketing_mode: "hosted",
+  marketing_url: "",
+  page_slug: "",
+  slug_edited: false,
+  is_featured: false,
+  pricing_mode: "free",
+  pricing_amount: "0",
   name: "",
   short_description: "",
   description: "",
@@ -96,15 +113,6 @@ export function getInitialFormState(): EventFormState {
     ...defaultFormState,
     starts_at: timestamptzToDatetimeLocal(new Date().toISOString()),
   };
-}
-
-export function isFreePricing(regularPrice: string, memberPrice: string) {
-  return (
-    regularPrice !== "" &&
-    memberPrice !== "" &&
-    Number(regularPrice) === 0 &&
-    Number(memberPrice) === 0
-  );
 }
 
 export function isDateTimeRangeInvalid(start: string, end: string) {
@@ -168,12 +176,12 @@ export function validateEventForm(
   else if (formState.short_description.length > 50) error = "Short overview must be 50 characters or fewer.";
   else if (formState.description.length > 3000) error = "Long overview must be 3,000 characters or fewer.";
   else if (!formState.description.trim()) error = "Description is required.";
-  else if (!formState.regular_price.trim()) error = "Regular price is required.";
-  else if (Number.isNaN(Number(formState.regular_price)))
-    error = "Regular price must be a valid number.";
-  else if (!formState.member_price.trim()) error = "Member price is required.";
-  else if (Number.isNaN(Number(formState.member_price)))
-    error = "Member price must be a valid number.";
+  else if (formState.marketing_mode === "external" && websiteUrlError(formState.marketing_url))
+    error = websiteUrlError(formState.marketing_url);
+  else if (formState.marketing_mode === "hosted" && eventSlugError((formState.slug_edited ? formState.page_slug : formState.page_slug || suggestedEventSlug(formState.name))))
+    error = eventSlugError((formState.slug_edited ? formState.page_slug : formState.page_slug || suggestedEventSlug(formState.name)));
+  else if (formState.pricing_mode !== "legacy" && priceError(formState.pricing_mode === "free" ? "0" : formState.pricing_amount))
+    error = priceError(formState.pricing_amount);
   else if (!formState.max_capacity) error = "Max capacity is required.";
   else if (invalidSections.mentors)
     error = "Every mentor requires a full name.";

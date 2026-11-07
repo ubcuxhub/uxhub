@@ -882,3 +882,25 @@ describe("overview write validation", () => {
     expect(adminRpc).not.toHaveBeenCalled();
   });
 });
+
+
+describe("event configuration server validation", () => {
+  it.each([
+    { configured_slug: "admin" },
+    { configured_marketing_mode: "external", configured_marketing_url: "javascript:alert(1)" },
+    { configured_marketing_mode: "external", configured_marketing_url: null },
+    { configured_pricing_mode: "paid", configured_price: -1 },
+    { configured_pricing_mode: "paid", configured_price: 1.001 },
+  ])("rejects invalid configuration before the mutation: %j", async fields => {
+    await expect(saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, ...fields } })).rejects.toThrow();
+    expect(adminRpc).not.toHaveBeenCalled();
+  });
+  it("normalizes international external hostnames without changing the effective destination", async () => {
+    await saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, configured_marketing_mode: "external", configured_marketing_url: "https://例子.com/event" } });
+    expect(adminRpc).toHaveBeenCalledWith("save_admin_event_builder", expect.objectContaining({ p_event: expect.objectContaining({ configured_marketing_url: "https://xn--fsqu00a.com/event" }) }));
+  });
+  it.each(["This page URL is already in use.", "Pricing is locked because registrations or payments exist.", "The page URL is locked after first publication."])("returns a useful configuration rejection: %s", async message => {
+    adminRpc.mockResolvedValueOnce({ data: null, error: { message, code: "P0001" } });
+    await expect(saveAdminEventAction(saveInput)).rejects.toThrow(message);
+  });
+});

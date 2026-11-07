@@ -628,10 +628,40 @@ export type Database = {
           },
         ]
       }
+      event_url_claims: {
+        Row: {
+          event_id: string
+          slug: string
+        }
+        ComputedFields: never
+        Insert: {
+          event_id: string
+          slug: string
+        }
+        Update: {
+          event_id?: string
+          slug?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_url_claims_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           agenda: Json | null
           agenda_enabled: boolean
+          configured_marketing_mode: string | null
+          configured_marketing_url: string | null
+          configured_price: number | null
+          configured_pricing_mode: string | null
+          configured_slug: string | null
+          configured_slug_edited: boolean
           created_at: string | null
           description: string
           description_images: string[] | null
@@ -639,6 +669,7 @@ export type Database = {
           ends_at: string | null
           event_colour: string | null
           event_type: Database["public"]["Enums"]["event_type"]
+          first_published_at: string | null
           header_colour: string | null
           header_image_url: string | null
           id: string
@@ -656,6 +687,7 @@ export type Database = {
           mentors_enabled: boolean
           min_team_size: number | null
           name: string
+          pricing_policy: string
           publish_at: string | null
           registration_closes_at: string | null
           registration_opens_at: string | null
@@ -674,6 +706,12 @@ export type Database = {
         Insert: {
           agenda?: Json | null
           agenda_enabled?: boolean
+          configured_marketing_mode?: string | null
+          configured_marketing_url?: string | null
+          configured_price?: number | null
+          configured_pricing_mode?: string | null
+          configured_slug?: string | null
+          configured_slug_edited?: boolean
           created_at?: string | null
           description: string
           description_images?: string[] | null
@@ -681,6 +719,7 @@ export type Database = {
           ends_at?: string | null
           event_colour?: string | null
           event_type?: Database["public"]["Enums"]["event_type"]
+          first_published_at?: string | null
           header_colour?: string | null
           header_image_url?: string | null
           id?: string
@@ -698,6 +737,7 @@ export type Database = {
           mentors_enabled?: boolean
           min_team_size?: number | null
           name: string
+          pricing_policy?: string
           publish_at?: string | null
           registration_closes_at?: string | null
           registration_opens_at?: string | null
@@ -715,6 +755,12 @@ export type Database = {
         Update: {
           agenda?: Json | null
           agenda_enabled?: boolean
+          configured_marketing_mode?: string | null
+          configured_marketing_url?: string | null
+          configured_price?: number | null
+          configured_pricing_mode?: string | null
+          configured_slug?: string | null
+          configured_slug_edited?: boolean
           created_at?: string | null
           description?: string
           description_images?: string[] | null
@@ -722,6 +768,7 @@ export type Database = {
           ends_at?: string | null
           event_colour?: string | null
           event_type?: Database["public"]["Enums"]["event_type"]
+          first_published_at?: string | null
           header_colour?: string | null
           header_image_url?: string | null
           id?: string
@@ -739,6 +786,7 @@ export type Database = {
           mentors_enabled?: boolean
           min_team_size?: number | null
           name?: string
+          pricing_policy?: string
           publish_at?: string | null
           registration_closes_at?: string | null
           registration_opens_at?: string | null
@@ -1178,6 +1226,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_event_pricing_locked: {
+        Args: { p_event_id: string }
+        Returns: boolean
+      }
       create_team: {
         Args: { p_event_id: string; p_name?: string; p_user_id: string }
         Returns: {

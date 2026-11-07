@@ -110,6 +110,14 @@ const MEMBER_BADGES: Record<string, EventBadge> = {
 };
 
 const EVENT: EventRow = {
+  configured_marketing_mode: null,
+  configured_marketing_url: null,
+  configured_price: null,
+  configured_pricing_mode: null,
+  configured_slug: null,
+  configured_slug_edited: true,
+  pricing_policy: "legacy",
+  first_published_at: null,
   agenda: null,
   agenda_enabled: true,
   created_at: "2026-09-01T00:00:00Z",

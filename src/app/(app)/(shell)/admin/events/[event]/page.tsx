@@ -10,7 +10,7 @@ import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchApplicationQuestions } from "@/lib/supabase-helpers/event-applications";
 import { fetchCheckInSessions } from "@/lib/supabase-helpers/check-ins";
-import { fetchEventById } from "@/lib/supabase-helpers/events";
+import { fetchEventById, fetchEventPricingLocked } from "@/lib/supabase-helpers/events";
 import {
   fetchEventMentors,
   fetchEventSponsors,
@@ -47,11 +47,13 @@ export default async function EventView({ params }: EventViewProps) {
     ]);
 
   if (!event) notFound();
+  const pricingLocked = await fetchEventPricingLocked(supabase, eventId);
   const workingDraft = event.status === "draft" && !event.publish_at ? await fetchEventDraftForEvent(supabase, eventId) : null;
 
   return (
     <PageContainer className="max-w-none min-[821px]:px-12 lg:px-12">
       <EventCreateModify
+        pricingLocked={pricingLocked}
         eventId={eventId}
         initialDraft={workingDraft}
         initialEvent={event}

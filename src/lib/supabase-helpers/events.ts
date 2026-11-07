@@ -151,3 +151,10 @@ export async function updateEventIfImageMatches(
   if (error) throw error;
   return data ?? null;
 }
+
+/** Staff-only aggregate, including in-flight purchases that lock repricing. */
+export async function fetchEventPricingLocked(supabase: DbClient, eventId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("admin_event_pricing_locked", { p_event_id: eventId });
+  if (error) throw error;
+  return data;
+}

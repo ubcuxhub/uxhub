@@ -203,4 +203,38 @@ yet. Since nobody gives a spot back, a full event only reopens when an offer
 expires.
 
 ## Check-in status for multi-day events
-Currently, if an event spans multiple days and requires check-in for multiple days, the badge will show 'Checked-in' from the first day they check in until the end of the event, regardless of whether they need to check in again at a later day in the event. 
+Currently, if an event spans multiple days and requires check-in for multiple days, the badge will show 'Checked-in' from the first day they check in until the end of the event, regardless of whether they need to check in again at a later day in the event.
+## Saved builder configuration
+
+The form-first builder stores desired marketing and pricing configuration in
+`events.configured_marketing_mode`, `configured_marketing_url`, `configured_slug`,
+`configured_pricing_mode` and `configured_price`. `configured_slug_edited`
+remembers whether the URL was deliberately edited, so automatic URLs continue
+following name changes after reload. These fields do not activate
+new marketing views or pricing rules. Existing consumers continue to read
+`slug`, `marketing_url`, `regular_price` and `member_price`; unrelated form
+updates omit effective prices. `is_featured` saves the staff choice without
+claiming portal Home selection/display is delivered.
+
+Existing events keep `pricing_policy = 'legacy'`. New builder events with
+Free/Paid configuration get `figma_pending`: they can be saved as drafts, but
+publication, scheduling, purchases, tickets and accepted offers are rejected at
+the database boundary until the pricing and free-registration follow-up enables
+them. This includes staff checkout of these drafts. Existing legacy staff draft
+checkout remains supported. A form save cannot change the effective policy.
+
+`first_published_at` records first activation and survives a return to Draft.
+Existing active rows are backfilled when the migration runs. Both effective
+and configured URLs lock after publication. Pre-publication desired URLs share
+an atomic claim namespace with existing event slugs, so collisions cannot be
+saved under concurrent requests. Marketing mode/external URL configuration
+remains independently editable; existing public destinations are preserved.
+
+Pricing configuration and effective prices lock when an event has a ticket,
+an unexpired accepted offer, or a nonfailed purchase (including an in-flight
+payment). Purchase/ticket/offer writes take the event lock used by reservation;
+form checks run after that lock and see committed registrations. Historical
+purchase amounts and ticket records are never rewritten by configuration saves.
+`admin_event_pricing_locked` exposes only the staff aggregate; URL claims have
+no browser grants. The event's existing RLS and staff server-action guards
+continue to govern form access and writes.
