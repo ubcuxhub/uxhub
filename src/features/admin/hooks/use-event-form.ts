@@ -1,5 +1,7 @@
 "use client";
 
+import { suggestedEventSlug } from "../lib/event-configuration";
+
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/toast";
@@ -69,7 +71,22 @@ export function useEventForm({
 }: UseEventFormOptions) {
   const router = useRouter();
   const startingFormState = useMemo(
-    () => initialDraft?.document.formState ?? (initialEvent ? formStateFromEvent(initialEvent) : getInitialFormState()),
+    () => {
+      const state = initialDraft?.document.formState;
+      if (!state) return initialEvent ? formStateFromEvent(initialEvent) : getInitialFormState();
+      // Old working documents never captured these settings. Recover them
+      // from the source event instead of resetting a saved featured choice,
+      // external destination or URL during an unrelated edit.
+      if (state.configuration_initialized === false && initialEvent) {
+        const source = formStateFromEvent(initialEvent);
+        return { ...state, configuration_initialized: true,
+          marketing_mode: source.marketing_mode, marketing_url: source.marketing_url,
+          page_slug: source.page_slug, slug_edited: source.slug_edited,
+          is_featured: source.is_featured, pricing_mode: source.pricing_mode,
+          pricing_amount: source.pricing_amount };
+      }
+      return state;
+    },
     [initialEvent, initialDraft]
   );
   const startingCheckIns = useMemo(
@@ -105,6 +122,7 @@ export function useEventForm({
     }))
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showConfigurationErrors, setShowConfigurationErrors] = useState(false);
   const [error, setError] = useState<string | null>(
     eventId && !initialEvent ? "Event not found." : null
   );
@@ -152,6 +170,11 @@ export function useEventForm({
         if (!saved) return;
         const legacy = JSON.parse(saved);
         const state = { ...getInitialFormState(), ...legacy.formState };
+        if (legacy.formState?.pricing_mode === undefined) {
+          state.pricing_mode = "legacy";
+          state.configuration_initialized = false;
+        }
+        if (legacy.formState?.page_slug === undefined) state.page_slug = suggestedEventSlug(state.name);
         // Browser object URLs cannot survive a restart; the original file must
         // be selected again. Preserve the rest of the recovered document.
         const missingUpload = [state.image_url, state.header_image_url].some(url => typeof url === "string" && url.startsWith("blob:"));
@@ -197,6 +220,8 @@ export function useEventForm({
     setFormState((current) => ({
       ...current,
       [field]: value,
+      ...(field === "name" && !current.slug_edited && !initialEvent?.first_published_at && initialEvent?.status !== "active" ? { page_slug: suggestedEventSlug(String(value)) } : {}),
+      ...(field === "page_slug" ? { slug_edited: true } : {}),
       ...(field === "status" && value !== "draft" ? { publish_at: "" } : {}),
     }));
   };
@@ -305,6 +330,7 @@ export function useEventForm({
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (submitLock.current) return;
+    setShowConfigurationErrors(true);
     resetSuccessMessage();
     setError(null);
     const hasUnsavedMentors = mentors.some(
@@ -377,8 +403,21 @@ export function useEventForm({
         mentors_enabled: formState.mentors_enabled,
         sponsors_enabled: formState.sponsors_enabled,
         requires_application: formState.requires_application,
-        regular_price: Number(formState.regular_price),
-        member_price: Number(formState.member_price),
+        configured_marketing_mode: formState.marketing_mode,
+        configured_marketing_url: formState.marketing_url || null,
+        configured_slug_edited: formState.slug_edited,
+        configured_slug: formState.slug_edited ? formState.page_slug || null : formState.page_slug || suggestedEventSlug(formState.name),
+        is_featured: formState.is_featured,
+        ...(formState.pricing_mode === "legacy" ? {} : {
+          configured_pricing_mode: formState.pricing_mode,
+          configured_price: formState.pricing_mode === "free" ? 0 : Number(formState.pricing_amount),
+        }),
+        // Effective amounts on existing events are deliberately omitted. New
+        // events cannot activate or register until deferred fulfillment lands.
+        ...(!eventId ? {
+          regular_price: formState.pricing_mode === "legacy" ? Number(formState.regular_price) : formState.pricing_mode === "free" ? 0 : Number(formState.pricing_amount),
+          member_price: formState.pricing_mode === "legacy" ? Number(formState.member_price) : 0,
+        } : {}),
         max_capacity: Number(formState.max_capacity),
         created_at: formState.created_at || new Date().toISOString(),
         location_building: formState.location_building || undefined,
@@ -506,6 +545,7 @@ export function useEventForm({
 
   return {
     formState,
+    showConfigurationErrors,
     legacyDraftRecovered,
     hasUnsavedChanges,
     navigation,

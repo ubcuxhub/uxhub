@@ -595,6 +595,12 @@ Border + `shadow-overlay`, enter in 200ms.
 
 ### 3.8 Feedback
 
+- **Alert:** inline note with optional icon/title/description. Variants are
+  `neutral`, `warning` (default), `info` and `destructive`. Use `neutral` for
+  locked settings/status summaries: `bg-muted text-foreground`, with secondary
+  description text supplied by the caller. Status colours and the default
+  warning treatment for existing consumers remain unchanged.
+
 - **Toast:** bottom right, stacked, 380px, auto-dismiss after 5s. Tones Success,
   Neutral, Error; optional action ("Try again"). Every admin result gets one.
   Text only, no Hubbo.

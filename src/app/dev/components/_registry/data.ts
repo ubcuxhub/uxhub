@@ -168,7 +168,7 @@ export const dataEntries: readonly RegistryEntry[] = [
     category: "Feedback",
     tier: "primitive",
     description:
-      "An inline notice in the page: a warning, something to know, or an error, with an icon and an optional title.",
+      "An inline notice in the page: neutral status, a warning, something to know, or an error, with an icon and an optional title.",
     importPath: "@/components/ui/alert",
     importNames: ["Alert", "AlertDescription", "AlertTitle"],
     source: "src/components/ui/alert.tsx",
