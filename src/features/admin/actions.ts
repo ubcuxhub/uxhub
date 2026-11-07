@@ -6,6 +6,7 @@ import { parseEventDescription, descriptionText } from "@/lib/event-description"
 import { revalidatePath } from "next/cache";
 
 import { requireAdmin, requireManager } from "@/lib/auth/guards";
+import { eventSlugError, priceError, websiteUrlError } from "./lib/event-configuration";
 import { createUniqueSlug, slugify } from "@/lib/slug";
 import { errorFields, log } from "@/lib/log";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -299,6 +300,21 @@ export async function saveAdminEventAction(
     const rich = parseEventDescription(input.event.description_rich);
     if (!rich || descriptionText(rich) !== input.event.description) throw new Error("Invalid long overview formatting.");
   }
+  if (input.event.configured_slug != null) {
+    const error = eventSlugError(input.event.configured_slug);
+    if (error) throw new Error(error);
+  }
+  if (input.event.configured_marketing_mode === "external") {
+    const error = websiteUrlError(input.event.configured_marketing_url ?? "");
+    if (error) throw new Error(error);
+    // Normalize hostnames (including international domains) consistently with
+    // URL parsing before the database's protocol/host safety constraint.
+    input = { ...input, event: { ...input.event, configured_marketing_url: new URL(input.event.configured_marketing_url!).href } };
+  }
+  if (input.event.configured_pricing_mode != null) {
+    const error = priceError(String(input.event.configured_price ?? ""));
+    if (error) throw new Error(error);
+  }
   let slug: string | null = null;
 
   if (!input.eventId) {
@@ -344,6 +360,16 @@ export async function saveAdminEventAction(
       log.warn(refusal, { eventId: input.eventId ?? null });
       return { error: error.message };
     }
+    const configurationMessages = [
+      "This page URL is already in use.",
+      "The page URL is locked after first publication.",
+      "Pricing is locked because registrations or payments exist.",
+      "New pricing is saved as a draft. Publication requires the pricing and free-registration integration.",
+      "Pricing activation requires the pricing integration.",
+    ];
+    if (configurationMessages.includes(error.message)) throw new Error(error.message);
+    if (error.code === "23505" && /events_slug|event_url_claims/.test(error.message)) throw new Error("This page URL is already in use.");
+    if (error.code === "23514" && /events_configured_/.test(error.message)) throw new Error("Review the marketing destination and pricing before saving.");
     throw error;
   }
   const saved = data as {

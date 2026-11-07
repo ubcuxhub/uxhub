@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   createFormSnapshot,
   defaultFormState,
-  isFreePricing,
   isDateTimeRangeInvalid,
   isEventScheduleRangeInvalid,
   toApplicationQuestionInputs,
@@ -79,12 +78,6 @@ describe("event form schema", () => {
         ends_at: "2026-08-01T10:00",
       })
     ).toBe(true);
-  });
-
-  it("recognizes free pricing only when both prices are explicitly zero", () => {
-    expect(isFreePricing("0", "0")).toBe(true);
-    expect(isFreePricing("", "")).toBe(false);
-    expect(isFreePricing("10", "0")).toBe(false);
   });
 
   it("returns question-specific validation errors", () => {

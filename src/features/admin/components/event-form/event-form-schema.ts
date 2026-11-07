@@ -1,4 +1,5 @@
 import { parseEventDescription, type EventDescription } from "@/lib/event-description";
+import { eventSlugError, priceError, suggestedEventSlug, websiteUrlError } from "../../lib/event-configuration";
 import {
   ResponseType,
   type CheckInSessionRow,
@@ -20,6 +21,14 @@ import {
 } from "@/lib/date";
 
 export interface EventFormState {
+  configuration_initialized: boolean;
+  marketing_mode: "disabled" | "hosted" | "external";
+  marketing_url: string;
+  page_slug: string;
+  slug_edited: boolean;
+  is_featured: boolean;
+  pricing_mode: "legacy" | "free" | "paid";
+  pricing_amount: string;
   name: string;
   short_description: string;
   description: string;
@@ -72,6 +81,14 @@ export const EMPTY_CHECK_IN_SESSION: CheckInSessionDraft = {
 };
 
 export const defaultFormState: EventFormState = {
+  configuration_initialized: true,
+  marketing_mode: "hosted",
+  marketing_url: "",
+  page_slug: "",
+  slug_edited: false,
+  is_featured: false,
+  pricing_mode: "free",
+  pricing_amount: "0",
   name: "",
   short_description: "",
   description: "",
@@ -109,6 +126,14 @@ export function getInitialFormState(): EventFormState {
 /** The builder's form state for a stored event. */
 export function formStateFromEvent(event: EventRow): EventFormState {
   return {
+    configuration_initialized: true,
+    marketing_mode: (event.configured_marketing_mode ?? (event.marketing_url ? "external" : "hosted")) as EventFormState["marketing_mode"],
+    marketing_url: event.configured_marketing_url ?? event.marketing_url ?? "",
+    page_slug: event.configured_slug ?? event.slug ?? "",
+    slug_edited: event.configured_slug_edited ?? true,
+    is_featured: event.is_featured,
+    pricing_mode: (event.configured_pricing_mode ?? "legacy") as EventFormState["pricing_mode"],
+    pricing_amount: String(event.configured_price ?? event.regular_price ?? ""),
     name: event.name ?? "",
     short_description: event.short_description ?? "",
     description: event.description ?? "",
@@ -166,15 +191,6 @@ export function checkInDraftsFromRows(
     start_time: timestamptzToDatetimeLocal(session.start_time),
     end_time: timestamptzToDatetimeLocal(session.end_time),
   }));
-}
-
-export function isFreePricing(regularPrice: string, memberPrice: string) {
-  return (
-    regularPrice !== "" &&
-    memberPrice !== "" &&
-    Number(regularPrice) === 0 &&
-    Number(memberPrice) === 0
-  );
 }
 
 export function isDateTimeRangeInvalid(start: string, end: string) {
@@ -238,12 +254,12 @@ export function validateEventForm(
   else if (formState.short_description.length > 50) error = "Short overview must be 50 characters or fewer.";
   else if (formState.description.length > 3000) error = "Long overview must be 3,000 characters or fewer.";
   else if (!formState.description.trim()) error = "Description is required.";
-  else if (!formState.regular_price.trim()) error = "Regular price is required.";
-  else if (Number.isNaN(Number(formState.regular_price)))
-    error = "Regular price must be a valid number.";
-  else if (!formState.member_price.trim()) error = "Member price is required.";
-  else if (Number.isNaN(Number(formState.member_price)))
-    error = "Member price must be a valid number.";
+  else if (formState.marketing_mode === "external" && websiteUrlError(formState.marketing_url))
+    error = websiteUrlError(formState.marketing_url);
+  else if (formState.marketing_mode === "hosted" && eventSlugError((formState.slug_edited ? formState.page_slug : formState.page_slug || suggestedEventSlug(formState.name))))
+    error = eventSlugError((formState.slug_edited ? formState.page_slug : formState.page_slug || suggestedEventSlug(formState.name)));
+  else if (formState.pricing_mode !== "legacy" && priceError(formState.pricing_mode === "free" ? "0" : formState.pricing_amount))
+    error = priceError(formState.pricing_amount);
   else if (!formState.max_capacity) error = "Max capacity is required.";
   else if (invalidSections.mentors)
     error = "Every mentor requires a full name.";
