@@ -2,8 +2,15 @@
 
 import { useId, useState } from "react";
 
-import { DateField, TimeField, DateTimeFieldPair } from "@/components/ui/date-time-field";
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
+import { Button } from "@/components/ui/button";
+import {
+  DateField,
+  DateTimeField,
+  DateTimeFieldPair,
+  TimeField,
+  type DateTimeValue,
+} from "@/components/ui/date-time-field";
+import { Field, FieldError, FieldLabel, FieldLabelRow } from "@/components/ui/field";
 import type { IsoDate, WallTime } from "@/lib/date-input";
 
 import { Composition, Specimen, SpecimenGroup } from "@/app/dev/_shell/Specimen";
@@ -116,6 +123,58 @@ function EventSchedule({ ids }: { ids: [string, string, string] }) {
           aria-errormessage={endError ? `${ids[2]}-error` : undefined}
         />
       </Labelled>
+    </div>
+  );
+}
+
+/** One moment, with a Clear label action and the field's own error. */
+function Moment({
+  id,
+  label,
+  initial,
+  width,
+}: {
+  id: string;
+  label: string;
+  initial: DateTimeValue;
+  width: string;
+}) {
+  const [value, setValue] = useState<DateTimeValue>(initial);
+  const [error, setError] = useState<string | null>(null);
+  const set = Boolean(value.date || value.time);
+  return (
+    <div className={width}>
+      <Field aria-labelledby={`${id}-label`} data-invalid={error ? true : undefined}>
+        <FieldLabelRow
+          action={
+            set ? (
+              <Button
+                type="button"
+                variant="link"
+                size="sm"
+                aria-label={`Clear ${label.toLowerCase()}`}
+                onClick={() => setValue({ date: null, time: null })}
+              >
+                Clear
+              </Button>
+            ) : null
+          }
+        >
+          <FieldLabel id={`${id}-label`} htmlFor={id}>
+            {label}
+          </FieldLabel>
+        </FieldLabelRow>
+        <DateTimeField
+          id={id}
+          dateLabel={`${label} date`}
+          timeLabel={`${label} time`}
+          value={value}
+          onValueChange={setValue}
+          onValidityChange={setError}
+          today={TODAY}
+        />
+        {error ? <FieldError>{error}</FieldError> : null}
+      </Field>
     </div>
   );
 }
@@ -313,6 +372,36 @@ function DateTimeFieldDemo({ open }: SectionProps) {
           />
         </div>
       </Composition>
+      <SpecimenGroup
+        title="Date and time"
+        spec="§3.11"
+        description="One moment as a date and a time. Side by side when its container is 24rem or wider, stacked below that, so it fits a drawer or a phone. Clear sits in the label row."
+      >
+        <Specimen label="wide container (side by side)" className="w-md max-w-full">
+          <Moment
+            id={id("dt-wide")}
+            label="Registration opens"
+            initial={{ date: DATE, time: "09:00" }}
+            width="w-full"
+          />
+        </Specimen>
+        <Specimen label="narrow container (stacked)" className="w-72 max-w-full">
+          <Moment
+            id={id("dt-narrow")}
+            label="Registration closes"
+            initial={{ date: DATE, time: "17:00" }}
+            width="w-full"
+          />
+        </Specimen>
+        <Specimen label="empty" className="w-md max-w-full">
+          <Moment
+            id={id("dt-empty")}
+            label="Publishes"
+            initial={{ date: null, time: null }}
+            width="w-full"
+          />
+        </Specimen>
+      </SpecimenGroup>
 
       <Composition
         title="Event schedule"

@@ -6,16 +6,19 @@ import {
 
 export { ResponseType };
 
+/**
+ * An application question in the admin builder. `id` is the saved question's,
+ * absent until the first save; saving sends it back so the question, and the
+ * answers to it, keep that id.
+ */
 export interface ApplicationQuestionTemplate {
+  id?: string;
   question: string;
   description: string;
   response: ResponseTypeValue;
   is_required: boolean;
   max_char_limit: number | "";
   response_options: string[];
-  restrict_file_types: boolean;
-  allowed_file_types: string[];
-  max_file_size_bytes: number | "";
 }
 
 /** Display-ready event details for a ticket; build one with `toTicketEvent`. */

@@ -341,6 +341,7 @@ export type Database = {
           id: string
           offer_expires_at: string | null
           status: Database["public"]["Enums"]["event_application_status"]
+          submitted_at: string | null
           updated_at: string
           user_id: string
         }
@@ -351,6 +352,7 @@ export type Database = {
           id?: string
           offer_expires_at?: string | null
           status?: Database["public"]["Enums"]["event_application_status"]
+          submitted_at?: string | null
           updated_at?: string
           user_id: string
         }
@@ -360,6 +362,7 @@ export type Database = {
           id?: string
           offer_expires_at?: string | null
           status?: Database["public"]["Enums"]["event_application_status"]
+          submitted_at?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -1230,6 +1233,19 @@ export type Database = {
         Args: { p_event_id: string }
         Returns: boolean
       }
+      can_edit_application_response: {
+        Args: { p_application_id: string; p_question_id: string }
+        Returns: boolean
+      }
+      can_read_application_file: { Args: { p_name: string }; Returns: boolean }
+      can_remove_application_file: {
+        Args: { p_name: string }
+        Returns: boolean
+      }
+      can_upload_application_file: {
+        Args: { p_name: string }
+        Returns: boolean
+      }
       create_team: {
         Args: { p_event_id: string; p_name?: string; p_user_id: string }
         Returns: {
@@ -1348,12 +1364,27 @@ export type Database = {
         }
         Returns: Json
       }
+      save_event_application_questions: {
+        Args: { p_event_id: string; p_questions: Json }
+        Returns: Json
+      }
+      save_event_check_in_sessions: {
+        Args: { p_event_id: string; p_sessions: Json }
+        Returns: Json
+      }
       set_user_role: {
         Args: {
           p_role: Database["public"]["Enums"]["role_access_enum"]
           p_target_user_id: string
         }
         Returns: Database["public"]["Enums"]["role_access_enum"]
+      }
+      submit_event_application: {
+        Args: { p_application_id: string }
+        Returns: {
+          missing_question_ids: string[]
+          status: string
+        }[]
       }
       team_change_blocked: {
         Args: { p_event_id: string; p_user_id: string }
@@ -1363,6 +1394,7 @@ export type Database = {
     }
     Enums: {
       event_application_status:
+        | "draft"
         | "submitted"
         | "accepted"
         | "rejected"
@@ -1515,6 +1547,7 @@ export const Constants = {
   public: {
     Enums: {
       event_application_status: [
+        "draft",
         "submitted",
         "accepted",
         "rejected",

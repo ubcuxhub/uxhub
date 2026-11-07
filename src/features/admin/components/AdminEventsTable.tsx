@@ -1,463 +1,237 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import {
-  ArrowDown,
-  ArrowUp,
-  Check,
-  FilePen,
-} from "lucide-react";
+import { useMemo, useRef, useState } from "react";
 
+import { SortFilterPanel, SortFilterSection } from "@/components/shared/SortFilterPanel";
+import { formatRowCount, TableRowCount, TableToolbar } from "@/components/shared/TableToolbar";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Pagination } from "@/components/ui/pagination";
+import { SearchField } from "@/components/ui/search-field";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import {
-  formatEventDate,
-  formatEventTime,
-  formatTimestamp,
-} from "@/lib/date";
-import type { EventStatus } from "@/lib/supabase/models";
-import type { AdminEventTableRow, AdminEventDirectoryRow } from "../lib/admin-event-table";
-export type { AdminEventTableRow } from "../lib/admin-event-table";
+  Table,
+  TableBody,
+  TableCard,
+  TableCell,
+  TableEmpty,
+  TableHead,
+  TableHeader,
+  TableNone,
+  TableRow,
+  TableRowLink,
+} from "@/components/ui/table";
+import { formatEventDate } from "@/lib/date";
+import type { EventRow, EventStatus } from "@/lib/supabase/models";
+import { useListPage } from "../hooks/use-list-page";
+import { useRecordRows } from "../hooks/use-record-rows";
 import { toggleSetValue } from "../lib/directory";
-import { AdminDirectoryLayout } from "./AdminDirectoryLayout";
-import { AdminDirectoryToolbar } from "./AdminDirectoryToolbar";
-import {
-  AdminDirectoryTable,
-  type AdminDirectoryColumn,
-} from "./AdminDirectoryTable";
-import { AdminDirectoryButton } from "./AdminDirectoryControls";
-import { AdminDirectoryFilters } from "./AdminDirectoryFilters";
+import { ChipFilterSection } from "./ChipFilterSection";
+import { EVENT_STATUS_LABELS, EventStatusBadge } from "./EventStatusBadge";
 
-type RegistrationStatus = "open" | "closed" | "not-applicable";
-type SortDirection = "ascending" | "descending";
-
-const statusConfig = {
-  active: { variant: "success", icon: Check, label: "Active" },
-  draft: { variant: "neutral", icon: FilePen, label: "Draft" },
-} satisfies Record<
-  EventStatus,
-  {
-    variant: "success" | "neutral";
-    icon: typeof Check;
-    label: string;
-  }
->;
-
-function EventStatusBadge({ status }: { status: EventStatus }) {
-  const { variant, icon: Icon, label } = statusConfig[status];
-
-  return (
-    <Badge variant={variant}>
-      <Icon aria-hidden="true" />
-      {label}
-    </Badge>
-  );
+export interface AdminEventTableRow {
+  event: EventRow;
+  registrationCount: number;
+  registrationOpen: boolean;
 }
 
-const eventStatusOptions = (
-  Object.entries(statusConfig) as [
-    EventStatus,
-    (typeof statusConfig)[EventStatus],
-  ][]
-).map(([value, config]) => ({ value, label: config.label }));
+type RegistrationStatus = "open" | "closed" | "not-applicable";
+type EventSort = "newest" | "oldest";
 
-const registrationStatusOptions: {
-  value: RegistrationStatus;
-  label: string;
-}[] = [
-  { value: "open", label: "Open" },
-  { value: "closed", label: "Closed" },
-  { value: "not-applicable", label: "N/A" },
+const DEFAULT_SORT: EventSort = "newest";
+
+const SORTS: { value: EventSort; label: string }[] = [
+  { value: "newest", label: "Date, newest first" },
+  { value: "oldest", label: "Date, oldest first" },
 ];
 
-function getRegistrationStatus(
-  row: AdminEventDirectoryRow
-): RegistrationStatus {
-  if (row.event.status === "draft") {
-    return "not-applicable";
-  }
+const STATUS_OPTIONS = (Object.entries(EVENT_STATUS_LABELS) as [EventStatus, string][]).map(
+  ([value, label]) => ({ value, label }),
+);
 
+const REGISTRATION_LABELS = {
+  open: "Open",
+  closed: "Closed",
+  "not-applicable": "N/A",
+} satisfies Record<RegistrationStatus, string>;
+
+const REGISTRATION_OPTIONS = (Object.entries(REGISTRATION_LABELS) as [RegistrationStatus, string][]).map(
+  ([value, label]) => ({ value, label }),
+);
+
+const EVENT_NOUN = { one: "event", other: "events" };
+const LIST_HREF = "/admin/events";
+const COLUMNS = 5;
+
+const eventHref = (row: AdminEventTableRow) => `${LIST_HREF}/${row.event.id}`;
+
+/** A draft takes no registrations, so it has no registration status. */
+function getRegistrationStatus(row: AdminEventTableRow): RegistrationStatus {
+  if (row.event.status === "draft") return "not-applicable";
   return row.registrationOpen ? "open" : "closed";
 }
 
-function DetailItem({
-  label,
-  children,
-  wide = false,
-}: {
-  label: string;
-  children: ReactNode;
-  wide?: boolean;
-}) {
-  return (
-    <div className={wide ? "sm:col-span-2" : undefined}>
-      <dt className="text-label uppercase tracking-wide text-muted-foreground">
-        {label}
-      </dt>
-      <dd className="mt-1 whitespace-pre-wrap text-small">{children || "—"}</dd>
-    </div>
-  );
+/** Sorts in place by start date. Undated events come last either way. */
+function sortEvents(rows: AdminEventTableRow[], sort: EventSort) {
+  return rows.sort((a, b) => {
+    const aDate = a.event.starts_at;
+    const bDate = b.event.starts_at;
+    if (!aDate || !bDate) return aDate ? -1 : bDate ? 1 : 0;
+    const difference = Date.parse(aDate) - Date.parse(bDate);
+    return sort === "oldest" ? difference : -difference;
+  });
 }
 
-function formatSchedule(timestamp: string | null) {
-  if (!timestamp) return "—";
-  return `${formatEventDate(timestamp, { month: "short" })} at ${formatEventTime(timestamp)}`;
-}
+/**
+ * Manage events: search, sort, filter and page the events. Each row links to
+ * the event's overview, which opens in a drawer over the list.
+ */
+export function AdminEventsTable({ rows }: { rows: AdminEventTableRow[] }) {
+  const [query, setQuery] = useState("");
+  const [sort, setSort] = useState<EventSort>(DEFAULT_SORT);
+  const [statusFilter, setStatusFilter] = useState<Set<EventStatus>>(new Set());
+  const [registrationFilter, setRegistrationFilter] = useState<Set<RegistrationStatus>>(new Set());
+  const searchRef = useRef<HTMLInputElement>(null);
+  const records = useRecordRows(LIST_HREF);
 
-function EventDetails({
-  row,
-}: {
-  row: AdminEventTableRow;
-}) {
-  const { event, registrationCount, registrationOpen } = row;
-  const agenda =
-    event.agenda &&
-    (Array.isArray(event.agenda) || typeof event.agenda === "object")
-      ? JSON.stringify(event.agenda, null, 2)
-      : event.agenda;
+  const search = query.trim().toLocaleLowerCase();
+  const filterCount = statusFilter.size + registrationFilter.size;
+  const filtering = search !== "" || filterCount > 0;
 
-  return (
-    <dl className="grid grid-cols-1 gap-x-6 gap-y-5 sm:grid-cols-2">
-      <DetailItem label="Status">{statusConfig[event.status].label}</DetailItem>
-      <DetailItem label="Event type">{event.event_type}</DetailItem>
-      <DetailItem label="Start">
-        {formatSchedule(event.starts_at)}
-      </DetailItem>
-      <DetailItem label="End">
-        {formatSchedule(event.ends_at)}
-      </DetailItem>
-      <DetailItem label="Registration opens">
-        {formatTimestamp(event.registration_opens_at) ?? "—"}
-      </DetailItem>
-      <DetailItem label="Registration closes">
-        {formatTimestamp(event.registration_closes_at) ?? "—"}
-      </DetailItem>
-      <DetailItem label="Registration status">
-        {event.status === "draft"
-          ? "N/A"
-          : registrationOpen
-            ? "Open"
-            : "Closed"}
-      </DetailItem>
-      <DetailItem label="Attendees">
-        {registrationCount} / {event.max_capacity}
-      </DetailItem>
-      <DetailItem label="Regular price">
-        ${Number(event.regular_price).toFixed(2)}
-      </DetailItem>
-      <DetailItem label="Member price">
-        ${Number(event.member_price).toFixed(2)}
-      </DetailItem>
-      <DetailItem label="Building">{event.location_building}</DetailItem>
-      <DetailItem label="Room">{event.location_room}</DetailItem>
-      <DetailItem label="Location URL" wide>
-        {event.location_address_url ? (
-          <a
-            href={event.location_address_url}
-            target="_blank"
-            rel="noreferrer"
-            className="break-all text-primary hover:underline"
-          >
-            {event.location_address_url}
-          </a>
-        ) : (
-          "—"
-        )}
-      </DetailItem>
-      <DetailItem label="Short description" wide>
-        {event.short_description}
-      </DetailItem>
-      <DetailItem label="Description" wide>
-        {event.description}
-      </DetailItem>
-      <DetailItem label="Applications enabled">
-        {event.requires_application ? "Yes" : "No"}
-      </DetailItem>
-      <DetailItem label="Mentors enabled">
-        {event.mentors_enabled ? "Yes" : "No"}
-      </DetailItem>
-      <DetailItem label="Sponsors enabled">
-        {event.sponsors_enabled ? "Yes" : "No"}
-      </DetailItem>
-      <DetailItem label="Slug">{event.slug}</DetailItem>
-      <DetailItem label="Cover image" wide>
-        {event.image_url ? (
-          <a
-            href={event.image_url}
-            target="_blank"
-            rel="noreferrer"
-            className="break-all text-primary hover:underline"
-          >
-            {event.image_url}
-          </a>
-        ) : (
-          "—"
-        )}
-      </DetailItem>
-      <DetailItem label="Description images" wide>
-        {event.description_images?.length
-          ? event.description_images.join("\n")
-          : "—"}
-      </DetailItem>
-      <DetailItem label="Agenda" wide>
-        {agenda ? (
-          <pre className="overflow-x-auto rounded-lg bg-muted p-3 text-label">
-            {String(agenda)}
-          </pre>
-        ) : (
-          "—"
-        )}
-      </DetailItem>
-      <DetailItem label="Created">
-        {formatTimestamp(event.created_at) ?? "—"}
-      </DetailItem>
-      <DetailItem label="Updated">
-        {formatTimestamp(event.updated_at) ?? "—"}
-      </DetailItem>
-      <DetailItem label="Event ID" wide>
-        <span className="break-all">{event.id}</span>
-      </DetailItem>
-    </dl>
+  const results = useMemo(
+    () =>
+      sortEvents(
+        rows.filter(
+          (row) =>
+            (!search || row.event.name.toLocaleLowerCase().includes(search)) &&
+            (statusFilter.size === 0 || statusFilter.has(row.event.status)) &&
+            (registrationFilter.size === 0 || registrationFilter.has(getRegistrationStatus(row))),
+        ),
+        sort,
+      ),
+    [rows, search, sort, statusFilter, registrationFilter],
   );
-}
 
-const eventColumns: AdminDirectoryColumn<AdminEventDirectoryRow>[] = [
-  {
-    id: "status",
-    header: "Status",
-    render: (row) => <EventStatusBadge status={row.event.status} />,
-  },
-  {
-    id: "name",
-    header: "Name",
-    cellClassName: "font-medium",
-    render: (row) => row.event.name,
-  },
-  {
-    id: "date",
-    header: "Date",
-    headerClassName: "whitespace-nowrap",
-    cellClassName: "whitespace-nowrap text-muted-foreground",
-    render: (row) =>
-      formatEventDate(row.event.starts_at, { month: "short" }) ?? "—",
-  },
-  {
-    id: "registered",
-    header: "Registered",
-    render: (row) => "draftId" in row && !row.eventId ? "—" : (
-      <>
-        {row.registrationCount}{" "}
-        <span className="text-muted-foreground">/ {row.event.max_capacity ?? "—"}</span>
-      </>
-    ),
-  },
-  {
-    id: "registration-status",
-    header: "Registration Status",
-    render: (row) => (
-      <Badge
-        variant={
-          row.event.status === "draft"
-            ? "neutral"
-            : row.registrationOpen
-              ? "success"
-              : "neutral"
-        }
-      >
-        {row.event.status === "draft"
-          ? "N/A"
-          : row.registrationOpen
-            ? "Open"
-            : "Closed"}
-      </Badge>
-    ),
-  },
-];
+  const view = JSON.stringify([search, sort, [...statusFilter].sort(), [...registrationFilter].sort()]);
+  const paging = useListPage(results, view, {
+    startIndex: results.findIndex((row) => eventHref(row) === records.activePath),
+  });
 
-export function AdminEventsTable({
-  rows,
-}: {
-  rows: AdminEventDirectoryRow[];
-}) {
-  const router = useRouter();
-  const [selectedRow, setSelectedRow] = useState<AdminEventTableRow | null>(
-    null
-  );
-  const [open, setOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [sortDirection, setSortDirection] =
-    useState<SortDirection>("descending");
-  const [eventStatuses, setEventStatuses] = useState<Set<EventStatus>>(
-    new Set()
-  );
-  const [registrationStatuses, setRegistrationStatuses] = useState<
-    Set<RegistrationStatus>
-  >(new Set());
+  const count = { shown: results.length, total: rows.length, noun: EVENT_NOUN, filtered: filtering };
 
-  const filteredRows = useMemo(() => {
-    const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
-
-    return rows
-      .filter((row) => {
-        const matchesName =
-          !normalizedQuery ||
-          row.event.name.toLocaleLowerCase().includes(normalizedQuery);
-        const matchesEventStatus =
-          eventStatuses.size === 0 || eventStatuses.has(row.event.status);
-        const matchesRegistrationStatus =
-          registrationStatuses.size === 0 ||
-          registrationStatuses.has(getRegistrationStatus(row));
-
-        return (
-          matchesName && matchesEventStatus && matchesRegistrationStatus
-        );
-      })
-      .sort((a, b) => {
-        const aDate = a.event.starts_at;
-        const bDate = b.event.starts_at;
-
-        if (!aDate && !bDate) return 0;
-        if (!aDate) return 1;
-        if (!bDate) return -1;
-
-        const comparison = Date.parse(aDate) - Date.parse(bDate);
-        return sortDirection === "ascending" ? comparison : -comparison;
-      });
-  }, [
-    eventStatuses,
-    registrationStatuses,
-    rows,
-    searchQuery,
-    sortDirection,
-  ]);
-
-  const selectRow = (row: AdminEventDirectoryRow) => {
-    if ("draftId" in row) {
-      router.push(row.eventId ? `/admin/events/${row.eventId}` : `/admin/events/drafts/${row.draftId}`);
-      return;
-    }
-    setSelectedRow(row);
-    setOpen(true);
+  const clearFilters = () => {
+    setStatusFilter(new Set());
+    setRegistrationFilter(new Set());
+  };
+  const showAll = () => {
+    setQuery("");
+    clearFilters();
+    // Show all goes with the filters; keep focus in the toolbar.
+    searchRef.current?.focus();
   };
 
   return (
-    <>
-      <AdminDirectoryLayout>
-        <AdminDirectoryToolbar
-          searchQuery={searchQuery}
-          onSearchQueryChange={setSearchQuery}
-          placeholder="Search events by name..."
-          searchLabel="Search events by name"
-        >
-          <AdminDirectoryButton
-            type="button"
-            onClick={() =>
-              setSortDirection((current) =>
-                current === "descending" ? "ascending" : "descending"
-              )
-            }
-            aria-label={`Sort by date ${
-              sortDirection === "descending" ? "ascending" : "descending"
-            }`}
-          >
-            Sort by date
-            {sortDirection === "descending" ? (
-              <ArrowDown aria-hidden="true" />
-            ) : (
-              <ArrowUp aria-hidden="true" />
-            )}
-          </AdminDirectoryButton>
-
-          <AdminDirectoryFilters
-            groups={[
-              {
-                id: "event-status-filter-heading",
-                label: "Status",
-                options: eventStatusOptions,
-                selectedValues: eventStatuses,
-                onToggle: (value) =>
-                  setEventStatuses((current) =>
-                    toggleSetValue(current, value as EventStatus)
-                  ),
-              },
-              {
-                id: "registration-status-filter-heading",
-                label: "Registration status",
-                options: registrationStatusOptions,
-                selectedValues: registrationStatuses,
-                onToggle: (value) =>
-                  setRegistrationStatuses((current) =>
-                    toggleSetValue(current, value as RegistrationStatus)
-                  ),
-              },
-            ]}
-            onClear={() => {
-              setEventStatuses(new Set());
-              setRegistrationStatuses(new Set());
-            }}
+    <div className="flex flex-col gap-4">
+      <TableToolbar
+        search={
+          <SearchField
+            ref={searchRef}
+            label="Search events"
+            placeholder="Search by name"
+            value={query}
+            onValueChange={setQuery}
           />
-        </AdminDirectoryToolbar>
-
-        <AdminDirectoryTable
-          columns={eventColumns}
-          rows={filteredRows}
-          getRowKey={(row) => "draftId" in row ? `draft:${row.draftId}` : row.event.id}
-          getRowLabel={(row) => `${"draftId" in row ? "Resume draft" : "View details"} for ${row.event.name}`}
-          onActivate={selectRow}
-          emptyMessage="No events match your search and filters."
+        }
+        actions={
+          <SortFilterPanel
+            activeCount={filterCount + (sort === DEFAULT_SORT ? 0 : 1)}
+            summary={formatRowCount(count)}
+            onClearAll={() => {
+              clearFilters();
+              setSort(DEFAULT_SORT);
+            }}
+          >
+            <SortFilterSection title="Sort by">
+              <Select value={sort} onValueChange={(value) => setSort(value as EventSort)}>
+                <SelectTrigger aria-label="Sort by">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SORTS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </SortFilterSection>
+            <ChipFilterSection
+              title="Status"
+              options={STATUS_OPTIONS}
+              selected={statusFilter}
+              onToggle={(value) => setStatusFilter((current) => toggleSetValue(current, value))}
+            />
+            <ChipFilterSection
+              title="Registration"
+              options={REGISTRATION_OPTIONS}
+              selected={registrationFilter}
+              onToggle={(value) => setRegistrationFilter((current) => toggleSetValue(current, value))}
+            />
+          </SortFilterPanel>
+        }
+      />
+      <TableCard>
+        <Table stickyFirstColumn className="min-w-[48rem]">
+          <TableHeader>
+            <TableRow>
+              {/* No checkbox column: it is for bulk actions (§3.16), and there are none yet. A CSV export would add one here. */}
+              <TableHead>Name</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Registration</TableHead>
+              <TableHead>Registered</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {paging.pageRows.length === 0 ? (
+              <TableEmpty colSpan={COLUMNS}>No events match your search and filters.</TableEmpty>
+            ) : (
+              paging.pageRows.map((row) => {
+                const href = eventHref(row);
+                const registration = getRegistrationStatus(row);
+                return (
+                  <TableRow key={row.event.id} {...records.rowProps(href)}>
+                    <TableCell className="max-w-72 truncate">
+                      <TableRowLink {...records.linkProps(href)}>{row.event.name}</TableRowLink>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap text-muted-foreground">
+                      {formatEventDate(row.event.starts_at, { month: "short" }) ?? <TableNone />}
+                    </TableCell>
+                    <TableCell>
+                      <EventStatusBadge status={row.event.status} publishAt={row.event.publish_at} />
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={registration === "open" ? "success" : "neutral"}>
+                        {REGISTRATION_LABELS[registration]}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="whitespace-nowrap tabular-nums">
+                      {row.registrationCount}{" "}
+                      <span className="text-muted-foreground">/ {row.event.max_capacity}</span>
+                    </TableCell>
+                  </TableRow>
+                );
+              })
+            )}
+          </TableBody>
+        </Table>
+        <Pagination
+          page={paging.page}
+          pageSize={paging.pageSize}
+          total={results.length}
+          onPageChange={paging.setPage}
+          summary={<TableRowCount count={{ ...count, range: paging.range }} onClearFilters={showAll} />}
         />
-
-      </AdminDirectoryLayout>
-
-      <Sheet open={open} onOpenChange={setOpen}>
-        <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
-          {selectedRow && (
-            <>
-              <SheetHeader className="pr-10">
-                <SheetTitle className="text-2xl">
-                  {selectedRow.event.name}
-                </SheetTitle>
-                <SheetDescription>
-                  View event details and management actions.
-                </SheetDescription>
-              </SheetHeader>
-              <div className="flex flex-wrap gap-2 px-4">
-                <Button asChild variant="outline">
-                  <Link href={`/admin/events/${selectedRow.event.id}`}>
-                    Edit
-                  </Link>
-                </Button>
-                <Button asChild variant="outline">
-                  <Link
-                    href={`/admin/events/${selectedRow.event.id}/check-in`}
-                  >
-                    Check-In
-                  </Link>
-                </Button>
-                <Button asChild variant="outline">
-                  <Link
-                    href={`/admin/events/${selectedRow.event.id}/review-applications`}
-                  >
-                    Apps
-                  </Link>
-                </Button>
-              </div>
-              <div className="border-t border-border-subtle px-4 py-5">
-                <EventDetails row={selectedRow} />
-              </div>
-            </>
-          )}
-        </SheetContent>
-      </Sheet>
-    </>
+      </TableCard>
+    </div>
   );
 }

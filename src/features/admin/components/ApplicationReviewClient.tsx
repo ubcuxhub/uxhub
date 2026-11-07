@@ -10,7 +10,7 @@ import {
 import {
   StatusUpdateSection,
 } from "@/features/admin/components/StatusUpdateSection";
-import type { EventApplicationRow, EventRow } from "@/lib/supabase/models";
+import type { EventRow, SubmittedApplicationRow } from "@/lib/supabase/models";
 import { Card, CardContent } from "@/components/ui/card";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { SuccessOverlay } from "@/components/shared/SuccessOverlay";
@@ -44,11 +44,13 @@ export interface AdminApplicationResponse {
 }
 
 interface ApplicationReviewClientProps {
-  application: EventApplicationRow;
+  application: SubmittedApplicationRow;
   hasTicket: boolean;
   userInfo: AdminApplicationUser;
   event: EventRow;
   responses: AdminApplicationResponse[];
+  /** Signed download links for file answers, by response id. */
+  fileUrls?: Record<string, string>;
 }
 
 const SUCCESS_MESSAGES: Record<ApplicationDecision, string> = {
@@ -63,9 +65,10 @@ export function ApplicationReviewClient({
   userInfo,
   event,
   responses,
+  fileUrls = {},
 }: ApplicationReviewClientProps) {
   const [application, setApplication] =
-    useState<EventApplicationRow>(initialApplication);
+    useState<SubmittedApplicationRow>(initialApplication);
   const [error, setError] = useState<string | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -120,7 +123,9 @@ export function ApplicationReviewClient({
             <ApplicantInfoCard
               name={formatUserName(userInfo)}
               email={userInfo.email}
-              applicationDate={application.created_at}
+              applicationDate={
+                application.submitted_at ?? application.created_at
+              }
               state={state}
               offerExpiresAt={application.offer_expires_at}
             />
@@ -154,6 +159,9 @@ export function ApplicationReviewClient({
                         key={response.id}
                         question={question.question}
                         response={response.response}
+                        responseType={question.response_type}
+                        responseOptions={question.response_options}
+                        fileUrl={fileUrls[response.id]}
                       />
                     );
                   })}

@@ -4,7 +4,7 @@ import { useState } from "react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { TableToolbar } from "./TableToolbar";
+import { formatRowCount, TableRowCount, TableToolbar, type TableRowCountValue } from "./TableToolbar";
 
 afterEach(cleanup);
 
@@ -115,5 +115,118 @@ describe("TableToolbar", () => {
     fireEvent.click(screen.getByRole("button", { name: "Clear selection" }));
     expect(screen.queryByRole("button", { name: "Clear selection" })).toBeNull();
     expect(document.activeElement).toBe(input);
+  });
+});
+
+describe("TableToolbar row count", () => {
+  const noun = { one: "user", other: "users" };
+  // The toolbar's own (empty) selection region is a status too.
+  const countRegion = () => document.querySelector<HTMLElement>("[data-slot=table-row-count] [role=status]")!;
+  const count = (shown: number, total: number, filtered?: boolean): TableRowCountValue => ({ shown, total, noun, filtered });
+
+  it("counts every row by default", () => {
+    render(<TableToolbar search={search} actions={actions} count={count(142, 142)} />);
+    expect(countRegion().textContent).toBe("142 users");
+    expect(screen.queryByRole("button", { name: "Show all" })).toBeNull();
+  });
+
+  it("uses the singular noun for one row and groups thousands", () => {
+    const { rerender } = render(<TableToolbar search={search} count={count(1, 1)} />);
+    expect(countRegion().textContent).toBe("1 user");
+    rerender(<TableToolbar search={search} count={count(1042, 1042)} />);
+    expect(countRegion().textContent).toBe("1,042 users");
+  });
+
+  it("counts shown of total while filtered, from one live region that stays mounted", () => {
+    const { rerender } = render(<TableToolbar search={search} count={count(142, 142)} />);
+    const region = countRegion();
+    rerender(<TableToolbar search={search} count={count(38, 142)} />);
+    expect(countRegion()).toBe(region);
+    expect(region.textContent).toBe("38 of 142 users");
+    // A search that matches every row still reads as filtered when told so.
+    rerender(<TableToolbar search={search} count={count(142, 142, true)} />);
+    expect(region.textContent).toBe("142 of 142 users");
+  });
+
+  it("clears the filters from the count line and moves focus to the search", () => {
+    function Filtered() {
+      const [filtered, setFiltered] = useState(true);
+      return (
+        <TableToolbar
+          search={search}
+          actions={actions}
+          count={count(filtered ? 38 : 142, 142)}
+          onClearFilters={() => setFiltered(false)}
+        />
+      );
+    }
+    render(<Filtered />);
+    const clear = screen.getByRole("button", { name: "Show all" });
+    clear.focus();
+    fireEvent.click(clear);
+    expect(countRegion().textContent).toBe("142 users");
+    expect(screen.queryByRole("button", { name: "Show all" })).toBeNull();
+    expect(document.activeElement).toBe(screen.getByRole("textbox", { name: "Search users" }));
+  });
+
+  it("keeps the selected count as it is while rows are selected", () => {
+    render(<TableToolbar search={search} actions={actions} selectedCount={2} count={count(38, 142)} />);
+    expect(screen.getAllByText("2 selected").length).toBeGreaterThan(0);
+    expect(screen.getByText("38 of 142 users")).toBeTruthy();
+  });
+});
+
+describe("formatRowCount with a page range", () => {
+  const noun = { one: "user", other: "users" };
+
+  it("counts the page's rows out of the whole list", () => {
+    expect(formatRowCount({ shown: 142, total: 142, noun, range: { from: 1, to: 25 } })).toBe("Showing 1–25 of 142 users");
+    expect(formatRowCount({ shown: 1042, total: 1042, noun, range: { from: 1001, to: 1042 } })).toBe(
+      "Showing 1,001–1,042 of 1,042 users",
+    );
+  });
+
+  it("keeps the full list's size in view while filtered", () => {
+    expect(formatRowCount({ shown: 38, total: 142, noun, range: { from: 26, to: 38 } })).toBe(
+      "Showing 26–38 of 38 users · filtered from 142",
+    );
+    // A search that matches every row still says it is filtered when told so.
+    expect(formatRowCount({ shown: 4, total: 4, noun, filtered: true, range: { from: 1, to: 4 } })).toBe(
+      "Showing 1–4 of 4 users · filtered from 4",
+    );
+  });
+
+  it("uses the singular for one row", () => {
+    expect(formatRowCount({ shown: 1, total: 1, noun, range: { from: 1, to: 1 } })).toBe("Showing 1 of 1 user");
+    expect(formatRowCount({ shown: 1, total: 142, noun, range: { from: 1, to: 1 } })).toBe(
+      "Showing 1 of 1 user · filtered from 142",
+    );
+  });
+
+  it("says how many are hidden when a filter leaves nothing", () => {
+    expect(formatRowCount({ shown: 0, total: 142, noun, range: { from: 0, to: 0 } })).toBe("0 of 142 users");
+    expect(formatRowCount({ shown: 0, total: 0, noun, range: { from: 0, to: 0 } })).toBe("0 users");
+  });
+});
+
+describe("TableRowCount", () => {
+  const noun = { one: "user", other: "users" };
+
+  it("announces a new page or filter from the same live region, and offers Show all while filtered", () => {
+    const onClear = vi.fn();
+    const { rerender } = render(
+      <TableRowCount count={{ shown: 142, total: 142, noun, range: { from: 1, to: 25 } }} onClearFilters={onClear} />,
+    );
+    const region = screen.getByRole("status");
+    expect(region.textContent).toBe("Showing 1–25 of 142 users");
+    expect(screen.queryByRole("button", { name: "Show all" })).toBeNull();
+
+    rerender(
+      <TableRowCount count={{ shown: 38, total: 142, noun, range: { from: 1, to: 25 } }} onClearFilters={onClear} />,
+    );
+    expect(screen.getByRole("status")).toBe(region);
+    expect(region.textContent).toBe("Showing 1–25 of 38 users · filtered from 142");
+    fireEvent.click(screen.getByRole("button", { name: "Show all" }));
+    expect(onClear).toHaveBeenCalledTimes(1);
   });
 });

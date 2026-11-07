@@ -16,7 +16,7 @@ describe("staff-only event working documents", () => {
     const questionResult = await fixtures.supabase.from("event_application_questions").insert({ event_id: event.id, question: "Why attend?", response_type: "short_text" }).select().single();
     if (questionResult.error) throw questionResult.error;
     const question = questionResult.data;
-    const applicationResult = await fixtures.supabase.from("event_applications").insert({ event_id: event.id, user_id: user.id }).select().single();
+    const applicationResult = await fixtures.supabase.from("event_applications").insert({ event_id: event.id, user_id: user.id, status: "submitted" }).select().single();
     if (applicationResult.error) throw applicationResult.error;
     const responseResult = await fixtures.supabase.from("event_application_responses").insert({ application_id: applicationResult.data.id, event_application_question_id: question.id, response: "To learn" }).select().single();
     if (responseResult.error) throw responseResult.error;
@@ -30,9 +30,9 @@ describe("staff-only event working documents", () => {
     expect(saved.error).toBeNull();
     expect((await fetchEventById(fixtures.supabase, event.id))?.name).toBe("Updated content");
     const changedSession = await fixtures.supabase.rpc("save_admin_event_builder", { ...input, p_event: { name: "Must roll back" }, p_check_in_sessions: [{ ...sessions[0], name: "Replacement" }] });
-    expect(changedSession.error?.message).toMatch(/attendance cannot be replaced/);
-    const changedQuestion = await fixtures.supabase.rpc("save_admin_event_builder", { ...input, p_event: { name: "Must also roll back" }, p_application_questions: [{ ...question, question: "Replacement?" }] });
-    expect(changedQuestion.error?.message).toMatch(/responses cannot be replaced/);
+    expect(changedSession.error?.message).toMatch(/already checked in/);
+    const changedQuestion = await fixtures.supabase.rpc("save_admin_event_builder", { ...input, p_event: { name: "Must also roll back" }, p_application_questions: [] });
+    expect(changedQuestion.error?.message).toMatch(/submitted applications/);
     expect((await fetchEventById(fixtures.supabase, event.id))?.name).toBe("Updated content");
     expect((await fixtures.supabase.from("check_in_sessions").select().eq("event_id", event.id)).data).toEqual([session]);
     expect((await fixtures.supabase.from("event_application_questions").select().eq("event_id", event.id)).data).toEqual([question]);
@@ -86,7 +86,8 @@ describe("staff-only event working documents", () => {
     fixtures.track("events", eventId);
     const retry = await fixtures.supabase.rpc("save_admin_event_builder", input);
     expect(retry.error).toBeNull();
-    expect(retry.data).toEqual(result.data);
+    expect(retry.data).toMatchObject({ id: eventId });
+    expect(result.data).toMatchObject({ id: eventId, check_in_session_ids: [], question_ids: [] });
     expect(await fetchEventDraft(fixtures.supabase, id)).toBeNull();
     expect(await fetchEventById(clientAs(null), eventId)).toBeNull();
   }));

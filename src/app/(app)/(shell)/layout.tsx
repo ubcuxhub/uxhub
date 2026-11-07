@@ -1,8 +1,7 @@
-import { AppShellHeader } from "@/components/shared/AppShellHeader";
 import { cookies } from "next/headers";
 
 import { AppSidebar } from "@/components/shared/AppSidebar";
-import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { SettingsDialog } from "@/features/settings/components/SettingsDialog";
 
 // Sidebar shell for the browsing portions of the portal and admin. Auth and
@@ -20,8 +19,12 @@ export default async function ShellLayout({
   return (
     <SidebarProvider defaultOpen={defaultOpen}>
       <AppSidebar />
-      <SidebarInset>
-        <AppShellHeader />
+      <SidebarInset className="group/shell">
+        {/* A record's full page (RecordPageTopBar) brings its own top bar. */}
+        <header className="flex h-14 shrink-0 items-center gap-3 px-5 group-has-[[data-hides-app-header]]/shell:hidden md:hidden">
+          <SidebarTrigger aria-label="Open menu" />
+          <span className="text-body-medium">UBC UX Hub</span>
+        </header>
         <div className="flex flex-1 flex-col overflow-y-auto">{children}</div>
       </SidebarInset>
       {/* Mounted here, not in the sidebar: below 768px the sidebar is a sheet

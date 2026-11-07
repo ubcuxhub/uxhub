@@ -138,8 +138,9 @@ No all caps or letter-spacing anywhere. Marketing only: `display-xl` 56/64 and
   starts 40px from the top. Page actions like Publish sit in the title row,
   never above it. No header bar fills the space. Sidebar-less screens (Sign in)
   centre content.
-- Side peek drawer top bars start at 40px too. Dialogs centre but stay ≥40px
-  from the top; taller ones scroll inside.
+- Side peek drawer top bars (and a record's full page, which uses the same
+  bar) start at 40px too from `sm` up; on phones the bar is compact (12px).
+  Dialogs centre but stay ≥40px from the top; taller ones scroll inside.
 - Content blocks span whole columns. Tables scroll sideways inside their card
   on small screens.
 
@@ -200,9 +201,25 @@ Never stronger, no coloured shadows, glows or neon focus.
 
 Lucide (`lucide-static` 1.55.0; `lucide-react` in code), 1.5px stroke.
 
-- **Sizes:** 16px beside 16px text (8px gap, centred); 14px beside small text.
+- **Sizes:** two, and nothing between. **20px (`size-5`) for app chrome:** the
+  sidebar nav (12px gap) and its trigger, the side peek drawer and record page
+  top bar (close, expand, collapse), empty-state icons, large placeholder or
+  illustrative icons (ImageUpload, the EventCard no-image calendar), the
+  builder's section navigator status marks, and the ConfirmDialog title icon
+  and SettingsDialog list chevron on phones. **16px (`size-4`) for everything
+  else:** beside text of any size (8px gap, centred), in buttons of every size
+  (including `sm` and `icon-sm`), badges, menus, fields, inline status icons,
+  stat cards, the calendar caption, Ticket. There is no 14px or 24px icon.
   Icon-only buttons are 28–32px circles with a `border-subtle` edge, an
-  accessible label and a tooltip.
+  accessible label and a tooltip; their icon is 16px, 20px only in the chrome
+  above.
+- **Exception:** a glyph inside a small mark scales with the mark: the switch
+  thumb check, avatar fallback icons, toast status dots, and the remove × in a
+  searchable-dropdown chip or a colour-picker swatch. Non-icon `size-*` uses
+  (decorative circles, thumbs, spinners, boxes) are not icons.
+- **In code:** a container sets the default (`[&_svg:not([class*='size-'])]:size-4`
+  in Button and Badge, the shadcn pattern), so an icon's own `size-*` class
+  always wins. A plain `[&_svg]:size-*` on a container would out-specify it.
 - **Colour:** `text-secondary` by default; status colour inside badges.
 - Decorative icons have no hover/pointer and are hidden from screen readers.
 - No emoji. No brand icons: use the company's own logo file (e.g. LinkedIn).
@@ -474,13 +491,13 @@ Badges report state (not clickable); chips filter a list and toggle.
 | Not selected | neutral | Not accepted this time |
 | Past | neutral | Event has ended |
 
-Every badge has a 14px icon and a label; one badge per item (current status
+Every badge has a 16px icon and a label; one badge per item (current status
 only). Sizes Default and Large. FilterChips (optional count, Selected, Disabled)
 combine, sit above the list in one row with any Select.
 
 **Student event-card badge decision (to sync to Figma):** Use the exact labels
 from [event-states.md](event-states.md), with the existing status tones and a
-14px Lucide icon. Dates in badge labels use the short Pacific form shown below;
+16px Lucide icon. Dates in badge labels use the short Pacific form shown below;
 the date is part of the label, not a separate badge. This is a display mapping,
 not a new stored event or application status. It supersedes `Pending` and
 `Accepted` as *student event-card* labels; the nine-badge table above remains a
@@ -512,7 +529,7 @@ and error meanings for the other rows.
   Events); admins also see Admin (Dashboard, Manage Events, Manage Users,
   Change Log). Profile, Log Out, Collapse Sidebar at the bottom. Selected item:
   `background-surface-subtle` at `radius-md`, no underline, bar or bold-only.
-  16px icon in `text-secondary`, 8px gap. Group labels use `label`, sentence
+  20px icon in `text-secondary`, 12px gap. Group labels use `label`, sentence
   case.
 - **Tabs:** sections of one object (Overview, Registrations 128, Teams 32,
   Judges); counts in `text-secondary`.
@@ -653,8 +670,29 @@ scrolls there and closes. Enter/Space opens, arrows move, Esc returns focus.
   over the page at 560px; the row stays highlighted; the table stays
   scrollable; another row swaps the content. Doesn't dim the page (use a Dialog
   when a decision is required).
-- Top bar at 40px: double-chevron close first (tooltip names action and
-  shortcut; Esc closes), "Open as full page" (own page with back pill).
+- The drawer is the record's URL: the list is the route's layout, so a refresh
+  shows the list with the drawer open. Close (chevron, Esc, browser Back)
+  returns to the list.
+- Top bar at 40px (12px on phones) with 20px icons (§2.7): double-chevron
+  close first (tooltip names action and shortcut); the record's actions on the
+  right (Edit user, Edit event).
+- Users open only in the drawer: no full page, no expand. An event's "Edit
+  event", and the expand button beside close ("Open as full page"), open its
+  builder, a full page that keeps the portal's page width and margins and
+  wears the same top bar in place of a back pill: close returns to the list
+  (tooltip names it), collapse ("Collapse to drawer") to the list with the
+  event's drawer open. The builder's unsaved-changes guard asks before either.
+  Below `sm` the drawer fills the screen and the page shows close only, and on
+  phones the builder hides the app header, as the drawer covers it.
+- Expand (and "Edit event") and collapse are one panel resizing: the drawer
+  grows leftward into the builder's page, or the page shrinks back into the
+  drawer, the two cross-fading inside it, while the list fades out or in
+  behind (200ms ease-out, §2.8). It is a React `<ViewTransition>` pair
+  (`RecordFrame` ↔ `RecordPage`, list in `RecordList`), switched on only by
+  those links' transition types: opening from a row still slides in, close
+  slides out, swapping records doesn't animate, and close from the builder
+  is instant. No morph on phones, with reduced motion, or without View
+  Transitions support; the page swaps instantly there.
 - Viewing: label/value text rows, not disabled inputs. Editing: fields with a
   pinned Cancel / Save changes footer; closing with unsaved changes asks first.
 - Profile header: name in 24/32 with verified icon and pronouns. Interests are
@@ -898,6 +936,11 @@ Organization lead), and Patterns parts (`Ticket`, `Hubbo/Placeholder`,
   drawn at 40px (code and its own description: 32px), Toast has an Info tone
   code can't render, Button lacks Ghost, and the Link label is black (code:
   `text-info-foreground`).
+- **Figma follow-ups for the two-size icon scale (§2.7):** badge icons 14 to
+  16; small and icon-sm button icons 14 to 16; sidebar nav icons 16 to 20; the
+  side peek drawer and record page top bar icons 20; the 24px and 18px icons
+  (ConfirmDialog title on phones, image upload and event-card placeholders,
+  section navigator marks) redrawn at 16 or 20.
 
 
 ### Partial section navigation

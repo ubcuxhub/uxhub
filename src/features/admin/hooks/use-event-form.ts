@@ -11,10 +11,6 @@ import {
   saveAdminEventAction,
   saveAdminEventDraftAction,
 } from "@/features/admin/actions";
-import {
-  ResponseType,
-  type ApplicationQuestionTemplate,
-} from "@/features/events/types";
 import { EVENT_IMAGE_ERRORS } from "@/lib/event-image";
 import type {
   CheckInSessionRow,
@@ -24,23 +20,29 @@ import type {
   MentorRow,
   SponsorRow,
 } from "@/lib/supabase/models";
-import type { CheckInSessionDraft } from "@/features/admin/types";
+import type {
+  CheckInSessionDraft,
+  CheckInSessionField,
+} from "@/features/admin/types";
 import {
+  checkInDraftsFromRows,
   createFormSnapshot,
   EMPTY_CHECK_IN_SESSION,
+  formStateFromEvent,
   getInitialFormState,
+  toApplicationQuestionInputs,
+  toCheckInSessionInputs,
+  questionsFromRows,
   validateEventForm,
+  withSavedCheckInSessionIds,
+  withSavedQuestionIds,
   type EventFormState,
   type MentorDraft,
   type SponsorDraft,
 } from "../components/event-form/event-form-schema";
-import {
-  datetimeLocalToTimestamptz,
-  timestamptzToDatetimeLocal,
-} from "@/lib/date";
+import { datetimeLocalToTimestamptz } from "@/lib/date";
 import { useApplicationQuestions } from "./use-application-questions";
 import { parseWorkingDocument, type EventWorkingDocument } from "../lib/event-working-document";
-import { parseEventDescription } from "@/lib/event-description";
 import type { Json } from "@/lib/supabase/database.types";
 import { useUnsavedChangesGuard } from "./use-unsaved-changes-guard";
 
@@ -56,64 +58,6 @@ interface UseEventFormOptions {
 }
 
 const LEGACY_DRAFT_KEY = "event_create_form_draft";
-
-function formStateFromEvent(event: EventRow): EventFormState {
-  return {
-    configuration_initialized: true,
-    marketing_mode: (event.configured_marketing_mode ?? (event.marketing_url ? "external" : "hosted")) as EventFormState["marketing_mode"],
-    marketing_url: event.configured_marketing_url ?? event.marketing_url ?? "",
-    page_slug: event.configured_slug ?? event.slug ?? "",
-    slug_edited: event.configured_slug_edited ?? true,
-    is_featured: event.is_featured,
-    pricing_mode: (event.configured_pricing_mode ?? "legacy") as EventFormState["pricing_mode"],
-    pricing_amount: String(event.configured_price ?? event.regular_price ?? ""),
-    name: event.name ?? "",
-    short_description: event.short_description ?? "",
-    description: event.description ?? "",
-    description_rich: parseEventDescription(event.description_rich),
-    header_image_url: event.header_image_url ?? "",
-    header_colour: event.header_colour ?? (event.header_image_url ? "" : "#325DC4"),
-    event_colour: event.event_colour ?? "#325DC4",
-    status: event.status,
-    publish_at: timestamptzToDatetimeLocal(event.publish_at),
-    event_type: event.event_type,
-    regular_price: String(event.regular_price ?? ""),
-    member_price: String(event.member_price ?? ""),
-    location_building: event.location_building ?? "",
-    location_room: event.location_room ?? "",
-    location_address_url: event.location_address_url ?? "",
-    starts_at: timestamptzToDatetimeLocal(event.starts_at),
-    ends_at: timestamptzToDatetimeLocal(event.ends_at),
-    max_capacity: String(event.max_capacity ?? ""),
-    image_url: event.image_url ?? "",
-    registration_opens_at: timestamptzToDatetimeLocal(
-      event.registration_opens_at
-    ),
-    registration_closes_at: timestamptzToDatetimeLocal(
-      event.registration_closes_at
-    ),
-    created_at: event.created_at ?? "",
-    mentors_enabled: event.mentors_enabled,
-    sponsors_enabled: event.sponsors_enabled,
-    requires_application: event.requires_application,
-  };
-}
-
-function questionsFromRows(
-  questions: EventApplicationQuestionRow[]
-): ApplicationQuestionTemplate[] {
-  return questions.map((question) => ({
-    question: question.question ?? "",
-    description: question.description ?? "",
-    response: question.response_type,
-    is_required: question.is_required,
-    max_char_limit: question.max_char_limit ?? "",
-    response_options: question.response_options ?? [],
-    restrict_file_types: question.restrict_file_types,
-    allowed_file_types: question.allowed_file_types ?? [],
-    max_file_size_bytes: question.max_file_size_bytes ?? "",
-  }));
-}
 
 export function useEventForm({
   eventId,
@@ -148,11 +92,7 @@ export function useEventForm({
   const startingCheckIns = useMemo(
     () =>
       initialDraft?.document.checkInEvents ?? (initialCheckInSessions.length
-        ? initialCheckInSessions.map((session) => ({
-            name: session.name ?? "",
-            start_time: timestamptzToDatetimeLocal(session.start_time),
-            end_time: timestamptzToDatetimeLocal(session.end_time),
-          }))
+        ? checkInDraftsFromRows(initialCheckInSessions)
         : [{ ...EMPTY_CHECK_IN_SESSION }]),
     [initialCheckInSessions, initialDraft]
   );
@@ -288,7 +228,7 @@ export function useEventForm({
 
   const updateCheckInEvent = (
     index: number,
-    field: keyof CheckInSessionDraft,
+    field: CheckInSessionField,
     value: string
   ) => {
     resetSuccessMessage();
@@ -493,57 +433,10 @@ export function useEventForm({
           formState.registration_closes_at
         ),
       };
-      const checkInSessions = checkInEvents.map((session) => ({
-        name: session.name,
-        start_time: datetimeLocalToTimestamptz(session.start_time)!,
-        end_time: datetimeLocalToTimestamptz(session.end_time)!,
-      }));
-      const applicationQuestions = questions.applicationTemplate.map(
-        (question, sortOrder) => ({
-          question: question.question,
-          description: question.description || null,
-          response_type: question.response,
-          is_required: question.is_required,
-          sort_order: sortOrder,
-          max_char_limit:
-            question.response === ResponseType.short_text ||
-            question.response === ResponseType.long_text
-              ? question.max_char_limit === ""
-                ? (eventId ? initialApplicationQuestions[sortOrder]?.max_char_limit ?? null : 5000)
-                : question.max_char_limit
-              : null,
-          response_options:
-            question.response === ResponseType.checkbox ||
-            question.response === ResponseType.multiple_choice ||
-            question.response === ResponseType.dropdown
-              ? question.response_options || []
-              : null,
-          restrict_file_types:
-            question.response === ResponseType.file_upload
-              ? question.restrict_file_types
-              : false,
-          allowed_file_types:
-            question.response === ResponseType.file_upload &&
-            question.restrict_file_types
-              ? question.allowed_file_types
-              : null,
-          max_file_size_bytes:
-            question.response === ResponseType.file_upload &&
-            question.max_file_size_bytes !== ""
-              ? question.max_file_size_bytes
-              : null,
-        })
+      const checkInSessions = toCheckInSessionInputs(checkInEvents);
+      const applicationQuestions = toApplicationQuestionInputs(
+        questions.applicationTemplate
       );
-      // Preserve legacy/default metadata for untouched questions. Re-encoding
-      // a null limit or an irrelevant [] as new defaults must not replace IDs
-      // (and cascade responses) during a content or branding update.
-      const untouchedQuestions = eventId && JSON.stringify(questions.applicationTemplate) === JSON.stringify(questionsFromRows(initialApplicationQuestions));
-      const questionsToSave = untouchedQuestions ? initialApplicationQuestions.map(row => ({
-        question: row.question, description: row.description, response_type: row.response_type,
-        is_required: row.is_required, sort_order: row.sort_order, max_char_limit: row.max_char_limit,
-        response_options: row.response_options, restrict_file_types: row.restrict_file_types,
-        allowed_file_types: row.allowed_file_types, max_file_size_bytes: row.max_file_size_bytes,
-      })) : applicationQuestions;
       const result = await saveAdminEventAction({
         eventId,
         draftId: hasSavedDraft.current ? draftId : undefined,
@@ -554,8 +447,23 @@ export function useEventForm({
         checkInSessions,
         mentorIds: mentors.map((mentor) => mentor.id!),
         sponsorIds: sponsors.map((sponsor) => sponsor.id!),
-        applicationQuestions: questionsToSave,
+        applicationQuestions,
       });
+      // A refusal the admin can act on, such as removing a question people
+      // have applied with or a session people have checked in to. Nothing was
+      // saved, so the image cleanup below runs.
+      if ("error" in result) throw new Error(result.error);
+      const savedCheckIns = withSavedCheckInSessionIds(
+        checkInEvents,
+        result.checkInSessionIds
+      );
+      setCheckInEvents(savedCheckIns);
+      const savedTemplate = withSavedQuestionIds(
+        questions.applicationTemplate,
+        result.questionIds
+      );
+      questions.setApplicationTemplate(savedTemplate);
+
       hasSavedDraft.current = false;
       clearRecoveredLegacyDraft();
       draftRevision.current = 0;
@@ -569,10 +477,10 @@ export function useEventForm({
       setCleanSnapshot(
         createFormSnapshot(
           savedFormState,
-          checkInEvents,
+          savedCheckIns,
           mentors,
           sponsors,
-          questions.applicationTemplate
+          savedTemplate
         )
       );
       setSuccessMessage(

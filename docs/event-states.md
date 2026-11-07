@@ -104,11 +104,12 @@ staff reach drafts and members get a 404. Fulfillment
 
 Only for events with `requires_application`.
 
-`event_applications.status` (enum `event_application_status`) has exactly four
+`event_applications.status` (enum `event_application_status`) has exactly five
 values. The database enforces the moves below:
 
 | `status` | Meaning | Next |
 | --- | --- | --- |
+| `draft` | The applicant is still filling it in | `submitted`, only through `submit_event_application` |
 | `submitted` | Waiting for review | `accepted`, `waitlisted`, `rejected` |
 | `waitlisted` | Not yet; may be accepted later | `accepted`, `rejected` |
 | `accepted` | Offered a spot until `offer_expires_at` | `rejected` |
@@ -130,6 +131,20 @@ not `status` values; they're worked out from the deadline and the ticket:
   `offer_expires_at`.
 - Taking back an offer before the person registers changes it to Rejected.
 
+Drafts belong to the applicant alone:
+
+- Members create applications only as drafts, inside the registration window.
+  `submit_event_application` submits one after checking that it is theirs, the
+  window is open, and every required question has an answer (and a file answer
+  names one of their uploads). It records `submitted_at`, which the review
+  list sorts by.
+- Answers and uploaded files can change only while the application is a
+  draft. The applicant may delete their draft; nobody can delete a submitted
+  one.
+- Admins never see drafts: RLS hides them and their answers and files, the
+  review list and its counts leave them out, and no decision can move one.
+  Drafts hold no seat.
+
 ## Students: event badge
 
 Every event card shows exactly one badge: the student's own badge if they have
@@ -139,6 +154,9 @@ one, otherwise the event's availability badge. Once an event has ended, it shows
 ### The student's own badge
 
 Shown once they've applied or registered.
+
+A `draft` is not an application yet for badges: the student sees the event's
+availability badge until they submit.
 
 | Badge | Shown when |
 | --- | --- |

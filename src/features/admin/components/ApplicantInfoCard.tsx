@@ -37,17 +37,17 @@ interface ApplicantInfoCardProps {
 export function ApplicationStateIcon({ state }: { state: ApplicationReviewState }) {
   switch (state) {
     case "submitted":
-      return <Clock className="text-warning-foreground" />;
+      return <Clock className="size-4 text-warning-foreground" />;
     case "waitlisted":
-      return <Hourglass className="text-muted-foreground" />;
+      return <Hourglass className="size-4 text-muted-foreground" />;
     case "accepted":
-      return <Check className="text-success-foreground" />;
+      return <Check className="size-4 text-success-foreground" />;
     case "registered":
-      return <Ticket className="text-success-foreground" />;
+      return <Ticket className="size-4 text-success-foreground" />;
     case "offer_expired":
-      return <Clock className="text-destructive" />;
+      return <Clock className="size-4 text-destructive" />;
     case "rejected":
-      return <X className="text-destructive" />;
+      return <X className="size-4 text-destructive" />;
   }
 }
 
@@ -87,11 +87,11 @@ export function ApplicantInfoCard({
         <div className="flex items-start justify-between">
           <div className="flex-1 space-y-1">
             <CardTitle className="flex items-center gap-2 text-subheading">
-              <User className="text-muted-foreground" />
+              <User className="size-4 text-muted-foreground" />
               {name}
             </CardTitle>
             <CardDescription className="flex items-center gap-2">
-              <Mail />
+              <Mail className="size-4" />
               {email}
             </CardDescription>
           </div>
@@ -100,12 +100,12 @@ export function ApplicantInfoCard({
       </CardHeader>
       <CardContent className="space-y-1">
         <div className="flex items-center gap-2 text-small text-muted-foreground">
-          <Calendar />
+          <Calendar className="size-4" />
           <span>Applied: {formatTimestamp(applicationDate)}</span>
         </div>
         {(state === "accepted" || state === "offer_expired") && offerExpiresAt && (
           <div className="flex items-center gap-2 text-small text-muted-foreground">
-            <Clock />
+            <Clock className="size-4" />
             <span>
               {state === "accepted" ? "Register by" : "Offer expired"}:{" "}
               {formatTimestamp(offerExpiresAt)}

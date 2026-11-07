@@ -22,7 +22,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import type { CheckInSessionDraft } from "../../types";
+import type { CheckInSessionDraft, CheckInSessionField } from "../../types";
 
 interface CheckInEventsSectionProps {
   checkInEvents: CheckInSessionDraft[];
@@ -30,7 +30,7 @@ interface CheckInEventsSectionProps {
   onRemove: (index: number) => void;
   onUpdate: (
     index: number,
-    field: keyof CheckInSessionDraft,
+    field: CheckInSessionField,
     value: string
   ) => void;
 }

@@ -14,6 +14,7 @@ import {
   TableNone,
   TableRow,
   TableRowButton,
+  TableRowLink,
   TableSkeleton,
 } from "./table";
 
@@ -214,8 +215,78 @@ describe("TableRowButton", () => {
   });
 });
 
+describe("TableRowLink", () => {
+  function LinkTable({
+    sticky = false,
+    current,
+    onClick,
+  }: {
+    sticky?: boolean;
+    current?: boolean;
+    onClick: (event: React.MouseEvent<HTMLAnchorElement>) => void;
+  }) {
+    return (
+      <Table stickyFirstColumn={sticky}>
+        <TableBody>
+          <TableRow>
+            <TableCell>
+              <TableRowLink
+                href="/admin/users/alex"
+                aria-current={current ? "page" : undefined}
+                onClick={(event) => {
+                  // Stands in for the router, which jsdom doesn't have.
+                  event.preventDefault();
+                  onClick(event);
+                }}
+              >
+                Alex Chen
+              </TableRowLink>
+            </TableCell>
+            <TableCell>alex@example.com</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>
+    );
+  }
+
+  it("is a real link inside the cell, stretched over the row", () => {
+    render(<LinkTable onClick={() => {}} />);
+    const row = screen.getByRole("row");
+    expect(row.getAttribute("role")).not.toBe("link");
+    const link = within(row).getByRole("link", { name: "Alex Chen" });
+    expect(link.getAttribute("href")).toBe("/admin/users/alex");
+    expect(link.closest("td")).not.toBeNull();
+    expect(link.getAttribute("data-slot")).toBe("table-row-link");
+    expect(link.className).toContain("after:inset-0");
+    // Not lifted above its own overlay like a plain link in a cell.
+    expect(link.hasAttribute("data-table-row-opener")).toBe(true);
+  });
+
+  it("marks the open record's row with aria-current", () => {
+    const { rerender } = render(<LinkTable current onClick={() => {}} />);
+    expect(screen.getByRole("link").getAttribute("aria-current")).toBe("page");
+    rerender(<LinkTable onClick={() => {}} />);
+    expect(screen.getByRole("link").hasAttribute("aria-current")).toBe(false);
+  });
+
+  it("in a sticky table, forwards a click elsewhere on the row once, modifier keys included", () => {
+    const onClick = vi.fn();
+    render(<LinkTable sticky onClick={(event) => onClick({ meta: event.metaKey, ctrl: event.ctrlKey })} />);
+    fireEvent.click(screen.getByText("alex@example.com"));
+    expect(onClick).toHaveBeenCalledTimes(1);
+    expect(onClick).toHaveBeenLastCalledWith({ meta: false, ctrl: false });
+    // Cmd-click on the row reaches the link as a Cmd-click, so it opens a new tab.
+    fireEvent.click(screen.getByText("alex@example.com"), { metaKey: true });
+    expect(onClick).toHaveBeenCalledTimes(2);
+    expect(onClick).toHaveBeenLastCalledWith({ meta: true, ctrl: false });
+    // The link itself is not forwarded again.
+    fireEvent.click(screen.getByRole("link", { name: "Alex Chen" }));
+    expect(onClick).toHaveBeenCalledTimes(3);
+  });
+});
+
 describe("TableCell", () => {
-  it("lifts links and controls above the row button's overlay", () => {
+  it("lifts links and controls above the row opener's overlay", () => {
     render(
       <Table>
         <TableBody>
@@ -232,10 +303,10 @@ describe("TableCell", () => {
     );
     const cell = screen.getByRole("link").closest("td")!;
     // Tailwind emits `relative z-10` for links and controls inside the cell,
-    // but not for the row button, whose own `::after` needs the row as its
-    // containing block.
+    // but not for the row button or row link, whose own `::after` needs the
+    // row as its containing block.
     expect(cell.className).toContain("a,button,input,select,textarea");
-    expect(cell.className).toContain(":not([data-slot=table-row-button])]:relative");
-    expect(cell.className).toContain(":not([data-slot=table-row-button])]:z-10");
+    expect(cell.className).toContain(":not([data-table-row-opener])]:relative");
+    expect(cell.className).toContain(":not([data-table-row-opener])]:z-10");
   });
 });

@@ -194,6 +194,20 @@ export const interactionEntries: readonly RegistryEntry[] = [
     openStates: ["drawer", "drawer-edit", "drawer-unsaved"],
   },
   {
+    slug: "record-drawer",
+    title: "Record drawer",
+    category: "Overlays",
+    tier: "composite",
+    description:
+      "One record (a user, an event) at its own URL: a side peek drawer over its list, which is the route's layout, so a refresh keeps both. Feature code fills RecordView; the list layout renders RecordFrame. An event's builder is its full page (RecordPage), wearing the drawer's top bar; expand and collapse morph the drawer's panel into the page and back while the list (RecordList) fades.",
+    importPath: "@/components/shared/RecordDrawer",
+    importNames: ["RecordFrame", "RecordView", "RecordSection", "RecordField", "RecordList", "RecordPage"],
+    source: "src/components/shared/RecordDrawer.tsx",
+    spec: "§3.15",
+    layout: "page",
+    openStates: ["drawer", "drawer-edit", "drawer-error", "page"],
+  },
+  {
     slug: "dropdown-menu",
     title: "Dropdown menu",
     category: "Overlays",

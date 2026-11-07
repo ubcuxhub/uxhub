@@ -78,7 +78,7 @@ export function SuccessOverlay({ message, onClose }: SuccessOverlayProps) {
             id={titleId}
             className="flex items-center gap-2 text-success-foreground"
           >
-            <Check aria-hidden />
+            <Check aria-hidden className="size-4" />
             Success
           </CardTitle>
         </CardHeader>

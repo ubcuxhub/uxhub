@@ -49,8 +49,16 @@ type PaginationProps = Omit<React.ComponentProps<"nav">, "onChange"> & {
   /** 1-based; clamped to the last page. */
   page: number;
   pageSize: number;
-  /** 0 renders nothing. */
+  /** 0 renders nothing, unless there is a `summary`. */
   total: number;
+  /**
+   * Replaces "Showing 1–10 of 48" on the left: a `TableRowCount` given this
+   * page's range ("Showing 1–25 of 38 users · filtered from 142", with Show
+   * all). It is its own live region, so the pagination announces nothing
+   * itself. Still shown with no rows (a filter that leaves none), without the
+   * page buttons.
+   */
+  summary?: React.ReactNode;
 } & (
     | {
         /**
@@ -81,6 +89,7 @@ function Pagination({
   page,
   pageSize,
   total,
+  summary: summarySlot,
   onPageChange,
   getPageHref,
   className,
@@ -115,7 +124,8 @@ function Pagination({
     else if (atStart && !atEnd) nextRef.current?.focus();
   }, [summary.page, atStart, atEnd]);
 
-  if (total <= 0) return null;
+  const empty = total <= 0;
+  if (empty && !summarySlot) return null;
 
   const step = (
     ref: React.RefObject<HTMLElement | null>,
@@ -164,32 +174,40 @@ function Pagination({
       )}
       {...props}
     >
-      {/* The visible text is split around the buttons; this is what is announced. */}
-      <p aria-live="polite" className="sr-only">
-        {announced.label}
-      </p>
-      <p aria-hidden className="whitespace-nowrap text-muted-foreground tabular-nums">
-        {summary.range}
-      </p>
-      <div className="ml-auto flex items-center gap-3">
-        {step(
-          prevRef,
-          "Previous page",
-          summary.page - 1,
-          atStart,
-          <ChevronLeft aria-hidden />,
-        )}
-        <span aria-hidden className="whitespace-nowrap text-foreground tabular-nums">
-          {summary.pageLabel}
-        </span>
-        {step(
-          nextRef,
-          "Next page",
-          summary.page + 1,
-          atEnd,
-          <ChevronRight aria-hidden />,
-        )}
-      </div>
+      {summarySlot ? (
+        <div className="min-w-0">{summarySlot}</div>
+      ) : (
+        <>
+          {/* The visible text is split around the buttons; this is what is announced. */}
+          <p aria-live="polite" className="sr-only">
+            {announced.label}
+          </p>
+          <p aria-hidden className="whitespace-nowrap text-muted-foreground tabular-nums">
+            {summary.range}
+          </p>
+        </>
+      )}
+      {empty ? null : (
+        <div className="ml-auto flex items-center gap-3">
+          {step(
+            prevRef,
+            "Previous page",
+            summary.page - 1,
+            atStart,
+            <ChevronLeft aria-hidden />,
+          )}
+          <span aria-hidden={!summarySlot || undefined} className="whitespace-nowrap text-foreground tabular-nums">
+            {summary.pageLabel}
+          </span>
+          {step(
+            nextRef,
+            "Next page",
+            summary.page + 1,
+            atEnd,
+            <ChevronRight aria-hidden />,
+          )}
+        </div>
+      )}
     </nav>
   );
 }

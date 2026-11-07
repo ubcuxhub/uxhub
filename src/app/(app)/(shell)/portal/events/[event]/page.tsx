@@ -19,6 +19,7 @@ import { resolveImagePreviewSrc } from "@/lib/event-image";
 import { fetchEventMentors, fetchEventSponsors } from "@/lib/supabase-helpers/event-people";
 import { EventPeopleCard } from "@/features/events/components/EventPeopleCard";
 import { loadEventBadges } from "@/features/events/lib/event-badge";
+import { ApplicationStatusCallout } from "@/features/applications/components/ApplicationStatusCallout";
 
 interface PortalEventPageProps {
   params: Promise<{ event: string }>;
@@ -59,6 +60,8 @@ export default async function PortalEventPage({
       {event.status !== "active" && (
         <Alert>Draft: only admins can see this.</Alert>
       )}
+      {/* Application status and entry point; renders nothing without applications. */}
+      <ApplicationStatusCallout event={event} userId={user.id} />
       
       <div className="border-border-subtle rounded-md border">
         <div className="w-full h-51 bg-muted relative rounded-t-md" style={{ backgroundColor: event.header_colour || undefined }}>
@@ -84,7 +87,7 @@ export default async function PortalEventPage({
 
             <div className="flex flex-col sm:flex-row justify-between gap-4"> 
               <div className="flex items-center gap-3 text-small">
-                <Calendar className="p-3 h-fit w-fit text-muted-foreground border-[0.8px] rounded-md" />
+                <span className="flex size-12 shrink-0 items-center justify-center rounded-md border-[0.8px] text-muted-foreground"><Calendar className="size-5" aria-hidden /></span>
                 <div className="flex flex-col gap-1">
                   <p className="font-medium">
                     {formatEventDate(event.starts_at, { year: "numeric", month: "short" }) ?? "TBD"}
@@ -102,7 +105,7 @@ export default async function PortalEventPage({
               </div>
 
               <div className="flex items-start gap-3 text-small">
-                <MapPin className="p-3 h-fit w-fit text-muted-foreground border-[0.8px] rounded-md" />
+                <span className="flex size-12 shrink-0 items-center justify-center rounded-md border-[0.8px] text-muted-foreground"><MapPin className="size-5" aria-hidden /></span>
                 <div className="flex flex-col gap-1">
                   <p className="font-medium">{event.location_building || "TBD"}</p>
                   <p className="text-muted-foreground">{event.location_room || ""}</p>
@@ -110,7 +113,7 @@ export default async function PortalEventPage({
               </div>
 
               <div className="flex items-center gap-3 text-small">
-                <Link2 className="p-3 h-fit w-fit text-muted-foreground border-[0.8px] rounded-md"/>
+                <span className="flex size-12 shrink-0 items-center justify-center rounded-md border-[0.8px] text-muted-foreground"><Link2 className="size-5" aria-hidden /></span>
                 <div className="flex flex-col gap-1">
                   <p className="font-medium">Event details</p>
                   {/* TODO: make this the actual event website - does this need a migration? */}

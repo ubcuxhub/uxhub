@@ -548,6 +548,87 @@ function TimeField({
   )
 }
 
+/** A moment as its two halves. Either may be missing while it's being filled. */
+interface DateTimeValue {
+  date: IsoDate | null
+  time: WallTime | null
+}
+
+interface DateTimeFieldProps {
+  /** The date input's `id`, for a `FieldLabel`'s `htmlFor`. The time input gets `${id}-time`. */
+  id?: string
+  value: DateTimeValue
+  onValueChange: (value: DateTimeValue) => void
+  /** The date's error, else the time's, else `null`, as each half reports it. */
+  onValidityChange?: (error: string | null) => void
+  /** The date input's accessible name ("Start date"). Omit to let the label name it. */
+  dateLabel?: string
+  /** The time input's accessible name ("Start time"). */
+  timeLabel?: string
+  /** Earliest date (an end after its start). */
+  min?: IsoDate
+  /** End-time mode for the time half (an end on the start's day). */
+  after?: WallTime
+  /** Today in Pacific time. Defaults to the live clock. */
+  today?: IsoDate
+  disabled?: boolean
+  className?: string
+}
+
+/**
+ * One moment, as a date field and a time field (DS `DateTimeField`; §3.11):
+ * side by side when the container has room (24rem), stacked below that, so it
+ * fits a drawer or a phone as well as a page. Sizing follows the container,
+ * not the viewport. Clear it with a label action (`FieldLabelRow`), or by
+ * emptying both halves.
+ */
+function DateTimeField({
+  id,
+  value,
+  onValueChange,
+  onValidityChange,
+  dateLabel,
+  timeLabel = "Time",
+  min,
+  after,
+  today,
+  disabled,
+  className,
+}: DateTimeFieldProps) {
+  const [dateError, setDateError] = React.useState<string | null>(null)
+  const [timeError, setTimeError] = React.useState<string | null>(null)
+  useReportValidity(dateError ?? timeError, onValidityChange)
+
+  return (
+    <div
+      data-slot="date-time-field"
+      className={cn("@container/date-time-field w-full min-w-0", className)}
+    >
+      <div className="grid gap-2 @sm/date-time-field:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+        <DateField
+          id={id}
+          aria-label={dateLabel}
+          value={value.date}
+          onValueChange={(date) => onValueChange({ ...value, date })}
+          onValidityChange={setDateError}
+          min={min}
+          today={today}
+          disabled={disabled}
+        />
+        <TimeField
+          id={id ? `${id}-time` : undefined}
+          aria-label={timeLabel}
+          value={value.time}
+          onValueChange={(time) => onValueChange({ ...value, time })}
+          onValidityChange={setTimeError}
+          after={after}
+          disabled={disabled}
+        />
+      </div>
+    </div>
+  )
+}
+
 /** The browser's date, only used before the Pacific clock has hydrated. */
 function localToday(): IsoDate {
   const now = new Date()
@@ -571,5 +652,5 @@ function DateTimeFieldPair({ date, time, className }: {
   )
 }
 
-export { DateField, TimeField, DateTimeFieldPair, TIME_INPUT_ERROR }
-export type { DateFieldProps, TimeFieldProps }
+export { DateField, DateTimeFieldPair, DateTimeField, TimeField, TIME_INPUT_ERROR }
+export type { DateFieldProps, DateTimeFieldProps, DateTimeValue, TimeFieldProps }

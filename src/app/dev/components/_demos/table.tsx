@@ -3,9 +3,8 @@
 import { Download, Ellipsis, ListFilter } from "lucide-react";
 import { useState } from "react";
 
-import { TableToolbar } from "@/components/shared/TableToolbar";
+import { TableRowCount, TableToolbar } from "@/components/shared/TableToolbar";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { IconButton } from "@/components/ui/icon-button";
 import { Pagination } from "@/components/ui/pagination";
 import { SearchField } from "@/components/ui/search-field";
@@ -22,6 +21,7 @@ import {
   TableNone,
   TableRow,
   TableRowButton,
+  TableRowLink,
   TableSkeleton,
 } from "@/components/ui/table";
 import { useRowSelection } from "@/hooks/use-row-selection";
@@ -31,6 +31,7 @@ import { Composition, Specimen, SpecimenGroup } from "@/app/dev/_shell/Specimen"
 import { USERS } from "./_fixtures/users";
 
 const PAGE_SIZE = 5;
+const USER_NOUN = { one: "user", other: "users" };
 
 /** Placeholder: the wrap-up swaps this IconButton for a DropdownMenu trigger. */
 function RowActions({ name }: { name: string }) {
@@ -86,7 +87,6 @@ function ManageUsers({
               setQuery(v);
               setPage(1);
             }}
-            resultCount={results.length}
           />
         }
         actions={
@@ -168,12 +168,77 @@ function ManageUsers({
           pageSize={PAGE_SIZE}
           total={results.length}
           onPageChange={setPage}
+          summary={
+            <TableRowCount
+              count={{
+                shown: results.length,
+                total: USERS.length,
+                noun: USER_NOUN,
+                filtered: q !== "",
+                range: {
+                  from: results.length === 0 ? 0 : (current - 1) * PAGE_SIZE + 1,
+                  to: Math.min(current * PAGE_SIZE, results.length),
+                },
+              }}
+              onClearFilters={() => {
+                setQuery("");
+                setPage(1);
+              }}
+            />
+          }
         />
       </TableCard>
       <p role="status" className="min-h-5 text-small text-muted-foreground">
         {opened ? `Opened ${opened}` : "Click a row to open it, or tick a checkbox to select."}
       </p>
     </div>
+  );
+}
+
+/**
+ * Rows that open a URL. In the app each href is a record route and
+ * `useRecordRows` sets `aria-current` and `replace`; here the hrefs are
+ * hashes, so the page stays put.
+ */
+function LinkRows() {
+  const [current, setCurrent] = useState<string | null>(null);
+  const rows = USERS.slice(0, 4);
+  return (
+    <TableCard>
+      <Table stickyFirstColumn className="min-w-[40rem]">
+        <TableHeader>
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>Email</TableHead>
+            <TableHead>Membership</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((user) => (
+            <TableRow key={user.id}>
+              <TableCell className="whitespace-nowrap">
+                <TableRowLink
+                  href={`#record-${user.id}`}
+                  scroll={false}
+                  // While a record is open, another row replaces it in history.
+                  replace={current !== null}
+                  aria-current={current === user.id ? "page" : undefined}
+                  onClick={(event) => {
+                    // Cmd- or Ctrl-click opens a new tab; this one stays as it was.
+                    if (event.metaKey || event.ctrlKey || event.shiftKey) return;
+                    setCurrent(user.id);
+                  }}
+                >
+                  {user.name}
+                </TableRowLink>
+              </TableCell>
+              <TableCell className="max-w-64 truncate text-muted-foreground">{user.email}</TableCell>
+              <TableCell className="text-muted-foreground">{user.membership ?? <TableNone />}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableCard>
   );
 }
 
@@ -227,25 +292,16 @@ function TableDemo() {
     <div className="flex flex-col gap-10">
       <Composition
         title="Manage Users"
-        description="Search, tick rows, page, and open a row. The header checkbox selects every row in the current results, across pages; Export follows the selection."
+        description="Search, tick rows, page, and open a row. The header checkbox selects every row in the current results, across pages; Export follows the selection. The footer counts the page's rows and, while a search hides some, the full list, with Show all."
       >
         <ManageUsers />
       </Composition>
 
       <Composition
-        title="Event drafts in the events table"
-        description="Manage Events includes saved working drafts in the same table, search, Draft filter and date sort as events. Selecting a working draft resumes its editor; saved events retain their details drawer. A working draft replaces its source event's row, and missing dates or registration counts show a dash."
+        title="Rows that open a URL (TableRowLink)"
+        description="The link twin of TableRowButton: a next/link stretched over the row, so Cmd-click opens a new tab and the cells keep their semantics. aria-current marks the open record's row and fills it; pass replace while a record is open so Back returns to the list. In the admin lists useRecordRows wires both, and returns focus to the row when its record closes."
       >
-        <TableCard>
-          <Table>
-            <TableHeader>
-              <TableRow><TableHead>Status</TableHead><TableHead>Name</TableHead><TableHead>Date</TableHead><TableHead>Registered</TableHead><TableHead>Registration Status</TableHead></TableRow>
-            </TableHeader>
-            <TableBody>
-              <TableRow><TableCell><Badge variant="neutral">Draft</Badge></TableCell><TableCell>Untitled event</TableCell><TableCell><TableNone /></TableCell><TableCell><TableNone /></TableCell><TableCell><Badge variant="neutral">N/A</Badge></TableCell></TableRow>
-            </TableBody>
-          </Table>
-        </TableCard>
+        <LinkRows />
       </Composition>
 
       <Composition

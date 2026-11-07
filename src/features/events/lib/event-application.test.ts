@@ -8,7 +8,7 @@ describe("prepareResponseData", () => {
         [{ id: "q1" }, { id: "q2" }, { id: "q3" }],
         {
           question_0: "A response",
-          question_1: ["Research", "Design"],
+          question_1: ["Research", "Design, UI"],
         },
         "application-1"
       )
@@ -21,7 +21,7 @@ describe("prepareResponseData", () => {
       {
         event_application_question_id: "q2",
         application_id: "application-1",
-        response: "Research, Design",
+        response: '["Research","Design, UI"]',
       },
       {
         event_application_question_id: "q3",
