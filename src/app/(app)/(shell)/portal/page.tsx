@@ -1,6 +1,13 @@
+import { cookies } from "next/headers";
+
 import { PageContainer } from "@/components/shared/PageContainer";
 import { requireAuth } from "@/lib/auth/guards";
 import { redirectToSetupIfNeeded } from "@/features/setup/server";
+import { ProfileNudge } from "@/features/setup/components/ProfileNudge";
+import {
+  PROFILE_NUDGE_COOKIE,
+  shouldShowProfileNudge,
+} from "@/features/setup/lib/profile-nudge";
 import {
   getEffectiveMembershipExpiry,
   hasActiveMembership,
@@ -21,6 +28,7 @@ export default async function PortalHome() {
   // New members land here after sign-in; send them through setup first.
   redirectToSetupIfNeeded(user, "/portal");
   const supabase = await createClient();
+  const nudgeDismissed = (await cookies()).has(PROFILE_NUDGE_COOKIE);
   const termEndsAt = await getMembershipTermEndsAt();
   const firstName = user.first_name || user.email.split("@")[0] || "there";
   const isMember = hasActiveMembership(user, termEndsAt);
@@ -40,6 +48,8 @@ export default async function PortalHome() {
         <h1 className="mb-2 text-h1 tracking-tight">Hey, {firstName}!</h1>
         <p className="text-muted-foreground">Welcome to the UX Hub portal.</p>
       </div>
+
+      {shouldShowProfileNudge(user, nudgeDismissed) && <ProfileNudge />}
 
       {membershipType ? (
         <MembershipCard
