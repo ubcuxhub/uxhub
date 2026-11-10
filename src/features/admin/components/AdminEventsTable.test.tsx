@@ -248,3 +248,42 @@ describe("Manage events row count", () => {
     expect(document.activeElement).toBe(screen.getByRole("searchbox"));
   });
 });
+
+describe("application signals", () => {
+  function applicationRow(id: string, name: string, toReview?: number): AdminEventTableRow {
+    const base = row(id, name, "2026-11-01T17:00:00+00:00", "active", true);
+    return { ...base, event: { ...base.event, requires_application: true }, applicationsToReview: toReview };
+  }
+
+  it("marks application events 'By application' and no others", () => {
+    render(<AdminEventsTable rows={[applicationRow("uxathon", "UXathon 2026"), rows[1]]} />);
+    expect(screen.getAllByText("By application")).toHaveLength(1);
+    expect(screen.getByText("By application").closest("tr")?.textContent).toContain("UXathon 2026");
+    // The state wording is unchanged.
+    expect(screen.getAllByText("Open")).toHaveLength(2);
+  });
+
+  it("links an 'N to review' badge to the submitted applications, named for the event", () => {
+    render(<AdminEventsTable rows={[applicationRow("uxathon", "UXathon 2026", 8)]} />);
+    const link = screen.getByRole("link", { name: "8 applications to review for UXathon 2026" });
+    expect(link.getAttribute("href")).toBe("/admin/events/uxathon/review-applications?status=submitted");
+    expect(link.textContent).toBe("8 to review");
+    // A sibling of the row's link, not nested in it.
+    expect(link.parentElement?.closest("a")).toBeNull();
+  });
+
+  it("uses the singular for one application", () => {
+    render(<AdminEventsTable rows={[applicationRow("uxathon", "UXathon 2026", 1)]} />);
+    expect(screen.getByRole("link", { name: "1 application to review for UXathon 2026" })).toBeTruthy();
+  });
+
+  it("shows no badge for zero, an unknown count, or an event without applications", () => {
+    const noApplications = { ...rows[1], applicationsToReview: 5 };
+    render(
+      <AdminEventsTable
+        rows={[applicationRow("zero", "Zero", 0), applicationRow("unknown", "Unknown"), noApplications]}
+      />,
+    );
+    expect(screen.queryByText(/to review/)).toBeNull();
+  });
+});

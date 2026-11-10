@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useRef, useState } from "react";
 
 import { SortFilterPanel, SortFilterSection } from "@/components/shared/SortFilterPanel";
@@ -32,6 +33,8 @@ export interface AdminEventTableRow {
   event: EventRow;
   registrationCount: number;
   registrationOpen: boolean;
+  /** Submitted applications awaiting a decision; only for events that take applications. */
+  applicationsToReview?: number;
 }
 
 type RegistrationStatus = "open" | "closed" | "not-applicable";
@@ -213,10 +216,26 @@ export function AdminEventsTable({ rows }: { rows: AdminEventTableRow[] }) {
                       <Badge variant={registration === "open" ? "success" : "neutral"}>
                         {REGISTRATION_LABELS[registration]}
                       </Badge>
+                      {row.event.requires_application ? (
+                        <div className="mt-1 whitespace-nowrap text-small text-muted-foreground">By application</div>
+                      ) : null}
                     </TableCell>
                     <TableCell className="whitespace-nowrap tabular-nums">
                       {row.registrationCount}{" "}
                       <span className="text-muted-foreground">/ {row.event.max_capacity}</span>
+                      {row.event.requires_application && (row.applicationsToReview ?? 0) > 0 ? (
+                        <div className="mt-1">
+                          <Link
+                            href={`${LIST_HREF}/${row.event.id}/review-applications?status=submitted`}
+                            aria-label={`${row.applicationsToReview} ${
+                              row.applicationsToReview === 1 ? "application" : "applications"
+                            } to review for ${row.event.name}`}
+                            className="inline-flex rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            <Badge variant="warning">{row.applicationsToReview} to review</Badge>
+                          </Link>
+                        </div>
+                      ) : null}
                     </TableCell>
                   </TableRow>
                 );

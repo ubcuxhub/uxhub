@@ -14,6 +14,7 @@ import { registrationWindow } from "@/features/admin/lib/event-registration-wind
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchEvents } from "@/lib/supabase-helpers/events";
+import { fetchSubmittedApplicationCounts } from "@/lib/supabase-helpers/event-application-review-counts";
 import { fetchEventSeatCounts } from "@/lib/supabase-helpers/event-tickets";
 
 const CREATE_EVENT_HREF = "/admin/events/create-new";
@@ -42,11 +43,18 @@ export default async function AdminEventsLayout({ children }: { children: React.
     events.map((event) => event.id)
   );
 
+  // Likewise one query for every application event's pending reviews.
+  const toReview = await fetchSubmittedApplicationCounts(
+    supabase,
+    events.filter((event) => event.requires_application).map((event) => event.id)
+  );
+
   const now = new Date();
   const rows: AdminEventTableRow[] = events.map((event) => ({
     event,
     registrationCount: seatCounts.get(event.id)?.tickets ?? 0,
     registrationOpen: registrationWindow(event, now) === "open",
+    applicationsToReview: toReview.get(event.id) ?? 0,
   }));
 
   return (
