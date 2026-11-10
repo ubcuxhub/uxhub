@@ -1,8 +1,9 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
-import { CircleAlert, Ellipsis, Info, Pencil, Trash2, TriangleAlert } from "lucide-react";
+import { useId, useState } from "react";
+import { CircleAlert, Info, TriangleAlert } from "lucide-react";
 
+import { BackButton } from "@/components/shared/BackButton";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { SuccessOverlay } from "@/components/shared/SuccessOverlay";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -15,13 +16,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Field,
@@ -34,17 +28,35 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { YearSelectOptions } from "@/app/dev/components/_demos/_fixtures/year-select";
-import { IconButton } from "@/components/ui/icon-button";
-import { Separator } from "@/components/ui/separator";
+import {
+  SegmentedToggle,
+  SegmentedToggleItem,
+} from "@/components/ui/segmented-toggle";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
 import { ApplicantInfoCard } from "@/features/admin/components/ApplicantInfoCard";
+import { ApplicantPager } from "@/features/admin/components/ApplicantPager";
 import { ApplicationResponseCard } from "@/features/admin/components/ApplicationResponseCard";
+import { ReviewStateBadge } from "@/features/admin/components/ReviewStateBadge";
 import { StatusUpdateSection } from "@/features/admin/components/StatusUpdateSection";
 import {
   type ApplicationDecision,
   type ApplicationReviewState,
 } from "@/features/admin/lib/application-review";
+import {
+  ReviewerNotes,
+  type ReviewerNote,
+} from "@/features/applications/components/ReviewerNotes";
+import { formatEventDate } from "@/lib/date";
+
+import { HERE } from "../_fixtures";
+import {
+  APPLICANTS,
+  FEATURED_APPLICANT,
+  REVIEWER,
+  REVIEW_NOTES,
+  REVIEW_NOW,
+} from "../_review-fixtures";
 
 import { LIFT, Panel } from "./frame";
 import type { Components } from "./types";
@@ -76,173 +88,126 @@ function Response() {
   );
 }
 
-interface Note {
-  id: number;
-  author: string;
-  src?: string;
-  when: string;
-  text: string;
-  mine: boolean;
+/** A thread that really edits: fixture notes in local state, with a short wait. */
+function useLocalNotes(initial: readonly ReviewerNote[]) {
+  const [notes, setNotes] = useState<ReviewerNote[]>([...initial]);
+  const wait = () => new Promise((resolve) => setTimeout(resolve, 450));
+  return {
+    notes,
+    onAdd: async (body: string) => {
+      await wait();
+      setNotes((current) => [
+        ...current,
+        {
+          id: `note-${current.length + 1}-${body.length}`,
+          body,
+          createdAt: REVIEW_NOW.toISOString(),
+          author: REVIEWER,
+        },
+      ]);
+    },
+    onEdit: async (id: string, body: string) => {
+      await wait();
+      setNotes((current) =>
+        current.map((note) =>
+          note.id === id ? { ...note, body, editedAt: REVIEW_NOW.toISOString() } : note,
+        ),
+      );
+    },
+    onDelete: async (id: string) => {
+      await wait();
+      setNotes((current) => current.filter((note) => note.id !== id));
+    },
+  };
 }
 
-const NOTES: Note[] = [
-  {
-    id: 1,
-    author: "Jordan Lee",
-    src: "/people/elaine.jpg",
-    when: "Yesterday",
-    text: "Strong research portfolio. The course planner case study is thorough.",
-    mine: false,
-  },
-  {
-    id: 2,
-    author: "You",
-    when: "2 hours ago",
-    text: "Agree. Leaning accept; let’s pair her with a developer-heavy team.",
-    mine: true,
-  },
-];
+const PANEL = `border-border-subtle ${LIFT}`;
 
-function NoteActions({
-  onEdit,
-  onDelete,
-}: {
-  onEdit: () => void;
-  onDelete: () => void;
-}) {
-  const triggerRef = useRef<HTMLButtonElement>(null);
-  const [confirming, setConfirming] = useState(false);
+function Notes() {
+  const thread = useLocalNotes(REVIEW_NOTES);
   return (
-    <>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <IconButton ref={triggerRef} variant="ghost" size="icon-sm" label="Note actions">
-            <Ellipsis />
-          </IconButton>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent
-          align="end"
-          onCloseAutoFocus={(event) => {
-            if (confirming) event.preventDefault();
-          }}
-        >
-          <DropdownMenuItem onSelect={onEdit}>
-            <Pencil aria-hidden />
-            Edit note
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive" onSelect={() => setConfirming(true)}>
-            <Trash2 aria-hidden />
-            Delete note
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <ConfirmDialog
-        open={confirming}
-        onOpenChange={(next) => {
-          setConfirming(next);
-          if (!next) setTimeout(() => triggerRef.current?.focus(), 0);
-        }}
-        icon={<TriangleAlert aria-hidden />}
-        title="Delete this note?"
-        description="Other reviewers won’t see it any more. This can’t be undone."
-        cancelLabel="Keep note"
-        confirmLabel="Delete note"
-        onConfirm={() => {
-          setConfirming(false);
-          onDelete();
-        }}
-      />
-    </>
+    <ReviewerNotes
+      {...thread}
+      currentUserId={REVIEWER.id}
+      now={REVIEW_NOW}
+      className={PANEL}
+    />
   );
 }
 
-function ReviewerNotes() {
-  const uid = useId();
-  const [notes, setNotes] = useState(NOTES);
-  const [draft, setDraft] = useState("");
-  const [editing, setEditing] = useState<number | null>(null);
+type NotesState = "empty" | "loading" | "error";
 
-  const save = () => {
-    const text = draft.trim();
-    if (!text) return;
-    setNotes((current) =>
-      editing === null
-        ? [...current, { id: Date.now(), author: "You", when: "Just now", text, mine: true }]
-        : current.map((note) => (note.id === editing ? { ...note, text } : note)),
-    );
-    setDraft("");
-    setEditing(null);
-  };
+function NotesStates() {
+  const [state, setState] = useState<NotesState>("empty");
+  const [attempt, setAttempt] = useState(0);
+  const thread = useLocalNotes([]);
+  return (
+    <div className="flex flex-col gap-3">
+      <SegmentedToggle
+        aria-label="Reviewer notes state"
+        value={state}
+        onValueChange={(value) => setState(value as NotesState)}
+        className="w-full"
+      >
+        <SegmentedToggleItem value="empty">Empty</SegmentedToggleItem>
+        <SegmentedToggleItem value="loading">Loading</SegmentedToggleItem>
+        <SegmentedToggleItem value="error">Load failed</SegmentedToggleItem>
+      </SegmentedToggle>
+      <ReviewerNotes
+        key={`${state}-${attempt}`}
+        {...thread}
+        notes={state === "empty" ? thread.notes : []}
+        status={state === "empty" ? "ready" : state}
+        onRetry={() => {
+          setState("loading");
+          setAttempt((n) => n + 1);
+        }}
+        currentUserId={REVIEWER.id}
+        now={REVIEW_NOW}
+        className={PANEL}
+      />
+    </div>
+  );
+}
 
+/**
+ * The application page's header at phone width: back to the list, who, and
+ * previous and next through the list the reviewer came from.
+ */
+function ApplicantHeader() {
+  const queue = APPLICANTS.filter((applicant) => applicant.state === "submitted");
+  const [index, setIndex] = useState(() =>
+    queue.findIndex((applicant) => applicant.id === FEATURED_APPLICANT.id),
+  );
+  const applicant = queue[index];
+  const target = (at: number) => (queue[at] ? { href: HERE, name: queue[at].name } : null);
   return (
     <Panel>
-      <CardHeader>
-        <CardTitle>Reviewer notes</CardTitle>
-        <CardDescription>
-          {notes.length} {notes.length === 1 ? "note" : "notes"} · only admins see these
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <ol className="flex flex-col gap-4">
-          {notes.map((note) => (
-            <li key={note.id} className="flex gap-3">
-              <Avatar name={note.author === "You" ? "Alex Chen" : note.author} src={note.src} size={32} decorative />
-              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <div className="flex items-center gap-2">
-                  <span className="text-small font-semibold">{note.author}</span>
-                  <span className="text-label font-normal text-muted-foreground">{note.when}</span>
-                  {note.mine ? (
-                    <div className="-my-1 ml-auto">
-                      <NoteActions
-                        onEdit={() => {
-                          setEditing(note.id);
-                          setDraft(note.text);
-                        }}
-                        onDelete={() =>
-                          setNotes((current) => current.filter((n) => n.id !== note.id))
-                        }
-                      />
-                    </div>
-                  ) : null}
-                </div>
-                <p className="text-small text-pretty text-muted-foreground">{note.text}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-        <Separator className="bg-border-subtle" />
-        <Field>
-          <FieldLabel htmlFor={`${uid}-note`}>
-            {editing === null ? "Add a note" : "Edit your note"}
-          </FieldLabel>
-          <Textarea
-            id={`${uid}-note`}
-            rows={3}
-            maxLength={280}
-            showCount
-            value={draft}
-            onChange={(event) => setDraft(event.target.value)}
-            placeholder="What stood out?"
-          />
-        </Field>
-        <div className="flex justify-end gap-2">
-          {editing !== null ? (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                setEditing(null);
-                setDraft("");
-              }}
-            >
-              Cancel
-            </Button>
-          ) : null}
-          <Button size="sm" disabled={!draft.trim()} onClick={save}>
-            {editing === null ? "Post note" : "Save note"}
-          </Button>
+      <CardContent className="flex flex-col gap-5">
+        <BackButton link={HERE} label="Back to applications" />
+        <div className="flex items-center gap-3">
+          <Avatar name={applicant.name} src={applicant.avatarUrl} size={56} decorative />
+          <div className="flex min-w-0 flex-col items-start gap-1">
+            <h3 className="max-w-full truncate text-h3">{applicant.name}</h3>
+            <ReviewStateBadge state={applicant.state} />
+          </div>
         </div>
+        <p className="text-small text-muted-foreground">
+          {applicant.program} · Submitted{" "}
+          {formatEventDate(applicant.submittedAt, { month: "short", year: undefined })}
+        </p>
+        <ApplicantPager
+          position={index + 1}
+          total={queue.length}
+          scope="Submitted"
+          previous={target(index - 1)}
+          next={target(index + 1)}
+          onNavigate={(event, direction) => {
+            event.preventDefault();
+            setIndex((at) => at + (direction === "next" ? 1 : -1));
+          }}
+          className="justify-between border-t border-border-subtle pt-4"
+        />
       </CardContent>
     </Panel>
   );
@@ -425,7 +390,9 @@ function ApplicationForm() {
 export const APPLICATION_COMPONENTS = {
   "applicant": Applicant,
   "application-response": Response,
-  "reviewer-notes": ReviewerNotes,
+  "reviewer-notes": Notes,
+  "reviewer-notes-states": NotesStates,
+  "applicant-header": ApplicantHeader,
   "application-decision": Decision,
   "alerts": Alerts,
   "application-form": ApplicationForm,

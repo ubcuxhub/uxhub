@@ -25,11 +25,11 @@ export const STANDALONE = {
     path: "/dev/templates",
     title: "Templates",
     description:
-      "Whole pages assembled from the components on fixture data: the events list, event detail and event builder.",
+      "Whole pages assembled from the components on fixture data: the events list, event detail, event builder, and the proposed application review pages.",
     spec: "§4.4",
     layout: "page",
     // `<id>-frame` (the mobile iframe) is understood too, but not listed.
-    openStates: ["events", "event-detail", "event-builder"],
+    openStates: ["events", "event-detail", "event-builder", "applications", "application-review"],
   },
 } as const satisfies Record<string, DocMeta & { path: string }>;
 

@@ -73,7 +73,7 @@ export const MANIFEST = [
     column: 2,
     uses: ["card", "switch", "segmented-toggle"],
   },
-  // Column 3: Admin data and check-in
+  // Column 3: Admin data, check-in and alerts
   {
     id: "admin-stats",
     column: 3,
@@ -104,7 +104,17 @@ export const MANIFEST = [
     column: 3,
     uses: ["card", "skeleton", "spinner"],
   },
-  // Column 4: Applications and review
+  {
+    id: "alerts",
+    column: 3,
+    uses: ["alert"],
+  },
+  // Column 4: Applications and review (docs/design/application-review.md)
+  {
+    id: "applicant-header",
+    column: 4,
+    uses: ["card", "back-button", "avatar", "status-badge", "button", "tooltip"],
+  },
   {
     id: "applicant",
     column: 4,
@@ -121,6 +131,11 @@ export const MANIFEST = [
     uses: ["card", "avatar", "dropdown-menu", "icon-button", "confirm-dialog", "separator", "field", "textarea", "button"],
   },
   {
+    id: "reviewer-notes-states",
+    column: 4,
+    uses: ["segmented-toggle", "card", "empty-state", "skeleton", "button"],
+  },
+  {
     id: "application-decision",
     column: 4,
     uses: ["card", "field", "input", "button", "spinner", "confirm-dialog", "success-overlay", "toast"],
@@ -129,16 +144,6 @@ export const MANIFEST = [
     id: "application-form",
     column: 4,
     uses: ["card", "field", "input", "select", "textarea", "checkbox", "button", "status-badge", "toast"],
-  },
-  {
-    id: "alerts",
-    column: 4,
-    uses: ["alert"],
-  },
-  {
-    id: "setup-outline",
-    column: 4,
-    uses: ["section-navigator"],
   },
   // Column 5: Event builder
   {
@@ -165,6 +170,11 @@ export const MANIFEST = [
     id: "venue-and-judges",
     column: 5,
     uses: ["card", "searchable-dropdown", "field", "select"],
+  },
+  {
+    id: "setup-outline",
+    column: 5,
+    uses: ["section-navigator"],
   },
   // Column 6: Navigation, overlays and event pages
   {
