@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { ApplicationNotes } from "@/features/admin/components/ApplicationNotes";
 import { ApplicationReviewClient } from "@/features/admin/components/ApplicationReviewClient";
 import {
   getReviewNeighbours,
@@ -22,6 +23,7 @@ import {
   fetchEventApplicationSummaries,
   isSubmittedApplication,
 } from "@/lib/supabase-helpers/event-applications";
+import { fetchReviewerNotes } from "@/lib/supabase-helpers/application-review-notes";
 import { fetchEventById } from "@/lib/supabase-helpers/events";
 import { isUuid } from "@/lib/uuid";
 
@@ -43,7 +45,7 @@ export default async function ApplicationReviewPage({
   params,
   searchParams,
 }: ApplicationReviewPageProps) {
-  await requireAdmin();
+  const admin = await requireAdmin();
   const [{ event: eventParam, applicationId }, rawQuery] = await Promise.all([
     params,
     searchParams,
@@ -68,11 +70,12 @@ export default async function ApplicationReviewPage({
     notFound();
   }
 
-  const [event, summaries, questions, responses] = await Promise.all([
+  const [event, summaries, questions, responses, notes] = await Promise.all([
     fetchEventById(supabase, application.event_id),
     fetchEventApplicationSummaries(supabase, eventId),
     fetchApplicationQuestions(supabase, eventId),
     fetchApplicationResponses(supabase, applicationId),
+    fetchReviewerNotes(supabase, applicationId),
   ]);
 
   const items: ReviewListItem[] = summaries.map((summary) =>
@@ -147,6 +150,13 @@ export default async function ApplicationReviewPage({
         next: target(neighbours.next),
       }}
       defaultDeadline={defaultOfferDeadline()}
+      notes={
+        <ApplicationNotes
+          applicationId={applicationId}
+          initialNotes={notes}
+          currentUserId={admin.id}
+        />
+      }
     />
   );
 }

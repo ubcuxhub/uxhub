@@ -8,6 +8,7 @@ import { formatEventDate, formatEventDateLabel } from "@/lib/date";
 import { createClient } from "@/lib/supabase/server";
 import type { EventRow } from "@/lib/supabase/models";
 import { fetchEventById } from "@/lib/supabase-helpers/events";
+import { fetchReviewerNoteCounts } from "@/lib/supabase-helpers/application-review-notes";
 import { fetchEventApplicationSummaries } from "@/lib/supabase-helpers/event-applications";
 
 interface ReviewApplicationsPageProps {
@@ -52,6 +53,10 @@ export default async function ReviewApplicationsPage({
   ]);
 
   if (!event) notFound();
+  const noteCounts = await fetchReviewerNoteCounts(
+    supabase,
+    summaries.map((summary) => summary.applicationId)
+  );
 
   const subtitle = describeSchedule(event);
 
@@ -61,7 +66,10 @@ export default async function ReviewApplicationsPage({
       eventName={event.name}
       subtitle={subtitle}
       capacity={event.max_capacity}
-      applications={summaries.map((summary) => withReviewState(summary))}
+      applications={summaries.map((summary) => ({
+        ...withReviewState(summary),
+        noteCount: noteCounts[summary.applicationId] ?? 0,
+      }))}
     />
   );
 }
