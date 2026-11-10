@@ -59,12 +59,6 @@ async function nextRequest(id: string) {
   session.member = data;
 }
 
-async function anyMembershipTypeId() {
-  const { data, error } = await db.from("membership_types").select("id").limit(1).single();
-  if (error) throw error;
-  return data.id;
-}
-
 /** Sets up a row the way a purchase or an earlier answer would have. */
 async function setColumns(id: string, patch: Partial<UserInfoRow>) {
   const { error } = await db.from("user_info").update(patch).eq("id", id);
@@ -183,9 +177,10 @@ describe("member setup against local Supabase", () => {
   }));
 
   it("changes the user type without a membership, clearing the old type's details", () => withFixtures(async (fixtures) => {
+    // Its own tier, made before the member who references it: CI's database is unseeded.
+    const tier = (await fixtures.createMembershipType()).id;
     const member = await signUp(fixtures);
     // A lapsed membership no longer holds the type.
-    const tier = await anyMembershipTypeId();
     await setColumns(member.id, {
       student_number: 12345678,
       faculty: "Faculty of Arts",
@@ -212,8 +207,9 @@ describe("member setup against local Supabase", () => {
   }));
 
   it("refuses a new user type while a membership is pending, but lets the member confirm theirs", () => withFixtures(async (fixtures) => {
+    const tier = await fixtures.createMembershipType();
     const member = await signUp(fixtures);
-    await setColumns(member.id, { membership_pre_ordered_type_id: await anyMembershipTypeId() });
+    await setColumns(member.id, { membership_pre_ordered_type_id: tier.id });
     await nextRequest(member.id);
 
     expect(await saveSetupAboutAction({ userType: "faculty" })).toEqual({ ok: false, error: USER_TYPE_LOCKED_MESSAGE });
