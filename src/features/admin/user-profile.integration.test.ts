@@ -64,13 +64,14 @@ describe("admin profile persistence against local Supabase", () => {
     const verified = await setStudentVerificationAction(user.id, true);
     expect(verified.student_verified_by).toBe(manager.id);
     expect(verified.student_verified_at).toBeTruthy();
+    expect(verified).toMatchObject({ ubc_verified_via: "manual", ubc_verified_by: manager.id, ubc_verified_at: verified.student_verified_at });
     await saveAdminProfile(db, user.id, { student_number: 12345678 });
-    expect(await fetchActiveProfile(db, user.id)).toMatchObject({ student_verified_at: null, student_verified_by: null });
+    expect(await fetchActiveProfile(db, user.id)).toMatchObject({ student_verified_at: null, student_verified_by: null, ubc_verified_at: null, ubc_verified_via: null });
     await setStudentVerificationAction(user.id, true);
     await saveAdminProfile(db, user.id, { user_type: "nonUbc" });
     expect((await fetchActiveProfile(db, user.id)).student_verified_at).toBeNull();
     await setStudentVerificationAction(user.id, true);
-    expect((await setStudentVerificationAction(user.id, false)).student_verified_at).toBeNull();
+    expect(await setStudentVerificationAction(user.id, false)).toMatchObject({ student_verified_at: null, ubc_verified_at: null, ubc_verified_via: null, ubc_verified_by: null });
   }));
 
   it("enforces own-row column restrictions and preserves admin directory reads", () => withProfiles(async ({ user, manager, admin }) => {

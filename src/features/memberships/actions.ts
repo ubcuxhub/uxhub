@@ -2,30 +2,105 @@
 
 import { revalidatePath } from "next/cache";
 import { requireAuth } from "@/lib/auth/guards";
+import { getConfirmedSignInEmail } from "@/lib/auth/current-user";
 import { errorFields, log } from "@/lib/log";
 import { adminUpdateUserInfoById } from "@/lib/supabase-helpers/admin-server";
 import { fetchMembershipTermEndsAt } from "@/lib/supabase-helpers/app-settings";
+import { releaseStaleUbcEmailHolds } from "@/lib/supabase-helpers/ubc-verification";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { FACULTIES, YEAR_LEVELS } from "@/lib/constants";
 import type {
   StudentStatus,
   UniversityYear,
+  UserInfoRow,
+  UserInfoUpdate,
   UserType,
 } from "@/lib/supabase/models";
-import { validateFacultyEmail, validateStudentNumber } from "./lib/validation";
+import { validateStudentNumber } from "./lib/validation";
 import {
   buildEligibilityUpdate,
   canEditMembershipClassification,
   userTypeConfirmation,
 } from "./lib/policy";
+import {
+  hasPurchaseUbcVerification,
+  normalizeUbcEmail,
+  ubcAudienceForUserType,
+  ubcEmailQualifies,
+  validateUbcEmail,
+  type UbcAudience,
+  type UbcSendResult,
+  type UbcVerifyResult,
+} from "./lib/ubc-verification";
+import { sendUbcCode, verifyUbcCode } from "./ubc-verification-server";
+
+const UBC_EMAIL_TAKEN =
+  "This UBC email is already verified on another account. Contact a UX Hub exec.";
+
+class UbcEmailTakenError extends Error {}
+
+function isUniqueViolation(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { code?: unknown }).code === "23505"
+  );
+}
+
+/**
+ * The stamp a save writes when the address is the member's confirmed sign-in
+ * email: that already proves it, so no code is sent. Written in the same
+ * update as the address, which is what keeps `scrub_ubc_verification` from
+ * clearing it.
+ */
+async function signInEmailStamp(
+  userId: string,
+  ubcEmail: string | null | undefined,
+  audience: UbcAudience,
+): Promise<Pick<UserInfoUpdate, "ubc_verified_at" | "ubc_verified_via" | "ubc_verified_by"> | null> {
+  if (!ubcEmail) return null;
+  const confirmed = await getConfirmedSignInEmail();
+  if (!confirmed || normalizeUbcEmail(confirmed) !== ubcEmail) return null;
+  if (!ubcEmailQualifies(ubcEmail, audience)) return null;
+
+  await releaseStaleUbcEmailHolds(supabaseAdmin, { email: ubcEmail, userId });
+  return {
+    ubc_verified_at: new Date().toISOString(),
+    ubc_verified_via: "sign_in_email",
+    ubc_verified_by: null,
+  };
+}
+
+/** Writes a profile update, turning the one-verified-account index into a message. */
+async function writeProfile(userId: string, update: UserInfoUpdate) {
+  try {
+    const rows = await adminUpdateUserInfoById(userId, update);
+    return (rows?.[0] ?? null) as UserInfoRow | null;
+  } catch (error) {
+    if (isUniqueViolation(error)) throw new UbcEmailTakenError(UBC_EMAIL_TAKEN);
+    throw error;
+  }
+}
 
 interface UpdateEligibilityInput {
   userType: UserType;
   studentNumber?: string | null;
   faculty?: string | null;
-  facultyEmail?: string | null;
+  /**
+   * A new UBC address, checked against the type's domain rule. Left out, a
+   * type change keeps the saved address only while it still qualifies, and a
+   * qualifying confirmed sign-in email fills an empty one.
+   */
+  ubcEmail?: string | null;
 }
 
+/**
+ * Settings › Profile's eligibility save. Never sends a code: the next join
+ * asks for one. Changing the type or the address clears the verification
+ * (the database trigger), unless the address is the confirmed sign-in email,
+ * which is stamped again.
+ */
 export async function updateEligibilityProfileAction(
   input: UpdateEligibilityInput
 ) {
@@ -47,32 +122,46 @@ export async function updateEligibilityProfileAction(
     if (error) throw new Error(error);
     studentNumber = Number(rawStudentNumber);
   }
-  // Faculty eligibility is proved by the signed-in address, so the validated
-  // value is also what gets stored — leaving it unwritten would strand the
-  // profile as incomplete.
-  let facultyEmail: string | undefined;
-  if (input.userType === "faculty") {
-    const normalized = input.facultyEmail?.trim().toLowerCase() ?? "";
-    if (
-      validateFacultyEmail(normalized) ||
-      normalized !== user.email.toLowerCase()
-    ) {
-      throw new Error(
-        "Faculty eligibility requires signing in with the same UBC email address."
-      );
+
+  const audience = ubcAudienceForUserType(input.userType);
+  let ubcEmail: string | null | undefined;
+  let stamp: Awaited<ReturnType<typeof signInEmailStamp>> = null;
+  if (audience) {
+    if (input.ubcEmail !== undefined) {
+      ubcEmail = input.ubcEmail ? normalizeUbcEmail(input.ubcEmail) : null;
+      if (ubcEmail) {
+        const error = validateUbcEmail(ubcEmail, audience);
+        if (error) throw new Error(error);
+      }
+    } else if (input.userType !== user.user_type) {
+      ubcEmail = ubcEmailQualifies(user.ubc_email, audience) ? user.ubc_email : null;
     }
-    facultyEmail = normalized;
+
+    const effective = ubcEmail !== undefined ? ubcEmail : user.ubc_email;
+    if (!effective) {
+      const confirmed = await getConfirmedSignInEmail();
+      if (confirmed && ubcEmailQualifies(confirmed, audience)) {
+        ubcEmail = normalizeUbcEmail(confirmed);
+      }
+    }
+    stamp = await signInEmailStamp(
+      user.id,
+      ubcEmail !== undefined ? ubcEmail : user.ubc_email,
+      audience,
+    );
   }
 
-  await adminUpdateUserInfoById(user.id, {
+  await writeProfile(user.id, {
     ...buildEligibilityUpdate({
       userType: input.userType,
       studentNumber,
       faculty: input.faculty,
-      facultyEmail,
+      ubcEmail,
     }),
+    ...(stamp ?? {}),
     ...userTypeConfirmation(),
   });
+  if (stamp) log.info("ubc_verification.verified", { userId: user.id, via: "sign_in_email" });
 }
 
 export type MembershipProfileInput =
@@ -82,11 +171,12 @@ export type MembershipProfileInput =
       major: string;
       studentNumber: string;
       year: UniversityYear;
+      ubcEmail: string;
     }
   | {
       audience: "faculty";
       faculty: string;
-      facultyEmail: string;
+      ubcEmail: string;
     }
   | {
       audience: "non-ubc";
@@ -95,8 +185,15 @@ export type MembershipProfileInput =
       year: UniversityYear | "";
     };
 
+/**
+ * `verified`: nothing more to prove (Non-UBC, the sign-in email, or a
+ * verification still valid on this account), so the flow continues. `code`:
+ * the details step stays open for the code sent to `email`; a failed send
+ * never fails the save, it shows in `send`.
+ */
 export type MembershipProfileResult =
-  | { ok: true }
+  | { ok: true; verification: "verified" }
+  | { ok: true; verification: "code"; email: string; send: UbcSendResult }
   | { ok: false; error: string };
 
 function optionalText(value: string) {
@@ -119,6 +216,10 @@ export async function saveMembershipProfileAction(
       };
     }
 
+    let update: UserInfoUpdate;
+    let audience: UbcAudience | null = null;
+    let ubcEmail: string | null = null;
+
     if (input.audience === "student") {
       const numberError = validateStudentNumber(input.studentNumber);
       if (numberError) return { ok: false, error: numberError };
@@ -131,37 +232,38 @@ export async function saveMembershipProfileAction(
       if (!input.major.trim()) {
         return { ok: false, error: "Enter your major." };
       }
-      await adminUpdateUserInfoById(user.id, {
+      audience = "student";
+      ubcEmail = normalizeUbcEmail(input.ubcEmail ?? "");
+      const emailError = validateUbcEmail(ubcEmail, audience);
+      if (emailError) return { ok: false, error: emailError };
+      update = {
         user_type: "ubcStudent",
         student_number: Number(input.studentNumber),
         faculty: input.faculty,
         year: input.year,
         major: input.major.trim(),
+        ubc_email: ubcEmail,
         faculty_email: null,
         school_institution: null,
         student_status: null,
         ...userTypeConfirmation(),
-      });
+      };
     } else if (input.audience === "faculty") {
-      const normalizedEmail = input.facultyEmail.trim().toLowerCase();
-      const emailError = validateFacultyEmail(normalizedEmail);
+      audience = "faculty";
+      ubcEmail = normalizeUbcEmail(input.ubcEmail ?? "");
+      const emailError = validateUbcEmail(ubcEmail, audience);
       if (emailError) return { ok: false, error: emailError };
-      if (normalizedEmail !== user.email.toLowerCase()) {
-        return {
-          ok: false,
-          error:
-            "Faculty eligibility requires signing in with the same UBC email address.",
-        };
-      }
       if (
         input.faculty &&
         !FACULTIES.includes(input.faculty as (typeof FACULTIES)[number])
       ) {
         return { ok: false, error: "Select a valid faculty." };
       }
-      await adminUpdateUserInfoById(user.id, {
+      update = {
         user_type: "faculty",
-        faculty_email: normalizedEmail,
+        ubc_email: ubcEmail,
+        // Read by the code in production until the cleanup migration.
+        faculty_email: ubcEmail,
         faculty: optionalText(input.faculty),
         student_number: null,
         major: null,
@@ -169,7 +271,7 @@ export async function saveMembershipProfileAction(
         school_institution: null,
         student_status: null,
         ...userTypeConfirmation(),
-      });
+      };
     } else if (input.audience === "non-ubc") {
       const validStatuses: StudentStatus[] = [
         "undergraduate",
@@ -185,23 +287,45 @@ export async function saveMembershipProfileAction(
       if (input.year && !YEAR_LEVELS.includes(input.year)) {
         return { ok: false, error: "Select a valid year." };
       }
-      await adminUpdateUserInfoById(user.id, {
+      update = {
         user_type: "nonUbc",
         school_institution: optionalText(input.schoolInstitution),
         student_status: input.studentStatus || null,
         year: input.year || null,
+        ubc_email: null,
         faculty_email: null,
         student_number: null,
         faculty: null,
         major: null,
         ...userTypeConfirmation(),
-      });
+      };
     } else {
       return { ok: false, error: "Select a valid membership classification." };
     }
 
+    const stamp = audience ? await signInEmailStamp(user.id, ubcEmail, audience) : null;
+    let saved: UserInfoRow | null;
+    try {
+      saved = await writeProfile(user.id, { ...update, ...(stamp ?? {}) });
+    } catch (error) {
+      if (error instanceof UbcEmailTakenError) return { ok: false, error: error.message };
+      throw error;
+    }
+
     revalidatePath("/portal/membership");
-    return { ok: true };
+    if (!audience || !ubcEmail) return { ok: true, verification: "verified" };
+    if (stamp) {
+      log.info("ubc_verification.verified", { userId: user.id, via: "sign_in_email" });
+      revalidatePath("/admin/users", "layout");
+      return { ok: true, verification: "verified" };
+    }
+    if (saved && hasPurchaseUbcVerification(saved)) {
+      return { ok: true, verification: "verified" };
+    }
+
+    const send = await sendUbcCode({ audience, email: ubcEmail, userId: user.id });
+    if (send.status === "already_verified") return { ok: true, verification: "verified" };
+    return { ok: true, verification: "code", email: ubcEmail, send };
   } catch (error) {
     log.error("membership.profile_save_failed", errorFields(error));
     return {
@@ -209,4 +333,29 @@ export async function saveMembershipProfileAction(
       error: "Your membership details could not be saved. Please try again.",
     };
   }
+}
+
+/** The details step's "Resend code" / "Send a new code", for the saved address. */
+export async function sendUbcCodeAction(): Promise<UbcSendResult> {
+  const user = await requireAuth("/portal/membership/join");
+  const audience = ubcAudienceForUserType(user.user_type);
+  if (!audience || !user.ubc_email) return { status: "send_failed" };
+  if (hasPurchaseUbcVerification(user)) return { status: "already_verified" };
+  return sendUbcCode({ audience, email: user.ubc_email, userId: user.id });
+}
+
+/** The details step's Verify, for the code sent to the saved address. */
+export async function verifyUbcCodeAction(code: string): Promise<UbcVerifyResult> {
+  const user = await requireAuth("/portal/membership/join");
+  if (!ubcAudienceForUserType(user.user_type)) return { status: "none" };
+  const result = await verifyUbcCode({
+    email: user.ubc_email,
+    input: code,
+    userId: user.id,
+  });
+  if (result.status === "verified") {
+    revalidatePath("/portal/membership");
+    revalidatePath("/admin/users", "layout");
+  }
+  return result;
 }

@@ -33,6 +33,7 @@ import {
   studentProfile,
   ticketPriceCents,
   uxathonQuestions,
+  withUbcVerification,
   type MembershipSlug,
   type SeedApplication,
   type SeedPurchase,
@@ -649,5 +650,5 @@ export function buildSeedCrowd(events: SeedEvent[], now: Date): SeedUser[] {
     status: "canceled",
   });
 
-  return users;
+  return users.map((user) => withUbcVerification(user, now));
 }

@@ -116,3 +116,25 @@ export function hasActiveMembership(
   if (!expiry) return true;
   return new Date(expiry) > new Date();
 }
+
+/**
+ * Whether the user holds a membership that blocks buying another one.
+ *
+ * A pre-order blocks unconditionally — it is pending, not expired, and the
+ * payment may still land. A held membership only blocks while it is still
+ * active: `membership_type_id` is never cleared when a membership lapses, so
+ * checking it alone would leave every expired member permanently unable to
+ * renew, and would lock the whole club out the day the term end passes.
+ */
+export function hasActiveOrPendingMembership(
+  user: Pick<
+    UserInfoRow,
+    | "membership_expires_at"
+    | "membership_pre_ordered_type_id"
+    | "membership_type_id"
+  >,
+  termEndsAt: string | null,
+) {
+  if (user.membership_pre_ordered_type_id) return true;
+  return hasActiveMembership(user, termEndsAt);
+}

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   renderEventConfirmationEmail,
   renderMembershipConfirmationEmail,
+  renderUbcVerificationCodeEmail,
 } from "./templates";
 
 const purchase = {
@@ -127,5 +128,23 @@ describe("renderMembershipConfirmationEmail", () => {
     });
 
     expect(html).toContain("US$15.00");
+  });
+});
+
+describe("renderUbcVerificationCodeEmail", () => {
+  it("shows the code and its expiry, but keeps it out of the subject", () => {
+    const { html, subject } = renderUbcVerificationCodeEmail({ code: "042917" });
+    expect(subject).toBe("Your UX Hub verification code");
+    expect(subject).not.toContain("042917");
+    expect(html).toContain(">042917</p>");
+    expect(html).toContain("It expires in 10 minutes.");
+    expect(html).toContain("Use this code to verify your UBC email for UX Hub.");
+    expect(html).toContain("UX Hub will never ask you for this code.");
+  });
+
+  it("escapes what it interpolates", () => {
+    const { html } = renderUbcVerificationCodeEmail({ code: "<b>1</b>" });
+    expect(html).not.toContain("<b>1</b>");
+    expect(html).toContain("&lt;b&gt;1&lt;/b&gt;");
   });
 });

@@ -249,6 +249,40 @@ describe("user seed fixtures", () => {
     }
   });
 
+  it("covers every UBC verification state on the login fixtures", () => {
+    const byEmail = new Map(seedUsers.map((user) => [user.email, user.profile]));
+    const via = (email: string) => byEmail.get(email)?.ubc_verified_via ?? null;
+    // Members who held a membership when the code step shipped.
+    expect(via("admin-explorer@example.com")).toBe("grandfathered");
+    expect(via("student-innovator@example.com")).toBe("grandfathered");
+    // Faculty sign in with their UBC address, which proves itself.
+    expect(via("faculty-member@ubc.ca")).toBe("sign_in_email");
+    expect(byEmail.get("faculty-member@ubc.ca")?.ubc_email).toBe("faculty-member@ubc.ca");
+    expect(via("admin-innovator@example.com")).toBe("code");
+    // A year old: expired, so joining asks again.
+    expect(via("admin-no-membership@example.com")).toBe("code");
+    // Applied after profiles exist, like the student verification it mirrors.
+    expect(via("student-explorer@example.com")).toBeNull();
+    // Nothing on file, so the code flow can be tried through the dev log.
+    expect(byEmail.get("no-membership@example.com")).toMatchObject({ ubc_email: null, ubc_verified_via: null });
+    expect(via("non-ubc@example.com")).toBeNull();
+  });
+
+  it("rejects a UBC verification the app couldn't have made", () => {
+    const users = structuredClone(seedUsers);
+    const innovator = users.find((user) => user.email === "admin-innovator@example.com")!;
+    innovator.ubcVerification!.email = "priya@ubc.ca";
+    expect(() => validateUserFixtures(users, seedEvents, membershipTypes, fixedNow)).toThrow(
+      "doesn't qualify for ubcStudent",
+    );
+
+    const signIn = structuredClone(seedUsers);
+    signIn.find((user) => user.email === "faculty-member@ubc.ca")!.ubcVerification!.email = "someone@ubc.ca";
+    expect(() => validateUserFixtures(signIn, seedEvents, membershipTypes, fixedNow)).toThrow(
+      "is verified by sign-in email but names",
+    );
+  });
+
   it("rejects a verification no manager could have made", () => {
     const index = seedUsers.findIndex((user) => user.studentVerification);
 

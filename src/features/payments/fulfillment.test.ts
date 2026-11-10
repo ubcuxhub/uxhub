@@ -416,6 +416,46 @@ describe("idempotent retries", () => {
     expect(squareMocks.create).not.toHaveBeenCalled();
     expect(result).toMatchObject({ ok: true, resolution: "processing" });
   });
+
+  it("refuses an unverified UBC student before any purchase row or charge", async () => {
+    const student = {
+      ...user,
+      user_type: "ubcStudent",
+      ubc_verified_at: null,
+      ubc_verified_via: null,
+    } as UserInfoRow;
+
+    const result = await executeCheckoutForUser(student, membershipInput);
+
+    expect(result).toEqual({
+      ok: false,
+      error: "Verify your UBC email before paying.",
+      terminal: true,
+    });
+    expect(purchasesMocks.fetchNonterminalMembershipPurchase).not.toHaveBeenCalled();
+    expect(customerMocks.ensureSquareCustomerId).not.toHaveBeenCalled();
+    expect(purchasesMocks.createPurchase).not.toHaveBeenCalled();
+    expect(squareMocks.create).not.toHaveBeenCalled();
+    expect(logMocks.warn).toHaveBeenCalledWith("payment.membership_ubc_unverified", {
+      userId: "user-1",
+      membershipTypeId: expect.any(String),
+    });
+  });
+
+  it("refuses a grandfathered student's new purchase too", async () => {
+    const grandfathered = {
+      ...user,
+      user_type: "ubcStudent",
+      ubc_verified_at: new Date().toISOString(),
+      ubc_verified_via: "grandfathered",
+    } as UserInfoRow;
+
+    await expect(executeCheckoutForUser(grandfathered, membershipInput)).resolves.toMatchObject({
+      ok: false,
+      terminal: true,
+    });
+    expect(purchasesMocks.createPurchase).not.toHaveBeenCalled();
+  });
 });
 
 describe("membership fulfillment", () => {

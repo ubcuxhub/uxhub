@@ -35,6 +35,7 @@ export type EventPrivateDetailsRow = Tables<"event_private_details">;
 export type UserInfoRow = Tables<"user_info">;
 export type UserInfoInsert = TablesInsert<"user_info">;
 export type UserInfoUpdate = TablesUpdate<"user_info">;
+export type UbcVerificationMethod = Enums<"ubc_verification_method">;
 
 export type MembershipTypeRow = Tables<"membership_types">;
 export type MembershipTypeInsert = TablesInsert<"membership_types">;

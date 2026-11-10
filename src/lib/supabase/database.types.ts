@@ -1055,6 +1055,51 @@ export type Database = {
           },
         ]
       }
+      ubc_verification_codes: {
+        Row: {
+          attempts: number
+          code_hash: string | null
+          code_salt: string | null
+          email: string
+          expires_at: string | null
+          last_sent_at: string
+          sends_in_window: number
+          user_id: string
+          window_started_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          attempts?: number
+          code_hash?: string | null
+          code_salt?: string | null
+          email: string
+          expires_at?: string | null
+          last_sent_at: string
+          sends_in_window?: number
+          user_id: string
+          window_started_at: string
+        }
+        Update: {
+          attempts?: number
+          code_hash?: string | null
+          code_salt?: string | null
+          email?: string
+          expires_at?: string | null
+          last_sent_at?: string
+          sends_in_window?: number
+          user_id?: string
+          window_started_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ubc_verification_codes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "user_info"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_info: {
         Row: {
           allergies: string[]
@@ -1090,6 +1135,12 @@ export type Database = {
           student_status: Database["public"]["Enums"]["student_status"] | null
           student_verified_at: string | null
           student_verified_by: string | null
+          ubc_email: string | null
+          ubc_verified_at: string | null
+          ubc_verified_by: string | null
+          ubc_verified_via:
+            | Database["public"]["Enums"]["ubc_verification_method"]
+            | null
           updated_at: string | null
           user_type: Database["public"]["Enums"]["user_type"]
           user_type_confirmed_at: string | null
@@ -1130,6 +1181,12 @@ export type Database = {
           student_status?: Database["public"]["Enums"]["student_status"] | null
           student_verified_at?: string | null
           student_verified_by?: string | null
+          ubc_email?: string | null
+          ubc_verified_at?: string | null
+          ubc_verified_by?: string | null
+          ubc_verified_via?:
+            | Database["public"]["Enums"]["ubc_verification_method"]
+            | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"]
           user_type_confirmed_at?: string | null
@@ -1169,6 +1226,12 @@ export type Database = {
           student_status?: Database["public"]["Enums"]["student_status"] | null
           student_verified_at?: string | null
           student_verified_by?: string | null
+          ubc_email?: string | null
+          ubc_verified_at?: string | null
+          ubc_verified_by?: string | null
+          ubc_verified_via?:
+            | Database["public"]["Enums"]["ubc_verification_method"]
+            | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"]
           user_type_confirmed_at?: string | null
@@ -1196,6 +1259,13 @@ export type Database = {
             referencedRelation: "user_info"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "user_info_ubc_verified_by_fkey"
+            columns: ["ubc_verified_by"]
+            isOneToOne: false
+            referencedRelation: "user_info"
+            referencedColumns: ["id"]
+          },
         ]
       }
     }
@@ -1203,6 +1273,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      begin_ubc_code_attempt: {
+        Args: { p_email: string; p_user: string }
+        Returns: {
+          attempts_left: number
+          challenge_sent_at: string
+          code_hash: string
+          code_salt: string
+          result: string
+        }[]
+      }
       can_edit_application_response: {
         Args: { p_application_id: string; p_question_id: string }
         Returns: boolean
@@ -1215,6 +1295,23 @@ export type Database = {
       can_upload_application_file: {
         Args: { p_name: string }
         Returns: boolean
+      }
+      claim_ubc_code_send: {
+        Args: {
+          p_code_hash: string
+          p_email: string
+          p_salt: string
+          p_user: string
+        }
+        Returns: {
+          expires_at: string
+          resend_at: string
+          result: string
+        }[]
+      }
+      complete_ubc_code_verification: {
+        Args: { p_challenge_sent_at: string; p_email: string; p_user: string }
+        Returns: string
       }
       create_team: {
         Args: { p_event_id: string; p_name?: string; p_user_id: string }
@@ -1266,6 +1363,10 @@ export type Database = {
         }[]
       }
       get_user_info_id: { Args: Record<PropertyKey, never>; Returns: string }
+      grandfather_ubc_members: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       is_admin: { Args: Record<PropertyKey, never>; Returns: boolean }
       is_authenticated: { Args: Record<PropertyKey, never>; Returns: boolean }
       is_manager: { Args: Record<PropertyKey, never>; Returns: boolean }
@@ -1335,6 +1436,13 @@ export type Database = {
         Args: { p_event_id: string; p_user_id: string }
         Returns: string
       }
+      ubc_email_qualifies: {
+        Args: {
+          p_email: string
+          p_user_type: Database["public"]["Enums"]["user_type"]
+        }
+        Returns: boolean
+      }
       valid_option_list: {
         Args: { allowed: string[]; choices: string[] }
         Returns: boolean
@@ -1367,6 +1475,11 @@ export type Database = {
         | "file_upload"
       role_access_enum: "basic" | "admin" | "manager"
       student_status: "undergraduate" | "graduate" | "other"
+      ubc_verification_method:
+        | "code"
+        | "sign_in_email"
+        | "manual"
+        | "grandfathered"
       uni_year: "1" | "2" | "3" | "4" | "5+"
       user_type: "ubcStudent" | "faculty" | "nonUbc"
     }
@@ -1523,6 +1636,12 @@ export const Constants = {
       ],
       role_access_enum: ["basic", "admin", "manager"],
       student_status: ["undergraduate", "graduate", "other"],
+      ubc_verification_method: [
+        "code",
+        "sign_in_email",
+        "manual",
+        "grandfathered",
+      ],
       uni_year: ["1", "2", "3", "4", "5+"],
       user_type: ["ubcStudent", "faculty", "nonUbc"],
     },

@@ -9,6 +9,7 @@ import { AdminUsersManager } from "./AdminUsersManager";
 let pathname = "/admin/users";
 
 vi.mock("next/navigation", () => ({ usePathname: () => pathname }));
+vi.mock("@/lib/auth/user-context", () => ({ useUser: () => ({ membershipTermEndsAt: null }) }));
 vi.mock("next/link", () => ({
   default: ({
     href,
@@ -39,6 +40,7 @@ afterEach(() => {
 function user(overrides: Partial<UserRecord>): UserRecord {
   return {
     birth_date: null, interests: [], profile_photo_path: null, student_verified_at: null, student_verified_by: null,
+    ubc_email: null, ubc_verified_at: null, ubc_verified_via: null, ubc_verified_by: null,
     id: "dora", auth_user_id: "auth-dora", first_name: "Dora", last_name: "Hu",
     email: "z@example.com", phone: "604-555-0100", preferred_pronouns: "She/Her",
     created_at: "2026-07-21T12:00:00Z", updated_at: null, deleted_at: null,
@@ -201,6 +203,29 @@ describe("AdminUsersManager", () => {
     fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Clear all" }));
     expect(rowNames()).toEqual(["Dora Hu"]);
     expect((screen.getByRole("searchbox") as HTMLInputElement).value).toBe("Dora");
+  });
+
+  it("filters UBC members by verification and leaves Non-UBC users out", () => {
+    const recent = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    renderManager([
+      user({ id: "coded", first_name: "Cody", last_name: "Code", ubc_verified_at: recent, ubc_verified_via: "code" }),
+      user({ id: "old", first_name: "Gran", last_name: "Father", ubc_verified_at: recent, ubc_verified_via: "grandfathered" }),
+      user({ id: "lapsed", first_name: "Ex", last_name: "Pired", ubc_verified_at: "2024-01-01T00:00:00Z", ubc_verified_via: "manual" }),
+      user({ id: "none", first_name: "Nat", last_name: "None" }),
+      user({ id: "offcampus", first_name: "Olu", last_name: "Off", user_type: "nonUbc" }),
+    ]);
+    openPanel();
+    toggleChip("Verified");
+    expect(rowNames()).toEqual(["Cody Code"]);
+    toggleChip("Grandfathered");
+    expect(rowNames()).toEqual(["Cody Code", "Gran Father"]);
+    toggleChip("Verified");
+    toggleChip("Grandfathered");
+    toggleChip("Expired");
+    expect(rowNames()).toEqual(["Ex Pired"]);
+    toggleChip("Expired");
+    toggleChip("Not verified");
+    expect(rowNames()).toEqual(["Nat None"]);
   });
 
   it("offers historical tiers for filtering", () => {

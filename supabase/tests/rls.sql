@@ -2480,6 +2480,177 @@ begin
 end;
 $$;
 
+-- ── UBC email verification ─────────────────────────────────────────────────
+-- Members read their own verified state but never write it; the pending code
+-- and the functions that run the code flow belong to the service role.
+insert into auth.users (
+  id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+)
+values (
+  gen_random_uuid(), 'authenticated', 'authenticated',
+  'rls-ubc-member@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()
+)
+returning id as auth_user_id, email
+\gset ubc_member_
+
+insert into public.user_info (
+  auth_user_id, email, first_name, last_name, role_access, user_type,
+  ubc_email, ubc_verified_at, ubc_verified_via
+)
+values (
+  :'ubc_member_auth_user_id', :'ubc_member_email', 'RLS', 'UBC Member', 'basic', 'ubcStudent',
+  'rls-ubc-member@student.ubc.ca', now(), 'code'
+)
+returning id \gset ubc_member_
+
+insert into public.user_info (
+  email, first_name, last_name, role_access, user_type, ubc_email
+)
+values (
+  'rls-ubc-other@example.test', 'RLS', 'UBC Other', 'basic', 'ubcStudent',
+  'rls-ubc-other@student.ubc.ca'
+)
+returning id \gset ubc_other_
+
+insert into public.ubc_verification_codes (
+  user_id, email, code_hash, code_salt, expires_at, last_sent_at, window_started_at, sends_in_window
+)
+values (
+  :'ubc_other_id', 'rls-ubc-other@student.ubc.ca', '\x00'::bytea, '\x00'::bytea,
+  now() + interval '10 minutes', now(), now(), 1
+);
+
+\o /dev/null
+select set_config('rls.ubc_member_id', :'ubc_member_id', true);
+select set_config('rls.ubc_other_id', :'ubc_other_id', true);
+\o
+
+do $$
+declare
+  role_name text;
+  column_name text;
+  fn text;
+  privilege text;
+begin
+  foreach role_name in array array['anon', 'authenticated'] loop
+    foreach column_name in array array['ubc_email', 'ubc_verified_at', 'ubc_verified_via', 'ubc_verified_by'] loop
+      if has_column_privilege(role_name, 'public.user_info', column_name, 'UPDATE') then
+        raise exception '% can update user_info.%', role_name, column_name;
+      end if;
+    end loop;
+    foreach privilege in array array['SELECT', 'INSERT', 'UPDATE', 'DELETE'] loop
+      if has_table_privilege(role_name, 'public.ubc_verification_codes', privilege) then
+        raise exception '% has % on ubc_verification_codes', role_name, privilege;
+      end if;
+    end loop;
+    foreach fn in array array[
+      'public.claim_ubc_code_send(uuid, text, bytea, bytea)',
+      'public.begin_ubc_code_attempt(uuid, text)',
+      'public.complete_ubc_code_verification(uuid, text, timestamptz)',
+      'public.grandfather_ubc_members()',
+      'public.ubc_email_qualifies(text, public.user_type)'
+    ] loop
+      if has_function_privilege(role_name, fn, 'execute') then
+        raise exception '% can execute %', role_name, fn;
+      end if;
+    end loop;
+  end loop;
+  if not has_table_privilege('service_role', 'public.ubc_verification_codes', 'SELECT')
+     or not has_function_privilege('service_role', 'public.claim_ubc_code_send(uuid, text, bytea, bytea)', 'execute') then
+    raise exception 'the service role lost the UBC code flow';
+  end if;
+end;
+$$;
+
+\o /dev/null
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'ubc_member_auth_user_id',
+    'email', :'ubc_member_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+\o
+
+set local role authenticated;
+
+do $$
+declare
+  v_email text;
+  v_via public.ubc_verification_method;
+  v_count integer;
+begin
+  select ubc_email, ubc_verified_via into v_email, v_via
+  from public.user_info where id = current_setting('rls.ubc_member_id')::uuid;
+  if v_email is distinct from 'rls-ubc-member@student.ubc.ca' or v_via is distinct from 'code' then
+    raise exception 'a member could not read their own UBC verification';
+  end if;
+
+  select count(*) into v_count
+  from public.user_info where id = current_setting('rls.ubc_other_id')::uuid;
+  if v_count <> 0 then
+    raise exception 'a member read another member''s UBC verification';
+  end if;
+
+  begin
+    update public.user_info set ubc_verified_via = 'manual'
+    where id = current_setting('rls.ubc_member_id')::uuid;
+    raise exception 'a member changed their own UBC verification';
+  exception when insufficient_privilege then null;
+  end;
+
+  begin
+    update public.user_info set ubc_email = 'someone-else@student.ubc.ca'
+    where id = current_setting('rls.ubc_member_id')::uuid;
+    raise exception 'a member changed their own UBC address directly';
+  exception when insufficient_privilege then null;
+  end;
+
+  begin
+    perform 1 from public.ubc_verification_codes;
+    raise exception 'a member read the pending codes';
+  exception when insufficient_privilege then null;
+  end;
+
+  begin
+    perform public.complete_ubc_code_verification(
+      current_setting('rls.ubc_member_id')::uuid, 'rls-ubc-member@student.ubc.ca', now()
+    );
+    raise exception 'a member called the code flow directly';
+  exception when insufficient_privilege then null;
+  end;
+end;
+$$;
+
+reset role;
+
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+
+set local role anon;
+
+do $$
+begin
+  begin
+    perform 1 from public.ubc_verification_codes;
+    raise exception 'anon read the pending codes';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform public.claim_ubc_code_send(gen_random_uuid(), 'x@student.ubc.ca', '\x00'::bytea, '\x00'::bytea);
+    raise exception 'anon claimed a code send';
+  exception when insufficient_privilege then null;
+  end;
+end;
+$$;
+
+reset role;
+
+
 \ir event-publication.sql
 
 rollback;

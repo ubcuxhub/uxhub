@@ -111,8 +111,6 @@ export function ProfileSettings() {
           userType: formData.user_type,
           studentNumber: formData.student_number || null,
           faculty: formData.faculty || null,
-          facultyEmail:
-            formData.user_type === "faculty" ? user.email : null,
         });
       }
       await updateUserInfoById(supabase, user.id, {

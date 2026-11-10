@@ -143,6 +143,24 @@ by `manager-no-membership@example.com`; everyone else is unverified. Each run
 resets verification and profile photos to that, undoing changes made through
 the admin dialog.
 
+UBC email verification (docs/design/ubc-email-verification.md) covers every
+state, and each run resets it too, along with any code a fixture was sent:
+
+| Fixture | UBC verification |
+| --- | --- |
+| `admin-explorer`, `student-innovator` (and every crowd UBC member) | `grandfathered`: held a membership when the code step shipped |
+| `student-explorer` (and five crowd students) | `manual`, by `manager-no-membership` |
+| `faculty-member@ubc.ca`, `admin-faculty@ubc.ca` | `sign_in_email` |
+| `admin-innovator` | `code`, recently |
+| `manager-no-membership` | `code`, recently, so joining skips the code |
+| `admin-no-membership` | `code`, over a year ago: expired, so joining asks again |
+| `no-membership`, `new-member` | unverified, no UBC email on file |
+
+To try the code step, sign in as `no-membership@example.com` and join: without
+`RESEND_API_KEY` the dev server logs the code as `ubc_verification.dev_code`.
+`withUbcVerification` in `data/users.ts` derives the defaults; a fixture names
+a `code` or `sign_in_email` verification with `ubcVerification`.
+
 `manager-no-membership@example.com` is the dedicated manager fixture. It can
 edit users and roles and is the only fixture that can access Club Settings.
 

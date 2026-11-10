@@ -22,10 +22,12 @@ import { formatUserName } from "@/lib/user-name";
 
 import { saveManagerUserDetailsAction, updateUserRoleAction } from "../actions";
 import { displaySchool } from "../lib/directory";
+import { ubcVerificationLine } from "../lib/ubc-verification-display";
 import {
   canEditUserSchool,
   createUserEditDraft,
   hasUserEdits,
+  isUbcVerifiedNow,
   userEditChanges,
   type UserEditDraft,
   type UserEditField,
@@ -49,8 +51,10 @@ const SCHOOL_LOCKED =
 
 interface AdminUserRecordProps {
   record: UserRecord;
-  /** The manager who verified this student, when their profile still exists. */
+  /** The manager who verified this member by hand, when their profile still exists. */
   verifierName: string | null;
+  /** When a UBC verification code that hasn't been entered yet was sent. */
+  ubcCodeSentAt?: string | null;
   /** Active tiers, offered when editing. */
   membershipTypes: MembershipTypeOption[];
   /** Managers edit; admins only look. */
@@ -82,13 +86,14 @@ function roleLabel(role: RoleAccess) {
 export function AdminUserRecord({
   record,
   verifierName,
+  ubcCodeSentAt = null,
   membershipTypes,
   canManage,
   currentUserId,
   transactions,
 }: AdminUserRecordProps) {
   const router = useRouter();
-  const { refreshUser } = useUser();
+  const { refreshUser, membershipTermEndsAt } = useUser();
   const ids = useId();
   const id = (name: string) => `${ids}-${name}`;
 
@@ -106,7 +111,7 @@ export function AdminUserRecord({
   const [pendingRole, setPendingRole] = useState<RoleAccess | null>(null);
   // Only managers get the Edit button, so only they ever hold a draft.
   const editing = draft !== null;
-  const dirty = draft !== null && hasUserEdits(user, draft);
+  const dirty = draft !== null && hasUserEdits(user, draft, membershipTermEndsAt);
 
   const photoPreview = draft?.photo?.preview;
   useEffect(() => () => {
@@ -120,13 +125,15 @@ export function AdminUserRecord({
   };
   const setField = (field: UserEditField, value: string) => {
     if (!draft) return;
-    // A new student number needs verifying again.
-    update({ fields: { ...draft.fields, [field]: value }, ...(field === "student_number" ? { verified: false } : {}) });
+    // A new student number undoes a manual verification (the database does
+    // the same); a code or sign-in email verification doesn't depend on it.
+    const unverify = field === "student_number" && user.ubc_verified_via === "manual";
+    update({ fields: { ...draft.fields, [field]: value }, ...(unverify ? { verified: false } : {}) });
   };
 
   const startEditing = () => {
     setError(null);
-    setDraft(createUserEditDraft(user));
+    setDraft(createUserEditDraft(user, membershipTermEndsAt));
   };
   const cancel = () => {
     setDraft(null);
@@ -158,7 +165,7 @@ export function AdminUserRecord({
           newInterest: "",
         });
       }
-      if (draft.verified !== !!updated.student_verified_at) {
+      if (draft.verified !== isUbcVerifiedNow(updated, membershipTermEndsAt)) {
         commit(await setStudentVerificationAction(updated.id, draft.verified));
       }
       if (draft.photo !== undefined) {
@@ -215,14 +222,19 @@ export function AdminUserRecord({
   const tierName = user.membership_type_name ? formatMembershipTypeName(user.membership_type_name) : null;
   const schoolEditable = draft !== null && canEditUserSchool(user, draft.fields.membership_type_id, membershipTypes);
   const verifiedBy =
-    user.student_verified_by === currentUserId
+    user.ubc_verified_by === currentUserId
       ? "you"
-      : user.student_verified_by === record.student_verified_by && verifierName
+      : user.ubc_verified_by === record.ubc_verified_by && verifierName
         ? verifierName
         : "a former or unavailable manager";
-  const verification = user.student_verified_at
-    ? `Verified · ${formatEventDate(user.student_verified_at, { month: "short" })} · by ${verifiedBy}`
-    : "Not verified";
+  const ubcVerified = isUbcVerifiedNow(user, membershipTermEndsAt);
+  const verification = ubcVerificationLine({
+    user,
+    termEndsAt: membershipTermEndsAt,
+    verifiedBy,
+    // The code row was read with the record; a save since may have moved on.
+    codeSentAt: user.ubc_verified_at === record.ubc_verified_at ? ubcCodeSentAt : null,
+  });
 
   const textField = (field: UserEditField, label: string, value: ReactNode, props: ComponentProps<typeof Input> = {}) => (
     <RecordField label={label} value={value} htmlFor={id(field)}>
@@ -244,10 +256,10 @@ export function AdminUserRecord({
         title={name}
         titleAdornment={
           <>
-            {user.student_verified_at ? (
-              <span className="inline-flex text-primary" title="Verified student">
+            {ubcVerified ? (
+              <span className="inline-flex text-primary" title="UBC verified">
                 <BadgeCheck className="size-4" aria-hidden />
-                <span className="sr-only">Verified student</span>
+                <span className="sr-only">UBC verified</span>
               </span>
             ) : null}
             {user.preferred_pronouns ? (
@@ -347,6 +359,7 @@ export function AdminUserRecord({
                 />
               )}
               {textField("student_number", "Student number", user.student_number?.toString(), { inputMode: "numeric", autoComplete: "off" })}
+              <RecordField label="UBC email" editing={false} value={user.ubc_email} />
               <RecordField label="Verification" value={verification}>
                 {draft ? (
                   <div className="flex min-h-10 items-center gap-2">
@@ -356,7 +369,7 @@ export function AdminUserRecord({
                       disabled={saving}
                       onCheckedChange={(verified) => update({ verified })}
                     />
-                    <Label htmlFor={id("verified")}>Verified student</Label>
+                    <Label htmlFor={id("verified")}>Verified</Label>
                   </div>
                 ) : undefined}
               </RecordField>

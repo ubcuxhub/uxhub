@@ -218,6 +218,33 @@ export function validateUserFixtures(
       }
     }
 
+    // Mirrors `validateUbcEmail` and the sign-in stamp in
+    // src/features/memberships: the address must qualify for the type, and a
+    // sign-in email verification is the account's own address.
+    if (user.ubcVerification) {
+      const { email, via, verifiedAt } = user.ubcVerification;
+      const userType = user.profile.user_type ?? "ubcStudent";
+      const domain = /^[^\s@]+@((?:[a-z0-9-]+\.)*ubc\.ca)$/.exec(email)?.[1];
+      const qualifies =
+        userType === "ubcStudent"
+          ? domain === "student.ubc.ca"
+          : userType === "faculty" &&
+            !!domain &&
+            !/(^|\.)(student|alumni)\.ubc\.ca$/.test(domain);
+      if (!qualifies) {
+        throw new Error(`"${user.email}" has UBC email "${email}", which doesn't qualify for ${userType}`);
+      }
+      if (via === "sign_in_email" && email !== user.email) {
+        throw new Error(`"${user.email}" is verified by sign-in email but names "${email}"`);
+      }
+      if (user.studentVerification) {
+        throw new Error(`"${user.email}" can't be verified both manually and by ${via}`);
+      }
+      if (new Date(verifiedAt) > now) {
+        throw new Error(`"${user.email}" cannot be UBC-verified in the future`);
+      }
+    }
+
     // `isEligibleForMembership` in src/features/memberships/lib/policy.ts gates
     // on `eligible_user_types.includes(user_type)`, so a tier the fixture's own
     // type could never buy describes an account the app would not have created.

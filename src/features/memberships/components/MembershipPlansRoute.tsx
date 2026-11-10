@@ -15,6 +15,7 @@ import {
   isMembershipProfileComplete,
   membershipDetailsPath,
 } from "@/features/memberships/lib/policy";
+import { hasPurchaseUbcVerification } from "@/features/memberships/lib/ubc-verification";
 
 function MembershipNotice({
   body,
@@ -63,7 +64,9 @@ export async function MembershipPlansRoute({ returnTo }: { returnTo?: string }) 
     );
   }
 
-  if (!isMembershipProfileComplete(user)) {
+  // An unverified UBC member goes back to the details step, which opens on
+  // the code state when a code is pending.
+  if (!isMembershipProfileComplete(user) || !hasPurchaseUbcVerification(user)) {
     redirect(withReturnTo(membershipDetailsPath(user.user_type), returnTo));
   }
 

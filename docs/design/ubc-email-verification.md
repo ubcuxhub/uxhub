@@ -1,6 +1,7 @@
 # UBC email verification for student and faculty memberships
 
-Status: proposal v2 · 2026-11-09 · blocking code verification
+Status: accepted v2 · 2026-11-10 · blocking code verification, implemented in
+one PR (see [Implementation notes](#implementation-notes))
 
 Builds on `main` after #259 (setup `user_type`, `user_type_confirmed_at`) and
 #260. Replaces v1 (email link, non-blocking): the link, the token module, the
@@ -37,7 +38,7 @@ notice are gone.
    no prompt, banner or email. Grandfathering lasts until their current
    membership ends. Since nobody can buy while a membership is active or
    pending, this means it never covers a purchase: the next purchase or renewal
-   asks for a code. The user still needs to confirm this; see Open question 1.
+   asks for a code. Confirmed; see [Resolved](#resolved) 1.
 6. **365-day validity.** A `code`, `sign_in_email` or `manual` verification
    counts for 365 days, matching the membership year. After that, the next
    purchase asks again. Members whose sign-in email qualifies are re-verified
@@ -576,7 +577,9 @@ token. `RESEND_API_KEY` and `EMAIL_FROM` are already required for receipts.
 
 ## PR breakdown
 
-Two PRs, about 2,300 lines in total, roughly half of it tests.
+Planned as two PRs, about 2,300 lines in total, roughly half of it tests. It
+shipped as one (PR 1 and 2 together), so there is no window between the two
+deploys and no second migration rerunning `grandfather_ubc_members()`.
 
 | PR | Contents | Lines |
 | --- | --- | --- |
@@ -584,20 +587,57 @@ Two PRs, about 2,300 lines in total, roughly half of it tests.
 | 2. Blocking member flow | `validateUbcEmail`, code module, actions, email template, `loadCurrentUser` sign-in email, details-form code states, plans and checkout redirects, payment guard, Settings field, seed, unit, component and integration tests, plus a one-line migration rerunning `grandfather_ubc_members()` so members who joined between the two deploys are covered | ~1,300 |
 | 3. Cleanup (after a term) | Drop `faculty_email`, `student_verified_*`, `grandfather_ubc_members()` | ~60 |
 
-PR 2 is the behaviour change. Merge it when exec contacts know about the
-"Can't get the code?" path. Keep each migration's timestamp the newest on
-`main`.
+The behaviour change ships with the merge. Merge it when exec contacts know
+about the "Can't get the code?" path. Keep each migration's timestamp the
+newest on `main`.
 
-## Open questions
+## Resolved
 
-1. **How long does grandfathering last?**
-   - Recommended: until the member's current membership ends, so their next
-     purchase or renewal asks for a code.
-   - The alternative is 365 days from the migration, which would let them
-     renew next fall with no code.
-   - This decides one branch of `hasPurchaseUbcVerification`.
-2. **Is a per-member send cap enough?** Someone could type a victim's UBC
-   address from several accounts, up to 5 emails a day each. Capping per
-   address as well needs a send-log table instead of the single code row.
-   Recommended: per member only for now; account creation already requires a
-   confirmed email.
+1. **How long does grandfathering last?** Until the member's current
+   membership ends, and it never covers a new purchase: their next purchase or
+   renewal asks for a code.
+   - "Current membership" is whatever is active or pending, read the way
+     `hasActiveOrPendingMembership` reads it (`expiry.ts`): a pre-order, or a
+     held tier whose effective expiry (the earlier of `membership_expires_at`
+     and the club-wide `membership_term_ends_at`) is unset or in the future.
+     A member pending at migration time is grandfathered through the
+     membership that pre-order becomes.
+   - `ubcVerificationStatus` shows `grandfathered` as verified only while that
+     holds, and expired after. `hasPurchaseUbcVerification` never accepts it,
+     and nobody can buy while a membership is active or pending, so the two
+     agree: the stamp can't carry into a purchase.
+   - The 365-days-from-migration alternative was rejected.
+2. **Is a per-member send cap enough?** Yes, for now: 5 sends per rolling 24
+   hours and the 60-second cooldown are per member, with no per-address send
+   log. Someone typing a victim's address from several accounts can send at
+   most 5 emails a day from each, and every account needs a confirmed email.
+   Revisit with a send-log table if abuse shows up.
+
+## Implementation notes
+
+Where the code differs from, or settles details the plan left open:
+
+- **Cap before cooldown.** `claim_ubc_code_send` answers `daily_cap` once five
+  sends are used, even inside the 60 seconds after the fifth, since a
+  countdown would only lead to the cap.
+- **Attempts left.** `begin_ubc_code_attempt` also returns `attempts_left`, so
+  "That code isn't right. 3 tries left." needs no extra read. A wrong fifth
+  guess answers `locked` straight away.
+- **Verify results** add `malformed` (refused before an attempt is counted)
+  and `error` (the database failed) to the list above.
+- **Address rule in SQL.** The backfill uses `public.ubc_email_qualifies`, the
+  same domain rule as `validateUbcEmail`; it is service-role only.
+- **Settings** shows the UBC email read-only with its status, for students and
+  faculty who have one; it replaces the "Faculty email" field. The address
+  changes in the join flow. `updateEligibilityProfileAction` still accepts
+  `ubcEmail` (validated by domain), keeps a saved address across a type change
+  only while it qualifies, fills an empty one from a qualifying confirmed
+  sign-in email and stamps that.
+- **Manual verification** checks for another verified account holding the
+  same address first and says so, instead of failing on the index. It also
+  writes the legacy `student_verified_*` columns for faculty.
+- **Changing a student number in admin** unticks "Verified" only for a manual
+  verification, matching the trigger; a code or sign-in stamp doesn't depend
+  on the number.
+- **Admin record line** for a waiting code reads "Code sent Nov 10 · not
+  entered", and Non-UBC members read "Not needed for Non-UBC members".

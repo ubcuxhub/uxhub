@@ -20,6 +20,8 @@ vi.mock("./confirmation-email", () => ({
   sendPurchaseConfirmationEmail: vi.fn(),
 }));
 vi.mock("./revalidation", () => ({ revalidatePurchasePaths: vi.fn() }));
+const sendEmail = vi.hoisted(() => vi.fn<(email: { html: string }) => Promise<boolean>>(async () => true));
+vi.mock("@/lib/email/client", () => ({ sendEmail }));
 
 const square = vi.hoisted(() => ({
   create: vi.fn(),
@@ -35,6 +37,9 @@ vi.mock("@/lib/square/client", () => ({
 
 const { executeCheckoutForUser, processSquarePaymentEvent } = await import(
   "./fulfillment"
+);
+const { sendUbcCode, verifyUbcCode } = await import(
+  "@/features/memberships/ubc-verification-server"
 );
 
 const db = createIntegrationClient();
@@ -313,5 +318,78 @@ describe("release_event_ticket", () => {
       expect((await ticketsFor(event.id)).map((ticket) => ticket.id).sort()).toEqual(
         [completed.ticketId, checkedIn.ticketId].sort()
       );
+    }));
+});
+
+describe("membership checkout for a UBC student", () => {
+  async function studentTierAndBuyer(fixtures: Fixtures, verified: Record<string, unknown>) {
+    const tier = await fixtures.createMembershipType({ eligible_user_types: ["ubcStudent"], active: true });
+    const user = (await fixtures.createUser({
+      user_type: "ubcStudent",
+      student_number: 38475610,
+      faculty: "Faculty of Arts",
+      year: "2",
+      major: "Psychology",
+      ubc_email: `${fixtures.tag}@student.ubc.ca`,
+      ...verified,
+    })) as UserInfoRow;
+    return { tier, user };
+  }
+
+  function membershipInput(slug: string): CheckoutRequestInput {
+    return { ...checkoutInput(slug), kind: "membership" };
+  }
+
+  async function purchasesOf(userId: string) {
+    const { data, error } = await db.from("purchases").select("id, status").eq("user_id", userId);
+    if (error) throw error;
+    return data;
+  }
+
+  it("refuses an unverified student before any purchase row or charge", () =>
+    withFixtures(async (fixtures) => {
+      const { tier, user } = await studentTierAndBuyer(fixtures, {});
+
+      await expect(executeCheckoutForUser(user, membershipInput(tier.slug))).resolves.toEqual({
+        ok: false,
+        error: "Verify your UBC email before paying.",
+        terminal: true,
+      });
+      expect(await purchasesOf(user.id)).toEqual([]);
+      expect(square.create).not.toHaveBeenCalled();
+    }));
+
+  it("refuses a grandfathered member's new purchase", () =>
+    withFixtures(async (fixtures) => {
+      const { tier, user } = await studentTierAndBuyer(fixtures, {
+        ubc_verified_at: new Date().toISOString(),
+        ubc_verified_via: "grandfathered",
+      });
+      await expect(executeCheckoutForUser(user, membershipInput(tier.slug))).resolves.toMatchObject({
+        ok: false,
+        terminal: true,
+      });
+      expect(await purchasesOf(user.id)).toEqual([]);
+    }));
+
+  it("charges a student once the emailed code is verified", () =>
+    withFixtures(async (fixtures) => {
+      const { tier, user } = await studentTierAndBuyer(fixtures, {});
+      const email = user.ubc_email!;
+
+      // The real send and verify, with only the mailbox faked.
+      await expect(sendUbcCode({ audience: "student", email, userId: user.id })).resolves.toMatchObject({ status: "sent" });
+      const html = sendEmail.mock.calls.at(-1)![0].html;
+      const code = />(\d{6})<\/p>/.exec(html)![1];
+      await expect(verifyUbcCode({ email, input: code, userId: user.id })).resolves.toEqual({ status: "verified" });
+
+      const { data: verifiedUser, error } = await db.from("user_info").select("*").eq("id", user.id).single();
+      if (error) throw error;
+      const result = await executeCheckoutForUser(verifiedUser as UserInfoRow, membershipInput(tier.slug));
+
+      // The charge went out; the mocked Square leaves it approved, not settled.
+      expect(result).toMatchObject({ ok: true });
+      expect(square.create).toHaveBeenCalledTimes(1);
+      expect(await purchasesOf(user.id)).toHaveLength(1);
     }));
 });

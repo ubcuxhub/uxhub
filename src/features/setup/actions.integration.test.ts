@@ -237,7 +237,7 @@ describe("member setup against local Supabase", () => {
       schoolInstitution: "SFU",
       studentStatus: "undergraduate",
       year: "",
-    })).toEqual({ ok: true });
+    })).toEqual({ ok: true, verification: "verified" });
     const saved = await fetchUserSetup(db, member.id);
     expect(saved).toMatchObject({ user_type: "nonUbc", setup_step: "about" });
     expect(saved.user_type_confirmed_at).not.toBeNull();

@@ -30,6 +30,7 @@ export const TABLES = {
   teamMembers: "team_members",
   eventLinks: "event_links",
   eventPrivateDetails: "event_private_details",
+  ubcVerificationCodes: "ubc_verification_codes",
 } as const;
 
 export type TableName = (typeof TABLES)[keyof typeof TABLES];

@@ -5,6 +5,7 @@ import {
   confirmedJoinPath,
   hasActiveOrPendingMembership,
   isEligibleForMembership,
+  isMembershipProfileComplete,
   userTypeConfirmation,
 } from "./policy";
 
@@ -20,6 +21,9 @@ describe("membership eligibility", () => {
     membership_type_id: null,
     membership_pre_ordered_type_id: null,
     student_number: null,
+    ubc_email: null,
+    ubc_verified_at: null,
+    ubc_verified_via: null,
     user_type: "nonUbc" as const,
     year: null,
   };
@@ -116,33 +120,82 @@ describe("membership eligibility", () => {
     ).toBe(false);
   });
 
+  const RECENT = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const studentTier = {
+    active: true,
+    eligible_user_types: ["ubcStudent" as const],
+  };
+  const completeStudent = {
+    ...baseUser,
+    user_type: "ubcStudent" as const,
+    faculty: "Arts",
+    major: "Psychology",
+    student_number: 28471936,
+    year: "2" as const,
+    ubc_email: "jane@student.ubc.ca",
+    ubc_verified_at: RECENT,
+    ubc_verified_via: "code" as const,
+  };
+
   it("requires a complete student profile for UBC students", () => {
     const student = { ...baseUser, user_type: "ubcStudent" as const };
-    const membership = {
-      active: true,
-      eligible_user_types: ["ubcStudent" as const],
-    };
 
-    expect(isEligibleForMembership(student, membership, null)).toBe(false);
+    expect(isEligibleForMembership(student, studentTier, null)).toBe(false);
     expect(
       isEligibleForMembership(
         { ...student, student_number: 28471936 },
-        membership,
+        studentTier,
         null
       )
     ).toBe(false);
+    expect(isEligibleForMembership(completeStudent, studentTier, null)).toBe(true);
+  });
+
+  it("needs a UBC student address on file", () => {
+    expect(isMembershipProfileComplete(completeStudent)).toBe(true);
+    expect(isMembershipProfileComplete({ ...completeStudent, ubc_email: null })).toBe(false);
+    expect(
+      isMembershipProfileComplete({ ...completeStudent, ubc_email: "jane@ubc.ca" }),
+    ).toBe(false);
+  });
+
+  it("needs a faculty address that passes the faculty rule", () => {
+    const faculty = { ...baseUser, user_type: "faculty" as const };
+    expect(isMembershipProfileComplete({ ...faculty, ubc_email: "prof@cs.ubc.ca" })).toBe(true);
+    expect(isMembershipProfileComplete({ ...faculty, ubc_email: "prof@student.ubc.ca" })).toBe(false);
+    // The legacy column alone no longer counts.
+    expect(isMembershipProfileComplete({ ...faculty, faculty_email: "prof@ubc.ca" })).toBe(false);
+  });
+
+  it("refuses a UBC tier until the UBC address is verified for purchase", () => {
     expect(
       isEligibleForMembership(
-        {
-          ...student,
-          faculty: "Arts",
-          major: "Psychology",
-          student_number: 28471936,
-          year: "2" as const,
-        },
-        membership,
-        null
-      )
+        { ...completeStudent, ubc_verified_at: null, ubc_verified_via: null },
+        studentTier,
+        null,
+      ),
+    ).toBe(false);
+    // Grandfathering covers the membership held at migration, never a purchase.
+    expect(
+      isEligibleForMembership(
+        { ...completeStudent, ubc_verified_via: "grandfathered" },
+        studentTier,
+        null,
+      ),
+    ).toBe(false);
+    expect(
+      isEligibleForMembership(
+        { ...completeStudent, ubc_verified_at: PAST, ubc_verified_via: "manual" },
+        studentTier,
+        null,
+      ),
+    ).toBe(false);
+    expect(
+      isEligibleForMembership(
+        { ...completeStudent, ubc_verified_via: "manual" },
+        studentTier,
+        null,
+      ),
     ).toBe(true);
   });
 });
@@ -162,6 +215,8 @@ describe("buildEligibilityUpdate", () => {
       school_institution: null,
       student_status: null,
     });
+    // The UBC address is owned too, and untouched when not given.
+    expect("ubc_email" in update).toBe(false);
     // Owned but unmentioned: left alone rather than nulled.
     expect("major" in update).toBe(false);
     expect("year" in update).toBe(false);
@@ -189,30 +244,33 @@ describe("buildEligibilityUpdate", () => {
       faculty_email: null,
       major: null,
       student_number: null,
+      ubc_email: null,
     });
   });
 
-  it("stores the verified faculty email alongside the faculty", () => {
+  it("stores a faculty member's UBC address, mirrored into the legacy faculty email", () => {
     expect(
       buildEligibilityUpdate({
         userType: "faculty",
         studentNumber: null,
         faculty: "Faculty of Arts",
-        facultyEmail: "prof@cs.ubc.ca",
+        ubcEmail: " Prof@CS.ubc.ca ",
       })
     ).toMatchObject({
       user_type: "faculty",
       faculty: "Faculty of Arts",
+      ubc_email: "prof@cs.ubc.ca",
       faculty_email: "prof@cs.ubc.ca",
     });
   });
 
-  it("only writes the faculty email for a faculty classification", () => {
+  it("stores a student's UBC address but clears the faculty email", () => {
     const student = buildEligibilityUpdate({
       userType: "ubcStudent",
       studentNumber: 28471936,
-      facultyEmail: "prof@cs.ubc.ca",
+      ubcEmail: "jane@student.ubc.ca",
     });
+    expect(student.ubc_email).toBe("jane@student.ubc.ca");
     // Not an owned column here, so it is cleared rather than stored.
     expect(student.faculty_email).toBeNull();
   });
