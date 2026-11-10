@@ -50,6 +50,59 @@ describe("GET /auth/callback", () => {
     );
   });
 
+  it("sends an expired confirmation link to the verify-expired screen", async () => {
+    const response = await GET(
+      new NextRequest(
+        "https://example.com/auth/callback?error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired",
+      ),
+    );
+
+    expect(response.headers.get("location")).toBe(
+      "https://example.com/auth/link-expired?type=verify",
+    );
+    expect(authMocks.exchangeCodeForSession).not.toHaveBeenCalled();
+  });
+
+  it("sends an expired recovery link to the reset-expired screen", async () => {
+    const response = await GET(
+      new NextRequest(
+        "https://example.com/auth/callback?error_code=otp_expired&next=%2Fauth%2Fupdate-password",
+      ),
+    );
+
+    expect(response.headers.get("location")).toBe(
+      "https://example.com/auth/link-expired?type=reset",
+    );
+  });
+
+  it("routes an expired code exchange the same way", async () => {
+    authMocks.exchangeCodeForSession.mockResolvedValue({
+      error: { code: "flow_state_expired", message: "expired" },
+    });
+
+    const response = await GET(
+      new NextRequest(
+        "https://example.com/auth/callback?code=old&next=%2Fportal%2Fevents",
+      ),
+    );
+
+    expect(response.headers.get("location")).toBe(
+      "https://example.com/auth/link-expired?type=verify&next=%2Fportal%2Fevents",
+    );
+  });
+
+  it("keeps the generic error for other provider failures", async () => {
+    const response = await GET(
+      new NextRequest(
+        "https://example.com/auth/callback?error=access_denied&error_code=unexpected_failure",
+      ),
+    );
+
+    expect(new URL(response.headers.get("location")!).pathname).toBe(
+      "/auth/error",
+    );
+  });
+
   it("uses a stable recoverable error and preserves safe next handling", async () => {
     authMocks.exchangeCodeForSession.mockRejectedValue(
       new Error("raw provider details"),

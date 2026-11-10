@@ -6,14 +6,19 @@ import { useRef, useState } from "react";
 
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { withDeadline } from "@/lib/async/deadline";
 import { useNavigationRecovery } from "@/hooks/use-navigation-recovery";
 import { createClient } from "@/lib/supabase/client";
 
 import {
   AUTH_ACTION_ERRORS,
+  INVALID_CREDENTIALS_MESSAGE,
   getAuthActionErrorMessage,
+  isEmailNotConfirmedError,
+  isInvalidCredentialsError,
 } from "../auth-errors";
+import { setPendingEmail } from "../pending-email";
 import { AuthPanel } from "./AuthPanel";
 import { AuthSubmitButton } from "./AuthSubmitButton";
 import { GoogleOAuthButton } from "./GoogleOAuthButton";
@@ -26,6 +31,7 @@ export function LoginForm({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const submittingRef = useRef(false);
   const router = useRouter();
@@ -43,6 +49,7 @@ export function LoginForm({
     submittingRef.current = true;
     setIsLoading(true);
     setError(null);
+    setPasswordError(null);
     let navigationStarted = false;
 
     try {
@@ -63,7 +70,18 @@ export function LoginForm({
       navigationStarted = true;
       recoverStalledNavigation();
     } catch (error: unknown) {
-      setError(getAuthActionErrorMessage(error, AUTH_ACTION_ERRORS.signIn));
+      if (isEmailNotConfirmedError(error)) {
+        // Unverified accounts always go through Verify email before anything
+        // else; the address travels out of band, as after sign-up.
+        setPendingEmail(email.trim().toLowerCase());
+        router.push(`/auth/verify-email?next=${encodeURIComponent(nextPath)}`);
+        navigationStarted = true;
+        recoverStalledNavigation();
+      } else if (isInvalidCredentialsError(error)) {
+        setPasswordError(INVALID_CREDENTIALS_MESSAGE);
+      } else {
+        setError(getAuthActionErrorMessage(error, AUTH_ACTION_ERRORS.signIn));
+      }
     } finally {
       if (!navigationStarted) {
         submittingRef.current = false;
@@ -75,13 +93,14 @@ export function LoginForm({
   return (
     <AuthPanel
       title="Sign in"
-      description="Continue to the UBC UX Hub Portal with:"
+      description="Sign in to the UBC UX Hub Portal."
       className={className}
       {...props}
     >
-      <GoogleOAuthButton nextPath={nextPath} />
+      <div className="flex flex-col gap-6">
+      <GoogleOAuthButton nextPath={nextPath} dividerLabel="or sign in with email" />
 
-      <form onSubmit={handleLogin} className="space-y-6">
+      <form onSubmit={handleLogin} className="flex flex-col gap-6">
         <Field>
           <FieldLabel htmlFor="email">
             Email
@@ -89,6 +108,7 @@ export function LoginForm({
           <Input
             id="email"
             type="email"
+            autoComplete="email"
             placeholder="name@example.com"
             required
             value={email}
@@ -96,45 +116,51 @@ export function LoginForm({
           />
         </Field>
 
-        <Field>
+        <Field data-invalid={passwordError ? true : undefined}>
           <div className="flex items-center justify-between gap-4">
             <FieldLabel htmlFor="password">
               Password
             </FieldLabel>
             <Link
               href="/auth/forgot-password"
+              onClick={() => {
+                // Carry the typed address over so Forgot password starts filled.
+                if (email.trim()) setPendingEmail(email.trim().toLowerCase());
+              }}
               className="text-body text-foreground underline-offset-4 hover:underline"
             >
               Forgot password?
             </Link>
           </div>
 
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
-            placeholder="Enter your password"
+            autoComplete="current-password"
             required
+            aria-invalid={passwordError ? true : undefined}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
+          {passwordError ? <FieldError>{passwordError}</FieldError> : null}
         </Field>
 
         {error ? <FieldError>{error}</FieldError> : null}
 
-        <AuthSubmitButton type="submit" disabled={isLoading}>
-          {isLoading ? "Signing in..." : "Sign in"}
+        <AuthSubmitButton type="submit" loading={isLoading}>
+          Sign in
         </AuthSubmitButton>
 
-        <p className="text-center text-body text-muted-foreground">
+        <p className="text-body text-muted-foreground">
           Don&apos;t have an account?{" "}
           <Link
             href={`/auth/sign-up?next=${encodeURIComponent(nextPath)}`}
-            className="font-medium text-foreground underline underline-offset-4"
+            className="text-foreground underline underline-offset-4"
           >
             Sign up
           </Link>
         </p>
       </form>
+      </div>
     </AuthPanel>
   );
 }

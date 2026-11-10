@@ -13,6 +13,7 @@ const authMocks = vi.hoisted(() => ({
 
 const routerMocks = vi.hoisted(() => ({
   replace: vi.fn(),
+  push: vi.fn(),
 }));
 
 vi.mock("@/lib/supabase/client", () => ({
@@ -53,7 +54,7 @@ describe("LoginForm", () => {
     expect(
       (
         screen.getByRole("button", {
-          name: "Signing in...",
+          name: "Sign in",
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
@@ -87,7 +88,7 @@ describe("LoginForm", () => {
     expect(
       (
         screen.getByRole("button", {
-          name: "Signing in...",
+          name: "Sign in",
         }) as HTMLButtonElement
       ).disabled,
     ).toBe(true);
@@ -123,7 +124,7 @@ describe("LoginForm", () => {
     render(<LoginForm />);
     submitLogin();
     fireEvent.submit(
-      screen.getByRole("button", { name: "Signing in..." }),
+      screen.getByRole("button", { name: "Sign in" }),
     );
 
     await act(async () => {
@@ -135,5 +136,60 @@ describe("LoginForm", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(ASYNC_DEADLINES.userAction);
     });
+  });
+
+  it("shows wrong credentials on the password field", async () => {
+    authMocks.signInWithPassword.mockResolvedValue({
+      error: Object.assign(new Error("Invalid login credentials"), {
+        code: "invalid_credentials",
+      }),
+    });
+
+    render(<LoginForm />);
+    await act(async () => {
+      submitLogin();
+    });
+
+    const message =
+      "That email and password don't match. Try again or reset your password.";
+    expect(screen.getByText(message)).toBeTruthy();
+    expect(
+      screen.getByLabelText("Password").getAttribute("aria-invalid"),
+    ).toBe("true");
+    expect(routerMocks.replace).not.toHaveBeenCalled();
+  });
+
+  it("sends an unconfirmed account to Verify email with its address", async () => {
+    sessionStorage.clear();
+    authMocks.signInWithPassword.mockResolvedValue({
+      error: Object.assign(new Error("Email not confirmed"), {
+        code: "email_not_confirmed",
+      }),
+    });
+
+    render(<LoginForm nextPath="/portal/events" />);
+    await act(async () => {
+      submitLogin();
+    });
+
+    expect(routerMocks.push).toHaveBeenCalledWith(
+      "/auth/verify-email?next=%2Fportal%2Fevents",
+    );
+    expect(sessionStorage.getItem("uxhub-pending-auth-email")).toBe(
+      "student@example.com",
+    );
+  });
+
+  it("carries the typed email to Forgot password", () => {
+    sessionStorage.clear();
+    render(<LoginForm />);
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "Student@Example.com" },
+    });
+    fireEvent.click(screen.getByRole("link", { name: "Forgot password?" }));
+
+    expect(sessionStorage.getItem("uxhub-pending-auth-email")).toBe(
+      "student@example.com",
+    );
   });
 });

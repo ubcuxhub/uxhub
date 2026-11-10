@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { toast } from "@/components/ui/toast";
 import { withDeadline } from "@/lib/async/deadline";
 import { useNavigationRecovery } from "@/hooks/use-navigation-recovery";
 
@@ -18,9 +19,11 @@ import {
 interface ResendEmailButtonProps {
   /** Performs the resend; throwing surfaces the message to the user. */
   onResend: () => Promise<"navigating" | void>;
+  /** The address the email went to, named in the confirmation toast. */
+  email: string;
 }
 
-export function ResendEmailButton({ onResend }: ResendEmailButtonProps) {
+export function ResendEmailButton({ onResend, email }: ResendEmailButtonProps) {
   const [status, setStatus] = useState<string | null>(null);
   const [isResending, setIsResending] = useState(false);
   const [cooldownEndsAt, setCooldownEndsAt] = useState<number | null>(null);
@@ -72,7 +75,7 @@ export function ResendEmailButton({ onResend }: ResendEmailButtonProps) {
       });
       navigationStarted = result === "navigating";
       if (navigationStarted) recoverStalledNavigation();
-      else setStatus("Email resent.");
+      else toast.success(`Email sent to ${email}`, { id: "auth-email-sent" });
     } catch (error: unknown) {
       const retryAfterSeconds = getResendCooldownSeconds(error);
 
@@ -96,16 +99,16 @@ export function ResendEmailButton({ onResend }: ResendEmailButtonProps) {
   const isCoolingDown = cooldownSeconds !== null;
 
   return (
-    <>
+    <div>
       <p className="text-body text-muted-foreground">
-        Didn&apos;t receive an email?{" "}
+        Didn&rsquo;t get an email?{" "}
         <button
           type="button"
-          className="font-medium text-foreground underline underline-offset-4 disabled:cursor-not-allowed disabled:opacity-60"
+          className="text-foreground underline underline-offset-4 disabled:cursor-not-allowed disabled:opacity-60"
           disabled={isResending || isCoolingDown}
           onClick={handleResend}
         >
-          {isResending ? "Resending..." : "Resend email"}
+          {isResending ? "Sending…" : "Resend email"}
         </button>
       </p>
 
@@ -118,6 +121,6 @@ export function ResendEmailButton({ onResend }: ResendEmailButtonProps) {
           {status}
         </p>
       ) : null}
-    </>
+    </div>
   );
 }

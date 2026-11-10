@@ -5,6 +5,12 @@ import {
   isAsyncTimeoutError,
   withDeadline,
 } from "@/lib/async/deadline";
+import {
+  getExpiredLinkPath,
+  getExpiredLinkTypeForNext,
+  isExpiredLinkCode,
+  readErrorCode,
+} from "@/features/auth/link-expired";
 import { ensureUserInfo } from "@/lib/auth/ensure-user-info";
 import { getSafeInternalPath } from "@/lib/auth/paths";
 import { getRequestOrigin } from "@/lib/http/request-origin";
@@ -24,6 +30,17 @@ function redirectToAuthError(
   return NextResponse.redirect(url);
 }
 
+/**
+ * An expired or already-used link gets its own screen with a way to ask for a
+ * new one. The `next` the link carried says whether it was a recovery link.
+ */
+function redirectToExpiredLink(origin: string, nextPath: string) {
+  const type = getExpiredLinkTypeForNext(nextPath);
+  return NextResponse.redirect(
+    new URL(getExpiredLinkPath(type, nextPath), origin),
+  );
+}
+
 function getCallbackErrorMessage(error: unknown) {
   return isAsyncTimeoutError(error)
     ? getAsyncErrorMessage(error, CALLBACK_ERROR_MESSAGE)
@@ -40,6 +57,10 @@ export async function GET(request: NextRequest) {
   const nextPath = getSafeInternalPath(searchParams.get("next"));
   const providerError =
     searchParams.get("error_description") || searchParams.get("error");
+
+  if (isExpiredLinkCode(searchParams.get("error_code"))) {
+    return redirectToExpiredLink(origin, nextPath);
+  }
 
   if (providerError) {
     return redirectToAuthError(origin, CALLBACK_ERROR_MESSAGE, nextPath);
@@ -59,6 +80,9 @@ export async function GET(request: NextRequest) {
     );
 
     if (exchangeError) {
+      if (isExpiredLinkCode(readErrorCode(exchangeError))) {
+        return redirectToExpiredLink(origin, nextPath);
+      }
       return redirectToAuthError(origin, CALLBACK_ERROR_MESSAGE, nextPath);
     }
 

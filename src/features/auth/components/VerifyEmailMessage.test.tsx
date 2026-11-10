@@ -11,7 +11,7 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { setPendingEmail } from "../pending-email";
-import { SignUpSuccessMessage } from "./SignUpSuccessMessage";
+import { VerifyEmailMessage } from "./VerifyEmailMessage";
 
 const authMocks = vi.hoisted(() => ({
   getSession: vi.fn(),
@@ -27,6 +27,9 @@ vi.mock("@/lib/supabase/client", () => ({
   createClient: () => ({ auth: authMocks }),
 }));
 
+// The artwork imports PNGs, which the test runner does not bundle.
+vi.mock("@/components/shared/Hubbo", () => ({ Hubbo: () => null }));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => routerMocks,
 }));
@@ -36,7 +39,7 @@ type AuthStateCallback = (
   session: { user: { id: string } } | null,
 ) => void;
 
-describe("SignUpSuccessMessage", () => {
+describe("VerifyEmailMessage", () => {
   let authStateCallback: AuthStateCallback;
   const unsubscribe = vi.fn();
 
@@ -64,7 +67,7 @@ describe("SignUpSuccessMessage", () => {
       data: { session: { user: { id: "user-1" } } },
     });
 
-    render(<SignUpSuccessMessage nextPath="/portal/events/summit" />);
+    render(<VerifyEmailMessage nextPath="/portal/events/summit" />);
 
     await waitFor(() => {
       expect(routerMocks.replace).toHaveBeenCalledWith(
@@ -75,7 +78,7 @@ describe("SignUpSuccessMessage", () => {
   });
 
   it("redirects when another tab publishes an authenticated session", async () => {
-    render(<SignUpSuccessMessage nextPath="/admin/events" />);
+    render(<VerifyEmailMessage nextPath="/admin/events" />);
 
     await waitFor(() => {
       expect(authMocks.onAuthStateChange).toHaveBeenCalledOnce();
@@ -90,7 +93,7 @@ describe("SignUpSuccessMessage", () => {
   });
 
   it("checks shared session cookies again when the old tab regains focus", async () => {
-    render(<SignUpSuccessMessage nextPath="/portal/settings" />);
+    render(<VerifyEmailMessage nextPath="/portal/settings" />);
 
     await waitFor(() => {
       expect(authMocks.getSession).toHaveBeenCalledOnce();
@@ -107,7 +110,7 @@ describe("SignUpSuccessMessage", () => {
   });
 
   it("checks authentication immediately before resending", async () => {
-    render(<SignUpSuccessMessage nextPath="/portal" />);
+    render(<VerifyEmailMessage nextPath="/portal" />);
 
     await waitFor(() => {
       expect(screen.getByRole("button", { name: "Resend email" })).toBeTruthy();
@@ -125,7 +128,7 @@ describe("SignUpSuccessMessage", () => {
   });
 
   it("resends for an unauthenticated user using the retained destination", async () => {
-    render(<SignUpSuccessMessage nextPath="/portal/events/summit?tab=tickets" />);
+    render(<VerifyEmailMessage nextPath="/portal/events/summit?tab=tickets" />);
 
     fireEvent.click(
       await screen.findByRole("button", { name: "Resend email" }),
