@@ -24,11 +24,13 @@
 import type { TablesInsert } from "../../../src/lib/supabase/database.types.ts";
 import {
   addDays,
+  addHours,
   addMonths,
   eventYear,
   onOrAfterWeekday,
   pacificTimestamp,
   startOfUtcDay,
+  startOfUtcHour,
   timestamp,
 } from "../lib/relative-dates.ts";
 
@@ -120,9 +122,19 @@ export const EVENT_PHASES = {
   /** Long-running and open right now. Purchasable. */
   ongoing: ["open-studio", "coffee-chat-series", "mentorship-program"],
   /**
+   * One day, running at the moment the seed runs: it starts an hour before
+   * the run and lasts six hours, with its check-in session open throughout.
+   * For the portal's "happening now" highlighting and for rehearsing QR
+   * check-in. Re-run the seed to bring it back once it has ended.
+   */
+  happeningToday: ["design-jam-today"],
+  /**
    * The point of the seed: upcoming, active, registration open, and left
-   * unpurchased by every fixture account so checkout can be run again and
-   * again. Keep these free of fixture purchases in `users.ts`.
+   * unpurchased by every login fixture so checkout can be run again and
+   * again. Keep these free of login-fixture purchases in `users.ts`. The
+   * crowd (`crowd.ts`) can hold seats here, since nobody signs in as it, but
+   * must leave `PURCHASABLE_MIN_SEATS_LEFT` open on each.
+   * `thinkbox-office-tour` is the nearly-full one.
    */
   purchasable: [
     "thinkbox-office-tour",
@@ -131,13 +143,28 @@ export const EVENT_PHASES = {
     "design-sprint-upcoming",
     "student-panel",
   ],
+  /** Upcoming, active, registration open, and every seat taken by the crowd. */
+  soldOut: ["figma-basics-workshop"],
   /** Upcoming and active, but the registration window has already closed. */
   registrationClosed: ["industry-talk-design-systems"],
   /** Upcoming and active, but registration has not opened yet. */
   registrationUpcoming: ["spring-showcase"],
   /** Draft: admin-only, invisible to the public RLS policy. */
   draft: ["ux-research-workshop"],
+  /**
+   * Draft with `publish_at` a few days out: the admin "Scheduled" state. The
+   * database's publication job (20261027230347) really will publish it at
+   * that minute if the local database is still running then; the next seed
+   * run puts it back to draft with a fresh date.
+   */
+  scheduled: ["accessibility-audit-clinic"],
 } as const;
+
+/**
+ * Seats every purchasable event keeps free after the crowd's tickets and held
+ * offers, so login fixtures can buy, re-seed, and buy again.
+ */
+export const PURCHASABLE_MIN_SEATS_LEFT = 3;
 
 /** Every slug the seed owns, in declaration order. */
 export const SEED_EVENT_SLUGS = Object.values(EVENT_PHASES).flat();
@@ -595,6 +622,10 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
     coffeeSeriesEnd: addMonths(today, 9),
     mentorshipStart: addMonths(today, -1),
     mentorshipEnd: addMonths(today, 18),
+    /* Happening now — an hour old at seed time, six hours long. */
+    designJamStart: addHours(startOfUtcHour(now), -1),
+    /* Upcoming and sold out. */
+    figmaWorkshop: addDays(today, 10),
     /* Upcoming and purchasable — the core of the seed. */
     thinkboxTour: addDays(today, 21),
     uxathonUpcoming: onOrAfterWeekday(addDays(today, 42), 6),
@@ -605,7 +636,11 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
     industryTalkDesignSystems: addMonths(today, 3),
     springShowcase: addMonths(today, 9),
     researchWorkshop: addMonths(today, 7),
+    /* Draft, scheduled to publish in three days. */
+    accessibilityClinic: addDays(today, 35),
+    accessibilityClinicPublish: addDays(today, 3),
   } as const;
+  const designJamEnd = addHours(schedule.designJamStart, 6);
 
   /** Opened two months before the event and closed well before it ran. */
   const closedHistoricalRegistration = (eventDate: Date) => ({
@@ -911,6 +946,67 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
         name: "Door Check-in",
         start_time: timestamp(schedule.mentorshipStart, 17, 45),
         end_time: timestamp(schedule.mentorshipEnd, 19),
+      },
+    ],
+    applicationQuestions: [],
+  },
+
+  /* ── Happening now — one day, running while the seed runs ──────────── */
+  {
+    event: {
+      name: `UX Hub Design Jam ${eventYear(schedule.designJamStart)}`,
+      slug: "design-jam-today",
+      status: "active",
+      description:
+        "A drop-in afternoon of quick design challenges: pick a prompt from the wall, pair up with whoever is at your table, and pin a sketch to the board before the next round starts. No experience needed, and you can leave whenever you like.",
+      regular_price: 0,
+      member_price: 0,
+      location_building: "AMS Nest",
+      location_room: "Room 2306",
+      location_address_url: "https://maps.app.goo.gl/9x8k2Qm4Zt6bXQ5s7",
+      // Wall-clock times move with the run (see EVENT_PHASES.happeningToday).
+      starts_at: schedule.designJamStart.toISOString(),
+      ends_at: designJamEnd.toISOString(),
+      max_capacity: 40,
+      // Walk-ins welcome until the doors close.
+      registration_opens_at: timestamp(addMonths(today, -1)),
+      registration_closes_at: designJamEnd.toISOString(),
+    },
+    imageKey: "1.png",
+    checkInSessions: [
+      {
+        name: "Door Check-in",
+        start_time: addHours(schedule.designJamStart, -0.5).toISOString(),
+        end_time: designJamEnd.toISOString(),
+      },
+    ],
+    applicationQuestions: [],
+  },
+
+  /* ── Upcoming — active, registration open, every seat taken ─────────── */
+  {
+    event: {
+      name: `Intro to Figma Workshop ${eventYear(schedule.figmaWorkshop)}`,
+      slug: "figma-basics-workshop",
+      status: "active",
+      description:
+        "Two hours from a blank canvas to a clickable prototype: frames, auto-layout, components, and just enough prototyping to share a flow. Laptops required. Twenty seats so every table gets a facilitator — it fills up fast.",
+      regular_price: 6,
+      member_price: 3,
+      location_building: "Irving K. Barber Learning Centre",
+      location_room: "Room 182",
+      location_address_url: "https://maps.app.goo.gl/Hq2nT7vYw4Lr9Kc81",
+      starts_at: pacificTimestamp(schedule.figmaWorkshop, "17:30"),
+      ends_at: pacificTimestamp(schedule.figmaWorkshop, "19:30"),
+      max_capacity: 20,
+      ...openRegistration(schedule.figmaWorkshop),
+    },
+    imageKey: "6.png",
+    checkInSessions: [
+      {
+        name: "Door Check-in",
+        start_time: timestamp(schedule.figmaWorkshop, 17, 15),
+        end_time: timestamp(schedule.figmaWorkshop, 18),
       },
     ],
     applicationQuestions: [],
@@ -1254,6 +1350,41 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       },
     ],
     applicationQuestions: applicationQuestions.designSprint,
+  },
+
+  /* ── Scheduled — draft, publishes itself in a few days ──────────────── */
+  {
+    event: {
+      name: `Accessibility Audit Clinic ${eventYear(schedule.accessibilityClinic)}`,
+      slug: "accessibility-audit-clinic",
+      status: "draft",
+      // Only drafts may carry one (events_publish_schedule_requires_draft).
+      // Kept to the hour so a re-run the same day rewrites the same value and
+      // leaves the publication watchdog's window alone.
+      publish_at: timestamp(schedule.accessibilityClinicPublish, 17),
+      description:
+        "Bring a project — a class assignment, a portfolio piece, a club website — and audit it against WCAG with people who do this for a living. Screen readers, contrast checkers and keyboard-only passes, with a short write-up of what to fix first.",
+      regular_price: 5,
+      member_price: 0,
+      location_building: "Henry Angus Building",
+      location_room: "Room 241",
+      location_address_url: "https://maps.app.goo.gl/Xk4mP2rT8wQ6nB3v1",
+      starts_at: pacificTimestamp(schedule.accessibilityClinic, "13:00"),
+      ends_at: pacificTimestamp(schedule.accessibilityClinic, "16:00"),
+      max_capacity: 35,
+      // Registration opens when the event goes public.
+      registration_opens_at: timestamp(schedule.accessibilityClinicPublish, 17),
+      registration_closes_at: timestamp(addDays(schedule.accessibilityClinic, -2), 23, 59),
+    },
+    imageKey: "2.png",
+    checkInSessions: [
+      {
+        name: "Door Check-in",
+        start_time: timestamp(schedule.accessibilityClinic, 12, 45),
+        end_time: timestamp(schedule.accessibilityClinic, 13, 30),
+      },
+    ],
+    applicationQuestions: [],
   },
   ];
 

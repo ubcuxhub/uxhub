@@ -64,8 +64,12 @@ row owned by a hand-made account (a purchase, say) still references it.
 Purchases, tickets and applications are pruned only when they belong to one of
 the fixture accounts, never to an account created by hand.
 
-The eleven fixture accounts all sign in with password `123456`; see
-`scripts/seed/README.md` for the membership x role grid.
+The eleven login fixtures all sign in with password `123456`; see
+`scripts/seed/README.md` for the membership x role grid. The seed also writes a
+"crowd" of 42 profile-only accounts (no Auth user, so nobody can sign in as
+one) on the reserved `crowd.uxhub.test` and `crowd.ubc.ca` domains, for volume
+in admin screens. Pruning deletes a crowd account the data no longer lists, so
+never sign up with one of those domains.
 
 `pnpm seed --target=prod` writes demo events for admins while the student-facing
 events feature is unlaunched. It never deletes, never writes user fixtures, and

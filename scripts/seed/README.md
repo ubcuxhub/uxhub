@@ -23,6 +23,7 @@ mispaste fails instead of hitting the wrong project.
 | Key                    | `SUPABASE_SECRET_KEY`         | `SEED_PROD_SUPABASE_SECRET_KEY` |
 | Deletes stale rows     | yes, unless `--no-prune`      | **never**                       |
 | Login fixtures         | yes                           | **never**                       |
+| Crowd accounts         | yes                           | **never**                       |
 | Event status           | as written in `data/events.ts`| forced to `draft`               |
 | `event-images` bucket  | created if missing            | must already exist              |
 
@@ -54,7 +55,9 @@ Deletion is scoped by ownership, not by table:
 | Events and membership tiers matched by slug                | Auth users and profiles created by hand              |
 | Mentors, sponsors, check-in sessions, application questions| Purchases, tickets and applications owned by any other account |
 | People sections, links, meeting details and agenda days of seed events | Teams owned by any other account                   |
-| Purchases, tickets and applications owned by the fixture accounts | Covers uploaded through the admin UI (`covers/`)     |
+| Purchases, tickets and applications owned by the fixture accounts, crowd included | Covers uploaded through the admin UI (`covers/`)     |
+| Application files under a fixture account's folder that no kept answer names | Crowd-domain profiles somebody signed up with (they have an Auth user) |
+| Crowd accounts `data/crowd.ts` no longer lists, with their tickets and applications |                                    |
 | Teams the fixture accounts own or joined, other than `data/teams.ts`'s |                                               |
 | Cover images under the `seed/covers/` storage prefix       |                                                      |
 
@@ -65,12 +68,22 @@ which are `restrict` from their link tables.
 
 ## Fixtures
 
-`data/events.ts` — 15 events. `EVENT_PHASES` at the top is the index of what
+`data/events.ts` — 18 events. `EVENT_PHASES` at the top is the index of what
 each one is for. The biggest group is **purchasable**: upcoming, active,
-registration open, and left unbought by every fixture account so event checkout
-can be run repeatedly. A test fails if a fixture purchase ever lands on one.
-The rest cover past events, still active so members keep their history, a
-closed registration window, a not-yet-open one, and a draft.
+registration open, and left unbought by every login fixture so event checkout
+can be run repeatedly. A test fails if a login fixture's purchase ever lands on
+one. The crowd may hold seats there (nobody signs in as it), but each
+purchasable event keeps at least `PURCHASABLE_MIN_SEATS_LEFT` (3) seats free
+after its tickets and open offers; `thinkbox-office-tour` sits at exactly that,
+the nearly-full state. The rest cover past events, still active so members keep
+their history, a closed registration window, a not-yet-open one, and:
+
+| Phase | Event | State |
+| --- | --- | --- |
+| `happeningToday` | `design-jam-today` | Free, one day, started an hour before the run and lasting six hours, with door check-in open throughout. For "happening now" highlighting and check-in rehearsal: `student-innovator@example.com` holds an unscanned ticket, nine crowd tickets are already checked in. Times move with the run, so re-seed to bring it back |
+| `soldOut` | `figma-basics-workshop` | Registration open, all 20 seats held by the crowd, so the badge reads "Full". One crowd purchase was canceled as sold out |
+| `draft` | `ux-research-workshop` | Draft, no schedule |
+| `scheduled` | `accessibility-audit-clinic` | Draft with `publish_at` three days out (17:00 UTC), the admin "Scheduled" state. The database's own publication job (20261027230347) is armed by the write and *will* publish it if the local database is still up then; the next run puts it back. `--target=prod` writes no `publish_at`, since that would undo the forced draft |
 
 Beyond dates and prices, the fixtures fill in the event page:
 
@@ -97,7 +110,7 @@ and `student-innovator@example.com` holds a ticket with no team. A run keeps the
 team's invite code and undoes team changes made through the app. Local only:
 `--target=prod` writes no accounts, so no teams.
 
-`data/users.ts` — eleven local accounts. **Password is `123456` for all of them.**
+`data/users.ts` — eleven local login accounts. **Password is `123456` for all of them.**
 Ten cover every membership state crossed with the basic and admin roles:
 
 | Membership | Non-admin                       | Admin                             |
@@ -132,6 +145,37 @@ purchased tickets across every phase, applications, and check-ins:
 most — giving each of them a full timeline would be a lot of fixture data to
 keep correct for very little.
 
+`data/crowd.ts` — the **crowd**: 42 profile-only accounts (no Auth user, so
+nobody can sign in as one), the shape of a member imported before they ever
+signed in. They exist for volume: the admin users table, the review list,
+attendee lists and CSV export. Everything is written out or derived from a list
+index, so every run builds the same people. Addresses are on
+`crowd.uxhub.test`, or `crowd.ubc.ca` for faculty (whose `faculty_email` must be
+a ubc.ca address matching their own); those domains are how the prune
+recognises the crowd, so never sign up with one. They cover:
+
+- Every user type, every tier, and no membership; two lapsed members
+  (`membership_expires_at` in the past, for the renewal flow), one of them with
+  a renewal pending (`membership_pre_ordered_type_id` and a `pending` purchase,
+  "Pending — payment processing"); a `canceled` and a `failed` membership
+  purchase; five students verified by the manager.
+- Applications in every state admins see. `uxathon-upcoming`: 8 submitted, 4
+  waitlisted, 3 accepted with a live offer (holding seats), 2 offer expired,
+  4 registered, 3 rejected, plus `student-innovator`'s draft, which admins never
+  see. Seven carry a portfolio PDF, uploaded to `application-files` at the path
+  the app uses (`<user>/<application>/<question>/<file>`).
+  `design-sprint-upcoming` has a smaller queue; `uxathon-past` has attendees
+  with check-ins and rejections. Every application past draft has a fixed
+  `submitted_at`, so the review list's order doesn't change between runs.
+- Tickets, with completed purchases for paid ones: 22 on `thinkbox-office-tour`,
+  20 on `figma-basics-workshop`, 16 on `design-jam-today`, 20 on last year's
+  `get-to-know-ux-hub` with door check-ins.
+
+All of it goes through the same batched upserts as the login fixtures, so a run
+takes a few seconds. `validateUserFixtures` also holds every event to its
+capacity (tickets plus open offers, as `event_seat_counts_unfiltered` counts
+them), since nothing in the database checks it on a direct insert.
+
 Renaming a fixture leaves its old account behind, holding the idempotency keys
 the new one needs. `RETIRED_FIXTURE_EMAILS` lists those addresses and the seed
 deletes them before writing. Only ever put an address there that an earlier
@@ -150,7 +194,8 @@ in at run time from the target's own host.
 | `index.ts`               | CLI, orchestration, and the prune pass                       |
 | `lib/targets.ts`         | local vs prod resolution and per-target policy               |
 | `lib/reconcile.ts`       | upsert-by-slug and child reconciliation primitives           |
-| `lib/reconcile-users.ts` | accounts, purchases, tickets, applications, and their prune  |
+| `lib/reconcile-users.ts` | accounts, crowd, purchases, tickets, applications, files, and their prune |
+| `lib/pdf.ts`             | the one-page PDF behind seeded file answers                   |
 | `lib/prune.ts`           | pure delete planning — the ownership rules live here         |
 | `lib/images.ts`          | cover upload, URL building, and stale-image cleanup          |
 | `lib/user-fixtures.ts`   | fixture validation, run before anything is written           |
