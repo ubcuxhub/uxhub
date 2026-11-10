@@ -76,6 +76,7 @@ import type { EventRow } from "@/lib/supabase/models";
 
 import { Composition } from "@/app/dev/_shell/Specimen";
 import { ApplicationReviewFlow, ApplicationsEmpty } from "./application-review";
+import { SETUP_TEMPLATE_STARTS, SetupTemplate } from "./setup";
 import type { SectionProps } from "@/app/dev/_shell/types";
 
 const TEMPLATES = [
@@ -84,6 +85,10 @@ const TEMPLATES = [
   { id: "event-builder", title: "Event builder", spec: "§4.4e" },
   { id: "applications", title: "Applications", spec: "proposal" },
   { id: "application-review", title: "Application review", spec: "proposal" },
+  { id: "setup-dietary", title: "Setup, dietary needs", spec: "Figma 4289:2" },
+  { id: "setup-photo", title: "Setup, choose a photo", spec: "Figma 4292:2" },
+  { id: "setup-interests", title: "Setup, interests", spec: "Figma 4297:2" },
+  { id: "setup-welcome", title: "Setup, welcome", spec: "Figma 4269:2" },
 ] as const;
 type TemplateId = (typeof TEMPLATES)[number]["id"];
 
@@ -772,6 +777,7 @@ function TemplateBody({ id }: { id: TemplateId }) {
   if (id === "event-builder") return <BuilderTemplate />;
   if (id === "applications") return <ApplicationReviewFlow start="list" />;
   if (id === "application-review") return <ApplicationReviewFlow start="detail" />;
+  if (id in SETUP_TEMPLATE_STARTS) return <SetupTemplate start={SETUP_TEMPLATE_STARTS[id]} />;
   return <EventsTemplate />;
 }
 
@@ -819,7 +825,7 @@ function Section({ open }: SectionProps) {
     <div className="flex flex-col gap-10">
       <Composition
         title={`${template.title} (${template.spec}), desktop`}
-        description={`Built from the real components on fixture data: no fetching, no auth. Pick another template with the Force open links above. Laid out at the width of your window; the page container caps at 1152px.${template.id === "event-builder" ? " The section pill floats at the bottom of the window, as it does on the real page." : ""}${template.id.startsWith("application") ? " A design proposal (docs/design/application-review.md): open a row, decide, add a note, then go back; the list keeps its filters, page and your row." : ""}`}
+        description={`Built from the real components on fixture data: no fetching, no auth. Pick another template with the Force open links above. Laid out at the width of your window; the page container caps at 1152px.${template.id === "event-builder" ? " The section pill floats at the bottom of the window, as it does on the real page." : ""}${template.id.startsWith("application") ? " A design proposal (docs/design/application-review.md): open a row, decide, add a note, then go back; the list keeps its filters, page and your row." : ""}${template.id.startsWith("setup") ? " Member setup at /portal/setup, on the auth shell, with an in-memory fake server (600ms per write). Every step works: Save, Skip, Back, the crop dialog (uploads stay in the browser), and Welcome." : ""}`}
       >
         <div className="overflow-hidden rounded-xl border border-border-subtle bg-background">
           <TemplateBody id={template.id} />

@@ -1,9 +1,40 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
 import { requireAuth } from "@/lib/auth/guards";
 import { errorFields, log } from "@/lib/log";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { adminDeleteAccount } from "@/lib/supabase-helpers/admin-server";
+import { fetchUserSetup, updateUserSetup } from "@/lib/supabase-helpers/setup";
+import type { InterestId } from "@/features/setup/lib/options";
+import { toSetupState, type SetupState } from "@/features/setup/lib/state";
+import { parseInterests } from "@/features/setup/lib/validation";
 import { matchesConfirmationEmail } from "./lib/account-deletion";
+import { mergeMemberInterests } from "./lib/interests";
+
+/**
+ * Settings' interests chips. Unlike setup's `finishSetupAction`, it keeps the
+ * free tags managers added to the same column and leaves `setup_step` alone,
+ * so editing interests here neither drops a manager's tags nor ends setup.
+ * The service role writes, as `interests` has no member grant, and only the
+ * signed-in member's own row.
+ */
+export async function saveInterestsAction(input: { interests: InterestId[] }): Promise<SetupState> {
+  const user = await requireAuth();
+  try {
+    const chosen = parseInterests(input?.interests);
+    const current = await fetchUserSetup(supabaseAdmin, user.id);
+    const row = await updateUserSetup(supabaseAdmin, user.id, {
+      interests: mergeMemberInterests(current.interests, chosen),
+    });
+    revalidatePath("/", "layout");
+    return toSetupState(row);
+  } catch (error) {
+    log.warn("settings.interests_save_failed", { userId: user.id, ...errorFields(error) });
+    throw error;
+  }
+}
 
 export type DeleteAccountResult = { ok: true } | { ok: false; error: string };
 
