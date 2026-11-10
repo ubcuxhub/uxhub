@@ -325,14 +325,16 @@ Table `application_review_notes`:
 Index on `(application_id, created_at)`. Hard delete (the dialog says it can't
 be undone); the audit log's admin change log can keep history if wanted.
 
-RLS (`is_admin()` covers admins and managers):
+RLS (`is_admin()` covers admins and managers). `author_id` is a `user_info.id`,
+not the Auth user id (`user_info.auth_user_id` is), so ownership compares with
+the existing helper `public.current_user_info_id()`, never `auth.uid()`:
 
 - select: `is_admin()` and the application is not a draft (admins never see
   drafts).
-- insert: `is_admin()` and `author_id = auth.uid()` and the application is not
-  a draft.
-- update (body only): `is_admin()` and `author_id = auth.uid()`.
-- delete: `is_admin()` and `author_id = auth.uid()`.
+- insert: `is_admin()` and `author_id = public.current_user_info_id()` and the
+  application is not a draft.
+- update (body only): `is_admin()` and `author_id = public.current_user_info_id()`.
+- delete: `is_admin()` and `author_id = public.current_user_info_id()`.
 - Applicants: no access, ever. A demoted admin keeps authorship but loses
   access; their notes still show with their name.
 
