@@ -19,6 +19,9 @@ export const AUTH_ACTION_ERRORS = {
 export const INVALID_CREDENTIALS_MESSAGE =
   "That email and password don't match. Try again or reset your password.";
 
+export const EMAIL_ALREADY_EXISTS_MESSAGE =
+  "An account with this email already exists.";
+
 export const INVALID_EMAIL_MESSAGE = "Enter a valid email address.";
 
 export function getAuthActionErrorMessage(
@@ -52,6 +55,16 @@ export function isInvalidCredentialsError(error: unknown): boolean {
   return (
     getErrorCode(error) === "invalid_credentials" ||
     /invalid login credentials/i.test(getErrorMessage(error))
+  );
+}
+
+/** Sign-up for an address that already has an account. */
+export function isUserAlreadyExistsError(error: unknown): boolean {
+  const code = getErrorCode(error);
+  return (
+    code === "user_already_exists" ||
+    code === "email_exists" ||
+    /already registered|already exists/i.test(getErrorMessage(error))
   );
 }
 

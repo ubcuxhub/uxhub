@@ -22,7 +22,9 @@ import { createClient } from "@/lib/supabase/client";
 import { completeProfileAction } from "../actions";
 import {
   AUTH_ACTION_ERRORS,
+  EMAIL_ALREADY_EXISTS_MESSAGE,
   getAuthActionErrorMessage,
+  isUserAlreadyExistsError,
 } from "../auth-errors";
 import { setPendingEmail } from "../pending-email";
 import {
@@ -41,7 +43,7 @@ type SignUpFormData = {
   password: string;
 };
 
-type SignUpFieldErrors = Partial<Record<"password", string>>;
+type SignUpFieldErrors = Partial<Record<"email" | "password", string>>;
 
 export function SignUpForm({
   className,
@@ -59,6 +61,7 @@ export function SignUpForm({
   const [fieldErrors, setFieldErrors] = useState<SignUpFieldErrors>({});
   const [isLoading, setIsLoading] = useState(false);
   const submittingRef = useRef(false);
+  const emailRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const recoverStalledNavigation = useNavigationRecovery(() => {
     submittingRef.current = false;
@@ -78,6 +81,11 @@ export function SignUpForm({
     }
 
     return errors;
+  };
+
+  const showEmailTaken = () => {
+    setFieldErrors({ email: EMAIL_ALREADY_EXISTS_MESSAGE });
+    emailRef.current?.focus();
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -120,6 +128,13 @@ export function SignUpForm({
       const user = authData.user;
       if (!user) throw new Error("User not returned from Supabase");
 
+      // With confirmations on, Supabase answers an existing address with a
+      // success whose user has no identities rather than an error.
+      if (user.identities && user.identities.length === 0) {
+        showEmailTaken();
+        return;
+      }
+
       // When email confirmation is disabled, signUp returns a session and the
       // profile can be created immediately. Otherwise the confirmation
       // callback creates it once the session exists.
@@ -146,7 +161,9 @@ export function SignUpForm({
       navigationStarted = true;
       recoverStalledNavigation();
     } catch (error: unknown) {
-      if ((error as { code?: unknown } | null)?.code === "weak_password") {
+      if (isUserAlreadyExistsError(error)) {
+        showEmailTaken();
+      } else if ((error as { code?: unknown } | null)?.code === "weak_password") {
         setFieldErrors({ password: PASSWORD_TOO_SHORT_ERROR });
       } else setError(
         isAsyncTimeoutError(error)
@@ -206,12 +223,14 @@ export function SignUpForm({
           </Field>
         </div>
 
-        <Field>
+        <Field data-invalid={fieldErrors.email ? true : undefined}>
           <FieldLabel htmlFor="email">
             Email
           </FieldLabel>
           <Input
+            ref={emailRef}
             id="email"
+            aria-invalid={fieldErrors.email ? true : undefined}
             type="email"
             autoComplete="email"
             placeholder="name@example.com"
@@ -219,6 +238,22 @@ export function SignUpForm({
             value={formData.email}
             onChange={(e) => handleChange("email", e.target.value)}
           />
+          {fieldErrors.email ? (
+            <FieldError>
+              {fieldErrors.email}{" "}
+              <Link
+                href={`/auth/login?next=${encodeURIComponent(nextPath)}`}
+                onClick={() => {
+                  // Carry the typed address over so Sign in starts filled.
+                  const typed = formData.email.trim().toLowerCase();
+                  if (typed) setPendingEmail(typed);
+                }}
+                className="text-foreground underline underline-offset-4"
+              >
+                Sign in instead
+              </Link>
+            </FieldError>
+          ) : null}
         </Field>
 
         <Field data-invalid={fieldErrors.password ? true : undefined}>

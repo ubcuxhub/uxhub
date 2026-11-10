@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,12 @@ import {
   isEmailNotConfirmedError,
   isInvalidCredentialsError,
 } from "../auth-errors";
-import { setPendingEmail } from "../pending-email";
+import {
+  getPendingEmailServerSnapshot,
+  getPendingEmailSnapshot,
+  setPendingEmail,
+  subscribePendingEmail,
+} from "../pending-email";
 import { AuthPanel } from "./AuthPanel";
 import { AuthSubmitButton } from "./AuthSubmitButton";
 import { GoogleOAuthButton } from "./GoogleOAuthButton";
@@ -28,7 +33,15 @@ export function LoginForm({
   nextPath = "/portal",
   ...props
 }: React.ComponentPropsWithoutRef<"div"> & { nextPath?: string }) {
-  const [email, setEmail] = useState("");
+  // Sign up hands over the address typed there; until the user edits the
+  // field, that address is its value.
+  const carriedEmail = useSyncExternalStore(
+    subscribePendingEmail,
+    getPendingEmailSnapshot,
+    getPendingEmailServerSnapshot,
+  );
+  const [typedEmail, setEmail] = useState<string | null>(null);
+  const email = typedEmail ?? carriedEmail;
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
