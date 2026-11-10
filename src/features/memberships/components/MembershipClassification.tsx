@@ -1,10 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import {
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldLabel,
+  FieldTitle,
+} from "@/components/ui/field";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { withReturnTo } from "@/lib/auth/paths";
 import type { UserType } from "@/lib/supabase/models";
 import {
@@ -42,6 +49,8 @@ export function MembershipClassification({
   returnTo?: string;
 }) {
   const router = useRouter();
+  const uid = useId();
+  const headingId = `${uid}-heading`;
   const [selection, setSelection] = useState<MembershipAudience>(
     userTypeToAudience(initialUserType),
   );
@@ -58,31 +67,38 @@ export function MembershipClassification({
   return (
     <div className="flex min-h-full flex-col">
       <div>
-        <h1 className="text-h2">What best describes you?</h1>
+        <h1 id={headingId} className="text-h2">
+          What best describes you?
+        </h1>
         <p className="mt-2 text-small text-muted-foreground">
           This helps us show you the right membership options.
         </p>
       </div>
 
-      <div className="mt-8 grid gap-4">
+      <RadioGroup
+        aria-labelledby={headingId}
+        value={selection}
+        onValueChange={(value) => setSelection(value as MembershipAudience)}
+        className="mt-8 gap-4"
+      >
         {OPTIONS.map((option) => (
-          <button
+          <FieldLabel
             key={option.audience}
-            type="button"
-            onClick={() => setSelection(option.audience)}
-            className={cn(
-              "rounded-lg border p-5 text-left transition-colors hover:bg-section",
-              selection === option.audience &&
-                "border-primary bg-primary/5 ring-1 ring-primary",
-            )}
+            htmlFor={`${uid}-${option.audience}`}
           >
-            <span className="font-medium">{option.title}</span>
-            <span className="mt-1 block text-small text-muted-foreground">
-              {option.description}
-            </span>
-          </button>
+            <Field orientation="horizontal">
+              <FieldContent>
+                <FieldTitle>{option.title}</FieldTitle>
+                <FieldDescription>{option.description}</FieldDescription>
+              </FieldContent>
+              <RadioGroupItem
+                value={option.audience}
+                id={`${uid}-${option.audience}`}
+              />
+            </Field>
+          </FieldLabel>
         ))}
-      </div>
+      </RadioGroup>
 
       <div className="mt-auto flex justify-end pt-8">
         <Button onClick={continueToDetails}>Next</Button>
