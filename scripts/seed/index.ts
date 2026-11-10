@@ -64,6 +64,8 @@ import {
   removeRetiredFixtures,
 } from "./lib/reconcile-users.ts";
 import { validateUserFixtures } from "./lib/user-fixtures.ts";
+import { seedReviewNotes } from "./data/review-notes.ts";
+import { reconcileReviewNotes, resolveSeedReviewNotes } from "./lib/review-notes.ts";
 import {
   parseTarget,
   resolveTarget,
@@ -897,6 +899,7 @@ async function main(): Promise<void> {
     ...buildSeedCrowd(seedEvents, seedNow),
   ];
   validateUserFixtures(seedUsers, seedEvents, membershipTypes, seedNow);
+  const reviewNotes = resolveSeedReviewNotes(seedReviewNotes, seedUsers, seedNow);
   await assertImageKeysExist(seedEvents);
 
   const { url, secretKey, policy } = resolveTarget(options.target, process.env);
@@ -1104,6 +1107,13 @@ async function main(): Promise<void> {
     summary.push(format("Application files", userSummary.files));
     summary.push(format("Check-ins", userSummary.checkIns));
     summary.push(format("Teams", await reconcileTeams(supabase, profileIds, options)));
+
+    const notes = await reconcileReviewNotes(supabase, reviewNotes, profileIds, {
+      dryRun: options.dryRun,
+      prune: options.prune,
+    });
+    summary.push(format("Former reviewer profile", notes.profile));
+    summary.push(format("Reviewer notes", notes.notes));
   }
 
   if (options.prune) {

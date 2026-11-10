@@ -13,6 +13,7 @@ export const TABLES = {
   eventApplications: "event_applications",
   eventApplicationQuestions: "event_application_questions",
   eventApplicationResponses: "event_application_responses",
+  applicationReviewNotes: "application_review_notes",
   checkInSessions: "check_in_sessions",
   checkIns: "check_ins",
   mentors: "mentors",
