@@ -112,3 +112,5 @@ export const ResponseType = {
   dropdown: "dropdown",
   file_upload: "file_upload",
 } as const satisfies Record<ResponseType, ResponseType>;
+
+export type EventDateLocationSettingsRow = Tables<"event_date_location_settings">;

@@ -97,6 +97,7 @@ export async function updateEventScheduleAction(
     revalidatePath("/events", "layout");
     return { ok: true, event: saved };
   } catch (error) {
+    if (error && typeof error === "object" && "hint" in error && error.hint === "EVENT_SETTINGS_CONFLICT" && "message" in error && typeof error.message === "string") return { ok: false, error: error.message };
     log.error("admin.event_schedule_save_failed", {
       eventId,
       ...errorFields(error),

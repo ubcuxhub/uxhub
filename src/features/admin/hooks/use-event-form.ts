@@ -1,5 +1,7 @@
 "use client";
 
+import { dateSessions, emptyEventDate, emptyLocation, type EventDateLocationDraft } from "../lib/event-date-location";
+
 import { suggestedEventSlug } from "../lib/event-configuration";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
@@ -22,7 +24,6 @@ import type {
 } from "@/lib/supabase/models";
 import type {
   CheckInSessionDraft,
-  CheckInSessionField,
 } from "@/features/admin/types";
 import {
   checkInDraftsFromRows,
@@ -47,6 +48,7 @@ import type { Json } from "@/lib/supabase/database.types";
 import { useUnsavedChangesGuard } from "./use-unsaved-changes-guard";
 
 interface UseEventFormOptions {
+  initialDateLocation?: { document: EventDateLocationDraft; revision: number } | null;
   eventId?: string;
   initialDraft?: { id: string; revision: number; document: EventWorkingDocument } | null;
   initialEvent?: EventRow | null;
@@ -61,6 +63,7 @@ const LEGACY_DRAFT_KEY = "event_create_form_draft";
 
 export function useEventForm({
   eventId,
+  initialDateLocation,
   initialDraft,
   initialEvent = null,
   initialCheckInSessions = [],
@@ -73,21 +76,32 @@ export function useEventForm({
   const startingFormState = useMemo(
     () => {
       const state = initialDraft?.document.formState;
-      if (!state) return initialEvent ? formStateFromEvent(initialEvent) : getInitialFormState();
+      if (!state) {
+        if (!initialEvent) return getInitialFormState();
+        const source = formStateFromEvent(initialEvent);
+        return { ...source, date_location_revision: initialDateLocation?.revision ?? 0,
+          date_location: initialDateLocation?.document ?? { automatic: true, audience: "everyone" as const,
+            location: { ...emptyLocation(), type: initialEvent.location_type ?? "in_person", building: source.location_building, room: source.location_room, address: initialEvent.location_address ?? "", map_url: source.location_address_url },
+            dates: initialCheckInSessions.length ? checkInDraftsFromRows(initialCheckInSessions).map(row => ({ ...emptyEventDate(), session_id: row.id ?? null, date: row.start_time.split("T")[0], start: row.start_time.split("T")[1] ?? "", end: row.end_time.split("T")[1] ?? "", label: row.name })) : [{ ...emptyEventDate(), date: source.starts_at.split("T")[0], start: source.starts_at.split("T")[1] ?? "", end: source.ends_at.split("T")[1] ?? "" }] } };
+      }
       // Old working documents never captured these settings. Recover them
       // from the source event instead of resetting a saved featured choice,
       // external destination or URL during an unrelated edit.
       if (state.configuration_initialized === false && initialEvent) {
         const source = formStateFromEvent(initialEvent);
-        return { ...state, configuration_initialized: true,
+        return { ...state, date_location: state.date_location ?? { automatic: true, audience: "everyone" as const, location: { ...emptyLocation(), building: state.location_building, room: state.location_room, map_url: state.location_address_url }, dates: [emptyEventDate()] }, configuration_initialized: true,
           marketing_mode: source.marketing_mode, marketing_url: source.marketing_url,
           page_slug: source.page_slug, slug_edited: source.slug_edited,
           is_featured: source.is_featured, pricing_mode: source.pricing_mode,
           pricing_amount: source.pricing_amount };
       }
-      return state;
+      return { ...state, date_location: state.date_location ?? {
+        automatic: true, audience: "everyone" as const,
+        location: { ...emptyLocation(), building: state.location_building, room: state.location_room, map_url: state.location_address_url },
+        dates: [{ ...emptyEventDate(), date: state.starts_at.split("T")[0], start: state.starts_at.split("T")[1] ?? "", end: state.ends_at.split("T")[1] ?? "" }],
+      } };
     },
-    [initialEvent, initialDraft]
+    [initialEvent, initialDraft, initialDateLocation, initialCheckInSessions]
   );
   const startingCheckIns = useMemo(
     () =>
@@ -181,7 +195,7 @@ export function useEventForm({
         if (state.image_url?.startsWith("blob:")) state.image_url = "";
         if (state.header_image_url?.startsWith("blob:")) state.header_image_url = "";
         const document = parseWorkingDocument({ version: 1, formState: state, checkInEvents: legacy.checkInEvents ?? [{ ...EMPTY_CHECK_IN_SESSION }], mentors: legacy.mentors ?? [], sponsors: legacy.sponsors ?? [], applicationTemplate: legacy.applicationTemplate ?? [] });
-        setFormState(document.formState);
+        setFormState({ ...document.formState, date_location: document.formState.date_location ?? getInitialFormState().date_location });
         setCheckInEvents(document.checkInEvents);
         setMentors(document.mentors);
         setSponsors(document.sponsors);
@@ -220,40 +234,14 @@ export function useEventForm({
     setFormState((current) => ({
       ...current,
       [field]: value,
+      ...(field === "date_location" && value && typeof value === "object" && "dates" in value ? {
+        starts_at: value.dates.map(row => `${row.date}T${row.start}`).sort()[0] ?? "",
+        ends_at: value.dates.map(row => `${row.date}T${row.end}`).sort().at(-1) ?? "",
+      } : {}),
       ...(field === "name" && !current.slug_edited && !initialEvent?.first_published_at && initialEvent?.status !== "active" ? { page_slug: suggestedEventSlug(String(value)) } : {}),
       ...(field === "page_slug" ? { slug_edited: true } : {}),
       ...(field === "status" && value !== "draft" ? { publish_at: "" } : {}),
     }));
-  };
-
-  const updateCheckInEvent = (
-    index: number,
-    field: CheckInSessionField,
-    value: string
-  ) => {
-    resetSuccessMessage();
-    setCheckInEvents((current) =>
-      current.map((item, itemIndex) =>
-        itemIndex === index ? { ...item, [field]: value } : item
-      )
-    );
-  };
-
-  const addCheckInEvent = () => {
-    resetSuccessMessage();
-    setCheckInEvents((current) => [
-      ...current,
-      { ...EMPTY_CHECK_IN_SESSION },
-    ]);
-  };
-
-  const removeCheckInEvent = (index: number) => {
-    resetSuccessMessage();
-    setCheckInEvents((current) =>
-      current.length === 1
-        ? current
-        : current.filter((_, itemIndex) => itemIndex !== index)
-    );
   };
 
   const uploadImage = async (file: File, kind: "icon" | "header" = "icon") => {
@@ -329,6 +317,7 @@ export function useEventForm({
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (event.currentTarget?.reportValidity && !event.currentTarget.reportValidity()) return;
     if (submitLock.current) return;
     setShowConfigurationErrors(true);
     resetSuccessMessage();
@@ -433,7 +422,7 @@ export function useEventForm({
           formState.registration_closes_at
         ),
       };
-      const checkInSessions = toCheckInSessionInputs(checkInEvents);
+      const checkInSessions = formState.date_location ? dateSessions(formState.date_location) : toCheckInSessionInputs(checkInEvents);
       const applicationQuestions = toApplicationQuestionInputs(
         questions.applicationTemplate
       );
@@ -453,6 +442,8 @@ export function useEventForm({
         expectedHeaderImageUrl: persistedHeaderUrl.current,
         expectedImageUrl: persistedImageUrl.current,
         event: payload,
+        dateLocation: formState.date_location,
+        dateLocationRevision: formState.date_location_revision,
         checkInSessions,
         mentorIds: mentors.map((mentor) => mentor.id!),
         sponsorIds: sponsors.map((sponsor) => sponsor.id!),
@@ -476,7 +467,9 @@ export function useEventForm({
       clearRecoveredLegacyDraft();
       draftRevision.current = 0;
       setDraftId(crypto.randomUUID());
-      const savedFormState = { ...formState, image_url: imageUrl, header_image_url: headerUrl };
+      const savedFormState = { ...formState, image_url: imageUrl, header_image_url: headerUrl,
+        date_location_revision: result.dateLocationRevision ?? formState.date_location_revision,
+        date_location: formState.date_location ? { ...formState.date_location, dates: formState.date_location.dates.map((row, index) => ({ ...row, session_id: result.checkInSessionIds[index] ?? row.session_id })) } : null };
       persistedHeaderUrl.current = headerUrl || null;
       setPendingHeaderFile(null);
       persistedImageUrl.current = imageUrl || null;
@@ -568,9 +561,6 @@ export function useEventForm({
     isDeleting,
     setPendingImageFile,
     handleFieldChange,
-    updateCheckInEvent,
-    addCheckInEvent,
-    removeCheckInEvent,
     handleSubmit,
     handleDeleteEvent,
     ...questions,

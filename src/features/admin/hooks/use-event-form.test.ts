@@ -111,6 +111,7 @@ const event = {
   regular_price: 0,
   member_price: 0,
   max_capacity: 10,
+  location_type: "in_person", location_building: "Nest", location_address: "6133 University Blvd",
   starts_at: "2024-07-01T17:00:00+00:00",
   ends_at: "2024-07-01T18:00:00+00:00",
   registration_opens_at: "2024-06-01T16:00:00+00:00",
@@ -183,7 +184,8 @@ describe("event form publishing schedule", () => {
       registration_closes_at: "",
     });
     act(() => {
-      result.current.handleFieldChange("ends_at", "2024-07-02T09:30");
+      const dates = result.current.formState.date_location!;
+      result.current.handleFieldChange("date_location", { ...dates, dates: [{ ...dates.dates[0], end: "12:30" }] });
       result.current.handleFieldChange("registration_closes_at", "2024-06-30T23:59");
       result.current.handleFieldChange("requires_application", true);
     });
@@ -194,7 +196,7 @@ describe("event form publishing schedule", () => {
     const payload = vi.mocked(saveAdminEventAction).mock.calls[0][0].event;
     expect(payload).toMatchObject({
       starts_at: "2024-07-01T17:00:00.000Z",
-      ends_at: "2024-07-02T16:30:00.000Z",
+      ends_at: "2024-07-01T19:30:00.000Z",
       registration_opens_at: "2024-06-01T16:00:00.000Z",
       registration_closes_at: "2024-07-01T06:59:00.000Z",
       requires_application: true,
@@ -318,12 +320,8 @@ describe("event form check-in sessions", () => {
       initialEvent: { ...event, publish_at: null },
       initialCheckInSessions: [doors],
     }));
-    act(() => result.current.updateCheckInEvent(0, "end_time", "2024-07-01T12:00"));
-    act(() => result.current.addCheckInEvent());
-    act(() => {
-      result.current.updateCheckInEvent(1, "name", "Lunch");
-      result.current.updateCheckInEvent(1, "start_time", "2024-07-01T12:00");
-      result.current.updateCheckInEvent(1, "end_time", "2024-07-01T13:00");
+    act(() => { const config = result.current.formState.date_location!;
+      result.current.handleFieldChange("date_location", { ...config, dates: [{ ...config.dates[0], end: "12:00" }, { ...config.dates[0], key: "second", session_id: null, start: "12:00", end: "13:00", label: "Lunch" }] });
     });
 
     await submit(result);
@@ -357,7 +355,7 @@ describe("event form check-in sessions", () => {
       initialEvent: { ...event, publish_at: null },
       initialCheckInSessions: [doors, workshop],
     }));
-    act(() => result.current.removeCheckInEvent(1));
+    act(() => { const config = result.current.formState.date_location!; result.current.handleFieldChange("date_location", { ...config, dates: config.dates.slice(0, 1) }); });
 
     await submit(result);
     expect(sent(0).map((session) => session.id)).toEqual(["check-in-1"]);

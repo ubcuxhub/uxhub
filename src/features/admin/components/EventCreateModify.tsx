@@ -27,7 +27,9 @@ import {
 } from "@/components/ui/field";
 import { useEventForm } from "@/features/admin/hooks/use-event-form";
 import { PrimaryDetailsSection } from "./event-form/PrimaryDetailsSection";
-import { CheckInEventsSection } from "./event-form/CheckInEventsSection";
+import { EventDateLocation } from "./event-form/EventDateLocation";
+import { EventRegistration } from "./event-form/EventRegistration";
+import { dateLocationProblem, type EventDateLocationDraft } from "../lib/event-date-location";
 import { MentorsSection } from "./event-form/MentorsSection";
 import { SponsorsSection } from "./event-form/SponsorsSection";
 import { ApplicationQuestionsSection } from "./event-form/ApplicationQuestionsSection";
@@ -35,6 +37,8 @@ import { EventFormSkeleton } from "./event-form/EventFormSkeleton";
 import { DeleteEventModal } from "./DeleteEventModal";
 
 interface EventCreateModifyProps {
+  initialDateLocation?: { document: EventDateLocationDraft; revision: number } | null;
+  registrationInfo?: { locked: boolean; seats: number };
   pricingLocked?: boolean;
   eventId?: string;
   /** Hide when the surrounding record page supplies navigation. */
@@ -54,6 +58,8 @@ export const EventCreateModify = ({
   eventId,
   showBackButton = true,
   pricingLocked = false,
+  initialDateLocation,
+  registrationInfo = { locked: false, seats: 0 },
   initialDraft,
   initialEvent = null,
   initialCheckInSessions = [],
@@ -66,6 +72,7 @@ export const EventCreateModify = ({
 }: EventCreateModifyProps) => {
   const form = useEventForm({
     eventId,
+    initialDateLocation,
     initialDraft,
     initialEvent,
     initialCheckInSessions,
@@ -92,7 +99,7 @@ export const EventCreateModify = ({
   const sections: NavigatorSection[] = [
     { id: "builder-basics", number: 1, title: "Basics", state: form.formState.name && (form.formState.pricing_mode === "legacy" || form.formState.pricing_mode === "free" || form.formState.pricing_amount !== "") ? "complete" : "not-started", required: true },
     { id: "builder-description", number: 2, title: "Description", state: form.formState.short_description && form.formState.description ? "complete" : "not-started", required: true },
-    { id: "builder-dates", number: 3, title: "Date and location", state: form.formState.starts_at && form.formState.ends_at ? "complete" : "not-started", required: true },
+    { id: "builder-dates", number: 3, title: "Date and location", state: form.formState.date_location && !dateLocationProblem(form.formState.date_location) ? "complete" : "not-started", required: true },
     { id: "builder-registration", number: 4, title: "Registration", state: Number(form.formState.max_capacity) > 0 ? "complete" : "not-started", required: true },
     { id: "builder-people", number: 7, title: "People and sponsors", state: "optional", required: false },
     { id: "builder-summary", number: 9, title: "Summary", state: "optional", required: false },
@@ -145,8 +152,8 @@ export const EventCreateModify = ({
         <form id="event-builder-form" noValidate className="flex min-w-0 flex-col gap-14 [&_input]:h-10 [&_button[data-slot=select-trigger]]:h-10" onSubmit={form.handleSubmit}><fieldset disabled={form.isSubmitting} className="flex min-w-0 flex-col gap-14">
           {section("builder-basics", "Basics", <><PrimaryDetailsSection showConfigurationErrors={form.showConfigurationErrors} urlLocked={!!initialEvent?.first_published_at || initialEvent?.status === "active"} formState={form.formState} isSubmitting={form.isSubmitting} onFieldChange={form.handleFieldChange} /><EventBranding state={form.formState} disabled={form.isSubmitting} onChange={form.handleFieldChange} onIcon={form.setPendingImageFile} onHeader={form.setPendingHeaderFile} /><EventFeatured state={form.formState} onChange={form.handleFieldChange} /><EventPricing showErrors={form.showConfigurationErrors} state={form.formState} locked={pricingLocked} effectivePrices={initialEvent && initialEvent.pricing_policy !== "figma_pending" ? { regular: initialEvent.regular_price, member: initialEvent.member_price } : undefined} onChange={form.handleFieldChange} /></>)}
           {section("builder-description", "Description", <EventDescriptionEditor key={form.legacyDraftRecovered ? "legacy-recovered" : "initial"} short={form.formState.short_description} value={form.formState.description} rich={form.formState.description_rich} disabled={form.isSubmitting} onChange={(short, text, rich) => { form.handleFieldChange("short_description", short); form.handleFieldChange("description", text); form.handleFieldChange("description_rich", rich); }} />)}
-          {section("builder-dates", "Date and location", <><PrimaryDetailsSection section="dates" formState={form.formState} isSubmitting={form.isSubmitting} onFieldChange={form.handleFieldChange} /><CheckInEventsSection checkInEvents={form.checkInEvents} onAdd={form.addCheckInEvent} onRemove={form.removeCheckInEvent} onUpdate={form.updateCheckInEvent} /></>)}
-          {section("builder-registration", "Registration", <><PrimaryDetailsSection section="registration" formState={form.formState} isSubmitting={form.isSubmitting} onFieldChange={form.handleFieldChange} /><ApplicationQuestionsSection enabled={form.formState.requires_application} applicationTemplate={form.applicationTemplate} questionErrors={form.questionErrors} onEnabledChange={enabled => form.handleFieldChange("requires_application", enabled)} onAdd={form.addApplicationQuestion} onRemove={form.removeApplicationQuestion} onUpdate={form.updateApplicationQuestion} onAddResponseOption={form.addResponseOption} onUpdateResponseOption={form.updateResponseOption} onRemoveResponseOption={form.removeResponseOption} /></>)}
+          {section("builder-dates", "Date and location", <EventDateLocation key={form.formState.date_location_revision} value={form.formState.date_location!} disabled={form.isSubmitting} showErrors={form.showConfigurationErrors} onChange={value => form.handleFieldChange("date_location", value)} />)}
+          {section("builder-registration", "Registration", <><EventRegistration state={form.formState} disabled={form.isSubmitting} info={registrationInfo} onChange={form.handleFieldChange} /><ApplicationQuestionsSection registrationModeOwned enabled={form.formState.requires_application} applicationTemplate={form.applicationTemplate} questionErrors={form.questionErrors} onEnabledChange={enabled => form.handleFieldChange("requires_application", enabled)} onAdd={form.addApplicationQuestion} onRemove={form.removeApplicationQuestion} onUpdate={form.updateApplicationQuestion} onAddResponseOption={form.addResponseOption} onUpdateResponseOption={form.updateResponseOption} onRemoveResponseOption={form.removeResponseOption} /></>)}
           {section("builder-people", "People and sponsors", <>
           <MentorsSection
             enabled={form.formState.mentors_enabled}

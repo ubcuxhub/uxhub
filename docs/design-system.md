@@ -620,7 +620,9 @@ default label and keyboard behavior are unchanged.
 
 - Type or pick. On blur, input is tidied to "Sat, Nov 14, 2026" and "9:00 AM".
   A time without AM/PM reads as PM; an end time takes the first match after the
-  start.
+  start. The event builder opts into `ambiguousStart="daytime"`: bare 7–11
+  means AM and 12–6 means PM. Explicit AM/PM and 24-hour input remain supported;
+  existing consumers keep the default PM interpretation.
 - Date popover: selected day `action-primary` fill; today a `border-default`
   ring; out-of-range days `text-disabled`. Error: "Use a real date, like Nov 14."
 - Time list: 15-minute steps; end-time options show duration ("2 hr 15 min");
@@ -632,6 +634,8 @@ default label and keyboard behavior are unchanged.
 `DateTimeFieldPair` composes existing date/time controls, preserving their labels
 and date-then-time tab order. It stacks below 24rem (384px) of its own available
 width and uses a flexible date plus an 8rem time column above that threshold.
+`timeWidth="wide"` reserves 9rem for time, shortening the flexible date by 1rem;
+registration window controls use this option. Other consumers retain the default.
 Use it inside cards and sidebar layouts instead of viewport-based paired grids.
 
 ### 3.12 Textarea, radio buttons and image upload

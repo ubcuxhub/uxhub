@@ -1,3 +1,4 @@
+import { dateLocationProblem, dateSessions, emptyEventDate, emptyLocation, type EventDateLocationDraft } from "../../lib/event-date-location";
 import { parseEventDescription, type EventDescription } from "@/lib/event-description";
 import { eventSlugError, priceError, suggestedEventSlug, websiteUrlError } from "../../lib/event-configuration";
 import {
@@ -18,9 +19,12 @@ import { APPLICATION_FILE_MAX_BYTES } from "@/lib/supabase-helpers/application-f
 import {
   datetimeLocalToTimestamptz,
   timestamptzToDatetimeLocal,
+  strictPacificTimestamp,
 } from "@/lib/date";
 
 export interface EventFormState {
+  date_location: EventDateLocationDraft | null;
+  date_location_revision: number;
   configuration_initialized: boolean;
   marketing_mode: "disabled" | "hosted" | "external";
   marketing_url: string;
@@ -81,6 +85,8 @@ export const EMPTY_CHECK_IN_SESSION: CheckInSessionDraft = {
 };
 
 export const defaultFormState: EventFormState = {
+  date_location: null,
+  date_location_revision: 0,
   configuration_initialized: true,
   marketing_mode: "hosted",
   marketing_url: "",
@@ -119,6 +125,7 @@ export const defaultFormState: EventFormState = {
 export function getInitialFormState(): EventFormState {
   return {
     ...defaultFormState,
+    date_location: { automatic: true, audience: "everyone", location: emptyLocation(), dates: [emptyEventDate()] },
     starts_at: timestamptzToDatetimeLocal(new Date().toISOString()),
   };
 }
@@ -126,6 +133,10 @@ export function getInitialFormState(): EventFormState {
 /** The builder's form state for a stored event. */
 export function formStateFromEvent(event: EventRow): EventFormState {
   return {
+    date_location: null,
+    date_location_revision: 0,
+    date_location: null,
+    date_location_revision: 0,
     configuration_initialized: true,
     marketing_mode: (event.configured_marketing_mode ?? (event.marketing_url ? "external" : "hosted")) as EventFormState["marketing_mode"],
     marketing_url: event.configured_marketing_url ?? event.marketing_url ?? "",
@@ -243,6 +254,11 @@ export function validateEventForm(
   sponsors: SponsorDraft[] = []
 ) {
   let error: string | null = null;
+  if (formState.date_location) {
+    error = dateLocationProblem(formState.date_location);
+    if (error) return { error, questionErrors: {}, invalidSections: { mentors: false, sponsors: false, applications: false } };
+    checkInEvents = dateSessions(formState.date_location).map(row => ({ ...row, id: row.id ?? undefined }));
+  }
   const invalidSections = {
     mentors: mentors.some((mentor) => !mentor.full_name.trim()),
     sponsors: sponsors.some((sponsor) => !sponsor.name.trim()),
@@ -260,7 +276,7 @@ export function validateEventForm(
     error = eventSlugError((formState.slug_edited ? formState.page_slug : formState.page_slug || suggestedEventSlug(formState.name)));
   else if (formState.pricing_mode !== "legacy" && priceError(formState.pricing_mode === "free" ? "0" : formState.pricing_amount))
     error = priceError(formState.pricing_amount);
-  else if (!formState.max_capacity) error = "Max capacity is required.";
+  else if (!formState.max_capacity || !/^\d+$/.test(formState.max_capacity) || Number(formState.max_capacity) < 0) error = "Capacity must be a nonnegative whole number.";
   else if (invalidSections.mentors)
     error = "Every mentor requires a full name.";
   else if (invalidSections.sponsors)
@@ -279,15 +295,15 @@ export function validateEventForm(
   )
     error = "Publish date must be in the future.";
   else if (
-    !isCompleteDateTime(formState.starts_at) ||
-    !isCompleteDateTime(formState.ends_at)
+    !formState.date_location && (!isCompleteDateTime(formState.starts_at) ||
+    !isCompleteDateTime(formState.ends_at))
   )
     error = "Event start and end dates and times are required.";
-  else if (isEventScheduleRangeInvalid(formState))
+  else if (!formState.date_location && isEventScheduleRangeInvalid(formState))
     error = "Event end time must be after the start time.";
   else if (
     [formState.registration_opens_at, formState.registration_closes_at].some(
-      (value) => value && !isCompleteDateTime(value)
+      (value) => value && !strictPacificTimestamp(value)
     )
   )
     error = "Registration dates require both a date and time.";

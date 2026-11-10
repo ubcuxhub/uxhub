@@ -1,3 +1,4 @@
+import { parseDateLocationDraft } from "./event-date-location";
 import type { CheckInSessionDraft } from "@/features/admin/types";
 import { ResponseType, type ApplicationQuestionTemplate } from "@/features/events/types";
 import { defaultFormState, type EventFormState, type MentorDraft, type SponsorDraft } from "../components/event-form/event-form-schema";
@@ -26,7 +27,9 @@ export function parseWorkingDocument(input: unknown): EventWorkingDocument {
   }
   for (const [key, initial] of Object.entries(defaultFormState)) {
     const value = state[key as keyof EventFormState];
-    if (key === "description_rich") {
+    if (key === "date_location") {
+      if (value !== null) parseDateLocationDraft(value);
+    } else if (key === "description_rich") {
       if (value !== null && !parseEventDescription(value)) throw new Error("Invalid long overview formatting.");
     } else if (typeof value !== typeof initial) throw new Error("Invalid draft field.");
   }

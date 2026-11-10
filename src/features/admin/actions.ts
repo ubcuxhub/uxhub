@@ -1,5 +1,7 @@
 "use server";
 
+import { parseDateLocationDraft, dateLocationProblem, dateSessions, type EventDateLocationDraft } from "./lib/event-date-location";
+
 import { saveEventDraft, fetchEventDraft, eventImageIsReferenced } from "@/lib/supabase-helpers/event-drafts";
 import type { EventWorkingDocument } from "./lib/event-working-document";
 import { parseEventDescription, descriptionText } from "@/lib/event-description";
@@ -183,6 +185,8 @@ export async function updateUserRoleAction(
 }
 
 export interface SaveAdminEventInput {
+  dateLocation?: EventDateLocationDraft | null;
+  dateLocationRevision?: number;
   eventId?: string;
   /**
    * The cover image URL the form was loaded with, used as the precondition for
@@ -204,7 +208,7 @@ export interface SaveAdminEventInput {
  * questions, each in the order they were sent, or why the save was refused.
  */
 export type SaveAdminEventResult =
-  | { id: string; checkInSessionIds: string[]; questionIds: string[] }
+  | { id: string; checkInSessionIds: string[]; questionIds: string[]; dateLocationRevision?: number }
   | { error: string };
 
 // Not exported: a "use server" module may only export async functions, and the
@@ -294,6 +298,14 @@ export async function saveAdminEventAction(
   await requireAdmin();
 
   assertPublishAt(input.event.status, input.event.publish_at);
+  let datePayload = {};
+  if (input.dateLocation) {
+    const config = parseDateLocationDraft(input.dateLocation);
+    const problem = dateLocationProblem(config);
+    if (problem) return { error: problem };
+    const sessions = dateSessions(config);
+    datePayload = { _date_revision: input.dateLocationRevision ?? 0, _date_location: { ...config, dates: config.dates.map((row, index) => ({ ...row, start_time: sessions[index].start_time, end_time: sessions[index].end_time })) } };
+  }
 
   if ((input.event.short_description?.length ?? 0) > 50 || (input.event.description?.length ?? 0) > 3000) throw new Error("Overview exceeds its character limit.");
   if (input.event.description_rich != null) {
@@ -342,7 +354,7 @@ export async function saveAdminEventAction(
       p_draft_id: input.draftId ?? null,
       p_draft_revision: input.draftRevision ?? 0,
       p_expected_header_image_url: input.expectedHeaderImageUrl ?? null,
-      p_event: input.event,
+      p_event: { ...input.event, ...datePayload },
       p_slug: slug,
       p_expected_image_url: input.expectedImageUrl,
       p_check_in_sessions: input.checkInSessions,
@@ -370,6 +382,7 @@ export async function saveAdminEventAction(
     if (configurationMessages.includes(error.message)) throw new Error(error.message);
     if (error.code === "23505" && /events_slug|event_url_claims/.test(error.message)) throw new Error("This page URL is already in use.");
     if (error.code === "23514" && /events_configured_/.test(error.message)) throw new Error("Review the marketing destination and pricing before saving.");
+    if (error.hint === "EVENT_SETTINGS_CONFLICT") return { error: error.message };
     throw error;
   }
   const saved = data as {
@@ -377,6 +390,7 @@ export async function saveAdminEventAction(
     check_in_session_ids?: string[];
     question_ids?: string[];
     removed_files?: string[];
+    date_location_revision?: number;
   } | null;
   if (!saved?.id) throw new Error("The event save returned no event id.");
 
@@ -402,6 +416,7 @@ export async function saveAdminEventAction(
   revalidatePath("/events", "layout");
   return {
     id: saved.id,
+    dateLocationRevision: saved.date_location_revision,
     checkInSessionIds: saved.check_in_session_ids ?? [],
     questionIds: saved.question_ids ?? [],
   };

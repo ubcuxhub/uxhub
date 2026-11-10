@@ -241,6 +241,17 @@ export function datetimeLocalToTimestamptz(value: string): string | null {
   return new Date(wallAsUtc - PST).toISOString();
 }
 
+/** Reject invalid, nonexistent and ambiguous Pacific wall times rather than shifting them. */
+export function strictPacificTimestamp(value: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return null;
+  const wall = Date.parse(`${value}:00Z`);
+  if (!Number.isFinite(wall) || new Date(wall).toISOString().slice(0, 16) !== value) return null;
+  const matches = [PDT, PST].map(offset => wall - offset).filter(instant =>
+    timestamptzToDatetimeLocal(new Date(instant).toISOString()) === value
+  );
+  return matches.length === 1 ? new Date(matches[0]).toISOString() : null;
+}
+
 /**
  * An end by this time (6:00 AM) on the morning after the start day belongs to
  * the start day: 7:00 PM to midnight, or a social that runs to 1:00 AM, is a
