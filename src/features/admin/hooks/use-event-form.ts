@@ -1,5 +1,7 @@
 "use client";
 
+import type { EventApplicationSettingsRow } from "@/lib/supabase/models";
+
 import { dateSessions, emptyEventDate, emptyLocation, type EventDateLocationDraft } from "../lib/event-date-location";
 
 import { suggestedEventSlug } from "../lib/event-configuration";
@@ -41,13 +43,14 @@ import {
   type MentorDraft,
   type SponsorDraft,
 } from "../components/event-form/event-form-schema";
-import { datetimeLocalToTimestamptz } from "@/lib/date";
+import { datetimeLocalToTimestamptz, timestamptzToDatetimeLocal } from "@/lib/date";
 import { useApplicationQuestions } from "./use-application-questions";
 import { parseWorkingDocument, type EventWorkingDocument } from "../lib/event-working-document";
 import type { Json } from "@/lib/supabase/database.types";
 import { useUnsavedChangesGuard } from "./use-unsaved-changes-guard";
 
 interface UseEventFormOptions {
+  initialApplicationSettings?: EventApplicationSettingsRow | null;
   initialDateLocation?: { document: EventDateLocationDraft; revision: number } | null;
   eventId?: string;
   initialDraft?: { id: string; revision: number; document: EventWorkingDocument } | null;
@@ -68,6 +71,7 @@ export function useEventForm({
   initialEvent = null,
   initialCheckInSessions = [],
   initialApplicationQuestions = [],
+  initialApplicationSettings,
   initialMentors = [],
   initialSponsors = [],
   onSuccess,
@@ -76,32 +80,38 @@ export function useEventForm({
   const startingFormState = useMemo(
     () => {
       const state = initialDraft?.document.formState;
+      const recoverDateLocation = (source: EventFormState): EventDateLocationDraft => {
+        if (initialDateLocation) return initialDateLocation.document;
+        const sessions = initialDraft?.document.checkInEvents.length
+          ? initialDraft.document.checkInEvents
+          : checkInDraftsFromRows(initialCheckInSessions);
+        return {
+          automatic: true,
+          audience: "everyone",
+          location: { ...emptyLocation(), type: initialEvent?.location_type ?? "in_person", building: source.location_building, room: source.location_room, address: initialEvent?.location_address ?? "", map_url: source.location_address_url },
+          dates: sessions.length ? sessions.map(row => ({ ...emptyEventDate(), session_id: row.id ?? null, date: row.start_time.split("T")[0], start: row.start_time.split("T")[1] ?? "", end: row.end_time.split("T")[1] ?? "", label: row.name })) : [{ ...emptyEventDate(), date: source.starts_at.split("T")[0], start: source.starts_at.split("T")[1] ?? "", end: source.ends_at.split("T")[1] ?? "" }],
+        };
+      };
       if (!state) {
         if (!initialEvent) return getInitialFormState();
-        const source = formStateFromEvent(initialEvent);
-        return { ...source, date_location_revision: initialDateLocation?.revision ?? 0,
-          date_location: initialDateLocation?.document ?? { automatic: true, audience: "everyone" as const,
-            location: { ...emptyLocation(), type: initialEvent.location_type ?? "in_person", building: source.location_building, room: source.location_room, address: initialEvent.location_address ?? "", map_url: source.location_address_url },
-            dates: initialCheckInSessions.length ? checkInDraftsFromRows(initialCheckInSessions).map(row => ({ ...emptyEventDate(), session_id: row.id ?? null, date: row.start_time.split("T")[0], start: row.start_time.split("T")[1] ?? "", end: row.end_time.split("T")[1] ?? "", label: row.name })) : [{ ...emptyEventDate(), date: source.starts_at.split("T")[0], start: source.starts_at.split("T")[1] ?? "", end: source.ends_at.split("T")[1] ?? "" }] } };
+        const source = { ...formStateFromEvent(initialEvent), decisions_release_at: timestamptzToDatetimeLocal(initialApplicationSettings?.decisions_release_at), confirmation_deadline: timestamptzToDatetimeLocal(initialApplicationSettings?.confirmation_deadline) };
+        return { ...source, date_location_revision: initialDateLocation?.revision ?? 0, date_location: recoverDateLocation(source) };
       }
+      const restored = { ...state, date_location: state.date_location ?? recoverDateLocation(state), date_location_revision: state.date_location ? state.date_location_revision : initialDateLocation?.revision ?? state.date_location_revision };
       // Old working documents never captured these settings. Recover them
       // from the source event instead of resetting a saved featured choice,
       // external destination or URL during an unrelated edit.
       if (state.configuration_initialized === false && initialEvent) {
         const source = formStateFromEvent(initialEvent);
-        return { ...state, date_location: state.date_location ?? { automatic: true, audience: "everyone" as const, location: { ...emptyLocation(), building: state.location_building, room: state.location_room, map_url: state.location_address_url }, dates: [emptyEventDate()] }, configuration_initialized: true,
+        return { ...restored, configuration_initialized: true,
           marketing_mode: source.marketing_mode, marketing_url: source.marketing_url,
           page_slug: source.page_slug, slug_edited: source.slug_edited,
           is_featured: source.is_featured, pricing_mode: source.pricing_mode,
           pricing_amount: source.pricing_amount };
       }
-      return { ...state, date_location: state.date_location ?? {
-        automatic: true, audience: "everyone" as const,
-        location: { ...emptyLocation(), building: state.location_building, room: state.location_room, map_url: state.location_address_url },
-        dates: [{ ...emptyEventDate(), date: state.starts_at.split("T")[0], start: state.starts_at.split("T")[1] ?? "", end: state.ends_at.split("T")[1] ?? "" }],
-      } };
+      return restored;
     },
-    [initialEvent, initialDraft, initialDateLocation, initialCheckInSessions]
+    [initialEvent, initialDraft, initialDateLocation, initialCheckInSessions, initialApplicationSettings]
   );
   const startingCheckIns = useMemo(
     () =>
@@ -111,8 +121,8 @@ export function useEventForm({
     [initialCheckInSessions, initialDraft]
   );
   const startingQuestions = useMemo(
-    () => initialDraft?.document.applicationTemplate ?? questionsFromRows(initialApplicationQuestions),
-    [initialApplicationQuestions, initialDraft]
+    () => initialApplicationSettings?.questions_locked_at ? questionsFromRows(initialApplicationQuestions) : initialDraft?.document.applicationTemplate ?? questionsFromRows(initialApplicationQuestions),
+    [initialApplicationQuestions, initialDraft, initialApplicationSettings]
   );
   const [formState, setFormState] =
     useState<EventFormState>(startingFormState);
@@ -423,18 +433,7 @@ export function useEventForm({
         ),
       };
       const checkInSessions = formState.date_location ? dateSessions(formState.date_location) : toCheckInSessionInputs(checkInEvents);
-      const applicationQuestions = toApplicationQuestionInputs(
-        questions.applicationTemplate
-      );
-      // Keep untouched legacy metadata alongside the saved question IDs.
-      // Questions edited in this session use the current input conventions.
-      const untouchedQuestions = eventId && JSON.stringify(questions.applicationTemplate) === JSON.stringify(questionsFromRows(initialApplicationQuestions));
-      const questionsToSave = untouchedQuestions ? initialApplicationQuestions.map(row => ({
-        id: row.id, question: row.question, description: row.description, response_type: row.response_type,
-        is_required: row.is_required, sort_order: row.sort_order, max_char_limit: row.max_char_limit,
-        response_options: row.response_options, restrict_file_types: row.restrict_file_types,
-        allowed_file_types: row.allowed_file_types, max_file_size_bytes: row.max_file_size_bytes,
-      })) : applicationQuestions;
+      const applicationQuestions = initialApplicationSettings?.questions_locked_at ? initialApplicationQuestions : toApplicationQuestionInputs(questions.applicationTemplate);
       const result = await saveAdminEventAction({
         eventId,
         draftId: hasSavedDraft.current ? draftId : undefined,
@@ -447,7 +446,8 @@ export function useEventForm({
         checkInSessions,
         mentorIds: mentors.map((mentor) => mentor.id!),
         sponsorIds: sponsors.map((sponsor) => sponsor.id!),
-        applicationQuestions: questionsToSave,
+        applicationTiming: { decisions_release_at: datetimeLocalToTimestamptz(formState.decisions_release_at), confirmation_deadline: datetimeLocalToTimestamptz(formState.confirmation_deadline) },
+        applicationQuestions,
       });
       // A refusal the admin can act on, such as removing a question people
       // have applied with or a session people have checked in to. Nothing was

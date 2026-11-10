@@ -256,3 +256,31 @@ purchase amounts and ticket records are never rewritten by configuration saves.
 `admin_event_pricing_locked` exposes only the staff aggregate; URL claims have
 no browser grants. The event's existing RLS and staff server-action guards
 continue to govern form access and writes.
+
+
+### Application editor settings
+
+The admin builder saves application timing in staff-only
+`event_application_settings`, separately from public event rows and existing
+per-offer `offer_expires_at`. Release decisions on and Confirm by are optional
+Pacific moments; entered values need a complete, unambiguous date and time, and
+confirmation follows release when both are set. Elapsed values remain editable.
+These form settings do not yet embargo decisions, change outstanding offers,
+reopen expired offers or send emails. Those attendee behaviours remain deferred.
+The intended common deadline/release policy is provisional pending product review.
+
+First submission records a durable `questions_locked_at`. Application drafts
+alone do not lock questions. After submission the builder shows ordered summaries,
+and direct question writes and atomic saves reject changes, additions, removals
+and replacements. Unchanged saves preserve question/response identity and stored
+descriptions. The lock survives application removal. Event deletion retains its
+existing payment protections and cascade behaviour. Question edits and submission
+serialize on the event row; submission validates the question set it locks.
+
+Before that lock, the builder supports Short form, Long form, Checkboxes,
+Multiple choice, Dropdown and one private PDF up to 5 MiB; Required, optional
+positive integer text limits, choice options and ordering persist. Description
+controls are omitted without clearing existing descriptions. Staff working drafts
+can contain incomplete questions and moments; materialized Application events
+need at least one valid question before publication or scheduling through the
+builder. Member upload/response permissions retain their existing contract.

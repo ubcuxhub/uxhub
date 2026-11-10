@@ -1,3 +1,4 @@
+import { applicationTimingProblem } from "./event-form-schema";
 import { describe, expect, it } from "vitest";
 import {
   createFormSnapshot,
@@ -234,7 +235,7 @@ describe("application question payload", () => {
     ]);
 
     expect(text).toMatchObject({
-      max_char_limit: 5000,
+      max_char_limit: null,
       response_options: null,
       restrict_file_types: false,
       allowed_file_types: null,
@@ -307,5 +308,23 @@ describe("event form check-in sessions", () => {
     expect(
       withSavedCheckInSessionIds([{ ...session, id: "session-1" }], [])[0].id
     ).toBe("session-1");
+  });
+});
+
+
+describe("application timing", () => {
+  it("keeps both moments optional and permits elapsed values", () => {
+    expect(applicationTimingProblem({ decisions_release_at: "", confirmation_deadline: "" })).toBeNull();
+    expect(applicationTimingProblem({ decisions_release_at: "2020-01-01T09:00", confirmation_deadline: "" })).toBeNull();
+  });
+  it.each(["2099-01-01T", "T09:00", "2026-03-08T02:30", "2025-11-02T01:30"])("rejects incomplete or ambiguous Pacific moment %s", value => {
+    expect(applicationTimingProblem({ decisions_release_at: value, confirmation_deadline: "" })).toMatch(/valid, unambiguous/);
+  });
+  it("requires confirmation after release, including across the DST boundary", () => {
+    expect(applicationTimingProblem({ decisions_release_at: "2025-11-02T00:30", confirmation_deadline: "2025-11-02T02:00" })).toBeNull();
+    expect(applicationTimingProblem({ decisions_release_at: "2099-01-01T09:00", confirmation_deadline: "2099-01-01T09:00" })).toMatch(/later/);
+  });
+  it("requires a question for Application mode", () => {
+    expect(validateEventForm({ ...validFormState, requires_application: true }, [], []).questionErrors[-1]).toMatch(/at least one valid question/);
   });
 });

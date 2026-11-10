@@ -380,6 +380,36 @@ export type Database = {
           },
         ]
       }
+      event_application_settings: {
+        Row: {
+          confirmation_deadline: string | null
+          decisions_release_at: string | null
+          event_id: string
+          questions_locked_at: string | null
+        }
+        ComputedFields: never
+        Insert: {
+          confirmation_deadline?: string | null
+          decisions_release_at?: string | null
+          event_id: string
+          questions_locked_at?: string | null
+        }
+        Update: {
+          confirmation_deadline?: string | null
+          decisions_release_at?: string | null
+          event_id?: string
+          questions_locked_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_application_settings_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_applications: {
         Row: {
           created_at: string
@@ -1418,6 +1448,19 @@ export type Database = {
         }[]
       }
       save_admin_event_atomically: {
+        Args: {
+          p_application_questions: Json
+          p_check_in_sessions: Json
+          p_event: Json
+          p_event_id: string
+          p_expected_image_url: string
+          p_mentors: Json
+          p_slug: string
+          p_sponsors: Json
+        }
+        Returns: Json
+      }
+      save_admin_event_before_application_settings: {
         Args: {
           p_application_questions: Json
           p_check_in_sessions: Json

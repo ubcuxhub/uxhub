@@ -2,8 +2,8 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FormEvent } from "react";
-import type { EventApplicationQuestionRow, EventRow } from "@/lib/supabase/models";
 import { defaultFormState, checkInDraftsFromRows, formStateFromEvent, getInitialFormState, questionsFromRows } from "../components/event-form/event-form-schema";
+import type { EventApplicationQuestionRow, EventRow } from "@/lib/supabase/models";
 import { useEventForm } from "./use-event-form";
 import { parseWorkingDocument } from "../lib/event-working-document";
 import { toast } from "@/components/ui/toast";
@@ -14,12 +14,12 @@ vi.mock("next/navigation", () => ({
 }));
 vi.mock("./use-unsaved-changes-guard", () => ({ useUnsavedChangesGuard: vi.fn() }));
 vi.mock("@/features/admin/actions", () => ({
+  saveAdminEventDraftAction: vi.fn(async () => ({ id: "draft-1", revision: 1 })),
   saveAdminEventAction: vi.fn(async () => ({
     id: "event-1",
     checkInSessionIds: [],
     questionIds: [],
   })),
-  saveAdminEventDraftAction: vi.fn(async () => ({ id: "draft-1", revision: 1 })),
   deleteAdminEventAction: vi.fn(),
   discardUnusedEventImageAction: vi.fn(),
 }));
@@ -104,6 +104,7 @@ const event = {
   id: "event-1",
   name: "Scheduled event",
   slug: "scheduled-event",
+  is_featured: false,
   short_description: "Preview",
   description: "Description",
   status: "draft",
@@ -188,6 +189,8 @@ describe("event form publishing schedule", () => {
       result.current.handleFieldChange("date_location", { ...dates, dates: [{ ...dates.dates[0], end: "12:30" }] });
       result.current.handleFieldChange("registration_closes_at", "2024-06-30T23:59");
       result.current.handleFieldChange("requires_application", true);
+      result.current.addApplicationQuestion("short_text");
+      result.current.updateApplicationQuestion(0, "question", "Why attend?");
     });
     await act(async () => {
       await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as FormEvent<HTMLFormElement>);
@@ -211,6 +214,77 @@ describe("event form publishing schedule", () => {
       "requires_application", "short_description", "sponsors_enabled",
       "starts_at", "status",
     ]);
+  });
+});
+
+
+describe("durable incomplete drafts", () => {
+  it("saves without publish fields and establishes a clean snapshot", async () => {
+    const { result } = renderHook(() => useEventForm({}));
+    act(() => result.current.handleFieldChange("name", "Work in progress"));
+    expect(result.current.hasUnsavedChanges).toBe(true);
+    await act(async () => { expect(await result.current.handleSaveDraft()).toBe(true); });
+    expect(saveAdminEventAction).not.toHaveBeenCalled();
+    expect(saveAdminEventDraftAction).toHaveBeenCalledWith(expect.objectContaining({ eventId: null, document: expect.objectContaining({ formState: expect.objectContaining({ name: "Work in progress", ends_at: "" }) }) }));
+    expect(result.current.hasUnsavedChanges).toBe(false);
+    expect(result.current.showDraftSaved).toBe(true);
+  });
+  it("keeps entered work and its dirty state after a failed save", async () => {
+    vi.mocked(saveAdminEventDraftAction).mockRejectedValueOnce(new Error("Draft changed elsewhere"));
+    const { result } = renderHook(() => useEventForm({}));
+    act(() => result.current.handleFieldChange("name", "Keep me"));
+    await act(async () => { expect(await result.current.handleSaveDraft(false)).toBe(false); });
+    expect(result.current.formState.name).toBe("Keep me");
+    expect(result.current.hasUnsavedChanges).toBe(true);
+    expect(result.current.error).toBe("Draft changed elsewhere");
+    expect(result.current.showDraftSaved).toBe(false);
+  });
+});
+
+
+it("reopens a saved unfinished card as clean while retaining all its values", () => {
+  const draft = { id: "saved-draft", revision: 2, document: { version: 1 as const, formState: { ...getInitialFormState(), name: "Saved" }, checkInEvents: [], mentors: [], sponsors: [{ name: "Still editing", brand_logo_path: "", isEditing: true }], applicationTemplate: [] } };
+  const { result } = renderHook(() => useEventForm({ initialDraft: draft }));
+  expect(result.current.sponsors[0].name).toBe("Still editing");
+  expect(result.current.hasUnsavedChanges).toBe(false);
+});
+
+
+it("preserves saved question identity during a branding save", async () => {
+  const question = { id: "question-1", event_id: event.id, created_at: null, updated_at: null, question: "Why?", description: null, response_type: "short_text" as const, is_required: false, sort_order: 0, max_char_limit: null, response_options: [], restrict_file_types: false, allowed_file_types: [], max_file_size_bytes: null };
+  const { result } = renderHook(() => useEventForm({ eventId: event.id, initialEvent: event, initialApplicationQuestions: [question], initialCheckInSessions: [{ id: "session-1", event_id: event.id, created_at: null, updated_at: null, name: "Doors", start_time: event.starts_at, end_time: event.ends_at }] }));
+  act(() => result.current.handleFieldChange("event_colour", "#C983C7"));
+  await act(async () => { await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as FormEvent<HTMLFormElement>); });
+  expect(result.current.error).toBeNull();
+  expect(saveAdminEventAction).toHaveBeenCalledWith(expect.objectContaining({ applicationQuestions: [expect.objectContaining({ id: question.id, max_char_limit: null, response_options: null, allowed_file_types: null })] }));
+});
+
+
+describe("event configuration editing", () => {
+  it("follows the name until the URL is deliberately edited, including after draft save", async () => {
+    const { result } = renderHook(() => useEventForm({}));
+    act(() => result.current.handleFieldChange("name", "Design Sprint"));
+    expect(result.current.formState.page_slug).toBe("design-sprint");
+    await act(async () => { await result.current.handleSaveDraft(false); });
+    act(() => result.current.handleFieldChange("name", "New Name"));
+    expect(result.current.formState.page_slug).toBe("new-name");
+    act(() => result.current.handleFieldChange("page_slug", "custom-url"));
+    act(() => result.current.handleFieldChange("name", "Another Name"));
+    expect(result.current.formState.page_slug).toBe("custom-url");
+  });
+  it("does not reset source-event settings when resuming an older working document", () => {
+    const source = { ...event, slug: "original-url", marketing_url: "https://existing.example.com", is_featured: true };
+    const { result } = renderHook(() => useEventForm({ eventId: event.id, initialEvent: source, initialDraft: { id: "old-draft", revision: 1, document: { version: 1, formState: { ...defaultFormState, name: "Old document name", pricing_mode: "legacy", configuration_initialized: false }, checkInEvents: [], mentors: [], sponsors: [], applicationTemplate: [] } } }));
+    expect(result.current.formState).toMatchObject({ name: "Old document name", page_slug: "original-url", marketing_mode: "external", marketing_url: "https://existing.example.com", is_featured: true });
+  });
+  it("keeps a saved automatic URL following the name after reloading an event", () => {
+    const { result } = renderHook(() => useEventForm({ eventId: event.id, initialEvent: { ...event, configured_slug: "scheduled-event", configured_slug_edited: false } }));
+    act(() => result.current.handleFieldChange("name", "Renamed Event"));
+    expect(result.current.formState.page_slug).toBe("renamed-event");
+  });
+  it("hydrates saved configuration and preserves both legacy effective amounts", () => {
+    const { result } = renderHook(() => useEventForm({ eventId: event.id, initialEvent: { ...event, slug: "original", regular_price: 20, member_price: 5, configured_pricing_mode: "paid", configured_price: 12.5, configured_marketing_mode: "external", configured_marketing_url: "https://devpost.com/design", configured_slug: "saved-url", is_featured: true } }));
+    expect(result.current.formState).toMatchObject({ pricing_mode: "paid", pricing_amount: "12.5", regular_price: "20", member_price: "5", marketing_mode: "external", marketing_url: "https://devpost.com/design", page_slug: "saved-url", is_featured: true });
   });
 });
 
@@ -364,45 +438,28 @@ describe("event form check-in sessions", () => {
   });
 });
 
-describe("durable incomplete drafts", () => {
-  it("saves without publish fields and establishes a clean snapshot", async () => {
-    const { result } = renderHook(() => useEventForm({}));
-    act(() => result.current.handleFieldChange("name", "Work in progress"));
-    expect(result.current.hasUnsavedChanges).toBe(true);
-    await act(async () => { expect(await result.current.handleSaveDraft()).toBe(true); });
-    expect(saveAdminEventAction).not.toHaveBeenCalled();
-    expect(saveAdminEventDraftAction).toHaveBeenCalledWith(expect.objectContaining({ eventId: null, document: expect.objectContaining({ formState: expect.objectContaining({ name: "Work in progress", ends_at: "" }) }) }));
-    expect(result.current.hasUnsavedChanges).toBe(false);
-    expect(result.current.showDraftSaved).toBe(true);
-  });
-  it("keeps entered work and its dirty state after a failed save", async () => {
-    vi.mocked(saveAdminEventDraftAction).mockRejectedValueOnce(new Error("Draft changed elsewhere"));
-    const { result } = renderHook(() => useEventForm({}));
-    act(() => result.current.handleFieldChange("name", "Keep me"));
-    await act(async () => { expect(await result.current.handleSaveDraft(false)).toBe(false); });
-    expect(result.current.formState.name).toBe("Keep me");
-    expect(result.current.hasUnsavedChanges).toBe(true);
-    expect(result.current.error).toBe("Draft changed elsewhere");
-    expect(result.current.showDraftSaved).toBe(false);
-  });
-});
 
-
-it("reopens a saved unfinished card as clean while retaining all its values", () => {
-  const draft = { id: "saved-draft", revision: 2, document: { version: 1 as const, formState: { ...getInitialFormState(), name: "Saved" }, checkInEvents: [], mentors: [], sponsors: [{ name: "Still editing", brand_logo_path: "", isEditing: true }], applicationTemplate: [] } };
-  const { result } = renderHook(() => useEventForm({ initialDraft: draft }));
-  expect(result.current.sponsors[0].name).toBe("Still editing");
-  expect(result.current.hasUnsavedChanges).toBe(false);
-});
-
-
-it("preserves untouched legacy question defaults during a branding save", async () => {
-  const question = { id: "question-1", event_id: event.id, created_at: null, updated_at: null, question: "Why?", description: null, response_type: "short_text" as const, is_required: false, sort_order: 0, max_char_limit: null, response_options: [], restrict_file_types: false, allowed_file_types: [], max_file_size_bytes: null };
-  const { result } = renderHook(() => useEventForm({ eventId: event.id, initialEvent: event, initialApplicationQuestions: [question], initialCheckInSessions: [{ id: "session-1", event_id: event.id, created_at: null, updated_at: null, name: "Doors", start_time: event.starts_at, end_time: event.ends_at }] }));
-  act(() => result.current.handleFieldChange("event_colour", "#C983C7"));
+it("loads staff-only timing and sends Pacific moments separately from event and offer fields", async () => {
+  vi.mocked(saveAdminEventAction).mockResolvedValue({ id: event.id, checkInSessionIds: ["session-1"], questionIds: [] });
+  const settings = { event_id: event.id, decisions_release_at: "2026-11-16T18:00:00Z", confirmation_deadline: "2026-11-17T18:00:00Z", questions_locked_at: null };
+  const { result } = renderHook(() => useEventForm({ eventId: event.id, initialEvent: event, initialApplicationSettings: settings, initialCheckInSessions: [{ id: "session-1", event_id: event.id, created_at: null, updated_at: null, name: "Doors", start_time: event.starts_at, end_time: event.ends_at }] }));
+  expect(result.current.formState.decisions_release_at).toBe("2026-11-16T11:00");
+  act(() => result.current.handleFieldChange("confirmation_deadline", "2026-11-18T11:00"));
   await act(async () => { await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as FormEvent<HTMLFormElement>); });
   expect(result.current.error).toBeNull();
-  expect(saveAdminEventAction).toHaveBeenCalledWith(expect.objectContaining({ applicationQuestions: [expect.objectContaining({ max_char_limit: null, response_options: [], allowed_file_types: [] })] }));
+  expect(saveAdminEventAction).toHaveBeenLastCalledWith(expect.objectContaining({ applicationTiming: { decisions_release_at: "2026-11-16T18:00:00.000Z", confirmation_deadline: "2026-11-18T18:00:00.000Z" } }));
+});
+
+it("saves an incomplete application and incomplete timing as a working draft", async () => {
+  const { result } = renderHook(() => useEventForm({}));
+  act(() => {
+    result.current.handleFieldChange("requires_application", true);
+    result.current.addApplicationQuestion("dropdown");
+    result.current.handleFieldChange("decisions_release_at", "2099-01-01T");
+  });
+  await act(async () => { await result.current.handleSaveDraft(); });
+  expect(result.current.error).toBeNull();
+  expect(saveAdminEventDraftAction).toHaveBeenLastCalledWith(expect.objectContaining({ document: expect.objectContaining({ formState: expect.objectContaining({ decisions_release_at: "2099-01-01T" }), applicationTemplate: [expect.objectContaining({ question: "", response_options: [""] })] }) }));
 });
 
 describe("drafts with saved event children", () => {
@@ -426,6 +483,7 @@ describe("drafts with saved event children", () => {
     unmount();
     const reopened = renderHook(() => useEventForm({ ...options, initialDraft: { id: sent.id, revision: 1, document } }));
     expect(reopened.result.current.formState.name).toBe("Working title");
+    expect(reopened.result.current.formState.date_location).toMatchObject({ location: { address: storedEvent.location_address }, dates: [{ session_id: session.id }] });
     expect(reopened.result.current.hasUnsavedChanges).toBe(false);
     vi.mocked(saveAdminEventAction).mockResolvedValue({ id: event.id, checkInSessionIds: [session.id], questionIds: [question.id] });
     await submit(reopened.result);
@@ -453,33 +511,5 @@ describe("drafts with saved event children", () => {
     expect(result.current.checkInEvents[0].id).toBe(session.id);
     expect(result.current.applicationTemplate[0].id).toBe(question.id);
     expect(result.current.hasUnsavedChanges).toBe(false);
-  });
-});
-
-describe("event configuration editing", () => {
-  it("follows the name until the URL is deliberately edited, including after draft save", async () => {
-    const { result } = renderHook(() => useEventForm({}));
-    act(() => result.current.handleFieldChange("name", "Design Sprint"));
-    expect(result.current.formState.page_slug).toBe("design-sprint");
-    await act(async () => { await result.current.handleSaveDraft(false); });
-    act(() => result.current.handleFieldChange("name", "New Name"));
-    expect(result.current.formState.page_slug).toBe("new-name");
-    act(() => result.current.handleFieldChange("page_slug", "custom-url"));
-    act(() => result.current.handleFieldChange("name", "Another Name"));
-    expect(result.current.formState.page_slug).toBe("custom-url");
-  });
-  it("does not reset source-event settings when resuming an older working document", () => {
-    const source = { ...event, slug: "original-url", marketing_url: "https://existing.example.com", is_featured: true };
-    const { result } = renderHook(() => useEventForm({ eventId: event.id, initialEvent: source, initialDraft: { id: "old-draft", revision: 1, document: { version: 1, formState: { ...defaultFormState, name: "Old document name", pricing_mode: "legacy", configuration_initialized: false }, checkInEvents: [], mentors: [], sponsors: [], applicationTemplate: [] } } }));
-    expect(result.current.formState).toMatchObject({ name: "Old document name", page_slug: "original-url", marketing_mode: "external", marketing_url: "https://existing.example.com", is_featured: true });
-  });
-  it("keeps a saved automatic URL following the name after reloading an event", () => {
-    const { result } = renderHook(() => useEventForm({ eventId: event.id, initialEvent: { ...event, configured_slug: "scheduled-event", configured_slug_edited: false } }));
-    act(() => result.current.handleFieldChange("name", "Renamed Event"));
-    expect(result.current.formState.page_slug).toBe("renamed-event");
-  });
-  it("hydrates saved configuration and preserves both legacy effective amounts", () => {
-    const { result } = renderHook(() => useEventForm({ eventId: event.id, initialEvent: { ...event, slug: "original", regular_price: 20, member_price: 5, configured_pricing_mode: "paid", configured_price: 12.5, configured_marketing_mode: "external", configured_marketing_url: "https://devpost.com/design", configured_slug: "saved-url", is_featured: true } }));
-    expect(result.current.formState).toMatchObject({ pricing_mode: "paid", pricing_amount: "12.5", regular_price: "20", member_price: "5", marketing_mode: "external", marketing_url: "https://devpost.com/design", page_slug: "saved-url", is_featured: true });
   });
 });

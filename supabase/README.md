@@ -393,3 +393,16 @@ details also use the existing Going/staff `event_private_details` boundary.
 Member per-date/physical-private rendering and broader audience integration remain
 deferred under the form-first spec. Registration capacity and mode are guarded
 on all event writes using the same event row lock as reservations.
+
+
+### Application form configuration
+
+`event_application_settings` stores staff-only release/confirmation configuration
+and the durable first-submission question lock. Browser roles have only RLS-scoped
+staff reads; writes run through the authorized builder transaction or submission
+trigger. `save_event_application_questions` and direct question-write triggers
+serialize on the event row with `submit_event_application`; submitted questions
+remain unchanged even when they have no answers. No migration rewrites offers,
+responses or attachment objects. Timing fields are configuration only until the
+attendee release/offer integration is implemented. See
+[application editor settings](../docs/event-states.md#application-editor-settings).
