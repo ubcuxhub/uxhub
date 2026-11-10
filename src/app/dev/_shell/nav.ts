@@ -43,7 +43,7 @@ export const TOP_LINKS: readonly NavEntry[] = [
   {
     href: "/dev/templates",
     title: "Templates",
-    keywords: ["events", "event detail", "event builder", "pages", "layouts"],
+    keywords: ["events", "event detail", "event builder", "applications", "application review", "reviewer notes", "pages", "layouts"],
   },
 ];
 
