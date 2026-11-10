@@ -14,6 +14,12 @@ import {
   ProfileFields,
   type ProfileFormData,
 } from "./ProfileFields";
+import {
+  DietarySettings,
+  InterestSettings,
+  PhotoSettings,
+  type TrackSave,
+} from "./SetupSettings";
 
 const supabase = createClient();
 
@@ -30,7 +36,6 @@ const emptyForm: ProfileFormData = {
   school_institution: "",
   student_status: "",
   year: "",
-  dietary_restrictions: "",
 };
 
 function toFormData(user: UserInfoRow): ProfileFormData {
@@ -47,7 +52,6 @@ function toFormData(user: UserInfoRow): ProfileFormData {
     school_institution: user.school_institution || "",
     student_status: user.student_status || "",
     year: user.year || "",
-    dietary_restrictions: user.dietary_restrictions || "",
   };
 }
 
@@ -119,7 +123,6 @@ export function ProfileSettings() {
         faculty: formData.faculty || null,
         major: formData.major || null,
         year: formData.year || null,
-        dietary_restrictions: formData.dietary_restrictions || null,
         ...(user.user_type === "nonUbc"
           ? {
               school_institution: formData.school_institution.trim() || null,
@@ -141,6 +144,28 @@ export function ProfileSettings() {
       setSaveStatus("error");
     }
   }, [formData, user, refreshUser]);
+
+  // The photo, dietary and interests sections save through the setup actions
+  // and report here, beside the profile fields' own autosave.
+  const track = useCallback<TrackSave>(
+    async (save) => {
+      setSaveStatus("saving");
+      setSaveError(null);
+      try {
+        await save();
+        await refreshUser();
+        setSaveStatus("saved");
+        setTimeout(() => setSaveStatus("idle"), 2000);
+        return true;
+      } catch {
+        // Production hides a server action's message.
+        setSaveError("Couldn't save — check your connection.");
+        setSaveStatus("error");
+        return false;
+      }
+    },
+    [refreshUser],
+  );
 
   useEffect(() => {
     // Nothing edited yet (first render, or a refresh echoing our own write):
@@ -203,6 +228,13 @@ export function ProfileSettings() {
         firstNameError={firstNameError}
         lastNameError={lastNameError}
         patch={patch}
+        beforeAbout={<PhotoSettings user={user} track={track} refreshUser={refreshUser} />}
+        afterAbout={
+          <>
+            <DietarySettings user={user} track={track} refreshUser={refreshUser} />
+            <InterestSettings user={user} track={track} refreshUser={refreshUser} />
+          </>
+        }
       />
     </div>
   );
