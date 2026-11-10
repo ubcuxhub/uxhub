@@ -429,6 +429,33 @@ export type Database = {
           },
         ]
       }
+      event_date_location_settings: {
+        Row: {
+          document: NonNullable<Json>
+          event_id: string
+          revision: number
+        }
+        ComputedFields: never
+        Insert: {
+          document: NonNullable<Json>
+          event_id: string
+          revision?: number
+        }
+        Update: {
+          document?: NonNullable<Json>
+          event_id?: string
+          revision?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_date_location_settings_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_links: {
         Row: {
           created_at: string
@@ -1391,6 +1418,19 @@ export type Database = {
         }[]
       }
       save_admin_event_atomically: {
+        Args: {
+          p_application_questions: Json
+          p_check_in_sessions: Json
+          p_event: Json
+          p_event_id: string
+          p_expected_image_url: string
+          p_mentors: Json
+          p_slug: string
+          p_sponsors: Json
+        }
+        Returns: Json
+      }
+      save_admin_event_before_date_locations: {
         Args: {
           p_application_questions: Json
           p_check_in_sessions: Json

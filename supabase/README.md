@@ -163,6 +163,7 @@ helper file, and fix it in one place.
 
 | Table                         | Helper file                                       |
 | ----------------------------- | ------------------------------------------------- |
+| `event_date_location_settings` | `src/lib/supabase-helpers/event-date-locations.ts` (staff editor only) |
 | `events`                      | `src/lib/supabase-helpers/events.ts`              |
 | `event_tickets`               | `src/lib/supabase-helpers/event-tickets.ts`       |
 | `event_applications`          | `src/lib/supabase-helpers/event-applications.ts`  |
@@ -379,3 +380,16 @@ external HTTP requests.
   `20260907120000_simplify_membership_benefits.sql` set the descriptions
   because no other path reached the production rows; it is the last of its kind.
   `name` and `slug` are not editable, so they stay migration-owned.
+
+## Event builder dates and locations
+
+`event_date_location_settings` stores the staff-only editor document and revision,
+including inactive location-type values and per-date whole-location overrides.
+Never include this table in member/public payloads. The atomic save synchronizes
+one check-in session per date, retains session IDs, derives the events envelope,
+and writes only the audience-approved summary/physical fields to `events`.
+Exact restricted physical details stay in the editor document; default meeting
+details also use the existing Going/staff `event_private_details` boundary.
+Member per-date/physical-private rendering and broader audience integration remain
+deferred under the form-first spec. Registration capacity and mode are guarded
+on all event writes using the same event row lock as reservations.

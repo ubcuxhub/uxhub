@@ -32,6 +32,7 @@ import {
 import { APPLICATION_FILE_MAX_BYTES } from "@/lib/supabase-helpers/application-files";
 
 interface ApplicationQuestionsSectionProps {
+  registrationModeOwned?: boolean;
   enabled: boolean;
   applicationTemplate: ApplicationQuestionTemplate[];
   questionErrors: Record<number, string>;
@@ -72,6 +73,7 @@ const choiceTypes = new Set<ResponseType>([
 ]);
 
 export function ApplicationQuestionsSection({
+  registrationModeOwned = false,
   enabled,
   applicationTemplate,
   questionErrors,
@@ -87,14 +89,14 @@ export function ApplicationQuestionsSection({
     <FieldSet className="gap-5">
       <div className="flex items-center justify-between gap-4">
         <FieldLegend>Application Questions</FieldLegend>
-        <div className="flex items-center gap-2">
+        {!registrationModeOwned && <div className="flex items-center gap-2">
           <Switch
             id="requires_application"
             checked={enabled}
             onCheckedChange={onEnabledChange}
           />
           <FieldLabel htmlFor="requires_application">Enabled</FieldLabel>
-        </div>
+        </div>}
       </div>
 
       {enabled && (

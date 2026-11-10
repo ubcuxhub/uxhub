@@ -58,6 +58,8 @@ interface DateFieldProps extends PickerFieldProps<IsoDate> {
 }
 
 interface TimeFieldProps extends PickerFieldProps<WallTime> {
+  /** Event-builder start parsing: bare 7–11 AM, 12–6 PM. Defaults to legacy PM. */
+  ambiguousStart?: "pm" | "daytime"
   /** End-time mode: options start after it and show durations. */
   after?: WallTime
   /** Minutes between options. Default 15. */
@@ -365,6 +367,7 @@ function TimeField({
   onValidityChange,
   name,
   after,
+  ambiguousStart = "pm",
   stepMinutes = 15,
   defaultOpen = false,
   disabled,
@@ -395,7 +398,7 @@ function TimeField({
   const submittedValue =
     value && !error && text === formatTimeInput(value) ? value : ""
   useCommittedValidity(inputRef, text, submittedValue, error, TIME_INPUT_ERROR)
-  const draftTime = text.trim() ? parseTimeInput(text, { after }) : null
+  const draftTime = text.trim() ? parseTimeInput(text, { after, ambiguousStart }) : null
 
   const accept = (time: WallTime) => {
     setParseError(null)
@@ -409,7 +412,7 @@ function TimeField({
       if (value !== null) onValueChange(null)
       return
     }
-    const parsed = parseTimeInput(text, { after })
+    const parsed = parseTimeInput(text, { after, ambiguousStart })
     if (!parsed) {
       setParseError(TIME_INPUT_ERROR)
       return
@@ -418,7 +421,7 @@ function TimeField({
   }
 
   const openList = () => {
-    const parsed = text.trim() ? parseTimeInput(text, { after }) : value
+    const parsed = text.trim() ? parseTimeInput(text, { after, ambiguousStart }) : value
     const index = parsed ? options.findIndex((o) => o.value === parsed) : -1
     setActiveIndex(index)
     setOpen(true)
@@ -457,7 +460,7 @@ function TimeField({
               setParseError(null)
               // Follow the typing: the matching option lights up, so Enter
               // accepts what was typed.
-              const parsed = next.trim() ? parseTimeInput(next, { after }) : null
+              const parsed = next.trim() ? parseTimeInput(next, { after, ambiguousStart }) : null
               setActiveIndex(parsed ? options.findIndex((o) => o.value === parsed) : -1)
             }}
             onBlur={(event) => {
@@ -637,14 +640,16 @@ function localToday(): IsoDate {
 }
 
 /** A date/time pair stacks below 24rem of available space, even in a wide shell. */
-function DateTimeFieldPair({ date, time, className }: {
+function DateTimeFieldPair({ date, time, className, timeWidth = "default" }: {
   date: React.ReactNode
   time: React.ReactNode
+  /** Reserve extra room for time text and the clock trigger. */
+  timeWidth?: "default" | "wide"
   className?: string
 }) {
   return (
     <div data-slot="date-time-field-pair" className={cn("@container/date-time-pair min-w-0 w-full", className)}>
-      <div className="grid min-w-0 gap-2 @min-[24rem]/date-time-pair:grid-cols-[minmax(0,1fr)_8rem]">
+      <div className={cn("grid min-w-0 gap-2", timeWidth === "wide" ? "@min-[24rem]/date-time-pair:grid-cols-[minmax(0,1fr)_9rem]" : "@min-[24rem]/date-time-pair:grid-cols-[minmax(0,1fr)_8rem]")}>
         <div className="min-w-0">{date}</div>
         <div className="min-w-0">{time}</div>
       </div>

@@ -25,6 +25,9 @@ const validFormState = {
 };
 
 describe("event form schema", () => {
+  it("retains zero capacity as a valid whole-number setting before seats are committed", () => {
+    expect(validateEventForm({ ...validFormState, max_capacity: "0" }, [], []).error).toBeNull();
+  });
   it.each([
     ["starts_at", ""],
     ["starts_at", "2099-08-01T"],
