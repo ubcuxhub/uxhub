@@ -22,10 +22,12 @@ describe("ProfileNudge", () => {
     openSettings.mockClear();
   });
 
-  it("opens Settings > Profile", () => {
+  it("opens Settings > Profile, records the dismissal and hides", () => {
     render(<ProfileNudge />);
     fireEvent.click(screen.getByRole("button", { name: "Add interests" }));
     expect(openSettings).toHaveBeenCalledWith("profile");
+    expect(dismiss).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("Complete your profile")).toBeNull();
   });
 
   it("hides and records the dismissal", () => {
