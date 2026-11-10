@@ -149,8 +149,11 @@ edit users and roles and is the only fixture that can access Club Settings.
 `new-member@example.com` (basic, no membership) is the one account that has not
 done member setup, so signing in lands on `/portal/setup` instead of the portal
 home. Every other fixture has `setup_step = 'done'`, like the existing members
-the setup migration backfilled. Each run puts it back at step 1 with no
-dietary needs, photo or interests, undoing setup done through the UI. Dietary
+the setup migration backfilled. Each run puts it back at step 1 ("What best
+describes you?", unanswered: `user_type_confirmed_at` null) with no
+dietary needs, photo or interests, undoing setup done through the UI. Every
+other fixture has answered (a fixed `user_type_confirmed_at`), so membership
+join skips the question for them and goes straight to their details. Dietary
 needs are structured (`diets`, `allergies`, `other_allergies`): two fixtures
 and six crowd accounts have one.
 

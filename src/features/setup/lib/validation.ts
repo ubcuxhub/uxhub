@@ -6,12 +6,14 @@ import {
   OTHER_ALLERGIES_MAX,
   OTHER_ALLERGY_MAX_LENGTH,
   SETUP_STEPS,
+  USER_TYPE_OPTIONS,
   type AllergyId,
   type AvatarPreset,
   type DietId,
   type InterestId,
   type SetupStep,
   type SetupStepId,
+  type UserTypeId,
 } from "./options";
 
 /**
@@ -30,6 +32,7 @@ const DIET_IDS = new Set<string>(DIET_OPTIONS.map((option) => option.id));
 const ALLERGY_IDS = new Set<string>(ALLERGY_OPTIONS.map((option) => option.id));
 const INTEREST_IDS = new Set<string>(INTEREST_OPTIONS.map((option) => option.id));
 const AVATAR_IDS = new Set<string>(AVATAR_PRESETS.map((option) => option.id));
+const USER_TYPE_IDS = new Set<string>(USER_TYPE_OPTIONS.map((option) => option.id));
 
 export function isSetupStepId(value: unknown): value is SetupStepId {
   return typeof value === "string" && (SETUP_STEPS as readonly string[]).includes(value);
@@ -99,4 +102,11 @@ export function parseAvatarPreset(value: unknown): AvatarPreset {
     throw new Error("Choose an icon from the list.");
   }
   return value as AvatarPreset;
+}
+
+export function parseUserType(value: unknown): UserTypeId {
+  if (typeof value !== "string" || !USER_TYPE_IDS.has(value)) {
+    throw new Error("Choose what best describes you from the list.");
+  }
+  return value as UserTypeId;
 }

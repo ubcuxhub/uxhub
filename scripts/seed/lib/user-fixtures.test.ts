@@ -64,13 +64,19 @@ describe("user seed fixtures", () => {
 
   it("leaves member setup unfinished for the new-member fixture only", () => {
     const unfinished = seedUsers.filter(
-      (user) => (user.profile.setup_step ?? "dietary") !== "done"
+      (user) => (user.profile.setup_step ?? "about") !== "done"
     );
 
     expect(unfinished.map((user) => user.email)).toEqual([
       "new-member@example.com",
     ]);
-    expect(unfinished[0].profile.setup_step).toBe("dietary");
+    expect(unfinished[0].profile.setup_step).toBe("about");
+  });
+
+  it("leaves \"What best describes you?\" unanswered for the new-member fixture only", () => {
+    const unanswered = seedUsers.filter((user) => !user.profile.user_type_confirmed_at);
+
+    expect(unanswered.map((user) => user.email)).toEqual(["new-member@example.com"]);
   });
 
   it("reaches every user type", () => {

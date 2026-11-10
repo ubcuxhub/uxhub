@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { INTEREST_OPTIONS } from "./options";
+import { INTEREST_OPTIONS, SETUP_STEPS } from "./options";
 import {
   getSetupRedirect,
   resolveSetupDestination,
@@ -13,7 +13,7 @@ import {
 
 describe("getSetupRedirect", () => {
   it("sends members who haven't finished or skipped setup from the portal home", () => {
-    for (const step of ["dietary", "photo", "interests"]) {
+    for (const step of ["about", "dietary", "photo", "interests"]) {
       expect(getSetupRedirect({ setup_step: step }, "/portal")).toBe(SETUP_PATH);
     }
   });
@@ -44,7 +44,12 @@ describe("getSetupRedirect", () => {
 });
 
 describe("nextSetupStep", () => {
+  it("asks what best describes you first", () => {
+    expect(SETUP_STEPS[0]).toBe("about");
+  });
+
   it("moves to the step after the one saved or skipped", () => {
+    expect(nextSetupStep("about", "about")).toBe("dietary");
     expect(nextSetupStep("dietary", "dietary")).toBe("photo");
     expect(nextSetupStep("photo", "photo")).toBe("interests");
     expect(nextSetupStep("interests", "interests")).toBe("done");
@@ -52,10 +57,12 @@ describe("nextSetupStep", () => {
 
   it("resumes after a step the member went back to", () => {
     expect(nextSetupStep("interests", "dietary")).toBe("photo");
+    expect(nextSetupStep("photo", "about")).toBe("dietary");
   });
 
   it("keeps a finished member finished", () => {
     expect(nextSetupStep("done", "dietary")).toBe("done");
+    expect(nextSetupStep("done", "about")).toBe("done");
   });
 });
 
@@ -64,6 +71,8 @@ describe("toSetupState", () => {
     expect(
       toSetupState({
         setup_step: "photo",
+        user_type: "faculty",
+        user_type_confirmed_at: "2026-11-10T00:00:00+00:00",
         diets: ["halal"],
         allergies: ["soy"],
         other_allergies: ["Kiwi"],
@@ -73,6 +82,8 @@ describe("toSetupState", () => {
       })
     ).toEqual({
       step: "photo",
+      userType: "faculty",
+      userTypeConfirmed: true,
       diets: ["halal"],
       allergies: ["soy"],
       otherAllergies: ["Kiwi"],
@@ -80,6 +91,23 @@ describe("toSetupState", () => {
       profilePhotoPath: "profiles/a/b.png",
       interests: ["ux-research"],
     });
+  });
+});
+
+describe("toSetupState, user type", () => {
+  it("treats a type nobody confirmed as unanswered", () => {
+    const state = toSetupState({
+      setup_step: "about",
+      user_type: "ubcStudent",
+      user_type_confirmed_at: null,
+      diets: [],
+      allergies: [],
+      other_allergies: [],
+      avatar_preset: null,
+      profile_photo_path: null,
+      interests: [],
+    });
+    expect(state).toMatchObject({ step: "about", userType: "ubcStudent", userTypeConfirmed: false });
   });
 });
 
@@ -108,6 +136,7 @@ describe("interest taxonomy", () => {
 describe("resolveSetupDestination", () => {
   it("sends an unfinished member heading for the portal home to setup", () => {
     expect(resolveSetupDestination("/portal", "dietary")).toBe(SETUP_PATH);
+    expect(resolveSetupDestination("/portal", "about")).toBe(SETUP_PATH);
     expect(resolveSetupDestination("/portal?x=1#top", "dietary")).toBe(SETUP_PATH);
   });
 

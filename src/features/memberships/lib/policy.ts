@@ -49,6 +49,32 @@ export function membershipDetailsPath(userType: UserType) {
   return `/portal/membership/join/${userTypeToAudience(userType)}`;
 }
 
+/** The join flow's "What best describes you?" step, asked again on purpose. */
+export const CHANGE_USER_TYPE_PATH = "/portal/membership/join?change=1";
+
+/**
+ * Where the join flow's first step sends a member who already answered
+ * "What best describes you?" (in setup or an earlier join): straight to the
+ * details for that type. Null asks the question: never answered, or the
+ * member chose to change it.
+ */
+export function confirmedJoinPath(
+  user: Pick<UserInfoRow, "user_type" | "user_type_confirmed_at">,
+  changing: boolean,
+): string | null {
+  if (changing || !user.user_type_confirmed_at) return null;
+  return membershipDetailsPath(user.user_type);
+}
+
+/**
+ * The stamp a save writes whenever the member answers "What best describes
+ * you?" (join details, or eligibility in Settings), so join skips the
+ * question next time.
+ */
+export function userTypeConfirmation(now = new Date()): Pick<UserInfoUpdate, "user_type_confirmed_at"> {
+  return { user_type_confirmed_at: now.toISOString() };
+}
+
 /**
  * The user columns membership eligibility reads. Narrower than `UserInfoRow` so
  * server actions can pass a partial row and tests can build fixtures.

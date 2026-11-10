@@ -2192,8 +2192,9 @@ begin
 end;
 $$;
 
--- Member setup (20261110030244): members write their own setup columns and
--- nothing else; managers keep editing anyone; deletion scrubs the answers.
+-- Member setup (20261110030244, 20261110041028): members write their own
+-- setup columns and nothing else (`user_type` stays privileged); managers keep
+-- editing anyone; deletion scrubs the answers.
 \o /dev/null
 select set_config('request.jwt.claims', '{}', true);
 \o
@@ -2242,10 +2243,14 @@ declare
   column_name text;
   v_row public.user_info%rowtype;
 begin
-  -- New rows start setup. (Rows that predate it were added with `done`.)
+  -- New rows start setup at "What best describes you?", unanswered. (Rows
+  -- that predate it were added with `done`.)
   select * into v_row from public.user_info where id = current_setting('rls.setup_member_id')::uuid;
-  if v_row.setup_step <> 'dietary' or v_row.diets <> '{}' or v_row.avatar_preset is not null then
-    raise exception 'a new profile does not start setup at the dietary step';
+  if v_row.setup_step <> 'about' or v_row.diets <> '{}' or v_row.avatar_preset is not null then
+    raise exception 'a new profile does not start setup at the about step';
+  end if;
+  if v_row.user_type_confirmed_at is not null then
+    raise exception 'a new profile starts with its user type confirmed';
   end if;
 
   -- Legacy free text written by older code lands in other_allergies.
@@ -2254,7 +2259,11 @@ begin
     raise exception 'inserted dietary_restrictions was not mirrored, got %', v_row.other_allergies;
   end if;
 
-  foreach column_name in array array['setup_step', 'diets', 'allergies', 'other_allergies', 'avatar_preset'] loop
+  if has_column_privilege('authenticated', 'public.user_info', 'user_type', 'UPDATE') then
+    raise exception 'members can update user_type directly';
+  end if;
+
+  foreach column_name in array array['setup_step', 'diets', 'allergies', 'other_allergies', 'avatar_preset', 'user_type_confirmed_at'] loop
     if not has_column_privilege('authenticated', 'public.user_info', column_name, 'UPDATE') then
       raise exception 'members cannot update their own %', column_name;
     end if;
@@ -2284,6 +2293,30 @@ declare
   changed_count integer;
   v_row public.user_info%rowtype;
 begin
+  -- Step 1: confirming the type they already have.
+  update public.user_info
+  set setup_step = 'dietary',
+      user_type_confirmed_at = now()
+  where id = current_setting('rls.setup_member_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 1 then
+    raise exception 'a member could not confirm their own user type';
+  end if;
+
+  update public.user_info set user_type_confirmed_at = now()
+  where id = current_setting('rls.setup_other_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'a member confirmed another member''s user type';
+  end if;
+
+  begin
+    update public.user_info set user_type = 'faculty'
+    where id = current_setting('rls.setup_member_id')::uuid;
+    raise exception 'a member changed their own user_type directly';
+  exception when insufficient_privilege then null;
+  end;
+
   update public.user_info
   set setup_step = 'photo',
       diets = array['vegan', 'halal'],
@@ -2440,7 +2473,8 @@ begin
   select * into v_row from public.user_info where id = current_setting('rls.setup_member_id')::uuid;
   if v_row.deleted_at is null
      or v_row.diets <> '{}' or v_row.allergies <> '{}' or v_row.other_allergies <> '{}'
-     or v_row.avatar_preset is not null or v_row.dietary_restrictions is not null then
+     or v_row.avatar_preset is not null or v_row.dietary_restrictions is not null
+     or v_row.user_type_confirmed_at is not null then
     raise exception 'account deletion left setup answers behind';
   end if;
 end;

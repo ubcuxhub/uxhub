@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../actions", () => ({
   finishSetupAction: vi.fn(),
+  saveSetupAboutAction: vi.fn(),
   saveSetupDietaryAction: vi.fn(),
   saveSetupPhotoAction: vi.fn(),
   skipSetupStepAction: vi.fn(),
@@ -22,12 +23,14 @@ globalThis.ResizeObserver ??= class {
   disconnect() {}
 };
 
-import type { SetupState } from "../lib/state";
-import { NO_DIETARY_ANSWER, NO_PHOTO_CHOICE, SetupFlow } from "./SetupFlow";
+import { USER_TYPE_LOCKED_MESSAGE, type SetupState } from "../lib/state";
+import { NO_ABOUT_ANSWER, NO_DIETARY_ANSWER, NO_PHOTO_CHOICE, SetupFlow } from "./SetupFlow";
 import type { SetupClient } from "./setup-client";
 
 const BLANK: SetupState = {
   step: "dietary",
+  userType: "ubcStudent",
+  userTypeConfirmed: false,
   diets: [],
   allergies: [],
   otherAllergies: [],
@@ -39,6 +42,10 @@ const BLANK: SetupState = {
 function fakeClient(): SetupClient & { [K in keyof SetupClient]: ReturnType<typeof vi.fn> } {
   const echo = (patch: Partial<SetupState>) => Promise.resolve({ ...BLANK, ...patch });
   return {
+    saveAbout: vi.fn(async ({ userType }) => ({
+      ok: true,
+      setup: await echo({ userType, userTypeConfirmed: true, step: "dietary" }),
+    })),
     saveDietary: vi.fn((needs) => echo({ ...needs, step: "photo" })),
     savePhoto: vi.fn(({ avatarPreset }) => echo({ avatarPreset, step: "interests" })),
     finish: vi.fn(({ interests }) => echo({ interests, step: "done" })),
@@ -50,15 +57,22 @@ function fakeClient(): SetupClient & { [K in keyof SetupClient]: ReturnType<type
 
 let client: ReturnType<typeof fakeClient>;
 
-function renderFlow(initial: Partial<SetupState> = {}) {
+function renderFlow(initial: Partial<SetupState> = {}, props: { userTypeLocked?: boolean } = {}) {
   return render(
-    <SetupFlow initial={{ ...BLANK, ...initial }} name="Jamie Lee" firstName="Jamie" client={client} />,
+    <SetupFlow
+      initial={{ ...BLANK, ...initial }}
+      name="Jamie Lee"
+      firstName="Jamie"
+      client={client}
+      {...props}
+    />,
   );
 }
 
 const heading = () => screen.getByRole("heading", { level: 1 });
 const chip = (name: string) => screen.getByRole("button", { name: new RegExp(`^${name}$`) });
 const press = (name: string) => fireEvent.click(chip(name));
+const radio = (name: RegExp) => screen.getByRole("radio", { name });
 
 beforeEach(() => {
   client = fakeClient();
@@ -70,17 +84,71 @@ describe("SetupFlow", () => {
   it("resumes at the stored step without stealing focus on load", () => {
     renderFlow({ step: "interests" });
     expect(heading().textContent).toBe("What are you into?");
-    expect(screen.getByText("Step 3 of 3")).toBeTruthy();
+    expect(screen.getByText("Step 4 of 4")).toBeTruthy();
     expect(document.activeElement).not.toBe(heading());
   });
 
   it("starts a member who finished at step 1, with their answers", () => {
-    renderFlow({ step: "done", diets: ["vegan"] });
-    expect(heading().textContent).toBe("Any dietary needs?");
-    expect(chip("Vegan").getAttribute("aria-pressed")).toBe("true");
+    renderFlow({ step: "done", userType: "faculty", userTypeConfirmed: true });
+    expect(heading().textContent).toBe("What best describes you?");
+    expect(screen.getByText("Step 1 of 4")).toBeTruthy();
+    expect(radio(/faculty member/).getAttribute("aria-checked")).toBe("true");
   });
 
-  describe("step 1, dietary needs", () => {
+  describe("step 1, about you", () => {
+    it("selects nothing until the member answers, and asks instead of disabling Continue", async () => {
+      renderFlow({ step: "about" });
+      expect(screen.getByRole("radiogroup", { name: "What best describes you?" })).toBeTruthy();
+      expect(screen.getAllByRole("radio").every((item) => item.getAttribute("aria-checked") === "false")).toBe(true);
+      fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+      expect(await screen.findByText(NO_ABOUT_ANSWER)).toBeTruthy();
+      expect(client.saveAbout).not.toHaveBeenCalled();
+    });
+
+    it("saves the answer, then moves on with focus on the new heading", async () => {
+      renderFlow({ step: "about" });
+      fireEvent.click(radio(/not from UBC/));
+      fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+      await waitFor(() => expect(heading().textContent).toBe("Any dietary needs?"));
+      expect(client.saveAbout).toHaveBeenCalledWith({ userType: "nonUbc" });
+      expect(document.activeElement).toBe(heading());
+      expect(screen.getByRole("status").textContent).toBe("Step 2 of 4: Any dietary needs?");
+    });
+
+    it("shows the server's refusal and stays on the step", async () => {
+      client.saveAbout.mockResolvedValueOnce({ ok: false, error: USER_TYPE_LOCKED_MESSAGE });
+      renderFlow({ step: "about" });
+      fireEvent.click(radio(/faculty member/));
+      fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+      expect((await screen.findByRole("alert")).textContent).toBe(USER_TYPE_LOCKED_MESSAGE);
+      expect(heading().textContent).toBe("What best describes you?");
+    });
+
+    it("can only confirm the stored type while a membership holds it", () => {
+      renderFlow({ step: "about", userType: "faculty" }, { userTypeLocked: true });
+      expect(radio(/faculty member/).getAttribute("aria-checked")).toBe("true");
+      expect(radio(/faculty member/).hasAttribute("disabled")).toBe(false);
+      expect(radio(/UBC student/).hasAttribute("disabled")).toBe(true);
+      expect(radio(/not from UBC/).hasAttribute("disabled")).toBe(true);
+      expect(screen.getByText(USER_TYPE_LOCKED_MESSAGE)).toBeTruthy();
+    });
+
+    it("can be skipped", async () => {
+      renderFlow({ step: "about" });
+      fireEvent.click(screen.getByRole("button", { name: "Skip for now" }));
+      await waitFor(() => expect(heading().textContent).toBe("Any dietary needs?"));
+      expect(client.skip).toHaveBeenCalledWith("about");
+      expect(client.saveAbout).not.toHaveBeenCalled();
+    });
+
+    it("has no Back, since there's nothing before it", () => {
+      renderFlow({ step: "about" });
+      expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
+    });
+  });
+
+  describe("step 2, dietary needs", () => {
     it("asks for an answer instead of disabling Save", async () => {
       renderFlow();
       const save = screen.getByRole("button", { name: "Save dietary needs" });
@@ -132,7 +200,7 @@ describe("SetupFlow", () => {
         otherAllergies: ["Kiwi"],
       });
       expect(document.activeElement).toBe(heading());
-      expect(screen.getByRole("status").textContent).toBe("Step 2 of 3: Choose a photo");
+      expect(screen.getByRole("status").textContent).toBe("Step 3 of 4: Choose a photo");
     });
 
     it("can be skipped", async () => {
@@ -152,13 +220,14 @@ describe("SetupFlow", () => {
       expect(heading().textContent).toBe("Any dietary needs?");
     });
 
-    it("has no Back, since there's nothing before it", () => {
+    it("goes Back to step 1", async () => {
       renderFlow();
-      expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
+      fireEvent.click(screen.getAllByRole("button", { name: "Back" })[0]);
+      await waitFor(() => expect(heading().textContent).toBe("What best describes you?"));
     });
   });
 
-  describe("step 2, photo", () => {
+  describe("step 3, photo", () => {
     it("offers the presets as one radio group beside the preview", async () => {
       renderFlow({ step: "photo" });
       const group = screen.getByRole("radiogroup", { name: "Icons" });
@@ -209,7 +278,7 @@ describe("SetupFlow", () => {
     });
   });
 
-  describe("step 3, interests and welcome", () => {
+  describe("step 4, interests and welcome", () => {
     it("counts the chosen interests and finishes into Welcome", async () => {
       renderFlow({ step: "interests" });
       expect(screen.getByText("0 selected")).toBeTruthy();

@@ -16,6 +16,7 @@ import { validateFacultyEmail, validateStudentNumber } from "./lib/validation";
 import {
   buildEligibilityUpdate,
   canEditMembershipClassification,
+  userTypeConfirmation,
 } from "./lib/policy";
 
 interface UpdateEligibilityInput {
@@ -63,15 +64,15 @@ export async function updateEligibilityProfileAction(
     facultyEmail = normalized;
   }
 
-  await adminUpdateUserInfoById(
-    user.id,
-    buildEligibilityUpdate({
+  await adminUpdateUserInfoById(user.id, {
+    ...buildEligibilityUpdate({
       userType: input.userType,
       studentNumber,
       faculty: input.faculty,
       facultyEmail,
     }),
-  );
+    ...userTypeConfirmation(),
+  });
 }
 
 export type MembershipProfileInput =
@@ -139,6 +140,7 @@ export async function saveMembershipProfileAction(
         faculty_email: null,
         school_institution: null,
         student_status: null,
+        ...userTypeConfirmation(),
       });
     } else if (input.audience === "faculty") {
       const normalizedEmail = input.facultyEmail.trim().toLowerCase();
@@ -166,6 +168,7 @@ export async function saveMembershipProfileAction(
         year: null,
         school_institution: null,
         student_status: null,
+        ...userTypeConfirmation(),
       });
     } else if (input.audience === "non-ubc") {
       const validStatuses: StudentStatus[] = [
@@ -191,6 +194,7 @@ export async function saveMembershipProfileAction(
         student_number: null,
         faculty: null,
         major: null,
+        ...userTypeConfirmation(),
       });
     } else {
       return { ok: false, error: "Select a valid membership classification." };
