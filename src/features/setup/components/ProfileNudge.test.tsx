@@ -30,7 +30,7 @@ describe("ProfileNudge", () => {
 
   it("hides and records the dismissal", () => {
     render(<ProfileNudge />);
-    fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    fireEvent.click(screen.getByRole("button", { name: "Not now" }));
     expect(dismiss).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("Complete your profile")).toBeNull();
   });

@@ -49,8 +49,6 @@ export default async function PortalHome() {
         <p className="text-muted-foreground">Welcome to the UX Hub portal.</p>
       </div>
 
-      {shouldShowProfileNudge(user, nudgeDismissed) && <ProfileNudge />}
-
       {membershipType ? (
         <MembershipCard
           cardholder={formatUserName(user) || firstName}
@@ -60,6 +58,9 @@ export default async function PortalHome() {
       ) : (
         canJoin && !isMember && <MembershipCardEmptyState />
       )}
+
+      {/* After the join prompt, so a required step stays first. */}
+      {shouldShowProfileNudge(user, nudgeDismissed) && <ProfileNudge />}
 
       {isMember && <DiscountCodes />}
     </PageContainer>
