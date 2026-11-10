@@ -18,6 +18,7 @@
  */
 
 import type { TablesInsert } from "../../../src/lib/supabase/database.types.ts";
+import { DIET_OPTIONS } from "../../../src/features/setup/lib/options.ts";
 import { encodeCheckboxResponse } from "../../../src/lib/application-response.ts";
 import { addDays, startOfUtcDay, timestamp } from "../lib/relative-dates.ts";
 import type { SeedEvent } from "./events.ts";
@@ -173,7 +174,7 @@ function profileOf(person: CrowdPerson, index: number) {
     pronouns: person.pronouns,
     birthDate: person.birthDate,
     interests: person.interests,
-    dietary: person.dietary ?? null,
+    diets: DIET_OPTIONS.filter((option) => option.label === person.dietary).map((option) => option.id),
     newsletter: person.newsletter ?? false,
     phone: `60455502${String(index).padStart(2, "0")}`,
   };
