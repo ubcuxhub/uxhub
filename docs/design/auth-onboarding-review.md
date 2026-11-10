@@ -351,5 +351,15 @@ Only #6 needs a migration. #3 and #4 can ship in parallel after #1 and #2;
   list, and the Welcome screen (described, not drawn).
 - The hosted Supabase project's auth settings (password length, rate limits,
   Google provider, redirect URLs) aren't in the repo.
+  - **Password minimum, checked 2026-11-09 (auth shell PR): still unverified.**
+    The main checkout is linked to the hosted project (`supabase/.temp/
+    project-ref`), but Supabase CLI 2.67.1 has no read-only way to see auth
+    config: `supabase config` only offers `push`, which writes, and was not
+    run. The minimum isn't stored in the database either, so `psql` can't read
+    it. Check it by hand in the dashboard (Authentication → Sign In /
+    Providers → Email → Minimum password length) or with the Management API
+    (`GET /v1/projects/{ref}/config/auth`, field `password_min_length`) using
+    a personal access token. Locally it is 6 (`supabase/config.toml`), below
+    the client's 8, so #4 should raise both.
 - Coded pages were viewed in the browser while signed out only; the portal
   home and settings were reviewed from code.

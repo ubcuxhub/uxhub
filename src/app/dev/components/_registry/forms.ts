@@ -52,6 +52,19 @@ export const formsEntries: readonly RegistryEntry[] = [
     aliases: [{ id: "form-controls" }],
   },
   {
+    slug: "password-input",
+    title: "Password input",
+    category: "Forms",
+    tier: "primitive",
+    description:
+      "A password field with a show/hide button, for sign-in, sign-up and password resets.",
+    importPath: "@/components/ui/password-input",
+    importNames: ["PasswordInput"],
+    source: "src/components/ui/password-input.tsx",
+    spec: "§3.2",
+    layout: "split",
+  },
+  {
     slug: "textarea",
     title: "Textarea",
     category: "Forms",
