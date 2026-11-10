@@ -76,6 +76,7 @@ import type { EventRow } from "@/lib/supabase/models";
 
 import { Composition } from "@/app/dev/_shell/Specimen";
 import { ApplicationReviewFlow, ApplicationsEmpty } from "./application-review";
+import { PROFILE_SCENARIOS, ProfileTemplate, type ProfileScenarioId } from "./profile";
 import { SETUP_TEMPLATE_STARTS, SetupTemplate } from "./setup";
 import type { SectionProps } from "@/app/dev/_shell/types";
 
@@ -89,6 +90,10 @@ const TEMPLATES = [
   { id: "setup-photo", title: "Setup, choose a photo", spec: "Figma 4292:2" },
   { id: "setup-interests", title: "Setup, interests", spec: "Figma 4297:2" },
   { id: "setup-welcome", title: "Setup, welcome", spec: "Figma 4269:2" },
+  { id: "profile-filled", title: "Settings Profile, filled member", spec: "proposal" },
+  { id: "profile-new", title: "Settings Profile, brand-new member", spec: "proposal" },
+  { id: "profile-saving", title: "Settings Profile, saving", spec: "proposal" },
+  { id: "profile-error", title: "Settings Profile, save error", spec: "proposal" },
 ] as const;
 type TemplateId = (typeof TEMPLATES)[number]["id"];
 
@@ -778,6 +783,7 @@ function TemplateBody({ id }: { id: TemplateId }) {
   if (id === "applications") return <ApplicationReviewFlow start="list" />;
   if (id === "application-review") return <ApplicationReviewFlow start="detail" />;
   if (id in SETUP_TEMPLATE_STARTS) return <SetupTemplate start={SETUP_TEMPLATE_STARTS[id]} />;
+  if (id in PROFILE_SCENARIOS) return <ProfileTemplate key={id} scenario={id as ProfileScenarioId} />;
   return <EventsTemplate />;
 }
 
@@ -825,7 +831,7 @@ function Section({ open }: SectionProps) {
     <div className="flex flex-col gap-10">
       <Composition
         title={`${template.title} (${template.spec}), desktop`}
-        description={`Built from the real components on fixture data: no fetching, no auth. Pick another template with the Force open links above. Laid out at the width of your window; the page container caps at 1152px.${template.id === "event-builder" ? " The section pill floats at the bottom of the window, as it does on the real page." : ""}${template.id.startsWith("application") ? " A design proposal (docs/design/application-review.md): open a row, decide, add a note, then go back; the list keeps its filters, page and your row." : ""}${template.id.startsWith("setup") ? " Member setup at /portal/setup, on the auth shell, with an in-memory fake server (600ms per write). Every step works: Save, Skip, Back, the crop dialog (uploads stay in the browser), and Welcome." : ""}`}
+        description={`Built from the real components on fixture data: no fetching, no auth. Pick another template with the Force open links above. Laid out at the width of your window; the page container caps at 1152px.${template.id === "event-builder" ? " The section pill floats at the bottom of the window, as it does on the real page." : ""}${template.id.startsWith("application") ? " A design proposal (docs/design/application-review.md): open a row, decide, add a note, then go back; the list keeps its filters, page and your row." : ""}${template.id.startsWith("setup") ? " Member setup at /portal/setup, on the auth shell, with an in-memory fake server (600ms per write). Every step works: Save, Skip, Back, the crop dialog (uploads stay in the browser), and Welcome." : ""}${template.id.startsWith("profile") ? " A design proposal (docs/design/profile-settings.md) for the Settings dialog's Profile tab, in a static copy of the dialog. Saving is faked per section (800ms debounce, then 600ms); Retry and the photo chooser work." : ""}`}
       >
         <div className="overflow-hidden rounded-xl border border-border-subtle bg-background">
           <TemplateBody id={template.id} />
