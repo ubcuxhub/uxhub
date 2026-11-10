@@ -27,7 +27,11 @@ import {
   saveMembershipProfileAction,
   type MembershipProfileInput,
 } from "@/features/memberships/actions";
-import type { MembershipAudience } from "@/features/memberships/lib/policy";
+import {
+  CHANGE_USER_TYPE_PATH,
+  userTypeToAudience,
+  type MembershipAudience,
+} from "@/features/memberships/lib/policy";
 import {
   ASYNC_DEADLINES,
   getAsyncErrorMessage,
@@ -35,6 +39,28 @@ import {
   withDeadline,
 } from "@/lib/async/deadline";
 import { useNavigationRecovery } from "@/hooks/use-navigation-recovery";
+
+/** Offered beside "Change" when join skipped "What best describes you?". */
+export const CHANGE_USER_TYPE_PROMPT: Record<MembershipAudience, string> = {
+  student: "Not a UBC student?",
+  faculty: "Not UBC faculty or staff?",
+  "non-ubc": "From UBC?",
+};
+
+/**
+ * Whether this is the type the member already answered (in setup or an
+ * earlier join). Join then skipped the question, so the form offers a way
+ * back to it instead of a Back that would skip it again.
+ */
+export function isConfirmedAudience(
+  user: Pick<UserInfoRow, "user_type" | "user_type_confirmed_at">,
+  audience: MembershipAudience,
+) {
+  return (
+    user.user_type_confirmed_at !== null &&
+    userTypeToAudience(user.user_type) === audience
+  );
+}
 
 export function MembershipDetailsForm({
   audience,
@@ -45,6 +71,14 @@ export function MembershipDetailsForm({
   returnTo?: string;
   user: UserInfoRow;
 }) {
+  const confirmed = isConfirmedAudience(user, audience);
+  // With an answer on record, the plain join step would skip straight back here.
+  const questionHref = withReturnTo(
+    user.user_type_confirmed_at !== null
+      ? CHANGE_USER_TYPE_PATH
+      : "/portal/membership/join",
+    returnTo ?? "/portal",
+  );
   const router = useRouter();
   const { setBusy } = useFlowDialog();
   const { refreshUser } = useUser();
@@ -152,6 +186,16 @@ export function MembershipDetailsForm({
             ? "You can change your other details later, but make sure your student number is correct before continuing."
             : "You can change this information later."}
         </p>
+        {confirmed ? (
+          <p className="mt-2 text-small text-muted-foreground">
+            {CHANGE_USER_TYPE_PROMPT[audience]}{" "}
+            <Button asChild variant="link" size="sm" disabled={pending}>
+              <FlowLink href={questionHref} replace>
+                Change
+              </FlowLink>
+            </Button>
+          </p>
+        ) : null}
       </div>
 
       <div className="mt-8 grid gap-5">
@@ -229,17 +273,15 @@ export function MembershipDetailsForm({
       ) : null}
 
       <div className="mt-auto flex justify-between gap-4 pt-8">
-        <Button asChild variant="outline" disabled={pending}>
-          <FlowLink
-            href={withReturnTo(
-              "/portal/membership/join",
-              returnTo ?? "/portal",
-            )}
-            replace
-          >
-            Back
-          </FlowLink>
-        </Button>
+        {confirmed ? (
+          <span />
+        ) : (
+          <Button asChild variant="outline" disabled={pending}>
+            <FlowLink href={questionHref} replace>
+              Back
+            </FlowLink>
+          </Button>
+        )}
         <Button onClick={save} disabled={pending}>
           {pending ? "Saving…" : "Next"}
         </Button>

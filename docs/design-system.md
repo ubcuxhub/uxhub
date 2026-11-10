@@ -245,6 +245,25 @@ One curve, ease-out `cubic-bezier(0, 0, 0.2, 1)`; never linear or bounce.
 Reduced motion keeps only fades. Cards never lift. Buttons show progress in
 place; content loads into shaped skeletons.
 
+**Ambient brand motion.** The one place motion is decoration rather than
+feedback: the auth shell's brand panel (`BrandMotion`, used on sign-in,
+sign-up, password reset and setup).
+
+- **Decorative only:** `aria-hidden`, no pointer events, never carries
+  information or blocks a control.
+- **Once:** the shape tiles fall and settle a single time when the shell
+  mounts (about 2s, staggered) on the ease-out curve, with no overshoot or
+  bounce, and never loop or replay while the member moves between auth
+  screens. After that, only a slow sway of a few pixels and about a degree
+  (ease-in-out, 9–14s cycles, since it never starts or stops).
+- **Cursor glow** only for a fine, hovering pointer (`(hover: hover) and
+  (pointer: fine)`); nothing on touch.
+- **Cheap:** `transform` and `opacity` only; paused while the tab is hidden.
+- **Reduced motion** shows the finished still frame: settled tiles, no sway,
+  no glow.
+- **Never behind text the member is reading:** it lives in the brand panel
+  only; below `lg` the panel becomes a static header with no motion.
+
 ### 2.9 Writing and terminology
 
 **Voice:** clear not corporate; ambitious not intimidating; playful not

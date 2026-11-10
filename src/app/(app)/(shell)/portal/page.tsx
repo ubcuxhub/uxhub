@@ -1,5 +1,13 @@
+import { cookies } from "next/headers";
+
 import { PageContainer } from "@/components/shared/PageContainer";
 import { requireAuth } from "@/lib/auth/guards";
+import { redirectToSetupIfNeeded } from "@/features/setup/server";
+import { ProfileNudge } from "@/features/setup/components/ProfileNudge";
+import {
+  PROFILE_NUDGE_COOKIE,
+  shouldShowProfileNudge,
+} from "@/features/setup/lib/profile-nudge";
 import {
   getEffectiveMembershipExpiry,
   hasActiveMembership,
@@ -17,7 +25,10 @@ import { fetchMembershipTypeById } from "@/lib/supabase-helpers/memberships";
 
 export default async function PortalHome() {
   const user = await requireAuth();
+  // New members land here after sign-in; send them through setup first.
+  redirectToSetupIfNeeded(user, "/portal");
   const supabase = await createClient();
+  const nudgeDismissed = (await cookies()).has(PROFILE_NUDGE_COOKIE);
   const termEndsAt = await getMembershipTermEndsAt();
   const firstName = user.first_name || user.email.split("@")[0] || "there";
   const isMember = hasActiveMembership(user, termEndsAt);
@@ -47,6 +58,9 @@ export default async function PortalHome() {
       ) : (
         canJoin && !isMember && <MembershipCardEmptyState />
       )}
+
+      {/* After the join prompt, so a required step stays first. */}
+      {shouldShowProfileNudge(user, nudgeDismissed) && <ProfileNudge />}
 
       {isMember && <DiscountCodes />}
     </PageContainer>

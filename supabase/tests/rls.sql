@@ -2192,6 +2192,294 @@ begin
 end;
 $$;
 
+-- Member setup (20261110030244, 20261110041028): members write their own
+-- setup columns and nothing else (`user_type` stays privileged); managers keep
+-- editing anyone; deletion scrubs the answers.
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+
+insert into auth.users (
+  id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+)
+values (
+  gen_random_uuid(), 'authenticated', 'authenticated',
+  'rls-setup-member@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()
+)
+returning id as auth_user_id, email
+\gset setup_member_
+
+insert into auth.users (
+  id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+)
+values (
+  gen_random_uuid(), 'authenticated', 'authenticated',
+  'rls-setup-manager@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()
+)
+returning id as auth_user_id, email
+\gset setup_manager_
+
+insert into public.user_info (auth_user_id, email, first_name, last_name, role_access)
+values (:'setup_member_auth_user_id', :'setup_member_email', 'RLS', 'Setup Member', 'basic')
+returning id \gset setup_member_
+
+insert into public.user_info (auth_user_id, email, first_name, last_name, role_access)
+values (:'setup_manager_auth_user_id', :'setup_manager_email', 'RLS', 'Setup Manager', 'manager')
+returning id \gset setup_manager_
+
+insert into public.user_info (email, first_name, last_name, role_access, dietary_restrictions)
+values ('rls-setup-other@example.test', 'RLS', 'Setup Other', 'basic', '  Kiwi  ')
+returning id \gset setup_other_
+
+\o /dev/null
+select set_config('rls.setup_member_id', :'setup_member_id', true);
+select set_config('rls.setup_other_id', :'setup_other_id', true);
+\o
+
+do $$
+declare
+  column_name text;
+  v_row public.user_info%rowtype;
+begin
+  -- New rows start setup at "What best describes you?", unanswered. (Rows
+  -- that predate it were added with `done`.)
+  select * into v_row from public.user_info where id = current_setting('rls.setup_member_id')::uuid;
+  if v_row.setup_step <> 'about' or v_row.diets <> '{}' or v_row.avatar_preset is not null then
+    raise exception 'a new profile does not start setup at the about step';
+  end if;
+  if v_row.user_type_confirmed_at is not null then
+    raise exception 'a new profile starts with its user type confirmed';
+  end if;
+
+  -- Legacy free text written by older code lands in other_allergies.
+  select * into v_row from public.user_info where id = current_setting('rls.setup_other_id')::uuid;
+  if v_row.other_allergies <> array['Kiwi'] then
+    raise exception 'inserted dietary_restrictions was not mirrored, got %', v_row.other_allergies;
+  end if;
+
+  if has_column_privilege('authenticated', 'public.user_info', 'user_type', 'UPDATE') then
+    raise exception 'members can update user_type directly';
+  end if;
+
+  foreach column_name in array array['setup_step', 'diets', 'allergies', 'other_allergies', 'avatar_preset', 'user_type_confirmed_at'] loop
+    if not has_column_privilege('authenticated', 'public.user_info', column_name, 'UPDATE') then
+      raise exception 'members cannot update their own %', column_name;
+    end if;
+    if has_column_privilege('anon', 'public.user_info', column_name, 'UPDATE') then
+      raise exception 'anon can update %', column_name;
+    end if;
+  end loop;
+end;
+$$;
+
+\o /dev/null
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'setup_member_auth_user_id',
+    'email', :'setup_member_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+\o
+
+set local role authenticated;
+
+do $$
+declare
+  changed_count integer;
+  v_row public.user_info%rowtype;
+begin
+  -- Step 1: confirming the type they already have.
+  update public.user_info
+  set setup_step = 'dietary',
+      user_type_confirmed_at = now()
+  where id = current_setting('rls.setup_member_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 1 then
+    raise exception 'a member could not confirm their own user type';
+  end if;
+
+  update public.user_info set user_type_confirmed_at = now()
+  where id = current_setting('rls.setup_other_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'a member confirmed another member''s user type';
+  end if;
+
+  begin
+    update public.user_info set user_type = 'faculty'
+    where id = current_setting('rls.setup_member_id')::uuid;
+    raise exception 'a member changed their own user_type directly';
+  exception when insufficient_privilege then null;
+  end;
+
+  update public.user_info
+  set setup_step = 'photo',
+      diets = array['vegan', 'halal'],
+      allergies = array['tree-nuts'],
+      other_allergies = array['Sesame', 'Kiwi'],
+      avatar_preset = 'flower'
+  where id = current_setting('rls.setup_member_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 1 then
+    raise exception 'a member could not save their own setup answers';
+  end if;
+
+  select * into v_row from public.user_info where id = current_setting('rls.setup_member_id')::uuid;
+  if v_row.dietary_restrictions is distinct from 'Sesame, Kiwi' then
+    raise exception 'other_allergies was not mirrored into dietary_restrictions, got %', v_row.dietary_restrictions;
+  end if;
+
+  -- Settings still edits the legacy text; it flows the other way.
+  update public.user_info set dietary_restrictions = 'Mango'
+  where id = current_setting('rls.setup_member_id')::uuid;
+  select * into v_row from public.user_info where id = current_setting('rls.setup_member_id')::uuid;
+  if v_row.other_allergies <> array['Mango'] then
+    raise exception 'dietary_restrictions was not mirrored into other_allergies, got %', v_row.other_allergies;
+  end if;
+
+  update public.user_info set diets = array['vegan'], setup_step = 'done'
+  where id = current_setting('rls.setup_other_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'a member changed another member''s setup answers';
+  end if;
+
+  begin
+    update public.user_info set interests = array['ux-research']
+    where id = current_setting('rls.setup_member_id')::uuid;
+    raise exception 'a member wrote interests directly';
+  exception when insufficient_privilege then null;
+  end;
+
+  begin
+    update public.user_info set profile_photo_path = null
+    where id = current_setting('rls.setup_member_id')::uuid;
+    raise exception 'a member wrote profile_photo_path directly';
+  exception when insufficient_privilege then null;
+  end;
+
+  begin
+    update public.user_info set role_access = 'admin'
+    where id = current_setting('rls.setup_member_id')::uuid;
+    raise exception 'a member promoted themselves alongside setup';
+  exception when insufficient_privilege then null;
+  end;
+
+  begin
+    update public.user_info set diets = array['paleo']
+    where id = current_setting('rls.setup_member_id')::uuid;
+    raise exception 'a diet outside the list was saved';
+  exception when check_violation then null;
+  end;
+
+  begin
+    update public.user_info set allergies = array['dairy', 'dairy']
+    where id = current_setting('rls.setup_member_id')::uuid;
+    raise exception 'a repeated allergy was saved';
+  exception when check_violation then null;
+  end;
+
+  begin
+    update public.user_info set other_allergies = array['Kiwi', 'kiwi']
+    where id = current_setting('rls.setup_member_id')::uuid;
+    raise exception 'a repeated other allergy was saved';
+  exception when check_violation then null;
+  end;
+
+  begin
+    update public.user_info set other_allergies = array[' Kiwi']
+    where id = current_setting('rls.setup_member_id')::uuid;
+    raise exception 'an untrimmed other allergy was saved';
+  exception when check_violation then null;
+  end;
+
+  begin
+    update public.user_info set other_allergies = array[repeat('x', 201)]
+    where id = current_setting('rls.setup_member_id')::uuid;
+    raise exception 'an over-long other allergy was saved';
+  exception when check_violation then null;
+  end;
+
+  begin
+    update public.user_info set avatar_preset = 'hubbo'
+    where id = current_setting('rls.setup_member_id')::uuid;
+    raise exception 'an unknown avatar preset was saved';
+  exception when check_violation then null;
+  end;
+
+  begin
+    update public.user_info set setup_step = 'welcome'
+    where id = current_setting('rls.setup_member_id')::uuid;
+    raise exception 'an unknown setup step was saved';
+  exception when check_violation then null;
+  end;
+end;
+$$;
+
+reset role;
+
+\o /dev/null
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'setup_manager_auth_user_id',
+    'email', :'setup_manager_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+\o
+
+set local role authenticated;
+
+do $$
+declare
+  changed_count integer;
+begin
+  update public.user_info set allergies = array['soy']
+  where id = current_setting('rls.setup_other_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 1 then
+    raise exception 'a manager could not edit a member''s dietary needs';
+  end if;
+
+  begin
+    update public.user_info set interests = array['ux-research']
+    where id = current_setting('rls.setup_other_id')::uuid;
+    raise exception 'a manager wrote interests from the browser client';
+  exception when insufficient_privilege then null;
+  end;
+end;
+$$;
+
+reset role;
+
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+
+-- Account deletion clears every setup answer.
+select public.delete_account(:'setup_member_auth_user_id');
+
+do $$
+declare
+  v_row public.user_info%rowtype;
+begin
+  select * into v_row from public.user_info where id = current_setting('rls.setup_member_id')::uuid;
+  if v_row.deleted_at is null
+     or v_row.diets <> '{}' or v_row.allergies <> '{}' or v_row.other_allergies <> '{}'
+     or v_row.avatar_preset is not null or v_row.dietary_restrictions is not null
+     or v_row.user_type_confirmed_at is not null then
+    raise exception 'account deletion left setup answers behind';
+  end if;
+end;
+$$;
+
 \ir event-publication.sql
 \ir event-drafts.sql
 \ir event-date-locations.sql

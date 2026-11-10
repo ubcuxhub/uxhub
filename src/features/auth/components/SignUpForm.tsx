@@ -11,6 +11,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import {
   isAsyncTimeoutError,
   withDeadline,
@@ -21,26 +22,28 @@ import { createClient } from "@/lib/supabase/client";
 import { completeProfileAction } from "../actions";
 import {
   AUTH_ACTION_ERRORS,
+  EMAIL_ALREADY_EXISTS_MESSAGE,
   getAuthActionErrorMessage,
+  isUserAlreadyExistsError,
 } from "../auth-errors";
 import { setPendingEmail } from "../pending-email";
+import {
+  PASSWORD_HINT,
+  PASSWORD_TOO_SHORT_ERROR,
+  isPasswordLongEnough,
+} from "../password-rules";
 import { AuthPanel } from "./AuthPanel";
 import { AuthSubmitButton } from "./AuthSubmitButton";
 import { GoogleOAuthButton } from "./GoogleOAuthButton";
-
-const MIN_PASSWORD_LENGTH = 8;
 
 type SignUpFormData = {
   firstName: string;
   lastName: string;
   email: string;
   password: string;
-  repeatPassword: string;
 };
 
-type SignUpFieldErrors = Partial<
-  Record<"password" | "repeatPassword", string>
->;
+type SignUpFieldErrors = Partial<Record<"email" | "password", string>>;
 
 export function SignUpForm({
   className,
@@ -52,13 +55,13 @@ export function SignUpForm({
     lastName: "",
     email: "",
     password: "",
-    repeatPassword: "",
   });
 
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<SignUpFieldErrors>({});
   const [isLoading, setIsLoading] = useState(false);
   const submittingRef = useRef(false);
+  const emailRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const recoverStalledNavigation = useNavigationRecovery(() => {
     submittingRef.current = false;
@@ -73,15 +76,16 @@ export function SignUpForm({
   const validate = (): SignUpFieldErrors => {
     const errors: SignUpFieldErrors = {};
 
-    if (formData.password.length < MIN_PASSWORD_LENGTH) {
-      errors.password = `Password must be at least ${MIN_PASSWORD_LENGTH} characters.`;
-    }
-
-    if (formData.password !== formData.repeatPassword) {
-      errors.repeatPassword = "Passwords do not match.";
+    if (!isPasswordLongEnough(formData.password)) {
+      errors.password = PASSWORD_TOO_SHORT_ERROR;
     }
 
     return errors;
+  };
+
+  const showEmailTaken = () => {
+    setFieldErrors({ email: EMAIL_ALREADY_EXISTS_MESSAGE });
+    emailRef.current?.focus();
   };
 
   const handleSignUp = async (e: React.FormEvent) => {
@@ -124,6 +128,13 @@ export function SignUpForm({
       const user = authData.user;
       if (!user) throw new Error("User not returned from Supabase");
 
+      // With confirmations on, Supabase answers an existing address with a
+      // success whose user has no identities rather than an error.
+      if (user.identities && user.identities.length === 0) {
+        showEmailTaken();
+        return;
+      }
+
       // When email confirmation is disabled, signUp returns a session and the
       // profile can be created immediately. Otherwise the confirmation
       // callback creates it once the session exists.
@@ -145,12 +156,16 @@ export function SignUpForm({
       setPendingEmail(normalizedEmail);
 
       router.push(
-        `/auth/sign-up-success?next=${encodeURIComponent(nextPath)}`,
+        `/auth/verify-email?next=${encodeURIComponent(nextPath)}`,
       );
       navigationStarted = true;
       recoverStalledNavigation();
     } catch (error: unknown) {
-      setError(
+      if (isUserAlreadyExistsError(error)) {
+        showEmailTaken();
+      } else if ((error as { code?: unknown } | null)?.code === "weak_password") {
+        setFieldErrors({ password: PASSWORD_TOO_SHORT_ERROR });
+      } else setError(
         isAsyncTimeoutError(error)
           ? "We could not confirm whether your account was created. Check your email or try signing in before submitting again."
           : getAuthActionErrorMessage(error, AUTH_ACTION_ERRORS.signUp),
@@ -170,21 +185,23 @@ export function SignUpForm({
   return (
     <AuthPanel
       title="Sign up"
-      description="Create a new account."
+      description="Create your UX Hub account to register for workshops, socials and UXathon."
       className={className}
       {...props}
     >
-      <GoogleOAuthButton nextPath={nextPath} />
+      <div className="flex flex-col gap-6">
+      <GoogleOAuthButton nextPath={nextPath} dividerLabel="or sign up with email" />
 
-      <form onSubmit={handleSignUp} className="space-y-4">
-        <div className="grid gap-6 sm:grid-cols-2">
+      <form onSubmit={handleSignUp} className="flex flex-col gap-4">
+        <div className="grid gap-4 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="first-name">
-              First Name *
+              First name
             </FieldLabel>
             <Input
               id="first-name"
-              placeholder="First name"
+              placeholder="First"
+              autoComplete="given-name"
               required
               value={formData.firstName}
               onChange={(e) => handleChange("firstName", e.target.value)}
@@ -193,11 +210,12 @@ export function SignUpForm({
 
           <Field>
             <FieldLabel htmlFor="last-name">
-              Last Name *
+              Last name
             </FieldLabel>
             <Input
               id="last-name"
-              placeholder="Last name"
+              placeholder="Last"
+              autoComplete="family-name"
               required
               value={formData.lastName}
               onChange={(e) => handleChange("lastName", e.target.value)}
@@ -205,30 +223,47 @@ export function SignUpForm({
           </Field>
         </div>
 
-        <Field>
+        <Field data-invalid={fieldErrors.email ? true : undefined}>
           <FieldLabel htmlFor="email">
-            Email *
+            Email
           </FieldLabel>
           <Input
+            ref={emailRef}
             id="email"
+            aria-invalid={fieldErrors.email ? true : undefined}
             type="email"
+            autoComplete="email"
             placeholder="name@example.com"
             required
             value={formData.email}
             onChange={(e) => handleChange("email", e.target.value)}
           />
+          {fieldErrors.email ? (
+            <FieldError>
+              {fieldErrors.email}{" "}
+              <Link
+                href={`/auth/login?next=${encodeURIComponent(nextPath)}`}
+                onClick={() => {
+                  // Carry the typed address over so Sign in starts filled.
+                  const typed = formData.email.trim().toLowerCase();
+                  if (typed) setPendingEmail(typed);
+                }}
+                className="text-foreground underline underline-offset-4"
+              >
+                Sign in instead
+              </Link>
+            </FieldError>
+          ) : null}
         </Field>
 
         <Field data-invalid={fieldErrors.password ? true : undefined}>
           <FieldLabel htmlFor="password">
-            Password *
+            Password
           </FieldLabel>
-          <Input
+          <PasswordInput
             id="password"
-            type="password"
-            placeholder="Enter your password"
+            autoComplete="new-password"
             required
-            minLength={MIN_PASSWORD_LENGTH}
             aria-invalid={fieldErrors.password ? true : undefined}
             value={formData.password}
             onChange={(e) => handleChange("password", e.target.value)}
@@ -236,46 +271,27 @@ export function SignUpForm({
           {fieldErrors.password ? (
             <FieldError>{fieldErrors.password}</FieldError>
           ) : (
-            <FieldDescription className="text-body">
-              Password must be at least {MIN_PASSWORD_LENGTH} characters.
-            </FieldDescription>
+            <FieldDescription>{PASSWORD_HINT}</FieldDescription>
           )}
-        </Field>
-
-        <Field data-invalid={fieldErrors.repeatPassword ? true : undefined}>
-          <FieldLabel htmlFor="repeat-password">
-            Confirm password *
-          </FieldLabel>
-          <Input
-            id="repeat-password"
-            type="password"
-            placeholder="Re-enter your password"
-            required
-            aria-invalid={fieldErrors.repeatPassword ? true : undefined}
-            value={formData.repeatPassword}
-            onChange={(e) => handleChange("repeatPassword", e.target.value)}
-          />
-          {fieldErrors.repeatPassword ? (
-            <FieldError>{fieldErrors.repeatPassword}</FieldError>
-          ) : null}
         </Field>
 
         {error ? <FieldError>{error}</FieldError> : null}
 
-        <AuthSubmitButton type="submit" disabled={isLoading}>
-          {isLoading ? "Creating account..." : "Complete sign up"}
+        <AuthSubmitButton type="submit" loading={isLoading}>
+          Create account
         </AuthSubmitButton>
 
-        <p className="text-center text-body text-muted-foreground">
+        <p className="text-body text-muted-foreground">
           Already have an account?{" "}
           <Link
             href={`/auth/login?next=${encodeURIComponent(nextPath)}`}
-            className="font-medium text-foreground underline underline-offset-4"
+            className="text-foreground underline underline-offset-4"
           >
             Sign in
           </Link>
         </p>
       </form>
+      </div>
     </AuthPanel>
   );
 }

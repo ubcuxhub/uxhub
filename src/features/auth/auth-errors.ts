@@ -16,6 +16,14 @@ export const AUTH_ACTION_ERRORS = {
     "Unable to update your password. Check your connection and try again.",
 } as const;
 
+export const INVALID_CREDENTIALS_MESSAGE =
+  "That email and password don't match. Try again or reset your password.";
+
+export const EMAIL_ALREADY_EXISTS_MESSAGE =
+  "An account with this email already exists.";
+
+export const INVALID_EMAIL_MESSAGE = "Enter a valid email address.";
+
 export function getAuthActionErrorMessage(
   error: unknown,
   fallback: string,
@@ -23,4 +31,44 @@ export function getAuthActionErrorMessage(
   return isAsyncTimeoutError(error)
     ? getAsyncErrorMessage(error, fallback)
     : fallback;
+}
+
+function getErrorCode(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null) return undefined;
+  const code = (error as { code?: unknown }).code;
+  return typeof code === "string" ? code : undefined;
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "";
+}
+
+/** Supabase refuses to sign in an account whose email isn't confirmed yet. */
+export function isEmailNotConfirmedError(error: unknown): boolean {
+  return (
+    getErrorCode(error) === "email_not_confirmed" ||
+    /email not confirmed/i.test(getErrorMessage(error))
+  );
+}
+
+export function isInvalidCredentialsError(error: unknown): boolean {
+  return (
+    getErrorCode(error) === "invalid_credentials" ||
+    /invalid login credentials/i.test(getErrorMessage(error))
+  );
+}
+
+/** Sign-up for an address that already has an account. */
+export function isUserAlreadyExistsError(error: unknown): boolean {
+  const code = getErrorCode(error);
+  return (
+    code === "user_already_exists" ||
+    code === "email_exists" ||
+    /already registered|already exists/i.test(getErrorMessage(error))
+  );
+}
+
+/** A plain address check; the server stays the authority. */
+export function isPlausibleEmail(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }

@@ -125,7 +125,7 @@ differently, and deletes any other note a fixture wrote, such as one posted
 through the review page. Local only: `--target=prod` writes no accounts, so no
 notes.
 
-`data/users.ts` — eleven local login accounts. **Password is `123456` for all of them.**
+`data/users.ts` — twelve local login accounts. **Password is `123456` for all of them.**
 Ten cover every membership state crossed with the basic and admin roles:
 
 | Membership | Non-admin                       | Admin                             |
@@ -136,15 +136,26 @@ Ten cover every membership state crossed with the basic and admin roles:
 | Non-UBC    | `non-ubc@example.com`           | `admin-non-ubc@example.com`       |
 | None       | `no-membership@example.com`     | `admin-no-membership@example.com` |
 
-Every fixture but `admin-no-membership@example.com` has a birthday and interest
-tags for the admin user directory; that one is left empty so the dialog's empty
-state is visible. `student-explorer@example.com` is a verified student, verified
+Every fixture but `admin-no-membership@example.com` and
+`new-member@example.com` has a birthday and interest tags for the admin user
+directory; the first is left empty so the dialog's empty state is visible. `student-explorer@example.com` is a verified student, verified
 by `manager-no-membership@example.com`; everyone else is unverified. Each run
 resets verification and profile photos to that, undoing changes made through
 the admin dialog.
 
 `manager-no-membership@example.com` is the dedicated manager fixture. It can
 edit users and roles and is the only fixture that can access Club Settings.
+
+`new-member@example.com` (basic, no membership) is the one account that has not
+done member setup, so signing in lands on `/portal/setup` instead of the portal
+home. Every other fixture has `setup_step = 'done'`, like the existing members
+the setup migration backfilled. Each run puts it back at step 1 ("What best
+describes you?", unanswered: `user_type_confirmed_at` null) with no
+dietary needs, photo or interests, undoing setup done through the UI. Every
+other fixture has answered (a fixed `user_type_confirmed_at`), so membership
+join skips the question for them and goes straight to their details. Dietary
+needs are structured (`diets`, `allergies`, `other_allergies`): two fixtures
+and six crowd accounts have one.
 
 The tier decides `user_type` — `isEligibleForMembership` checks
 `eligible_user_types.includes(user_type)` — so the faculty accounts are
@@ -153,10 +164,10 @@ the non-UBC ones are `nonUbc`. Each type owns a mutually exclusive field set,
 mirroring `completeMembershipProfile`; the validator rejects a fixture that
 mixes them.
 
-Three of the eleven are **deep** fixtures (`fullEventHistory: true`) carrying
+Three of the twelve are **deep** fixtures (`fullEventHistory: true`) carrying
 purchased tickets across every phase, applications, and check-ins:
 `admin-explorer@example.com`, `no-membership@example.com`, and
-`student-innovator@example.com`. The other eight hold a membership purchase at
+`student-innovator@example.com`. The other nine hold a membership purchase at
 most — giving each of them a full timeline would be a lot of fixture data to
 keep correct for very little.
 

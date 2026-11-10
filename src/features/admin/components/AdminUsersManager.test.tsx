@@ -42,11 +42,12 @@ function user(overrides: Partial<UserRecord>): UserRecord {
     id: "dora", auth_user_id: "auth-dora", first_name: "Dora", last_name: "Hu",
     email: "z@example.com", phone: "604-555-0100", preferred_pronouns: "She/Her",
     created_at: "2026-07-21T12:00:00Z", updated_at: null, deleted_at: null,
+    setup_step: "done", diets: [], allergies: [], other_allergies: [], avatar_preset: null,
     dietary_restrictions: null, faculty: "Arts", faculty_email: null, major: "English",
     membership_type_id: "innovator", membership_type_name: "Innovator", membership_expires_at: null,
     membership_pre_ordered_type_id: null, newsletter: true, order_date_deprecated: null,
     order_date: null, role_access: "manager", school_institution: null,
-    square_customer_id: null, student_number: 12345, student_status: "undergraduate", user_type: "ubcStudent", year: "2",
+    square_customer_id: null, student_number: 12345, student_status: "undergraduate", user_type: "ubcStudent", user_type_confirmed_at: null, year: "2",
     ...overrides,
   };
 }
