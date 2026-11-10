@@ -1057,11 +1057,14 @@ export type Database = {
       }
       user_info: {
         Row: {
+          allergies: string[]
           auth_user_id: string | null
+          avatar_preset: string | null
           birth_date: string | null
           created_at: string | null
           deleted_at: string | null
           dietary_restrictions: string | null
+          diets: string[]
           email: string
           faculty: string | null
           faculty_email: string | null
@@ -1075,11 +1078,13 @@ export type Database = {
           membership_type_id: string | null
           newsletter: boolean
           order_date_deprecated: string | null
+          other_allergies: string[]
           phone: string | null
           preferred_pronouns: string | null
           profile_photo_path: string | null
           role_access: Database["public"]["Enums"]["role_access_enum"]
           school_institution: string | null
+          setup_step: string
           square_customer_id: string | null
           student_number: number | null
           student_status: Database["public"]["Enums"]["student_status"] | null
@@ -1087,15 +1092,19 @@ export type Database = {
           student_verified_by: string | null
           updated_at: string | null
           user_type: Database["public"]["Enums"]["user_type"]
+          user_type_confirmed_at: string | null
           year: Database["public"]["Enums"]["uni_year"] | null
         }
         ComputedFields: never
         Insert: {
+          allergies?: string[]
           auth_user_id?: string | null
+          avatar_preset?: string | null
           birth_date?: string | null
           created_at?: string | null
           deleted_at?: string | null
           dietary_restrictions?: string | null
+          diets?: string[]
           email: string
           faculty?: string | null
           faculty_email?: string | null
@@ -1109,11 +1118,13 @@ export type Database = {
           membership_type_id?: string | null
           newsletter?: boolean
           order_date_deprecated?: string | null
+          other_allergies?: string[]
           phone?: string | null
           preferred_pronouns?: string | null
           profile_photo_path?: string | null
           role_access: Database["public"]["Enums"]["role_access_enum"]
           school_institution?: string | null
+          setup_step?: string
           square_customer_id?: string | null
           student_number?: number | null
           student_status?: Database["public"]["Enums"]["student_status"] | null
@@ -1121,14 +1132,18 @@ export type Database = {
           student_verified_by?: string | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"]
+          user_type_confirmed_at?: string | null
           year?: Database["public"]["Enums"]["uni_year"] | null
         }
         Update: {
+          allergies?: string[]
           auth_user_id?: string | null
+          avatar_preset?: string | null
           birth_date?: string | null
           created_at?: string | null
           deleted_at?: string | null
           dietary_restrictions?: string | null
+          diets?: string[]
           email?: string
           faculty?: string | null
           faculty_email?: string | null
@@ -1142,11 +1157,13 @@ export type Database = {
           membership_type_id?: string | null
           newsletter?: boolean
           order_date_deprecated?: string | null
+          other_allergies?: string[]
           phone?: string | null
           preferred_pronouns?: string | null
           profile_photo_path?: string | null
           role_access?: Database["public"]["Enums"]["role_access_enum"]
           school_institution?: string | null
+          setup_step?: string
           square_customer_id?: string | null
           student_number?: number | null
           student_status?: Database["public"]["Enums"]["student_status"] | null
@@ -1154,6 +1171,7 @@ export type Database = {
           student_verified_by?: string | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"]
+          user_type_confirmed_at?: string | null
           year?: Database["public"]["Enums"]["uni_year"] | null
         }
         Relationships: [
@@ -1317,6 +1335,11 @@ export type Database = {
         Args: { p_event_id: string; p_user_id: string }
         Returns: string
       }
+      valid_option_list: {
+        Args: { allowed: string[]; choices: string[] }
+        Returns: boolean
+      }
+      valid_other_allergies: { Args: { entries: string[] }; Returns: boolean }
       valid_user_interests: { Args: { tags: string[] }; Returns: boolean }
     }
     Enums: {

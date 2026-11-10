@@ -8,6 +8,7 @@ import type { DemoLoader } from "@/app/dev/_shell/types";
 export const formsDemos: Record<string, DemoLoader> = {
   field: () => import("../_demos/field"),
   input: () => import("../_demos/input"),
+  "password-input": () => import("../_demos/password-input"),
   textarea: () => import("../_demos/textarea"),
   select: () => import("../_demos/select"),
   checkbox: () => import("../_demos/checkbox"),

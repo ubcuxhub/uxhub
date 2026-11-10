@@ -74,7 +74,9 @@ export async function replaceProfilePhoto(
     });
     if (error) throw new Error("Unable to upload profile photo.");
   }
-  let query = db.from(TABLES.userInfo).update({ profile_photo_path: nextPath }).eq("id", userId).is("deleted_at", null);
+  // An uploaded photo replaces a chosen avatar preset rather than hiding behind it.
+  const patch: UserInfoUpdate = nextPath ? { profile_photo_path: nextPath, avatar_preset: null } : { profile_photo_path: null };
+  let query = db.from(TABLES.userInfo).update(patch).eq("id", userId).is("deleted_at", null);
   query = expectedPath === null ? query.is("profile_photo_path", null) : query.eq("profile_photo_path", expectedPath);
   const { data, error } = await query.select("*").maybeSingle();
   if (error || !data) {

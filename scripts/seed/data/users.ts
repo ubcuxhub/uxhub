@@ -1,6 +1,11 @@
 import type { TablesInsert } from "../../../src/lib/supabase/database.types.ts";
 import { addDays, startOfUtcDay, timestamp } from "../lib/relative-dates.ts";
 import { encodeCheckboxResponse } from "../../../src/lib/application-response.ts";
+import type {
+  AllergyId,
+  DietId,
+  SetupStep,
+} from "../../../src/features/setup/lib/options.ts";
 import { seedEvents, type SeedEvent } from "./events.ts";
 
 export interface SeedPurchase {
@@ -167,9 +172,25 @@ export interface CommonProfileInput {
   pronouns: string;
   admin?: boolean;
   role?: TablesInsert<"user_info">["role_access"];
-  dietary?: string | null;
+  diets?: DietId[];
+  allergies?: AllergyId[];
+  otherAllergies?: string[];
+  /** Defaults to `done`: only the dedicated new-member fixture starts setup. */
+  setupStep?: SetupStep;
+  /**
+   * Whether the account answered "What best describes you?". Defaults to
+   * true: every fixture but new-member chose its type through the join flow,
+   * like the members the migration backfilled, so join skips the question.
+   */
+  userTypeConfirmed?: boolean;
   newsletter?: boolean;
 }
+
+/**
+ * When the confirmed fixtures answered. Fixed, so a second run writes the
+ * same value and changes nothing.
+ */
+export const SEED_USER_TYPE_CONFIRMED_AT = "2026-09-01T16:00:00.000Z";
 
 function baseProfile(input: CommonProfileInput) {
   return {
@@ -186,7 +207,16 @@ function baseProfile(input: CommonProfileInput) {
     phone: input.phone,
     preferred_pronouns: input.pronouns,
     role_access: input.role ?? (input.admin ? "admin" : "basic"),
-    dietary_restrictions: input.dietary ?? null,
+    // Written in full every run, which undoes setup done through the UI.
+    // The legacy free text mirrors `other_allergies` (see the migration), so
+    // it is written to match rather than left to keep an old value.
+    setup_step: input.setupStep ?? "done",
+    user_type_confirmed_at: (input.userTypeConfirmed ?? true) ? SEED_USER_TYPE_CONFIRMED_AT : null,
+    diets: input.diets ?? [],
+    allergies: input.allergies ?? [],
+    other_allergies: input.otherAllergies ?? [],
+    dietary_restrictions: input.otherAllergies?.length ? input.otherAllergies.join(", ") : null,
+    avatar_preset: null,
     newsletter: input.newsletter ?? false,
     square_customer_id: null,
   };
@@ -349,7 +379,7 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
       phone: "6045550101",
       pronouns: "they/them",
       admin: true,
-      dietary: "Vegetarian",
+      diets: ["vegetarian"],
       newsletter: true,
       studentNumber: 10000001,
       faculty: "Faculty of Arts",
@@ -608,7 +638,7 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
       lastName: "Kim",
       phone: "6045550103",
       pronouns: "he/him",
-      dietary: "Gluten-free",
+      allergies: ["gluten"],
       newsletter: true,
       studentNumber: 10000003,
       faculty: "Faculty of Applied Science",
@@ -884,6 +914,34 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
       faculty: "Faculty of Arts",
       major: "Design",
       year: "4",
+    }),
+    purchases: [],
+    registrations: [],
+  },
+
+  /* ── Setup fixture ───────────────────────────────────────────────────────
+   * The one account that has not done member setup, so the portal home sends
+   * it to /portal/setup. Every other fixture is `done`, like the existing
+   * members the setup migration backfilled. Each run puts it back at step 1,
+   * "What best describes you?", unanswered.
+   */
+  {
+    email: "new-member@example.com",
+    password: SEED_PASSWORD,
+    membershipSlug: null,
+    fullEventHistory: false,
+    profile: studentProfile({
+      // Fresh from sign-up: no birthday, interests, dietary needs or photo.
+      firstName: "Jamie",
+      lastName: "Lee",
+      phone: "6045550112",
+      pronouns: "they/them",
+      setupStep: "about",
+      userTypeConfirmed: false,
+      studentNumber: 10000008,
+      faculty: "Faculty of Arts",
+      major: "Cognitive Systems",
+      year: "1",
     }),
     purchases: [],
     registrations: [],

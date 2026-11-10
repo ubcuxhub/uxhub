@@ -3,14 +3,12 @@ import { redirect } from "next/navigation";
 import {
   UpdatePasswordForm,
 } from "@/features/auth/components/UpdatePasswordForm";
+import { getExpiredLinkPath } from "@/features/auth/link-expired";
 import { withDeadline } from "@/lib/async/deadline";
 import { createClient } from "@/lib/supabase/server";
 
-const INVALID_RECOVERY_MESSAGE =
-  "This password reset link is invalid or has expired. Request a new link and try again.";
-
 export default async function Page() {
-  let hasValidSession = false;
+  let email: string | null = null;
 
   try {
     const {
@@ -21,16 +19,16 @@ export default async function Page() {
       return supabase.auth.getUser();
     }, { operation: "Recovery session check" });
 
-    hasValidSession = !error && Boolean(user?.id);
+    if (!error && user?.id) email = user.email ?? "";
   } catch {
-    hasValidSession = false;
+    email = null;
   }
 
-  if (!hasValidSession) {
-    redirect(
-      `/auth/error?error=${encodeURIComponent(INVALID_RECOVERY_MESSAGE)}&next=${encodeURIComponent("/auth/update-password")}`,
-    );
+  // No recovery session: the link expired, was already used, or was opened in
+  // a browser that did not ask for it.
+  if (email === null) {
+    redirect(getExpiredLinkPath("reset"));
   }
 
-  return <UpdatePasswordForm />;
+  return <UpdatePasswordForm email={email} />;
 }
