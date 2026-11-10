@@ -1,14 +1,19 @@
 /**
  * Member setup's server actions and photo route against the local database,
  * acting as a member through `clientAs`: each step saved or skipped, the
- * resume point, the photo/preset swap, and what setup can't write.
+ * resume point, the user type answer and when it may change, the
+ * photo/preset swap, and what setup can't write.
  */
 import { readFileSync } from "node:fs";
 import { NextRequest } from "next/server";
 import { describe, expect, it, vi } from "vitest";
 
 import type { UserInfoRow } from "@/lib/supabase/models";
-import { fetchUserSetup, updateUserSetup } from "@/lib/supabase-helpers/setup";
+import {
+  fetchUserSetup,
+  updateUserSetup,
+  updateUserTypeIfMembershipUnchanged,
+} from "@/lib/supabase-helpers/setup";
 import { clientAs, createIntegrationClient, withFixtures, type Fixtures } from "@/test/integration";
 
 vi.mock("server-only", () => ({}));
@@ -25,8 +30,11 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 import { POST } from "@/app/api/profile-photo/route";
+import { saveMembershipProfileAction } from "@/features/memberships/actions";
+import { USER_TYPE_LOCKED_MESSAGE } from "./lib/state";
 import {
   finishSetupAction,
+  saveSetupAboutAction,
   saveSetupDietaryAction,
   saveSetupPhotoAction,
   skipSetupStepAction,
@@ -51,6 +59,18 @@ async function nextRequest(id: string) {
   session.member = data;
 }
 
+async function anyMembershipTypeId() {
+  const { data, error } = await db.from("membership_types").select("id").limit(1).single();
+  if (error) throw error;
+  return data.id;
+}
+
+/** Sets up a row the way a purchase or an earlier answer would have. */
+async function setColumns(id: string, patch: Partial<UserInfoRow>) {
+  const { error } = await db.from("user_info").update(patch).eq("id", id);
+  if (error) throw error;
+}
+
 function upload(expectedPath: string, body: BlobPart = new Uint8Array(png)) {
   const form = new FormData();
   form.set("expectedPath", expectedPath);
@@ -61,8 +81,13 @@ function upload(expectedPath: string, body: BlobPart = new Uint8Array(png)) {
 describe("member setup against local Supabase", () => {
   it("starts new members at step 1 and walks every step to done", () => withFixtures(async (fixtures) => {
     const member = await signUp(fixtures);
-    expect(member.setup_step).toBe("dietary");
+    expect(member).toMatchObject({ setup_step: "about", user_type: "ubcStudent", user_type_confirmed_at: null });
 
+    // Confirming the default type is an answer too.
+    const about = await saveSetupAboutAction({ userType: "ubcStudent" });
+    expect(about).toMatchObject({ ok: true, setup: { step: "dietary", userType: "ubcStudent", userTypeConfirmed: true } });
+
+    await nextRequest(member.id);
     const dietary = await saveSetupDietaryAction({
       diets: ["vegan", "vegan"],
       allergies: ["peanuts"],
@@ -94,6 +119,9 @@ describe("member setup against local Supabase", () => {
 
   it("skips each step without saving and resumes where the member left off", () => withFixtures(async (fixtures) => {
     const member = await signUp(fixtures);
+    expect((await skipSetupStepAction("about")).step).toBe("dietary");
+    await nextRequest(member.id);
+    expect((await fetchUserSetup(db, member.id)).user_type_confirmed_at).toBeNull();
     expect((await skipSetupStepAction("dietary")).step).toBe("photo");
     await nextRequest(member.id);
     expect((await skipSetupStepAction("photo")).step).toBe("interests");
@@ -143,7 +171,8 @@ describe("member setup against local Supabase", () => {
     await expect(saveSetupDietaryAction({ diets: [], allergies: [], otherAllergies: ["x".repeat(201)] })).rejects.toThrow();
     await expect(saveSetupPhotoAction({ avatarPreset: "hubbo" as never })).rejects.toThrow("icon");
     await expect(finishSetupAction({ interests: ["Free tag" as never] })).rejects.toThrow("interests");
-    expect((await fetchUserSetup(db, member.id)).setup_step).toBe("dietary");
+    await expect(saveSetupAboutAction({ userType: "alumni" as never })).rejects.toThrow("best describes you");
+    expect((await fetchUserSetup(db, member.id)).setup_step).toBe("about");
 
     // The member's own client reaches only their row, and never interests.
     const client = clientAs(member);
@@ -153,9 +182,75 @@ describe("member setup against local Supabase", () => {
     expect((await fetchUserSetup(db, other.id)).diets).toEqual([]);
   }));
 
+  it("changes the user type without a membership, clearing the old type's details", () => withFixtures(async (fixtures) => {
+    const member = await signUp(fixtures);
+    // A lapsed membership no longer holds the type.
+    const tier = await anyMembershipTypeId();
+    await setColumns(member.id, {
+      student_number: 12345678,
+      faculty: "Faculty of Arts",
+      major: "Design",
+      year: "2",
+      membership_type_id: tier,
+      membership_expires_at: "2020-04-30T07:00:00+00:00",
+    });
+    await nextRequest(member.id);
+
+    const result = await saveSetupAboutAction({ userType: "nonUbc" });
+    expect(result).toMatchObject({ ok: true, setup: { step: "dietary", userType: "nonUbc", userTypeConfirmed: true } });
+    const { data: row } = await db.from("user_info").select("*").eq("id", member.id).single();
+    expect(row).toMatchObject({
+      user_type: "nonUbc",
+      student_number: null,
+      faculty: null,
+      major: null,
+      // Both types own a year, as in Settings (`buildEligibilityUpdate`).
+      year: "2",
+      membership_type_id: tier,
+    });
+    expect(row?.user_type_confirmed_at).not.toBeNull();
+  }));
+
+  it("refuses a new user type while a membership is pending, but lets the member confirm theirs", () => withFixtures(async (fixtures) => {
+    const member = await signUp(fixtures);
+    await setColumns(member.id, { membership_pre_ordered_type_id: await anyMembershipTypeId() });
+    await nextRequest(member.id);
+
+    expect(await saveSetupAboutAction({ userType: "faculty" })).toEqual({ ok: false, error: USER_TYPE_LOCKED_MESSAGE });
+    expect(await fetchUserSetup(db, member.id)).toMatchObject({
+      user_type: "ubcStudent",
+      user_type_confirmed_at: null,
+      setup_step: "about",
+    });
+
+    // A membership bought after the check also stops the write.
+    const stale = { ...member, membership_pre_ordered_type_id: null };
+    expect(await updateUserTypeIfMembershipUnchanged(db, stale, { user_type: "faculty" })).toBeNull();
+    expect((await fetchUserSetup(db, member.id)).user_type).toBe("ubcStudent");
+
+    expect(await saveSetupAboutAction({ userType: "ubcStudent" })).toMatchObject({
+      ok: true,
+      setup: { step: "dietary", userType: "ubcStudent", userTypeConfirmed: true },
+    });
+  }));
+
+  it("records the answer when membership join saves the details", () => withFixtures(async (fixtures) => {
+    const member = await signUp(fixtures);
+    expect(await saveMembershipProfileAction({
+      audience: "non-ubc",
+      schoolInstitution: "SFU",
+      studentStatus: "undergraduate",
+      year: "",
+    })).toEqual({ ok: true });
+    const saved = await fetchUserSetup(db, member.id);
+    expect(saved).toMatchObject({ user_type: "nonUbc", setup_step: "about" });
+    expect(saved.user_type_confirmed_at).not.toBeNull();
+  }));
+
   it("requires a signed-in member", () => withFixtures(async () => {
     session.member = null;
     await expect(skipSetupStepAction("dietary")).rejects.toThrow("No member signed in");
     await expect(finishSetupAction({ interests: [] })).rejects.toThrow("No member signed in");
+    await expect(saveSetupAboutAction({ userType: "faculty" })).rejects.toThrow("No member signed in");
   }));
 });

@@ -3,18 +3,42 @@
  * admin user record.
  *
  * Ids are what the database stores; labels are display copy and may change.
- * The diet, allergy and avatar ids are also listed in the CHECK constraints of
- * supabase/migrations/20261110030244_add_member_setup.sql, so adding or
- * renaming one needs a migration too. Interests are validated here only, since
+ * The step, diet, allergy and avatar ids are also listed in CHECK constraints
+ * (supabase/migrations/20261110030244_add_member_setup.sql and
+ * 20261110041028_add_setup_user_type.sql), so adding or renaming one needs a
+ * migration too. User type ids are the `user_type` enum's values. Interests are validated here only, since
  * `user_info.interests` also holds managers' free tags.
  *
  * Dependency-free on purpose: the seed (scripts/seed) imports it directly.
  */
 
-export const SETUP_STEPS = ["dietary", "photo", "interests"] as const;
+export const SETUP_STEPS = ["about", "dietary", "photo", "interests"] as const;
 export type SetupStepId = (typeof SETUP_STEPS)[number];
 /** `user_info.setup_step`: the step to show next, or `done`. */
 export type SetupStep = SetupStepId | "done";
+
+/**
+ * "What best describes you?": the `user_type` enum, in the words membership
+ * join uses. The same answer decides which memberships a member can buy.
+ */
+export const USER_TYPE_OPTIONS = [
+  {
+    id: "ubcStudent",
+    title: "I’m a UBC student",
+    description: "Currently enrolled at The University of British Columbia.",
+  },
+  {
+    id: "faculty",
+    title: "I’m a UBC faculty member",
+    description: "Faculty or staff at The University of British Columbia.",
+  },
+  {
+    id: "nonUbc",
+    title: "I’m not from UBC",
+    description: "Joining from outside The University of British Columbia.",
+  },
+] as const;
+export type UserTypeId = (typeof USER_TYPE_OPTIONS)[number]["id"];
 
 export const DIET_OPTIONS = [
   { id: "vegetarian", label: "Vegetarian" },

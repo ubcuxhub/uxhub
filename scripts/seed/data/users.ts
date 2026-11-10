@@ -177,8 +177,20 @@ export interface CommonProfileInput {
   otherAllergies?: string[];
   /** Defaults to `done`: only the dedicated new-member fixture starts setup. */
   setupStep?: SetupStep;
+  /**
+   * Whether the account answered "What best describes you?". Defaults to
+   * true: every fixture but new-member chose its type through the join flow,
+   * like the members the migration backfilled, so join skips the question.
+   */
+  userTypeConfirmed?: boolean;
   newsletter?: boolean;
 }
+
+/**
+ * When the confirmed fixtures answered. Fixed, so a second run writes the
+ * same value and changes nothing.
+ */
+export const SEED_USER_TYPE_CONFIRMED_AT = "2026-09-01T16:00:00.000Z";
 
 function baseProfile(input: CommonProfileInput) {
   return {
@@ -199,6 +211,7 @@ function baseProfile(input: CommonProfileInput) {
     // The legacy free text mirrors `other_allergies` (see the migration), so
     // it is written to match rather than left to keep an old value.
     setup_step: input.setupStep ?? "done",
+    user_type_confirmed_at: (input.userTypeConfirmed ?? true) ? SEED_USER_TYPE_CONFIRMED_AT : null,
     diets: input.diets ?? [],
     allergies: input.allergies ?? [],
     other_allergies: input.otherAllergies ?? [],
@@ -909,7 +922,8 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
   /* ── Setup fixture ───────────────────────────────────────────────────────
    * The one account that has not done member setup, so the portal home sends
    * it to /portal/setup. Every other fixture is `done`, like the existing
-   * members the setup migration backfilled. Each run puts it back at step 1.
+   * members the setup migration backfilled. Each run puts it back at step 1,
+   * "What best describes you?", unanswered.
    */
   {
     email: "new-member@example.com",
@@ -922,7 +936,8 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
       lastName: "Lee",
       phone: "6045550112",
       pronouns: "they/them",
-      setupStep: "dietary",
+      setupStep: "about",
+      userTypeConfirmed: false,
       studentNumber: 10000008,
       faculty: "Faculty of Arts",
       major: "Cognitive Systems",

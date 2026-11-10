@@ -85,6 +85,7 @@ const TEMPLATES = [
   { id: "event-builder", title: "Event builder", spec: "§4.4e" },
   { id: "applications", title: "Applications", spec: "proposal" },
   { id: "application-review", title: "Application review", spec: "proposal" },
+  { id: "setup-about", title: "Setup, about you", spec: "proposal" },
   { id: "setup-dietary", title: "Setup, dietary needs", spec: "Figma 4289:2" },
   { id: "setup-photo", title: "Setup, choose a photo", spec: "Figma 4292:2" },
   { id: "setup-interests", title: "Setup, interests", spec: "Figma 4297:2" },

@@ -3,11 +3,13 @@ import { BUCKETS } from "@/lib/supabase-helpers/buckets";
 
 import {
   finishSetupAction,
+  saveSetupAboutAction,
   saveSetupDietaryAction,
   saveSetupPhotoAction,
   skipSetupStepAction,
+  type SetupAboutResult,
 } from "../actions";
-import type { AvatarPreset, InterestId, SetupStepId } from "../lib/options";
+import type { AvatarPreset, InterestId, SetupStepId, UserTypeId } from "../lib/options";
 import type { SetupState } from "../lib/state";
 import type { DietaryNeeds } from "../lib/validation";
 
@@ -16,6 +18,8 @@ import type { DietaryNeeds } from "../lib/validation";
  * the dev templates and tests can run the real UI on fixture data.
  */
 export interface SetupClient {
+  /** Resolves `{ ok: false }`, with copy to show, when the type can't change. */
+  saveAbout: (input: { userType: UserTypeId }) => Promise<SetupAboutResult>;
   saveDietary: (input: DietaryNeeds) => Promise<SetupState>;
   savePhoto: (input: { avatarPreset: AvatarPreset | null }) => Promise<SetupState>;
   finish: (input: { interests: InterestId[] }) => Promise<SetupState>;
@@ -59,6 +63,7 @@ export function profilePhotoUrl(path: string | null): string | null {
 }
 
 export const serverSetupClient: SetupClient = {
+  saveAbout: saveSetupAboutAction,
   saveDietary: saveSetupDietaryAction,
   savePhoto: saveSetupPhotoAction,
   finish: finishSetupAction,

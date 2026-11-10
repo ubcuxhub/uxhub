@@ -35,6 +35,7 @@ export const STANDALONE = {
       "event-builder",
       "applications",
       "application-review",
+      "setup-about",
       "setup-dietary",
       "setup-photo",
       "setup-interests",

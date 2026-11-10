@@ -1092,6 +1092,7 @@ export type Database = {
           student_verified_by: string | null
           updated_at: string | null
           user_type: Database["public"]["Enums"]["user_type"]
+          user_type_confirmed_at: string | null
           year: Database["public"]["Enums"]["uni_year"] | null
         }
         ComputedFields: never
@@ -1131,6 +1132,7 @@ export type Database = {
           student_verified_by?: string | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"]
+          user_type_confirmed_at?: string | null
           year?: Database["public"]["Enums"]["uni_year"] | null
         }
         Update: {
@@ -1169,6 +1171,7 @@ export type Database = {
           student_verified_by?: string | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"]
+          user_type_confirmed_at?: string | null
           year?: Database["public"]["Enums"]["uni_year"] | null
         }
         Relationships: [

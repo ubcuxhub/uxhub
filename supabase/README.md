@@ -216,7 +216,11 @@ UPDATE grants: managers edit through authorized server endpoints, and members
 edit their own `interests` through server actions (setup and Settings). The
 later member setup migration does grant members UPDATE on its own columns
 (`setup_step`, `diets`, `allergies`, `other_allergies`, `avatar_preset`), held
-to valid values by CHECK constraints. Anonymization triggers clear all four additions during
+to valid values by CHECK constraints, and the one after it on
+`user_type_confirmed_at` (whether the member answered "What best describes
+you?"; null means never asked, since `user_type` always has a default).
+`user_type` itself stays privileged: the setup and membership actions change
+it with the service role, and only without an active or pending membership. Anonymization triggers clear all four additions during
 the existing `delete_account` transaction; changes to student number or user
 type invalidate manual verification.
 

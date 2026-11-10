@@ -9,8 +9,9 @@ import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { AuthPanel } from "@/features/auth/components/AuthPanel";
 
-import { SETUP_STEPS, type InterestId, type SetupStepId } from "../lib/options";
+import { SETUP_STEPS, type InterestId, type SetupStepId, type UserTypeId } from "../lib/options";
 import type { SetupState } from "../lib/state";
+import { AboutFields } from "./AboutFields";
 import { AvatarPicker, type AvatarChoice } from "./AvatarPicker";
 import {
   DietaryFields,
@@ -25,6 +26,11 @@ import { SAVE_FAILED, serverSetupClient, type SetupClient } from "./setup-client
 export type SetupView = SetupStepId | "welcome";
 
 export const SETUP_COPY: Record<SetupStepId, { title: string; description: string }> = {
+  about: {
+    title: "What best describes you?",
+    description:
+      "The UX Hub team uses this to plan for everyone who comes, and it decides which memberships you can join.",
+  },
   dietary: {
     title: "Any dietary needs?",
     description:
@@ -40,6 +46,7 @@ export const SETUP_COPY: Record<SetupStepId, { title: string; description: strin
   },
 };
 
+export const NO_ABOUT_ANSWER = "Choose what best describes you, or skip for now.";
 export const NO_DIETARY_ANSWER =
   "Choose what applies to you, or “I don't have any dietary needs”. You can also skip for now.";
 export const NO_PHOTO_CHOICE = "Choose an icon or upload a photo, or skip for now.";
@@ -50,7 +57,16 @@ export function stepLabel(step: SetupStepId): string {
 
 /** Where a visit starts: the stored step, or step 1 for a member who finished and came back. */
 export function initialView(state: SetupState): SetupView {
-  return state.step === "done" ? "dietary" : state.step;
+  return state.step === "done" ? SETUP_STEPS[0] : state.step;
+}
+
+/**
+ * The answer to show selected: the member's own, or the stored type when it
+ * can't change anyway. Otherwise none, since every row has a default type
+ * nobody chose.
+ */
+export function initialUserType(state: SetupState, locked: boolean): UserTypeId | null {
+  return state.userTypeConfirmed || locked ? state.userType : null;
 }
 
 function initialChoice(state: SetupState): AvatarChoice {
@@ -70,11 +86,16 @@ interface SetupFlowProps {
   homeHref?: string;
   /** Start on another screen (dev templates only). */
   startAt?: SetupView;
+  /**
+   * The member holds an active or pending membership, so step 1 can confirm
+   * their type but not change it (the server refuses that too).
+   */
+  userTypeLocked?: boolean;
 }
 
 /**
- * Member setup at `/portal/setup` (review §4 and §7 #6–#9): dietary needs,
- * a photo and interests, then Welcome. Every step can be skipped; nothing
+ * Member setup at `/portal/setup` (review §4 and §7 #6–#9): what best
+ * describes you, dietary needs, a photo and interests, then Welcome. Every step can be skipped; nothing
  * here gates registration or checkout.
  *
  * The step lives in component state, not the URL: a visit resumes at the
@@ -89,11 +110,15 @@ export function SetupFlow({
   client = serverSetupClient,
   homeHref = "/portal",
   startAt,
+  userTypeLocked = false,
 }: SetupFlowProps) {
   const [view, setView] = useState<SetupView>(startAt ?? initialView(initial));
   const [setup, setSetup] = useState(initial);
+  const [userType, setUserType] = useState<UserTypeId | null>(() =>
+    initialUserType(initial, userTypeLocked),
+  );
   const [dietary, setDietary] = useState<DietaryValue>(() =>
-    toDietaryValue(initial, initial.step !== "dietary"),
+    toDietaryValue(initial, initial.step !== "about" && initial.step !== "dietary"),
   );
   const [choice, setChoice] = useState<AvatarChoice>(() => initialChoice(initial));
   const [interests, setInterests] = useState<InterestId[]>(() => pickInterestIds(initial.interests));
@@ -127,8 +152,8 @@ export function SetupFlow({
     try {
       setSetup(await write());
       go(next);
-    } catch {
-      setError(SAVE_FAILED);
+    } catch (failure) {
+      setError(failure instanceof SetupRefusal ? failure.message : SAVE_FAILED);
     } finally {
       setPending(null);
     }
@@ -156,14 +181,41 @@ export function SetupFlow({
     );
   }
 
-  const back = view === "dietary" ? null : () => go(SETUP_STEPS[SETUP_STEPS.indexOf(view) - 1]);
+  const back = view === SETUP_STEPS[0] ? null : () => go(SETUP_STEPS[SETUP_STEPS.indexOf(view) - 1]);
 
   let body: ReactNode;
   let primaryLabel: string;
   let meta: ReactNode = null;
   let onSubmit: () => void;
 
-  if (view === "dietary") {
+  if (view === "about") {
+    primaryLabel = "Continue";
+    body = (
+      <AboutFields
+        label={SETUP_COPY.about.title}
+        value={userType}
+        onChange={(value) => {
+          setError(null);
+          setUserType(value);
+        }}
+        lockedTo={userTypeLocked ? setup.userType : null}
+        invalid={error === NO_ABOUT_ANSWER}
+        disabled={busy}
+      />
+    );
+    onSubmit = () => {
+      if (!userType) return setError(NO_ABOUT_ANSWER);
+      void run(
+        "save",
+        async () => {
+          const result = await client.saveAbout({ userType });
+          if (!result.ok) throw new SetupRefusal(result.error);
+          return result.setup;
+        },
+        "dietary",
+      );
+    };
+  } else if (view === "dietary") {
     primaryLabel = "Save dietary needs";
     body = (
       <DietaryFields
@@ -279,6 +331,9 @@ export function SetupFlow({
     </AuthPanel>
   );
 }
+
+/** A write the server refused with copy meant for the member. */
+class SetupRefusal extends Error {}
 
 /** Polite, visually hidden: says which step just opened. */
 function LiveStatus({ text }: { text: string }) {

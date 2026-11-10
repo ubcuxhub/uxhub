@@ -1,4 +1,4 @@
-import type { UserInfoRow } from "@/lib/supabase/models";
+import type { UserInfoRow, UserType } from "@/lib/supabase/models";
 import type { UserSetupRow } from "@/lib/supabase-helpers/setup";
 import {
   SETUP_STEPS,
@@ -7,6 +7,7 @@ import {
   type DietId,
   type SetupStep,
   type SetupStepId,
+  type UserTypeId,
 } from "./options";
 import { isSetupStep } from "./validation";
 
@@ -21,9 +22,26 @@ export const SETUP_PATH = "/portal/setup";
  */
 export const SETUP_GATED_PATHS: readonly string[] = ["/portal"];
 
+// The setup options and the `user_type` enum list the same three ids.
+type SameIds<A, B> = [A] extends [B] ? ([B] extends [A] ? true : never) : never;
+const USER_TYPE_IDS_MATCH: SameIds<UserType, UserTypeId> = true;
+void USER_TYPE_IDS_MATCH;
+
+/**
+ * Why setup refuses a new answer to "What best describes you?": the type
+ * decides which memberships a member can buy, and one they already hold (or
+ * pre-ordered) was bought for the old type.
+ */
+export const USER_TYPE_LOCKED_MESSAGE =
+  "You have an active or pending membership, so this can’t change until it ends.";
+
 /** The setup columns of `user_info`, as setup reads them. */
 export interface SetupState {
   step: SetupStep;
+  /** The stored type. Every row has one, answered or not. */
+  userType: UserTypeId;
+  /** Whether the member answered the question, here or in membership join. */
+  userTypeConfirmed: boolean;
   diets: DietId[];
   allergies: AllergyId[];
   otherAllergies: string[];
@@ -42,6 +60,8 @@ export function toSetupStep(value: string | null | undefined): SetupStep {
 export function toSetupState(row: SetupRow): SetupState {
   return {
     step: toSetupStep(row.setup_step),
+    userType: row.user_type,
+    userTypeConfirmed: row.user_type_confirmed_at !== null,
     // The CHECK constraints hold these to the option ids.
     diets: row.diets as DietId[],
     allergies: row.allergies as AllergyId[],

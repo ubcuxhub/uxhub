@@ -15,7 +15,9 @@ import { nextSetupStep, type SetupState } from "@/features/setup/lib/state";
  */
 
 const FIXTURE: SetupState = {
-  step: "dietary",
+  step: "about",
+  userType: "ubcStudent",
+  userTypeConfirmed: false,
   diets: [],
   allergies: [],
   otherAllergies: [],
@@ -34,6 +36,10 @@ function fakeClient(): SetupClient {
     return state;
   };
   return {
+    saveAbout: async ({ userType }) => ({
+      ok: true,
+      setup: await write({ userType, userTypeConfirmed: true, step: nextSetupStep(state.step, "about") }),
+    }),
     saveDietary: (needs) => write({ ...needs, step: nextSetupStep(state.step, "dietary") }),
     savePhoto: ({ avatarPreset }) =>
       write({
@@ -50,6 +56,7 @@ function fakeClient(): SetupClient {
 }
 
 export const SETUP_TEMPLATE_STARTS: Record<string, SetupView> = {
+  "setup-about": "about",
   "setup-dietary": "dietary",
   "setup-photo": "photo",
   "setup-interests": "interests",

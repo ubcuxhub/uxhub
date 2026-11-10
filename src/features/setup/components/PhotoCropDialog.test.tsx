@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../actions", () => ({
   finishSetupAction: vi.fn(),
+  saveSetupAboutAction: vi.fn(),
   saveSetupDietaryAction: vi.fn(),
   saveSetupPhotoAction: vi.fn(),
   skipSetupStepAction: vi.fn(),
