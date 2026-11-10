@@ -110,7 +110,11 @@ export function PhotoSettings({ user, track, refreshUser }: SetupSettingsProps) 
 /** Dietary needs in Settings: setup step 1's fields, saved shortly after each change. */
 export function DietarySettings({ user, track }: SetupSettingsProps) {
   const [value, setValue] = useState<DietaryValue>(() =>
-    toDietaryValue(savedDietary(user), toSetupStep(user.setup_step) !== "dietary"),
+    toDietaryValue(
+      savedDietary(user),
+      // "about" and "dietary" come before the dietary step is answered.
+      !["about", "dietary"].includes(toSetupStep(user.setup_step)),
+    ),
   );
   const lastSaved = useRef<DietaryNeeds>(savedDietary(user));
   const trackRef = useLatest(track);

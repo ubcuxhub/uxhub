@@ -45,6 +45,7 @@ const BASE: UserInfoRow = {
   preferred_pronouns: "she/her",
   phone: "604 555 0134",
   user_type: "ubcStudent",
+  user_type_confirmed_at: "2026-09-02T17:00:00Z",
   faculty: "Faculty of Science",
   faculty_email: null,
   major: "Cognitive Systems",
