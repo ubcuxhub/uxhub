@@ -28,6 +28,7 @@ import type {
   CheckInSessionDraft,
 } from "@/features/admin/types";
 import {
+  defaultFormState,
   checkInDraftsFromRows,
   createFormSnapshot,
   EMPTY_CHECK_IN_SESSION,
@@ -97,7 +98,8 @@ export function useEventForm({
         const source = { ...formStateFromEvent(initialEvent), decisions_release_at: timestamptzToDatetimeLocal(initialApplicationSettings?.decisions_release_at), confirmation_deadline: timestamptzToDatetimeLocal(initialApplicationSettings?.confirmation_deadline) };
         return { ...source, date_location_revision: initialDateLocation?.revision ?? 0, date_location: recoverDateLocation(source) };
       }
-      const restored = { ...state, date_location: state.date_location ?? recoverDateLocation(state), date_location_revision: state.date_location ? state.date_location_revision : initialDateLocation?.revision ?? state.date_location_revision };
+      const teamSource = state.teams_configuration_initialized === false && initialEvent ? formStateFromEvent(initialEvent) : { ...defaultFormState, ...state };
+      const restored = { ...defaultFormState, ...state, teams_configuration_initialized: true, teams_enabled: teamSource.teams_enabled, min_team_size: teamSource.min_team_size, max_team_size: teamSource.max_team_size, team_deadline: teamSource.team_deadline, date_location: state.date_location ?? recoverDateLocation(state), date_location_revision: state.date_location ? state.date_location_revision : initialDateLocation?.revision ?? state.date_location_revision };
       // Old working documents never captured these settings. Recover them
       // from the source event instead of resetting a saved featured choice,
       // external destination or URL during an unrelated edit.
@@ -401,6 +403,10 @@ export function useEventForm({
         event_type: formState.event_type,
         mentors_enabled: formState.mentors_enabled,
         sponsors_enabled: formState.sponsors_enabled,
+        teams_enabled: formState.teams_enabled,
+        min_team_size: formState.min_team_size === "" ? null : Number(formState.min_team_size),
+        max_team_size: formState.max_team_size === "" ? null : Number(formState.max_team_size),
+        team_deadline: datetimeLocalToTimestamptz(formState.team_deadline),
         requires_application: formState.requires_application,
         configured_marketing_mode: formState.marketing_mode,
         configured_marketing_url: formState.marketing_url || null,

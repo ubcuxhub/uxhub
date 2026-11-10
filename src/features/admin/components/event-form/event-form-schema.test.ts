@@ -1,4 +1,4 @@
-import { applicationTimingProblem } from "./event-form-schema";
+import { teamSettingsProblem, applicationTimingProblem } from "./event-form-schema";
 import { describe, expect, it } from "vitest";
 import {
   createFormSnapshot,
@@ -326,5 +326,22 @@ describe("application timing", () => {
   });
   it("requires a question for Application mode", () => {
     expect(validateEventForm({ ...validFormState, requires_application: true }, [], []).questionErrors[-1]).toMatch(/at least one valid question/);
+  });
+});
+
+
+describe("team form settings", () => {
+  it.each(["0", "-1", "1.5", "1e2", "no", "2147483648"])("rejects an invalid size %s even when teams are off", value => {
+    expect(teamSettingsProblem({ ...defaultFormState, min_team_size: value })).toMatch(/positive whole number/);
+    expect(teamSettingsProblem({ ...defaultFormState, max_team_size: value })).toMatch(/positive whole number/);
+  });
+  it("accepts blank limits and elapsed deadlines without event-relative ordering", () => {
+    expect(teamSettingsProblem(defaultFormState)).toBeNull();
+    expect(teamSettingsProblem({ ...defaultFormState, min_team_size: "1", max_team_size: "4", team_deadline: "2020-01-01T10:00" })).toBeNull();
+  });
+  it("rejects reversed limits and incomplete, invalid or ambiguous Pacific deadlines", () => {
+    expect(teamSettingsProblem({ ...defaultFormState, min_team_size: "5", max_team_size: "4" })).toMatch(/cannot exceed/);
+    for (const deadline of ["2026-11-16T", "T10:00", "2026-02-30T10:00", "2026-03-08T02:30", "2025-11-02T01:30"]) expect(teamSettingsProblem({ ...defaultFormState, team_deadline: deadline })).toMatch(/valid, unambiguous/);
+    expect(validateEventForm({ ...validFormState, min_team_size: "5", max_team_size: "4" }, [], []).error).toMatch(/cannot exceed/);
   });
 });

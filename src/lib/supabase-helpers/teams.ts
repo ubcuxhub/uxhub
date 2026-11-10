@@ -163,3 +163,13 @@ export async function deleteTeam(
   if (error) throw error;
   return (data as TeamFailureReason | null) ?? null;
 }
+
+export interface EventTeamSettingsInfo { teamCount: number; largestTeam: number }
+
+/** Staff-only aggregate for editor locks; never exposes invite codes or membership data. */
+export async function fetchEventTeamSettingsInfo(client: DbClient, eventId: string): Promise<EventTeamSettingsInfo> {
+  const { data, error } = await client.rpc("admin_event_team_settings", { p_event_id: eventId });
+  if (error) throw error;
+  const info = data as { team_count: number; largest_team: number };
+  return { teamCount: info.team_count, largestTeam: info.largest_team };
+}

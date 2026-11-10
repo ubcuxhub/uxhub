@@ -58,6 +58,11 @@ export interface EventFormState {
   created_at: string;
   mentors_enabled: boolean;
   sponsors_enabled: boolean;
+  teams_configuration_initialized: boolean;
+  teams_enabled: boolean;
+  min_team_size: string;
+  max_team_size: string;
+  team_deadline: string;
   requires_application: boolean;
   decisions_release_at: string;
   confirmation_deadline: string;
@@ -121,6 +126,11 @@ export const defaultFormState: EventFormState = {
   created_at: "",
   mentors_enabled: false,
   sponsors_enabled: false,
+  teams_configuration_initialized: true,
+  teams_enabled: false,
+  min_team_size: "",
+  max_team_size: "",
+  team_deadline: "",
   requires_application: false,
   decisions_release_at: "",
   confirmation_deadline: "",
@@ -175,6 +185,11 @@ export function formStateFromEvent(event: EventRow): EventFormState {
     created_at: event.created_at ?? "",
     mentors_enabled: event.mentors_enabled,
     sponsors_enabled: event.sponsors_enabled,
+    teams_configuration_initialized: true,
+    teams_enabled: event.teams_enabled ?? false,
+    min_team_size: String(event.min_team_size ?? ""),
+    max_team_size: String(event.max_team_size ?? ""),
+    team_deadline: timestamptzToDatetimeLocal(event.team_deadline),
     requires_application: event.requires_application,
     decisions_release_at: "",
     confirmation_deadline: "",
@@ -358,6 +373,7 @@ export function validateEventForm(
   });
   invalidSections.applications = Object.keys(questionErrors).length > 0;
 
+  if (!error) error = teamSettingsProblem(formState);
   if (!error) error = applicationTimingProblem(formState);
 
   if (!error && invalidSections.applications) {
@@ -461,5 +477,15 @@ export function applicationTimingProblem(state: Pick<EventFormState, "decisions_
   const confirm = state.confirmation_deadline;
   if ([release, confirm].some(value => value && !strictPacificTimestamp(value))) return "Application timing requires a valid, unambiguous Pacific date and time.";
   if (release && confirm && strictPacificTimestamp(confirm)! <= strictPacificTimestamp(release)!) return "Confirm by must be later than Release decisions on.";
+  return null;
+}
+
+/** Retained settings are validated even when hidden; working drafts may be incomplete. */
+export function teamSettingsProblem(state: Pick<EventFormState, "min_team_size" | "max_team_size" | "team_deadline">) {
+  for (const [label, value] of [["Minimum", state.min_team_size], ["Maximum", state.max_team_size]]) {
+    if (value !== "" && (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)) || Number(value) < 1 || Number(value) > 2147483647)) return `${label} team size must be a positive whole number no greater than 2,147,483,647.`;
+  }
+  if (state.min_team_size && state.max_team_size && Number(state.min_team_size) > Number(state.max_team_size)) return "Minimum team size cannot exceed maximum team size.";
+  if (state.team_deadline && !strictPacificTimestamp(state.team_deadline)) return "Team deadline requires a valid, unambiguous Pacific date and time.";
   return null;
 }

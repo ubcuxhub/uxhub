@@ -406,3 +406,16 @@ remain unchanged even when they have no answers. No migration rewrites offers,
 responses or attachment objects. Timing fields are configuration only until the
 attendee release/offer integration is implemented. See
 [application editor settings](../docs/event-states.md#application-editor-settings).
+
+### Team form configuration
+
+The builder reuses `events.teams_enabled`, nullable min/max sizes and deadline.
+No retains hidden configuration. `guard_event_team_settings` blocks disabling
+formed teams (including empty/ownerless teams) and lowering max below the largest
+team. Team creation/growth and settings writes serialize on the event row; the
+existing attendee RPCs take that lock before their checks and team locks. Direct
+service-role team writes also honor enabled/capacity guards. No memberships or
+historical records are rewritten. `admin_event_team_settings` supplies staff-only
+aggregate editor locks via `src/lib/supabase-helpers/teams.ts`. Member/invite and
+staff assignment interfaces remain deferred; nullable limits and deadline keep
+their existing unlimited/no-lock meaning.

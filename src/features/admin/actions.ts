@@ -299,6 +299,11 @@ export async function saveAdminEventAction(
   await requireAdmin();
 
   assertPublishAt(input.event.status, input.event.publish_at);
+  const { min_team_size: min, max_team_size: max, team_deadline: deadline } = input.event;
+  if ([min, max].some(value => value != null && (!Number.isSafeInteger(value) || value < 1 || value > 2147483647))) return { error: "Team sizes must be positive whole numbers no greater than 2,147,483,647." };
+  if (min != null && max != null && min > max) return { error: "Minimum team size cannot exceed maximum team size." };
+  if (deadline != null && !isTimestamptz(deadline)) return { error: "Team deadline requires a valid date and time with a timezone." };
+
   if (input.applicationTiming) {
     const { decisions_release_at: release, confirmation_deadline: confirm } = input.applicationTiming;
     if ([release, confirm].some(value => value !== null && !isTimestamptz(value))) return { error: "Application timing requires a valid date and time with a timezone." };
@@ -388,6 +393,7 @@ export async function saveAdminEventAction(
     if (configurationMessages.includes(error.message)) throw new Error(error.message);
     if (error.code === "23505" && /events_slug|event_url_claims/.test(error.message)) throw new Error("This page URL is already in use.");
     if (error.code === "23514" && /events_configured_/.test(error.message)) throw new Error("Review the marketing destination and pricing before saving.");
+    if (error.code === "23514" && /events_(min_team_size|max_team_size|team_size_range)_check/.test(error.message)) return { error: "Team sizes must be positive whole numbers with minimum no greater than maximum." };
     if (error.hint === "EVENT_SETTINGS_CONFLICT") return { error: error.message };
     throw error;
   }

@@ -1354,6 +1354,7 @@ export type Database = {
         Args: { p_event_id: string }
         Returns: boolean
       }
+      admin_event_team_settings: { Args: { p_event_id: string }; Returns: Json }
       can_edit_application_response: {
         Args: { p_application_id: string; p_question_id: string }
         Returns: boolean

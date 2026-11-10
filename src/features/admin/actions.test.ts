@@ -1060,3 +1060,22 @@ describe("event configuration server validation", () => {
     await expect(saveAdminEventAction(saveInput)).rejects.toThrow(message);
   });
 });
+
+
+describe("team settings action boundary", () => {
+  it.each([{ min_team_size: 0 }, { max_team_size: 1.5 }, { min_team_size: 5, max_team_size: 4 }, { team_deadline: "2026-11-16T10:00" }])("rejects invalid input before the RPC: %j", async fields => {
+    const result = await saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, ...fields } });
+    expect(result).toHaveProperty("error");
+    expect(adminRpc).not.toHaveBeenCalled();
+  });
+  it("returns a settings conflict without claiming the save succeeded", async () => {
+    adminRpc.mockResolvedValue({ data: null, error: { hint: "EVENT_SETTINGS_CONFLICT", message: "Teams cannot be turned off because teams already exist." } });
+    expect(await saveAdminEventAction({ ...saveInput, eventId: "event-1", event: { teams_enabled: false } })).toEqual({ error: "Teams cannot be turned off because teams already exist." });
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+  it("requires staff authorization before team settings writes", async () => {
+    guards.requireAdmin.mockRejectedValue(new Error("Staff access required"));
+    await expect(saveAdminEventAction({ ...saveInput, event: { teams_enabled: true } })).rejects.toThrow("Staff access required");
+    expect(adminRpc).not.toHaveBeenCalled();
+  });
+});

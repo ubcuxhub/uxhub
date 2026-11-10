@@ -209,10 +209,10 @@ describe("event form publishing schedule", () => {
     expect(Object.keys(payload).sort()).toEqual([
       "configured_marketing_mode", "configured_marketing_url", "configured_slug", "configured_slug_edited", "created_at", "description", "description_rich", "ends_at", "event_colour", "event_type", "header_colour", "header_image_url", "image_url", "is_featured",
       "location_address_url", "location_building", "location_room",
-      "max_capacity", "mentors_enabled", "name", "publish_at",
+      "max_capacity", "max_team_size", "mentors_enabled", "min_team_size", "name", "publish_at",
       "registration_closes_at", "registration_opens_at",
       "requires_application", "short_description", "sponsors_enabled",
-      "starts_at", "status",
+      "starts_at", "status", "team_deadline", "teams_enabled",
     ]);
   });
 });
@@ -512,4 +512,38 @@ describe("drafts with saved event children", () => {
     expect(result.current.applicationTemplate[0].id).toBe(question.id);
     expect(result.current.hasUnsavedChanges).toBe(false);
   });
+});
+
+it("recovers team settings from an event when an older working document has no team fields", async () => {
+  const source = { ...event, teams_enabled: true, min_team_size: 2, max_team_size: 4, team_deadline: "2026-11-16T18:00:00Z" };
+  const oldState = { ...formStateFromEvent(source) };
+  for (const key of ["teams_configuration_initialized", "teams_enabled", "min_team_size", "max_team_size", "team_deadline"]) delete (oldState as unknown as Record<string, unknown>)[key];
+  const document = parseWorkingDocument({ version: 1, formState: oldState, checkInEvents: [], mentors: [], sponsors: [], applicationTemplate: [] });
+  const { result } = renderHook(() => useEventForm({ eventId: source.id, initialEvent: source, initialDraft: { id: "old-draft", revision: 1, document } }));
+  expect(result.current.formState).toMatchObject({ teams_enabled: true, min_team_size: "2", max_team_size: "4", team_deadline: "2026-11-16T11:00", teams_configuration_initialized: true });
+  act(() => result.current.handleFieldChange("max_team_size", "5"));
+  expect(result.current.hasUnsavedChanges).toBe(true);
+});
+
+it("retains hidden team settings through draft save/reload and event payloads", async () => {
+  const source = { ...event, teams_enabled: true, min_team_size: 2, max_team_size: 4, team_deadline: "2026-11-16T18:00:00Z" };
+  const { result, unmount } = renderHook(() => useEventForm({ eventId: source.id, initialEvent: source }));
+  act(() => result.current.handleFieldChange("teams_enabled", false));
+  await act(async () => { await result.current.handleSaveDraft(); });
+  const sent = vi.mocked(saveAdminEventDraftAction).mock.calls.at(-1)![0];
+  expect(sent.document.formState).toMatchObject({ teams_enabled: false, min_team_size: "2", max_team_size: "4", team_deadline: "2026-11-16T11:00" });
+  unmount();
+  const reopened = renderHook(() => useEventForm({ eventId: source.id, initialEvent: source, initialDraft: { id: sent.id, revision: 1, document: parseWorkingDocument(sent.document) } }));
+  expect(reopened.result.current.hasUnsavedChanges).toBe(false);
+  await act(async () => { await reopened.result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as FormEvent<HTMLFormElement>); });
+  expect(reopened.result.current.error).toBeNull();
+  expect(saveAdminEventAction).toHaveBeenLastCalledWith(expect.objectContaining({ event: expect.objectContaining({ teams_enabled: false, min_team_size: 2, max_team_size: 4, team_deadline: "2026-11-16T18:00:00.000Z" }) }));
+});
+
+it("saves incomplete team settings in a working document", async () => {
+  const { result } = renderHook(() => useEventForm({}));
+  act(() => { result.current.handleFieldChange("teams_enabled", true); result.current.handleFieldChange("min_team_size", "0"); result.current.handleFieldChange("team_deadline", "2099-01-01T"); });
+  await act(async () => { await result.current.handleSaveDraft(); });
+  expect(result.current.error).toBeNull();
+  expect(saveAdminEventDraftAction).toHaveBeenLastCalledWith(expect.objectContaining({ document: expect.objectContaining({ formState: expect.objectContaining({ teams_enabled: true, min_team_size: "0", team_deadline: "2099-01-01T" }) }) }));
 });
