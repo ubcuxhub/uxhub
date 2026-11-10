@@ -59,6 +59,8 @@ export interface EventFormState {
   mentors_enabled: boolean;
   sponsors_enabled: boolean;
   requires_application: boolean;
+  decisions_release_at: string;
+  confirmation_deadline: string;
 }
 
 export interface MentorDraft {
@@ -120,6 +122,8 @@ export const defaultFormState: EventFormState = {
   mentors_enabled: false,
   sponsors_enabled: false,
   requires_application: false,
+  decisions_release_at: "",
+  confirmation_deadline: "",
 };
 
 export function getInitialFormState(): EventFormState {
@@ -133,8 +137,6 @@ export function getInitialFormState(): EventFormState {
 /** The builder's form state for a stored event. */
 export function formStateFromEvent(event: EventRow): EventFormState {
   return {
-    date_location: null,
-    date_location_revision: 0,
     date_location: null,
     date_location_revision: 0,
     configuration_initialized: true,
@@ -174,6 +176,8 @@ export function formStateFromEvent(event: EventRow): EventFormState {
     mentors_enabled: event.mentors_enabled,
     sponsors_enabled: event.sponsors_enabled,
     requires_application: event.requires_application,
+    decisions_release_at: "",
+    confirmation_deadline: "",
   };
 }
 
@@ -329,6 +333,7 @@ export function validateEventForm(
     error = "Check-in end time must be after the start time.";
 
   const questionErrors: Record<number, string> = {};
+  if (formState.requires_application && !applicationTemplate.length) questionErrors[-1] = "Applications require at least one valid question before publication.";
   applicationTemplate.forEach((item, index) => {
     if (!item.question.trim()) {
       questionErrors[index] = "Question is required.";
@@ -336,7 +341,7 @@ export function validateEventForm(
       (item.response === ResponseType.short_text ||
         item.response === ResponseType.long_text) &&
       item.max_char_limit !== "" &&
-      item.max_char_limit <= 0
+      (!Number.isSafeInteger(item.max_char_limit) || item.max_char_limit <= 0)
     ) {
       questionErrors[index] =
         "Text response questions require a maximum character limit greater than 0.";
@@ -352,6 +357,8 @@ export function validateEventForm(
     }
   });
   invalidSections.applications = Object.keys(questionErrors).length > 0;
+
+  if (!error) error = applicationTimingProblem(formState);
 
   if (!error && invalidSections.applications) {
     error = "Please fix the errors in application questions.";
@@ -388,7 +395,7 @@ export function toApplicationQuestionInputs(
       sort_order: sortOrder,
       max_char_limit: isTextType(question.response)
         ? question.max_char_limit === ""
-          ? 5000
+          ? null
           : question.max_char_limit
         : null,
       response_options: isChoiceType(question.response)
@@ -446,4 +453,13 @@ export function withSavedCheckInSessionIds(
     ...session,
     id: sessionIds[index] ?? session.id,
   }));
+}
+
+/** Validate complete Pacific moments without making historical edits expire. */
+export function applicationTimingProblem(state: Pick<EventFormState, "decisions_release_at" | "confirmation_deadline">) {
+  const release = state.decisions_release_at;
+  const confirm = state.confirmation_deadline;
+  if ([release, confirm].some(value => value && !strictPacificTimestamp(value))) return "Application timing requires a valid, unambiguous Pacific date and time.";
+  if (release && confirm && strictPacificTimestamp(confirm)! <= strictPacificTimestamp(release)!) return "Confirm by must be later than Release decisions on.";
+  return null;
 }

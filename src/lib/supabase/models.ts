@@ -50,6 +50,8 @@ export type SquareWebhookEventUpdate = TablesUpdate<"square_webhook_events">;
 
 export type EventTicketRow = Tables<"event_tickets">;
 
+export type EventApplicationSettingsRow = Tables<"event_application_settings">;
+
 export type EventApplicationRow = Tables<"event_applications">;
 export type EventApplicationInsert = TablesInsert<"event_applications">;
 export type EventApplicationUpdate = TablesUpdate<"event_applications">;

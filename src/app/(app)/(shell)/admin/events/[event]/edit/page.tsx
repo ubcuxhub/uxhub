@@ -1,3 +1,4 @@
+import { fetchEventApplicationSettings } from "@/lib/supabase-helpers/event-application-settings";
 import { fetchEventDateLocationSettings, fetchEventRegistrationSettings } from "@/lib/supabase-helpers/event-date-locations";
 import { fetchEventDraftForEvent } from "@/lib/supabase-helpers/event-drafts";
 import { notFound } from "next/navigation";
@@ -55,7 +56,7 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
 
   if (!event) notFound();
   const pricingLocked = await fetchEventPricingLocked(supabase, eventId);
-  const [dateLocation, registrationInfo] = await Promise.all([fetchEventDateLocationSettings(supabase, eventId), fetchEventRegistrationSettings(supabase, eventId)]);
+  const [dateLocation, registrationInfo, applicationSettings] = await Promise.all([fetchEventDateLocationSettings(supabase, eventId), fetchEventRegistrationSettings(supabase, eventId), fetchEventApplicationSettings(supabase, eventId)]);
   const workingDraft = event.status === "draft" && !event.publish_at ? await fetchEventDraftForEvent(supabase, eventId) : null;
 
   return (
@@ -66,6 +67,7 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
     >
       <PageContainer className="max-w-none min-[821px]:px-12 lg:px-12">
         <EventCreateModify
+          initialApplicationSettings={applicationSettings}
           initialDateLocation={dateLocation}
           registrationInfo={registrationInfo}
           pricingLocked={pricingLocked}

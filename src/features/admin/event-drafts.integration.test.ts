@@ -33,7 +33,7 @@ describe("staff-only event working documents", () => {
     const changedSession = await fixtures.supabase.rpc("save_admin_event_builder", { ...input, p_event: { name: "Must roll back" }, p_check_in_sessions: [] });
     expect(changedSession.error?.message).toMatch(/cannot be removed/);
     const changedQuestion = await fixtures.supabase.rpc("save_admin_event_builder", { ...input, p_event: { name: "Must also roll back" }, p_application_questions: [{ ...question, response_type: "long_text" }] });
-    expect(changedQuestion.error?.message).toMatch(/response type cannot change/);
+    expect(changedQuestion.error?.message).toMatch(/first submitted application/);
     expect((await fetchEventById(fixtures.supabase, event.id))?.name).toBe("Updated content");
     expect((await fixtures.supabase.from("check_in_sessions").select().eq("event_id", event.id)).data).toEqual([session]);
     expect((await fixtures.supabase.from("event_application_questions").select().eq("event_id", event.id)).data).toEqual([question]);
@@ -89,6 +89,45 @@ describe("staff-only event working documents", () => {
     expect((await fetchEventById(fixtures.supabase, event.id))?.name).toBe(event.name);
     expect((await fetchEventById(fixtures.supabase, event.id))?.header_image_url).toBe(event.header_image_url);
     expect((await fetchEventDraft(fixtures.supabase, id))?.revision).toBe(draft.revision);
+  }));
+
+  it("materializes dates and application timing through the full wrapper chain and retries with the same IDs", () => withFixtures(async fixtures => {
+    const id = fixtures.track("admin_event_drafts", randomUUID());
+    const draft = await saveEventDraft(fixtures.supabase, id, null, 0, document);
+    const input = {
+      p_draft_id: id, p_draft_revision: draft.revision, p_event_id: null!,
+      p_expected_image_url: null!, p_expected_header_image_url: null!,
+      p_slug: `draft-settings-${fixtures.tag}`,
+      p_event: {
+        name: "Complete with settings", description: "Description", regular_price: 0, member_price: 0, max_capacity: 10, status: "draft", requires_application: true,
+        _date_revision: 0,
+        _date_location: {
+          automatic: true, audience: "everyone",
+          location: { type: "in_person", building: "Nest", address: "6133 University Blvd" },
+          dates: [{ key: "opening", session_id: null, date: "2099-08-01", label: "Opening", start_time: "2099-08-01T18:00:00Z", end_time: "2099-08-01T19:00:00Z", location: null }],
+        },
+        _application_timing: { decisions_release_at: "2099-07-01T18:00:00Z", confirmation_deadline: "2099-07-02T18:00:00Z" },
+      },
+      p_check_in_sessions: [],
+      p_application_questions: [{ id: null, question: "Why attend?", response_type: "short_text" }],
+      p_mentors: [], p_sponsors: [],
+    };
+    const result = await fixtures.supabase.rpc("save_admin_event_builder", input);
+    if (result.error) throw result.error;
+    const saved = result.data as { id: string; date_location_revision: number; check_in_session_ids: string[]; question_ids: string[] };
+    fixtures.track("events", saved.id);
+    expect(saved.date_location_revision).toBe(1);
+    expect(saved.check_in_session_ids).toHaveLength(1);
+    expect(saved.question_ids).toHaveLength(1);
+    const dateSettings = await fixtures.supabase.from("event_date_location_settings").select().eq("event_id", saved.id).single();
+    expect(dateSettings.error).toBeNull();
+    expect(dateSettings.data?.document).toMatchObject({ dates: [{ session_id: saved.check_in_session_ids[0] }] });
+    const timing = await fixtures.supabase.from("event_application_settings").select().eq("event_id", saved.id).single();
+    expect(timing.error).toBeNull();
+    expect(new Date(timing.data!.decisions_release_at!).toISOString()).toBe("2099-07-01T18:00:00.000Z");
+    const retry = await fixtures.supabase.rpc("save_admin_event_builder", input);
+    expect(retry.error).toBeNull();
+    expect(retry.data).toEqual(result.data);
   }));
 
   it("materializes atomically and safely retries after response loss", () => withFixtures(async fixtures => {

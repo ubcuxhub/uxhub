@@ -1,13 +1,16 @@
 "use client";
 
 import {
+  ArrowUp,
+  ArrowDown,
+  LockKeyhole,
   CheckSquare,
   ChevronDown,
   CircleDot,
   FileUp,
   ListMinus,
-  Plus,
   Text,
+  Plus,
   X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -24,7 +27,7 @@ import {
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import {
   ResponseType,
   type ApplicationQuestionTemplate,
@@ -33,6 +36,8 @@ import { APPLICATION_FILE_MAX_BYTES } from "@/lib/supabase-helpers/application-f
 
 interface ApplicationQuestionsSectionProps {
   registrationModeOwned?: boolean;
+  locked?: boolean;
+  onMove: (index: number, direction: -1 | 1) => void;
   enabled: boolean;
   applicationTemplate: ApplicationQuestionTemplate[];
   questionErrors: Record<number, string>;
@@ -54,15 +59,15 @@ interface ApplicationQuestionsSectionProps {
 }
 
 const questionTypes = [
-  { value: ResponseType.short_text, label: "Short Form Question", icon: ListMinus },
-  { value: ResponseType.long_text, label: "Long Form Question", icon: Text },
+  { value: ResponseType.short_text, label: "Short form", icon: ListMinus },
+  { value: ResponseType.long_text, label: "Long form", icon: Text },
   { value: ResponseType.checkbox, label: "Checkboxes", icon: CheckSquare },
   {
     value: ResponseType.multiple_choice,
-    label: "Multiple Choice",
+    label: "Multiple choice",
     icon: CircleDot,
   },
-  { value: ResponseType.file_upload, label: "File Upload", icon: FileUp },
+  { value: ResponseType.file_upload, label: "File upload", icon: FileUp },
   { value: ResponseType.dropdown, label: "Dropdown", icon: ChevronDown },
 ] as const;
 
@@ -74,6 +79,8 @@ const choiceTypes = new Set<ResponseType>([
 
 export function ApplicationQuestionsSection({
   registrationModeOwned = false,
+  locked = false,
+  onMove,
   enabled,
   applicationTemplate,
   questionErrors,
@@ -85,13 +92,17 @@ export function ApplicationQuestionsSection({
   onUpdateResponseOption,
   onRemoveResponseOption,
 }: ApplicationQuestionsSectionProps) {
+  if (registrationModeOwned && !enabled) return null;
   return (
-    <FieldSet className="gap-5">
+    <Card className="gap-4 py-5">
+      <CardHeader className="px-5"><CardTitle>Application questions</CardTitle><CardDescription>Choose the questions applicants answer. Applications need at least one valid question before publication.</CardDescription></CardHeader>
+      <CardContent className="px-5"><FieldSet className="gap-5">
       <div className="flex items-center justify-between gap-4">
-        <FieldLegend>Application Questions</FieldLegend>
+        <FieldLegend className="sr-only">Application questions</FieldLegend>
         {!registrationModeOwned && <div className="flex items-center gap-2">
           <Switch
             id="requires_application"
+            disabled={locked}
             checked={enabled}
             onCheckedChange={onEnabledChange}
           />
@@ -101,28 +112,35 @@ export function ApplicationQuestionsSection({
 
       {enabled && (
         <FieldGroup className="gap-5">
+          {locked && <p className="flex items-start gap-2 rounded-lg bg-muted p-4 text-small"><LockKeyhole className="mt-0.5 size-4 shrink-0" aria-hidden />Application questions are locked because an application has been submitted.</p>}
+          {questionErrors[-1] && <FieldError>{questionErrors[-1]}</FieldError>}
           {applicationTemplate.map((question, index) => {
             const type = questionTypes.find(
               (option) => option.value === question.response
             );
             const questionError = questionErrors[index];
+            const labelError = questionError === "Question is required." ? questionError : undefined;
+            const answerError = labelError ? undefined : questionError;
             return (
-              <div
-                key={`application-${index}`}
-                className="relative flex flex-col gap-4 rounded-xl border bg-card p-5"
-              >
-                <div className="flex items-center justify-between gap-4 pr-8">
-                  <h3 className="text-subheading">{type?.label}</h3>
-                  <IconButton
-                    variant="ghost"
-                    label={`Remove question ${index + 1}`}
-                    className="absolute right-2 top-2"
-                    onClick={() => onRemove(index)}
-                  >
-                    <X />
-                  </IconButton>
-                </div>
+              <Card key={question.id ?? `application-${index}`} className="gap-4 py-5">
+                <CardHeader className="flex flex-wrap items-center justify-between gap-2 px-5">
+                  <CardTitle className="text-body-medium">Question {index + 1} · {type?.label}</CardTitle>
+                  {!locked && <div className="flex gap-1">
+                    <IconButton className="max-sm:min-h-11 max-sm:min-w-11" label={`Move question ${index + 1} up`} disabled={index === 0} onClick={() => onMove(index, -1)}><ArrowUp aria-hidden /></IconButton>
+                    <IconButton className="max-sm:min-h-11 max-sm:min-w-11" label={`Move question ${index + 1} down`} disabled={index === applicationTemplate.length - 1} onClick={() => onMove(index, 1)}><ArrowDown aria-hidden /></IconButton>
+                    <IconButton className="max-sm:min-h-11 max-sm:min-w-11" variant="ghost" label={`Remove question ${index + 1}`} onClick={() => onRemove(index)}><X aria-hidden /></IconButton>
+                  </div>}
+                </CardHeader>
+                <CardContent className="space-y-4 px-5">
+                {locked ? <div className="space-y-2">
+                  <p className="break-words font-medium">{question.question}</p>
+                  <p className="text-small text-muted-foreground">{question.is_required ? "Required" : "Optional"}{question.max_char_limit !== "" ? ` · Maximum ${question.max_char_limit} characters` : ""}</p>
+                  {choiceTypes.has(question.response) && <ul className="list-inside list-disc space-y-1 text-small">{question.response_options.map((option, optionIndex) => <li className="break-words" key={optionIndex}>{option}</li>)}</ul>}
+                </div> : <>
                 <div className="flex items-center gap-2">
+                  <FieldLabel htmlFor={`question_required_${index}`}>
+                    Required
+                  </FieldLabel>
                   <Checkbox
                     id={`question_required_${index}`}
                     checked={question.is_required}
@@ -130,11 +148,8 @@ export function ApplicationQuestionsSection({
                       onUpdate(index, "is_required", checked)
                     }
                   />
-                  <FieldLabel htmlFor={`question_required_${index}`}>
-                    Required
-                  </FieldLabel>
                 </div>
-                <Field data-invalid={questionError ? true : undefined}>
+                <Field data-invalid={labelError ? true : undefined}>
                   <FieldLabel htmlFor={`question_${index}`}>Question</FieldLabel>
                   <Input
                     id={`question_${index}`}
@@ -142,34 +157,25 @@ export function ApplicationQuestionsSection({
                     onChange={(event) =>
                       onUpdate(index, "question", event.target.value)
                     }
-                    aria-invalid={questionError ? true : undefined}
+                    aria-describedby={labelError ? `question_${index}_error` : undefined}
+                    aria-invalid={labelError ? true : undefined}
                     required
                   />
-                  <FieldError>{questionError}</FieldError>
+                  <FieldError id={`question_${index}_error`}>{labelError}</FieldError>
                 </Field>
-                <Field>
-                  <FieldLabel htmlFor={`question_description_${index}`}>
-                    Description (Optional)
-                  </FieldLabel>
-                  <Textarea
-                    id={`question_description_${index}`}
-                    value={question.description}
-                    onChange={(event) =>
-                      onUpdate(index, "description", event.target.value)
-                    }
-                  />
-                </Field>
-
                 {(question.response === ResponseType.short_text ||
                   question.response === ResponseType.long_text) && (
-                  <Field className="max-w-xs">
+                  <Field className="max-w-xs" data-invalid={!!answerError}>
                     <FieldLabel htmlFor={`max_char_limit_${index}`}>
-                      Maximum Characters
+                      Maximum characters (optional)
                     </FieldLabel>
                     <Input
                       id={`max_char_limit_${index}`}
                       type="number"
                       min="1"
+                      step="1"
+                      aria-invalid={!!answerError}
+                      aria-describedby={answerError ? `answer_${index}_error` : undefined}
                       value={question.max_char_limit}
                       placeholder={
                         question.response === ResponseType.short_text
@@ -186,6 +192,7 @@ export function ApplicationQuestionsSection({
                         )
                       }
                     />
+                    <FieldError id={`answer_${index}_error`}>{answerError}</FieldError>
                   </Field>
                 )}
 
@@ -208,7 +215,9 @@ export function ApplicationQuestionsSection({
                           </span>
                           <Input
                             value={option}
-                            aria-label={`Option ${optionIndex + 1}`}
+                            aria-label={`Question ${index + 1}, option ${optionIndex + 1}`}
+                            aria-invalid={!!answerError}
+                            aria-describedby={answerError ? `answer_${index}_error` : undefined}
                             onChange={(event) =>
                               onUpdateResponseOption(
                                 index,
@@ -222,6 +231,7 @@ export function ApplicationQuestionsSection({
                             type="button"
                             variant="ghost"
                             size="icon"
+                            className="max-sm:min-h-11 max-sm:min-w-11"
                             aria-label={`Remove option ${optionIndex + 1}`}
                             onClick={() =>
                               onRemoveResponseOption(index, optionIndex)
@@ -232,6 +242,7 @@ export function ApplicationQuestionsSection({
                         </div>
                       ))}
                     </FieldGroup>
+                    <FieldError id={`answer_${index}_error`}>{answerError}</FieldError>
                     <Button
                       type="button"
                       variant="outline"
@@ -244,27 +255,26 @@ export function ApplicationQuestionsSection({
                   </FieldSet>
                 )}
 
+                </>}
                 {question.response === ResponseType.file_upload && (
                   <FieldDescription>
                     Applicants upload one PDF, up to{" "}
                     {APPLICATION_FILE_MAX_BYTES / (1024 * 1024)} MB.
                   </FieldDescription>
                 )}
-              </div>
+                </CardContent>
+              </Card>
             );
           })}
 
-          <div className="grid gap-5 rounded-xl border bg-muted/30 p-5 md:grid-cols-[0.7fr_1.5fr]">
-            <div className="flex min-h-32 items-center justify-center">
-              <Plus className="size-10" />
-            </div>
+          {!locked && <Card className="bg-section py-5"><CardContent className="space-y-3 px-5"><p className="text-body-medium">Add a question</p>
             <div className="grid gap-2 sm:grid-cols-2">
               {questionTypes.map(({ value, label, icon: Icon }) => (
                 <Button
                   key={value}
                   type="button"
                   variant="outline"
-                  className="justify-start"
+                  className="min-h-11 justify-start sm:min-h-10"
                   onClick={() => onAdd(value)}
                 >
                   <Icon data-icon="inline-start" />
@@ -272,9 +282,9 @@ export function ApplicationQuestionsSection({
                 </Button>
               ))}
             </div>
-          </div>
+          </CardContent></Card>}
         </FieldGroup>
       )}
-    </FieldSet>
+    </FieldSet></CardContent></Card>
   );
 }

@@ -2195,5 +2195,6 @@ $$;
 \ir event-publication.sql
 \ir event-drafts.sql
 \ir event-date-locations.sql
+\ir event-application-settings.sql
 
 rollback;

@@ -1,5 +1,8 @@
 "use client";
 
+import type { EventApplicationSettingsRow } from "@/lib/supabase/models";
+import { ApplicationTiming } from "./event-form/ApplicationTiming";
+
 import { EventPricing } from "./event-form/EventPricing";
 import { EventFeatured } from "./event-form/EventMarketing";
 
@@ -37,6 +40,7 @@ import { EventFormSkeleton } from "./event-form/EventFormSkeleton";
 import { DeleteEventModal } from "./DeleteEventModal";
 
 interface EventCreateModifyProps {
+  initialApplicationSettings?: EventApplicationSettingsRow | null;
   initialDateLocation?: { document: EventDateLocationDraft; revision: number } | null;
   registrationInfo?: { locked: boolean; seats: number };
   pricingLocked?: boolean;
@@ -59,6 +63,7 @@ export const EventCreateModify = ({
   showBackButton = true,
   pricingLocked = false,
   initialDateLocation,
+  initialApplicationSettings,
   registrationInfo = { locked: false, seats: 0 },
   initialDraft,
   initialEvent = null,
@@ -73,6 +78,7 @@ export const EventCreateModify = ({
   const form = useEventForm({
     eventId,
     initialDateLocation,
+    initialApplicationSettings,
     initialDraft,
     initialEvent,
     initialCheckInSessions,
@@ -149,11 +155,11 @@ export const EventCreateModify = ({
       {form.loadingEvent ? (
         <EventFormSkeleton />
       ) : (
-        <form id="event-builder-form" noValidate className="flex min-w-0 flex-col gap-14 [&_input]:h-10 [&_button[data-slot=select-trigger]]:h-10" onSubmit={form.handleSubmit}><fieldset disabled={form.isSubmitting} className="flex min-w-0 flex-col gap-14">
+        <form id="event-builder-form" noValidate className="flex min-w-0 flex-col gap-14 [&_input:not([type=checkbox]):not([type=radio])]:h-10 [&_button[data-slot=select-trigger]]:h-10" onSubmit={form.handleSubmit}><fieldset disabled={form.isSubmitting} className="flex min-w-0 flex-col gap-14">
           {section("builder-basics", "Basics", <><PrimaryDetailsSection showConfigurationErrors={form.showConfigurationErrors} urlLocked={!!initialEvent?.first_published_at || initialEvent?.status === "active"} formState={form.formState} isSubmitting={form.isSubmitting} onFieldChange={form.handleFieldChange} /><EventBranding state={form.formState} disabled={form.isSubmitting} onChange={form.handleFieldChange} onIcon={form.setPendingImageFile} onHeader={form.setPendingHeaderFile} /><EventFeatured state={form.formState} onChange={form.handleFieldChange} /><EventPricing showErrors={form.showConfigurationErrors} state={form.formState} locked={pricingLocked} effectivePrices={initialEvent && initialEvent.pricing_policy !== "figma_pending" ? { regular: initialEvent.regular_price, member: initialEvent.member_price } : undefined} onChange={form.handleFieldChange} /></>)}
           {section("builder-description", "Description", <EventDescriptionEditor key={form.legacyDraftRecovered ? "legacy-recovered" : "initial"} short={form.formState.short_description} value={form.formState.description} rich={form.formState.description_rich} disabled={form.isSubmitting} onChange={(short, text, rich) => { form.handleFieldChange("short_description", short); form.handleFieldChange("description", text); form.handleFieldChange("description_rich", rich); }} />)}
           {section("builder-dates", "Date and location", <EventDateLocation key={form.formState.date_location_revision} value={form.formState.date_location!} disabled={form.isSubmitting} showErrors={form.showConfigurationErrors} onChange={value => form.handleFieldChange("date_location", value)} />)}
-          {section("builder-registration", "Registration", <><EventRegistration state={form.formState} disabled={form.isSubmitting} info={registrationInfo} onChange={form.handleFieldChange} /><ApplicationQuestionsSection registrationModeOwned enabled={form.formState.requires_application} applicationTemplate={form.applicationTemplate} questionErrors={form.questionErrors} onEnabledChange={enabled => form.handleFieldChange("requires_application", enabled)} onAdd={form.addApplicationQuestion} onRemove={form.removeApplicationQuestion} onUpdate={form.updateApplicationQuestion} onAddResponseOption={form.addResponseOption} onUpdateResponseOption={form.updateResponseOption} onRemoveResponseOption={form.removeResponseOption} /></>)}
+          {section("builder-registration", "Registration", <><EventRegistration state={form.formState} disabled={form.isSubmitting} info={registrationInfo} onChange={form.handleFieldChange} /><ApplicationQuestionsSection locked={!!initialApplicationSettings?.questions_locked_at} onMove={form.moveApplicationQuestion} registrationModeOwned enabled={form.formState.requires_application} applicationTemplate={form.applicationTemplate} questionErrors={form.questionErrors} onEnabledChange={enabled => form.handleFieldChange("requires_application", enabled)} onAdd={form.addApplicationQuestion} onRemove={form.removeApplicationQuestion} onUpdate={form.updateApplicationQuestion} onAddResponseOption={form.addResponseOption} onUpdateResponseOption={form.updateResponseOption} onRemoveResponseOption={form.removeResponseOption} />{form.formState.requires_application && <ApplicationTiming state={form.formState} showErrors={form.showConfigurationErrors} onChange={form.handleFieldChange} />}</>)}
           {section("builder-people", "People and sponsors", <>
           <MentorsSection
             enabled={form.formState.mentors_enabled}

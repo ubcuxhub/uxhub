@@ -123,40 +123,28 @@ export function useApplicationQuestions(
 
   const addApplicationQuestion = (response: ResponseType) => {
     resetSuccessMessage();
+    setQuestionErrors({});
     setApplicationTemplate((current) => [...current, createQuestion(response)]);
   };
 
   const removeApplicationQuestion = (index: number) => {
     resetSuccessMessage();
+    setQuestionErrors({});
     setApplicationTemplate((current) =>
       current.filter((_, itemIndex) => itemIndex !== index)
     );
   };
 
-  const handleResponseTypeChange = (
-    index: number,
-    response: ResponseType
-  ) => {
+  const moveApplicationQuestion = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= applicationTemplate.length) return;
     resetSuccessMessage();
-    clearError(index);
-    setApplicationTemplate((current) =>
-      current.map((question, itemIndex) =>
-        itemIndex === index
-          ? {
-              ...question,
-              response,
-              ...(isChoiceType(response)
-                ? { response_options: question.response_options || [] }
-                : {}),
-              ...((response === ResponseType.short_text ||
-                response === ResponseType.long_text) &&
-              !question.max_char_limit
-                ? { max_char_limit: "" }
-                : {}),
-            }
-          : question
-      )
-    );
+    setQuestionErrors({});
+    setApplicationTemplate(current => {
+      const next = [...current];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
   };
 
   return {
@@ -170,6 +158,6 @@ export function useApplicationQuestions(
     removeResponseOption,
     addApplicationQuestion,
     removeApplicationQuestion,
-    handleResponseTypeChange,
+    moveApplicationQuestion,
   };
 }

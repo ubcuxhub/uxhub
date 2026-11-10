@@ -20,7 +20,7 @@ import {
   adminUpdateUserInfoById,
 } from "@/lib/supabase-helpers/admin-server";
 import { datetimeLocalToTimestamptz } from "@/lib/date";
-import { assertPublishAt } from "@/features/admin/lib/event-publication";
+import { assertPublishAt, isTimestamptz } from "@/features/admin/lib/event-publication";
 import {
   validateMembershipTypeInput,
   type MembershipTypeInput,
@@ -185,6 +185,7 @@ export async function updateUserRoleAction(
 }
 
 export interface SaveAdminEventInput {
+  applicationTiming?: { decisions_release_at: string | null; confirmation_deadline: string | null };
   dateLocation?: EventDateLocationDraft | null;
   dateLocationRevision?: number;
   eventId?: string;
@@ -298,6 +299,11 @@ export async function saveAdminEventAction(
   await requireAdmin();
 
   assertPublishAt(input.event.status, input.event.publish_at);
+  if (input.applicationTiming) {
+    const { decisions_release_at: release, confirmation_deadline: confirm } = input.applicationTiming;
+    if ([release, confirm].some(value => value !== null && !isTimestamptz(value))) return { error: "Application timing requires a valid date and time with a timezone." };
+    if (release && confirm && Date.parse(confirm) <= Date.parse(release)) return { error: "Confirm by must be later than Release decisions on." };
+  }
   let datePayload = {};
   if (input.dateLocation) {
     const config = parseDateLocationDraft(input.dateLocation);
@@ -354,7 +360,7 @@ export async function saveAdminEventAction(
       p_draft_id: input.draftId ?? null,
       p_draft_revision: input.draftRevision ?? 0,
       p_expected_header_image_url: input.expectedHeaderImageUrl ?? null,
-      p_event: { ...input.event, ...datePayload },
+      p_event: { ...input.event, ...datePayload, ...(input.applicationTiming ? { _application_timing: input.applicationTiming } : {}) },
       p_slug: slug,
       p_expected_image_url: input.expectedImageUrl,
       p_check_in_sessions: input.checkInSessions,

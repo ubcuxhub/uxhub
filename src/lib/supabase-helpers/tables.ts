@@ -14,6 +14,7 @@ export const TABLES = {
   userInfo: "user_info",
   eventTickets: "event_tickets",
   eventApplications: "event_applications",
+  eventApplicationSettings: "event_application_settings",
   eventApplicationQuestions: "event_application_questions",
   eventApplicationResponses: "event_application_responses",
   applicationReviewNotes: "application_review_notes",
