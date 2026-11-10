@@ -69,3 +69,19 @@ export async function updateUserSetup(
   if (!data) throw new Error("Unable to save setup.");
   return data;
 }
+
+/** An active profile's `setup_step` by auth user id, or null when there is none. */
+export async function fetchSetupStepByAuthId(
+  db: DbClient,
+  authUserId: string
+): Promise<string | null> {
+  const { data, error } = await db
+    .from(TABLES.userInfo)
+    .select("setup_step")
+    .eq("auth_user_id", authUserId)
+    .is("deleted_at", null)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data?.setup_step ?? null;
+}

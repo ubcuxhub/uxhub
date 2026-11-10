@@ -11,10 +11,12 @@ import {
   isExpiredLinkCode,
   readErrorCode,
 } from "@/features/auth/link-expired";
+import { resolveSetupDestination } from "@/features/setup/lib/state";
 import { ensureUserInfo } from "@/lib/auth/ensure-user-info";
 import { getSafeInternalPath } from "@/lib/auth/paths";
 import { getRequestOrigin } from "@/lib/http/request-origin";
 import { createClient } from "@/lib/supabase/server";
+import { fetchSetupStepByAuthId } from "@/lib/supabase-helpers/setup";
 
 const CALLBACK_ERROR_MESSAGE =
   "We couldn't complete sign-in. The link may have expired or already been used. Try signing in again.";
@@ -105,7 +107,22 @@ export async function GET(request: NextRequest) {
       return redirectToAuthError(origin, result.message, nextPath);
     }
 
-    return NextResponse.redirect(new URL(nextPath, origin));
+    // A new member heading for the portal home goes straight to setup, so the
+    // portal never renders first. The lookup is best effort: the portal page
+    // keeps its own gate.
+    let destination = nextPath;
+    try {
+      destination = resolveSetupDestination(
+        nextPath,
+        await withDeadline(() => fetchSetupStepByAuthId(supabase, authUser.id), {
+          operation: "Setup state lookup",
+        }),
+      );
+    } catch {
+      destination = nextPath;
+    }
+
+    return NextResponse.redirect(new URL(destination, origin));
   } catch (error) {
     return redirectToAuthError(
       origin,

@@ -20,6 +20,10 @@ vi.mock("@/lib/supabase/client", () => ({
   createClient: () => ({ auth: authMocks }),
 }));
 
+const resolvePostSignInPath = vi.hoisted(() => vi.fn());
+
+vi.mock("@/features/setup/actions", () => ({ resolvePostSignInPath }));
+
 vi.mock("next/navigation", () => ({
   useRouter: () => routerMocks,
 }));
@@ -27,6 +31,7 @@ vi.mock("next/navigation", () => ({
 describe("LoginForm", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resolvePostSignInPath.mockImplementation(async (path: string) => path);
   });
 
   afterEach(() => {
@@ -73,6 +78,20 @@ describe("LoginForm", () => {
         .disabled,
     ).toBe(false);
     expect(routerMocks.replace).not.toHaveBeenCalled();
+  });
+
+  it("navigates to the destination the server resolves", async () => {
+    authMocks.signInWithPassword.mockResolvedValue({ error: null });
+    resolvePostSignInPath.mockResolvedValue("/portal/setup");
+
+    render(<LoginForm />);
+
+    await act(async () => {
+      submitLogin();
+    });
+
+    expect(resolvePostSignInPath).toHaveBeenCalledWith("/portal");
+    expect(routerMocks.replace).toHaveBeenCalledWith("/portal/setup");
   });
 
   it("stays pending after success while navigation commits", async () => {

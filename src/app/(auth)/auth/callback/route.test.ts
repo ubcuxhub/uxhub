@@ -10,6 +10,10 @@ const authMocks = vi.hoisted(() => ({
 
 const ensureUserInfo = vi.hoisted(() => vi.fn());
 
+const fetchSetupStepByAuthId = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/supabase-helpers/setup", () => ({ fetchSetupStepByAuthId }));
+
 vi.mock("@/lib/supabase/server", () => ({
   createClient: () => ({ auth: authMocks }),
 }));
@@ -33,6 +37,38 @@ describe("GET /auth/callback", () => {
       error: null,
     });
     ensureUserInfo.mockResolvedValue({ status: "ok" });
+    fetchSetupStepByAuthId.mockResolvedValue("done");
+  });
+
+  function callback(next?: string) {
+    const query = next ? `&next=${encodeURIComponent(next)}` : "";
+    return GET(new NextRequest(`https://example.com/auth/callback?code=c${query}`));
+  }
+
+  it("sends a member who hasn't finished setup straight to setup", async () => {
+    fetchSetupStepByAuthId.mockResolvedValue("dietary");
+    const response = await callback();
+    expect(fetchSetupStepByAuthId).toHaveBeenCalledWith(expect.anything(), "auth-user-1");
+    expect(response.headers.get("location")).toBe("https://example.com/portal/setup");
+  });
+
+  it("lets a finished member through to the portal", async () => {
+    const response = await callback("/portal");
+    expect(response.headers.get("location")).toBe("https://example.com/portal");
+  });
+
+  it("honours a non-portal next without gating it", async () => {
+    fetchSetupStepByAuthId.mockResolvedValue("dietary");
+    const response = await callback("/portal/events/x/checkout");
+    expect(response.headers.get("location")).toBe(
+      "https://example.com/portal/events/x/checkout"
+    );
+  });
+
+  it("falls back to next when the lookup fails", async () => {
+    fetchSetupStepByAuthId.mockRejectedValue(new Error("db down"));
+    const response = await callback();
+    expect(response.headers.get("location")).toBe("https://example.com/portal");
   });
 
   it("exchanges recovery codes before reaching the password update form", async () => {

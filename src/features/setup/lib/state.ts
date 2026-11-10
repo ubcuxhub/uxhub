@@ -75,6 +75,21 @@ export function getSetupRedirect(
   return toSetupStep(user.setup_step) === "done" ? null : SETUP_PATH;
 }
 
+/**
+ * The gate applied to a destination before navigating: `SETUP_PATH` when
+ * `nextPath` is a gated page (its query and hash ignored) and setup isn't
+ * done, else `nextPath` unchanged. A missing step (no profile yet) passes
+ * through, so this never blocks.
+ */
+export function resolveSetupDestination(
+  nextPath: string,
+  setupStep: string | null | undefined
+): string {
+  if (setupStep == null) return nextPath;
+  const pathname = nextPath.split(/[?#]/, 1)[0];
+  return getSetupRedirect({ setup_step: setupStep }, pathname) ?? nextPath;
+}
+
 export type AvatarSource =
   | { kind: "photo"; path: string }
   | { kind: "preset"; preset: AvatarPreset }

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { INTEREST_OPTIONS } from "./options";
 import {
   getSetupRedirect,
+  resolveSetupDestination,
   nextSetupStep,
   resolveAvatar,
   SETUP_PATH,
@@ -101,5 +102,23 @@ describe("interest taxonomy", () => {
     const ids = INTEREST_OPTIONS.map((option) => option.id);
     expect(ids.length).toBeLessThanOrEqual(20);
     expect(new Set(ids).size).toBe(ids.length);
+  });
+});
+
+describe("resolveSetupDestination", () => {
+  it("sends an unfinished member heading for the portal home to setup", () => {
+    expect(resolveSetupDestination("/portal", "dietary")).toBe(SETUP_PATH);
+    expect(resolveSetupDestination("/portal?x=1#top", "dietary")).toBe(SETUP_PATH);
+  });
+
+  it("honours any other destination, and a finished or missing step", () => {
+    expect(resolveSetupDestination("/portal/events/foo/checkout", "dietary")).toBe(
+      "/portal/events/foo/checkout"
+    );
+    expect(resolveSetupDestination("/auth/update-password", "dietary")).toBe(
+      "/auth/update-password"
+    );
+    expect(resolveSetupDestination("/portal", "done")).toBe("/portal");
+    expect(resolveSetupDestination("/portal", null)).toBe("/portal");
   });
 });

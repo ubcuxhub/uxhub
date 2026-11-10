@@ -3,13 +3,25 @@
 import { revalidatePath } from "next/cache";
 
 import { requireAuth } from "@/lib/auth/guards";
+import { getSafeInternalPath } from "@/lib/auth/paths";
 import { errorFields, log } from "@/lib/log";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { replaceProfilePhoto } from "@/lib/supabase-helpers/admin-user-profile";
-import { fetchUserSetup, updateUserSetup, type UserSetupRow } from "@/lib/supabase-helpers/setup";
+import {
+  fetchSetupStepByAuthId,
+  fetchUserSetup,
+  updateUserSetup,
+  type UserSetupRow,
+} from "@/lib/supabase-helpers/setup";
 import type { AvatarPreset, InterestId, SetupStepId } from "./lib/options";
-import { nextSetupStep, toSetupState, toSetupStep, type SetupState } from "./lib/state";
+import {
+  nextSetupStep,
+  resolveSetupDestination,
+  toSetupState,
+  toSetupStep,
+  type SetupState,
+} from "./lib/state";
 import {
   isSetupStepId,
   parseAvatarPreset,
@@ -105,4 +117,25 @@ export async function skipSetupStepAction(step: SetupStepId): Promise<SetupState
       setup_step: nextSetupStep(toSetupStep(user.setup_step), step),
     });
   });
+}
+
+/**
+ * Where to send a member who just signed in with a password: `nextPath` (made
+ * safe), or `/portal/setup` when it is the portal home and setup isn't done.
+ * Deciding before navigating keeps the portal from flashing. Never throws: any
+ * failure falls back to the safe path, and the portal page's own gate remains.
+ */
+export async function resolvePostSignInPath(nextPath: string): Promise<string> {
+  const safePath = getSafeInternalPath(typeof nextPath === "string" ? nextPath : null);
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return safePath;
+    return resolveSetupDestination(safePath, await fetchSetupStepByAuthId(supabase, user.id));
+  } catch (error) {
+    log.warn("setup.post_sign_in_lookup_failed", errorFields(error));
+    return safePath;
+  }
 }

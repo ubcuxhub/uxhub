@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { withDeadline } from "@/lib/async/deadline";
 import { useNavigationRecovery } from "@/hooks/use-navigation-recovery";
+import { resolvePostSignInPath } from "@/features/setup/actions";
 import { createClient } from "@/lib/supabase/client";
 
 import {
@@ -79,7 +80,12 @@ export function LoginForm({
 
       if (error) throw error;
 
-      router.replace(nextPath);
+      // Decide the destination first, so a new member never sees the portal.
+      const destination = await withDeadline(() => resolvePostSignInPath(nextPath), {
+        operation: "Sign in",
+      }).catch(() => nextPath);
+
+      router.replace(destination);
       navigationStarted = true;
       recoverStalledNavigation();
     } catch (error: unknown) {
