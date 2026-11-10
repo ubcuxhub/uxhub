@@ -1,7 +1,6 @@
 import { listApplicationFiles, removeApplicationFiles } from "./application-files";
 import type { DbClient } from "./types";
 import { TABLES } from "./tables";
-import { fetchUserInfoContactsByIds } from "./users";
 import type {
   EventApplicationQuestionInsert,
   EventApplicationQuestionRow,
@@ -80,6 +79,8 @@ export interface ApplicationSummary {
   userId: string;
   name: string;
   email: string;
+  /** Their major, else faculty, for a second line under the name. */
+  program: string | null;
   /** When it was submitted. */
   appliedAt: string;
   status: SubmittedApplicationStatus;
@@ -173,11 +174,15 @@ export async function fetchEventApplicationSummaries(
   const ticketHolders = new Set(
     (ticketsResult.data ?? []).map((ticket) => ticket.user_id)
   );
-  const users = await fetchUserInfoContactsByIds(
-    supabase,
-    applications.map((application) => application.user_id)
-  );
-  const userById = new Map(users.map((user) => [user.id, user]));
+  const { data: users, error: usersError } = await supabase
+    .from(TABLES.userInfo)
+    .select("id, first_name, last_name, email, major, faculty")
+    .in(
+      "id",
+      applications.map((application) => application.user_id)
+    );
+  if (usersError) throw usersError;
+  const userById = new Map((users ?? []).map((user) => [user.id, user]));
 
   return applications.map((application) => {
     const user = userById.get(application.user_id);
@@ -186,6 +191,7 @@ export async function fetchEventApplicationSummaries(
       userId: application.user_id,
       name: user ? formatUserName(user) : "Unknown User",
       email: user?.email ?? "",
+      program: user?.major || user?.faculty || null,
       appliedAt: application.submitted_at ?? application.created_at,
       status: application.status,
       offerExpiresAt: application.offer_expires_at,
