@@ -372,6 +372,23 @@ describe("membership checkout for a UBC student", () => {
       expect(await purchasesOf(user.id)).toEqual([]);
     }));
 
+  it("doesn't gate a tier Non-UBC members can buy too", () =>
+    withFixtures(async (fixtures) => {
+      // Before the buyer: cleanup runs newest first, and the purchase points the buyer at it.
+      const openTier = await fixtures.createMembershipType({
+        name: `Integration open tier ${fixtures.tag}`,
+        slug: `integration-open-tier-${fixtures.tag}`,
+        eligible_user_types: ["ubcStudent", "faculty", "nonUbc"],
+        active: true,
+      });
+      const { user } = await studentTierAndBuyer(fixtures, {});
+
+      const result = await executeCheckoutForUser(user, membershipInput(openTier.slug));
+
+      expect(result).toMatchObject({ ok: true });
+      expect(square.create).toHaveBeenCalledTimes(1);
+    }));
+
   it("charges a student once the emailed code is verified", () =>
     withFixtures(async (fixtures) => {
       const { tier, user } = await studentTierAndBuyer(fixtures, {});

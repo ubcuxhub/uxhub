@@ -4,6 +4,10 @@ import { revalidatePath } from "next/cache";
 import { requireManager } from "@/lib/auth/guards";
 import { log } from "@/lib/log";
 import { TABLES } from "@/lib/supabase-helpers/tables";
+import {
+  UBC_ADDRESS_PROOFS,
+  UBC_VERIFICATION_TTL_DAYS,
+} from "@/features/memberships/lib/ubc-verification";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { replaceProfilePhoto, saveAdminProfile } from "@/lib/supabase-helpers/admin-user-profile";
 import { normalizeInterests, validateBirthDate } from "./lib/user-profile";
@@ -35,18 +39,24 @@ export async function setStudentVerificationAction(userId: string, verified: boo
   const now = new Date().toISOString();
 
   if (verified) {
-    // One verified account per address: say so instead of failing the save.
-    const { data: target } = await supabaseAdmin
+    // A manual stamp doesn't hold the address, but verifying someone whose
+    // address another account has proven (by code or sign-in, within the
+    // year) is worth stopping and saying so.
+    const { data: target, error: targetError } = await supabaseAdmin
       .from(TABLES.userInfo).select("ubc_email").eq("id", userId).maybeSingle();
+    if (targetError) throw new Error("Unable to check this user's UBC email.");
     const email = (target as { ubc_email: string | null } | null)?.ubc_email;
     if (email) {
-      const { count } = await supabaseAdmin
+      const cutoff = new Date(Date.now() - UBC_VERIFICATION_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
+      const { count, error } = await supabaseAdmin
         .from(TABLES.userInfo)
         .select("id", { count: "exact", head: true })
         .eq("ubc_email", email)
         .neq("id", userId)
         .is("deleted_at", null)
-        .not("ubc_verified_at", "is", null);
+        .in("ubc_verified_via", [...UBC_ADDRESS_PROOFS])
+        .gt("ubc_verified_at", cutoff);
+      if (error) throw new Error("Unable to check this user's UBC email.");
       if (count) throw new Error("This UBC email is already verified on another account.");
     }
   }

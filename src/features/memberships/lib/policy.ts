@@ -12,6 +12,7 @@ import { validateStudentNumber } from "@/features/memberships/lib/validation";
 import {
   hasPurchaseUbcVerification,
   normalizeUbcEmail,
+  tierRequiresUbcVerification,
   validateUbcEmail,
 } from "@/features/memberships/lib/ubc-verification";
 
@@ -102,6 +103,25 @@ export type MembershipEligibilityType = Pick<
   MembershipTypeRow,
   "active" | "eligible_user_types"
 >;
+
+/**
+ * Whether an unverified UBC member must verify before buying, given the tiers
+ * on offer: some active tier for their type is for UBC audiences alone. The
+ * plans route sends them to the code step then, instead of listing only the
+ * tiers they could buy unverified.
+ */
+export function needsUbcVerificationForTiers(
+  user: MembershipEligibilityUser,
+  membershipTypes: MembershipEligibilityType[],
+) {
+  if (hasPurchaseUbcVerification(user)) return false;
+  return membershipTypes.some(
+    (membership) =>
+      membership.active &&
+      membership.eligible_user_types.includes(user.user_type) &&
+      tierRequiresUbcVerification(membership),
+  );
+}
 
 export { hasActiveOrPendingMembership };
 
@@ -203,10 +223,10 @@ export function isMembershipProfileComplete(user: MembershipEligibilityUser) {
  * truth for which audiences may buy it — do not reintroduce a slug list here,
  * or the two checks drift and the UI offers purchases the server rejects.
  *
- * A UBC student or faculty member also needs a purchase-valid UBC
- * verification (`hasPurchaseUbcVerification`), so the plans route, the
- * checkout route and the payment action all send an unverified member back to
- * the code step.
+ * A tier for UBC audiences alone also needs a purchase-valid UBC
+ * verification (`hasPurchaseUbcVerification`), so the checkout route and the
+ * payment action refuse an unverified member. A tier Non-UBC members can buy
+ * too isn't gated (`tierRequiresUbcVerification`).
  *
  * `termEndsAt` closes sales once the club-wide term has ended. Enforcing it
  * here rather than only in the UI is what stops a direct link to the checkout
@@ -222,7 +242,7 @@ export function isEligibleForMembership(
     !isMembershipTermClosed(termEndsAt) &&
     !hasActiveOrPendingMembership(user, termEndsAt) &&
     isMembershipProfileComplete(user) &&
-    hasPurchaseUbcVerification(user) &&
+    (!tierRequiresUbcVerification(membership) || hasPurchaseUbcVerification(user)) &&
     membership.eligible_user_types.includes(user.user_type)
   );
 }

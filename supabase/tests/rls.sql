@@ -2650,6 +2650,26 @@ $$;
 
 reset role;
 
+-- Only a code or the sign-in email holds an address: a manual or
+-- grandfathered stamp on someone else's address can't block its owner, but
+-- two proofs of one address can't coexist.
+do $$
+begin
+  insert into public.user_info (email, first_name, last_name, role_access, user_type, ubc_email, ubc_verified_at, ubc_verified_via)
+  values
+    ('rls-ubc-squat-gf@example.test', 'RLS', 'Squat GF', 'basic', 'ubcStudent', 'rls-ubc-owned@student.ubc.ca', now(), 'grandfathered'),
+    ('rls-ubc-squat-manual@example.test', 'RLS', 'Squat Manual', 'basic', 'ubcStudent', 'rls-ubc-owned@student.ubc.ca', now(), 'manual'),
+    ('rls-ubc-owner@example.test', 'RLS', 'Owner', 'basic', 'ubcStudent', 'rls-ubc-owned@student.ubc.ca', now(), 'code');
+
+  begin
+    insert into public.user_info (email, first_name, last_name, role_access, user_type, ubc_email, ubc_verified_at, ubc_verified_via)
+    values ('rls-ubc-second-owner@example.test', 'RLS', 'Second', 'basic', 'ubcStudent', 'rls-ubc-owned@student.ubc.ca', now(), 'sign_in_email');
+    raise exception 'two accounts proved the same UBC address';
+  exception when unique_violation then null;
+  end;
+end;
+$$;
+
 
 \ir event-publication.sql
 

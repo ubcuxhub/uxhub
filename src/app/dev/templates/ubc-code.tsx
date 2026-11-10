@@ -167,6 +167,7 @@ export function UbcCodeTemplate({ scenario }: { scenario: UbcCodeScenarioId }) {
         start={{ kind: "send", result: { status: "sent", resendAt: new Date(later(60)).toISOString(), expiresAt: new Date(later(600)).toISOString() } }}
         initialState={codeState(code)}
         onChangeEmail={() => undefined}
+        onAddressChanged={() => undefined}
         onVerified={() => setVerified(true)}
       />
       {verified ? <ContinuedNote /> : null}

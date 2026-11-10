@@ -71,7 +71,7 @@ describe("sendUbcCode", () => {
     ["daily_cap", { status: "daily_cap" }],
     ["taken", { status: "taken" }],
     ["already_verified", { status: "already_verified" }],
-    ["mismatch", { status: "send_failed" }],
+    ["mismatch", { status: "address_changed" }],
   ])("maps a refused %s send without emailing", async (result, expected) => {
     mocks.claim.mockResolvedValue({ result, resendAt: "2026-11-10T00:00:30Z", expiresAt: "2026-11-10T00:09:00Z" });
     await expect(sendUbcCode(SEND)).resolves.toEqual(expected);
@@ -149,7 +149,12 @@ describe("verifyUbcCode", () => {
     expect(loggedText()).not.toContain("000000");
   });
 
-  it.each(["none", "stale", "expired", "locked"])("passes %s through from the attempt", async (result) => {
+  it("reads a stale attempt as a changed address, which sends the member back to the form", async () => {
+    mocks.begin.mockResolvedValue({ result: "stale", challengeSentAt: null, codeHash: null, codeSalt: null, attemptsLeft: null });
+    await expect(verifyUbcCode({ email: EMAIL, input: "123456", userId: USER })).resolves.toEqual({ status: "address_changed" });
+  });
+
+  it.each(["none", "expired", "locked"])("passes %s through from the attempt", async (result) => {
     mocks.begin.mockResolvedValue({ result, challengeSentAt: null, codeHash: null, codeSalt: null, attemptsLeft: null });
     await expect(verifyUbcCode({ email: EMAIL, input: "123456", userId: USER })).resolves.toEqual({ status: result });
   });

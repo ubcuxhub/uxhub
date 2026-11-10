@@ -6,6 +6,7 @@ import {
   hasActiveOrPendingMembership,
   isEligibleForMembership,
   isMembershipProfileComplete,
+  needsUbcVerificationForTiers,
   userTypeConfirmation,
 } from "./policy";
 
@@ -149,6 +150,22 @@ describe("membership eligibility", () => {
       )
     ).toBe(false);
     expect(isEligibleForMembership(completeStudent, studentTier, null)).toBe(true);
+  });
+
+  it("doesn't gate a tier Non-UBC members can buy too, like the payment smoke test", () => {
+    const smokeTier = { active: true, eligible_user_types: ["ubcStudent" as const, "faculty" as const, "nonUbc" as const] };
+    const unverified = { ...completeStudent, ubc_verified_at: null, ubc_verified_via: null };
+    expect(isEligibleForMembership(unverified, smokeTier, null)).toBe(true);
+    expect(isEligibleForMembership(unverified, studentTier, null)).toBe(false);
+  });
+
+  it("sends an unverified UBC member to verify only when a UBC-only tier is on offer", () => {
+    const smokeTier = { active: true, eligible_user_types: ["ubcStudent" as const, "faculty" as const, "nonUbc" as const] };
+    const unverified = { ...completeStudent, ubc_verified_at: null, ubc_verified_via: null };
+    expect(needsUbcVerificationForTiers(unverified, [smokeTier, studentTier])).toBe(true);
+    expect(needsUbcVerificationForTiers(unverified, [smokeTier])).toBe(false);
+    expect(needsUbcVerificationForTiers(unverified, [{ ...studentTier, active: false }])).toBe(false);
+    expect(needsUbcVerificationForTiers(completeStudent, [studentTier])).toBe(false);
   });
 
   it("needs a UBC student address on file", () => {

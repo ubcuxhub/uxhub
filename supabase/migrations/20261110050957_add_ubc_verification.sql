@@ -185,28 +185,20 @@ grant execute on function public.grandfather_ubc_members() to service_role;
 
 select public.grandfather_ubc_members();
 
--- 5. A manual or grandfathered row can't hold an address another verified
---    row also holds, or the index below would fail the deploy.
-update public.user_info u
-set ubc_email = null
-where u.deleted_at is null
-  and u.ubc_verified_via in ('manual', 'grandfathered')
-  and u.ubc_email is not null
-  and exists (
-    select 1 from public.user_info o
-    where o.id <> u.id
-      and o.deleted_at is null
-      and o.ubc_verified_at is not null
-      and o.ubc_email = u.ubc_email
-  );
-
 alter table public.user_info enable trigger update_user_info_updated_at;
 
--- 6. One verified account per address, so a friend can't reuse someone
---    else's inbox. An unverified address may repeat.
+-- 5. One account per proven address, so a friend can't reuse someone else's
+--    inbox. Only a code or the sign-in email proves an address, so only those
+--    hold one: a manual or grandfathered stamp vouches for the member, not
+--    for whatever address they type next, and must not block its real owner.
+--    Step 2 is the only one that writes proven addresses, and auth emails
+--    are unique, so the backfill can't collide here. An unproven address may
+--    repeat.
 create unique index user_info_ubc_email_verified_key
   on public.user_info (ubc_email)
-  where ubc_verified_at is not null and ubc_email is not null and deleted_at is null;
+  where ubc_verified_via in ('code', 'sign_in_email')
+    and ubc_email is not null
+    and deleted_at is null;
 
 -- ── Keeping the stamp honest ───────────────────────────────────────────────
 -- Clears the verification when what it vouched for changes, unless the same
@@ -304,6 +296,7 @@ begin
     where o.id <> p_user
       and o.deleted_at is null
       and o.ubc_email = p_email
+      and o.ubc_verified_via in ('code', 'sign_in_email')
       and o.ubc_verified_at > v_now - interval '365 days'
   ) then
     return query select 'taken'::text, null::timestamptz, null::timestamptz;
@@ -333,7 +326,10 @@ begin
     if v_code.last_sent_at > v_now - interval '60 seconds' then
       return query select 'cooldown'::text,
         v_code.last_sent_at + interval '60 seconds',
-        case when v_code.code_hash is not null then v_code.expires_at end;
+        -- Only a live code for this same address counts as sent; after an
+        -- address change the last code went to the old one.
+        case when v_code.code_hash is not null and v_code.email = p_email
+          then v_code.expires_at end;
       return;
     end if;
 
@@ -462,12 +458,13 @@ begin
     return 'stale';
   end if;
 
-  -- A hold over a year old no longer counts (see `claim_ubc_code_send`).
+  -- A proven hold over a year old no longer counts (see `claim_ubc_code_send`).
   update public.user_info o
   set ubc_verified_at = null, ubc_verified_via = null, ubc_verified_by = null
   where o.id <> p_user
     and o.deleted_at is null
     and o.ubc_email = p_email
+    and o.ubc_verified_via in ('code', 'sign_in_email')
     and o.ubc_verified_at <= now() - interval '365 days';
 
   begin

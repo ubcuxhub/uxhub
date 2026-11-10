@@ -212,13 +212,13 @@ describe("complete_ubc_code_verification", () => {
       expect(await completeUbcCodeVerification(db, { userId: user.id, email, challengeSentAt: sentAt })).toBe("verified");
       expect(await profile(stale.id)).toMatchObject({ ubc_email: email, ubc_verified_at: null, ubc_verified_via: null });
 
-      // Now held by `user`: a third account can't take it, by code or directly.
+      // Now held by `user`: a third account can't take it, by code or by sign-in.
       const third = await student(fixtures, "third");
       await update(third.id, { ubc_email: email });
       expect((await claim(third.id, email)).result).toBe("taken");
       const { error } = await db
         .from("user_info")
-        .update({ ubc_verified_at: new Date().toISOString(), ubc_verified_via: "manual" })
+        .update({ ubc_verified_at: new Date().toISOString(), ubc_verified_via: "sign_in_email" })
         .eq("id", third.id);
       expect(error?.code).toBe("23505");
     }));
@@ -230,9 +230,80 @@ describe("complete_ubc_code_verification", () => {
       const email = user.ubc_email!;
       await update(rival.id, { ubc_email: email });
       const sentAt = await sendAndBegin(user.id, email);
-      // The rival is stamped by an exec between the send and the completion.
-      await update(rival.id, { ubc_verified_at: new Date().toISOString(), ubc_verified_via: "manual" });
+      // The rival proves it by sign-in between the send and the completion.
+      await update(rival.id, { ubc_verified_at: new Date().toISOString(), ubc_verified_via: "sign_in_email" });
       expect(await completeUbcCodeVerification(db, { userId: user.id, email, challengeSentAt: sentAt })).toBe("taken");
+    }));
+});
+
+describe("addresses only a code or the sign-in email can hold", () => {
+  it("doesn't let a lapsed grandfathered or manual member squat someone else's address", () =>
+    withFixtures(async (fixtures) => {
+      const tier = await fixtures.createMembershipType();
+      const manager = await fixtures.createUser({ role_access: "manager" });
+      const owner = await student(fixtures, "owner");
+      const victim = owner.ubc_email!;
+
+      // A grandfathered member whose membership lapsed, and a manually
+      // verified one, both save the owner's address. Their stamps stay (they
+      // vouch for the member, not the address) but hold nothing.
+      const lapsed = await student(fixtures, "squat-gf", {
+        ubc_email: null,
+        membership_type_id: tier.id,
+        membership_expires_at: ago(DAY),
+        ubc_verified_at: ago(30 * DAY),
+        ubc_verified_via: "grandfathered",
+      });
+      const manual = await student(fixtures, "squat-manual", {
+        ubc_verified_at: ago(DAY),
+        ubc_verified_via: "manual",
+        ubc_verified_by: manager.id,
+      });
+      await update(lapsed.id, { ubc_email: victim });
+      await update(manual.id, { ubc_email: victim });
+      expect((await profile(lapsed.id)).ubc_verified_via).toBe("grandfathered");
+      expect((await profile(manual.id)).ubc_verified_via).toBe("manual");
+
+      // The real owner still gets a code and completes it.
+      const sentAt = await sendAndBegin(owner.id, victim);
+      expect(await completeUbcCodeVerification(db, { userId: owner.id, email: victim, challengeSentAt: sentAt })).toBe("verified");
+      // The squatters' stamps were not released: they never held the address.
+      expect((await profile(lapsed.id)).ubc_verified_via).toBe("grandfathered");
+      expect((await profile(manual.id)).ubc_verified_via).toBe("manual");
+    }));
+
+  it("doesn't block the owner's sign-in stamp either", () =>
+    withFixtures(async (fixtures) => {
+      const owner = await student(fixtures, "signin-owner");
+      const squatter = await student(fixtures, "signin-squat", {
+        ubc_verified_at: ago(DAY),
+        ubc_verified_via: "grandfathered",
+      });
+      await update(squatter.id, { ubc_email: owner.ubc_email });
+      const { error } = await db
+        .from("user_info")
+        .update({ ubc_verified_at: new Date().toISOString(), ubc_verified_via: "sign_in_email" })
+        .eq("id", owner.id);
+      expect(error).toBeNull();
+    }));
+});
+
+describe("cooldown after an address change", () => {
+  it("doesn't report the old address's code as sent to the new one", () =>
+    withFixtures(async (fixtures) => {
+      const user = await student(fixtures, "moving");
+      expect((await claim(user.id, user.ubc_email!)).result).toBe("ok");
+      const next = `${fixtures.tag}-moved-on@student.ubc.ca`;
+      await update(user.id, { ubc_email: next });
+
+      const cooldown = await claim(user.id, next);
+      expect(cooldown).toMatchObject({ result: "cooldown", expiresAt: null });
+      expect(cooldown.resendAt).not.toBeNull();
+
+      // The same address within the cooldown still counts as sent.
+      await backdateCode(user.id, { last_sent_at: ago(61_000) });
+      expect((await claim(user.id, next)).result).toBe("ok");
+      expect((await claim(user.id, next)).expiresAt).not.toBeNull();
     }));
 });
 

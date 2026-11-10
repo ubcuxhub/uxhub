@@ -100,6 +100,9 @@ export function stateAfterSend(result: UbcSendResult, previous: UbcCodeState | n
       return { ...base, status: "verified" };
     case "send_failed":
       return { ...base, status: "send_failed", resendAt: null };
+    case "address_changed":
+      // The step closes (`onAddressChanged`); nothing here changes.
+      return base;
   }
 }
 
@@ -165,6 +168,7 @@ export function UbcCodeStep({
   client,
   email,
   onBusyChange,
+  onAddressChanged,
   onChangeEmail,
   onVerified,
   start,
@@ -173,6 +177,11 @@ export function UbcCodeStep({
   client: UbcCodeClient;
   email: string;
   onBusyChange?: (busy: boolean) => void;
+  /**
+   * The saved address changed under this step (another tab), so its code is
+   * for the wrong address: back to the form, which says so.
+   */
+  onAddressChanged: () => void;
   onChangeEmail: () => void;
   onVerified: () => void;
   start: UbcCodeStart;
@@ -242,7 +251,14 @@ export function UbcCodeStep({
     status === "expired" || status === "locked" || status === "no_code" || (status === "send_failed" && !liveCode);
   const blocked = status === "taken" || (status === "daily_cap" && !liveCode);
   const fieldDisabled = verified || blocked || needsNewCode || pending !== null;
-  const message = codeMessage(status, state.attemptsLeft);
+  // Asked again within the cooldown, for an address no code went to yet.
+  const message =
+    status === "no_code" && cooldown > 0
+      ? {
+          text: "You asked for a code a moment ago. Send one to this address when the timer runs out.",
+          error: false,
+        }
+      : codeMessage(status, state.attemptsLeft);
   const busy = pending !== null;
 
   const run = async <T,>(kind: "send" | "verify", action: () => Promise<T>) => {
@@ -263,6 +279,10 @@ export function UbcCodeStep({
       result = await run("send", client.sendCode);
     } catch {
       result = { status: "send_failed" };
+    }
+    if (result.status === "address_changed") {
+      onAddressChanged();
+      return;
     }
     const next = stateAfterSend(result, state);
     setState(next);
@@ -294,6 +314,9 @@ export function UbcCodeStep({
     }
     setNow(Date.now());
     switch (result.status) {
+      case "address_changed":
+        onAddressChanged();
+        return;
       case "verified":
         setState((previous) => ({ ...previous, status: "verified" }));
         setAnnouncement("Verified");

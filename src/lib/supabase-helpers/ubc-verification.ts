@@ -3,6 +3,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import {
+  UBC_ADDRESS_PROOFS,
   UBC_CODE_MAX_ATTEMPTS,
   UBC_CODE_RESEND_SECONDS,
   UBC_VERIFICATION_TTL_DAYS,
@@ -145,8 +146,9 @@ export async function fetchPendingUbcCode(
 }
 
 /**
- * Clears another account's verification of `email` when it is over a year
- * old, so it stops holding the address (the one-verified-account index). The
+ * Clears another account's proof of `email` (a `code` or `sign_in_email`
+ * stamp, the only kinds that hold an address) when it is over a year old, so
+ * it stops holding the address (the one-account-per-address index). The
  * code flow does the same inside `complete_ubc_code_verification`; this is
  * for the sign-in email stamp, which is a plain update.
  */
@@ -164,6 +166,7 @@ export async function releaseStaleUbcEmailHolds(
     .eq("ubc_email", email)
     .neq("id", userId)
     .is("deleted_at", null)
+    .in("ubc_verified_via", [...UBC_ADDRESS_PROOFS])
     .lte("ubc_verified_at", cutoff);
   if (error) throw error;
 }

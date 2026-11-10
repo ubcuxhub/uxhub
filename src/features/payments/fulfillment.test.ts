@@ -189,6 +189,7 @@ beforeEach(() => {
   membershipsMocks.fetchMembershipTypeBySlug.mockResolvedValue({
     id: "membership-type-1",
     price: 20,
+    eligible_user_types: ["ubcStudent"],
   });
 
   eventsMocks.fetchEventBySlug.mockResolvedValue({
@@ -440,6 +441,21 @@ describe("idempotent retries", () => {
       userId: "user-1",
       membershipTypeId: expect.any(String),
     });
+  });
+
+  it("doesn't gate a tier Non-UBC members can buy too", async () => {
+    membershipsMocks.fetchMembershipTypeBySlug.mockResolvedValue({
+      id: "smoke-tier",
+      price: 1.23,
+      eligible_user_types: ["ubcStudent", "faculty", "nonUbc"],
+    });
+    purchasesMocks.fetchNonterminalMembershipPurchase.mockResolvedValue(null);
+    const student = { ...user, user_type: "ubcStudent", ubc_verified_at: null, ubc_verified_via: null } as UserInfoRow;
+
+    await executeCheckoutForUser(student, membershipInput);
+
+    expect(logMocks.warn).not.toHaveBeenCalledWith("payment.membership_ubc_unverified", expect.anything());
+    expect(purchasesMocks.fetchNonterminalMembershipPurchase).toHaveBeenCalled();
   });
 
   it("refuses a grandfathered student's new purchase too", async () => {

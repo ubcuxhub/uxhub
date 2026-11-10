@@ -20,6 +20,7 @@ const EMAIL = "jane@student.ubc.ca";
 let client: { sendCode: ReturnType<typeof vi.fn>; verifyCode: ReturnType<typeof vi.fn> };
 let onVerified: ReturnType<typeof vi.fn<() => void>>;
 let onChangeEmail: ReturnType<typeof vi.fn<() => void>>;
+let onAddressChanged: ReturnType<typeof vi.fn<() => void>>;
 
 beforeEach(() => {
   vi.useFakeTimers({ shouldAdvanceTime: true });
@@ -27,6 +28,7 @@ beforeEach(() => {
   client = { sendCode: vi.fn(), verifyCode: vi.fn() };
   onVerified = vi.fn<() => void>();
   onChangeEmail = vi.fn<() => void>();
+  onAddressChanged = vi.fn<() => void>();
 });
 afterEach(() => {
   cleanup();
@@ -40,6 +42,7 @@ function renderStep(start: UbcCodeStart = { kind: "send", result: SENT }) {
       email={EMAIL}
       start={start}
       onChangeEmail={onChangeEmail}
+      onAddressChanged={onAddressChanged}
       onVerified={onVerified}
     />,
   );
@@ -148,6 +151,29 @@ describe("UbcCodeStep", () => {
     expect(status()).toBe("You can resend the code now.");
   });
 
+  it("doesn't claim a code went to a new address during the cooldown", () => {
+    renderStep({ kind: "send", result: { status: "cooldown", resendAt: at(25), expiresAt: null } });
+    expect(screen.getByText(/We’ll email a 6-digit code to/)).toBeTruthy();
+    expect(screen.queryByText(/We sent a 6-digit code/)).toBeNull();
+    expect(screen.getByText(/You asked for a code a moment ago/)).toBeTruthy();
+    expect(button("Send a new code in 0:25").disabled).toBe(true);
+    expect(field().disabled).toBe(true);
+  });
+
+  it("goes back to the form when the address changed under the step", async () => {
+    client.verifyCode.mockResolvedValue({ status: "address_changed" });
+    renderStep();
+    fireEvent.change(field(), { target: { value: "555555" } });
+    await waitFor(() => expect(onAddressChanged).toHaveBeenCalled());
+
+    onAddressChanged.mockClear();
+    client.sendCode.mockResolvedValue({ status: "address_changed" });
+    cleanup();
+    renderStep({ kind: "send", result: { status: "send_failed" } });
+    fireEvent.click(button("Send a new code"));
+    await waitFor(() => expect(onAddressChanged).toHaveBeenCalled());
+  });
+
   it("treats a cooldown with a live code as code sent", () => {
     renderStep({ kind: "send", result: { status: "cooldown", resendAt: at(20), expiresAt: at(500) } });
     expect(screen.getByText(/We sent a 6-digit code/)).toBeTruthy();
@@ -180,6 +206,7 @@ describe("UbcCodeStep", () => {
         start={{ kind: "send", result: SENT }}
         initialState={{ status: "daily_cap", attemptsLeft: 5, resendAt: null, expiresAt: Date.now() + 500_000 }}
         onChangeEmail={onChangeEmail}
+        onAddressChanged={onAddressChanged}
         onVerified={onVerified}
       />,
     );

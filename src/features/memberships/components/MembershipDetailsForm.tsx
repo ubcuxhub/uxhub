@@ -263,6 +263,12 @@ export function MembershipDetailsForm({
         start={codeStep.start}
         onBusyChange={setBusy}
         onChangeEmail={changeEmail}
+        onAddressChanged={() => {
+          changeEmail();
+          setError(
+            "Your UBC email changed in another window. Check it, then press Next for a new code.",
+          );
+        }}
         onVerified={proceed}
       />
     );

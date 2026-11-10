@@ -1,4 +1,5 @@
 import type {
+  MembershipTypeRow,
   UbcVerificationMethod,
   UserInfoRow,
   UserType,
@@ -22,6 +23,24 @@ export const UBC_CODE_RESEND_SECONDS = 60;
 export const UBC_CODE_SENDS_PER_DAY = 5;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The methods that prove an address, and so hold it: only one live account
+ * may hold a given address this way (`user_info_ubc_email_verified_key`). A
+ * manual or grandfathered stamp vouches for the member, not an address.
+ */
+export const UBC_ADDRESS_PROOFS = ["code", "sign_in_email"] as const;
+
+/**
+ * Whether buying `membership` needs a UBC verification: only tiers for UBC
+ * audiences alone. A tier Non-UBC members can buy too (the production payment
+ * smoke-test tier, say) proves nothing about UBC, so it isn't gated.
+ */
+export function tierRequiresUbcVerification(
+  membership: Pick<MembershipTypeRow, "eligible_user_types">,
+) {
+  return !membership.eligible_user_types.includes("nonUbc");
+}
 
 export type UbcAudience = "student" | "faculty";
 
@@ -184,6 +203,8 @@ export type UbcSendResult =
   | { status: "daily_cap" }
   | { status: "taken" }
   | { status: "already_verified" }
+  /** The saved address changed (another tab); the form has to be saved again. */
+  | { status: "address_changed" }
   | { status: "send_failed" };
 
 /** The outcome of entering a code. */
@@ -193,7 +214,10 @@ export type UbcVerifyResult =
   | { status: "malformed" }
   | { status: "expired" }
   | { status: "locked" }
+  /** A newer code was sent to the same address. */
   | { status: "stale" }
+  /** The code went to an address that is no longer the saved one. */
+  | { status: "address_changed" }
   | { status: "taken" }
   | { status: "none" }
   | { status: "error" };

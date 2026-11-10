@@ -75,8 +75,8 @@ export async function sendUbcCode({
       case "already_verified":
         return { status: "already_verified" };
       default:
-        // The saved address moved under us; the form saves it again.
-        return { status: "send_failed" };
+        // The saved address moved under us (another tab); the form saves it again.
+        return { status: "address_changed" };
     }
   }
 
@@ -134,7 +134,9 @@ export async function verifyUbcCode({
     const attempt = await beginUbcCodeAttempt(supabaseAdmin, { userId, email });
     if (attempt.result !== "ok") {
       log.warn("ubc_verification.code_rejected", { userId, reason: attempt.result });
-      return { status: attempt.result };
+      // Here `stale` means the code row was sent to another address than the
+      // saved one; a superseded send to the same address surfaces at completion.
+      return { status: attempt.result === "stale" ? "address_changed" : attempt.result };
     }
 
     const actual = hashUbcCode({ code, email, salt: attempt.codeSalt!, userId });
