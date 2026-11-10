@@ -96,3 +96,14 @@ export function pacificTimestamp(value: Date, time: string): string {
 export function eventYear(value: Date): number {
   return value.getUTCFullYear();
 }
+
+/** `value` with its minutes, seconds and milliseconds dropped (UTC). */
+export function startOfUtcHour(value: Date): Date {
+  const result = new Date(value);
+  result.setUTCMinutes(0, 0, 0);
+  return result;
+}
+
+export function addHours(value: Date, hours: number): Date {
+  return new Date(value.getTime() + hours * 60 * 60 * 1000);
+}

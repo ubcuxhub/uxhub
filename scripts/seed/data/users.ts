@@ -21,6 +21,11 @@ export interface SeedApplication {
   status: "draft" | "submitted" | "waitlisted" | "accepted" | "rejected";
   /** Required when accepted (docs/event-states.md). */
   offerExpiresAt?: string;
+  /**
+   * When it left draft, which the admin review list sorts by. Required for
+   * everything but a draft: left out, the database would stamp the run time.
+   */
+  submittedAt?: string;
 }
 
 /**
@@ -33,6 +38,12 @@ export interface SeedRegistration {
   /** The completed purchase behind a paid ticket. */
   purchaseKey?: string;
   responses?: Record<string, string>;
+  /**
+   * File answers, question to file name. The seed uploads a small PDF to the
+   * `application-files` bucket at the path the app would use, which needs the
+   * application's id, and stores that path as the answer.
+   */
+  files?: Record<string, string>;
   ticket: boolean;
   application?: SeedApplication;
 }
@@ -49,7 +60,20 @@ export type SeedProfile = Omit<
 export interface SeedUser {
   email: string;
   membershipSlug: string | null;
-  password: string;
+  /**
+   * When the membership ends. Defaults to a year from the run; set it in the
+   * past for a lapsed member (`membership_type_id` is never cleared when a
+   * membership lapses, see `hasActiveOrPendingMembership`).
+   */
+  membershipExpiresAt?: string;
+  /**
+   * A membership bought but not yet paid for: `membership_pre_ordered_type_id`,
+   * shown as "Pending — payment processing". Needs a pending or authorized
+   * purchase of the same tier.
+   */
+  membershipPreOrderedSlug?: string;
+  /** Null for a crowd account, which has a profile but no Auth user. */
+  password: string | null;
   profile: SeedProfile;
   purchases: SeedPurchase[];
   registrations: SeedRegistration[];
@@ -93,14 +117,14 @@ export const RETIRED_FIXTURE_EMAILS = [
   "mock-member@example.com",
 ] as const;
 
-const designSprintQuestions = {
+export const designSprintQuestions = {
   year: "What year of study are you in?",
   figma: "How would you describe your experience with Figma?",
   goal: "What do you want to walk away from the Design Sprint with? Two or three sentences is plenty.",
   dietary: "Any dietary restrictions we should know about for lunch?",
 } as const;
 
-const uxathonQuestions = {
+export const uxathonQuestions = {
   year: "What year of study are you in?",
   contribution: "Which area do you most want to contribute in?",
   experience: "Have you participated in a hackathon or design sprint before?",
@@ -110,18 +134,18 @@ const uxathonQuestions = {
   portfolio: "Attach a resume or portfolio if you have one (PDF, up to 5 MB).",
 } as const;
 
-function requireEvent(events: SeedEvent[], slug: string): SeedEvent {
+export function requireEvent(events: SeedEvent[], slug: string): SeedEvent {
   const event = events.find((candidate) => candidate.event.slug === slug);
   if (!event) throw new Error(`Missing seed event "${slug}"`);
   return event;
 }
 
-function ticketPriceCents(event: SeedEvent, isMember: boolean): number {
+export function ticketPriceCents(event: SeedEvent, isMember: boolean): number {
   const price = isMember ? event.event.member_price : event.event.regular_price;
   return Math.round(Number(price) * 100);
 }
 
-function afterTimestamp(value: string, minutes: number): string {
+export function afterTimestamp(value: string, minutes: number): string {
   return new Date(new Date(value).getTime() + minutes * 60 * 1000).toISOString();
 }
 
@@ -134,7 +158,7 @@ function afterTimestamp(value: string, minutes: number): string {
  * so a fixture looks like an account somebody actually signed up for, rather
  * than a row with a plausible-looking mix of student and faculty fields.
  */
-interface CommonProfileInput {
+export interface CommonProfileInput {
   firstName: string;
   birthDate?: string;
   interests?: string[];
@@ -168,7 +192,7 @@ function baseProfile(input: CommonProfileInput) {
   };
 }
 
-function studentProfile(
+export function studentProfile(
   input: CommonProfileInput & {
     studentNumber: number;
     faculty: string;
@@ -189,7 +213,7 @@ function studentProfile(
   };
 }
 
-function facultyProfile(
+export function facultyProfile(
   input: CommonProfileInput & { email: string; faculty: string }
 ): SeedProfile {
   return {
@@ -208,7 +232,7 @@ function facultyProfile(
   };
 }
 
-function nonUbcProfile(
+export function nonUbcProfile(
   input: CommonProfileInput & {
     schoolInstitution: string;
     studentStatus: TablesInsert<"user_info">["student_status"];
@@ -229,14 +253,14 @@ function nonUbcProfile(
 }
 
 /** Tier prices, in cents, as asserted by `validateUserFixtures`. */
-const MEMBERSHIP_PRICE_CENTS = {
+export const MEMBERSHIP_PRICE_CENTS = {
   explorer: 1200,
   innovator: 1800,
   faculty: 1800,
   "non-ubc": 2400,
 } as const;
 
-type MembershipSlug = keyof typeof MEMBERSHIP_PRICE_CENTS;
+export type MembershipSlug = keyof typeof MEMBERSHIP_PRICE_CENTS;
 
 /**
  * The membership purchase every member fixture needs.
@@ -244,7 +268,7 @@ type MembershipSlug = keyof typeof MEMBERSHIP_PRICE_CENTS;
  * `validateUserFixtures` requires a member to hold a completed purchase for
  * their own tier, so this is the minimum a grid account can carry.
  */
-function membershipPurchase(
+export function membershipPurchase(
   handle: string,
   slug: MembershipSlug,
   createdAt: string
@@ -286,6 +310,7 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
   const industryTalkUpcoming = requireEvent(events, "industry-talk-design-systems");
   const researchWorkshopDraft = requireEvent(events, "ux-research-workshop");
   const uxathonUpcoming = requireEvent(events, "uxathon-upcoming");
+  const designJamToday = requireEvent(events, "design-jam-today");
 
   const industryCheckIn = industryTalkPast.checkInSessions[0]?.start_time;
   const getToKnowCheckIn = getToKnowPast.checkInSessions[0]?.start_time;
@@ -394,6 +419,10 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
         application: {
           status: "accepted",
           offerExpiresAt: historicalPurchaseTime(designSprintPast),
+          submittedAt: afterTimestamp(
+            designSprintPast.event.registration_opens_at!,
+            3 * 60
+          ),
         },
         responses: {
           [designSprintQuestions.year]: "3",
@@ -416,7 +445,10 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
       {
         eventSlug: uxathonPast.event.slug,
         ticket: false,
-        application: { status: "rejected" },
+        application: {
+          status: "rejected",
+          submittedAt: afterTimestamp(uxathonPast.event.registration_opens_at!, 26 * 60),
+        },
         responses: {
           [uxathonQuestions.year]: "3",
           // Comma-joined, as answers were stored before drafts: the admin
@@ -434,7 +466,7 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
         // needs something waiting in it.
         eventSlug: researchWorkshopDraft.event.slug,
         ticket: false,
-        application: { status: "submitted" },
+        application: { status: "submitted", submittedAt: timestamp(addDays(today, -4), 21, 12) },
         responses: {
           [designSprintQuestions.year]: "3",
           [designSprintQuestions.figma]:
@@ -532,7 +564,10 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
       {
         eventSlug: uxathonPast.event.slug,
         ticket: false,
-        application: { status: "rejected" },
+        application: {
+          status: "rejected",
+          submittedAt: afterTimestamp(uxathonPast.event.registration_opens_at!, 50 * 60),
+        },
         responses: {
           [uxathonQuestions.year]: "2",
           [uxathonQuestions.contribution]: encodeCheckboxResponse([
@@ -550,7 +585,7 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
         // Waitlisted, so the review queue shows more than one state.
         eventSlug: researchWorkshopDraft.event.slug,
         ticket: false,
-        application: { status: "waitlisted" },
+        application: { status: "waitlisted", submittedAt: timestamp(addDays(today, -6), 17, 40) },
         responses: {
           [designSprintQuestions.year]: "2",
           [designSprintQuestions.figma]: "I can follow a tutorial",
@@ -638,6 +673,12 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
         eventSlug: industryTalkUpcoming.event.slug,
         purchaseKey:
           "seed:event:student-innovator:industry-talk-design-systems",
+        ticket: true,
+      },
+      {
+        // Today's free drop-in, not checked in yet: sign in as an admin and
+        // scan this account's ticket to rehearse check-in.
+        eventSlug: designJamToday.event.slug,
         ticket: true,
       },
       {

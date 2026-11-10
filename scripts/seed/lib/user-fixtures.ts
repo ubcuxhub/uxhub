@@ -1,5 +1,6 @@
-import type { SeedUser } from "../data/users.ts";
+import type { SeedRegistration, SeedUser } from "../data/users.ts";
 import type { SeedEvent } from "../data/events.ts";
+import { isCrowdEmail } from "../data/crowd.ts";
 import type { TablesInsert } from "../../../src/lib/supabase/database.types.ts";
 import {
   decodeCheckboxResponse,
@@ -27,17 +28,35 @@ export function classifySeedEvent(event: SeedEvent, now: Date): SeedEventPhase {
   return start > current ? "upcoming" : "past";
 }
 
+/** Every question a registration answers: text answers and file answers. */
+export function answeredQuestions(registration: SeedRegistration): string[] {
+  return [
+    ...Object.keys(registration.responses ?? {}),
+    ...Object.keys(registration.files ?? {}),
+  ];
+}
+
+/**
+ * Whether the fixture's membership is current at `now`. A lapsed member keeps
+ * their tier (the app never clears it) but pays the regular price.
+ */
+export function isActiveSeedMember(user: SeedUser, now: Date): boolean {
+  if (!user.membershipSlug) return false;
+  return !user.membershipExpiresAt || new Date(user.membershipExpiresAt) > now;
+}
+
 export function getUserFixtureTotals(users: SeedUser[]): UserFixtureTotals {
   return users.reduce<UserFixtureTotals>(
     (totals, user) => {
-      totals.authUsers += 1;
+      // Crowd accounts have a profile and no Auth user.
+      if (user.password !== null) totals.authUsers += 1;
       totals.profiles += 1;
       totals.purchases += user.purchases.length;
       totals.tickets += user.registrations.filter((r) => r.ticket).length;
       totals.applications += user.registrations.filter((r) => r.application).length;
 
       for (const registration of user.registrations) {
-        totals.responses += Object.keys(registration.responses ?? {}).length;
+        totals.responses += answeredQuestions(registration).length;
         totals.checkIns += Object.keys(registration.checkIns ?? {}).length;
       }
 
@@ -156,8 +175,22 @@ export function validateUserFixtures(
     if (!user.profile.first_name.trim() || !user.profile.last_name.trim()) {
       throw new Error(`"${user.email}" needs both a first and last name`);
     }
-    if (user.password.length < 6) {
-      throw new Error(`Seed password for "${user.email}" must be at least 6 characters`);
+    // Login fixtures have a password and an ordinary address; the crowd has
+    // neither, and its reserved domains are how the prune recognises it.
+    if (user.password === null) {
+      if (!isCrowdEmail(user.email)) {
+        throw new Error(`"${user.email}" has no password but is not on a crowd domain`);
+      }
+      if (user.profile.role_access !== "basic") {
+        throw new Error(`Crowd account "${user.email}" must have the basic role`);
+      }
+    } else {
+      if (isCrowdEmail(user.email)) {
+        throw new Error(`Login fixture "${user.email}" cannot use a crowd domain`);
+      }
+      if (user.password.length < 6) {
+        throw new Error(`Seed password for "${user.email}" must be at least 6 characters`);
+      }
     }
     if (user.membershipSlug && !membershipSlugs.has(user.membershipSlug)) {
       throw new Error(
@@ -212,8 +245,41 @@ export function validateUserFixtures(
     const membershipPurchases = user.purchases.filter(
       (purchase) => purchase.kind === "membership"
     );
-    if (!user.membershipSlug && membershipPurchases.length > 0) {
-      throw new Error(`Non-member "${user.email}" cannot have a membership purchase`);
+    // A non-member may have tried: a pending, canceled or failed purchase is
+    // fine, a completed one would have made them a member.
+    if (
+      !user.membershipSlug &&
+      membershipPurchases.some((purchase) => purchase.status === "completed")
+    ) {
+      throw new Error(`Non-member "${user.email}" cannot have a completed membership purchase`);
+    }
+    if (user.membershipExpiresAt && !user.membershipSlug) {
+      throw new Error(`Non-member "${user.email}" cannot have a membership expiry`);
+    }
+    if (user.membershipPreOrderedSlug) {
+      const preOrdered = user.membershipPreOrderedSlug;
+      const tier = membershipBySlug.get(preOrdered);
+      if (!tier) {
+        throw new Error(`Unknown pre-ordered membership "${preOrdered}" for "${user.email}"`);
+      }
+      if (!(tier.eligible_user_types ?? []).includes(user.profile.user_type ?? "ubcStudent")) {
+        throw new Error(`"${user.email}" pre-ordered "${preOrdered}", which their type cannot buy`);
+      }
+      // `isEligibleForMembership` refuses a purchase while one is active.
+      if (isActiveSeedMember(user, now)) {
+        throw new Error(`"${user.email}" pre-ordered a membership while one is still active`);
+      }
+      if (
+        !membershipPurchases.some(
+          (purchase) =>
+            purchase.membershipSlug === preOrdered &&
+            (purchase.status === "pending" || purchase.status === "authorized")
+        )
+      ) {
+        throw new Error(
+          `"${user.email}" pre-ordered "${preOrdered}" without a pending purchase of it`
+        );
+      }
     }
     if (
       user.membershipSlug &&
@@ -245,6 +311,14 @@ export function validateUserFixtures(
           `Purchase "${purchase.idempotencyKey}" references unknown event "${purchase.eventSlug}"`
         );
       }
+      if ((purchase.status === "completed") !== Boolean(purchase.fulfilledAt)) {
+        throw new Error(
+          `Purchase "${purchase.idempotencyKey}" must be fulfilled exactly when completed`
+        );
+      }
+      if (new Date(purchase.createdAt) > now) {
+        throw new Error(`Purchase "${purchase.idempotencyKey}" is in the future`);
+      }
       if (purchase.membershipSlug && !membershipSlugs.has(purchase.membershipSlug)) {
         throw new Error(
           `Purchase "${purchase.idempotencyKey}" references unknown membership "${purchase.membershipSlug}"`
@@ -253,7 +327,7 @@ export function validateUserFixtures(
 
       const expectedAmount = purchase.eventSlug
         ? Number(
-            user.membershipSlug
+            isActiveSeedMember(user, now)
               ? eventBySlug.get(purchase.eventSlug)?.event.member_price
               : eventBySlug.get(purchase.eventSlug)?.event.regular_price
           ) * 100
@@ -305,6 +379,25 @@ export function validateUserFixtures(
           `Application for "${registration.eventSlug}" needs an offer deadline exactly when accepted`
         );
       }
+      if (registration.application) {
+        const { status, submittedAt, offerExpiresAt } = registration.application;
+        if ((status === "draft") === Boolean(submittedAt)) {
+          throw new Error(
+            `Application for "${registration.eventSlug}" needs a submitted time exactly when it is not a draft`
+          );
+        }
+        if (submittedAt && new Date(submittedAt) > now) {
+          throw new Error(`Application for "${registration.eventSlug}" is submitted in the future`);
+        }
+        if (submittedAt && offerExpiresAt && offerExpiresAt <= submittedAt) {
+          throw new Error(
+            `Application for "${registration.eventSlug}" has an offer deadline before it was submitted`
+          );
+        }
+      }
+      if (registration.files && !registration.application) {
+        throw new Error(`Registration for "${registration.eventSlug}" has files but no application`);
+      }
       if (
         registration.ticket &&
         registration.application &&
@@ -334,12 +427,30 @@ export function validateUserFixtures(
       );
       const responses = registration.responses ?? {};
 
+      for (const [questionText, fileName] of Object.entries(registration.files ?? {})) {
+        if (questionByText.get(questionText)?.response_type !== "file_upload") {
+          throw new Error(
+            `Registration for "${registration.eventSlug}" attaches a file to "${questionText}", which takes none`
+          );
+        }
+        if (questionText in responses) {
+          throw new Error(
+            `Registration for "${registration.eventSlug}" answers "${questionText}" twice`
+          );
+        }
+        // The application-files bucket takes PDFs only.
+        if (!/^[A-Za-z0-9._ ()-]+\.pdf$/.test(fileName)) {
+          throw new Error(`Seed file "${fileName}" must be a plain .pdf name`);
+        }
+      }
+
       // A draft is still being filled in; submitting checks its answers.
       const isDraft = registration.application?.status === "draft";
       for (const question of event.applicationQuestions) {
         if (
           !isDraft &&
           question.is_required &&
+          !registration.files?.[question.question] &&
           !hasApplicationAnswer(question.response_type, responses[question.question])
         ) {
           throw new Error(
@@ -407,4 +518,34 @@ export function validateUserFixtures(
       }
     }
   }
+
+  // Nothing checks capacity on a direct insert, so the seed has to.
+  for (const [slug, taken] of getSeatsTaken(users, now)) {
+    const capacity = eventBySlug.get(slug)?.event.max_capacity;
+    if (capacity != null && taken > capacity) {
+      throw new Error(`"${slug}" has ${taken} seats taken but holds only ${capacity}`);
+    }
+  }
+}
+
+/**
+ * Seats taken per event, as `event_seat_counts_unfiltered` counts them:
+ * tickets, plus accepted offers still open with no ticket behind them.
+ */
+export function getSeatsTaken(users: SeedUser[], now: Date): Map<string, number> {
+  const taken = new Map<string, number>();
+  for (const user of users) {
+    for (const registration of user.registrations) {
+      const application = registration.application;
+      const holdsOffer =
+        !registration.ticket &&
+        application?.status === "accepted" &&
+        Boolean(application.offerExpiresAt) &&
+        new Date(application.offerExpiresAt!) > now;
+      if (registration.ticket || holdsOffer) {
+        taken.set(registration.eventSlug, (taken.get(registration.eventSlug) ?? 0) + 1);
+      }
+    }
+  }
+  return taken;
 }

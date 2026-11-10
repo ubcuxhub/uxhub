@@ -56,7 +56,9 @@ import {
   RETIRED_FIXTURE_EMAILS,
   type SeedUser,
 } from "./data/users.ts";
+import { buildSeedCrowd } from "./data/crowd.ts";
 import {
+  pruneCrowdProfiles,
   pruneUserFixtures,
   reconcileUserFixtures,
   removeRetiredFixtures,
@@ -273,11 +275,24 @@ async function prunePass(
       ["Event tickets", pruned.tickets],
       ["Event applications", pruned.applications],
       ["Application responses", pruned.responses],
+      ["Application files", pruned.files],
       ["Check-ins", pruned.checkIns],
     ] as const) {
       const line = formatPruned(label, count);
       if (line) lines.push(line);
     }
+  }
+
+  /* ── Crowd accounts the data no longer lists ── */
+  if (shouldRun(options, "users")) {
+    const crowdEmails = seedUsers
+      .filter((user) => user.password === null)
+      .map((user) => user.email);
+    const line = formatPruned(
+      "Crowd accounts",
+      await pruneCrowdProfiles(supabase, crowdEmails, { dryRun: options.dryRun })
+    );
+    if (line) lines.push(line);
   }
 
   /* ── Events ── */
@@ -876,7 +891,11 @@ async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
   const seedNow = new Date();
   const seedEvents = buildSeedEvents(seedNow);
-  const seedUsers = buildSeedUsers(seedEvents, seedNow);
+  // Login fixtures, then the crowd: profile-only accounts for volume.
+  const seedUsers = [
+    ...buildSeedUsers(seedEvents, seedNow),
+    ...buildSeedCrowd(seedEvents, seedNow),
+  ];
   validateUserFixtures(seedUsers, seedEvents, membershipTypes, seedNow);
   await assertImageKeysExist(seedEvents);
 
@@ -956,6 +975,9 @@ async function main(): Promise<void> {
         // See TargetPolicy.forceDraft: an active row stays readable through the
         // anon API even while the studentEvents flag hides every page for it.
         status: policy.forceDraft ? ("draft" as const) : seed.event.status,
+        // A schedule would have the database publish the event itself, which
+        // on prod would undo forceDraft a few days later.
+        publish_at: policy.forceDraft ? null : (seed.event.publish_at ?? null),
         event_type: seed.event.event_type ?? "regular",
         // One upsert writes every event, and PostgREST fills a column only some
         // rows name with null, not its default: spell the defaults out.
@@ -1079,6 +1101,7 @@ async function main(): Promise<void> {
     summary.push(format("Event tickets", userSummary.tickets));
     summary.push(format("Event applications", userSummary.applications));
     summary.push(format("Application responses", userSummary.responses));
+    summary.push(format("Application files", userSummary.files));
     summary.push(format("Check-ins", userSummary.checkIns));
     summary.push(format("Teams", await reconcileTeams(supabase, profileIds, options)));
   }
