@@ -1,5 +1,6 @@
 import { PageContainer } from "@/components/shared/PageContainer";
 import { requireAuth } from "@/lib/auth/guards";
+import { redirectToSetupIfNeeded } from "@/features/setup/server";
 import {
   getEffectiveMembershipExpiry,
   hasActiveMembership,
@@ -17,6 +18,8 @@ import { fetchMembershipTypeById } from "@/lib/supabase-helpers/memberships";
 
 export default async function PortalHome() {
   const user = await requireAuth();
+  // New members land here after sign-in; send them through setup first.
+  redirectToSetupIfNeeded(user, "/portal");
   const supabase = await createClient();
   const termEndsAt = await getMembershipTermEndsAt();
   const firstName = user.first_name || user.email.split("@")[0] || "there";

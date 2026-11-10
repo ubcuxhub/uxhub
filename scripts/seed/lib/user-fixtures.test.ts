@@ -29,8 +29,8 @@ describe("user seed fixtures", () => {
 
   it("reports the representative dataset totals", () => {
     expect(getUserFixtureTotals(seedUsers)).toEqual({
-      authUsers: 11,
-      profiles: 11,
+      authUsers: 12,
+      profiles: 12,
       purchases: 18,
       tickets: 12,
       applications: 6,
@@ -57,8 +57,20 @@ describe("user seed fixtures", () => {
         "none/basic",
         "none/admin",
         "none/manager",
+        "none/basic",
       ].sort()
     );
+  });
+
+  it("leaves member setup unfinished for the new-member fixture only", () => {
+    const unfinished = seedUsers.filter(
+      (user) => (user.profile.setup_step ?? "dietary") !== "done"
+    );
+
+    expect(unfinished.map((user) => user.email)).toEqual([
+      "new-member@example.com",
+    ]);
+    expect(unfinished[0].profile.setup_step).toBe("dietary");
   });
 
   it("reaches every user type", () => {
@@ -219,11 +231,12 @@ describe("user seed fixtures", () => {
       seedUsers.filter(
         (user) => user.profile.birth_date === null && user.profile.interests?.length === 0
       ).map((user) => user.email)
-    ).toEqual(["admin-no-membership@example.com"]);
+    ).toEqual(["admin-no-membership@example.com", "new-member@example.com"]);
     // Written on every run so changes made through the admin dialog are undone.
     for (const user of seedUsers) {
       expect(user.profile).toMatchObject({
         profile_photo_path: null,
+        avatar_preset: null,
         student_verified_at: null,
         student_verified_by: null,
       });
