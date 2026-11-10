@@ -59,6 +59,7 @@ Deletion is scoped by ownership, not by table:
 | Application files under a fixture account's folder that no kept answer names | Crowd-domain profiles somebody signed up with (they have an Auth user) |
 | Crowd accounts `data/crowd.ts` no longer lists, with their tickets and applications |                                    |
 | Teams the fixture accounts own or joined, other than `data/teams.ts`'s |                                               |
+| Reviewer notes the fixture accounts wrote, other than `data/review-notes.ts`'s | Reviewer notes by any other account   |
 | Cover images under the `seed/covers/` storage prefix       |                                                      |
 
 An extra event survives if a non-fixture purchase points at it —
@@ -109,6 +110,20 @@ can't hold fixture tickets, so the one team lives on `mentorship-program`:
 and `student-innovator@example.com` holds a ticket with no team. A run keeps the
 team's invite code and undoes team changes made through the app. Local only:
 `--target=prod` writes no accounts, so no teams.
+
+`data/review-notes.ts` — reviewer notes, the thread admins keep on an
+application under review, on the crowd's `uxathon-upcoming` applications and
+written by the admin login fixtures, so any admin you sign in as sees other
+reviewers' notes. They cover a thread of three (Noah Fischer's), an edited note,
+a long one cut at six lines (Isabel Costa's), notes on waitlisted, rejected and
+accepted applications, and plenty of applications with none. One author is a
+deleted account: a profile at `deleted+seed-former-reviewer@deleted.uxhub.invalid`
+shaped the way `delete_account` leaves one, so its notes show as "Deleted user".
+Times follow each application's `submitted_at`, fixed for the run's day. A run
+matches notes on application, author and time, replaces one the data describes
+differently, and deletes any other note a fixture wrote, such as one posted
+through the review page. Local only: `--target=prod` writes no accounts, so no
+notes.
 
 `data/users.ts` — eleven local login accounts. **Password is `123456` for all of them.**
 Ten cover every membership state crossed with the basic and admin roles:
@@ -195,6 +210,7 @@ in at run time from the target's own host.
 | `lib/targets.ts`         | local vs prod resolution and per-target policy               |
 | `lib/reconcile.ts`       | upsert-by-slug and child reconciliation primitives           |
 | `lib/reconcile-users.ts` | accounts, crowd, purchases, tickets, applications, files, and their prune |
+| `lib/review-notes.ts`    | reviewer notes and their former-reviewer author: checks, reconcile, prune |
 | `lib/pdf.ts`             | the one-page PDF behind seeded file answers                   |
 | `lib/prune.ts`           | pure delete planning — the ownership rules live here         |
 | `lib/images.ts`          | cover upload, URL building, and stale-image cleanup          |

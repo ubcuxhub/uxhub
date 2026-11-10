@@ -5,6 +5,7 @@ import { CROWD_EMAIL_DOMAINS } from "../data/crowd.ts";
 import { emptyCounts, type Counts } from "./reconcile.ts";
 import { planPrune, pruneKey } from "./prune.ts";
 import { minimalPdf } from "./pdf.ts";
+import { releaseReviewNotesBy } from "./review-notes.ts";
 import { answeredQuestions, getUserFixtureTotals } from "./user-fixtures.ts";
 
 /** Mirrors BUCKETS.applicationFiles in src/lib/supabase-helpers/buckets.ts. */
@@ -1550,6 +1551,7 @@ export async function pruneCrowdProfiles(
   if (ids.length === 0 || options.dryRun) return ids.length;
 
   await removeApplicationFiles(supabase, await listApplicationFiles(supabase, ids));
+  await releaseReviewNotesBy(supabase, ids);
   for (const table of [TABLE.eventTickets, TABLE.eventApplications]) {
     for (const part of chunk(ids)) {
       const { error: deleteError } = await supabase.from(table).delete().in("user_id", part);
@@ -1630,6 +1632,10 @@ export async function removeRetiredFixtures(
         );
       }
     }
+
+    // Reviewer notes are `no action` on their author: a real account is
+    // anonymised, never deleted, so its notes stay. A fixture leaves nothing.
+    await releaseReviewNotesBy(supabase, profileIds);
 
     // `app_settings.updated_by` records who last moved the membership term
     // date. It is attribution, not data anyone depends on, and the reference is

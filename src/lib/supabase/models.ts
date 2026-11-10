@@ -76,6 +76,10 @@ export type CheckInRow = Tables<"check_ins">;
 export type CheckInInsert = TablesInsert<"check_ins">;
 export type CheckInUpdate = TablesUpdate<"check_ins">;
 
+export type ApplicationReviewNoteRow = Tables<"application_review_notes">;
+export type ApplicationReviewNoteInsert =
+  TablesInsert<"application_review_notes">;
+
 export type EventApplicationStatus = Enums<"event_application_status">;
 /** Every status but `draft`: what admins review and decide. */
 export type SubmittedApplicationStatus = Exclude<EventApplicationStatus, "draft">;

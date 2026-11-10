@@ -1762,6 +1762,436 @@ end;
 $$;
 reset role;
 
+-- ── Reviewer notes ──────────────────────────────────────────────────────────
+--
+-- Admins and managers read every note on a submitted application and change
+-- only their own; nobody reads or writes one on a draft; applicants and anon
+-- never see any; a demoted admin loses access but keeps authorship.
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+
+insert into auth.users (
+  id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+)
+values (
+  gen_random_uuid(), 'authenticated', 'authenticated',
+  'rls-notes-admin@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()
+)
+returning id as auth_user_id, email
+\gset notes_admin_
+
+insert into auth.users (
+  id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+)
+values (
+  gen_random_uuid(), 'authenticated', 'authenticated',
+  'rls-notes-manager@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()
+)
+returning id as auth_user_id, email
+\gset notes_manager_
+
+insert into auth.users (
+  id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+)
+values (
+  gen_random_uuid(), 'authenticated', 'authenticated',
+  'rls-notes-applicant@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()
+)
+returning id as auth_user_id, email
+\gset notes_applicant_
+
+insert into public.user_info (auth_user_id, email, first_name, last_name, role_access)
+values (:'notes_admin_auth_user_id', :'notes_admin_email', 'RLS', 'Notes Admin', 'admin')
+returning id \gset notes_admin_
+
+insert into public.user_info (auth_user_id, email, first_name, last_name, role_access)
+values (:'notes_manager_auth_user_id', :'notes_manager_email', 'RLS', 'Notes Manager', 'manager')
+returning id \gset notes_manager_
+
+insert into public.user_info (auth_user_id, email, first_name, last_name, role_access)
+values (:'notes_applicant_auth_user_id', :'notes_applicant_email', 'RLS', 'Notes Applicant', 'basic')
+returning id \gset notes_applicant_
+
+insert into public.user_info (email, first_name, last_name, role_access)
+values ('rls-notes-drafter@example.test', 'RLS', 'Notes Drafter', 'basic')
+returning id \gset notes_drafter_
+
+insert into public.events (
+  name, description, regular_price, member_price, max_capacity, slug,
+  registration_opens_at, registration_closes_at, status, requires_application
+)
+values (
+  'RLS Notes Event', 'RLS reviewer notes event', 0, 0, 10, 'rls-notes-event',
+  now() - interval '1 hour', now() + interval '1 hour', 'active', true
+)
+returning id \gset notes_event_
+
+insert into public.event_applications (event_id, user_id)
+values (:'notes_event_id', :'notes_applicant_id')
+returning id \gset notes_submitted_
+
+insert into public.event_applications (event_id, user_id, status)
+values (:'notes_event_id', :'notes_drafter_id', 'draft')
+returning id \gset notes_draft_
+
+-- Written as the superuser, which the policies do not bind: the manager's note
+-- on the submitted application, and a note on the draft no policy would admit.
+insert into public.application_review_notes (application_id, author_id, body)
+values (:'notes_submitted_id', :'notes_manager_id', 'Strong portfolio.')
+returning id \gset notes_manager_note_
+
+insert into public.application_review_notes (application_id, author_id, body)
+values (:'notes_draft_id', :'notes_manager_id', 'On a draft.')
+returning id \gset notes_draft_note_
+
+\o /dev/null
+select set_config('rls.notes_admin_id', :'notes_admin_id', true);
+select set_config('rls.notes_manager_id', :'notes_manager_id', true);
+select set_config('rls.notes_submitted_id', :'notes_submitted_id', true);
+select set_config('rls.notes_draft_id', :'notes_draft_id', true);
+select set_config('rls.notes_manager_note_id', :'notes_manager_note_id', true);
+select set_config('rls.notes_draft_note_id', :'notes_draft_note_id', true);
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'notes_admin_auth_user_id',
+    'email', :'notes_admin_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+\o
+
+set local role authenticated;
+do $$
+declare
+  v_note_id uuid;
+  v_author_id uuid;
+  v_edited_at timestamptz;
+  visible_count integer;
+  changed_count integer;
+begin
+  -- Reads every note on a submitted application, none on a draft.
+  select count(*) into visible_count
+  from public.application_review_notes
+  where application_id = current_setting('rls.notes_submitted_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'admin should see the manager''s note, saw %', visible_count;
+  end if;
+
+  select count(*) into visible_count
+  from public.application_review_notes
+  where id = current_setting('rls.notes_draft_note_id')::uuid;
+  if visible_count <> 0 then
+    raise exception 'admin can read a note on a draft';
+  end if;
+
+  -- Adds a note as themselves; the author defaults to the caller.
+  insert into public.application_review_notes (application_id, body)
+  values (current_setting('rls.notes_submitted_id')::uuid, 'Great answers.')
+  returning id, author_id, edited_at into v_note_id, v_author_id, v_edited_at;
+  if v_author_id <> current_setting('rls.notes_admin_id')::uuid then
+    raise exception 'a new note did not default to its author';
+  end if;
+  if v_edited_at is not null then
+    raise exception 'a new note starts out edited';
+  end if;
+
+  insert into public.application_review_notes (application_id, author_id, body)
+  values (
+    current_setting('rls.notes_submitted_id')::uuid,
+    current_setting('rls.notes_admin_id')::uuid,
+    'A second thought.'
+  );
+
+  -- Can't write as somebody else.
+  begin
+    insert into public.application_review_notes (application_id, author_id, body)
+    values (
+      current_setting('rls.notes_submitted_id')::uuid,
+      current_setting('rls.notes_manager_id')::uuid,
+      'Spoofed.'
+    );
+    raise exception 'admin posted a note as another admin';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  -- Can't write on a draft.
+  begin
+    insert into public.application_review_notes (application_id, body)
+    values (current_setting('rls.notes_draft_id')::uuid, 'Too early.');
+    raise exception 'admin posted a note on a draft';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  -- Blank and over-long notes are refused.
+  begin
+    insert into public.application_review_notes (application_id, body)
+    values (current_setting('rls.notes_submitted_id')::uuid, '   ');
+    raise exception 'admin posted a blank note';
+  exception
+    when check_violation then null;
+  end;
+  begin
+    insert into public.application_review_notes (application_id, body)
+    values (current_setting('rls.notes_submitted_id')::uuid, repeat('a', 2001));
+    raise exception 'admin posted a note over 2000 characters';
+  exception
+    when check_violation then null;
+  end;
+
+  -- Saving unchanged text leaves the note unedited; changing it marks it.
+  update public.application_review_notes set body = body where id = v_note_id;
+  select edited_at into v_edited_at from public.application_review_notes where id = v_note_id;
+  if v_edited_at is not null then
+    raise exception 'saving an unchanged note marked it edited';
+  end if;
+
+  update public.application_review_notes set body = 'Great answers, clear process.'
+  where id = v_note_id;
+  get diagnostics changed_count = row_count;
+  select edited_at into v_edited_at from public.application_review_notes where id = v_note_id;
+  if changed_count <> 1 or v_edited_at is null then
+    raise exception 'admin could not edit their own note';
+  end if;
+
+  -- Only the text changes.
+  begin
+    update public.application_review_notes
+    set author_id = current_setting('rls.notes_manager_id')::uuid
+    where id = v_note_id;
+    raise exception 'admin moved their note to another author';
+  exception
+    when insufficient_privilege then null;
+  end;
+  begin
+    update public.application_review_notes
+    set application_id = current_setting('rls.notes_draft_id')::uuid
+    where id = v_note_id;
+    raise exception 'admin moved their note to another application';
+  exception
+    when insufficient_privilege then null;
+  end;
+  begin
+    update public.application_review_notes set edited_at = null where id = v_note_id;
+    raise exception 'admin set edited_at by hand';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  -- Somebody else's note is read-only.
+  update public.application_review_notes set body = 'Rewritten.'
+  where id = current_setting('rls.notes_manager_note_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'admin edited another admin''s note';
+  end if;
+
+  delete from public.application_review_notes
+  where id = current_setting('rls.notes_manager_note_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'admin deleted another admin''s note';
+  end if;
+
+  delete from public.application_review_notes where id = v_note_id;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 1 then
+    raise exception 'admin could not delete their own note';
+  end if;
+end;
+$$;
+reset role;
+
+-- Managers count as admins.
+\o /dev/null
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'notes_manager_auth_user_id',
+    'email', :'notes_manager_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+\o
+set local role authenticated;
+do $$
+declare
+  visible_count integer;
+  changed_count integer;
+begin
+  select count(*) into visible_count
+  from public.application_review_notes
+  where application_id = current_setting('rls.notes_submitted_id')::uuid;
+  if visible_count <> 2 then
+    raise exception 'manager should see both remaining notes, saw %', visible_count;
+  end if;
+
+  update public.application_review_notes set body = 'Strong portfolio, clear writing.'
+  where id = current_setting('rls.notes_manager_note_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 1 then
+    raise exception 'manager could not edit their own note';
+  end if;
+end;
+$$;
+reset role;
+
+-- The applicant never sees notes, not even on their own application.
+\o /dev/null
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'notes_applicant_auth_user_id',
+    'email', :'notes_applicant_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+\o
+set local role authenticated;
+do $$
+declare
+  visible_count integer;
+  changed_count integer;
+begin
+  select count(*) into visible_count from public.application_review_notes;
+  if visible_count <> 0 then
+    raise exception 'an applicant can read reviewer notes, saw %', visible_count;
+  end if;
+
+  begin
+    insert into public.application_review_notes (application_id, body)
+    values (current_setting('rls.notes_submitted_id')::uuid, 'Pick me.');
+    raise exception 'a member posted a reviewer note';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  delete from public.application_review_notes;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'a member deleted reviewer notes';
+  end if;
+end;
+$$;
+reset role;
+
+set local role anon;
+do $$
+begin
+  begin
+    perform 1 from public.application_review_notes;
+    raise exception 'anon can read reviewer notes';
+  exception
+    when insufficient_privilege then null;
+  end;
+  begin
+    insert into public.application_review_notes (application_id, body)
+    values (current_setting('rls.notes_submitted_id')::uuid, 'Anonymous.');
+    raise exception 'anon posted a reviewer note';
+  exception
+    when insufficient_privilege then null;
+  end;
+end;
+$$;
+reset role;
+
+-- A demoted admin loses access, and their notes stay.
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+update public.user_info set role_access = 'basic' where id = :'notes_manager_id';
+\o /dev/null
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'notes_manager_auth_user_id',
+    'email', :'notes_manager_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+\o
+set local role authenticated;
+do $$
+declare
+  visible_count integer;
+  changed_count integer;
+begin
+  select count(*) into visible_count from public.application_review_notes;
+  if visible_count <> 0 then
+    raise exception 'a demoted admin can still read notes, saw %', visible_count;
+  end if;
+
+  update public.application_review_notes set body = 'Changed after demotion.'
+  where id = current_setting('rls.notes_manager_note_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'a demoted admin edited their note';
+  end if;
+
+  delete from public.application_review_notes
+  where id = current_setting('rls.notes_manager_note_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'a demoted admin deleted their note';
+  end if;
+end;
+$$;
+reset role;
+
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+do $$
+declare
+  v_edited_at timestamptz;
+begin
+  if not exists (
+    select 1 from public.application_review_notes
+    where id = current_setting('rls.notes_manager_note_id')::uuid
+      and author_id = current_setting('rls.notes_manager_id')::uuid
+  ) then
+    raise exception 'a demoted admin''s note lost its author';
+  end if;
+
+  -- Not even the service side moves a note or forges its edit time.
+  begin
+    update public.application_review_notes
+    set author_id = current_setting('rls.notes_admin_id')::uuid
+    where id = current_setting('rls.notes_manager_note_id')::uuid;
+    raise exception 'a note moved to another author';
+  exception
+    when check_violation then null;
+  end;
+
+  update public.application_review_notes set edited_at = null
+  where id = current_setting('rls.notes_manager_note_id')::uuid;
+  select edited_at into v_edited_at from public.application_review_notes
+  where id = current_setting('rls.notes_manager_note_id')::uuid;
+  if v_edited_at is null then
+    raise exception 'an update cleared edited_at without changing the text';
+  end if;
+
+  -- Deleting the application takes its notes with it.
+  delete from public.event_applications where id = current_setting('rls.notes_draft_id')::uuid;
+  if exists (
+    select 1 from public.application_review_notes
+    where id = current_setting('rls.notes_draft_note_id')::uuid
+  ) then
+    raise exception 'a deleted application left its notes';
+  end if;
+end;
+$$;
+
 \ir event-publication.sql
 
 rollback;

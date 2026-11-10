@@ -44,6 +44,49 @@ export type Database = {
           },
         ]
       }
+      application_review_notes: {
+        Row: {
+          application_id: string
+          author_id: string
+          body: string
+          created_at: string
+          edited_at: string | null
+          id: string
+        }
+        ComputedFields: never
+        Insert: {
+          application_id: string
+          author_id?: string
+          body: string
+          created_at?: string
+          edited_at?: string | null
+          id?: string
+        }
+        Update: {
+          application_id?: string
+          author_id?: string
+          body?: string
+          created_at?: string
+          edited_at?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "application_review_notes_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "event_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "application_review_notes_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "user_info"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       check_in_sessions: {
         Row: {
           created_at: string | null
