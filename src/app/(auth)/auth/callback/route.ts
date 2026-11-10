@@ -5,10 +5,18 @@ import {
   isAsyncTimeoutError,
   withDeadline,
 } from "@/lib/async/deadline";
+import {
+  getExpiredLinkPath,
+  getExpiredLinkTypeForNext,
+  isExpiredLinkCode,
+  readErrorCode,
+} from "@/features/auth/link-expired";
+import { resolveSetupDestination } from "@/features/setup/lib/state";
 import { ensureUserInfo } from "@/lib/auth/ensure-user-info";
 import { getSafeInternalPath } from "@/lib/auth/paths";
 import { getRequestOrigin } from "@/lib/http/request-origin";
 import { createClient } from "@/lib/supabase/server";
+import { fetchSetupStepByAuthId } from "@/lib/supabase-helpers/setup";
 
 const CALLBACK_ERROR_MESSAGE =
   "We couldn't complete sign-in. The link may have expired or already been used. Try signing in again.";
@@ -22,6 +30,17 @@ function redirectToAuthError(
   url.searchParams.set("error", message);
   url.searchParams.set("next", nextPath);
   return NextResponse.redirect(url);
+}
+
+/**
+ * An expired or already-used link gets its own screen with a way to ask for a
+ * new one. The `next` the link carried says whether it was a recovery link.
+ */
+function redirectToExpiredLink(origin: string, nextPath: string) {
+  const type = getExpiredLinkTypeForNext(nextPath);
+  return NextResponse.redirect(
+    new URL(getExpiredLinkPath(type, nextPath), origin),
+  );
 }
 
 function getCallbackErrorMessage(error: unknown) {
@@ -41,6 +60,10 @@ export async function GET(request: NextRequest) {
   const providerError =
     searchParams.get("error_description") || searchParams.get("error");
 
+  if (isExpiredLinkCode(searchParams.get("error_code"))) {
+    return redirectToExpiredLink(origin, nextPath);
+  }
+
   if (providerError) {
     return redirectToAuthError(origin, CALLBACK_ERROR_MESSAGE, nextPath);
   }
@@ -59,6 +82,9 @@ export async function GET(request: NextRequest) {
     );
 
     if (exchangeError) {
+      if (isExpiredLinkCode(readErrorCode(exchangeError))) {
+        return redirectToExpiredLink(origin, nextPath);
+      }
       return redirectToAuthError(origin, CALLBACK_ERROR_MESSAGE, nextPath);
     }
 
@@ -81,7 +107,22 @@ export async function GET(request: NextRequest) {
       return redirectToAuthError(origin, result.message, nextPath);
     }
 
-    return NextResponse.redirect(new URL(nextPath, origin));
+    // A new member heading for the portal home goes straight to setup, so the
+    // portal never renders first. The lookup is best effort: the portal page
+    // keeps its own gate.
+    let destination = nextPath;
+    try {
+      destination = resolveSetupDestination(
+        nextPath,
+        await withDeadline(() => fetchSetupStepByAuthId(supabase, authUser.id), {
+          operation: "Setup state lookup",
+        }),
+      );
+    } catch {
+      destination = nextPath;
+    }
+
+    return NextResponse.redirect(new URL(destination, origin));
   } catch (error) {
     return redirectToAuthError(
       origin,

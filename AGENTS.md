@@ -64,7 +64,7 @@ row owned by a hand-made account (a purchase, say) still references it.
 Purchases, tickets and applications are pruned only when they belong to one of
 the fixture accounts, never to an account created by hand.
 
-The eleven login fixtures all sign in with password `123456`; see
+The twelve login fixtures all sign in with password `123456`; see
 `scripts/seed/README.md` for the membership x role grid. The seed also writes a
 "crowd" of 42 profile-only accounts (no Auth user, so nobody can sign in as
 one) on the reserved `crowd.uxhub.test` and `crowd.ubc.ca` domains, for volume

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 
+import { Hubbo } from "@/components/shared/Hubbo";
 import { withDeadline } from "@/lib/async/deadline";
 import { createClient } from "@/lib/supabase/client";
 
@@ -15,7 +16,7 @@ import {
   subscribePendingEmail,
 } from "../pending-email";
 
-export function SignUpSuccessMessage({
+export function VerifyEmailMessage({
   nextPath = "/portal",
 }: {
   nextPath?: string;
@@ -114,12 +115,22 @@ export function SignUpSuccessMessage({
 
   return (
     <AuthMessage
-      title="Thank you for signing up!"
-      action={email ? <ResendEmailButton onResend={handleResend} /> : null}
-      backLink={{ href: "/auth/login", label: "Back to log in" }}
+      title="Check your email"
+      illustration={<Hubbo emotion="welcoming" size="hero" className="h-50" />}
+      description={
+        <>
+          We sent a verification link to{" "}
+          {email ? (
+            <strong className="font-medium text-foreground">{email}</strong>
+          ) : (
+            "your email address"
+          )}
+          . Open it to confirm your email and set up your profile.
+        </>
+      }
+      backLink={{ href: "/auth/login", label: "Back to sign in" }}
     >
-      We&rsquo;ve sent a confirmation link to {email || "your email address"}.
-      Confirm your account to finish signing up.
+      {email ? <ResendEmailButton email={email} onResend={handleResend} /> : null}
     </AuthMessage>
   );
 }

@@ -33,7 +33,6 @@ export type ProfileFormData = {
   school_institution: string;
   student_status: StudentStatus | "";
   year: UniversityYear | "";
-  dietary_restrictions: string;
 };
 
 const USER_TYPES: Array<{ value: UserType; label: string }> = [
@@ -58,6 +57,10 @@ interface ProfileFieldsProps {
   firstNameError: string | null;
   lastNameError: string | null;
   patch: (values: Partial<ProfileFormData>) => void;
+  /** Sections shown before "About you" (the photo). */
+  beforeAbout?: React.ReactNode;
+  /** Sections shown after "About you" (dietary needs, interests). */
+  afterAbout?: React.ReactNode;
 }
 
 /**
@@ -75,9 +78,13 @@ export function ProfileFields({
   firstNameError,
   lastNameError,
   patch,
+  beforeAbout,
+  afterAbout,
 }: ProfileFieldsProps) {
   return (
     <div className="space-y-8">
+      {beforeAbout}
+
       <Section title="About you">
         <TextField
           label="First name"
@@ -104,14 +111,9 @@ export function ProfileFields({
           onChange={(phone) => patch({ phone })}
           placeholder="e.g. 604 555 0134"
         />
-        <TextField
-          label="Dietary restrictions"
-          value={formData.dietary_restrictions}
-          onChange={(dietary_restrictions) => patch({ dietary_restrictions })}
-          placeholder="e.g. Vegetarian"
-          hint="Used when we cater events."
-        />
       </Section>
+
+      {afterAbout}
 
       <Section
         title={user.user_type === "faculty" ? "At UBC" : "Studies"}
@@ -218,7 +220,7 @@ export function ProfileFields({
   );
 }
 
-function SectionHeader({
+export function SectionHeader({
   title,
   description,
 }: {

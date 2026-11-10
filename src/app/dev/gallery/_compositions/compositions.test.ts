@@ -15,7 +15,9 @@ const columnOf = (column: number) =>
  * everything else must appear in at least one composition's `uses`.
  */
 const NOT_IN_GALLERY: readonly string[] = [
-  // (none: every registry entry renders from props or fixtures)
+  // Lives on the auth screens, which are outside the portal the gallery
+  // composes; no portal screen asks for a password.
+  "password-input",
 ];
 
 const SLUGS = new Set(ENTRIES.map((entry) => entry.slug));

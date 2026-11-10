@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 
+import { Hubbo } from "@/components/shared/Hubbo";
 import { withDeadline } from "@/lib/async/deadline";
 import { createClient } from "@/lib/supabase/client";
 
@@ -37,12 +38,22 @@ export function CheckEmailMessage() {
 
   return (
     <AuthMessage
-      title="Check your email!"
-      action={email ? <ResendEmailButton onResend={handleResend} /> : null}
-      backLink={{ href: "/auth/login", label: "Back to log in" }}
+      title="Check your email"
+      illustration={<Hubbo emotion="welcoming" size="hero" className="h-50" />}
+      description={
+        <>
+          If an account exists for{" "}
+          {email ? (
+            <strong className="font-medium text-foreground">{email}</strong>
+          ) : (
+            "that email address"
+          )}
+          , we&rsquo;ll send a password reset link with instructions to continue.
+        </>
+      }
+      backLink={{ href: "/auth/login", label: "Back to sign in" }}
     >
-      If an account exists for {email || "that email address"}, we&rsquo;ll send
-      a password reset link with instructions to continue.
+      {email ? <ResendEmailButton email={email} onResend={handleResend} /> : null}
     </AuthMessage>
   );
 }

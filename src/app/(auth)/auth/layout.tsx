@@ -1,7 +1,5 @@
-import Image from "next/image";
-import Link from "next/link";
-
 import { ForceLightTheme } from "@/components/shared/ForceLightTheme";
+import { AuthShell } from "@/features/auth/components/AuthShell";
 import { forceLightThemeScript } from "@/lib/theme";
 
 export default function AuthLayout({
@@ -10,30 +8,10 @@ export default function AuthLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <main className="min-h-svh bg-ux-hub text-foreground lg:bg-background lg:bg-none">
+    <>
       <script dangerouslySetInnerHTML={{ __html: forceLightThemeScript }} />
       <ForceLightTheme />
-
-      <div className="grid min-h-svh lg:grid-cols-[minmax(320px,467px)_minmax(0,1fr)]">
-        <aside className="relative hidden overflow-hidden bg-ux-hub px-16 py-[72px] lg:block">
-          <Link href="/" className="relative z-10 inline-flex items-center gap-3">
-            <Image
-              src="/auth/logo-right-text-white.svg"
-              alt="UBC UX Hub Logo"
-              width={100}
-              height={42}
-              className="h-auto w-[140px]"
-              priority
-            />
-          </Link>
-        </aside>
-
-        {/* Below lg the brand aside is hidden, so the gradient moves behind the
-            card rather than leaving it white-on-white. */}
-        <section className="flex items-center justify-center bg-ux-hub px-4 py-10 sm:px-10 lg:bg-none lg:px-20">
-          {children}
-        </section>
-      </div>
-    </main>
+      <AuthShell>{children}</AuthShell>
+    </>
   );
 }

@@ -25,11 +25,26 @@ export const STANDALONE = {
     path: "/dev/templates",
     title: "Templates",
     description:
-      "Whole pages assembled from the components on fixture data: the events list, event detail, event builder, and the proposed application review pages.",
+      "Whole pages assembled from the components on fixture data: the events list, event detail, event builder, the proposed application review pages, member setup, and the proposed Settings Profile tab.",
     spec: "§4.4",
     layout: "page",
     // `<id>-frame` (the mobile iframe) is understood too, but not listed.
-    openStates: ["events", "event-detail", "event-builder", "applications", "application-review"],
+    openStates: [
+      "events",
+      "event-detail",
+      "event-builder",
+      "applications",
+      "application-review",
+      "setup-about",
+      "setup-dietary",
+      "setup-photo",
+      "setup-interests",
+      "setup-welcome",
+      "profile-filled",
+      "profile-new",
+      "profile-saving",
+      "profile-error",
+    ],
   },
 } as const satisfies Record<string, DocMeta & { path: string }>;
 
