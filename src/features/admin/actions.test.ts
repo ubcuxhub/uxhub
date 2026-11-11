@@ -342,7 +342,7 @@ describe("discardUnusedEventImageAction: the reference check", () => {
 
 const saveInput = {
   expectedImageUrl: null,
-  event: { name: "Design Sprint" },
+  event: { name: "Design Sprint", short_description: "Overview", description: "Long overview", slug: "design-sprint", starts_at: "2099-08-01T18:00:00Z", ends_at: "2099-08-01T19:00:00Z", max_capacity: 10 },
   checkInSessions: [],
   mentorIds: [],
   sponsorIds: [],
@@ -1047,7 +1047,7 @@ describe("event configuration server validation", () => {
   });
   it.each(["This page URL is already in use.", "Pricing is locked because registrations or payments exist.", "The page URL is locked after first publication."])("returns a useful configuration rejection: %s", async message => {
     adminRpc.mockResolvedValueOnce({ data: null, error: { message, code: "P0001" } });
-    await expect(saveAdminEventAction(saveInput)).rejects.toThrow(message);
+    await expect(saveAdminEventAction(saveInput)).resolves.toEqual({ error: message });
   });
 });
 

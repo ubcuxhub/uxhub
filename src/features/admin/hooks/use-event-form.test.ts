@@ -188,6 +188,7 @@ describe("event form publishing schedule", () => {
       const dates = result.current.formState.date_location!;
       result.current.handleFieldChange("date_location", { ...dates, dates: [{ ...dates.dates[0], end: "12:30" }] });
       result.current.handleFieldChange("registration_closes_at", "2024-06-30T23:59");
+      result.current.handleFieldChange("publish_at", "2024-06-29T10:00");
       result.current.handleFieldChange("requires_application", true);
       result.current.addApplicationQuestion("short_text");
       result.current.updateApplicationQuestion(0, "question", "Why attend?");
@@ -581,4 +582,39 @@ it.each([true, false])("round-trips schedule visibility %s through working draft
   await act(async () => { await submit(); });
   expect(reopened.result.current.error).toBeNull();
   expect(saveAdminEventAction).toHaveBeenLastCalledWith(expect.objectContaining({ event: expect.objectContaining({ agenda_enabled: enabled }) }));
+});
+
+describe("builder publication commands", () => {
+  it("reveals required issues only after attempting Publish and keeps incomplete drafts savable", async () => {
+    const { result } = renderHook(() => useEventForm({}));
+    expect(result.current.publishAttempted).toBe(false);
+    expect(result.current.validation.issues.some(issue => issue.required)).toBe(true);
+    await act(async () => { await result.current.handleSaveDraft(false); });
+    expect(result.current.publishAttempted).toBe(false);
+    await act(async () => { expect(await result.current.handlePublication("publish")).toBe(false); });
+    expect(result.current.publishAttempted).toBe(true);
+    expect(result.current.validationAttempt).toBe(1);
+    expect(saveAdminEventAction).not.toHaveBeenCalled();
+  });
+  it("sends the loaded lifecycle precondition and reports the actual saved outcome", async () => {
+    const { result } = renderHook(() => useEventForm({ eventId: event.id, initialEvent: event }));
+    vi.mocked(saveAdminEventAction).mockResolvedValueOnce({ id: event.id, checkInSessionIds: [], questionIds: [], publication: { id: event.id, name: "Saved name", status: "active", publish_at: null, registration_opens_at: event.registration_opens_at, registration_closes_at: null } });
+    await act(async () => { expect(await result.current.handlePublication("publish")).toBe(true); });
+    expect(vi.mocked(saveAdminEventAction).mock.calls.at(-1)![0]).toMatchObject({ expectedPublication: { status: "draft", publish_at: event.publish_at }, event: { status: "active", publish_at: null } });
+    expect(result.current.publicationSuccess).toMatchObject({ name: "Saved name", status: "active" });
+    expect(result.current.hasUnsavedChanges).toBe(false);
+  });
+  it("retains scheduled edits after failure and retries the latest values", async () => {
+    const { result } = renderHook(() => useEventForm({ eventId: event.id, initialEvent: event }));
+    act(() => result.current.handleFieldChange("name", "Edited name"));
+    vi.mocked(saveAdminEventAction).mockResolvedValueOnce({ error: "Connection lost" });
+    await act(async () => { expect(await result.current.handlePublication("save")).toBe(false); });
+    expect(result.current.hasUnsavedChanges).toBe(true);
+    expect(result.current.publicationSuccess).toBeNull();
+    const options = vi.mocked(toast.error).mock.calls.at(-1)![1]!;
+    expect(options.duration).toBe(Infinity);
+    act(() => result.current.handleFieldChange("name", "Edited after failure"));
+    await act(async () => { options.action!.onClick(); });
+    expect(vi.mocked(saveAdminEventAction).mock.calls.at(-1)![0].event.name).toBe("Edited after failure");
+  });
 });

@@ -5,7 +5,7 @@ import { Bold, Italic, Link as LinkIcon, List } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Field, FieldLabel, FieldDescription, FieldError } from "@/components/ui/field";
+import { Field, FieldLabel, FieldDescription, FieldError, useFieldControl, joinIds } from "@/components/ui/field";
 import { EventDescription } from "@/components/shared/EventDescription";
 import { descriptionText, plainDescription, safeDescriptionLink, type DescriptionSpan, type EventDescription as RichDescription } from "@/lib/event-description";
 import { useState } from "react";
@@ -35,8 +35,13 @@ function readEditor(root: HTMLElement): RichDescription {
   return blocks;
 }
 
-export function EventDescriptionEditor({ short, value, rich, disabled, onChange }: {
-  short: string; value: string; rich: RichDescription | null; disabled: boolean;
+function OverviewControl(props: React.ComponentProps<"div">) {
+  const field = useFieldControl();
+  return <div {...props} aria-invalid={props["aria-invalid"] || field.invalid} aria-describedby={joinIds(props["aria-describedby"], field.describedBy)} />;
+}
+
+export function EventDescriptionEditor({ short, value, rich, disabled, onChange, validationManaged = false }: {
+  short: string; value: string; rich: RichDescription | null; disabled: boolean; validationManaged?: boolean;
   onChange: (short: string, text: string, rich: RichDescription) => void;
 }) {
   const editor = useRef<HTMLDivElement>(null);
@@ -58,14 +63,14 @@ export function EventDescriptionEditor({ short, value, rich, disabled, onChange 
     document.execCommand(name, false, argument);
     sync();
   };
-  return <div className="space-y-4 rounded-xl border border-border bg-card p-5">
-    <Field>
+  return <div data-slot="card" className="space-y-4 rounded-xl border border-border bg-card p-5">
+    <Field validationKey="short-overview">
       <div className="flex justify-between gap-3"><FieldLabel className="text-small font-medium" htmlFor="short-overview">Short overview</FieldLabel><span id="short-count" className="text-caption text-muted-foreground">{short.length} / 50</span></div>
       <Textarea id="short-overview" placeholder="One short line. E.g. Portfolio feedback from industry designers" disabled={disabled} value={short} maxLength={50} aria-describedby="short-count" onChange={e => onChange(e.target.value, value, rich ?? plainDescription(value))} />
     </Field>
-    <Field>
+    <Field validationKey="long-overview">
       <div className="flex justify-between gap-3"><FieldLabel className="text-small font-medium" id="long-label">Long overview</FieldLabel><span id="long-count" className="text-caption text-muted-foreground">{value.length} / 3,000</span></div>
-      <div className="overflow-hidden rounded-2xl border border-input">
+      <div className="overflow-hidden rounded-2xl border border-input has-[[aria-invalid=true]]:border-destructive">
         <div role="toolbar" aria-label="Formatting" className="flex gap-1 border-b border-border bg-section p-1">
           {[["Bold", Bold, "bold"], ["Italic", Italic, "italic"], ["Bulleted list", List, "insertUnorderedList"]].map(([label, Icon, cmd]) => {
             const ToolbarIcon = Icon as typeof Bold;
@@ -75,12 +80,12 @@ export function EventDescriptionEditor({ short, value, rich, disabled, onChange 
         </div>
         <div className="relative">
           {!value.trim() && <p aria-hidden className="pointer-events-none absolute inset-x-5 top-3 text-muted-foreground">Who it’s for, what happens and what to bring. A few short paragraphs work best.</p>}
-        <div ref={editor} contentEditable={!disabled} suppressContentEditableWarning role="textbox" aria-multiline="true" aria-placeholder="Who it’s for, what happens and what to bring. A few short paragraphs work best." aria-labelledby="long-label" aria-describedby={`long-count long-hint${error ? " long-error" : ""}`} aria-invalid={!!error} className="min-h-36 px-5 py-3 outline-none focus-visible:focus-ring [&_ul]:list-disc [&_ul]:pl-6 [&_a]:text-primary [&_a]:underline" onInput={sync} onDrop={e => { e.preventDefault(); document.execCommand("insertText", false, e.dataTransfer.getData("text/plain")); sync(); }} onPaste={e => { e.preventDefault(); document.execCommand("insertText", false, e.clipboardData.getData("text/plain")); sync(); }}><EventDescription rich={initial} text={value} /></div>
+        <OverviewControl id="long-overview" ref={editor} contentEditable={!disabled} suppressContentEditableWarning role="textbox" aria-multiline="true" aria-placeholder="Who it’s for, what happens and what to bring. A few short paragraphs work best." aria-labelledby="long-label" aria-describedby={`long-count long-hint${error && !validationManaged ? " long-error" : ""}`} aria-invalid={!!error} className="min-h-36 px-5 py-3 outline-none focus-visible:focus-ring [&_ul]:list-disc [&_ul]:pl-6 [&_a]:text-primary [&_a]:underline" onInput={sync} onDrop={e => { e.preventDefault(); document.execCommand("insertText", false, e.dataTransfer.getData("text/plain")); sync(); }} onPaste={e => { e.preventDefault(); document.execCommand("insertText", false, e.clipboardData.getData("text/plain")); sync(); }}><EventDescription rich={initial} text={value} /></OverviewControl>
         </div>
       </div>
       {linkOpen && <div className="flex flex-wrap items-end gap-2"><Field><FieldLabel className="text-small font-medium" htmlFor="overview-link">Link URL</FieldLabel><Input id="overview-link" value={url} onChange={e => setUrl(e.target.value)} placeholder="https://" /></Field><Button type="button" disabled={!safeDescriptionLink(url)} onClick={() => { command("createLink", safeDescriptionLink(url)); selection.current = null; setLinkOpen(false); setUrl(""); }}>Insert link</Button><Button type="button" variant="outline" onClick={() => { selection.current = null; setLinkOpen(false); }}>Cancel</Button></div>}
       <FieldDescription id="long-hint">Shown on the portal event page and the hosted marketing page.</FieldDescription>
-      {error && <FieldError id="long-error">{error}</FieldError>}
+      {error && !validationManaged && <FieldError id="long-error">{error}</FieldError>}
     </Field>
   </div>;
 }

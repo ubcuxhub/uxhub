@@ -345,3 +345,29 @@ describe("team form settings", () => {
     expect(validateEventForm({ ...validFormState, min_team_size: "5", max_team_size: "4" }, [], []).error).toMatch(/cannot exceed/);
   });
 });
+
+describe("publication issue collection", () => {
+  it.each(["disabled", "hosted", "external"] as const)("requires a long overview only with enabled marketing (%s)", marketing_mode => {
+    const state = { ...validFormState, marketing_mode, marketing_url: "https://example.com/event", description: "" };
+    const result = validateEventForm(state, [], []);
+    expect(result.issues.some(issue => issue.target === "long-overview")).toBe(marketing_mode !== "disabled");
+    expect(validateEventForm({ ...state, short_description: "" }, [], []).issues.some(issue => issue.target === "short-overview")).toBe(true);
+  });
+  it("collects issues across all sections and distinguishes missing values from consistency errors", () => {
+    const state = { ...validFormState, name: "", description: "", max_capacity: "-1", registration_opens_at: "2099-08-02T12:00", registration_closes_at: "2099-08-01T12:00", min_team_size: "3", max_team_size: "2" };
+    const issues = validateEventForm(state, [], []).issues;
+    expect(issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ section: "basics", target: "event-name", required: true }),
+      expect.objectContaining({ section: "description", target: "long-overview", required: true }),
+      expect.objectContaining({ section: "registration", target: "event-capacity", required: false }),
+      expect.objectContaining({ section: "registration", target: "registration_closes_at-date", required: false }),
+      expect.objectContaining({ section: "teams", required: false }),
+    ]));
+    expect(validateEventForm(validFormState, [], []).issues).toEqual([]);
+  });
+  it("does not count optional sections and rejects publication at or after registration closes", () => {
+    expect(validateEventForm({ ...validFormState, max_capacity: "0", marketing_mode: "disabled", description: "" }, [], []).issues).toEqual([]);
+    const result = validateEventForm({ ...validFormState, publish_at: "2099-08-01T10:00", registration_closes_at: "2099-08-01T10:00" }, [], []);
+    expect(result.issues).toContainEqual(expect.objectContaining({ section: "summary", message: "Publish time must be before registration closes." }));
+  });
+});

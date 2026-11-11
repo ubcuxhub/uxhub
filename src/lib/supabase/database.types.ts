@@ -1566,6 +1566,22 @@ export type Database = {
         }
         Returns: Json
       }
+      save_admin_event_builder_before_publication: {
+        Args: {
+          p_application_questions: Json
+          p_check_in_sessions: Json
+          p_draft_id: string
+          p_draft_revision: number
+          p_event: Json
+          p_event_id: string
+          p_expected_header_image_url: string
+          p_expected_image_url: string
+          p_mentors: Json
+          p_slug: string
+          p_sponsors: Json
+        }
+        Returns: Json
+      }
       save_admin_event_draft: {
         Args: {
           p_document: Json

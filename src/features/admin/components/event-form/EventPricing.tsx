@@ -20,7 +20,7 @@ interface Props {
 export function EventPricing({ state, locked, effectivePrices, onChange, showErrors = false }: Props) {
   const error = showErrors && state.pricing_mode === "paid" ? priceError(state.pricing_amount) : null;
   const summary = effectivePrices && `Non-members: $${effectivePrices.regular.toFixed(2)} CAD · Members: $${effectivePrices.member.toFixed(2)} CAD`;
-  return <div className="@container/pricing space-y-4 rounded-xl border border-border bg-card p-5">
+  return <div data-slot="card" className="@container/pricing space-y-4 rounded-xl border border-border bg-card p-5">
     <div className="space-y-0.5 border-b border-border-subtle pb-4">
       <h3 className="text-subheading">Pricing</h3>
       <p className="text-muted-foreground">{state.pricing_mode === "legacy" ? "Existing prices are preserved. Configure Free/Paid pricing before registrations begin." : "Members with an active membership get in free. Non-members pay the ticket price."}</p>

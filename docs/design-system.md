@@ -1006,3 +1006,10 @@ See `/dev/components/sortable-section` for interactive collapse/reorder examples
 Entry photos/logos reuse ImageUpload with `requirements={{ square: false }}`:
 JPG/PNG up to 4 MB without cover/header minimum dimensions. The authorized
 entry upload validates file bytes server-side; it does not enable SVG uploads.
+
+
+`FieldValidation` supplies already-visible `{ target, message }` issues to fields.
+Use `Field validationKey="target"` to render icon/copy errors and associate them
+with its controls through the existing Field context. The caller owns delayed
+required-field validation and immediate consistency feedback; fields without a
+key retain existing behavior. See `/dev/components/field` for an example.

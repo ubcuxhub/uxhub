@@ -1,3 +1,4 @@
+import { timestamptzToDatetimeLocal } from "@/lib/date";
 import {
   formStateFromEvent,
   checkInDraftsFromRows,
@@ -9,6 +10,7 @@ import type {
   EventApplicationQuestionRow,
   EventRow,
   EventStatus,
+  EventUpdate,
 } from "@/lib/supabase/models";
 
 /*
@@ -157,5 +159,27 @@ export function eventScheduleProblem(
   ) {
     return "Registration end time must be after the start time.";
   }
-  return publishAtProblem(input.status, input.publish_at, now);
+  return publishAtProblem(input.status, input.publish_at, now) ?? publicationClosingProblem(input as EventScheduleInput);
+}
+
+
+/** Validate the builder's proposed full event with the same rules as its UI. */
+export function builderPublicationProblem(input: import("../actions").SaveAdminEventInput): string | null {
+  if (input.event.status !== "active" && !input.event.publish_at) return null;
+  const row = { ...input.event, status: input.event.status ?? "draft", configured_marketing_mode: input.event.configured_marketing_mode ?? "hosted" } as EventRow;
+  const state = {
+    ...formStateFromEvent(row),
+    content: input.content ?? null,
+    date_location: input.dateLocation ?? null,
+    decisions_release_at: timestamptzToDatetimeLocal(input.applicationTiming?.decisions_release_at),
+    confirmation_deadline: timestamptzToDatetimeLocal(input.applicationTiming?.confirmation_deadline),
+  };
+  const result = validateEventForm(state, checkInDraftsFromRows(input.checkInSessions.map(row => ({ ...row, id: row.id ?? undefined }))), questionsFromRows(input.applicationQuestions as EventApplicationQuestionRow[]));
+  return result.error;
+}
+
+/** Publication succeeds only before a separately configured closing instant. */
+export function publicationClosingProblem(event: Pick<EventUpdate, "publish_at" | "registration_closes_at">) {
+  if (event.publish_at && event.registration_closes_at && Date.parse(event.publish_at) >= Date.parse(event.registration_closes_at)) return "Publish time must be before registration closes.";
+  return null;
 }

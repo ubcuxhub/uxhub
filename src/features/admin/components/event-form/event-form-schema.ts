@@ -1,5 +1,5 @@
-import { type EventContent } from "../../lib/event-content";
-import { dateLocationProblem, dateSessions, emptyEventDate, emptyLocation, type EventDateLocationDraft } from "../../lib/event-date-location";
+import { eventContentProblem, type EventContent } from "../../lib/event-content";
+import { dateLocationIssues, emptyEventDate, emptyLocation, type EventDateLocationDraft } from "../../lib/event-date-location";
 import { parseEventDescription, type EventDescription } from "@/lib/event-description";
 import { eventSlugError, priceError, suggestedEventSlug, websiteUrlError } from "../../lib/event-configuration";
 import {
@@ -275,6 +275,16 @@ export function createFormSnapshot(
   });
 }
 
+export type BuilderSection = "basics" | "description" | "dates" | "registration" | "teams" | "schedule" | "people" | "resources" | "summary" | "settings";
+export interface EventFormIssue {
+  section: BuilderSection;
+  target: string;
+  message: string;
+  /** Missing required values stay quiet until Publish. */
+  required: boolean;
+}
+
+/** One validation result drives publication, Summary, counts and field feedback. */
 export function validateEventForm(
   formState: EventFormState,
   checkInEvents: CheckInSessionDraft[],
@@ -282,81 +292,44 @@ export function validateEventForm(
   mentors: MentorDraft[] = [],
   sponsors: SponsorDraft[] = []
 ) {
-  let error: string | null = null;
-  if (formState.date_location) {
-    error = dateLocationProblem(formState.date_location);
-    if (error) return { error, questionErrors: {}, invalidSections: { mentors: false, sponsors: false, applications: false } };
-    checkInEvents = dateSessions(formState.date_location).map(row => ({ ...row, id: row.id ?? undefined }));
-  }
+  const issues: EventFormIssue[] = [];
+  const add = (section: BuilderSection, target: string, message: string | null, required = false) => {
+    if (message) issues.push({ section, target, message, required });
+  };
+  if (!formState.name.trim()) add("basics", "event-name", "Event name is required.", true);
+  if (!formState.short_description.trim()) add("description", "short-overview", "Short description is required.", true);
+  if (formState.short_description.length > 50) add("description", "short-overview", "Short overview must be 50 characters or fewer.");
+  if (formState.description.length > 3000) add("description", "long-overview", "Long overview must be 3,000 characters or fewer.");
+  if (formState.marketing_mode !== "disabled" && !formState.description.trim()) add("description", "long-overview", "Description is required.", true);
+  if (formState.marketing_mode === "external") add("basics", "event-website", websiteUrlError(formState.marketing_url), !formState.marketing_url);
+  if (formState.marketing_mode === "hosted") add("basics", "event-page-slug", eventSlugError(formState.page_slug || (!formState.slug_edited ? suggestedEventSlug(formState.name) : "")), !formState.page_slug && (formState.slug_edited || !formState.name.trim()));
+  if (formState.pricing_mode !== "legacy") add("basics", "configured-price", priceError(formState.pricing_mode === "free" ? "0" : formState.pricing_amount), !formState.pricing_amount);
+  if (!formState.max_capacity || !/^\d+$/.test(formState.max_capacity) || !Number.isSafeInteger(Number(formState.max_capacity)) || Number(formState.max_capacity) > 2147483647) add("registration", "event-capacity", "Capacity must be a nonnegative whole number.", !formState.max_capacity);
   const invalidSections = {
-    mentors: mentors.some((mentor) => !mentor.full_name.trim()),
-    sponsors: sponsors.some((sponsor) => !sponsor.name.trim()),
+    mentors: mentors.some(mentor => !mentor.full_name.trim()),
+    sponsors: sponsors.some(sponsor => !sponsor.name.trim()),
     applications: false,
   };
-  if (!formState.name.trim()) error = "Event name is required.";
-  else if (!formState.short_description.trim())
-    error = "Short description is required.";
-  else if (formState.short_description.length > 50) error = "Short overview must be 50 characters or fewer.";
-  else if (formState.description.length > 3000) error = "Long overview must be 3,000 characters or fewer.";
-  else if (!formState.description.trim()) error = "Description is required.";
-  else if (formState.marketing_mode === "external" && websiteUrlError(formState.marketing_url))
-    error = websiteUrlError(formState.marketing_url);
-  else if (formState.marketing_mode === "hosted" && eventSlugError((formState.slug_edited ? formState.page_slug : formState.page_slug || suggestedEventSlug(formState.name))))
-    error = eventSlugError((formState.slug_edited ? formState.page_slug : formState.page_slug || suggestedEventSlug(formState.name)));
-  else if (formState.pricing_mode !== "legacy" && priceError(formState.pricing_mode === "free" ? "0" : formState.pricing_amount))
-    error = priceError(formState.pricing_amount);
-  else if (!formState.max_capacity || !/^\d+$/.test(formState.max_capacity) || Number(formState.max_capacity) < 0) error = "Capacity must be a nonnegative whole number.";
-  else if (invalidSections.mentors)
-    error = "Every mentor requires a full name.";
-  else if (invalidSections.sponsors)
-    error = "Every sponsor requires a name.";
-  else if (formState.publish_at && formState.status !== "draft")
-    error = "Only draft events can have a publish date.";
-  else if (
-    formState.publish_at &&
-    timestamptzToDatetimeLocal(datetimeLocalToTimestamptz(formState.publish_at)) !==
-      formState.publish_at
-  )
-    error = "Publish date must be a valid date and time in Pacific time.";
-  else if (
-    formState.publish_at &&
-    Date.parse(datetimeLocalToTimestamptz(formState.publish_at)!) <= Date.now()
-  )
-    error = "Publish date must be in the future.";
-  else if (
-    !formState.date_location && (!isCompleteDateTime(formState.starts_at) ||
-    !isCompleteDateTime(formState.ends_at))
-  )
-    error = "Event start and end dates and times are required.";
-  else if (!formState.date_location && isEventScheduleRangeInvalid(formState))
-    error = "Event end time must be after the start time.";
-  else if (
-    [formState.registration_opens_at, formState.registration_closes_at].some(
-      (value) => value && !strictPacificTimestamp(value)
-    )
-  )
-    error = "Registration dates require both a date and time.";
-  else if (
-    isDateTimeRangeInvalid(
-      formState.registration_opens_at,
-      formState.registration_closes_at
-    )
-  )
-    error = "Registration end time must be after the start time.";
-  else if (
-    !checkInEvents.every(
-      (item) => item.name && item.start_time && item.end_time
-    )
-  )
-    error =
-      "All check-in sessions require name, start time, and end time.";
-  else if (
-    checkInEvents.some((item) =>
-      isDateTimeRangeInvalid(item.start_time, item.end_time)
-    )
-  )
-    error = "Check-in end time must be after the start time.";
-
+  if (invalidSections.mentors) add("people", "builder-people", "Every mentor requires a full name.", true);
+  if (invalidSections.sponsors) add("people", "builder-people", "Every sponsor requires a name.", true);
+  if (formState.publish_at) {
+    if (formState.status !== "draft") add("summary", "publish-date", "Only draft events can have a publish date.");
+    else if (!strictPacificTimestamp(formState.publish_at)) add("summary", "publish-date", "Publish date must be a valid date and time in Pacific time.");
+    else if (Date.parse(strictPacificTimestamp(formState.publish_at)!) <= Date.now()) add("summary", "publish-date", "Publish date must be in the future.");
+    else if (formState.registration_closes_at && strictPacificTimestamp(formState.registration_closes_at) && strictPacificTimestamp(formState.publish_at)! >= strictPacificTimestamp(formState.registration_closes_at)!) add("summary", "publish-date", "Publish time must be before registration closes.");
+  }
+  if (formState.date_location) {
+    issues.push(...dateLocationIssues(formState.date_location).map(issue => ({ ...issue, section: "dates" as const })));
+  } else {
+    if (!isCompleteDateTime(formState.starts_at) || !isCompleteDateTime(formState.ends_at)) add("dates", "builder-dates", "Event start and end dates and times are required.", true);
+    else if (isEventScheduleRangeInvalid(formState)) add("dates", "builder-dates", "Event end time must be after the start time.");
+    if (!checkInEvents.every(item => item.name && item.start_time && item.end_time)) add("registration", "builder-registration", "All check-in sessions require name, start time, and end time.", true);
+    else if (checkInEvents.some(item => isDateTimeRangeInvalid(item.start_time, item.end_time))) add("registration", "builder-registration", "Check-in end time must be after the start time.");
+  }
+  for (const field of ["registration_opens_at", "registration_closes_at"] as const) {
+    if (formState[field] && !strictPacificTimestamp(formState[field])) add("registration", `${field}-date`, "Registration dates require both a date and time.");
+  }
+  if (isDateTimeRangeInvalid(formState.registration_opens_at, formState.registration_closes_at)) add("registration", "registration_closes_at-date", "Registration end time must be after the start time.");
   const questionErrors: Record<number, string> = {};
   if (formState.requires_application && !applicationTemplate.length) questionErrors[-1] = "Applications require at least one valid question before publication.";
   applicationTemplate.forEach((item, index) => {
@@ -381,16 +354,26 @@ export function validateEventForm(
         "Select response questions require at least one option.";
     }
   });
+
   invalidSections.applications = Object.keys(questionErrors).length > 0;
-
-  if (!error) error = teamSettingsProblem(formState);
-  if (!error) error = applicationTimingProblem(formState);
-
-  if (!error && invalidSections.applications) {
-    error = "Please fix the errors in application questions.";
+  for (const [index, message] of Object.entries(questionErrors)) add("registration", Number(index) < 0 ? "builder-registration" : `question_${index}`, message, true);
+  add("teams", "builder-teams", teamSettingsProblem(formState));
+  add("registration", "builder-registration", applicationTimingProblem(formState));
+  if (formState.content) {
+    const content = formState.content;
+    for (const section of content.sections) {
+      const problem = eventContentProblem({ ...content, sections: [section], links: [] });
+      add("people", `people-section-${section.key}`, problem, !!problem && (!section.title.trim() || !section.items.length || section.items.some(item => !item.name.trim())));
+    }
+    // Cross-section constraints are checked once as well.
+    const problem = eventContentProblem({ ...content, links: [] });
+    if (problem && !issues.some(issue => issue.section === "people" && issue.message === problem)) add("people", "builder-people", problem);
+    for (const link of content.links) add("resources", `url-${link.id}`, eventContentProblem({ ...content, sections: [], links: [link] }), !link.url || (link.type === "other" && !link.label.trim()));
   }
-
-  return { error, questionErrors, invalidSections };
+  // Keep the public result's existing question error message for callers.
+  const first = issues[0];
+  const error = first && first.section === "registration" && first.target.startsWith("question_") ? "Please fix the errors in application questions." : first?.message ?? null;
+  return { error, issues, questionErrors, invalidSections };
 }
 
 const isTextType = (response: ApplicationQuestionTemplate["response"]) =>

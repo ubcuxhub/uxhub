@@ -23,7 +23,7 @@ import {
   adminUpdateUserInfoById,
 } from "@/lib/supabase-helpers/admin-server";
 import { datetimeLocalToTimestamptz } from "@/lib/date";
-import { assertPublishAt, isTimestamptz } from "@/features/admin/lib/event-publication";
+import { assertPublishAt, isTimestamptz, builderPublicationProblem, publicationClosingProblem } from "@/features/admin/lib/event-publication";
 import {
   validateMembershipTypeInput,
   type MembershipTypeInput,
@@ -179,7 +179,18 @@ export async function updateUserRoleAction(
   return data;
 }
 
+export interface SavedEventPublication {
+  id: string;
+  name: string;
+  status: "draft" | "active";
+  publish_at: string | null;
+  registration_opens_at: string | null;
+  registration_closes_at: string | null;
+}
+
 export interface SaveAdminEventInput {
+  /** Checked under the same row lock as the write, including cron activation. */
+  expectedPublication?: { status: "draft" | "active"; publish_at: string | null } | null;
   applicationTiming?: { decisions_release_at: string | null; confirmation_deadline: string | null };
   dateLocation?: EventDateLocationDraft | null;
   content?: EventContent;
@@ -205,7 +216,7 @@ export interface SaveAdminEventInput {
  * questions, each in the order they were sent, or why the save was refused.
  */
 export type SaveAdminEventResult =
-  | { id: string; checkInSessionIds: string[]; questionIds: string[]; dateLocationRevision?: number; content?: EventContent }
+  | { id: string; checkInSessionIds: string[]; questionIds: string[]; dateLocationRevision?: number; content?: EventContent; publication?: SavedEventPublication }
   | { error: string };
 
 // Not exported: a "use server" module may only export async functions, and the
@@ -336,6 +347,8 @@ export async function saveAdminEventAction(
     const error = priceError(String(input.event.configured_price ?? ""));
     if (error) throw new Error(error);
   }
+  const publicationProblem = publicationClosingProblem(input.event) ?? builderPublicationProblem(input);
+  if (publicationProblem) return { error: publicationProblem };
   let slug: string | null = null;
 
   if (!input.eventId) {
@@ -363,7 +376,7 @@ export async function saveAdminEventAction(
       p_draft_id: input.draftId ?? null,
       p_draft_revision: input.draftRevision ?? 0,
       p_expected_header_image_url: input.expectedHeaderImageUrl ?? null,
-      p_event: { ...input.event, ...datePayload, ...(input.content ? { _content: input.content } : {}), ...(input.applicationTiming ? { _application_timing: input.applicationTiming } : {}) },
+      p_event: { ...input.event, ...datePayload, ...(input.expectedPublication ? { _expected_publication: input.expectedPublication } : {}), ...(input.content ? { _content: input.content } : {}), ...(input.applicationTiming ? { _application_timing: input.applicationTiming } : {}) },
       p_slug: slug,
       p_expected_image_url: input.expectedImageUrl,
       p_check_in_sessions: input.checkInSessions,
@@ -373,6 +386,7 @@ export async function saveAdminEventAction(
     }
   );
   if (error) {
+    if (error.hint === "EVENT_PUBLICATION_CONFLICT" || error.hint === "EVENT_PUBLICATION_INVALID") return { error: error.message };
     if (error.message.includes(IMAGE_CONFLICT_SENTINEL)) {
       throw new Error(SAVE_CONFLICT_ERROR);
     }
@@ -388,7 +402,7 @@ export async function saveAdminEventAction(
       "New pricing is saved as a draft. Publication requires the pricing and free-registration integration.",
       "Pricing activation requires the pricing integration.",
     ];
-    if (configurationMessages.includes(error.message)) throw new Error(error.message);
+    if (configurationMessages.includes(error.message)) return { error: error.message };
     if (error.code === "23505" && /events_slug|event_url_claims/.test(error.message)) throw new Error("This page URL is already in use.");
     if (error.code === "23514" && /events_configured_/.test(error.message)) throw new Error("Review the marketing destination and pricing before saving.");
     if (error.code === "23514" && /events_(min_team_size|max_team_size|team_size_range)_check/.test(error.message)) return { error: "Team sizes must be positive whole numbers with minimum no greater than maximum." };
@@ -403,6 +417,7 @@ export async function saveAdminEventAction(
     removed_files?: string[];
     content?: EventContent;
     date_location_revision?: number;
+    publication?: SavedEventPublication;
   } | null;
   if (!saved?.id) throw new Error("The event save returned no event id.");
 
@@ -428,6 +443,7 @@ export async function saveAdminEventAction(
   revalidatePath("/events", "layout");
   return {
     id: saved.id,
+    publication: saved.publication,
     content: saved.content,
     dateLocationRevision: saved.date_location_revision,
     checkInSessionIds: saved.check_in_session_ids ?? [],

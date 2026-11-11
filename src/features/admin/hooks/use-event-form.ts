@@ -53,6 +53,8 @@ import type { Json } from "@/lib/supabase/database.types";
 import { useUnsavedChangesGuard } from "./use-unsaved-changes-guard";
 
 interface UseEventFormOptions {
+  /** Validate uncommitted control text before using the model’s last value. */
+  validateControls?: (draft: boolean) => boolean;
   initialContent?: EventContent;
   initialApplicationSettings?: EventApplicationSettingsRow | null;
   initialDateLocation?: { document: EventDateLocationDraft; revision: number } | null;
@@ -70,7 +72,7 @@ const LEGACY_DRAFT_KEY = "event_create_form_draft";
 
 export function useEventForm({
   initialContent,
-  eventId,
+  eventId: initialEventId,
   initialDateLocation,
   initialDraft,
   initialEvent = null,
@@ -80,8 +82,15 @@ export function useEventForm({
   initialMentors = [],
   initialSponsors = [],
   onSuccess,
+  validateControls,
 }: UseEventFormOptions) {
   const router = useRouter();
+  const [eventId, setEventId] = useState(initialEventId);
+  const [publication, setPublication] = useState({ status: initialEvent?.status ?? "draft", publish_at: initialEvent?.publish_at ?? null });
+  const expectedPublication = useRef(initialEvent ? { status: initialEvent.status, publish_at: initialEvent.publish_at } : null);
+  const [publicationSuccess, setPublicationSuccess] = useState<null | { id: string; name: string; status: string; publish_at: string | null; registration_opens_at: string | null; registration_closes_at: string | null; completed_at: number }>(null);
+  const [publishAttempted, setPublishAttempted] = useState(false);
+  const [validationAttempt, setValidationAttempt] = useState(0);
   const startingFormState = useMemo(
     () => {
       const state = initialDraft?.document.formState;
@@ -162,6 +171,7 @@ export function useEventForm({
   const [draftId, setDraftId] = useState(() => initialDraft?.id ?? crypto.randomUUID());
   const draftRevision = useRef(initialDraft?.revision ?? 0);
   const hasSavedDraft = useRef(!!initialDraft);
+  const lastSavedDraftState = useRef<EventFormState | null>(null);
   const [showDraftSaved, setShowDraftSaved] = useState(false);
   const [pendingHeaderFile, setPendingHeaderFile] = useState<File | null>(null);
   const persistedHeaderUrl = useRef(initialEvent?.header_image_url ?? null);
@@ -295,6 +305,11 @@ export function useEventForm({
 
   const handleSaveDraft = async (showSuccess = true): Promise<boolean> => {
     if (submitLock.current) return false;
+    if (validateControls && !validateControls(true)) {
+      setError("Finish or clear invalid field text before saving a draft.");
+      setValidationAttempt(value => value + 1);
+      return false;
+    }
     submitLock.current = true;
     toast.dismiss(draftErrorToastId);
     setIsSubmitting(true);
@@ -306,6 +321,7 @@ export function useEventForm({
       if (pendingImageFile) { saved.image_url = await uploadImage(pendingImageFile); uploads.push(saved.image_url); }
       if (pendingHeaderFile) { saved.header_image_url = await uploadImage(pendingHeaderFile, "header"); saved.header_colour = ""; uploads.push(saved.header_image_url); }
       const result = await saveAdminEventDraftAction({ id: draftId, eventId: eventId ?? null, revision: draftRevision.current, document: { version: 1, formState: saved, checkInEvents, mentors, sponsors, applicationTemplate: questions.applicationTemplate } });
+      lastSavedDraftState.current = saved;
       draftRevision.current = result.revision;
       clearRecoveredLegacyDraft();
       hasSavedDraft.current = true;
@@ -332,16 +348,17 @@ export function useEventForm({
   // Retry the latest values, including edits made after the failed request.
   useEffect(() => { retryDraftSave.current = showSuccess => { void handleSaveDraft(showSuccess); }; });
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (event.currentTarget?.reportValidity && !event.currentTarget.reportValidity()) return;
-    if (submitLock.current) return;
+  const publicationToastId = useId();
+  useEffect(() => () => toast.dismiss(publicationToastId), [publicationToastId]);
+  const retryPublication = useRef<(intent: "publish" | "schedule" | "cancel" | "save") => void>(() => {});
+  const saveEvent = async (state: EventFormState, intent: "publish" | "schedule" | "cancel" | "save", uploadedWithDraft = false): Promise<boolean> => {
+    if (submitLock.current) return false;
+    toast.dismiss(publicationToastId);
     setShowConfigurationErrors(true);
     resetSuccessMessage();
     setError(null);
-    if (formState.content) { const problem = eventContentProblem(formState.content); if (problem) { setError(problem); window.dispatchEvent(new Event("event-content-invalid")); return; } }
     const validation = validateEventForm(
-      formState,
+      state,
       checkInEvents,
       questions.applicationTemplate,
       mentors,
@@ -360,90 +377,92 @@ export function useEventForm({
           validation.invalidSections.applications,
       }));
       setError(validation.error);
-      return;
+      setValidationAttempt(value => value + 1);
+      return false;
     }
     submitLock.current = true;
     setIsSubmitting(true);
 
-    let imageUrl = formState.image_url;
+    let imageUrl = state.image_url;
     // Tracked separately so a failure after the upload can take the orphaned
     // object back out instead of leaking one per attempt.
     let uploadedImageUrl: string | null = null;
-    let headerUrl = formState.header_image_url;
+    let headerUrl = state.header_image_url;
     let uploadedHeaderUrl: string | null = null;
     try {
-      if (pendingImageFile) {
+      if (pendingImageFile && !uploadedWithDraft) {
         imageUrl = await uploadImage(pendingImageFile);
         uploadedImageUrl = imageUrl;
       }
-      if (pendingHeaderFile) { headerUrl = await uploadImage(pendingHeaderFile, "header"); uploadedHeaderUrl = headerUrl; }
+      if (pendingHeaderFile && !uploadedWithDraft) { headerUrl = await uploadImage(pendingHeaderFile, "header"); uploadedHeaderUrl = headerUrl; }
       const payload: EventUpdate = {
-        name: formState.name,
-        short_description: formState.short_description || null,
-        description: formState.description,
-        description_rich: formState.description_rich as unknown as Json,
+        name: state.name,
+        short_description: state.short_description || null,
+        description: state.description,
+        description_rich: state.description_rich as unknown as Json,
         header_image_url: headerUrl || null,
-        header_colour: headerUrl ? null : formState.header_colour || null,
-        event_colour: formState.event_colour,
-        status: formState.status,
-        publish_at: formState.status === "draft"
-          ? datetimeLocalToTimestamptz(formState.publish_at)
+        header_colour: headerUrl ? null : state.header_colour || null,
+        event_colour: state.event_colour,
+        status: state.status,
+        publish_at: state.status === "draft"
+          ? datetimeLocalToTimestamptz(state.publish_at)
           : null,
-        event_type: formState.event_type,
-        mentors_enabled: formState.mentors_enabled,
-        sponsors_enabled: formState.sponsors_enabled,
-        agenda_enabled: formState.agenda_enabled,
-        teams_enabled: formState.teams_enabled,
-        min_team_size: formState.min_team_size === "" ? null : Number(formState.min_team_size),
-        max_team_size: formState.max_team_size === "" ? null : Number(formState.max_team_size),
-        team_deadline: datetimeLocalToTimestamptz(formState.team_deadline),
-        requires_application: formState.requires_application,
-        configured_marketing_mode: formState.marketing_mode,
-        configured_marketing_url: formState.marketing_url || null,
-        configured_slug_edited: formState.slug_edited,
-        configured_slug: formState.slug_edited ? formState.page_slug || null : formState.page_slug || suggestedEventSlug(formState.name),
-        is_featured: formState.is_featured,
-        ...(formState.pricing_mode === "legacy" ? {} : {
-          configured_pricing_mode: formState.pricing_mode,
-          configured_price: formState.pricing_mode === "free" ? 0 : Number(formState.pricing_amount),
+        event_type: state.event_type,
+        mentors_enabled: state.mentors_enabled,
+        sponsors_enabled: state.sponsors_enabled,
+        agenda_enabled: state.agenda_enabled,
+        teams_enabled: state.teams_enabled,
+        min_team_size: state.min_team_size === "" ? null : Number(state.min_team_size),
+        max_team_size: state.max_team_size === "" ? null : Number(state.max_team_size),
+        team_deadline: datetimeLocalToTimestamptz(state.team_deadline),
+        requires_application: state.requires_application,
+        configured_marketing_mode: state.marketing_mode,
+        configured_marketing_url: state.marketing_url || null,
+        configured_slug_edited: state.slug_edited,
+        configured_slug: state.slug_edited ? state.page_slug || null : state.page_slug || suggestedEventSlug(state.name),
+        is_featured: state.is_featured,
+        ...(state.pricing_mode === "legacy" ? {} : {
+          configured_pricing_mode: state.pricing_mode,
+          configured_price: state.pricing_mode === "free" ? 0 : Number(state.pricing_amount),
         }),
         // Effective amounts on existing events are deliberately omitted. New
         // events cannot activate or register until deferred fulfillment lands.
         ...(!eventId ? {
-          regular_price: formState.pricing_mode === "legacy" ? Number(formState.regular_price) : formState.pricing_mode === "free" ? 0 : Number(formState.pricing_amount),
-          member_price: formState.pricing_mode === "legacy" ? Number(formState.member_price) : 0,
+          regular_price: state.pricing_mode === "legacy" ? Number(state.regular_price) : state.pricing_mode === "free" ? 0 : Number(state.pricing_amount),
+          member_price: state.pricing_mode === "legacy" ? Number(state.member_price) : 0,
         } : {}),
-        max_capacity: Number(formState.max_capacity),
-        created_at: formState.created_at || new Date().toISOString(),
-        location_building: formState.location_building || undefined,
-        location_room: formState.location_room || undefined,
-        location_address_url: formState.location_address_url || undefined,
-        starts_at: datetimeLocalToTimestamptz(formState.starts_at),
-        ends_at: datetimeLocalToTimestamptz(formState.ends_at),
+        max_capacity: Number(state.max_capacity),
+        created_at: state.created_at || new Date().toISOString(),
+        location_building: state.location_building || undefined,
+        location_room: state.location_room || undefined,
+        location_address_url: state.location_address_url || undefined,
+        starts_at: datetimeLocalToTimestamptz(state.starts_at),
+        ends_at: datetimeLocalToTimestamptz(state.ends_at),
         image_url: imageUrl || null,
         registration_opens_at: datetimeLocalToTimestamptz(
-          formState.registration_opens_at
+          state.registration_opens_at
         ),
         registration_closes_at: datetimeLocalToTimestamptz(
-          formState.registration_closes_at
+          state.registration_closes_at
         ),
       };
-      const checkInSessions = formState.date_location ? dateSessions(formState.date_location) : toCheckInSessionInputs(checkInEvents);
+      const checkInSessions = state.date_location ? dateSessions(state.date_location) : toCheckInSessionInputs(checkInEvents);
       const applicationQuestions = initialApplicationSettings?.questions_locked_at ? initialApplicationQuestions : toApplicationQuestionInputs(questions.applicationTemplate);
       const result = await saveAdminEventAction({
         eventId,
-        content: formState.content ?? undefined,
+        expectedPublication: expectedPublication.current,
+        content: state.content ?? undefined,
         draftId: hasSavedDraft.current ? draftId : undefined,
         draftRevision: draftRevision.current,
         expectedHeaderImageUrl: persistedHeaderUrl.current,
         expectedImageUrl: persistedImageUrl.current,
         event: payload,
-        dateLocation: formState.date_location,
-        dateLocationRevision: formState.date_location_revision,
+        dateLocation: state.date_location,
+        dateLocationRevision: state.date_location_revision,
         checkInSessions,
         mentorIds: mentors.map((mentor) => mentor.id!),
         sponsorIds: sponsors.map((sponsor) => sponsor.id!),
-        applicationTiming: { decisions_release_at: datetimeLocalToTimestamptz(formState.decisions_release_at), confirmation_deadline: datetimeLocalToTimestamptz(formState.confirmation_deadline) },
+        applicationTiming: { decisions_release_at: datetimeLocalToTimestamptz(state.decisions_release_at), confirmation_deadline: datetimeLocalToTimestamptz(state.confirmation_deadline) },
         applicationQuestions,
       });
       // A refusal the admin can act on, such as removing a question people
@@ -464,36 +483,25 @@ export function useEventForm({
       clearRecoveredLegacyDraft();
       draftRevision.current = 0;
       setDraftId(crypto.randomUUID());
-      const savedFormState = { ...formState, content: result.content ?? formState.content, image_url: imageUrl, header_image_url: headerUrl,
-        date_location_revision: result.dateLocationRevision ?? formState.date_location_revision,
-        date_location: formState.date_location ? { ...formState.date_location, dates: formState.date_location.dates.map((row, index) => ({ ...row, session_id: result.checkInSessionIds[index] ?? row.session_id })) } : null };
+      const savedFormState = { ...state, content: result.content ?? state.content, image_url: imageUrl, header_image_url: headerUrl,
+        date_location_revision: result.dateLocationRevision ?? state.date_location_revision,
+        date_location: state.date_location ? { ...state.date_location, dates: state.date_location.dates.map((row, index) => ({ ...row, session_id: result.checkInSessionIds[index] ?? row.session_id })) } : null };
       persistedHeaderUrl.current = headerUrl || null;
       setPendingHeaderFile(null);
       persistedImageUrl.current = imageUrl || null;
-      setFormState(savedFormState);
       setPendingImageFile(null);
-      setCleanSnapshot(
-        createFormSnapshot(
-          savedFormState,
-          savedCheckIns,
-          mentors,
-          sponsors,
-          savedTemplate
-        )
-      );
-      setSuccessMessage(
-        eventId ? "Event updated successfully." : "Event created successfully."
-      );
-
-      if (onSuccess) {
-        bypassUnsavedChangesWarning.current = true;
-        onSuccess(result.id);
-      } else if (!eventId) {
-        bypassUnsavedChangesWarning.current = true;
-        router.push("/admin/events");
-      } else {
-        router.refresh();
-      }
+      const savedPublication = result.publication ?? { id: result.id, name: savedFormState.name, status: savedFormState.status, publish_at: datetimeLocalToTimestamptz(savedFormState.publish_at), registration_opens_at: datetimeLocalToTimestamptz(savedFormState.registration_opens_at), registration_closes_at: datetimeLocalToTimestamptz(savedFormState.registration_closes_at) };
+      expectedPublication.current = { status: savedPublication.status as EventFormState["status"], publish_at: savedPublication.publish_at };
+      setPublication(expectedPublication.current);
+      setEventId(result.id);
+      const actualState = { ...savedFormState, status: savedPublication.status as EventFormState["status"], publish_at: timestamptzToDatetimeLocal(savedPublication.publish_at) };
+      setFormState(actualState);
+      setCleanSnapshot(createFormSnapshot(actualState, savedCheckIns, mentors, sponsors, savedTemplate));
+      setSuccessMessage(intent === "cancel" ? "Schedule cancelled. Draft saved." : "Changes saved");
+      if (!eventId) window.history.replaceState(window.history.state, "", `/admin/events/${result.id}/edit`);
+      if (intent === "publish" || intent === "schedule") setPublicationSuccess({ ...savedPublication, completed_at: Date.now() });
+      if (onSuccess) onSuccess(result.id);
+      return true;
     } catch (saveError) {
       // The upload landed but nothing references it, so clean it up. Best
       // effort: the save error is what the admin needs to see.
@@ -505,13 +513,47 @@ export function useEventForm({
           // Leaves an orphaned object; not worth masking the save error.
         }
       }
-      setError(
-        saveError instanceof Error ? saveError.message : "Failed to save event."
-      );
+      const message = saveError instanceof Error ? saveError.message : "Failed to save event.";
+      setError(message);
+      if (intent) toast.error("Couldn’t save publication changes", { id: publicationToastId, duration: Infinity, description: `${message} Your edits are still here. If the response was lost, reload to check the saved state or retry.`, action: { label: "Try again", onClick: () => retryPublication.current(intent) } });
+      return false;
     } finally {
       submitLock.current = false;
       setIsSubmitting(false);
     }
+  };
+
+  const validation = validateEventForm(formState, checkInEvents, questions.applicationTemplate, mentors, sponsors);
+  const handlePublication = async (intent: "publish" | "schedule" | "cancel" | "save", publishAt = formState.publish_at) => {
+    setPublishAttempted(true);
+    const state = { ...formState, status: intent === "publish" ? "active" as const : publication.status, publish_at: intent === "publish" || intent === "cancel" ? "" : intent === "schedule" ? publishAt : formState.publish_at };
+    const controlsValid = validateControls?.(false) ?? true;
+    const nextValidation = validateEventForm(state, checkInEvents, questions.applicationTemplate, mentors, sponsors);
+    if (nextValidation.error || !controlsValid) {
+      setShowConfigurationErrors(true);
+      setValidationAttempt(value => value + 1);
+      setError(nextValidation.error ?? "Fix the invalid fields before publishing.");
+      return false;
+    }
+    setFormState(state);
+    // A durable working-document identity makes a new event's publication
+    // retry reuse the same materialization after response loss.
+    let uploadedWithDraft = false;
+    if (!eventId && !hasSavedDraft.current) {
+      if (!await handleSaveDraft(false)) return false;
+      uploadedWithDraft = true;
+      if (lastSavedDraftState.current) {
+        state.image_url = lastSavedDraftState.current.image_url;
+        state.header_image_url = lastSavedDraftState.current.header_image_url;
+      }
+      setFormState(state);
+    }
+    return saveEvent(state, intent, uploadedWithDraft);
+  };
+  useEffect(() => { retryPublication.current = intent => { void handlePublication(intent); }; });
+  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    await handlePublication(publication.status === "active" || publication.publish_at ? "save" : "publish");
   };
 
   const handleDeleteEvent = async () => {
@@ -535,6 +577,14 @@ export function useEventForm({
 
   return {
     formState,
+    eventId,
+    publication,
+    publicationSuccess,
+    setPublicationSuccess,
+    publishAttempted,
+    validationAttempt,
+    validation,
+    handlePublication,
     showConfigurationErrors,
     legacyDraftRecovered,
     hasUnsavedChanges,

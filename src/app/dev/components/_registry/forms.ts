@@ -22,6 +22,7 @@ export const formsEntries: readonly RegistryEntry[] = [
     importNames: [
       "Field",
       "FieldContent",
+      "FieldValidation",
       "FieldDescription",
       "FieldError",
       "FieldGroup",
