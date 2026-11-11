@@ -26,6 +26,7 @@ export function parseWorkingDocument(input: unknown): EventWorkingDocument {
     state.configuration_initialized = false;
   }
   if (!("teams_enabled" in document.formState)) state.teams_configuration_initialized = false;
+  if (!("agenda_enabled" in document.formState)) state.schedule_configuration_initialized = false;
   for (const [key, initial] of Object.entries(defaultFormState)) {
     const value = state[key as keyof EventFormState];
     if (key === "date_location") {

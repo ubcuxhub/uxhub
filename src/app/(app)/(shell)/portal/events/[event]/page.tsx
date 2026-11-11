@@ -42,7 +42,7 @@ export default async function PortalEventPage({
   }
   
   const [agenda, mentors, sponsors, badges] = await Promise.all([
-    fetchEventAgenda(supabase, event.id),
+    event.agenda_enabled ? fetchEventAgenda(supabase, event.id) : [],
     // Admins switch these sections off per event, as the public event page does.
     event.mentors_enabled ? fetchEventMentors(supabase, event.id) : [],
     event.sponsors_enabled ? fetchEventSponsors(supabase, event.id) : [],

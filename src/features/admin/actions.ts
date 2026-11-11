@@ -299,6 +299,7 @@ export async function saveAdminEventAction(
   await requireAdmin();
 
   assertPublishAt(input.event.status, input.event.publish_at);
+  if ("agenda_enabled" in input.event && typeof input.event.agenda_enabled !== "boolean") return { error: "Schedule visibility must be on or off." };
   const { min_team_size: min, max_team_size: max, team_deadline: deadline } = input.event;
   if ([min, max].some(value => value != null && (!Number.isSafeInteger(value) || value < 1 || value > 2147483647))) return { error: "Team sizes must be positive whole numbers no greater than 2,147,483,647." };
   if (min != null && max != null && min > max) return { error: "Minimum team size cannot exceed maximum team size." };

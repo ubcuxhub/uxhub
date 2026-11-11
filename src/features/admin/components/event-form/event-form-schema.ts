@@ -58,6 +58,8 @@ export interface EventFormState {
   created_at: string;
   mentors_enabled: boolean;
   sponsors_enabled: boolean;
+  schedule_configuration_initialized: boolean;
+  agenda_enabled: boolean;
   teams_configuration_initialized: boolean;
   teams_enabled: boolean;
   min_team_size: string;
@@ -126,6 +128,8 @@ export const defaultFormState: EventFormState = {
   created_at: "",
   mentors_enabled: false,
   sponsors_enabled: false,
+  schedule_configuration_initialized: true,
+  agenda_enabled: false,
   teams_configuration_initialized: true,
   teams_enabled: false,
   min_team_size: "",
@@ -185,6 +189,8 @@ export function formStateFromEvent(event: EventRow): EventFormState {
     created_at: event.created_at ?? "",
     mentors_enabled: event.mentors_enabled,
     sponsors_enabled: event.sponsors_enabled,
+    schedule_configuration_initialized: true,
+    agenda_enabled: event.agenda_enabled ?? true,
     teams_configuration_initialized: true,
     teams_enabled: event.teams_enabled ?? false,
     min_team_size: String(event.min_team_size ?? ""),

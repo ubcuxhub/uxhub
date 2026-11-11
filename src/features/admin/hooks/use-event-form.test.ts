@@ -207,6 +207,7 @@ describe("event form publishing schedule", () => {
     // save_admin_event_atomically writes every events column the payload
     // names, so this is exactly what a save can change.
     expect(Object.keys(payload).sort()).toEqual([
+      "agenda_enabled",
       "configured_marketing_mode", "configured_marketing_url", "configured_slug", "configured_slug_edited", "created_at", "description", "description_rich", "ends_at", "event_colour", "event_type", "header_colour", "header_image_url", "image_url", "is_featured",
       "location_address_url", "location_building", "location_room",
       "max_capacity", "max_team_size", "mentors_enabled", "min_team_size", "name", "publish_at",
@@ -546,4 +547,38 @@ it("saves incomplete team settings in a working document", async () => {
   await act(async () => { await result.current.handleSaveDraft(); });
   expect(result.current.error).toBeNull();
   expect(saveAdminEventDraftAction).toHaveBeenLastCalledWith(expect.objectContaining({ document: expect.objectContaining({ formState: expect.objectContaining({ teams_enabled: true, min_team_size: "0", team_deadline: "2099-01-01T" }) }) }));
+});
+
+it("starts new schedules off and restores old drafts from the event's saved choice", () => {
+  const fresh = renderHook(() => useEventForm({}));
+  expect(fresh.result.current.formState.agenda_enabled).toBe(false);
+  fresh.unmount();
+  const oldState = Object.fromEntries(Object.entries(defaultFormState).filter(([key]) => !["agenda_enabled", "schedule_configuration_initialized"].includes(key)));
+  const document = parseWorkingDocument({ version: 1, formState: oldState, checkInEvents: [], mentors: [], sponsors: [], applicationTemplate: [] });
+  for (const enabled of [true, false]) {
+    const reopened = renderHook(() => useEventForm({ eventId: event.id, initialEvent: { ...event, agenda_enabled: enabled }, initialDraft: { id: "old-draft", revision: 1, document } }));
+    expect(reopened.result.current.formState.agenda_enabled).toBe(enabled);
+    reopened.unmount();
+  }
+});
+
+it.each([true, false])("round-trips schedule visibility %s through working drafts and the event save", async enabled => {
+  const source = { ...event, agenda_enabled: !enabled };
+  const { result, unmount } = renderHook(() => useEventForm({ eventId: source.id, initialEvent: source }));
+  act(() => result.current.handleFieldChange("agenda_enabled", enabled));
+  expect(result.current.hasUnsavedChanges).toBe(true);
+  await act(async () => { await result.current.handleSaveDraft(); });
+  const sent = vi.mocked(saveAdminEventDraftAction).mock.calls.at(-1)![0];
+  unmount();
+  const reopened = renderHook(() => useEventForm({ eventId: source.id, initialEvent: source, initialDraft: { id: sent.id, revision: 1, document: parseWorkingDocument(sent.document) } }));
+  expect(reopened.result.current.formState.agenda_enabled).toBe(enabled);
+  expect(reopened.result.current.hasUnsavedChanges).toBe(false);
+  vi.mocked(saveAdminEventAction).mockResolvedValueOnce({ error: "Offline" });
+  const submit = () => reopened.result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as FormEvent<HTMLFormElement>);
+  await act(async () => { await submit(); });
+  expect(reopened.result.current.error).toBe("Offline");
+  expect(reopened.result.current.formState.agenda_enabled).toBe(enabled);
+  await act(async () => { await submit(); });
+  expect(reopened.result.current.error).toBeNull();
+  expect(saveAdminEventAction).toHaveBeenLastCalledWith(expect.objectContaining({ event: expect.objectContaining({ agenda_enabled: enabled }) }));
 });

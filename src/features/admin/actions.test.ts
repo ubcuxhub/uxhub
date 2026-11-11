@@ -365,6 +365,23 @@ describe("saveAdminEventDraftAction", () => {
 });
 
 describe("saveAdminEventAction", () => {
+  it.each([true, false])("passes the saved agenda visibility %s to the atomic builder", async enabled => {
+    await saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, agenda_enabled: enabled } });
+    expect(adminRpc.mock.calls[0][1].p_event.agenda_enabled).toBe(enabled);
+  });
+
+  it.each([null, "false", 0])("rejects forged agenda visibility %s before writing", async value => {
+    const event = { ...saveInput.event, agenda_enabled: value } as unknown as Parameters<typeof saveAdminEventAction>[0]["event"];
+    await expect(saveAdminEventAction({ ...saveInput, event })).resolves.toEqual({ error: "Schedule visibility must be on or off." });
+    expect(adminRpc).not.toHaveBeenCalled();
+  });
+
+  it("requires authorization before saving agenda visibility", async () => {
+    const denied = new Error("Access denied");
+    guards.requireAdmin.mockRejectedValueOnce(denied);
+    await expect(saveAdminEventAction({ ...saveInput, event: { agenda_enabled: false } })).rejects.toBe(denied);
+    expect(adminRpc).not.toHaveBeenCalled();
+  });
   it.each(["2099-08-01T18:00:00.000Z", null])("saves the publish schedule %s", async (publish_at) => {
     await saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, status: "draft", publish_at } });
     expect(adminRpc.mock.calls[0][1].p_event.publish_at).toBe(publish_at);

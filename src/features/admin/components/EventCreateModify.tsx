@@ -2,6 +2,7 @@
 
 import type { EventApplicationSettingsRow } from "@/lib/supabase/models";
 import { EventTeams } from "./event-form/EventTeams";
+import { EventSchedule } from "./event-form/EventSchedule";
 import { teamSettingsProblem } from "./event-form/event-form-schema";
 import type { EventTeamSettingsInfo } from "@/lib/supabase-helpers/teams";
 import { ApplicationTiming } from "./event-form/ApplicationTiming";
@@ -105,6 +106,7 @@ export const EventCreateModify = ({
     "builder-registration": { number: 4, description: "How members sign up, how many can and how they check in." },
     "builder-teams": { number: 5, description: "Team events show a Your Team card with an invite link on the event page." },
     "builder-people": { number: 7 },
+    "builder-schedule": { number: 6, description: "Shown as the agenda on the event page." },
     "builder-summary": { number: 9 },
     "builder-settings": { number: 10, description: "Actions that affect the whole event." },
   };
@@ -114,6 +116,7 @@ export const EventCreateModify = ({
     { id: "builder-dates", number: 3, title: "Date and location", state: form.formState.date_location && !dateLocationProblem(form.formState.date_location) ? "complete" : "not-started", required: true },
     { id: "builder-registration", number: 4, title: "Registration", state: Number(form.formState.max_capacity) > 0 ? "complete" : "not-started", required: true },
     { id: "builder-teams", number: 5, title: "Teams", state: teamSettingsProblem(form.formState) ? "not-started" : "complete", required: false },
+    { id: "builder-schedule", number: 6, title: "Schedule", state: "complete", required: false },
     { id: "builder-people", number: 7, title: "People and sponsors", state: "optional", required: false },
     { id: "builder-summary", number: 9, title: "Summary", state: "optional", required: false },
     { id: "builder-settings", number: 10, title: "Other settings", state: "optional", required: false },
@@ -168,6 +171,7 @@ export const EventCreateModify = ({
           {section("builder-dates", "Date and location", <EventDateLocation key={form.formState.date_location_revision} value={form.formState.date_location!} disabled={form.isSubmitting} showErrors={form.showConfigurationErrors} onChange={value => form.handleFieldChange("date_location", value)} />)}
           {section("builder-registration", "Registration", <><EventRegistration state={form.formState} disabled={form.isSubmitting} info={registrationInfo} onChange={form.handleFieldChange} /><ApplicationQuestionsSection locked={!!initialApplicationSettings?.questions_locked_at} onMove={form.moveApplicationQuestion} registrationModeOwned enabled={form.formState.requires_application} applicationTemplate={form.applicationTemplate} questionErrors={form.questionErrors} onEnabledChange={enabled => form.handleFieldChange("requires_application", enabled)} onAdd={form.addApplicationQuestion} onRemove={form.removeApplicationQuestion} onUpdate={form.updateApplicationQuestion} onAddResponseOption={form.addResponseOption} onUpdateResponseOption={form.updateResponseOption} onRemoveResponseOption={form.removeResponseOption} />{form.formState.requires_application && <ApplicationTiming state={form.formState} showErrors={form.showConfigurationErrors} onChange={form.handleFieldChange} />}</>)}
           {section("builder-teams", "Teams", <EventTeams state={form.formState} info={teamInfo} showErrors={form.showConfigurationErrors} onChange={form.handleFieldChange} />)}
+          {section("builder-schedule", "Schedule", <EventSchedule enabled={form.formState.agenda_enabled} onChange={enabled => form.handleFieldChange("agenda_enabled", enabled)} />)}
           {section("builder-people", "People and sponsors", <>
           <MentorsSection
             enabled={form.formState.mentors_enabled}
