@@ -1,87 +1,79 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
+import { ticketAppearance } from "@/components/shared/Ticket";
 import { toQrSvg } from "@/features/events/lib/qr-code";
 
 import { EventTicket } from "./EventTicket";
 
 afterEach(cleanup);
 
-const event = {
-  name: "Design Sprint",
-  date: "November 4, 2026",
-  time: "6:00 p.m. – 8:30 p.m.",
-  location: "ICICS, X150",
+const base = {
+  eventName: "Design Sprint",
+  holderName: "Ada Lovelace",
+  qrToken: "3f1c9a52-8d4e-4b7a-9c61-2e5f0d8b7a14.q1v8Zx3mR0aT9cLwP2nYkA",
 };
-const holder = { name: "Ada Lovelace", email: "ada@student.ubc.ca" };
-const qrToken = "3f1c9a52-8d4e-4b7a-9c61-2e5f0d8b7a14.q1v8Zx3mR0aT9cLwP2nYkA";
 const QR_CODE = { name: "Check-in QR code" };
 
 describe("EventTicket", () => {
   it("shows the event, the holder, and a code to scan", () => {
-    render(<EventTicket event={event} holder={holder} qrToken={qrToken} />);
+    render(<EventTicket {...base} />);
 
-    expect(screen.getByRole("article", { name: "Ticket for Design Sprint" }));
-    expect(screen.getByText("November 4, 2026"));
-    expect(screen.getByText("ICICS, X150"));
-    expect(screen.getByText("Ada Lovelace"));
-    expect(screen.getByText("Going"));
-    expect(screen.getByRole("img", QR_CODE));
+    const article = screen.getByRole("article", { name: "Ticket for Design Sprint" });
+    expect(article.textContent).toContain("Design Sprint");
+    expect(article.textContent).toContain("Ada Lovelace");
+    expect(screen.getByRole("img", QR_CODE)).toBeTruthy();
   });
 
   it("draws the code for the token it was given", () => {
-    render(<EventTicket event={event} holder={holder} qrToken={qrToken} />);
+    render(<EventTicket {...base} />);
 
     const path = screen.getByRole("img", QR_CODE).querySelector("path");
-    expect(path?.getAttribute("d")).toBe(toQrSvg(qrToken).path);
+    expect(path?.getAttribute("d")).toBe(toQrSvg(base.qrToken).path);
   });
 
-  it("keeps the code after check-in", () => {
-    render(
-      <EventTicket
-        event={event}
-        holder={holder}
-        badge="checked_in"
-        qrToken={qrToken}
-      />
-    );
+  it("takes its label colour from the event colour, as the compact Ticket does", () => {
+    render(<EventTicket {...base} eventColour="#F2C94C" />);
 
-    expect(screen.getByText("Checked in"));
-    expect(screen.getByRole("img", QR_CODE));
+    const article = screen.getByRole("article", { name: "Ticket for Design Sprint" });
+    const expected = document.createElement("div");
+    expected.style.color = ticketAppearance("#F2C94C").label;
+    expect(article.style.color).toBe(expected.style.color);
   });
 
-  it("uses the student-facing badge and hides the code when they have no ticket", () => {
-    render(
-      <EventTicket
-        event={event}
-        holder={holder}
-        badge="register_by"
-        registerBy="Oct 20"
-        qrToken={qrToken}
-      />
-    );
+  it("shows the event image, or an icon without one", () => {
+    const event = "img[src*='example.com']";
+    const { container, rerender } = render(<EventTicket {...base} imageUrl="https://example.com/a.png" />);
+    expect(container.querySelector(event)).toBeTruthy();
 
-    expect(screen.getByText("Register by Oct 20"));
-    expect(screen.queryByRole("img", QR_CODE)).toBeNull();
-    expect(screen.queryByText("Cancelled")).toBeNull();
+    rerender(<EventTicket {...base} imageUrl={null} />);
+    expect(container.querySelector(event)).toBeNull();
+    expect(container.querySelector("svg.lucide-image")).toBeTruthy();
   });
 
-  it("shows no code without a token", () => {
-    render(<EventTicket event={event} holder={holder} />);
+  it("flips to the logo and back, keeping only the visible side reachable", () => {
+    const { container } = render(<EventTicket {...base} />);
+    const [front, back] = container.querySelectorAll("[inert], .backface-hidden");
+    expect(front.hasAttribute("inert")).toBe(false);
+    expect(back.hasAttribute("inert")).toBe(true);
 
-    expect(screen.queryByRole("img", QR_CODE)).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Flip ticket to show UX Hub logo" }));
+    expect(front.hasAttribute("inert")).toBe(true);
+    expect(back.hasAttribute("inert")).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: "Flip ticket to show QR code" }));
+    expect(front.hasAttribute("inert")).toBe(false);
   });
 
-  it("falls back to TBD for unscheduled details", () => {
-    render(
-      <EventTicket
-        event={{ name: "Design Sprint", date: null, time: null, location: null }}
-        holder={{ name: "Ada Lovelace" }}
-      />
-    );
+  it("puts the white logo on deep colours and the black one on pale colours", () => {
+    const logo = () => screen.getByRole("img", { name: "UBC UX Hub" }).getAttribute("src");
+    render(<EventTicket {...base} eventColour="#325DC4" />);
+    expect(logo()).toContain("logo-stacked-white");
+    cleanup();
 
-    expect(screen.getAllByText("TBD")).toHaveLength(2);
+    render(<EventTicket {...base} eventColour="#F2C94C" />);
+    expect(logo()).toContain("logo-stacked-black");
   });
 });

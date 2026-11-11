@@ -38,6 +38,9 @@ describe("StatusBadge", () => {
       [{ status: "opens", date: "Oct 12" }, "Opens Oct 12", "bg-info"],
       [{ status: "register_by", date: "Oct 20" }, "Register by Oct 20", "bg-info"],
       [{ status: "registration_closed" }, "Registration closed", "bg-muted"],
+      [{ status: "applications_open" }, "Applications open", "bg-success"],
+      [{ status: "applications_closed" }, "Applications closed", "bg-muted"],
+      [{ status: "draft" }, "Draft", "bg-muted"],
       [{ status: "under_review" }, "Under review", "bg-warning"],
       [{ status: "offer_expired" }, "Offer expired", "bg-muted"],
     ] as const;
@@ -48,7 +51,7 @@ describe("StatusBadge", () => {
       expect(badge().querySelector("svg"), text).toBeTruthy();
       cleanup();
     }
-    expect(STUDENT_EVENT_STATUSES).toHaveLength(5);
+    expect(STUDENT_EVENT_STATUSES).toHaveLength(8);
   });
 
   it("still reads sensibly when a dated status has no date", () => {

@@ -19,6 +19,7 @@ const alertVariants = cva(
         warning: "bg-warning text-warning-foreground",
         info: "bg-info text-info-foreground",
         destructive: "bg-error text-destructive",
+        neutral: "bg-muted text-foreground",
       },
     },
     defaultVariants: {
