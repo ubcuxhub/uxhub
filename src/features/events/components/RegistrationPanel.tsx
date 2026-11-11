@@ -144,10 +144,11 @@ function ActionLayout({ title, description, action }: ActionLayoutProps) {
 }
 
 /**
- * Wide (from a 768px card): the copy and buttons on the left, up to 480px,
- * and the ticket 40px to their right; spare width stays on the far right.
- * Stacked: the copy, then the ticket up to 444px, then the buttons at full
- * width (Figma "RegistrationTicket").
+ * Wide (from an 896px card): the copy and buttons on the left, up to 480px,
+ * and the 444px ticket 40px to their right; spare width stays on the far
+ * right. The buttons sit in a row that wraps when the column is narrow.
+ * Narrower: the copy, then the ticket, then the buttons at full width
+ * (Figma "RegistrationTicket").
  */
 function TicketLayout({
   title,
@@ -161,15 +162,15 @@ function TicketLayout({
   const hasActions = Boolean(primary || secondary);
 
   return (
-    <div className="grid gap-4 @3xl:grid-cols-[minmax(0,480px)_444px] @3xl:items-center @3xl:gap-x-10">
-      <div className={cn("flex min-w-0 flex-col gap-1 text-body", hasActions && "@3xl:self-end")}>
+    <div className="grid gap-4 @4xl:grid-cols-[minmax(0,480px)_444px] @4xl:items-center @4xl:gap-x-10">
+      <div className={cn("flex min-w-0 flex-col gap-1 text-body", hasActions && "@4xl:self-end")}>
         {title ? <p className="text-foreground">{title}</p> : null}
         <p className={title ? "text-muted-foreground" : "text-foreground"}>{description}</p>
         {priceLine ? <p className="mt-2 text-small text-muted-foreground">{priceLine}</p> : null}
       </div>
 
       <Ticket
-        className="@3xl:col-start-2 @3xl:row-span-2 @3xl:row-start-1"
+        className="@4xl:col-start-2 @4xl:row-span-2 @4xl:row-start-1"
         eventName={ticket.eventName}
         holderName={ticket.holderName}
         eventColour={ticket.eventColour ?? undefined}
@@ -178,7 +179,7 @@ function TicketLayout({
       />
 
       {hasActions ? (
-        <div className="flex flex-col gap-3 @3xl:flex-row @3xl:items-start @3xl:self-start">
+        <div className="flex flex-col gap-3 @4xl:flex-row @4xl:flex-wrap @4xl:self-start">
           {primary ? <PanelButton action={primary} ticket={ticket} /> : null}
           {secondary ? <PanelButton action={secondary} variant="secondary" ticket={ticket} /> : null}
         </div>
