@@ -146,6 +146,7 @@ export const MANIFEST = [
     uses: ["card", "field", "input", "select", "textarea", "checkbox", "button", "status-badge", "toast"],
   },
   { id: "builder-date-location", column: 5, uses: ["card", "separator", "field", "date-time-field", "segmented-toggle", "radio-group", "select", "input", "button", "icon-button", "confirm-dialog"] },
+  { id: "builder-people-ordering", column: 5, uses: ["sortable-section", "button", "field", "input"] },
   // Column 5: Event builder
   {
     id: "builder-basics",

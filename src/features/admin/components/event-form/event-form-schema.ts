@@ -1,3 +1,4 @@
+import { type EventContent } from "../../lib/event-content";
 import { dateLocationProblem, dateSessions, emptyEventDate, emptyLocation, type EventDateLocationDraft } from "../../lib/event-date-location";
 import { parseEventDescription, type EventDescription } from "@/lib/event-description";
 import { eventSlugError, priceError, suggestedEventSlug, websiteUrlError } from "../../lib/event-configuration";
@@ -23,6 +24,7 @@ import {
 } from "@/lib/date";
 
 export interface EventFormState {
+  content: EventContent | null;
   date_location: EventDateLocationDraft | null;
   date_location_revision: number;
   configuration_initialized: boolean;
@@ -94,6 +96,7 @@ export const EMPTY_CHECK_IN_SESSION: CheckInSessionDraft = {
 };
 
 export const defaultFormState: EventFormState = {
+  content: null,
   date_location: null,
   date_location_revision: 0,
   configuration_initialized: true,
@@ -151,6 +154,7 @@ export function getInitialFormState(): EventFormState {
 /** The builder's form state for a stored event. */
 export function formStateFromEvent(event: EventRow): EventFormState {
   return {
+    content: null,
     date_location: null,
     date_location_revision: 0,
     configuration_initialized: true,

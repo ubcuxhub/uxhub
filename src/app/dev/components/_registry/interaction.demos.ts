@@ -6,6 +6,7 @@ import type { DemoLoader } from "@/app/dev/_shell/types";
  * only the component page imports this, and it loads one demo.
  */
 export const interactionDemos: Record<string, DemoLoader> = {
+  "sortable-section": () => import("../_demos/sortable-section"),
   button: () => import("../_demos/button"),
   "icon-button": () => import("../_demos/icon-button"),
   spinner: () => import("../_demos/spinner"),

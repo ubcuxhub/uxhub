@@ -1,0 +1,89 @@
+-- Once copied, an entry remains event-owned even if reverted to source values.
+-- The original migration is already applied locally; retain its history.
+create or replace function public.save_admin_event_atomically(
+ p_event_id uuid, p_event jsonb, p_slug text, p_expected_image_url text,
+ p_check_in_sessions jsonb, p_application_questions jsonb, p_mentors jsonb, p_sponsors jsonb
+) returns jsonb language plpgsql set search_path = '' as $$
+declare
+ d jsonb := p_event->'_content'; r jsonb; eid uuid; sec jsonb; item jsonb; link jsonb;
+ sid uuid; mid uuid; pos integer; section_pos integer := 0; existing_revision integer;
+ m public.mentors; sp public.sponsors; selected_mentors jsonb; selected_sponsors jsonb;
+begin
+ if d is null then
+   return public.save_admin_event_before_content(p_event_id,p_event,p_slug,p_expected_image_url,p_check_in_sessions,p_application_questions,p_mentors,p_sponsors);
+ end if;
+ perform public.validate_event_content(d);
+ if p_event_id is not null then
+   perform 1 from public.events where id = p_event_id for update;
+   select revision into existing_revision from public.event_content_settings where event_id = p_event_id;
+   if coalesce(existing_revision,0) <> coalesce((d->>'revision')::integer,0) then raise exception 'People or resources changed in another tab. Reload before saving.' using hint = 'EVENT_CONTENT_INVALID'; end if;
+ end if;
+ -- The legacy save must retain the associations until the complete editor syncs them.
+ select coalesce(jsonb_agg(mentor_id order by sort_order),'[]') into selected_mentors
+ from public.event_mentors where event_id = p_event_id and section_id in (select id from public.event_people_sections where event_id = p_event_id and lower(btrim(title)) = 'mentors');
+ select coalesce(jsonb_agg(sponsor_id order by sort_order),'[]') into selected_sponsors from public.event_sponsors where event_id = p_event_id;
+ p_event := p_event || jsonb_build_object('mentors_enabled', exists(select 1 from jsonb_array_elements(d->'sections') s where s->>'kind' <> 'Sponsors'), 'sponsors_enabled', exists(select 1 from jsonb_array_elements(d->'sections') s where s->>'kind' = 'Sponsors'));
+ r := public.save_admin_event_before_content(p_event_id,p_event - '_content',p_slug,p_expected_image_url,p_check_in_sessions,p_application_questions,selected_mentors,selected_sponsors);
+ eid := (r->>'id')::uuid;
+ -- All changes below participate in the parent transaction; shared rows are never updated.
+ delete from public.event_mentors where event_id = eid;
+ delete from public.event_sponsors where event_id = eid;
+ -- Retain section identities; park titles to allow renaming/swapping custom names.
+ update public.event_people_sections set title = '__content_' || id::text where event_id = eid;
+ for sec in select value from jsonb_array_elements(d->'sections') loop
+   sid := (sec->>'key')::uuid;
+   if exists(select 1 from public.event_people_sections where id = sid and event_id <> eid) then raise exception 'Section belongs to another event.' using hint = 'EVENT_CONTENT_INVALID'; end if;
+   insert into public.event_people_sections(id,event_id,title,sort_order) values(sid,eid,sec->>'title',section_pos)
+   on conflict(id) do update set title=excluded.title,sort_order=excluded.sort_order;
+   pos := 0;
+   for item in select value from jsonb_array_elements(sec->'items') loop
+     mid := null;
+     if sec->>'kind' = 'Sponsors' then
+       if item->>'directory_id' is not null and not exists(select 1 from public.sponsors where id=(item->>'key')::uuid and owner_event_id=eid) then
+         select * into sp from public.sponsors where id = (item->>'directory_id')::uuid and owner_event_id is null;
+         if not found then raise exception 'The selected shared sponsor was not found.' using hint = 'EVENT_CONTENT_INVALID'; end if;
+         if (sp.name,coalesce(sp.description,''),coalesce(sp.website_url,''),coalesce(sp.brand_logo_path,'')) is not distinct from
+            (item->>'name',item->>'description',item->>'url',item->>'image_url') then mid := sp.id; end if;
+       end if;
+       if mid is null then
+         mid := (item->>'key')::uuid;
+         if exists(select 1 from public.sponsors where id = mid and owner_event_id is distinct from eid) then raise exception 'Entry belongs to another event.' using hint = 'EVENT_CONTENT_INVALID'; end if;
+         insert into public.sponsors(id,owner_event_id,name,description,website_url,brand_logo_path)
+         values(mid,eid,btrim(item->>'name'),nullif(item->>'description',''),nullif(item->>'url',''),nullif(item->>'image_url',''))
+         on conflict(id) do update set name=excluded.name,description=excluded.description,website_url=excluded.website_url,brand_logo_path=excluded.brand_logo_path;
+       end if;
+       insert into public.event_sponsors(event_id,sponsor_id,sort_order) values(eid,mid,pos);
+     else
+       if item->>'directory_id' is not null and not exists(select 1 from public.mentors where id=(item->>'key')::uuid and owner_event_id=eid) then
+         select * into m from public.mentors where id = (item->>'directory_id')::uuid and owner_event_id is null;
+         if not found then raise exception 'The selected shared person was not found.' using hint = 'EVENT_CONTENT_INVALID'; end if;
+         if (m.full_name,coalesce(m.position,''),coalesce(m.description,''),coalesce(m.linkedin_url,''),coalesce(m.profile_image_path,'')) is not distinct from
+           (item->>'name',item->>'position',item->>'description',item->>'url',item->>'image_url') then mid := m.id; end if;
+       end if;
+       if mid is null then
+         mid := (item->>'key')::uuid;
+         if exists(select 1 from public.mentors where id = mid and owner_event_id is distinct from eid) then raise exception 'Entry belongs to another event.' using hint = 'EVENT_CONTENT_INVALID'; end if;
+         insert into public.mentors(id,owner_event_id,full_name,position,description,linkedin_url,profile_image_path)
+         values(mid,eid,btrim(item->>'name'),nullif(item->>'position',''),nullif(item->>'description',''),nullif(item->>'url',''),nullif(item->>'image_url',''))
+         on conflict(id) do update set full_name=excluded.full_name,position=excluded.position,description=excluded.description,linkedin_url=excluded.linkedin_url,profile_image_path=excluded.profile_image_path;
+       end if;
+       insert into public.event_mentors(event_id,section_id,mentor_id,sort_order) values(eid,sid,mid,pos);
+     end if;
+     pos := pos + 1;
+   end loop;
+   section_pos := section_pos + 1;
+ end loop;
+ delete from public.event_people_sections where event_id=eid and id not in (select (value->>'key')::uuid from jsonb_array_elements(d->'sections'));
+ for link in select value from jsonb_array_elements(d->'links') loop
+   if exists(select 1 from public.event_links where id=(link->>'id')::uuid and event_id<>eid) then raise exception 'Resource belongs to another event.' using hint = 'EVENT_CONTENT_INVALID'; end if;
+ end loop;
+ delete from public.event_links where event_id=eid;
+ insert into public.event_links(id,event_id,type,label,url,visibility,sort_order)
+ select (value->>'id')::uuid,eid,(value->>'type')::public.event_link_type,nullif(btrim(value->>'label'),''),value->>'url',(value->>'visibility')::public.event_link_visibility,ordinality-1
+ from jsonb_array_elements(d->'links') with ordinality;
+ d := d || jsonb_build_object('revision',coalesce(existing_revision,0)+1);
+ insert into public.event_content_settings(event_id,document,revision) values(eid,d,coalesce(existing_revision,0)+1)
+ on conflict(event_id) do update set document=excluded.document,revision=excluded.revision;
+ return r || jsonb_build_object('content', d);
+end;
+$$;

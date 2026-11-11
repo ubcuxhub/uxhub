@@ -37,6 +37,8 @@ function TableCard({ className, ...props }: React.ComponentProps<"div">) {
 }
 
 interface TableProps extends React.ComponentProps<"table"> {
+  /** Rounded, individually spaced rows for editable item lists. */
+  variant?: "default" | "separated";
   /** Pins the first column while scrolling; with a checkbox column, the first two. */
   stickyFirstColumn?: boolean;
   /** Sets `aria-busy` while loading. */
@@ -50,6 +52,7 @@ function Table({
   scrollerClassName,
   stickyFirstColumn = false,
   busy = false,
+  variant = "default",
   ...props
 }: TableProps) {
   const scrollerRef = React.useRef<HTMLDivElement>(null);
@@ -99,6 +102,7 @@ function Table({
           aria-busy={busy || undefined}
           className={cn(
             "w-full caption-bottom border-collapse text-table",
+            variant === "separated" && "border-separate border-spacing-x-0 border-spacing-y-3 [&_tbody>tr]:border-0 [&_tbody>tr>td]:h-auto [&_tbody>tr>td]:px-4 [&_tbody>tr>td]:py-3 [&_tbody>tr>td:first-child]:rounded-l-lg [&_tbody>tr>td:last-child]:rounded-r-lg",
             // Pinned cells take their row's fill (`bg-inherit`), so selected and
             // hovered rows stay one colour under a scrolling cell.
             "data-sticky:[&_tr>:first-child]:sticky data-sticky:[&_tr>:first-child]:left-0 data-sticky:[&_tr>:first-child]:z-[1]",

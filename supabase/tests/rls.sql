@@ -2487,5 +2487,6 @@ $$;
 \ir event-date-locations.sql
 \ir event-application-settings.sql
 \ir event-team-settings.sql
+\ir event-content.sql
 
 rollback;

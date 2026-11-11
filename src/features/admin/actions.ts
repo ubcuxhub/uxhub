@@ -1,5 +1,8 @@
 "use server";
 
+import { eventContentProblem, type EventContent } from "./lib/event-content";
+import { searchMentors, searchSponsors } from "@/lib/supabase-helpers/event-people";
+
 import { parseDateLocationDraft, dateLocationProblem, dateSessions, type EventDateLocationDraft } from "./lib/event-date-location";
 
 import { saveEventDraft, fetchEventDraft, eventImageIsReferenced } from "@/lib/supabase-helpers/event-drafts";
@@ -32,12 +35,6 @@ import {
   fetchCheckInStatuses,
   upsertCheckIn,
 } from "@/lib/supabase-helpers/check-ins";
-import {
-  saveMentor,
-  saveSponsor,
-  type MentorInput,
-  type SponsorInput,
-} from "@/lib/supabase-helpers/event-people";
 import { removeApplicationFiles } from "@/lib/supabase-helpers/application-files";
 import { updateEventApplication } from "@/lib/supabase-helpers/event-applications";
 import {
@@ -50,8 +47,6 @@ import type {
 } from "@/features/admin/types";
 import type {
   EventUpdate,
-  MentorRow,
-  SponsorRow,
   UserInfoUpdate,
 } from "@/lib/supabase/models";
 import type { RoleAccess, SubmittedApplicationRow } from "@/lib/supabase/models";
@@ -187,6 +182,7 @@ export async function updateUserRoleAction(
 export interface SaveAdminEventInput {
   applicationTiming?: { decisions_release_at: string | null; confirmation_deadline: string | null };
   dateLocation?: EventDateLocationDraft | null;
+  content?: EventContent;
   dateLocationRevision?: number;
   eventId?: string;
   /**
@@ -209,7 +205,7 @@ export interface SaveAdminEventInput {
  * questions, each in the order they were sent, or why the save was refused.
  */
 export type SaveAdminEventResult =
-  | { id: string; checkInSessionIds: string[]; questionIds: string[]; dateLocationRevision?: number }
+  | { id: string; checkInSessionIds: string[]; questionIds: string[]; dateLocationRevision?: number; content?: EventContent }
   | { error: string };
 
 // Not exported: a "use server" module may only export async functions, and the
@@ -298,6 +294,7 @@ export async function saveAdminEventAction(
 ): Promise<SaveAdminEventResult> {
   await requireAdmin();
 
+  if (input.content) { const problem = eventContentProblem(input.content); if (problem) return { error: problem }; }
   assertPublishAt(input.event.status, input.event.publish_at);
   if ("agenda_enabled" in input.event && typeof input.event.agenda_enabled !== "boolean") return { error: "Schedule visibility must be on or off." };
   const { min_team_size: min, max_team_size: max, team_deadline: deadline } = input.event;
@@ -366,7 +363,7 @@ export async function saveAdminEventAction(
       p_draft_id: input.draftId ?? null,
       p_draft_revision: input.draftRevision ?? 0,
       p_expected_header_image_url: input.expectedHeaderImageUrl ?? null,
-      p_event: { ...input.event, ...datePayload, ...(input.applicationTiming ? { _application_timing: input.applicationTiming } : {}) },
+      p_event: { ...input.event, ...datePayload, ...(input.content ? { _content: input.content } : {}), ...(input.applicationTiming ? { _application_timing: input.applicationTiming } : {}) },
       p_slug: slug,
       p_expected_image_url: input.expectedImageUrl,
       p_check_in_sessions: input.checkInSessions,
@@ -395,6 +392,7 @@ export async function saveAdminEventAction(
     if (error.code === "23505" && /events_slug|event_url_claims/.test(error.message)) throw new Error("This page URL is already in use.");
     if (error.code === "23514" && /events_configured_/.test(error.message)) throw new Error("Review the marketing destination and pricing before saving.");
     if (error.code === "23514" && /events_(min_team_size|max_team_size|team_size_range)_check/.test(error.message)) return { error: "Team sizes must be positive whole numbers with minimum no greater than maximum." };
+    if (error.hint === "EVENT_CONTENT_INVALID") return { error: error.message };
     if (error.hint === "EVENT_SETTINGS_CONFLICT") return { error: error.message };
     throw error;
   }
@@ -403,6 +401,7 @@ export async function saveAdminEventAction(
     check_in_session_ids?: string[];
     question_ids?: string[];
     removed_files?: string[];
+    content?: EventContent;
     date_location_revision?: number;
   } | null;
   if (!saved?.id) throw new Error("The event save returned no event id.");
@@ -429,34 +428,11 @@ export async function saveAdminEventAction(
   revalidatePath("/events", "layout");
   return {
     id: saved.id,
+    content: saved.content,
     dateLocationRevision: saved.date_location_revision,
     checkInSessionIds: saved.check_in_session_ids ?? [],
     questionIds: saved.question_ids ?? [],
   };
-}
-
-export async function saveAdminMentorAction(
-  input: MentorInput
-): Promise<MentorRow> {
-  await requireAdmin();
-  if (!input.full_name.trim()) {
-    throw new Error("Mentor name is required.");
-  }
-  const mentor = await saveMentor(supabaseAdmin, input);
-  revalidatePath("/admin/events", "layout");
-  return mentor;
-}
-
-export async function saveAdminSponsorAction(
-  input: SponsorInput
-): Promise<SponsorRow> {
-  await requireAdmin();
-  if (!input.name.trim()) {
-    throw new Error("Sponsor name is required.");
-  }
-  const sponsor = await saveSponsor(supabaseAdmin, input);
-  revalidatePath("/admin/events", "layout");
-  return sponsor;
 }
 
 export async function deleteAdminEventAction(eventId: string) {
@@ -610,4 +586,11 @@ export async function updateMembershipTypeAction(
     description: row.description,
     price: Number(row.price),
   };
+}
+
+export async function searchEventDirectoryAction(kind: "people" | "sponsors", query: string) {
+  await requireAdmin();
+  if (typeof query !== "string" || query.length > 200) throw new Error("Invalid directory query.");
+  const client = await createClient();
+  return kind === "sponsors" ? { sponsors: await searchSponsors(client, query) } : { people: await searchMentors(client, query) };
 }

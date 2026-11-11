@@ -459,6 +459,33 @@ export type Database = {
           },
         ]
       }
+      event_content_settings: {
+        Row: {
+          document: NonNullable<Json>
+          event_id: string
+          revision: number
+        }
+        ComputedFields: never
+        Insert: {
+          document: NonNullable<Json>
+          event_id: string
+          revision?: number
+        }
+        Update: {
+          document?: NonNullable<Json>
+          event_id?: string
+          revision?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_content_settings_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_date_location_settings: {
         Row: {
           document: NonNullable<Json>
@@ -953,6 +980,7 @@ export type Database = {
           full_name: string
           id: string
           linkedin_url: string | null
+          owner_event_id: string | null
           position: string | null
           profile_image_path: string | null
           updated_at: string
@@ -964,6 +992,7 @@ export type Database = {
           full_name: string
           id?: string
           linkedin_url?: string | null
+          owner_event_id?: string | null
           position?: string | null
           profile_image_path?: string | null
           updated_at?: string
@@ -974,11 +1003,20 @@ export type Database = {
           full_name?: string
           id?: string
           linkedin_url?: string | null
+          owner_event_id?: string | null
           position?: string | null
           profile_image_path?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "mentors_owner_event_id_fkey"
+            columns: ["owner_event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       purchases: {
         Row: {
@@ -1070,6 +1108,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          owner_event_id: string | null
           updated_at: string
           website_url: string | null
         }
@@ -1080,6 +1119,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          owner_event_id?: string | null
           updated_at?: string
           website_url?: string | null
         }
@@ -1089,10 +1129,19 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          owner_event_id?: string | null
           updated_at?: string
           website_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sponsors_owner_event_id_fkey"
+            columns: ["owner_event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       square_webhook_events: {
         Row: {
@@ -1448,6 +1497,7 @@ export type Database = {
           ticket_id: string
         }[]
       }
+      safe_event_content_url: { Args: { p_url: string }; Returns: boolean }
       save_admin_event_atomically: {
         Args: {
           p_application_questions: Json
@@ -1462,6 +1512,19 @@ export type Database = {
         Returns: Json
       }
       save_admin_event_before_application_settings: {
+        Args: {
+          p_application_questions: Json
+          p_check_in_sessions: Json
+          p_event: Json
+          p_event_id: string
+          p_expected_image_url: string
+          p_mentors: Json
+          p_slug: string
+          p_sponsors: Json
+        }
+        Returns: Json
+      }
+      save_admin_event_before_content: {
         Args: {
           p_application_questions: Json
           p_check_in_sessions: Json
@@ -1544,6 +1607,10 @@ export type Database = {
       }
       valid_other_allergies: { Args: { entries: string[] }; Returns: boolean }
       valid_user_interests: { Args: { tags: string[] }; Returns: boolean }
+      validate_event_content: {
+        Args: { p_document: Json; p_draft?: boolean }
+        Returns: undefined
+      }
     }
     Enums: {
       event_application_status:

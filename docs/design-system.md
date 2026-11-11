@@ -979,3 +979,30 @@ number or the rendered section count. Required progress counts rendered required
 sections only. Existing callers without explicit numbers keep sequential labels.
 `numberFormat="plain"` displays builder numbers as `7/10` and `7` in the menu;
 the default `"padded"` preserves `07/10` and `07` for existing consumers.
+
+
+`Table variant="separated"` uses rounded cell ends, 12px vertical gaps, and
+16px horizontal / 12px vertical cell padding for editable item summaries,
+matching event sponsor item 4619:1025. Cell height follows content plus padding. It preserves native table semantics, density, selection,
+keyboard actions and the internal horizontal scroller. The default joined rows
+remain unchanged. See `/dev/components/table` for separated rows.
+
+### 3.18 Sortable section
+
+`SortableSection` composes Card and controlled disclosure with an always-visible
+drag grip, plain position number and entry count. Reordering uses the drag
+handle; no separate Move up/down buttons are shown. Focus a handle and press
+Up/Down to reorder with the keyboard; boundaries do not move. Disclosure and movement
+are separate controls. Keep stable item keys/focus across movement, announce new
+positions in the caller, and supply labelled drag/drop data. Set `dragType` to
+ignore unrelated drags. The whole card accepts drops: its upper/lower half
+selects before/after, with a horizontal insertion bar. The `onDrop` placement
+argument describes the insertion boundary; callers adjust for removal of the
+source item. `sectionId` enables programmatic focus and scrolling on creation. `ReorderControls`
+provides the same drag handle and keyboard movement for entries. Collapsed content
+retains edits; callers expand and focus errors before navigation. Disable lone-item handles and keep at least 44px handle targets on phones.
+See `/dev/components/sortable-section` for interactive collapse/reorder examples.
+
+Entry photos/logos reuse ImageUpload with `requirements={{ square: false }}`:
+JPG/PNG up to 4 MB without cover/header minimum dimensions. The authorized
+entry upload validates file bytes server-side; it does not enable SVG uploads.

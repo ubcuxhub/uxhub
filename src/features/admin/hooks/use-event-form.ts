@@ -1,5 +1,7 @@
 "use client";
 
+import { emptyContent, eventContentProblem, legacyEventContent, type EventContent } from "../lib/event-content";
+
 import type { EventApplicationSettingsRow } from "@/lib/supabase/models";
 
 import { dateSessions, emptyEventDate, emptyLocation, type EventDateLocationDraft } from "../lib/event-date-location";
@@ -51,6 +53,7 @@ import type { Json } from "@/lib/supabase/database.types";
 import { useUnsavedChangesGuard } from "./use-unsaved-changes-guard";
 
 interface UseEventFormOptions {
+  initialContent?: EventContent;
   initialApplicationSettings?: EventApplicationSettingsRow | null;
   initialDateLocation?: { document: EventDateLocationDraft; revision: number } | null;
   eventId?: string;
@@ -66,6 +69,7 @@ interface UseEventFormOptions {
 const LEGACY_DRAFT_KEY = "event_create_form_draft";
 
 export function useEventForm({
+  initialContent,
   eventId,
   initialDateLocation,
   initialDraft,
@@ -94,12 +98,12 @@ export function useEventForm({
         };
       };
       if (!state) {
-        if (!initialEvent) return getInitialFormState();
+        if (!initialEvent) return { ...getInitialFormState(), content: initialContent ?? emptyContent() };
         const source = { ...formStateFromEvent(initialEvent), decisions_release_at: timestamptzToDatetimeLocal(initialApplicationSettings?.decisions_release_at), confirmation_deadline: timestamptzToDatetimeLocal(initialApplicationSettings?.confirmation_deadline) };
-        return { ...source, date_location_revision: initialDateLocation?.revision ?? 0, date_location: recoverDateLocation(source) };
+        return { ...source, content: initialContent ?? emptyContent(), date_location_revision: initialDateLocation?.revision ?? 0, date_location: recoverDateLocation(source) };
       }
       const teamSource = state.teams_configuration_initialized === false && initialEvent ? formStateFromEvent(initialEvent) : { ...defaultFormState, ...state };
-      const restored = { ...defaultFormState, ...state, schedule_configuration_initialized: true, agenda_enabled: state.schedule_configuration_initialized === false && initialEvent ? initialEvent.agenda_enabled ?? true : state.agenda_enabled ?? defaultFormState.agenda_enabled, teams_configuration_initialized: true, teams_enabled: teamSource.teams_enabled, min_team_size: teamSource.min_team_size, max_team_size: teamSource.max_team_size, team_deadline: teamSource.team_deadline, date_location: state.date_location ?? recoverDateLocation(state), date_location_revision: state.date_location ? state.date_location_revision : initialDateLocation?.revision ?? state.date_location_revision };
+      const restored = { ...defaultFormState, ...state, content: state.content ?? legacyEventContent(initialDraft?.document.mentors ?? [], initialDraft?.document.sponsors ?? [], initialContent), schedule_configuration_initialized: true, agenda_enabled: state.schedule_configuration_initialized === false && initialEvent ? initialEvent.agenda_enabled ?? true : state.agenda_enabled ?? defaultFormState.agenda_enabled, teams_configuration_initialized: true, teams_enabled: teamSource.teams_enabled, min_team_size: teamSource.min_team_size, max_team_size: teamSource.max_team_size, team_deadline: teamSource.team_deadline, date_location: state.date_location ?? recoverDateLocation(state), date_location_revision: state.date_location ? state.date_location_revision : initialDateLocation?.revision ?? state.date_location_revision };
       // Old working documents never captured these settings. Recover them
       // from the source event instead of resetting a saved featured choice,
       // external destination or URL during an unrelated edit.
@@ -113,7 +117,7 @@ export function useEventForm({
       }
       return restored;
     },
-    [initialEvent, initialDraft, initialDateLocation, initialCheckInSessions, initialApplicationSettings]
+    [initialEvent, initialDraft, initialDateLocation, initialCheckInSessions, initialApplicationSettings, initialContent]
   );
   const startingCheckIns = useMemo(
     () =>
@@ -207,7 +211,7 @@ export function useEventForm({
         if (state.image_url?.startsWith("blob:")) state.image_url = "";
         if (state.header_image_url?.startsWith("blob:")) state.header_image_url = "";
         const document = parseWorkingDocument({ version: 1, formState: state, checkInEvents: legacy.checkInEvents ?? [{ ...EMPTY_CHECK_IN_SESSION }], mentors: legacy.mentors ?? [], sponsors: legacy.sponsors ?? [], applicationTemplate: legacy.applicationTemplate ?? [] });
-        setFormState({ ...document.formState, date_location: document.formState.date_location ?? getInitialFormState().date_location });
+        setFormState({ ...document.formState, content: document.formState.content ?? legacyEventContent(document.mentors, document.sponsors), date_location: document.formState.date_location ?? getInitialFormState().date_location });
         setCheckInEvents(document.checkInEvents);
         setMentors(document.mentors);
         setSponsors(document.sponsors);
@@ -297,6 +301,7 @@ export function useEventForm({
     setError(null);
     const uploads: string[] = [];
     try {
+      if (formState.content) { const problem = eventContentProblem(formState.content, true); if (problem) { setShowConfigurationErrors(true); window.dispatchEvent(new Event("event-content-invalid")); throw new Error(problem); } }
       const saved = { ...formState };
       if (pendingImageFile) { saved.image_url = await uploadImage(pendingImageFile); uploads.push(saved.image_url); }
       if (pendingHeaderFile) { saved.header_image_url = await uploadImage(pendingHeaderFile, "header"); saved.header_colour = ""; uploads.push(saved.header_image_url); }
@@ -334,23 +339,7 @@ export function useEventForm({
     setShowConfigurationErrors(true);
     resetSuccessMessage();
     setError(null);
-    const hasUnsavedMentors = mentors.some(
-      (mentor) => !mentor.id || mentor.isEditing
-    );
-    const hasUnsavedSponsors = sponsors.some(
-      (sponsor) => !sponsor.id || sponsor.isEditing
-    );
-    if (hasUnsavedMentors || hasUnsavedSponsors) {
-      setFormState((current) => ({
-        ...current,
-        mentors_enabled: current.mentors_enabled || hasUnsavedMentors,
-        sponsors_enabled: current.sponsors_enabled || hasUnsavedSponsors,
-      }));
-      setError(
-        "Save or cancel every mentor and sponsor card before saving the event."
-      );
-      return;
-    }
+    if (formState.content) { const problem = eventContentProblem(formState.content); if (problem) { setError(problem); window.dispatchEvent(new Event("event-content-invalid")); return; } }
     const validation = validateEventForm(
       formState,
       checkInEvents,
@@ -443,6 +432,7 @@ export function useEventForm({
       const applicationQuestions = initialApplicationSettings?.questions_locked_at ? initialApplicationQuestions : toApplicationQuestionInputs(questions.applicationTemplate);
       const result = await saveAdminEventAction({
         eventId,
+        content: formState.content ?? undefined,
         draftId: hasSavedDraft.current ? draftId : undefined,
         draftRevision: draftRevision.current,
         expectedHeaderImageUrl: persistedHeaderUrl.current,
@@ -474,7 +464,7 @@ export function useEventForm({
       clearRecoveredLegacyDraft();
       draftRevision.current = 0;
       setDraftId(crypto.randomUUID());
-      const savedFormState = { ...formState, image_url: imageUrl, header_image_url: headerUrl,
+      const savedFormState = { ...formState, content: result.content ?? formState.content, image_url: imageUrl, header_image_url: headerUrl,
         date_location_revision: result.dateLocationRevision ?? formState.date_location_revision,
         date_location: formState.date_location ? { ...formState.date_location, dates: formState.date_location.dates.map((row, index) => ({ ...row, session_id: result.checkInSessionIds[index] ?? row.session_id })) } : null };
       persistedHeaderUrl.current = headerUrl || null;
@@ -555,9 +545,7 @@ export function useEventForm({
     setPendingHeaderFile,
     checkInEvents,
     mentors,
-    setMentors,
     sponsors,
-    setSponsors,
     isSubmitting,
     loadingEvent: false,
     error,

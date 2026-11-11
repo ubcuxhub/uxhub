@@ -419,3 +419,18 @@ historical records are rewritten. `admin_event_team_settings` supplies staff-onl
 aggregate editor locks via `src/lib/supabase-helpers/teams.ts`. Member/invite and
 staff assignment interfaces remain deferred; nullable limits and deadline keep
 their existing unlimited/no-lock meaning.
+
+
+### People and resource form configuration
+
+`event_content_settings` stores the staff-only ordered editor document and a
+revision checked under the event row lock. Applied saves synchronize people
+sections, mentor/sponsor associations and viewer-scoped `event_links` atomically
+through the existing builder save chain. Directory rows have null `owner_event_id`;
+new/edited event entries use owned rows and never mutate shared sources. Searches
+exclude owned rows. Browser roles cannot write the document or invoke saves.
+Every included section needs an item, including in working drafts; incomplete
+entry fields/link rows remain recoverable in working documents. HTTP(S) URL
+safety is checked in application validation and the database. Going-only links
+retain existing RLS after an event ends; after-event public links remain distinct.
+The section-aware attendee renderer remains deferred.

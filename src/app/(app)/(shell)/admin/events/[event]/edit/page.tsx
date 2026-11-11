@@ -1,3 +1,4 @@
+import { fetchEventContent } from "@/lib/supabase-helpers/event-content";
 import { fetchEventTeamSettingsInfo } from "@/lib/supabase-helpers/teams";
 import { fetchEventApplicationSettings } from "@/lib/supabase-helpers/event-application-settings";
 import { fetchEventDateLocationSettings, fetchEventRegistrationSettings } from "@/lib/supabase-helpers/event-date-locations";
@@ -57,7 +58,7 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
 
   if (!event) notFound();
   const pricingLocked = await fetchEventPricingLocked(supabase, eventId);
-  const [dateLocation, registrationInfo, applicationSettings, teamInfo] = await Promise.all([fetchEventDateLocationSettings(supabase, eventId), fetchEventRegistrationSettings(supabase, eventId), fetchEventApplicationSettings(supabase, eventId), fetchEventTeamSettingsInfo(supabase, eventId)]);
+  const [dateLocation, registrationInfo, applicationSettings, teamInfo, content] = await Promise.all([fetchEventDateLocationSettings(supabase, eventId), fetchEventRegistrationSettings(supabase, eventId), fetchEventApplicationSettings(supabase, eventId), fetchEventTeamSettingsInfo(supabase, eventId), fetchEventContent(supabase, eventId)]);
   const workingDraft = event.status === "draft" && !event.publish_at ? await fetchEventDraftForEvent(supabase, eventId) : null;
 
   return (
@@ -68,6 +69,7 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
     >
       <PageContainer className="max-w-none min-[821px]:px-12 lg:px-12">
         <EventCreateModify
+          initialContent={content}
           teamInfo={teamInfo}
           initialApplicationSettings={applicationSettings}
           initialDateLocation={dateLocation}

@@ -32,6 +32,7 @@ export const TABLES = {
   eventAgendaItems: "event_agenda_items",
   teams: "teams",
   teamMembers: "team_members",
+  eventContentSettings: "event_content_settings",
   eventLinks: "event_links",
   eventPrivateDetails: "event_private_details",
 } as const;

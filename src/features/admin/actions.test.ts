@@ -36,8 +36,8 @@ const applicationFiles = vi.hoisted(() => ({
   removeApplicationFiles: vi.fn(),
 }));
 const eventPeople = vi.hoisted(() => ({
-  saveMentor: vi.fn(),
-  saveSponsor: vi.fn(),
+  searchMentors: vi.fn(),
+  searchSponsors: vi.fn(),
 }));
 const saveAdminProfile = vi.hoisted(() => vi.fn());
 const fetchMembershipTypeById = vi.hoisted(() => vi.fn());
@@ -71,8 +71,6 @@ import {
   fetchAdminCheckInSnapshotAction,
   saveAdminEventAction,
   saveAdminEventDraftAction,
-  saveAdminMentorAction,
-  saveAdminSponsorAction,
   setMembershipTermEndsAtAction,
   toggleCheckInAction,
   updateApplicationDecisionAction,
@@ -846,31 +844,6 @@ describe("updateApplicationDecisionAction", () => {
       updateApplicationDecisionAction("application-1", "approve" as "accept", null),
     ).rejects.toThrow("Invalid application decision.");
     expect(applications.updateEventApplication).not.toHaveBeenCalled();
-  });
-});
-
-describe("saveAdminMentorAction and saveAdminSponsorAction", () => {
-  it("rejects a blank mentor name", async () => {
-    await expect(
-      saveAdminMentorAction({ full_name: "   " } as never),
-    ).rejects.toThrow("Mentor name is required.");
-    expect(eventPeople.saveMentor).not.toHaveBeenCalled();
-  });
-
-  it("rejects a blank sponsor name", async () => {
-    await expect(
-      saveAdminSponsorAction({ name: "   " } as never),
-    ).rejects.toThrow("Sponsor name is required.");
-    expect(eventPeople.saveSponsor).not.toHaveBeenCalled();
-  });
-
-  it("saves a named mentor", async () => {
-    const mentor = { id: "mentor-1", full_name: "Ada" };
-    eventPeople.saveMentor.mockResolvedValue(mentor);
-
-    await expect(
-      saveAdminMentorAction({ full_name: "Ada" } as never),
-    ).resolves.toBe(mentor);
   });
 });
 

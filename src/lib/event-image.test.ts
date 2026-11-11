@@ -397,3 +397,9 @@ describe("separate event image kinds", () => {
     expect(() => parseEventImageUpload({ kind, fileType: "image/png", size: 100, buffer: pngHeader(width, height) })).toThrow(/at least/);
   });
 });
+
+
+it("accepts nonsquare entry logos without cover/header minimums while retaining file safety", () => {
+  expect(parseEventImageUpload({ kind: "entry", fileType: "image/png", size: 100, buffer: pngHeader(120, 48) }).dimensions).toEqual({ width: 120, height: 48 });
+  expect(() => parseEventImageUpload({ kind: "entry", fileType: "image/svg+xml", size: 100, buffer: pngHeader(120, 48) })).toThrow();
+});

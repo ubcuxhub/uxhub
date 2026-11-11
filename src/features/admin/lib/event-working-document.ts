@@ -1,3 +1,4 @@
+import { parseEventContent } from "./event-content";
 import { parseDateLocationDraft } from "./event-date-location";
 import type { CheckInSessionDraft } from "@/features/admin/types";
 import { ResponseType, type ApplicationQuestionTemplate } from "@/features/events/types";
@@ -29,7 +30,9 @@ export function parseWorkingDocument(input: unknown): EventWorkingDocument {
   if (!("agenda_enabled" in document.formState)) state.schedule_configuration_initialized = false;
   for (const [key, initial] of Object.entries(defaultFormState)) {
     const value = state[key as keyof EventFormState];
-    if (key === "date_location") {
+    if (key === "content") {
+      if (value !== null) parseEventContent(value);
+    } else if (key === "date_location") {
       if (value !== null) parseDateLocationDraft(value);
     } else if (key === "description_rich") {
       if (value !== null && !parseEventDescription(value)) throw new Error("Invalid long overview formatting.");

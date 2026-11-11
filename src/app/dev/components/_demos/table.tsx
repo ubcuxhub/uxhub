@@ -341,6 +341,12 @@ function TableDemo() {
         </div>
       </Composition>
 
+      <Composition title="Separated item rows" description="Rounded rows with gaps and 16px horizontal / 12px vertical cell padding, for editable people or sponsor lists. Scroll stays inside the table. Works in both densities and themes.">
+        <Table variant="separated" aria-label="People" className="min-w-[28rem]">
+          <TableBody>{USERS.slice(0, 3).map(user => <TableRow key={user.id} className="bg-transparent [&>td]:bg-section"><TableCell>{user.name}</TableCell><TableCell>{user.email}</TableCell><TableCell><Button variant="outline" aria-label={`Edit ${user.name}`}>Edit</Button></TableCell></TableRow>)}</TableBody>
+        </Table>
+      </Composition>
+
       <SpecimenGroup
         surface="page"
         title="Loading and empty"

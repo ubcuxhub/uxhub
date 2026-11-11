@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     const file = formData.get("file");
     const eventName = formData.get("eventName");
     const kind = formData.get("kind");
-    if (kind !== null && kind !== "icon" && kind !== "header") return NextResponse.json({ error: "Invalid image kind." }, { status: 400 });
+    if (kind !== null && kind !== "icon" && kind !== "header" && kind !== "entry") return NextResponse.json({ error: "Invalid image kind." }, { status: 400 });
 
     if (!(file instanceof File)) {
       return NextResponse.json({ error: "No file provided." }, { status: 400 });

@@ -1,5 +1,6 @@
 "use client";
 
+import SortableSectionDemo from "@/app/dev/components/_demos/sortable-section";
 import { useId, useState } from "react";
 
 import { EventDateLocation } from "@/features/admin/components/event-form/EventDateLocation";
@@ -307,6 +308,7 @@ function DateLocationForm() {
 }
 
 export const BUILDER_COMPONENTS = {
+  "builder-people-ordering": SortableSectionDemo,
   "builder-basics": Basics,
   "builder-date-location": DateLocationForm,
   "builder-schedule": Schedule,

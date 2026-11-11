@@ -85,7 +85,7 @@ export const dataEntries: readonly RegistryEntry[] = [
     category: "Data display",
     tier: "primitive",
     description:
-      "A table of records with selection, sticky columns and loading and empty states, such as Manage Users. Pair it with TableToolbar and Pagination.",
+      "A table of records with selection, sticky columns, separated rounded item rows and loading and empty states, such as Manage Users. Pair it with TableToolbar and Pagination.",
     importPath: "@/components/ui/table",
     importNames: [
       "Table",

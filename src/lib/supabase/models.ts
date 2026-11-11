@@ -8,6 +8,8 @@ import type {
 export type AppSettingsRow = Tables<"app_settings">;
 export type AppSettingsUpdate = TablesUpdate<"app_settings">;
 
+export type EventContentSettingsRow = Tables<"event_content_settings">;
+
 export type EventRow = Tables<"events">;
 export type EventInsert = TablesInsert<"events">;
 export type EventUpdate = TablesUpdate<"events">;
@@ -15,11 +17,7 @@ export type EventStatus = Enums<"event_status">;
 export type EventType = Enums<"event_type">;
 
 export type MentorRow = Tables<"mentors">;
-export type MentorInsert = TablesInsert<"mentors">;
-export type MentorUpdate = TablesUpdate<"mentors">;
 export type SponsorRow = Tables<"sponsors">;
-export type SponsorInsert = TablesInsert<"sponsors">;
-export type SponsorUpdate = TablesUpdate<"sponsors">;
 export type EventMentorInsert = TablesInsert<"event_mentors">;
 export type EventPeopleSectionRow = Tables<"event_people_sections">;
 export type EventPeopleSectionInsert = TablesInsert<"event_people_sections">;

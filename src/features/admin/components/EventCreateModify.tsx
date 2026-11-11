@@ -37,13 +37,14 @@ import { PrimaryDetailsSection } from "./event-form/PrimaryDetailsSection";
 import { EventDateLocation } from "./event-form/EventDateLocation";
 import { EventRegistration } from "./event-form/EventRegistration";
 import { dateLocationProblem, type EventDateLocationDraft } from "../lib/event-date-location";
-import { MentorsSection } from "./event-form/MentorsSection";
-import { SponsorsSection } from "./event-form/SponsorsSection";
+import { EventPeopleEditor, EventResourcesEditor } from "./event-form/EventPeopleResources";
+import { emptyContent, type EventContent } from "../lib/event-content";
 import { ApplicationQuestionsSection } from "./event-form/ApplicationQuestionsSection";
 import { EventFormSkeleton } from "./event-form/EventFormSkeleton";
 import { DeleteEventModal } from "./DeleteEventModal";
 
 interface EventCreateModifyProps {
+  initialContent?: EventContent;
   initialApplicationSettings?: EventApplicationSettingsRow | null;
   initialDateLocation?: { document: EventDateLocationDraft; revision: number } | null;
   registrationInfo?: { locked: boolean; seats: number };
@@ -65,6 +66,7 @@ interface EventCreateModifyProps {
 
 export const EventCreateModify = ({
   eventId,
+  initialContent,
   showBackButton = true,
   pricingLocked = false,
   teamInfo = { teamCount: 0, largestTeam: 0 },
@@ -83,6 +85,7 @@ export const EventCreateModify = ({
 }: EventCreateModifyProps) => {
   const form = useEventForm({
     eventId,
+    initialContent,
     initialDateLocation,
     initialApplicationSettings,
     initialDraft,
@@ -107,6 +110,7 @@ export const EventCreateModify = ({
     "builder-teams": { number: 5, description: "Team events show a Your Team card with an invite link on the event page." },
     "builder-people": { number: 7 },
     "builder-schedule": { number: 6, description: "Shown as the agenda on the event page." },
+    "builder-resources": { number: 8, description: "Community links, files and the event recap for this event." },
     "builder-summary": { number: 9 },
     "builder-settings": { number: 10, description: "Actions that affect the whole event." },
   };
@@ -118,6 +122,7 @@ export const EventCreateModify = ({
     { id: "builder-teams", number: 5, title: "Teams", state: teamSettingsProblem(form.formState) ? "not-started" : "complete", required: false },
     { id: "builder-schedule", number: 6, title: "Schedule", state: "complete", required: false },
     { id: "builder-people", number: 7, title: "People and sponsors", state: "optional", required: false },
+    { id: "builder-resources", number: 8, title: "Links and resources", state: "optional", required: false },
     { id: "builder-summary", number: 9, title: "Summary", state: "optional", required: false },
     { id: "builder-settings", number: 10, title: "Other settings", state: "optional", required: false },
   ];
@@ -172,26 +177,8 @@ export const EventCreateModify = ({
           {section("builder-registration", "Registration", <><EventRegistration state={form.formState} disabled={form.isSubmitting} info={registrationInfo} onChange={form.handleFieldChange} /><ApplicationQuestionsSection locked={!!initialApplicationSettings?.questions_locked_at} onMove={form.moveApplicationQuestion} registrationModeOwned enabled={form.formState.requires_application} applicationTemplate={form.applicationTemplate} questionErrors={form.questionErrors} onEnabledChange={enabled => form.handleFieldChange("requires_application", enabled)} onAdd={form.addApplicationQuestion} onRemove={form.removeApplicationQuestion} onUpdate={form.updateApplicationQuestion} onAddResponseOption={form.addResponseOption} onUpdateResponseOption={form.updateResponseOption} onRemoveResponseOption={form.removeResponseOption} />{form.formState.requires_application && <ApplicationTiming state={form.formState} showErrors={form.showConfigurationErrors} onChange={form.handleFieldChange} />}</>)}
           {section("builder-teams", "Teams", <EventTeams state={form.formState} info={teamInfo} showErrors={form.showConfigurationErrors} onChange={form.handleFieldChange} />)}
           {section("builder-schedule", "Schedule", <EventSchedule enabled={form.formState.agenda_enabled} onChange={enabled => form.handleFieldChange("agenda_enabled", enabled)} />)}
-          {section("builder-people", "People and sponsors", <>
-          <MentorsSection
-            enabled={form.formState.mentors_enabled}
-            mentors={form.mentors}
-            options={mentorOptions}
-            onEnabledChange={(enabled) =>
-              form.handleFieldChange("mentors_enabled", enabled)
-            }
-            onChange={form.setMentors}
-          />
-          <SponsorsSection
-            enabled={form.formState.sponsors_enabled}
-            sponsors={form.sponsors}
-            options={sponsorOptions}
-            onEnabledChange={(enabled) =>
-              form.handleFieldChange("sponsors_enabled", enabled)
-            }
-            onChange={form.setSponsors}
-          />
-          </>)}
+          {section("builder-people", "People and sponsors", <EventPeopleEditor content={form.formState.content ?? emptyContent()} onChange={content => form.handleFieldChange("content", content)} people={mentorOptions} sponsors={sponsorOptions} showErrors={form.showConfigurationErrors} />)}
+          {section("builder-resources", "Links and resources", <EventResourcesEditor content={form.formState.content ?? emptyContent()} onChange={content => form.handleFieldChange("content", content)} showErrors={form.showConfigurationErrors} />)}
           {section("builder-summary", "Summary", <><PrimaryDetailsSection section="publication" formState={form.formState} isSubmitting={form.isSubmitting} onFieldChange={form.handleFieldChange} /><p className="text-muted-foreground">Save an incomplete draft at any time. Create or update the event when its required details are complete.</p></>)}
           {section("builder-settings", "Other settings", <div className="space-y-4 rounded-xl border border-border bg-card p-5">
             {draft && <div className="flex flex-wrap items-center justify-between gap-4">
