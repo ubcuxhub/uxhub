@@ -10,7 +10,6 @@ export interface DescriptionBlock {
   spans: DescriptionSpan[];
 }
 export type EventDescription = DescriptionBlock[];
-export const SHORT_OVERVIEW_LIMIT = 50;
 export const LONG_OVERVIEW_LIMIT = 3000;
 
 export function safeDescriptionLink(value: string): string | undefined {

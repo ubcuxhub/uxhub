@@ -155,34 +155,6 @@ export async function updateEventSchedule(
   return data;
 }
 
-/**
- * Updates an event only while its stored cover image still matches
- * `expectedImageUrl`.
- *
- * Returns `null` when no row matched, which the caller must treat as a
- * conflict rather than retrying unconditionally: another writer replaced the
- * cover (and deleted the object this payload still points at) since the form
- * was loaded, so an unguarded write would leave the row referencing an image
- * that no longer exists.
- */
-export async function updateEventIfImageMatches(
-  supabase: DbClient,
-  id: string,
-  payload: EventUpdate,
-  expectedImageUrl: string | null
-): Promise<{ id: string } | null> {
-  const pending = supabase.from(TABLES.events).update(payload).eq("id", id);
-  const guarded =
-    expectedImageUrl === null
-      ? pending.is("image_url", null)
-      : pending.eq("image_url", expectedImageUrl);
-
-  const { data, error } = await guarded.select("id").maybeSingle();
-
-  if (error) throw error;
-  return data ?? null;
-}
-
 /** Staff-only aggregate, including in-flight purchases that lock repricing. */
 export async function fetchEventPricingLocked(supabase: DbClient, eventId: string): Promise<boolean> {
   const { data, error } = await supabase.rpc("admin_event_pricing_locked", { p_event_id: eventId });
