@@ -2481,5 +2481,6 @@ end;
 $$;
 
 \ir event-publication.sql
+\ir audit-events.sql
 
 rollback;

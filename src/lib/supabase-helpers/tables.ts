@@ -7,6 +7,7 @@
  */
 export const TABLES = {
   appSettings: "app_settings",
+  auditEvents: "audit_events",
   events: "events",
   userInfo: "user_info",
   eventTickets: "event_tickets",
