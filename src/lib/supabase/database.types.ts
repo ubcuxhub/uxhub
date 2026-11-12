@@ -87,6 +87,51 @@ export type Database = {
           },
         ]
       }
+      audit_events: {
+        Row: {
+          action: string
+          actor_id: string | null
+          changes: Json | null
+          context: NonNullable<Json>
+          created_at: string
+          id: string
+          source: Database["public"]["Enums"]["audit_event_source"]
+          subject_id: string | null
+          subject_table: string | null
+        }
+        ComputedFields: never
+        Insert: {
+          action: string
+          actor_id?: string | null
+          changes?: Json | null
+          context?: NonNullable<Json>
+          created_at?: string
+          id?: string
+          source: Database["public"]["Enums"]["audit_event_source"]
+          subject_id?: string | null
+          subject_table?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          changes?: Json | null
+          context?: NonNullable<Json>
+          created_at?: string
+          id?: string
+          source?: Database["public"]["Enums"]["audit_event_source"]
+          subject_id?: string | null
+          subject_table?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "user_info"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       check_in_sessions: {
         Row: {
           created_at: string | null
@@ -1203,6 +1248,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      audit_ignored_columns: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
       can_edit_application_response: {
         Args: { p_application_id: string; p_question_id: string }
         Returns: boolean
@@ -1343,6 +1392,7 @@ export type Database = {
       valid_user_interests: { Args: { tags: string[] }; Returns: boolean }
     }
     Enums: {
+      audit_event_source: "admin_change" | "user_activity"
       event_application_status:
         | "draft"
         | "submitted"
@@ -1496,6 +1546,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      audit_event_source: ["admin_change", "user_activity"],
       event_application_status: [
         "draft",
         "submitted",
