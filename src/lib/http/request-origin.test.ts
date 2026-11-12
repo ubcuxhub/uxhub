@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getRequestOrigin } from "./request-origin";
+import { getHeadersOrigin, getRequestOrigin } from "./request-origin";
 
 function makeRequest(url: string, headers: Record<string, string> = {}) {
   return new Request(url, { headers });
@@ -47,5 +47,28 @@ describe("getRequestOrigin", () => {
     request.headers.delete("host");
 
     expect(getRequestOrigin(request)).toBe("https://uxhub.ca");
+  });
+});
+
+describe("getHeadersOrigin", () => {
+  it("prefers forwarded headers over the Host header", () => {
+    const headers = new Headers({
+      host: "10.0.0.4:3000",
+      "x-forwarded-host": "uxhub.ca, internal.vercel.app",
+      "x-forwarded-proto": "https, http",
+    });
+
+    expect(getHeadersOrigin(headers)).toBe("https://uxhub.ca");
+  });
+
+  it("uses the fallback protocol when none is forwarded", () => {
+    const headers = new Headers({ host: "127.0.0.1:3000" });
+
+    expect(getHeadersOrigin(headers, "http")).toBe("http://127.0.0.1:3000");
+    expect(getHeadersOrigin(headers)).toBe("https://127.0.0.1:3000");
+  });
+
+  it("returns null without a host", () => {
+    expect(getHeadersOrigin(new Headers())).toBeNull();
   });
 });

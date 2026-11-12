@@ -13,15 +13,29 @@
  */
 export function getRequestOrigin(request: Request) {
   const requestUrl = new URL(request.url);
-  const host =
-    firstHeaderValue(request.headers.get("x-forwarded-host")) ??
-    firstHeaderValue(request.headers.get("host"));
 
-  if (!host) return requestUrl.origin;
+  return (
+    getHeadersOrigin(request.headers, requestUrl.protocol.replace(":", "")) ??
+    requestUrl.origin
+  );
+}
+
+/**
+ * The same origin from the headers alone, for a server component (pass it
+ * `await headers()`). Null without a host header.
+ */
+export function getHeadersOrigin(
+  headers: Pick<Headers, "get">,
+  fallbackProtocol = "https"
+) {
+  const host =
+    firstHeaderValue(headers.get("x-forwarded-host")) ??
+    firstHeaderValue(headers.get("host"));
+
+  if (!host) return null;
 
   const protocol =
-    firstHeaderValue(request.headers.get("x-forwarded-proto")) ??
-    requestUrl.protocol.replace(":", "");
+    firstHeaderValue(headers.get("x-forwarded-proto")) ?? fallbackProtocol;
 
   return `${protocol}://${host}`;
 }

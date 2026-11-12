@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
+import Link from "next/link";
+import { ScanLine } from "lucide-react";
 import { CheckInTable } from "@/features/admin/components/CheckInTable";
+import { searchCheckInAttendees } from "@/features/admin/lib/check-in-search";
 import {
   type CheckInAttendee,
   type CheckInSession,
@@ -21,6 +24,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { PageContainer } from "@/components/shared/PageContainer";
+import { Button } from "@/components/ui/button";
 import { formatEventDate, formatEventTime } from "@/lib/date";
 
 // Stat card component
@@ -144,15 +148,7 @@ export function CheckInManager({
     };
   }, [eventId, supabase]);
 
-  // Filter attendees based on search
-  const query = searchQuery.trim().toLowerCase();
-  const filteredAttendees = query
-    ? attendees.filter(
-        (attendee) =>
-          attendee.user_name.toLowerCase().includes(query) ||
-          attendee.user_email.toLowerCase().includes(query)
-      )
-    : attendees;
+  const filteredAttendees = searchCheckInAttendees(attendees, searchQuery);
 
   const handleCheckInToggle = async (
     ticketId: string,
@@ -212,13 +208,19 @@ export function CheckInManager({
       className="flex flex-col gap-6"
     >
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-4">
               <div>
                 <h1 className="text-h2">Check-In Management</h1>
                 <p className="text-small text-muted-foreground">
                   Manage attendee check-ins for this event
                 </p>
               </div>
+              <Button asChild>
+                <Link href={`/admin/events/${eventId}/check-in/scan`}>
+                  <ScanLine aria-hidden />
+                  Scan tickets
+                </Link>
+              </Button>
             </div>
 
               <>
