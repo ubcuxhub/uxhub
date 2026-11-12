@@ -19,12 +19,18 @@ import {
   type MembershipTypeInput,
 } from "@/features/admin/lib/membership-type";
 import {
+  checkInTicket,
   deleteCheckIn,
   fetchCheckInAttendees,
+  fetchCheckInSessionEventId,
   fetchCheckInSessions,
   fetchCheckInStatuses,
-  upsertCheckIn,
+  fetchCheckInTicketById,
+  fetchCheckInTicketByToken,
+  type CheckInTicket,
 } from "@/lib/supabase-helpers/check-ins";
+import { isUuid } from "@/lib/uuid";
+import type { CheckInRejection, CheckInResult } from "./types";
 import {
   saveMentor,
   saveSponsor,
@@ -376,7 +382,100 @@ export async function toggleCheckInAction(
     return null;
   }
 
-  return upsertCheckIn(supabaseAdmin, ticketId, sessionId);
+  const { checkedInAt } = await checkInTicket(supabaseAdmin, ticketId, sessionId);
+  return checkedInAt;
+}
+
+// `event_tickets.qr_token` is 16 random bytes as hex.
+const QR_TOKEN_PATTERN = /^[0-9a-f]{32}$/;
+
+type CheckInMethod = "scan" | "lookup";
+
+/** Checks in the ticket whose QR code was scanned at the door. */
+export async function checkInScannedTicketAction(
+  sessionId: string,
+  code: string
+): Promise<CheckInResult> {
+  await requireAdmin();
+
+  const qrToken = typeof code === "string" ? code.trim() : "";
+  if (!QR_TOKEN_PATTERN.test(qrToken)) {
+    return rejectCheckIn("invalid_code", "scan", sessionId);
+  }
+
+  const [eventId, ticket] = await Promise.all([
+    fetchSessionEventId(sessionId),
+    fetchCheckInTicketByToken(supabaseAdmin, qrToken),
+  ]);
+  if (!ticket) return rejectCheckIn("invalid_code", "scan", sessionId);
+
+  return recordCheckIn(ticket, eventId, sessionId, "scan");
+}
+
+/** Checks in a ticket an admin picked by name when its code won't scan. */
+export async function checkInTicketAction(
+  sessionId: string,
+  ticketId: string
+): Promise<CheckInResult> {
+  await requireAdmin();
+
+  const [eventId, ticket] = await Promise.all([
+    fetchSessionEventId(sessionId),
+    typeof ticketId === "string" && isUuid(ticketId)
+      ? fetchCheckInTicketById(supabaseAdmin, ticketId)
+      : null,
+  ]);
+  if (!ticket) return rejectCheckIn("not_found", "lookup", sessionId);
+
+  return recordCheckIn(ticket, eventId, sessionId, "lookup");
+}
+
+async function fetchSessionEventId(sessionId: string): Promise<string> {
+  const eventId =
+    typeof sessionId === "string" && isUuid(sessionId)
+      ? await fetchCheckInSessionEventId(supabaseAdmin, sessionId)
+      : null;
+  if (!eventId) throw new Error("Check-in session not found.");
+  return eventId;
+}
+
+async function recordCheckIn(
+  ticket: CheckInTicket,
+  eventId: string,
+  sessionId: string,
+  method: CheckInMethod
+): Promise<CheckInResult> {
+  if (ticket.event_id !== eventId) {
+    return rejectCheckIn("wrong_event", method, sessionId, ticket.id);
+  }
+
+  const { checkedInAt, alreadyCheckedIn } = await checkInTicket(
+    supabaseAdmin,
+    ticket.id,
+    sessionId
+  );
+  log.info("check_in.recorded", {
+    method,
+    sessionId,
+    ticketId: ticket.id,
+    alreadyCheckedIn,
+  });
+
+  return {
+    status: alreadyCheckedIn ? "already_checked_in" : "checked_in",
+    name: ticket.user_name,
+    checkedInAt,
+  };
+}
+
+function rejectCheckIn(
+  reason: CheckInRejection,
+  method: CheckInMethod,
+  sessionId: string,
+  ticketId: string | null = null
+): CheckInResult {
+  log.warn("check_in.rejected", { reason, method, sessionId, ticketId });
+  return { status: "rejected", reason };
 }
 
 export async function fetchAdminCheckInSnapshotAction(eventId: string) {
