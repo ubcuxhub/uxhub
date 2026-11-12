@@ -83,21 +83,15 @@ describe("relative event seed timeline", () => {
     }
   });
 
-  it("covers the free, member-discount, and full-price checkout paths", () => {
-    const prices = EVENT_PHASES.purchasable.map((slug) => {
-      const { regular_price, member_price } = seedEvent(slug).event;
-      return { regular: Number(regular_price), member: Number(member_price) };
-    });
-
-    expect(prices.some((price) => price.regular === 0)).toBe(true);
-    expect(
-      prices.some((price) => price.regular > 0 && price.member === price.regular)
-    ).toBe(true);
-    expect(
-      prices.some(
-        (price) => price.regular > 0 && price.member > 0 && price.member < price.regular
-      )
-    ).toBe(true);
+  it("covers free and paid checkout with active members always free", () => {
+    const prices = EVENT_PHASES.purchasable.map(slug => seedEvent(slug).event);
+    expect(prices.some(event => event.configured_pricing_mode === "free" && event.regular_price === 0)).toBe(true);
+    expect(prices.some(event => event.configured_pricing_mode === "paid" && Number(event.regular_price) > 0)).toBe(true);
+    for (const event of prices) {
+      expect(event.pricing_policy).toBe("figma");
+      expect(event.member_price).toBe(0);
+      expect(event.configured_price).toBe(event.regular_price);
+    }
   });
 
   it("keeps the ongoing events open through a long window", () => {

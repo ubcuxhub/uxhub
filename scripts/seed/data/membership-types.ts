@@ -23,7 +23,7 @@ export const membershipTypes: TablesInsert<"membership_types">[] = [
     eligible_user_types: ["ubcStudent"],
     price: 12.0,
     description:
-      "Free or discounted entry to every UX Hub event, except UXathon.",
+      "Free entry to UX Hub events while your membership is active.",
   },
   {
     active: true,
@@ -32,7 +32,7 @@ export const membershipTypes: TablesInsert<"membership_types">[] = [
     eligible_user_types: ["ubcStudent"],
     price: 18.0,
     description:
-      "A guaranteed spot at UXathon, plus free or discounted entry to every other UX Hub event.",
+      "Free entry to UX Hub events, including UXathon, while your membership is active.",
   },
   {
     active: true,
@@ -41,7 +41,7 @@ export const membershipTypes: TablesInsert<"membership_types">[] = [
     eligible_user_types: ["faculty"],
     price: 18.0,
     description:
-      "Free or discounted entry to every UX Hub event, except UXathon.",
+      "Free entry to UX Hub events while your membership is active.",
   },
   {
     active: true,
@@ -50,6 +50,6 @@ export const membershipTypes: TablesInsert<"membership_types">[] = [
     eligible_user_types: ["nonUbc"],
     price: 24.0,
     description:
-      "Free or discounted entry to every UX Hub event, except UXathon.",
+      "Free entry to UX Hub events while your membership is active.",
   },
 ];

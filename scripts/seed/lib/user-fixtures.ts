@@ -334,6 +334,9 @@ export function validateUserFixtures(
         : Number(
             membershipBySlug.get(purchase.membershipSlug ?? "")?.price
           ) * 100;
+      if (purchase.kind === "event_ticket" && purchase.amountCents === 0 && purchase.squarePaymentId) {
+        throw new Error(`Charge-free purchase "${purchase.idempotencyKey}" must not have a Square payment`);
+      }
       if (purchase.amountCents !== expectedAmount) {
         throw new Error(
           `Purchase "${purchase.idempotencyKey}" amount ${purchase.amountCents} does not match expected ${expectedAmount}`

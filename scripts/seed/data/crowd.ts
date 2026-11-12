@@ -456,11 +456,10 @@ export function buildSeedCrowd(events: SeedEvent[], now: Date): SeedUser[] {
     Boolean(user.membershipSlug) &&
     (!user.membershipExpiresAt || new Date(user.membershipExpiresAt) > now);
 
-  /** A completed ticket purchase at `createdAt`, or null for a free ticket. */
+  /** A completed purchase for every ticket, including charge-free registrations. */
   const buyTicket = (index: number, event: SeedEvent, createdAt: string) => {
     const user = userAt(index);
     const amountCents = ticketPriceCents(event, isActiveMember(user));
-    if (amountCents === 0) return undefined;
     const key = `seed:crowd:event:${handleAt(index)}:${event.event.slug}`;
     user.purchases.push({
       amountCents,
@@ -469,7 +468,7 @@ export function buildSeedCrowd(events: SeedEvent[], now: Date): SeedUser[] {
       fulfilledAt: afterTimestamp(createdAt, 1),
       idempotencyKey: key,
       kind: "event_ticket",
-      squarePaymentId: `seed:crowd:payment:${handleAt(index)}:${event.event.slug}`,
+      squarePaymentId: amountCents > 0 ? `seed:crowd:payment:${handleAt(index)}:${event.event.slug}` : undefined,
       status: "completed",
     });
     return key;

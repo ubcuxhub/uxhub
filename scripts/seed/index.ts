@@ -63,6 +63,8 @@ import {
   reconcileUserFixtures,
   removeRetiredFixtures,
 } from "./lib/reconcile-users.ts";
+import { prepareBuilderDateSettings, reconcileBuilderSettings } from "./lib/builder-settings.ts";
+import { prepareLegacySeedPricing, validateSeedEvents } from "./lib/event-model.ts";
 import { validateUserFixtures } from "./lib/user-fixtures.ts";
 import { seedReviewNotes } from "./data/review-notes.ts";
 import { reconcileReviewNotes, resolveSeedReviewNotes } from "./lib/review-notes.ts";
@@ -747,7 +749,19 @@ async function reconcileTeams(
 ): Promise<Counts> {
   const counts = emptyCounts();
   if (options.dryRun) {
-    counts.created += seedTeams.length;
+    for (const team of seedTeams) {
+      const ownerId = profileIds.get(team.ownerEmail);
+      const event = await supabase.from(TABLE.events).select("id").eq("slug", team.eventSlug).maybeSingle();
+      if (event.error) throw event.error;
+      if (!ownerId || !event.data) {
+        counts.created += 1;
+        continue;
+      }
+      const existing = await supabase.from(TABLE.teams).select("id").eq("event_id", event.data.id).eq("owner_id", ownerId).maybeSingle();
+      if (existing.error) throw existing.error;
+      if (existing.data) counts.updated += 1;
+      else counts.created += 1;
+    }
     return counts;
   }
 
@@ -898,6 +912,7 @@ async function main(): Promise<void> {
     ...buildSeedUsers(seedEvents, seedNow),
     ...buildSeedCrowd(seedEvents, seedNow),
   ];
+  validateSeedEvents(seedEvents);
   validateUserFixtures(seedUsers, seedEvents, membershipTypes, seedNow);
   const reviewNotes = resolveSeedReviewNotes(seedReviewNotes, seedUsers, seedNow);
   await assertImageKeysExist(seedEvents);
@@ -943,6 +958,12 @@ async function main(): Promise<void> {
   });
 
   const summary: string[] = [];
+  if (shouldRun(options, "events")) {
+    const converted = await prepareLegacySeedPricing(supabase, seedEvents, seedUsers, {
+      ...options, users: !skipUsers && shouldRun(options, "users"),
+    });
+    if (converted) summary.push(`Legacy event pricing: ${converted} fixture events prepared for conversion`);
+  }
 
   if (shouldRun(options, "storage")) {
     summary.push(await reconcileBuckets(supabase, options));
@@ -970,6 +991,7 @@ async function main(): Promise<void> {
   }
 
   if (shouldRun(options, "events")) {
+    if (!options.dryRun) await prepareBuilderDateSettings(supabase, seedEvents);
     const { idsBySlug, counts: eventCounts } = await upsertBySlug(
       supabase,
       TABLE.events,
@@ -988,9 +1010,7 @@ async function main(): Promise<void> {
         location_type: seed.event.location_type ?? "in_person",
         agenda_enabled: seed.event.agenda_enabled ?? true,
         teams_enabled: seed.event.teams_enabled ?? false,
-        short_description:
-          seed.event.short_description ??
-          seed.event.description.slice(0, 180),
+        short_description: seed.event.short_description,
         // Built from the target's own host rather than uploaded here, so
         // `--only=events` still resolves images a previous run wrote.
         image_url: seedImageUrl(supabase, BUCKET.eventImages.id, seed.imageKey),
@@ -1064,6 +1084,7 @@ async function main(): Promise<void> {
         await reconcilePrivateDetails(supabase, eventId, seed, options)
       );
       addCounts(agendaCounts, await reconcileAgenda(supabase, eventId, seed, options));
+      if (!options.dryRun) await reconcileBuilderSettings(supabase, eventId, seed);
     }
 
     summary.push(format("Check-in sessions", sessionCounts));
@@ -1138,6 +1159,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  console.error(`\nSeed failed: ${error instanceof Error ? error.message : error}`);
+  console.error(`\nSeed failed: ${error && typeof error === "object" && "message" in error ? String(error.message) : String(error)}`);
   process.exit(1);
 });

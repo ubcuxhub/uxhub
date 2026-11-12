@@ -86,6 +86,25 @@ their history, a closed registration window, a not-yet-open one, and:
 | `draft` | `ux-research-workshop` | Draft, no schedule |
 | `scheduled` | `accessibility-audit-clinic` | Draft with `publish_at` three days out (17:00 UTC), the admin "Scheduled" state. The database's own publication job (20261027230347) is armed by the write and *will* publish it if the local database is still up then; the next run puts it back. `--target=prod` writes no `publish_at`, since that would undo the forced draft |
 
+Every event uses operational Free/Paid settings (`pricing_policy = figma`):
+active members are free; non-members and lapsed members pay the configured CAD
+price. Free purchases have no Square payment/customer ID. Short overviews are
+at most 50 characters, with the full prose retained as the long overview.
+Hosted/external/disabled marketing settings are saved fixtures; destination/Home
+activation remains deferred (AEB-041), as do application release/confirmation
+and attendee/staff team workflows (AEB-043/044). Existing foundations remain.
+
+On a full local seed with pruning, conversion from legacy fixture pricing first
+checks every affected event for non-fixture purchases, tickets or applications.
+If any exist, conversion refuses before deleting records; use a separate fresh
+local database. Otherwise it removes only fixture tickets/purchases (check-ins
+cascade), temporarily expires fixture offers, and restores them through the user pass.
+Event/application/question/team identities and durable question locks survive;
+no trigger is disabled. A partial local failure can be retried. Locked legacy
+conversion refuses `--no-prune`, `--only=events` and prod; normal repeated runs
+with matching pricing support these modes. Prod still forces draft/no schedule,
+never prunes and never writes fixture accounts. No production run is needed.
+
 Beyond dates and prices, the fixtures fill in the event page:
 
 | Event | Dates | Also seeds |
@@ -97,8 +116,9 @@ Beyond dates and prices, the fixtures fill in the event page:
 | `industry-talk-ai-and-ux`, `student-panel` | — | Online, with meeting details |
 | `industry-talk-design-systems` | — | Hybrid, with meeting details the three deep fixtures can see |
 
-People sections are Mentors only until the builder reads other sections: it
-saves every person on an event back as a mentor.
+People sections use the delivered builder’s ordered groups. Attendee rendering
+of additional groups, full sponsor details and remaining resource placements
+is deferred to AEB-042; saved settings do not imply those flows are delivered.
 
 Agendas live in `event_agenda_days` and `event_agenda_items`, not the legacy
 `events.agenda` column, which the fixtures still fill for the public page.
@@ -279,3 +299,14 @@ purchased. It deletes an unreferenced tier. After a real purchase, it retains th
 inactive tier because purchases and membership profiles deliberately keep their
 financial references. It never removes purchases, webhook events, users, or
 membership assignments.
+
+Saved builder examples: `design-sprint-upcoming` includes Judges and a custom
+Workshop hosts group alongside Mentors; selected upcoming/draft events include
+single/multiple-date documents, online/public/Going locations and a per-date
+room override. Design Sprint uses one check-in window per agenda day; the selected
+single-day fixtures use their event window (split for the two-stop tour).
+Repeated seeds retain session identities by name. Content documents reference reconciled people, sponsor and
+resource identities, and only advance revision when content changes. Application
+timing settings are saved without resetting the durable submitted-question lock;
+release/expiry enforcement remains deferred. The seed does not expose protected
+location or meeting data through the public event row.

@@ -360,7 +360,7 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
 
   const gridPurchaseTime = timestamp(addDays(today, -60), 15);
 
-  return [
+  const users: SeedUser[] = [
   /* ── Deep fixtures ───────────────────────────────────────────────────────
    * Three accounts carrying purchased registrations across every phase. These
    * are what the portal history, receipts, applications, and check-in screens
@@ -947,6 +947,15 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
     registrations: [],
   },
   ];
+  // Charge-free registrations have real completed purchases without Square IDs.
+  for (const user of users) {
+    for (const purchase of user.purchases) {
+      if (purchase.kind === "event_ticket" && purchase.amountCents === 0) {
+        delete purchase.squarePaymentId;
+      }
+    }
+  }
+  return users;
 }
 
 export const seedUsers = buildSeedUsers(seedEvents, new Date());
