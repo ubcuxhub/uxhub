@@ -10,7 +10,8 @@ export type AppSettingsUpdate = TablesUpdate<"app_settings">;
 
 export type EventContentSettingsRow = Tables<"event_content_settings">;
 
-export type EventRow = Tables<"events">;
+// PostgREST computed fields are returned only when explicitly selected.
+export type EventRow = Omit<Tables<"events">, "event_has_ended">;
 export type EventInsert = TablesInsert<"events">;
 export type EventUpdate = TablesUpdate<"events">;
 export type EventStatus = Enums<"event_status">;

@@ -53,6 +53,28 @@ export type Database = {
           },
         ]
       }
+      admin_event_mutations: {
+        Row: {
+          created_at: string
+          id: string
+          request: NonNullable<Json>
+          result: NonNullable<Json>
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          id: string
+          request: NonNullable<Json>
+          result: NonNullable<Json>
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          request?: NonNullable<Json>
+          result?: NonNullable<Json>
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           id: boolean
@@ -826,6 +848,7 @@ export type Database = {
           registration_opens_at: string | null
           regular_price: number
           requires_application: boolean
+          revision: number
           short_description: string | null
           slug: string
           sponsors_enabled: boolean
@@ -834,8 +857,9 @@ export type Database = {
           team_deadline: string | null
           teams_enabled: boolean
           updated_at: string | null
+          event_has_ended: boolean | null
         }
-        ComputedFields: never
+        ComputedFields: "event_has_ended"
         Insert: {
           agenda?: Json | null
           agenda_enabled?: boolean
@@ -876,6 +900,7 @@ export type Database = {
           registration_opens_at?: string | null
           regular_price: number
           requires_application?: boolean
+          revision?: number
           short_description?: string | null
           slug: string
           sponsors_enabled?: boolean
@@ -925,6 +950,7 @@ export type Database = {
           registration_opens_at?: string | null
           regular_price?: number
           requires_application?: boolean
+          revision?: number
           short_description?: string | null
           slug?: string
           sponsors_enabled?: boolean
@@ -1433,13 +1459,30 @@ export type Database = {
         Returns: string[]
       }
       delete_account: { Args: { p_auth_user_id: string }; Returns: undefined }
+      delete_admin_event_safely: {
+        Args: { p_event_id: string; p_operation_id: string }
+        Returns: Json
+      }
       delete_event_atomically: {
+        Args: { target_event_id: string }
+        Returns: undefined
+      }
+      delete_event_before_safe_mutations: {
         Args: { target_event_id: string }
         Returns: undefined
       }
       delete_team: {
         Args: { p_team_id: string; p_user_id: string }
         Returns: string
+      }
+      event_has_ended: {
+        Args: {
+          e: Omit<
+            Database["public"]["Tables"]["events"]["Row"],
+            Database["public"]["Tables"]["events"]["ComputedFields"]
+          >
+        }
+        Returns: boolean
       }
       event_is_public: {
         Args: {
@@ -1582,6 +1625,22 @@ export type Database = {
         }
         Returns: Json
       }
+      save_admin_event_builder_before_safe_mutations: {
+        Args: {
+          p_application_questions: Json
+          p_check_in_sessions: Json
+          p_draft_id: string
+          p_draft_revision: number
+          p_event: Json
+          p_event_id: string
+          p_expected_header_image_url: string
+          p_expected_image_url: string
+          p_mentors: Json
+          p_slug: string
+          p_sponsors: Json
+        }
+        Returns: Json
+      }
       save_admin_event_draft: {
         Args: {
           p_document: Json
@@ -1597,6 +1656,15 @@ export type Database = {
       }
       save_event_check_in_sessions: {
         Args: { p_event_id: string; p_sessions: Json }
+        Returns: Json
+      }
+      save_past_event_resources: {
+        Args: {
+          p_event_id: string
+          p_links: Json
+          p_operation_id: string
+          p_revision: number
+        }
         Returns: Json
       }
       set_user_role: {
@@ -1616,6 +1684,65 @@ export type Database = {
       team_change_blocked: {
         Args: { p_event_id: string; p_user_id: string }
         Returns: string
+      }
+      update_admin_event_schedule: {
+        Args: { p_event_id: string; p_patch: Json }
+        Returns: {
+          agenda: Json | null
+          agenda_enabled: boolean
+          configured_marketing_mode: string | null
+          configured_marketing_url: string | null
+          configured_price: number | null
+          configured_pricing_mode: string | null
+          configured_slug: string | null
+          configured_slug_edited: boolean
+          created_at: string | null
+          description: string
+          description_images: string[] | null
+          description_rich: Json | null
+          ends_at: string | null
+          event_colour: string | null
+          event_type: Database["public"]["Enums"]["event_type"]
+          first_published_at: string | null
+          header_colour: string | null
+          header_image_url: string | null
+          id: string
+          image_url: string | null
+          is_featured: boolean
+          location_address: string | null
+          location_address_url: string | null
+          location_building: string | null
+          location_room: string | null
+          location_type: Database["public"]["Enums"]["event_location_type"]
+          marketing_url: string | null
+          max_capacity: number
+          max_team_size: number | null
+          member_price: number
+          mentors_enabled: boolean
+          min_team_size: number | null
+          name: string
+          pricing_policy: string
+          publish_at: string | null
+          registration_closes_at: string | null
+          registration_opens_at: string | null
+          regular_price: number
+          requires_application: boolean
+          revision: number
+          short_description: string | null
+          slug: string
+          sponsors_enabled: boolean
+          starts_at: string | null
+          status: Database["public"]["Enums"]["event_status"]
+          team_deadline: string | null
+          teams_enabled: boolean
+          updated_at: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "events"
+          isOneToOne: false
+          isSetofReturn: true
+        }
       }
       valid_option_list: {
         Args: { allowed: string[]; choices: string[] }

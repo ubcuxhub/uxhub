@@ -148,10 +148,7 @@ export async function updateEventSchedule(
   patch: EventSchedulePatch
 ): Promise<EventRow | null> {
   const { data, error } = await supabase
-    .from(TABLES.events)
-    .update(patch)
-    .eq("id", id)
-    .select("*")
+    .rpc("update_admin_event_schedule", { p_event_id: id, p_patch: patch })
     .maybeSingle();
 
   if (error) throw error;

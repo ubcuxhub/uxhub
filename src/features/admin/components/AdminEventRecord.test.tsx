@@ -35,6 +35,7 @@ function event(overrides: Partial<EventRow> = {}): EventRow {
     configured_pricing_mode: null,
     configured_slug: null,
     configured_slug_edited: true,
+    revision: 0,
     pricing_policy: "legacy",
     first_published_at: null,
     status: "active",

@@ -1,5 +1,7 @@
 "use client";
 
+import { Hubbo } from "@/components/shared/Hubbo";
+
 import { useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -77,8 +79,8 @@ export function EventPublicationSuccess({ form }: { form: Form }) {
   const registration = saved?.registration_opens_at && Date.parse(saved.registration_opens_at) > saved.completed_at ? `Registration opens ${publicationTimeLabel(saved.registration_opens_at)}.` : saved?.registration_closes_at && Date.parse(saved.registration_closes_at) <= saved.completed_at ? "Registration has closed." : "Registration is open.";
   return <Dialog open={!!saved} onOpenChange={open => { if (!open) form.setPublicationSuccess(null); }}>
     <DialogContent showCloseButton={false} className="max-w-[482px] gap-4 px-7 pt-11 pb-8" onOpenAutoFocus={() => { opener.current = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null; }} onCloseAutoFocus={event => { event.preventDefault(); if (opener.current?.isConnected) opener.current.focus(); else document.querySelector<HTMLButtonElement>("#event-builder-header button[aria-haspopup=menu], #event-builder-header button")?.focus(); }}>
-      <div aria-label="Hubbo placeholder" className="mx-auto flex h-50 w-36 items-center justify-center rounded-xl border border-dashed border-border bg-muted text-center text-caption text-muted-foreground">Hubbo<br />placeholder</div>
-      <DialogHeader className="items-center gap-4 space-y-0 pr-0 text-center sm:text-center"><DialogTitle className="text-h2">{scheduled ? "Event scheduled" : "Event published"}</DialogTitle><DialogDescription className="text-body">{scheduled ? `${saved?.name} goes live ${publicationTimeLabel(saved!.publish_at!)}. You can keep editing until then.` : `${saved?.name} is live. Members can find it in the portal. ${registration}`}</DialogDescription></DialogHeader>
+      {saved?.updated ? <Hubbo emotion="excited" size="hero" className="mx-auto h-50" /> : <div aria-label="Hubbo placeholder" className="mx-auto flex h-50 w-36 items-center justify-center rounded-xl border border-dashed border-border bg-muted text-center text-caption text-muted-foreground">Hubbo<br />placeholder</div>}
+      <DialogHeader className="items-center gap-4 space-y-0 pr-0 text-center sm:text-center"><DialogTitle className="text-h2">{saved?.updated ? "Event updated" : scheduled ? "Event scheduled" : "Event published"}</DialogTitle><DialogDescription className="text-body">{saved?.updated ? `Members now see the latest version of ${saved.name}.` : scheduled ? `${saved?.name} goes live ${publicationTimeLabel(saved!.publish_at!)}. You can keep editing until then.` : `${saved?.name} is live. Members can find it in the portal. ${registration}`}</DialogDescription></DialogHeader>
       <DialogFooter className="flex-wrap gap-3 pt-2 sm:justify-center"><Button type="button" variant="outline" onClick={() => form.setPublicationSuccess(null)}>Keep editing</Button><Button asChild><a href={saved ? `/admin/events/${saved.id}` : "#"}>View event page</a></Button></DialogFooter>
     </DialogContent>
   </Dialog>;

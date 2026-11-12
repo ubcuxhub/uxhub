@@ -341,6 +341,7 @@ describe("discardUnusedEventImageAction: the reference check", () => {
 // ---------------------------------------------------------------------------
 
 const saveInput = {
+  expectedRevision: 0,
   expectedImageUrl: null,
   event: { name: "Design Sprint", short_description: "Overview", description: "Long overview", slug: "design-sprint", starts_at: "2099-08-01T18:00:00Z", ends_at: "2099-08-01T19:00:00Z", max_capacity: 10 },
   checkInSessions: [],
@@ -1068,4 +1069,9 @@ describe("team settings action boundary", () => {
     await expect(saveAdminEventAction({ ...saveInput, event: { teams_enabled: true } })).rejects.toThrow("Staff access required");
     expect(adminRpc).not.toHaveBeenCalled();
   });
+});
+
+it("refuses an existing-event update without a revision before touching the database", async () => {
+  expect(await saveAdminEventAction({ ...saveInput, eventId: "event-1", expectedRevision: undefined })).toEqual({ error: "Reload this event before updating; its saved revision is missing." });
+  expect(adminRpc).not.toHaveBeenCalled();
 });

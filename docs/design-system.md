@@ -1013,3 +1013,12 @@ Use `Field validationKey="target"` to render icon/copy errors and associate them
 with its controls through the existing Field context. The caller owns delayed
 required-field validation and immediate consistency feedback; fields without a
 key retain existing behavior. See `/dev/components/field` for an example.
+
+
+SectionNavigator defaults to sidebar-aware centered placement. Use
+`placement="bottom-right"` for a fixed corner tracker (16px phone / 32px desktop
+insets) that stays anchored when the sidebar expands or collapses.
+
+The section navigation menu is non-modal: opening it preserves page scrolling
+and scrollbar space, keeping the fixed trigger stationary. Escape and selection
+retain the existing focus behavior.

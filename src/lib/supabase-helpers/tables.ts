@@ -10,6 +10,7 @@ export const TABLES = {
   events: "events",
   eventUrlClaims: "event_url_claims",
   eventDateLocationSettings: "event_date_location_settings",
+  adminEventMutations: "admin_event_mutations",
   adminEventDrafts: "admin_event_drafts",
   userInfo: "user_info",
   eventTickets: "event_tickets",

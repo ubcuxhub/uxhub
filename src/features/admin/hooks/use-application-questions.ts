@@ -14,6 +14,7 @@ const isChoiceType = (response: ResponseType) =>
 const createQuestion = (
   response: ResponseType
 ): ApplicationQuestionTemplate => ({
+  clientKey: crypto.randomUUID(),
   question: "",
   description: "",
   response,

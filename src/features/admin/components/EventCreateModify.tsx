@@ -1,5 +1,8 @@
 "use client";
 
+import { Info, Lock } from "lucide-react";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import type { EventHistoryInfo } from "@/lib/supabase-helpers/event-mutations";
 import type { EventApplicationSettingsRow } from "@/lib/supabase/models";
 import { EventTeams } from "./event-form/EventTeams";
 import { EventSchedule } from "./event-form/EventSchedule";
@@ -42,10 +45,10 @@ import { type EventDateLocationDraft } from "../lib/event-date-location";
 import { EventPeopleEditor, EventResourcesEditor } from "./event-form/EventPeopleResources";
 import { emptyContent, type EventContent } from "../lib/event-content";
 import { ApplicationQuestionsSection } from "./event-form/ApplicationQuestionsSection";
-import { EventFormSkeleton } from "./event-form/EventFormSkeleton";
 import { DeleteEventModal } from "./DeleteEventModal";
 
 interface EventCreateModifyProps {
+  historyInfo?: EventHistoryInfo;
   initialContent?: EventContent;
   initialApplicationSettings?: EventApplicationSettingsRow | null;
   initialDateLocation?: { document: EventDateLocationDraft; revision: number } | null;
@@ -68,6 +71,7 @@ interface EventCreateModifyProps {
 
 export const EventCreateModify = ({
   eventId,
+  historyInfo,
   initialContent,
   showBackButton = true,
   pricingLocked = false,
@@ -122,7 +126,7 @@ export const EventCreateModify = ({
   const draft = !published && !scheduled;
   const publicationBlocked = initialEvent?.pricing_policy === "figma_pending" || (!initialEvent && form.formState.pricing_mode !== "legacy");
   const issueSections = ["basics", "description", "dates", "registration", "teams", "schedule", "people", "resources", "summary", "settings"];
-  const issues = [...new Map([...form.validation.issues, ...inputIssues].map(issue => [`${issue.section}:${issue.target}`, issue])).values()].sort((a, b) => issueSections.indexOf(a.section) - issueSections.indexOf(b.section));
+  const issues = [...new Map([...form.validation.issues, ...inputIssues].map(issue => [`${issue.section}:${issue.target}`, issue])).values()].filter(issue => !form.past || issue.section === "resources").sort((a, b) => issueSections.indexOf(a.section) - issueSections.indexOf(b.section));
   const visibleIssues = issues.filter(issue => form.publishAttempted || !issue.required);
   const focusIssue = (issue: EventFormIssue) => {
     if (issue.section === "people") window.dispatchEvent(new Event("event-content-invalid"));
@@ -159,8 +163,8 @@ export const EventCreateModify = ({
     { id: "builder-description", number: 2, title: "Description", state: "complete", required: true },
     { id: "builder-dates", number: 3, title: "Date and location", state: "complete", required: true },
     { id: "builder-registration", number: 4, title: "Registration", state: "complete", required: true },
-    { id: "builder-teams", number: 5, title: "Teams", state: "complete", required: false },
-    { id: "builder-schedule", number: 6, title: "Schedule", state: "complete", required: false },
+    { id: "builder-teams", number: 5, title: "Teams", state: form.formState.teams_enabled ? "complete" : "optional", required: false },
+    { id: "builder-schedule", number: 6, title: "Schedule", state: form.formState.agenda_enabled ? "complete" : "optional", required: false },
     { id: "builder-people", number: 7, title: "People and sponsors", state: form.formState.content?.sections.length ? "complete" : "optional", required: false },
     { id: "builder-resources", number: 8, title: "Links and resources", state: form.formState.content?.links.length ? "complete" : "optional", required: false },
     { id: "builder-summary", number: 9, title: "Summary", state: "optional", required: false },
@@ -185,16 +189,19 @@ export const EventCreateModify = ({
     document.querySelectorAll("[data-builder-section]").forEach(element => observer.observe(element));
     return () => observer.disconnect();
   }, [offset]);
-  const section = (id: string, title: string, children: ReactNode) => (
+  const section = (id: string, title: string, children: ReactNode) => {
+    const status = sections.find(section => section.id === id)!;
+    return (
     <section id={id} data-builder-section style={{ scrollMarginTop: offset + (typeof window !== "undefined" && window.innerWidth < 640 ? 56 : 0) }} className="space-y-4 border-t border-border pt-14 first:border-0 first:pt-0">
-      <div className="flex flex-wrap items-end justify-between gap-3 pb-2"><div>
+      <div className="flex items-start justify-between gap-3 pb-2"><div>
         <p className="text-badge text-muted-foreground">Section {sectionDetails[id].number}</p>
         <h2 tabIndex={-1} className="pt-1 text-h3 outline-none focus-visible:focus-ring">{title}</h2>
         {sectionDetails[id].description && <p className="pt-0.5 text-muted-foreground">{sectionDetails[id].description}</p>}
-      </div>{visibleIssues.some(issue => `builder-${issue.section}` === id) && <StatusBadge label={`${visibleIssues.filter(issue => `builder-${issue.section}` === id).length} to fix`} tone="error" />}</div>
-      {children}
+      </div>{status.issues ? <StatusBadge label={`${status.issues} to fix`} tone="error" /> : status.state === "complete" ? <StatusBadge label="Complete" tone="success" /> : !status.required ? <StatusBadge label="Optional" tone="neutral" /> : null}</div>
+      {form.past && !["builder-resources", "builder-summary", "builder-settings"].includes(id) ? <fieldset disabled onDragStartCapture={event => event.preventDefault()} className="min-w-0 space-y-4"><legend className="mb-3 flex items-center gap-2 text-small text-muted-foreground"><Lock aria-hidden className="size-4" />Locked</legend>{children}</fieldset> : children}
     </section>
-  );
+    );
+  };
 
   return (
     <FieldValidation errors={visibleIssues}><div className="event-builder flex w-full min-w-0 flex-col gap-6 pb-50">
@@ -203,22 +210,21 @@ export const EventCreateModify = ({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-2.5">
             <h1 className="break-words text-h2">{form.formState.name || "Untitled event"}</h1>
-            <StatusBadge label={scheduled ? "Scheduled" : published ? "Published" : "Draft"} tone={scheduled ? "info" : published ? "success" : "neutral"} />
+            <StatusBadge label={form.past ? "Past" : scheduled ? "Scheduled" : published ? "Published" : "Draft"} tone={form.past ? "neutral" : scheduled ? "info" : published ? "success" : "neutral"} />
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <span role="status" className="text-small text-muted-foreground">{saveStatus}{scheduled ? ` · Goes live ${publicationTimeLabel(form.publication.publish_at!)}` : published ? " · Published" : ""}</span>
+            <span role="status" className="text-small text-muted-foreground">{saveStatus}{form.past ? ` · Ended ${publicationTimeLabel(form.savedEnd!)}` : scheduled ? ` · Goes live ${publicationTimeLabel(form.publication.publish_at!)}` : published ? " · Published" : ""}</span>
             {draft && <Button type="button" size="sm" variant="outline" loading={form.isSubmitting} onClick={() => void form.handleSaveDraft()}>Save draft</Button>}
-            {(scheduled || published) && <Button type="button" size="sm" loading={form.isSubmitting} onClick={() => void form.handlePublication("save")}>{scheduled ? "Save changes" : "Update event"}</Button>}
+            {(scheduled || published) && form.hasUnsavedChanges && <Button type="button" size="sm" variant="outline" disabled={form.isSubmitting || form.unresolvedSave} onClick={() => { form.handleDiscardChanges(); setInputIssues([]); }}>Discard changes</Button>}
+            {(scheduled || published) && <Button disabled={!form.hasUnsavedChanges || form.isDeleting} type="button" size="sm" loading={form.isSubmitting} onClick={() => void form.handlePublication("save")}>{scheduled ? "Save changes" : "Update"}</Button>}
             {!published && <EventPublishMenu form={form} size="sm" />}
           </div>
         </div>
       </div>
-      {form.loadingEvent ? (
-        <EventFormSkeleton />
-      ) : (
-        <form ref={formElement} onClickCapture={captureInputIssues} onChangeCapture={captureInputIssues} onBlurCapture={captureInputIssues} id="event-builder-form" noValidate className="flex min-w-0 flex-col gap-14 [&_[data-slot=card]:has([data-invalid=true])]:border-destructive [&_input:not([type=checkbox]):not([type=radio])]:h-10 [&_button[data-slot=select-trigger]]:h-10" onSubmit={form.handleSubmit}><fieldset disabled={form.isSubmitting} className="flex min-w-0 flex-col gap-14">
+      {published && <Alert variant={form.past ? "neutral" : "info"} className={form.past ? "border-border" : "border-info-foreground"} icon={<Info aria-hidden />}><AlertTitle>{form.past ? "This event has ended" : "This event is live"}</AlertTitle><AlertDescription>{form.past ? `Details are locked so they match what happened: ${historyInfo?.registered ?? 0} registered, ${historyInfo?.checkedIn ?? 0} checked in. You can still add or change links, like the event recap.` : `Members still see the published version. Your changes go live when you choose Update. ${historyInfo?.registered ?? 0} people are registered.`}</AlertDescription></Alert>}
+        <form key={form.resetKey} ref={formElement} onClickCapture={captureInputIssues} onChangeCapture={captureInputIssues} onBlurCapture={captureInputIssues} id="event-builder-form" noValidate className="flex min-w-0 flex-col gap-14 [&_[data-slot=card]:has([data-invalid=true])]:border-destructive [&_input:not([type=checkbox]):not([type=radio])]:h-10 [&_button[data-slot=select-trigger]]:h-10" onSubmit={form.handleSubmit}><fieldset disabled={form.isSubmitting || form.isDeleting} className="flex min-w-0 flex-col gap-14">
           {section("builder-basics", "Basics", <><PrimaryDetailsSection showConfigurationErrors={form.publishAttempted} urlLocked={!!initialEvent?.first_published_at || published} formState={form.formState} onFieldChange={form.handleFieldChange} /><EventBranding state={form.formState} disabled={form.isSubmitting} onChange={form.handleFieldChange} onIcon={form.setPendingImageFile} onHeader={form.setPendingHeaderFile} /><EventFeatured state={form.formState} onChange={form.handleFieldChange} /><EventPricing showErrors={form.publishAttempted} state={form.formState} locked={pricingLocked} effectivePrices={initialEvent && initialEvent.pricing_policy !== "figma_pending" ? { regular: initialEvent.regular_price, member: initialEvent.member_price } : undefined} onChange={form.handleFieldChange} /></>)}
-          {section("builder-description", "Description", <EventDescriptionEditor validationManaged key={form.legacyDraftRecovered ? "legacy-recovered" : "initial"} short={form.formState.short_description} value={form.formState.description} rich={form.formState.description_rich} disabled={form.isSubmitting} onChange={(short, text, rich) => { form.handleFieldChange("short_description", short); form.handleFieldChange("description", text); form.handleFieldChange("description_rich", rich); }} />)}
+          {section("builder-description", "Description", <EventDescriptionEditor validationManaged key={`${form.resetKey}-${form.legacyDraftRecovered ? "legacy-recovered" : "initial"}`} short={form.formState.short_description} value={form.formState.description} rich={form.formState.description_rich} disabled={form.isSubmitting || form.past} onChange={(short, text, rich) => { form.handleFieldChange("short_description", short); form.handleFieldChange("description", text); form.handleFieldChange("description_rich", rich); }} />)}
           {section("builder-dates", "Date and location", <EventDateLocation key={form.formState.date_location_revision} value={form.formState.date_location!} disabled={form.isSubmitting} showErrors={form.publishAttempted} onChange={value => form.handleFieldChange("date_location", value)} />)}
           {section("builder-registration", "Registration", <><EventRegistration state={form.formState} disabled={form.isSubmitting} info={registrationInfo} onChange={form.handleFieldChange} /><ApplicationQuestionsSection locked={!!initialApplicationSettings?.questions_locked_at} onMove={form.moveApplicationQuestion} registrationModeOwned enabled={form.formState.requires_application} applicationTemplate={form.applicationTemplate} questionErrors={form.publishAttempted ? form.validation.questionErrors : form.questionErrors} onEnabledChange={enabled => form.handleFieldChange("requires_application", enabled)} onAdd={form.addApplicationQuestion} onRemove={form.removeApplicationQuestion} onUpdate={form.updateApplicationQuestion} onAddResponseOption={form.addResponseOption} onUpdateResponseOption={form.updateResponseOption} onRemoveResponseOption={form.removeResponseOption} />{form.formState.requires_application && <ApplicationTiming state={form.formState} showErrors={form.publishAttempted || visibleIssues.some(issue => issue.section === "registration")} onChange={form.handleFieldChange} />}</>)}
           {section("builder-teams", "Teams", <EventTeams state={form.formState} info={teamInfo} showErrors={form.publishAttempted || visibleIssues.some(issue => issue.section === "teams")} onChange={form.handleFieldChange} />)}
@@ -226,8 +232,8 @@ export const EventCreateModify = ({
           {section("builder-people", "People and sponsors", <EventPeopleEditor content={form.formState.content ?? emptyContent()} onChange={content => form.handleFieldChange("content", content)} people={mentorOptions} sponsors={sponsorOptions} showErrors={form.showConfigurationErrors} />)}
           {section("builder-resources", "Links and resources", <EventResourcesEditor content={form.formState.content ?? emptyContent()} onChange={content => form.handleFieldChange("content", content)} showErrors={form.showConfigurationErrors} />)}
           {section("builder-summary", "Summary", <div className="space-y-4 rounded-xl border border-border bg-card p-5">
-            <div className="flex flex-wrap items-center justify-between gap-4"><h3 className="text-subheading">{published ? "Published" : scheduled ? "Scheduled" : issues.length ? form.publishAttempted ? "A few things to fix" : "Almost ready" : publicationBlocked ? "Publication unavailable" : "Ready to publish"}</h3>{!published && <EventPublishMenu form={form} />}</div>
-            <p className="text-muted-foreground">{published ? "Members can find this event in the portal. Registration follows its own dates." : scheduled ? `It goes live ${publicationTimeLabel(form.publication.publish_at!)}. You can keep editing until then.` : issues.length ? "Complete the required details before the event goes live." : publicationBlocked ? "New pricing is saved as a draft. Publication requires the pricing and free-registration integration." : "Everything required is filled in. Choose Publish to go live now or schedule it."}</p>
+            <div className="flex flex-wrap items-center justify-between gap-4"><h3 className="text-subheading">{form.past ? "Event ended" : published ? "Published" : scheduled ? "Scheduled" : issues.length ? form.publishAttempted ? "A few things to fix" : "Almost ready" : publicationBlocked ? "Publication unavailable" : "Ready to publish"}</h3>{!published && <EventPublishMenu form={form} />}</div>
+            <p className="text-muted-foreground">{form.past ? `${historyInfo?.registered ?? 0} registered, ${historyInfo?.checkedIn ?? 0} checked in. Add an event recap link in Links and resources.` : published ? "Members can find this event in the portal. Registration follows its own dates." : scheduled ? `It goes live ${publicationTimeLabel(form.publication.publish_at!)}. You can keep editing until then.` : issues.length ? "Complete the required details before the event goes live." : publicationBlocked ? "New pricing is saved as a draft. Publication requires the pricing and free-registration integration." : "Everything required is filled in. Choose Publish to go live now or schedule it."}</p>
             {!!issues.length && <ul className="space-y-2">{sections.filter(item => issues.some(issue => `builder-${issue.section}` === item.id)).map(item => <li key={item.id}><Button type="button" variant="link" className="h-auto whitespace-normal p-0 text-left" onClick={() => focusIssue(issues.find(issue => `builder-${issue.section}` === item.id)!)}>{item.title}{form.publishAttempted ? ` · ${issues.filter(issue => `builder-${issue.section}` === item.id).length} to fix` : ""}</Button></li>)}</ul>}
             {form.publishAttempted && !!issues.length && <ul className="space-y-1 text-small text-destructive">{issues.map((issue, index) => <li key={`${issue.target}-${index}`}><Button type="button" variant="link" className="h-auto whitespace-normal p-0 text-left text-destructive" onClick={() => focusIssue(issue)}>{issue.message}</Button></li>)}</ul>}
             {publicationBlocked && !!issues.length && <p className="text-small text-muted-foreground">New-pricing events remain drafts until the pricing and free-registration integration is available.</p>}
@@ -256,9 +262,8 @@ export const EventCreateModify = ({
           )}
           </fieldset>
         </form>
-      )}
 
-      <SectionNavigator title="Event sections" sections={sections} currentId={currentId} numberFormat="plain" className="bottom-4 z-40 sm:right-8 sm:bottom-8 sm:left-auto sm:translate-x-0" />
+      <SectionNavigator title="Event sections" sections={sections} currentId={currentId} numberFormat="plain" placement="bottom-right" className="z-40" />
       <EventPublicationSuccess form={form} />
       <EventLeaveDialog eventName={form.formState.name || "Untitled event"} navigation={form.navigation} draft={draft} pending={form.isSubmitting} error={form.error} save={() => form.handleSaveDraft(false)} />
       <Dialog open={form.showDraftSaved} onOpenChange={form.setShowDraftSaved}>
@@ -276,7 +281,8 @@ export const EventCreateModify = ({
       </Dialog>
       {form.eventId && (
         <DeleteEventModal
-          eventName={form.formState.name}
+          eventName={initialEvent?.name ?? form.formState.name}
+          eventId={form.eventId}
           isOpen={form.showDeleteModal}
           onClose={() => {
             form.setShowDeleteModal(false);

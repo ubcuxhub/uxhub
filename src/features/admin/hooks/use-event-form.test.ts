@@ -7,14 +7,14 @@ import type { EventApplicationQuestionRow, EventRow } from "@/lib/supabase/model
 import { useEventForm } from "./use-event-form";
 import { parseWorkingDocument } from "../lib/event-working-document";
 import { toast } from "@/components/ui/toast";
-vi.mock("@/components/ui/toast", () => ({ toast: { error: vi.fn(), dismiss: vi.fn() } }));
+vi.mock("@/components/ui/toast", () => ({ toast: { error: vi.fn(), success: vi.fn(), dismiss: vi.fn() } }));
 
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
 }));
 vi.mock("./use-unsaved-changes-guard", () => ({ useUnsavedChangesGuard: vi.fn() }));
 vi.mock("@/features/admin/actions", () => ({
-  saveAdminEventDraftAction: vi.fn(async () => ({ id: "draft-1", revision: 1 })),
+  recoverAdminEventDraftAction: vi.fn(async () => null), recoverAdminEventMutationAction: vi.fn(async () => null), savePastEventResourcesAction: vi.fn(), loadAdminEventDeletionInfoAction: vi.fn(async () => null), saveAdminEventDraftAction: vi.fn(async () => ({ id: "draft-1", revision: 1 })),
   saveAdminEventAction: vi.fn(async () => ({
     id: "event-1",
     checkInSessionIds: [],
@@ -617,4 +617,66 @@ describe("builder publication commands", () => {
     await act(async () => { options.action!.onClick(); });
     expect(vi.mocked(saveAdminEventAction).mock.calls.at(-1)![0].event.name).toBe("Edited after failure");
   });
+});
+
+it("keeps live edits local, discards to the saved snapshot, then updates its revision and success state", async () => {
+  const live = { ...event, status: "active" as const, publish_at: null, revision: 4 };
+  const { result } = renderHook(() => useEventForm({ eventId: live.id, initialEvent: live }));
+  act(() => result.current.handleFieldChange("name", "Unsaved name"));
+  expect(saveAdminEventAction).not.toHaveBeenCalled();
+  expect(result.current.hasUnsavedChanges).toBe(true);
+  act(() => result.current.handleDiscardChanges());
+  expect(result.current.formState.name).toBe(live.name);
+  expect(result.current.hasUnsavedChanges).toBe(false);
+  act(() => result.current.handleFieldChange("name", "Updated name"));
+  vi.mocked(saveAdminEventAction).mockResolvedValueOnce({ id: live.id, revision: 5, checkInSessionIds: [], questionIds: [] });
+  await act(async () => { expect(await result.current.handlePublication("save")).toBe(true); });
+  expect(saveAdminEventAction).toHaveBeenCalledWith(expect.objectContaining({ expectedRevision: 4, operationId: expect.any(String) }));
+  expect(result.current.publicationSuccess?.updated).toBe(true);
+  expect(result.current.hasUnsavedChanges).toBe(false);
+  act(() => result.current.handleFieldChange("name", "Another edit"));
+  act(() => result.current.handleDiscardChanges());
+  expect(result.current.formState.name).toBe("Updated name");
+});
+
+it("recovers an acknowledged commit after response loss without writing a second event", async () => {
+  const { recoverAdminEventMutationAction } = await import("@/features/admin/actions");
+  const live = { ...event, status: "active" as const, publish_at: null, revision: 1 };
+  const { result } = renderHook(() => useEventForm({ eventId: live.id, initialEvent: live }));
+  act(() => result.current.handleFieldChange("name", "Committed name"));
+  vi.mocked(saveAdminEventAction).mockRejectedValueOnce(new Error("Response lost"));
+  vi.mocked(recoverAdminEventMutationAction).mockResolvedValueOnce({ id: live.id, revision: 2, checkInSessionIds: [], questionIds: [] });
+  await act(async () => { expect(await result.current.handlePublication("save")).toBe(true); });
+  expect(saveAdminEventAction).toHaveBeenCalledTimes(1);
+  expect(result.current.hasUnsavedChanges).toBe(false);
+  expect(result.current.formState.name).toBe("Committed name");
+});
+
+it("locks ended content and saves only resources despite historical publication validation", async () => {
+  const { savePastEventResourcesAction } = await import("@/features/admin/actions");
+  const live = { ...event, status: "active" as const, publish_at: null, revision: 1, ends_at: "2020-01-01T19:00:00Z" };
+  const { result } = renderHook(() => useEventForm({ eventId: live.id, initialEvent: live }));
+  expect(result.current.past).toBe(true);
+  act(() => result.current.handleFieldChange("name", "Forged edit"));
+  expect(result.current.formState.name).toBe(live.name);
+  const content = { revision: 0, sections: [], links: [{ id: crypto.randomUUID(), type: "event_recap" as const, label: "Recap", url: "https://example.test/recap", visibility: "after_event" as const }] };
+  act(() => result.current.handleFieldChange("content", content));
+  vi.mocked(savePastEventResourcesAction).mockResolvedValueOnce({ id: live.id, revision: 2, content, checkInSessionIds: [], questionIds: [] });
+  await act(async () => { expect(await result.current.handlePublication("save")).toBe(true); });
+  expect(saveAdminEventAction).not.toHaveBeenCalled();
+  expect(savePastEventResourcesAction).toHaveBeenCalled();
+});
+
+it("becomes Past only at the saved final end while retaining its published status", () => {
+  vi.restoreAllMocks();
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date("2024-07-01T17:59:59Z"));
+  try {
+    const live = { ...event, status: "active" as const, publish_at: null };
+    const { result } = renderHook(() => useEventForm({ eventId:live.id,initialEvent:live }));
+    expect(result.current.past).toBe(false);
+    act(() => { vi.advanceTimersByTime(1001); });
+    expect(result.current.past).toBe(true);
+    expect(result.current.publication.status).toBe("active");
+  } finally { vi.useRealTimers(); }
 });

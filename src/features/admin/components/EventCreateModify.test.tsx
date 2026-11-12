@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { EventCreateModify } from "./EventCreateModify";
 
 vi.mock("@/components/shared/Hubbo", () => ({ Hubbo: () => <span>Hubbo</span> }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }) }));
-vi.mock("@/features/admin/actions", () => ({ saveAdminEventDraftAction: vi.fn(), saveAdminEventAction: vi.fn(), deleteAdminEventAction: vi.fn(), discardUnusedEventImageAction: vi.fn(), searchAdminEventPeopleAction: vi.fn(async () => []) }));
+vi.mock("@/features/admin/actions", () => ({ recoverAdminEventDraftAction: vi.fn(async () => null), recoverAdminEventMutationAction: vi.fn(async () => null), savePastEventResourcesAction: vi.fn(), loadAdminEventDeletionInfoAction: vi.fn(async () => null), saveAdminEventDraftAction: vi.fn(), saveAdminEventAction: vi.fn(), deleteAdminEventAction: vi.fn(), discardUnusedEventImageAction: vi.fn(), searchAdminEventPeopleAction: vi.fn(async () => []) }));
 
 beforeEach(() => {
   localStorage.clear();
@@ -52,4 +52,17 @@ it("blocks uncommitted invalid date text rather than publishing its previous val
   expect(saveAdminEventAction).not.toHaveBeenCalled();
   expect(saveAdminEventDraftAction).not.toHaveBeenCalled();
   expect(screen.queryByRole("heading", { name: "Ready to publish" })).toBeNull();
+});
+
+it("shows optional section badges and replaces them when the section is completed", () => {
+  const { container } = render(<EventCreateModify />);
+  const teams = within(container.querySelector("#builder-teams")! as HTMLElement);
+  const basics = within(container.querySelector("#builder-basics")! as HTMLElement);
+  expect(teams.getByText("Optional")).toBeTruthy();
+  expect(basics.queryByText("Complete")).toBeNull();
+  fireEvent.click(teams.getByRole("radio", { name: "Yes" }));
+  expect(teams.getByText("Complete")).toBeTruthy();
+  fireEvent.click(teams.getByRole("radio", { name: "No" }));
+  expect(teams.getByText("Optional")).toBeTruthy();
+  expect(teams.queryByText("Complete")).toBeNull();
 });

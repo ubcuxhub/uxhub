@@ -2,6 +2,7 @@
 
 import { emptyContent, eventContentProblem, legacyEventContent, type EventContent } from "../lib/event-content";
 
+import type { ApplicationQuestionTemplate } from "@/features/events/types";
 import type { EventApplicationSettingsRow } from "@/lib/supabase/models";
 
 import { dateSessions, emptyEventDate, emptyLocation, type EventDateLocationDraft } from "../lib/event-date-location";
@@ -13,6 +14,11 @@ import { useRouter } from "next/navigation";
 import { toast } from "@/components/ui/toast";
 import {
   deleteAdminEventAction,
+  recoverAdminEventMutationAction,
+  recoverAdminEventDraftAction,
+  savePastEventResourcesAction,
+  type SaveAdminEventInput,
+  type SaveAdminEventResult,
   discardUnusedEventImageAction,
   saveAdminEventAction,
   saveAdminEventDraftAction,
@@ -68,6 +74,16 @@ interface UseEventFormOptions {
   onSuccess?: (id: string) => void;
 }
 
+function eventHasEnded(status: string, endsAt: string | null | undefined, startsAt?: string | null, now = Date.now()) {
+  const end = endsAt || startsAt;
+  return status === "active" && !!end && Date.parse(end) <= now;
+}
+
+function sameWorkingDocument(left: EventWorkingDocument, right: EventWorkingDocument) {
+  const stable = (value: unknown) => JSON.stringify(value, (_key, item) => item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b))) : item);
+  return stable(left) === stable(right);
+}
+
 const LEGACY_DRAFT_KEY = "event_create_form_draft";
 
 export function useEventForm({
@@ -88,7 +104,12 @@ export function useEventForm({
   const [eventId, setEventId] = useState(initialEventId);
   const [publication, setPublication] = useState({ status: initialEvent?.status ?? "draft", publish_at: initialEvent?.publish_at ?? null });
   const expectedPublication = useRef(initialEvent ? { status: initialEvent.status, publish_at: initialEvent.publish_at } : null);
-  const [publicationSuccess, setPublicationSuccess] = useState<null | { id: string; name: string; status: string; publish_at: string | null; registration_opens_at: string | null; registration_closes_at: string | null; completed_at: number }>(null);
+  const [publicationSuccess, setPublicationSuccess] = useState<null | { id: string; name: string; status: string; publish_at: string | null; registration_opens_at: string | null; registration_closes_at: string | null; completed_at: number; updated?: boolean }>(null);
+  const savedRevision = useRef(initialEvent?.revision ?? 0);
+  const [resetKey, setResetKey] = useState(0);
+  const [unresolvedSave, setUnresolvedSave] = useState(false);
+  const [savedEnd, setSavedEnd] = useState(initialEvent?.ends_at || initialEvent?.starts_at || null);
+  const [clock, setClock] = useState(() => Date.now());
   const [publishAttempted, setPublishAttempted] = useState(false);
   const [validationAttempt, setValidationAttempt] = useState(0);
   const startingFormState = useMemo(
@@ -135,8 +156,8 @@ export function useEventForm({
         : [{ ...EMPTY_CHECK_IN_SESSION }]),
     [initialCheckInSessions, initialDraft]
   );
-  const startingQuestions = useMemo(
-    () => initialApplicationSettings?.questions_locked_at ? questionsFromRows(initialApplicationQuestions) : initialDraft?.document.applicationTemplate ?? questionsFromRows(initialApplicationQuestions),
+  const startingQuestions = useMemo<ApplicationQuestionTemplate[]>(
+    () => (initialApplicationSettings?.questions_locked_at ? questionsFromRows(initialApplicationQuestions) : initialDraft?.document.applicationTemplate ?? questionsFromRows(initialApplicationQuestions)).map(question => ({ ...question, clientKey: question.clientKey ?? question.id ?? crypto.randomUUID() })),
     [initialApplicationQuestions, initialDraft, initialApplicationSettings]
   );
   const [formState, setFormState] =
@@ -167,6 +188,7 @@ export function useEventForm({
   );
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const deleteOperation = useRef(crypto.randomUUID());
   const [isDeleting, setIsDeleting] = useState(false);
   const [draftId, setDraftId] = useState(() => initialDraft?.id ?? crypto.randomUUID());
   const draftRevision = useRef(initialDraft?.revision ?? 0);
@@ -192,6 +214,14 @@ export function useEventForm({
       startingQuestions
     )
   );
+  const savedDocument = useRef<{ state: EventFormState; checkIns: CheckInSessionDraft[]; mentors: MentorDraft[]; sponsors: SponsorDraft[]; template: ApplicationQuestionTemplate[] }>({ state: startingFormState, checkIns: startingCheckIns, mentors, sponsors, template: startingQuestions });
+  const past = eventHasEnded(publication.status, savedEnd, null, clock);
+  useEffect(() => {
+    if (!savedEnd || past || publication.status !== "active") return;
+    const timer = window.setTimeout(() => setClock(Date.now()), Math.min(2147483647, Math.max(1, Date.parse(savedEnd) - Date.now() + 1)));
+    return () => clearTimeout(timer);
+  }, [savedEnd, past, publication.status, clock]);
+  const pendingSave = useRef<{ input: SaveAdminEventInput; state: EventFormState; checkIns: CheckInSessionDraft[]; template: typeof startingQuestions; mentors: MentorDraft[]; sponsors: SponsorDraft[]; resources: boolean } | null>(null);
   const resetSuccessMessage = () => setSuccessMessage(null);
   const questions = useApplicationQuestions(
     resetSuccessMessage,
@@ -255,6 +285,10 @@ export function useEventForm({
     field: K,
     value: EventFormState[K]
   ) => {
+    if (past && field !== "content") return;
+    if (past && field === "content" && value && typeof value === "object" && "links" in value) {
+      value = { ...value, sections: savedDocument.current.state.content?.sections ?? [] } as EventFormState[K];
+    }
     resetSuccessMessage();
     questions.setQuestionErrors({});
     setFormState((current) => ({
@@ -268,6 +302,25 @@ export function useEventForm({
       ...(field === "page_slug" ? { slug_edited: true } : {}),
       ...(field === "status" && value !== "draft" ? { publish_at: "" } : {}),
     }));
+  };
+
+  const handleDiscardChanges = () => {
+    if (submitLock.current || pendingSave.current) return;
+    const saved = savedDocument.current;
+    setFormState(saved.state);
+    setCheckInEvents(saved.checkIns);
+    setMentors(saved.mentors);
+    setSponsors(saved.sponsors);
+    questions.setApplicationTemplate(saved.template);
+    questions.setQuestionErrors({});
+    setPendingImageFile(null);
+    setPendingHeaderFile(null);
+    setError(null);
+    setPublishAttempted(false);
+    setShowConfigurationErrors(false);
+    setCleanSnapshot(createFormSnapshot(saved.state, saved.checkIns, saved.mentors, saved.sponsors, saved.template));
+    setResetKey(value => value + 1);
+    toast.dismiss(publicationToastId);
   };
 
   const uploadImage = async (file: File, kind: "icon" | "header" = "icon") => {
@@ -299,6 +352,7 @@ export function useEventForm({
     return data.url;
   };
 
+  const pendingDraft = useRef<{ id: string; revision: number; state: EventFormState; document: EventWorkingDocument } | null>(null);
   const draftErrorToastId = useId();
   const retryDraftSave = useRef<(showSuccess: boolean) => void>(() => {});
   useEffect(() => () => toast.dismiss(draftErrorToastId), [draftErrorToastId]);
@@ -317,24 +371,31 @@ export function useEventForm({
     const uploads: string[] = [];
     try {
       if (formState.content) { const problem = eventContentProblem(formState.content, true); if (problem) { setShowConfigurationErrors(true); window.dispatchEvent(new Event("event-content-invalid")); throw new Error(problem); } }
+      const previous = pendingDraft.current;
+      if (previous) {
+        const recovered = await recoverAdminEventDraftAction(previous.id).catch(() => null);
+        if (recovered && sameWorkingDocument(recovered.document, previous.document)) draftRevision.current = recovered.revision;
+        pendingDraft.current = null;
+      }
       const saved = { ...formState };
-      if (pendingImageFile) { saved.image_url = await uploadImage(pendingImageFile); uploads.push(saved.image_url); }
-      if (pendingHeaderFile) { saved.header_image_url = await uploadImage(pendingHeaderFile, "header"); saved.header_colour = ""; uploads.push(saved.header_image_url); }
-      const result = await saveAdminEventDraftAction({ id: draftId, eventId: eventId ?? null, revision: draftRevision.current, document: { version: 1, formState: saved, checkInEvents, mentors, sponsors, applicationTemplate: questions.applicationTemplate } });
-      lastSavedDraftState.current = saved;
+      if (pendingImageFile && !pendingDraft.current) { saved.image_url = await uploadImage(pendingImageFile); uploads.push(saved.image_url); }
+      if (pendingHeaderFile && !pendingDraft.current) { saved.header_image_url = await uploadImage(pendingHeaderFile, "header"); saved.header_colour = ""; uploads.push(saved.header_image_url); }
+      const attempt = { id: draftId, revision: draftRevision.current, state: saved, document: { version: 1 as const, formState: saved, checkInEvents, mentors, sponsors, applicationTemplate: questions.applicationTemplate } };
+      pendingDraft.current = attempt;
+      const result = await saveAdminEventDraftAction({ id: attempt.id, eventId: eventId ?? null, revision: attempt.revision, document: attempt.document });
+      pendingDraft.current = null;
+      lastSavedDraftState.current = attempt.state;
       draftRevision.current = result.revision;
       clearRecoveredLegacyDraft();
       hasSavedDraft.current = true;
-      setFormState(saved);
-      setPendingImageFile(null);
-      setPendingHeaderFile(null);
-      setCleanSnapshot(createFormSnapshot(saved, checkInEvents, mentors, sponsors, questions.applicationTemplate));
+      setFormState(attempt.state); setPendingImageFile(null); setPendingHeaderFile(null);
+      setCleanSnapshot(createFormSnapshot(attempt.state, attempt.document.checkInEvents, attempt.document.mentors, attempt.document.sponsors, attempt.document.applicationTemplate));
       setSuccessMessage("Draft saved");
       if (showSuccess) setShowDraftSaved(true);
       if (!eventId) window.history.replaceState(window.history.state, "", `/admin/events/drafts/${draftId}`);
       return true;
     } catch (error) {
-      await Promise.allSettled(uploads.map(url => discardUnusedEventImageAction(url)));
+      if (!pendingDraft.current) await Promise.allSettled(uploads.map(url => discardUnusedEventImageAction(url)));
       setError(error instanceof Error ? error.message : "Failed to save draft.");
       toast.error("Couldn’t save your draft", {
         id: draftErrorToastId,
@@ -365,7 +426,7 @@ export function useEventForm({
       sponsors
     );
     questions.setQuestionErrors(validation.questionErrors);
-    if (validation.error) {
+    if (validation.error && !past && !pendingSave.current) {
       setFormState((current) => ({
         ...current,
         mentors_enabled:
@@ -390,11 +451,11 @@ export function useEventForm({
     let headerUrl = state.header_image_url;
     let uploadedHeaderUrl: string | null = null;
     try {
-      if (pendingImageFile && !uploadedWithDraft) {
+      if (pendingImageFile && !uploadedWithDraft && !pendingSave.current) {
         imageUrl = await uploadImage(pendingImageFile);
         uploadedImageUrl = imageUrl;
       }
-      if (pendingHeaderFile && !uploadedWithDraft) { headerUrl = await uploadImage(pendingHeaderFile, "header"); uploadedHeaderUrl = headerUrl; }
+      if (pendingHeaderFile && !uploadedWithDraft && !pendingSave.current) { headerUrl = await uploadImage(pendingHeaderFile, "header"); uploadedHeaderUrl = headerUrl; }
       const payload: EventUpdate = {
         name: state.name,
         short_description: state.short_description || null,
@@ -448,7 +509,9 @@ export function useEventForm({
       };
       const checkInSessions = state.date_location ? dateSessions(state.date_location) : toCheckInSessionInputs(checkInEvents);
       const applicationQuestions = initialApplicationSettings?.questions_locked_at ? initialApplicationQuestions : toApplicationQuestionInputs(questions.applicationTemplate);
-      const result = await saveAdminEventAction({
+      const input: SaveAdminEventInput = {
+        operationId: crypto.randomUUID(),
+        expectedRevision: savedRevision.current,
         eventId,
         expectedPublication: expectedPublication.current,
         content: state.content ?? undefined,
@@ -464,49 +527,75 @@ export function useEventForm({
         sponsorIds: sponsors.map((sponsor) => sponsor.id!),
         applicationTiming: { decisions_release_at: datetimeLocalToTimestamptz(state.decisions_release_at), confirmation_deadline: datetimeLocalToTimestamptz(state.confirmation_deadline) },
         applicationQuestions,
-      });
-      // A refusal the admin can act on, such as removing a question people
-      // have applied with or a session people have checked in to. Nothing was
-      // saved, so the image cleanup below runs.
-      if ("error" in result) throw new Error(result.error);
+      };
+      const attempt = pendingSave.current ?? { input, state: { ...state, image_url: imageUrl, header_image_url: headerUrl }, checkIns: checkInEvents, template: questions.applicationTemplate, mentors, sponsors, resources: past };
+      pendingSave.current = attempt;
+      setUnresolvedSave(true);
+      let result: SaveAdminEventResult;
+      try {
+        result = attempt.resources
+          ? await savePastEventResourcesAction({ eventId: attempt.input.eventId!, revision: attempt.input.expectedRevision!, operationId: attempt.input.operationId!, content: attempt.state.content! })
+          : await saveAdminEventAction(attempt.input);
+      } catch (failure) {
+        const recovered = await recoverAdminEventMutationAction(attempt.input.operationId!).catch(() => null);
+        if (!recovered) throw failure;
+        result = recovered;
+      }
+      if ("error" in result) { pendingSave.current = null; setUnresolvedSave(false); throw new Error(result.error); }
+      pendingSave.current = null;
+      setUnresolvedSave(false);
+      savedRevision.current = result.revision ?? savedRevision.current;
+      const editedSinceAttempt = createFormSnapshot(state, checkInEvents, mentors, sponsors, questions.applicationTemplate) !== createFormSnapshot(attempt.state, attempt.checkIns, attempt.mentors, attempt.sponsors, attempt.template) && !uploadedImageUrl && !uploadedHeaderUrl;
+      state = attempt.state;
+      imageUrl = state.image_url;
+      headerUrl = state.header_image_url;
+
       const savedCheckIns = withSavedCheckInSessionIds(
-        checkInEvents,
-        result.checkInSessionIds
+        attempt.checkIns,
+        attempt.resources ? attempt.checkIns.map(row => row.id!) : result.checkInSessionIds
       );
-      setCheckInEvents(savedCheckIns);
+      if (!editedSinceAttempt) setCheckInEvents(savedCheckIns);
       const savedTemplate = withSavedQuestionIds(
-        questions.applicationTemplate,
-        result.questionIds
+        attempt.template,
+        attempt.resources ? attempt.template.map(row => row.id!) : result.questionIds
       );
-      questions.setApplicationTemplate(savedTemplate);
+      if (!editedSinceAttempt) questions.setApplicationTemplate(savedTemplate);
+      else questions.setApplicationTemplate(current => current.map(question => {
+        const saved = savedTemplate.find(row => question.clientKey && row.clientKey === question.clientKey || question.id && row.id === question.id);
+        return saved ? { ...question, id: saved.id } : question;
+      }));
       hasSavedDraft.current = false;
       clearRecoveredLegacyDraft();
       draftRevision.current = 0;
       setDraftId(crypto.randomUUID());
       const savedFormState = { ...state, content: result.content ?? state.content, image_url: imageUrl, header_image_url: headerUrl,
         date_location_revision: result.dateLocationRevision ?? state.date_location_revision,
-        date_location: state.date_location ? { ...state.date_location, dates: state.date_location.dates.map((row, index) => ({ ...row, session_id: result.checkInSessionIds[index] ?? row.session_id })) } : null };
+        date_location: state.date_location ? { ...state.date_location, dates: state.date_location.dates.map((row, index) => ({ ...row, session_id: (attempt.resources ? row.session_id : result.checkInSessionIds[index]) ?? row.session_id })) } : null };
       persistedHeaderUrl.current = headerUrl || null;
-      setPendingHeaderFile(null);
+      if (!editedSinceAttempt) setPendingHeaderFile(null);
       persistedImageUrl.current = imageUrl || null;
-      setPendingImageFile(null);
+      if (!editedSinceAttempt) setPendingImageFile(null);
       const savedPublication = result.publication ?? { id: result.id, name: savedFormState.name, status: savedFormState.status, publish_at: datetimeLocalToTimestamptz(savedFormState.publish_at), registration_opens_at: datetimeLocalToTimestamptz(savedFormState.registration_opens_at), registration_closes_at: datetimeLocalToTimestamptz(savedFormState.registration_closes_at) };
       expectedPublication.current = { status: savedPublication.status as EventFormState["status"], publish_at: savedPublication.publish_at };
       setPublication(expectedPublication.current);
       setEventId(result.id);
       const actualState = { ...savedFormState, status: savedPublication.status as EventFormState["status"], publish_at: timestamptzToDatetimeLocal(savedPublication.publish_at) };
-      setFormState(actualState);
-      setCleanSnapshot(createFormSnapshot(actualState, savedCheckIns, mentors, sponsors, savedTemplate));
+      setSavedEnd(datetimeLocalToTimestamptz(actualState.ends_at || actualState.starts_at));
+      savedDocument.current = { state: actualState, checkIns: savedCheckIns, mentors: attempt.mentors, sponsors: attempt.sponsors, template: savedTemplate };
+      if (editedSinceAttempt) {
+        setFormState(current => ({ ...current, date_location: current.date_location ? { ...current.date_location, dates: current.date_location.dates.map(row => ({ ...row, session_id: actualState.date_location?.dates.find(saved => saved.key === row.key)?.session_id ?? row.session_id })) } : null, date_location_revision: actualState.date_location_revision, content: current.content ? { ...current.content, revision: actualState.content?.revision ?? current.content.revision } : current.content }));
+      } else setFormState(actualState);
+      setCleanSnapshot(createFormSnapshot(actualState, savedCheckIns, attempt.mentors, attempt.sponsors, savedTemplate));
       setSuccessMessage(intent === "cancel" ? "Schedule cancelled. Draft saved." : "Changes saved");
       if (!eventId) window.history.replaceState(window.history.state, "", `/admin/events/${result.id}/edit`);
-      if (intent === "publish" || intent === "schedule") setPublicationSuccess({ ...savedPublication, completed_at: Date.now() });
+      if (intent === "publish" || intent === "schedule" || (intent === "save" && savedPublication.status === "active")) setPublicationSuccess({ ...savedPublication, updated: intent === "save", completed_at: Date.now() });
       if (onSuccess) onSuccess(result.id);
       return true;
     } catch (saveError) {
       // The upload landed but nothing references it, so clean it up. Best
       // effort: the save error is what the admin needs to see.
-      if (uploadedHeaderUrl) { await discardUnusedEventImageAction(uploadedHeaderUrl).catch(() => {}); }
-      if (uploadedImageUrl) {
+      if (uploadedHeaderUrl && !pendingSave.current) { await discardUnusedEventImageAction(uploadedHeaderUrl).catch(() => {}); }
+      if (uploadedImageUrl && !pendingSave.current) {
         try {
           await discardUnusedEventImageAction(uploadedImageUrl);
         } catch {
@@ -515,7 +604,7 @@ export function useEventForm({
       }
       const message = saveError instanceof Error ? saveError.message : "Failed to save event.";
       setError(message);
-      if (intent) toast.error("Couldn’t save publication changes", { id: publicationToastId, duration: Infinity, description: `${message} Your edits are still here. If the response was lost, reload to check the saved state or retry.`, action: { label: "Try again", onClick: () => retryPublication.current(intent) } });
+      if (intent) toast.error(past ? "Couldn’t update resources" : publication.status === "active" ? "Couldn’t update event" : "Couldn’t save publication changes", { id: publicationToastId, duration: Infinity, description: `${message} Your edits are still here. If the response was lost, reload to check the saved state or retry.`, action: { label: "Try again", onClick: () => retryPublication.current(intent) } });
       return false;
     } finally {
       submitLock.current = false;
@@ -529,7 +618,7 @@ export function useEventForm({
     const state = { ...formState, status: intent === "publish" ? "active" as const : publication.status, publish_at: intent === "publish" || intent === "cancel" ? "" : intent === "schedule" ? publishAt : formState.publish_at };
     const controlsValid = validateControls?.(false) ?? true;
     const nextValidation = validateEventForm(state, checkInEvents, questions.applicationTemplate, mentors, sponsors);
-    if (nextValidation.error || !controlsValid) {
+    if ((nextValidation.error || !controlsValid) && !past && !pendingSave.current) {
       setShowConfigurationErrors(true);
       setValidationAttempt(value => value + 1);
       setError(nextValidation.error ?? "Fix the invalid fields before publishing.");
@@ -557,13 +646,15 @@ export function useEventForm({
   };
 
   const handleDeleteEvent = async () => {
-    if (!eventId) return;
+    if (!eventId || submitLock.current) return;
+    submitLock.current = true;
     setIsDeleting(true);
     setError(null);
     try {
-      await deleteAdminEventAction(eventId);
+      await deleteAdminEventAction(eventId, deleteOperation.current);
       setShowDeleteModal(false);
       bypassUnsavedChangesWarning.current = true;
+      toast.success("Event deleted");
       router.push("/admin/events");
     } catch (deleteError) {
       setError(
@@ -571,13 +662,19 @@ export function useEventForm({
           ? deleteError.message
           : "Failed to delete event."
       );
+      toast.error("Couldn’t confirm deletion", { duration: Infinity, description: "Check Manage Events for the saved state, or try deleting again. Payment protections still apply." });
       setIsDeleting(false);
-    }
+    } finally { submitLock.current = false; }
   };
 
   return {
     formState,
     eventId,
+    past,
+    savedEnd,
+    resetKey,
+    unresolvedSave,
+    handleDiscardChanges,
     publication,
     publicationSuccess,
     setPublicationSuccess,
@@ -597,7 +694,6 @@ export function useEventForm({
     mentors,
     sponsors,
     isSubmitting,
-    loadingEvent: false,
     error,
     setError,
     successMessage,

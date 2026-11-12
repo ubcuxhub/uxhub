@@ -434,3 +434,20 @@ entry fields/link rows remain recoverable in working documents. HTTP(S) URL
 safety is checked in application validation and the database. Going-only links
 retain existing RLS after an event ends; after-event public links remain distinct.
 The section-aware attendee renderer remains deferred.
+
+## Event builder mutation safety
+
+`events.revision` increments for every event-row update, including overview and
+scheduled publication. Builder server actions send the loaded revision and a
+stable operation UUID. `admin_event_mutations` stores committed responses in the
+same transaction and is service-role only; retrying the same operation returns
+its receipt without repeating the write. Deletion receipts retain asset cleanup
+targets after the event is removed. Keep these receipts private and intact while
+clients may still retry.
+
+Ended active events use `ends_at` (final date envelope), falling back to
+`starts_at`. The builder refuses full historical saves; the overview RPC refuses
+schedule changes. A dedicated resource RPC validates and replaces only links,
+preserving historical sections and child identities. Authenticated direct event
+and child-setting writes are also locked. Trusted service-role seed/maintenance
+writes remain available; first-party mutations must use the guarded actions.

@@ -1,5 +1,9 @@
 "use server";
 
+import type { Json } from "@/lib/supabase/database.types";
+
+import { fetchEventMutationResult, eventMutationResult, fetchEventHistoryInfo } from "@/lib/supabase-helpers/event-mutations";
+
 import { eventContentProblem, type EventContent } from "./lib/event-content";
 import { searchMentors, searchSponsors } from "@/lib/supabase-helpers/event-people";
 
@@ -189,6 +193,8 @@ export interface SavedEventPublication {
 }
 
 export interface SaveAdminEventInput {
+  operationId?: string;
+  expectedRevision?: number;
   /** Checked under the same row lock as the write, including cron activation. */
   expectedPublication?: { status: "draft" | "active"; publish_at: string | null } | null;
   applicationTiming?: { decisions_release_at: string | null; confirmation_deadline: string | null };
@@ -216,7 +222,7 @@ export interface SaveAdminEventInput {
  * questions, each in the order they were sent, or why the save was refused.
  */
 export type SaveAdminEventResult =
-  | { id: string; checkInSessionIds: string[]; questionIds: string[]; dateLocationRevision?: number; content?: EventContent; publication?: SavedEventPublication }
+  | { revision?: number; id: string; checkInSessionIds: string[]; questionIds: string[]; dateLocationRevision?: number; content?: EventContent; publication?: SavedEventPublication }
   | { error: string };
 
 // Not exported: a "use server" module may only export async functions, and the
@@ -305,6 +311,7 @@ export async function saveAdminEventAction(
 ): Promise<SaveAdminEventResult> {
   await requireAdmin();
 
+  if (input.eventId && (!Number.isSafeInteger(input.expectedRevision) || input.expectedRevision! < 0)) return { error: "Reload this event before updating; its saved revision is missing." };
   if (input.content) { const problem = eventContentProblem(input.content); if (problem) return { error: problem }; }
   assertPublishAt(input.event.status, input.event.publish_at);
   if ("agenda_enabled" in input.event && typeof input.event.agenda_enabled !== "boolean") return { error: "Schedule visibility must be on or off." };
@@ -376,7 +383,7 @@ export async function saveAdminEventAction(
       p_draft_id: input.draftId ?? null,
       p_draft_revision: input.draftRevision ?? 0,
       p_expected_header_image_url: input.expectedHeaderImageUrl ?? null,
-      p_event: { ...input.event, ...datePayload, ...(input.expectedPublication ? { _expected_publication: input.expectedPublication } : {}), ...(input.content ? { _content: input.content } : {}), ...(input.applicationTiming ? { _application_timing: input.applicationTiming } : {}) },
+      p_event: { ...input.event, ...datePayload, ...(input.operationId ? { _operation_id: input.operationId } : {}), ...(input.expectedRevision !== undefined ? { _expected_revision: input.expectedRevision } : {}), ...(input.expectedPublication ? { _expected_publication: input.expectedPublication } : {}), ...(input.content ? { _content: input.content } : {}), ...(input.applicationTiming ? { _application_timing: input.applicationTiming } : {}) },
       p_slug: slug,
       p_expected_image_url: input.expectedImageUrl,
       p_check_in_sessions: input.checkInSessions,
@@ -386,6 +393,7 @@ export async function saveAdminEventAction(
     }
   );
   if (error) {
+    if (["EVENT_REVISION_CONFLICT", "EVENT_HISTORY_LOCKED"].includes(error.hint ?? "")) return { error: error.message };
     if (error.hint === "EVENT_PUBLICATION_CONFLICT" || error.hint === "EVENT_PUBLICATION_INVALID") return { error: error.message };
     if (error.message.includes(IMAGE_CONFLICT_SENTINEL)) {
       throw new Error(SAVE_CONFLICT_ERROR);
@@ -412,6 +420,7 @@ export async function saveAdminEventAction(
   }
   const saved = data as {
     id?: string;
+    revision?: number;
     check_in_session_ids?: string[];
     question_ids?: string[];
     removed_files?: string[];
@@ -441,8 +450,10 @@ export async function saveAdminEventAction(
   // The list, and the event's overview (page and drawer) and builder below it.
   revalidatePath("/admin/events", "layout");
   revalidatePath("/events", "layout");
+  revalidatePath("/portal/events", "layout");
   return {
     id: saved.id,
+    revision: saved.revision,
     publication: saved.publication,
     content: saved.content,
     dateLocationRevision: saved.date_location_revision,
@@ -451,19 +462,23 @@ export async function saveAdminEventAction(
   };
 }
 
-export async function deleteAdminEventAction(eventId: string) {
+export async function deleteAdminEventAction(eventId: string, operationId?: string) {
   await requireAdmin();
 
-  const existing = await fetchEventById(supabaseAdmin, eventId);
-
-  const { error } = await supabaseAdmin.rpc("delete_event_atomically", {
-    target_event_id: eventId,
-  });
-
-  if (error) throw error;
-
-  await discardEventImage(existing?.image_url);
-  await discardEventImage(existing?.header_image_url);
+  if (operationId) {
+    const { data, error } = await supabaseAdmin.rpc("delete_admin_event_safely", { p_event_id: eventId, p_operation_id: operationId });
+    if (error) throw error;
+    const assets = data as { images?: string[]; files?: string[] } | null;
+    await Promise.all((assets?.images ?? []).map(discardEventImage));
+    await discardApplicationFiles(assets?.files ?? []);
+  } else {
+    // Compatibility for existing server callers; the builder uses a receipt.
+    const existing = await fetchEventById(supabaseAdmin, eventId);
+    const { error } = await supabaseAdmin.rpc("delete_event_atomically", { target_event_id: eventId });
+    if (error) throw error;
+    await discardEventImage(existing?.image_url);
+    await discardEventImage(existing?.header_image_url);
+  }
 
   revalidatePath("/admin/events", "layout");
 }
@@ -609,4 +624,47 @@ export async function searchEventDirectoryAction(kind: "people" | "sponsors", qu
   if (typeof query !== "string" || query.length > 200) throw new Error("Invalid directory query.");
   const client = await createClient();
   return kind === "sponsors" ? { sponsors: await searchSponsors(client, query) } : { people: await searchMentors(client, query) };
+}
+
+/** Recover the committed response before deciding whether to replay a request. */
+export async function recoverAdminEventMutationAction(id: string): Promise<SaveAdminEventResult | null> {
+  await requireAdmin();
+  const saved = await fetchEventMutationResult(supabaseAdmin, id);
+  if (saved) {
+    revalidatePath("/admin/events", "layout");
+    revalidatePath("/portal/events", "layout");
+    revalidatePath("/events", "layout");
+  }
+  return saved;
+}
+
+export async function savePastEventResourcesAction(input: { eventId: string; revision: number; operationId: string; content: EventContent }): Promise<SaveAdminEventResult> {
+  await requireAdmin();
+  const problem = eventContentProblem({ ...input.content, sections: [] });
+  if (problem) return { error: problem };
+  const { data, error } = await supabaseAdmin.rpc("save_past_event_resources", {
+    p_event_id: input.eventId, p_revision: input.revision, p_operation_id: input.operationId,
+    p_links: input.content.links as unknown as Json,
+  });
+  if (error) {
+    if (["EVENT_REVISION_CONFLICT", "EVENT_HISTORY_LOCKED", "EVENT_CONTENT_INVALID"].includes(error.hint ?? "")) return { error: error.message };
+    throw error;
+  }
+  revalidatePath("/admin/events", "layout");
+  revalidatePath("/portal/events", "layout");
+  revalidatePath("/events", "layout");
+  return eventMutationResult(data);
+}
+
+export async function loadAdminEventDeletionInfoAction(eventId: string) {
+  await requireAdmin();
+  const event = await fetchEventById(supabaseAdmin, eventId);
+  if (!event) return null;
+  return { name: event.name, ...await fetchEventHistoryInfo(supabaseAdmin, eventId) };
+}
+
+export async function recoverAdminEventDraftAction(id: string) {
+  await requireAdmin();
+  const draft = await fetchEventDraft(supabaseAdmin, id);
+  return draft ? { revision: draft.revision, document: draft.document } : null;
 }

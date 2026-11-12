@@ -12,6 +12,8 @@ export { ResponseType };
  * answers to it, keep that id.
  */
 export interface ApplicationQuestionTemplate {
+  /** Stable editor identity while a server-assigned id is pending. */
+  clientKey?: string;
   id?: string;
   question: string;
   description: string;
