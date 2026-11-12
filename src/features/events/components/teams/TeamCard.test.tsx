@@ -28,6 +28,8 @@ const routerMocks = vi.hoisted(() => ({ replace: vi.fn(), refresh: vi.fn() }));
 
 vi.mock("../../team-actions", () => actions);
 vi.mock("@/components/ui/toast", () => toastMocks);
+// Static image imports aren't sized under Vitest, which next/image rejects.
+vi.mock("@/components/shared/Hubbo", () => ({ Hubbo: () => null }));
 vi.mock("@/lib/auth/user-context", () => ({
   useUser: () => ({ user: { first_name: "Aubrey" } }),
 }));
