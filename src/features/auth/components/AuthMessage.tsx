@@ -4,41 +4,35 @@ import Link from "next/link";
 import { AuthPanel } from "./AuthPanel";
 
 interface AuthMessageProps
-  extends Omit<ComponentPropsWithoutRef<typeof AuthPanel>, "title" | "children"> {
-  title: string;
-  children: ReactNode;
-  /** Optional follow-up action, e.g. resending the email this screen announces. */
-  action?: ReactNode;
+  extends Omit<ComponentPropsWithoutRef<typeof AuthPanel>, "children"> {
+  /** Follow-up actions under the message, e.g. resend or buttons. */
+  children?: ReactNode;
+  /** Quiet text link under the actions, e.g. "Back to sign in". */
   backLink?: { href: string; label: string };
 }
 
 /**
- * Shared shell for the terminal auth screens — the ones that report an outcome
- * rather than collect input (check email, sign-up success, error).
+ * Shared shell for the terminal auth screens: the ones that report an outcome
+ * rather than collect input (check email, verify email, expired link, error).
+ * The message itself goes in `description`.
  */
 export function AuthMessage({
-  title,
   children,
-  action,
   backLink,
   ...props
 }: AuthMessageProps) {
   return (
-    <AuthPanel title={title} {...props}>
-      <div className="mx-auto flex max-w-[460px] flex-col items-center text-center">
-        <div className="text-body leading-6 text-foreground">{children}</div>
-
-        {action ? <div className="mt-7">{action}</div> : null}
+    <AuthPanel {...props}>
+      <div className="flex flex-col items-start gap-3">
+        {children}
 
         {backLink ? (
-          <p className="mt-7 text-body text-muted-foreground">
-            <Link
-              href={backLink.href}
-              className="font-medium text-foreground underline underline-offset-4"
-            >
-              {backLink.label}
-            </Link>
-          </p>
+          <Link
+            href={backLink.href}
+            className="text-body text-foreground underline underline-offset-4"
+          >
+            {backLink.label}
+          </Link>
         ) : null}
       </div>
     </AuthPanel>

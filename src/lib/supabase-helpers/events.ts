@@ -124,6 +124,40 @@ export async function updateEvent(
   return data;
 }
 
+/** The columns the admin overview's quick edit changes. */
+export type EventSchedulePatch = Pick<
+  EventUpdate,
+  | "status"
+  | "publish_at"
+  | "starts_at"
+  | "ends_at"
+  | "registration_opens_at"
+  | "registration_closes_at"
+>;
+
+/**
+ * Writes an event's status and dates and returns the saved row, or null when
+ * no row was written: the event is gone, or RLS refused the caller.
+ *
+ * Pass the signed-in admin's client, not the service role, so the database
+ * sees who made the change (the audit log reads `auth.uid()`).
+ */
+export async function updateEventSchedule(
+  supabase: DbClient,
+  id: string,
+  patch: EventSchedulePatch
+): Promise<EventRow | null> {
+  const { data, error } = await supabase
+    .from(TABLES.events)
+    .update(patch)
+    .eq("id", id)
+    .select("*")
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
 /**
  * Updates an event only while its stored cover image still matches
  * `expectedImageUrl`.

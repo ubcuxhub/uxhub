@@ -19,10 +19,11 @@ export default async function Page({
   return (
     <AuthMessage
       title="Sorry, something went wrong."
+      description={
+        params.error ||
+        "We couldn't complete authentication. Please try signing in again."
+      }
       backLink={backLink}
-    >
-      {params.error ||
-        "We couldn't complete authentication. Please try signing in again."}
-    </AuthMessage>
+    />
   );
 }

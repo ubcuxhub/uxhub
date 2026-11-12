@@ -68,8 +68,16 @@ insert into public.mentors (full_name)
 values ('RLS Mentor')
 returning id \gset mentor_
 
-insert into public.event_mentors (event_id, mentor_id)
-values (:'event_id', :'mentor_id');
+insert into public.event_people_sections (event_id, title)
+values (:'event_id', 'Mentors')
+returning id \gset mentor_section_
+
+insert into public.event_people_sections (event_id, title)
+values (:'draft_event_id', 'Judges')
+returning id \gset draft_section_
+
+insert into public.event_mentors (event_id, section_id, mentor_id)
+values (:'event_id', :'mentor_section_id', :'mentor_id');
 
 insert into public.sponsors (name)
 values ('RLS Sponsor')
@@ -124,6 +132,32 @@ returning id \gset draft_agenda_item_
 insert into public.event_tickets (event_id, user_id)
 values (:'event_id', :'user_a_id'), (:'event_id', :'user_b_id');
 
+-- User A owns a team with user B on it; another team on the event has neither.
+insert into public.teams (event_id, owner_id)
+values (:'event_id', :'user_a_id')
+returning id \gset team_a_
+
+insert into public.teams (event_id)
+values (:'event_id')
+returning id \gset other_team_
+
+insert into public.team_members (event_id, team_id, user_id)
+values (:'event_id', :'team_a_id', :'user_a_id'), (:'event_id', :'team_a_id', :'user_b_id');
+
+-- One link per visibility, and meeting details. The event has no dates, so it
+-- never ends and its after-event link stays hidden.
+insert into public.event_links (event_id, type, url, visibility)
+values
+  (:'event_id', 'slack_workspace', 'https://slack.example.test', 'everyone'),
+  (:'event_id', 'participant_package', 'https://package.example.test', 'going'),
+  (:'event_id', 'event_recap', 'https://recap.example.test', 'after_event');
+
+insert into public.event_links (event_id, type, url)
+values (:'draft_event_id', 'slack_workspace', 'https://draft-slack.example.test');
+
+insert into public.event_private_details (event_id, meeting_url)
+values (:'event_id', 'https://zoom.example.test/j/1');
+
 set local role anon;
 do $$
 declare
@@ -158,6 +192,10 @@ select set_config('rls.agenda_day_id', :'agenda_day_id', true);
 select set_config('rls.agenda_item_id', :'agenda_item_id', true);
 select set_config('rls.draft_agenda_day_id', :'draft_agenda_day_id', true);
 select set_config('rls.draft_agenda_item_id', :'draft_agenda_item_id', true);
+select set_config('rls.mentor_section_id', :'mentor_section_id', true);
+select set_config('rls.draft_section_id', :'draft_section_id', true);
+select set_config('rls.team_a_id', :'team_a_id', true);
+select set_config('rls.other_team_id', :'other_team_id', true);
 \o
 
 -- Agenda visibility for anonymous visitors. This runs after the settings above
@@ -186,6 +224,131 @@ begin
   where id = current_setting('rls.draft_agenda_item_id')::uuid;
   if visible_count <> 0 then
     raise exception 'anon can read a draft event agenda item';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_people_sections
+  where id = current_setting('rls.mentor_section_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'anon cannot read an active event people section';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_mentors
+  where section_id = current_setting('rls.mentor_section_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'anon cannot read an active event section''s people';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_people_sections
+  where id = current_setting('rls.draft_section_id')::uuid;
+  if visible_count <> 0 then
+    raise exception 'anon can read a draft event people section';
+  end if;
+
+  if has_table_privilege('anon', 'public.event_people_sections', 'INSERT')
+     or has_table_privilege('authenticated', 'public.event_people_sections', 'INSERT')
+     or has_table_privilege('authenticated', 'public.event_people_sections', 'UPDATE')
+     or has_table_privilege('authenticated', 'public.event_people_sections', 'DELETE') then
+    raise exception 'browser roles can write people sections';
+  end if;
+
+  if has_table_privilege('anon', 'public.teams', 'SELECT')
+     or has_table_privilege('anon', 'public.team_members', 'SELECT') then
+    raise exception 'anon can read teams';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_links
+  where event_id = current_setting('rls.event_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'anon should see only the everyone link, saw %', visible_count;
+  end if;
+
+  select count(*) into visible_count
+  from public.event_links
+  where event_id = current_setting('rls.draft_event_id')::uuid;
+  if visible_count <> 0 then
+    raise exception 'anon can read a draft event link';
+  end if;
+
+  if has_table_privilege('anon', 'public.event_private_details', 'SELECT') then
+    raise exception 'anon can read private event details';
+  end if;
+
+  if has_table_privilege('anon', 'public.event_links', 'INSERT')
+     or has_table_privilege('authenticated', 'public.event_links', 'INSERT')
+     or has_table_privilege('authenticated', 'public.event_private_details', 'INSERT')
+     or has_table_privilege('authenticated', 'public.event_private_details', 'UPDATE') then
+    raise exception 'browser roles can write event links or private details';
+  end if;
+end;
+$$;
+reset role;
+
+-- Teams for a student: their own team and teammates, nobody else's, and no
+-- writes except through the server's team functions.
+set local role authenticated;
+do $$
+declare
+  visible_count integer;
+begin
+  select count(*) into visible_count
+  from public.teams
+  where id = current_setting('rls.team_a_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'user A cannot read their own team';
+  end if;
+
+  select count(*) into visible_count
+  from public.teams
+  where id = current_setting('rls.other_team_id')::uuid;
+  if visible_count <> 0 then
+    raise exception 'user A can read a team they are not on';
+  end if;
+
+  select count(*) into visible_count
+  from public.team_members
+  where team_id = current_setting('rls.team_a_id')::uuid;
+  if visible_count <> 2 then
+    raise exception 'user A should see both members of their team, saw %', visible_count;
+  end if;
+
+  begin
+    insert into public.team_members (event_id, team_id, user_id)
+    values (
+      current_setting('rls.event_id')::uuid,
+      current_setting('rls.other_team_id')::uuid,
+      current_setting('rls.user_a_id')::uuid
+    );
+    raise exception 'user A wrote a team member row';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  if has_function_privilege('authenticated', 'public.create_team(uuid, uuid, text)', 'execute')
+     or has_function_privilege('authenticated', 'public.join_team(text, uuid)', 'execute')
+     or has_function_privilege('authenticated', 'public.leave_team(uuid, uuid)', 'execute')
+     or has_function_privilege('authenticated', 'public.delete_team(uuid, uuid)', 'execute')
+     or has_function_privilege('anon', 'public.join_team(text, uuid)', 'execute') then
+    raise exception 'browser roles can call the team functions';
+  end if;
+
+  -- User A holds a ticket: the going link too, but not the recap before the
+  -- event ends, and the meeting details.
+  select count(*) into visible_count
+  from public.event_links
+  where event_id = current_setting('rls.event_id')::uuid;
+  if visible_count <> 2 then
+    raise exception 'ticket holder should see the everyone and going links, saw %', visible_count;
+  end if;
+
+  select count(*) into visible_count
+  from public.event_private_details
+  where event_id = current_setting('rls.event_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'ticket holder cannot read the meeting details';
   end if;
 end;
 $$;
@@ -251,10 +414,24 @@ begin
       null;
   end;
 
-  insert into public.event_applications (event_id, user_id)
+  -- Members start a draft; only submit_event_application submits it.
+  begin
+    insert into public.event_applications (event_id, user_id)
+    values (
+      current_setting('rls.event_id')::uuid,
+      public.current_user_info_id()
+    );
+    raise exception 'user A inserted a submitted application directly';
+  exception
+    when insufficient_privilege then
+      null;
+  end;
+
+  insert into public.event_applications (event_id, user_id, status)
   values (
     current_setting('rls.event_id')::uuid,
-    public.current_user_info_id()
+    public.current_user_info_id(),
+    'draft'
   );
 
   update public.event_applications
@@ -560,6 +737,13 @@ begin
     raise exception 'admin cannot read a draft event agenda item';
   end if;
 
+  select count(*) into visible_count
+  from public.event_people_sections
+  where id = current_setting('rls.draft_section_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'admin cannot read a draft event people section';
+  end if;
+
   update public.user_info
   set first_name = 'Admin tried to edit'
   where id = current_setting('rls.user_b_id')::uuid;
@@ -630,6 +814,13 @@ begin
   where id = current_setting('rls.draft_agenda_item_id')::uuid;
   if changed_count <> 1 then
     raise exception 'manager cannot read a draft event agenda item';
+  end if;
+
+  select count(*) into changed_count
+  from public.event_people_sections
+  where id = current_setting('rls.draft_section_id')::uuid;
+  if changed_count <> 1 then
+    raise exception 'manager cannot read a draft event people section';
   end if;
 
   update public.user_info
@@ -810,9 +1001,14 @@ begin
      or has_table_privilege('anon', 'public.event_applications', 'SELECT') then
     raise exception 'anon can read tickets or applications';
   end if;
-  if has_column_privilege('authenticated', 'public.event_applications', 'status', 'INSERT')
-     or has_column_privilege('authenticated', 'public.event_applications', 'offer_expires_at', 'INSERT') then
+  -- Members name a status on insert, which "applications: insert own draft"
+  -- holds to draft; the decision columns stay out of reach.
+  if has_column_privilege('authenticated', 'public.event_applications', 'offer_expires_at', 'INSERT')
+     or has_column_privilege('authenticated', 'public.event_applications', 'submitted_at', 'INSERT') then
     raise exception 'members can choose their own application decision';
+  end if;
+  if has_function_privilege('anon', 'public.submit_event_application(uuid)', 'execute') then
+    raise exception 'anon can submit applications';
   end if;
   if not has_function_privilege('anon', 'public.event_seat_counts(uuid[])', 'execute') then
     raise exception 'anon lost execute on event_seat_counts';
@@ -874,8 +1070,8 @@ declare
   visible_count integer;
   changed_count integer;
 begin
-  insert into public.event_applications (event_id, user_id)
-  values (current_setting('rls.application_event_id')::uuid, public.current_user_info_id())
+  insert into public.event_applications (event_id, user_id, status)
+  values (current_setting('rls.application_event_id')::uuid, public.current_user_info_id(), 'draft')
   returning id into v_application_id;
 
   insert into public.event_application_responses (
@@ -888,6 +1084,36 @@ begin
   where application_id = v_application_id;
   if visible_count <> 1 then
     raise exception 'user A should see their response by application, saw %', visible_count;
+  end if;
+
+  if (select status from public.submit_event_application(v_application_id)) <> 'SUBMITTED' then
+    raise exception 'user A could not submit a complete draft';
+  end if;
+
+  -- Submitted answers are final.
+  update public.event_application_responses
+  set response = 'Edited'
+  where application_id = v_application_id;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'user A edited an answer after submitting';
+  end if;
+
+  delete from public.event_application_responses
+  where application_id = v_application_id;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'user A deleted an answer after submitting';
+  end if;
+
+  delete from public.event_applications where id = v_application_id;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'user A deleted a submitted application';
+  end if;
+
+  if (select status from public.submit_event_application(v_application_id)) <> 'NOT_DRAFT' then
+    raise exception 'user A submitted an application twice';
   end if;
 
   update public.event_applications
@@ -985,7 +1211,520 @@ reset role;
 \o /dev/null
 select set_config('request.jwt.claims', '{}', true);
 \o
+-- A student reads the check-ins on their own ticket, and no one else's. User B
+-- was checked in above; check user A in on their ticket to the first event.
+-- User A stays basic: as a manager, the admin policy would show them every row.
+update public.user_info set role_access = 'basic' where id = :'user_a_id';
+insert into public.check_ins (ticket_id, check_in_session_id, checked_in_at)
+select ticket.id, session.id, now()
+from public.event_tickets ticket
+join public.check_in_sessions session on session.event_id = ticket.event_id
+where ticket.event_id = :'event_id'
+  and ticket.user_id = :'user_a_id'
+  and session.name = 'RLS Session';
+
+\o /dev/null
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'user_a_auth_user_id',
+    'email', :'user_a_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+\o
+
+set local role authenticated;
+
+do $$
+declare
+  visible_count integer;
+  changed_count integer;
+begin
+  select count(*) into visible_count
+  from public.check_ins check_in
+  join public.event_tickets ticket on ticket.id = check_in.ticket_id
+  where ticket.event_id = current_setting('rls.event_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'user A should see their own check-in, saw %', visible_count;
+  end if;
+
+  select count(*) into visible_count
+  from public.check_ins
+  where ticket_id = current_setting('rls.user_b_ticket_id')::uuid;
+  if visible_count <> 0 then
+    raise exception 'user A can read user B check-in';
+  end if;
+
+  update public.check_ins
+  set checked_in_at = now() - interval '1 day'
+  where ticket_id in (
+    select id from public.event_tickets where user_id = public.current_user_info_id()
+  );
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'user A updated their own check-in';
+  end if;
+end;
+$$;
+
+reset role;
+
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
 update public.user_info set role_access = :'user_a_saved_role' where id = :'user_a_id';
+
+-- Application drafts and their files (20261106193112, 20261106193115). User A
+-- works on their own draft; user C owns a draft A must not touch, and later a
+-- submitted application whose file an admin may read.
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+select role_access as user_a_drafts_saved_role from public.user_info where id = :'user_a_id' \gset
+update public.user_info set role_access = 'basic' where id = :'user_a_id';
+
+insert into auth.users (
+  id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+)
+values (
+  gen_random_uuid(), 'authenticated', 'authenticated',
+  'rls-user-c@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()
+)
+returning id as auth_user_id, email
+\gset user_c_
+
+insert into public.user_info (auth_user_id, email, first_name, last_name, role_access)
+values (:'user_c_auth_user_id', :'user_c_email', 'RLS', 'User C', 'basic')
+returning id \gset user_c_
+
+insert into public.events (
+  name, description, regular_price, member_price, max_capacity, slug,
+  registration_opens_at, registration_closes_at, status, requires_application
+)
+values
+  ('RLS Drafts Event', 'RLS drafts event', 0, 0, 10, 'rls-drafts-event',
+   now() - interval '1 hour', now() + interval '1 hour', 'active', true)
+returning id \gset drafts_event_
+
+insert into public.events (
+  name, description, regular_price, member_price, max_capacity, slug,
+  registration_opens_at, registration_closes_at, status, requires_application
+)
+values
+  ('RLS Second Drafts Event', 'RLS second drafts event', 0, 0, 10, 'rls-drafts-event-2',
+   now() - interval '1 hour', now() + interval '1 hour', 'active', true)
+returning id \gset drafts_event_2_
+
+insert into public.events (
+  name, description, regular_price, member_price, max_capacity, slug,
+  registration_opens_at, registration_closes_at, status, requires_application
+)
+values
+  ('RLS Closed Drafts Event', 'RLS closed drafts event', 0, 0, 10, 'rls-drafts-closed',
+   now() - interval '2 hours', now() - interval '1 hour', 'active', true)
+returning id \gset drafts_closed_event_
+
+insert into public.event_application_questions (event_id, question, response_type, sort_order)
+values (:'drafts_event_id', 'Why?', 'long_text', 0)
+returning id \gset drafts_text_question_
+
+insert into public.event_application_questions (
+  event_id, question, response_type, sort_order, response_options
+)
+values (:'drafts_event_id', 'Pick any', 'checkbox', 1, array['A', 'B, C'])
+returning id \gset drafts_checkbox_question_
+
+insert into public.event_application_questions (event_id, question, response_type, sort_order)
+values (:'drafts_event_id', 'Resume', 'file_upload', 2)
+returning id \gset drafts_file_question_
+
+insert into public.event_application_questions (
+  event_id, question, response_type, sort_order, is_required
+)
+values (:'drafts_event_id', 'Anything else?', 'short_text', 3, false);
+
+insert into public.event_application_questions (event_id, question, response_type)
+values (:'drafts_event_2_id', 'Why this one?', 'long_text')
+returning id \gset drafts_2_question_
+
+insert into public.event_application_questions (event_id, question, response_type)
+values (:'drafts_event_2_id', 'Portfolio', 'file_upload')
+returning id \gset drafts_2_file_question_
+
+insert into public.event_applications (event_id, user_id, status)
+values (:'drafts_event_id', :'user_c_id', 'draft')
+returning id \gset user_c_draft_
+
+insert into public.event_application_responses (
+  application_id, event_application_question_id, response
+)
+values (:'user_c_draft_id', :'drafts_text_question_id', 'User C draft answer');
+
+-- Started while registration was open; it has since closed.
+insert into public.event_applications (event_id, user_id, status)
+values (:'drafts_closed_event_id', :'user_a_id', 'draft')
+returning id \gset user_a_closed_draft_
+
+\o /dev/null
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'user_a_auth_user_id',
+    'email', :'user_a_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+select set_config('rls.user_c_id', :'user_c_id', true);
+select set_config('rls.drafts_event_id', :'drafts_event_id', true);
+select set_config('rls.drafts_event_2_id', :'drafts_event_2_id', true);
+select set_config('rls.drafts_text_question_id', :'drafts_text_question_id', true);
+select set_config('rls.drafts_checkbox_question_id', :'drafts_checkbox_question_id', true);
+select set_config('rls.drafts_file_question_id', :'drafts_file_question_id', true);
+select set_config('rls.drafts_2_question_id', :'drafts_2_question_id', true);
+select set_config('rls.user_c_draft_id', :'user_c_draft_id', true);
+select set_config('rls.user_a_closed_draft_id', :'user_a_closed_draft_id', true);
+-- storage.protect_delete refuses SQL deletes unless this is set.
+select set_config('storage.allow_delete_query', 'true', true);
+\o
+
+set local role authenticated;
+
+do $$
+declare
+  v_application_id uuid;
+  v_second_id uuid;
+  v_result record;
+  v_prefix text;
+  visible_count integer;
+  changed_count integer;
+begin
+  insert into public.event_applications (event_id, user_id, status)
+  values (current_setting('rls.drafts_event_id')::uuid, public.current_user_info_id(), 'draft')
+  returning id into v_application_id;
+
+  -- Answers belong to questions of the application's own event.
+  begin
+    insert into public.event_application_responses (
+      application_id, event_application_question_id, response
+    )
+    values (v_application_id, current_setting('rls.drafts_2_question_id')::uuid, 'Wrong event');
+    raise exception 'user A answered another event''s question';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  -- Someone else's draft is out of reach.
+  select count(*) into visible_count
+  from public.event_applications
+  where id = current_setting('rls.user_c_draft_id')::uuid;
+  if visible_count <> 0 then
+    raise exception 'user A can read user C draft';
+  end if;
+
+  begin
+    insert into public.event_application_responses (
+      application_id, event_application_question_id, response
+    )
+    values (
+      current_setting('rls.user_c_draft_id')::uuid,
+      current_setting('rls.drafts_checkbox_question_id')::uuid,
+      '["A"]'
+    );
+    raise exception 'user A answered user C draft';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  delete from public.event_applications where id = current_setting('rls.user_c_draft_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'user A deleted user C draft';
+  end if;
+
+  if (select status from public.submit_event_application(current_setting('rls.user_c_draft_id')::uuid))
+     <> 'NOT_FOUND' then
+    raise exception 'user A could submit user C draft';
+  end if;
+
+  if (select status from public.submit_event_application(current_setting('rls.user_a_closed_draft_id')::uuid))
+     <> 'REGISTRATION_CLOSED' then
+    raise exception 'user A submitted after registration closed';
+  end if;
+
+  -- Blank text and an empty checkbox selection count as missing.
+  insert into public.event_application_responses (
+    application_id, event_application_question_id, response
+  )
+  values
+    (v_application_id, current_setting('rls.drafts_text_question_id')::uuid, '   '),
+    (v_application_id, current_setting('rls.drafts_checkbox_question_id')::uuid, '[]');
+
+  select * into v_result from public.submit_event_application(v_application_id);
+  if v_result.status <> 'INCOMPLETE'
+     or v_result.missing_question_ids <> array[
+       current_setting('rls.drafts_text_question_id')::uuid,
+       current_setting('rls.drafts_checkbox_question_id')::uuid,
+       current_setting('rls.drafts_file_question_id')::uuid
+     ] then
+    raise exception 'incomplete draft reported %', row_to_json(v_result);
+  end if;
+
+  -- A file answer has to name an upload of this applicant's for that question.
+  update public.event_application_responses
+  set response = 'Because'
+  where application_id = v_application_id
+    and event_application_question_id = current_setting('rls.drafts_text_question_id')::uuid;
+  update public.event_application_responses
+  set response = '["B, C"]'
+  where application_id = v_application_id
+    and event_application_question_id = current_setting('rls.drafts_checkbox_question_id')::uuid;
+  insert into public.event_application_responses (
+    application_id, event_application_question_id, response
+  )
+  values (
+    v_application_id,
+    current_setting('rls.drafts_file_question_id')::uuid,
+    'someone/else/entirely.pdf'
+  );
+
+  select * into v_result from public.submit_event_application(v_application_id);
+  if v_result.status <> 'INCOMPLETE'
+     or v_result.missing_question_ids <> array[current_setting('rls.drafts_file_question_id')::uuid] then
+    raise exception 'unuploaded file answer reported %', row_to_json(v_result);
+  end if;
+
+  -- Uploads go only into the member's own draft, under a file question.
+  v_prefix := public.current_user_info_id()::text || '/' || v_application_id::text || '/';
+
+  begin
+    insert into storage.objects (bucket_id, name)
+    values (
+      'application-files',
+      current_setting('rls.user_c_id') || '/' || current_setting('rls.user_c_draft_id') || '/'
+        || current_setting('rls.drafts_file_question_id') || '/cv.pdf'
+    );
+    raise exception 'user A uploaded into user C draft';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  begin
+    insert into storage.objects (bucket_id, name)
+    values (
+      'application-files',
+      v_prefix || current_setting('rls.drafts_text_question_id') || '/cv.pdf'
+    );
+    raise exception 'user A uploaded under a text question';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  insert into storage.objects (bucket_id, name)
+  values
+    ('application-files', v_prefix || current_setting('rls.drafts_file_question_id') || '/old.pdf'),
+    ('application-files', v_prefix || current_setting('rls.drafts_file_question_id') || '/cv.pdf');
+
+  -- Replacing a file while drafting: the old one can be removed.
+  delete from storage.objects
+  where bucket_id = 'application-files'
+    and name = v_prefix || current_setting('rls.drafts_file_question_id') || '/old.pdf';
+  get diagnostics changed_count = row_count;
+  if changed_count <> 1 then
+    raise exception 'user A could not remove a file from their draft';
+  end if;
+
+  select count(*) into visible_count
+  from storage.objects
+  where bucket_id = 'application-files' and starts_with(name, v_prefix);
+  if visible_count <> 1 then
+    raise exception 'user A should see their one upload, saw %', visible_count;
+  end if;
+
+  update public.event_application_responses
+  set response = v_prefix || current_setting('rls.drafts_file_question_id') || '/cv.pdf'
+  where application_id = v_application_id
+    and event_application_question_id = current_setting('rls.drafts_file_question_id')::uuid;
+
+  select * into v_result from public.submit_event_application(v_application_id);
+  if v_result.status <> 'SUBMITTED' or cardinality(v_result.missing_question_ids) <> 0 then
+    raise exception 'complete draft reported %', row_to_json(v_result);
+  end if;
+
+  if (select submitted_at from public.event_applications where id = v_application_id) is null then
+    raise exception 'submitting did not record submitted_at';
+  end if;
+
+  -- After submitting, the files are as final as the answers.
+  delete from storage.objects
+  where bucket_id = 'application-files' and starts_with(name, v_prefix);
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'user A removed a file after submitting';
+  end if;
+
+  begin
+    insert into storage.objects (bucket_id, name)
+    values (
+      'application-files',
+      v_prefix || current_setting('rls.drafts_file_question_id') || '/late.pdf'
+    );
+    raise exception 'user A uploaded after submitting';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  -- A member deletes their own draft, and its answers go with it.
+  insert into public.event_applications (event_id, user_id, status)
+  values (current_setting('rls.drafts_event_2_id')::uuid, public.current_user_info_id(), 'draft')
+  returning id into v_second_id;
+  insert into public.event_application_responses (
+    application_id, event_application_question_id, response
+  )
+  values (v_second_id, current_setting('rls.drafts_2_question_id')::uuid, 'Changed my mind');
+
+  delete from public.event_applications where id = v_second_id;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 1 then
+    raise exception 'user A could not delete their own draft';
+  end if;
+
+  select count(*) into visible_count
+  from public.event_application_responses
+  where application_id = v_second_id;
+  if visible_count <> 0 then
+    raise exception 'deleting a draft left % answers', visible_count;
+  end if;
+end;
+$$;
+
+reset role;
+
+-- No decision moves a draft, and nothing goes back to being one.
+do $$
+begin
+  begin
+    update public.event_applications
+    set status = 'submitted'
+    where id = current_setting('rls.user_c_draft_id')::uuid;
+    raise exception 'a draft was submitted without submit_event_application';
+  exception
+    when check_violation then null;
+  end;
+
+  begin
+    update public.event_applications
+    set status = 'accepted', offer_expires_at = now() + interval '1 day'
+    where id = current_setting('rls.user_c_draft_id')::uuid;
+    raise exception 'a draft was accepted';
+  exception
+    when check_violation then null;
+  end;
+
+  begin
+    update public.event_applications
+    set status = 'draft'
+    where user_id = current_setting('rls.user_a_id')::uuid
+      and event_id = current_setting('rls.drafts_event_id')::uuid;
+    raise exception 'a submitted application went back to draft';
+  exception
+    when check_violation then null;
+  end;
+end;
+$$;
+
+-- User C: a submitted application with a file on the second event, beside
+-- their draft. Written as the superuser, which Storage's policies do not bind.
+insert into public.event_applications (event_id, user_id)
+values (:'drafts_event_2_id', :'user_c_id')
+returning id \gset user_c_submitted_
+
+insert into storage.objects (bucket_id, name)
+values
+  ('application-files',
+   :'user_c_id' || '/' || :'user_c_submitted_id' || '/' || :'drafts_2_file_question_id' || '/c.pdf'),
+  ('application-files',
+   :'user_c_id' || '/' || :'user_c_draft_id' || '/' || :'drafts_file_question_id' || '/c-draft.pdf');
+
+-- A member cannot read someone else's files.
+set local role authenticated;
+do $$
+declare
+  visible_count integer;
+begin
+  select count(*) into visible_count
+  from storage.objects
+  where bucket_id = 'application-files'
+    and starts_with(name, current_setting('rls.user_c_id') || '/');
+  if visible_count <> 0 then
+    raise exception 'user A can read user C files, saw %', visible_count;
+  end if;
+end;
+$$;
+reset role;
+
+-- Admins see submitted applications, their answers and files, never drafts.
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+update public.user_info set role_access = 'admin' where id = :'user_a_id';
+\o /dev/null
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'user_a_auth_user_id',
+    'email', :'user_a_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+\o
+set local role authenticated;
+do $$
+declare
+  visible_count integer;
+  changed_count integer;
+begin
+  select count(*) into visible_count
+  from public.event_applications
+  where user_id = current_setting('rls.user_c_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'admin should see only user C submitted application, saw %', visible_count;
+  end if;
+
+  select count(*) into visible_count
+  from public.event_application_responses
+  where application_id = current_setting('rls.user_c_draft_id')::uuid;
+  if visible_count <> 0 then
+    raise exception 'admin can read draft answers';
+  end if;
+
+  update public.event_applications
+  set status = 'rejected'
+  where id = current_setting('rls.user_c_draft_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'admin decided a draft';
+  end if;
+
+  select count(*) into visible_count
+  from storage.objects
+  where bucket_id = 'application-files'
+    and starts_with(name, current_setting('rls.user_c_id') || '/');
+  if visible_count <> 1 then
+    raise exception 'admin should read only the submitted file, saw %', visible_count;
+  end if;
+end;
+$$;
+reset role;
+
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+update public.user_info set role_access = :'user_a_drafts_saved_role' where id = :'user_a_id';
 
 -- Scheduled drafts stay hidden until the job actually changes their status.
 update public.events set status = 'draft', publish_at = now() + interval '1 day'
@@ -1022,6 +1761,724 @@ begin
 end;
 $$;
 reset role;
+
+-- ── Reviewer notes ──────────────────────────────────────────────────────────
+--
+-- Admins and managers read every note on a submitted application and change
+-- only their own; nobody reads or writes one on a draft; applicants and anon
+-- never see any; a demoted admin loses access but keeps authorship.
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+
+insert into auth.users (
+  id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+)
+values (
+  gen_random_uuid(), 'authenticated', 'authenticated',
+  'rls-notes-admin@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()
+)
+returning id as auth_user_id, email
+\gset notes_admin_
+
+insert into auth.users (
+  id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+)
+values (
+  gen_random_uuid(), 'authenticated', 'authenticated',
+  'rls-notes-manager@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()
+)
+returning id as auth_user_id, email
+\gset notes_manager_
+
+insert into auth.users (
+  id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+)
+values (
+  gen_random_uuid(), 'authenticated', 'authenticated',
+  'rls-notes-applicant@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()
+)
+returning id as auth_user_id, email
+\gset notes_applicant_
+
+insert into public.user_info (auth_user_id, email, first_name, last_name, role_access)
+values (:'notes_admin_auth_user_id', :'notes_admin_email', 'RLS', 'Notes Admin', 'admin')
+returning id \gset notes_admin_
+
+insert into public.user_info (auth_user_id, email, first_name, last_name, role_access)
+values (:'notes_manager_auth_user_id', :'notes_manager_email', 'RLS', 'Notes Manager', 'manager')
+returning id \gset notes_manager_
+
+insert into public.user_info (auth_user_id, email, first_name, last_name, role_access)
+values (:'notes_applicant_auth_user_id', :'notes_applicant_email', 'RLS', 'Notes Applicant', 'basic')
+returning id \gset notes_applicant_
+
+insert into public.user_info (email, first_name, last_name, role_access)
+values ('rls-notes-drafter@example.test', 'RLS', 'Notes Drafter', 'basic')
+returning id \gset notes_drafter_
+
+insert into public.events (
+  name, description, regular_price, member_price, max_capacity, slug,
+  registration_opens_at, registration_closes_at, status, requires_application
+)
+values (
+  'RLS Notes Event', 'RLS reviewer notes event', 0, 0, 10, 'rls-notes-event',
+  now() - interval '1 hour', now() + interval '1 hour', 'active', true
+)
+returning id \gset notes_event_
+
+insert into public.event_applications (event_id, user_id)
+values (:'notes_event_id', :'notes_applicant_id')
+returning id \gset notes_submitted_
+
+insert into public.event_applications (event_id, user_id, status)
+values (:'notes_event_id', :'notes_drafter_id', 'draft')
+returning id \gset notes_draft_
+
+-- Written as the superuser, which the policies do not bind: the manager's note
+-- on the submitted application, and a note on the draft no policy would admit.
+insert into public.application_review_notes (application_id, author_id, body)
+values (:'notes_submitted_id', :'notes_manager_id', 'Strong portfolio.')
+returning id \gset notes_manager_note_
+
+insert into public.application_review_notes (application_id, author_id, body)
+values (:'notes_draft_id', :'notes_manager_id', 'On a draft.')
+returning id \gset notes_draft_note_
+
+\o /dev/null
+select set_config('rls.notes_admin_id', :'notes_admin_id', true);
+select set_config('rls.notes_manager_id', :'notes_manager_id', true);
+select set_config('rls.notes_submitted_id', :'notes_submitted_id', true);
+select set_config('rls.notes_draft_id', :'notes_draft_id', true);
+select set_config('rls.notes_manager_note_id', :'notes_manager_note_id', true);
+select set_config('rls.notes_draft_note_id', :'notes_draft_note_id', true);
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'notes_admin_auth_user_id',
+    'email', :'notes_admin_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+\o
+
+set local role authenticated;
+do $$
+declare
+  v_note_id uuid;
+  v_author_id uuid;
+  v_edited_at timestamptz;
+  visible_count integer;
+  changed_count integer;
+begin
+  -- Reads every note on a submitted application, none on a draft.
+  select count(*) into visible_count
+  from public.application_review_notes
+  where application_id = current_setting('rls.notes_submitted_id')::uuid;
+  if visible_count <> 1 then
+    raise exception 'admin should see the manager''s note, saw %', visible_count;
+  end if;
+
+  select count(*) into visible_count
+  from public.application_review_notes
+  where id = current_setting('rls.notes_draft_note_id')::uuid;
+  if visible_count <> 0 then
+    raise exception 'admin can read a note on a draft';
+  end if;
+
+  -- Adds a note as themselves; the author defaults to the caller.
+  insert into public.application_review_notes (application_id, body)
+  values (current_setting('rls.notes_submitted_id')::uuid, 'Great answers.')
+  returning id, author_id, edited_at into v_note_id, v_author_id, v_edited_at;
+  if v_author_id <> current_setting('rls.notes_admin_id')::uuid then
+    raise exception 'a new note did not default to its author';
+  end if;
+  if v_edited_at is not null then
+    raise exception 'a new note starts out edited';
+  end if;
+
+  insert into public.application_review_notes (application_id, author_id, body)
+  values (
+    current_setting('rls.notes_submitted_id')::uuid,
+    current_setting('rls.notes_admin_id')::uuid,
+    'A second thought.'
+  );
+
+  -- Can't write as somebody else.
+  begin
+    insert into public.application_review_notes (application_id, author_id, body)
+    values (
+      current_setting('rls.notes_submitted_id')::uuid,
+      current_setting('rls.notes_manager_id')::uuid,
+      'Spoofed.'
+    );
+    raise exception 'admin posted a note as another admin';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  -- Can't write on a draft.
+  begin
+    insert into public.application_review_notes (application_id, body)
+    values (current_setting('rls.notes_draft_id')::uuid, 'Too early.');
+    raise exception 'admin posted a note on a draft';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  -- Blank and over-long notes are refused.
+  begin
+    insert into public.application_review_notes (application_id, body)
+    values (current_setting('rls.notes_submitted_id')::uuid, '   ');
+    raise exception 'admin posted a blank note';
+  exception
+    when check_violation then null;
+  end;
+  begin
+    insert into public.application_review_notes (application_id, body)
+    values (current_setting('rls.notes_submitted_id')::uuid, repeat('a', 2001));
+    raise exception 'admin posted a note over 2000 characters';
+  exception
+    when check_violation then null;
+  end;
+
+  -- Saving unchanged text leaves the note unedited; changing it marks it.
+  update public.application_review_notes set body = body where id = v_note_id;
+  select edited_at into v_edited_at from public.application_review_notes where id = v_note_id;
+  if v_edited_at is not null then
+    raise exception 'saving an unchanged note marked it edited';
+  end if;
+
+  update public.application_review_notes set body = 'Great answers, clear process.'
+  where id = v_note_id;
+  get diagnostics changed_count = row_count;
+  select edited_at into v_edited_at from public.application_review_notes where id = v_note_id;
+  if changed_count <> 1 or v_edited_at is null then
+    raise exception 'admin could not edit their own note';
+  end if;
+
+  -- Only the text changes.
+  begin
+    update public.application_review_notes
+    set author_id = current_setting('rls.notes_manager_id')::uuid
+    where id = v_note_id;
+    raise exception 'admin moved their note to another author';
+  exception
+    when insufficient_privilege then null;
+  end;
+  begin
+    update public.application_review_notes
+    set application_id = current_setting('rls.notes_draft_id')::uuid
+    where id = v_note_id;
+    raise exception 'admin moved their note to another application';
+  exception
+    when insufficient_privilege then null;
+  end;
+  begin
+    update public.application_review_notes set edited_at = null where id = v_note_id;
+    raise exception 'admin set edited_at by hand';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  -- Somebody else's note is read-only.
+  update public.application_review_notes set body = 'Rewritten.'
+  where id = current_setting('rls.notes_manager_note_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'admin edited another admin''s note';
+  end if;
+
+  delete from public.application_review_notes
+  where id = current_setting('rls.notes_manager_note_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'admin deleted another admin''s note';
+  end if;
+
+  delete from public.application_review_notes where id = v_note_id;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 1 then
+    raise exception 'admin could not delete their own note';
+  end if;
+end;
+$$;
+reset role;
+
+-- Managers count as admins.
+\o /dev/null
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'notes_manager_auth_user_id',
+    'email', :'notes_manager_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+\o
+set local role authenticated;
+do $$
+declare
+  visible_count integer;
+  changed_count integer;
+begin
+  select count(*) into visible_count
+  from public.application_review_notes
+  where application_id = current_setting('rls.notes_submitted_id')::uuid;
+  if visible_count <> 2 then
+    raise exception 'manager should see both remaining notes, saw %', visible_count;
+  end if;
+
+  update public.application_review_notes set body = 'Strong portfolio, clear writing.'
+  where id = current_setting('rls.notes_manager_note_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 1 then
+    raise exception 'manager could not edit their own note';
+  end if;
+end;
+$$;
+reset role;
+
+-- The applicant never sees notes, not even on their own application.
+\o /dev/null
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'notes_applicant_auth_user_id',
+    'email', :'notes_applicant_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+\o
+set local role authenticated;
+do $$
+declare
+  visible_count integer;
+  changed_count integer;
+begin
+  select count(*) into visible_count from public.application_review_notes;
+  if visible_count <> 0 then
+    raise exception 'an applicant can read reviewer notes, saw %', visible_count;
+  end if;
+
+  begin
+    insert into public.application_review_notes (application_id, body)
+    values (current_setting('rls.notes_submitted_id')::uuid, 'Pick me.');
+    raise exception 'a member posted a reviewer note';
+  exception
+    when insufficient_privilege then null;
+  end;
+
+  delete from public.application_review_notes;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'a member deleted reviewer notes';
+  end if;
+end;
+$$;
+reset role;
+
+set local role anon;
+do $$
+begin
+  begin
+    perform 1 from public.application_review_notes;
+    raise exception 'anon can read reviewer notes';
+  exception
+    when insufficient_privilege then null;
+  end;
+  begin
+    insert into public.application_review_notes (application_id, body)
+    values (current_setting('rls.notes_submitted_id')::uuid, 'Anonymous.');
+    raise exception 'anon posted a reviewer note';
+  exception
+    when insufficient_privilege then null;
+  end;
+end;
+$$;
+reset role;
+
+-- A demoted admin loses access, and their notes stay.
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+update public.user_info set role_access = 'basic' where id = :'notes_manager_id';
+\o /dev/null
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'notes_manager_auth_user_id',
+    'email', :'notes_manager_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+\o
+set local role authenticated;
+do $$
+declare
+  visible_count integer;
+  changed_count integer;
+begin
+  select count(*) into visible_count from public.application_review_notes;
+  if visible_count <> 0 then
+    raise exception 'a demoted admin can still read notes, saw %', visible_count;
+  end if;
+
+  update public.application_review_notes set body = 'Changed after demotion.'
+  where id = current_setting('rls.notes_manager_note_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'a demoted admin edited their note';
+  end if;
+
+  delete from public.application_review_notes
+  where id = current_setting('rls.notes_manager_note_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'a demoted admin deleted their note';
+  end if;
+end;
+$$;
+reset role;
+
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+do $$
+declare
+  v_edited_at timestamptz;
+begin
+  if not exists (
+    select 1 from public.application_review_notes
+    where id = current_setting('rls.notes_manager_note_id')::uuid
+      and author_id = current_setting('rls.notes_manager_id')::uuid
+  ) then
+    raise exception 'a demoted admin''s note lost its author';
+  end if;
+
+  -- Not even the service side moves a note or forges its edit time.
+  begin
+    update public.application_review_notes
+    set author_id = current_setting('rls.notes_admin_id')::uuid
+    where id = current_setting('rls.notes_manager_note_id')::uuid;
+    raise exception 'a note moved to another author';
+  exception
+    when check_violation then null;
+  end;
+
+  update public.application_review_notes set edited_at = null
+  where id = current_setting('rls.notes_manager_note_id')::uuid;
+  select edited_at into v_edited_at from public.application_review_notes
+  where id = current_setting('rls.notes_manager_note_id')::uuid;
+  if v_edited_at is null then
+    raise exception 'an update cleared edited_at without changing the text';
+  end if;
+
+  -- Deleting the application takes its notes with it.
+  delete from public.event_applications where id = current_setting('rls.notes_draft_id')::uuid;
+  if exists (
+    select 1 from public.application_review_notes
+    where id = current_setting('rls.notes_draft_note_id')::uuid
+  ) then
+    raise exception 'a deleted application left its notes';
+  end if;
+end;
+$$;
+
+-- Member setup (20261110030244, 20261110041028): members write their own
+-- setup columns and nothing else (`user_type` stays privileged); managers keep
+-- editing anyone; deletion scrubs the answers.
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+
+insert into auth.users (
+  id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+)
+values (
+  gen_random_uuid(), 'authenticated', 'authenticated',
+  'rls-setup-member@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()
+)
+returning id as auth_user_id, email
+\gset setup_member_
+
+insert into auth.users (
+  id, aud, role, email, encrypted_password, email_confirmed_at,
+  raw_app_meta_data, raw_user_meta_data, created_at, updated_at
+)
+values (
+  gen_random_uuid(), 'authenticated', 'authenticated',
+  'rls-setup-manager@example.test', '', now(), '{}'::jsonb, '{}'::jsonb, now(), now()
+)
+returning id as auth_user_id, email
+\gset setup_manager_
+
+insert into public.user_info (auth_user_id, email, first_name, last_name, role_access)
+values (:'setup_member_auth_user_id', :'setup_member_email', 'RLS', 'Setup Member', 'basic')
+returning id \gset setup_member_
+
+insert into public.user_info (auth_user_id, email, first_name, last_name, role_access)
+values (:'setup_manager_auth_user_id', :'setup_manager_email', 'RLS', 'Setup Manager', 'manager')
+returning id \gset setup_manager_
+
+insert into public.user_info (email, first_name, last_name, role_access, dietary_restrictions)
+values ('rls-setup-other@example.test', 'RLS', 'Setup Other', 'basic', '  Kiwi  ')
+returning id \gset setup_other_
+
+\o /dev/null
+select set_config('rls.setup_member_id', :'setup_member_id', true);
+select set_config('rls.setup_other_id', :'setup_other_id', true);
+\o
+
+do $$
+declare
+  column_name text;
+  v_row public.user_info%rowtype;
+begin
+  -- New rows start setup at "What best describes you?", unanswered. (Rows
+  -- that predate it were added with `done`.)
+  select * into v_row from public.user_info where id = current_setting('rls.setup_member_id')::uuid;
+  if v_row.setup_step <> 'about' or v_row.diets <> '{}' or v_row.avatar_preset is not null then
+    raise exception 'a new profile does not start setup at the about step';
+  end if;
+  if v_row.user_type_confirmed_at is not null then
+    raise exception 'a new profile starts with its user type confirmed';
+  end if;
+
+  -- Legacy free text written by older code lands in other_allergies.
+  select * into v_row from public.user_info where id = current_setting('rls.setup_other_id')::uuid;
+  if v_row.other_allergies <> array['Kiwi'] then
+    raise exception 'inserted dietary_restrictions was not mirrored, got %', v_row.other_allergies;
+  end if;
+
+  if has_column_privilege('authenticated', 'public.user_info', 'user_type', 'UPDATE') then
+    raise exception 'members can update user_type directly';
+  end if;
+
+  foreach column_name in array array['setup_step', 'diets', 'allergies', 'other_allergies', 'avatar_preset', 'user_type_confirmed_at'] loop
+    if not has_column_privilege('authenticated', 'public.user_info', column_name, 'UPDATE') then
+      raise exception 'members cannot update their own %', column_name;
+    end if;
+    if has_column_privilege('anon', 'public.user_info', column_name, 'UPDATE') then
+      raise exception 'anon can update %', column_name;
+    end if;
+  end loop;
+end;
+$$;
+
+\o /dev/null
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'setup_member_auth_user_id',
+    'email', :'setup_member_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+\o
+
+set local role authenticated;
+
+do $$
+declare
+  changed_count integer;
+  v_row public.user_info%rowtype;
+begin
+  -- Step 1: confirming the type they already have.
+  update public.user_info
+  set setup_step = 'dietary',
+      user_type_confirmed_at = now()
+  where id = current_setting('rls.setup_member_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 1 then
+    raise exception 'a member could not confirm their own user type';
+  end if;
+
+  update public.user_info set user_type_confirmed_at = now()
+  where id = current_setting('rls.setup_other_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'a member confirmed another member''s user type';
+  end if;
+
+  begin
+    update public.user_info set user_type = 'faculty'
+    where id = current_setting('rls.setup_member_id')::uuid;
+    raise exception 'a member changed their own user_type directly';
+  exception when insufficient_privilege then null;
+  end;
+
+  update public.user_info
+  set setup_step = 'photo',
+      diets = array['vegan', 'halal'],
+      allergies = array['tree-nuts'],
+      other_allergies = array['Sesame', 'Kiwi'],
+      avatar_preset = 'flower'
+  where id = current_setting('rls.setup_member_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 1 then
+    raise exception 'a member could not save their own setup answers';
+  end if;
+
+  select * into v_row from public.user_info where id = current_setting('rls.setup_member_id')::uuid;
+  if v_row.dietary_restrictions is distinct from 'Sesame, Kiwi' then
+    raise exception 'other_allergies was not mirrored into dietary_restrictions, got %', v_row.dietary_restrictions;
+  end if;
+
+  -- Settings still edits the legacy text; it flows the other way.
+  update public.user_info set dietary_restrictions = 'Mango'
+  where id = current_setting('rls.setup_member_id')::uuid;
+  select * into v_row from public.user_info where id = current_setting('rls.setup_member_id')::uuid;
+  if v_row.other_allergies <> array['Mango'] then
+    raise exception 'dietary_restrictions was not mirrored into other_allergies, got %', v_row.other_allergies;
+  end if;
+
+  update public.user_info set diets = array['vegan'], setup_step = 'done'
+  where id = current_setting('rls.setup_other_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 0 then
+    raise exception 'a member changed another member''s setup answers';
+  end if;
+
+  begin
+    update public.user_info set interests = array['ux-research']
+    where id = current_setting('rls.setup_member_id')::uuid;
+    raise exception 'a member wrote interests directly';
+  exception when insufficient_privilege then null;
+  end;
+
+  begin
+    update public.user_info set profile_photo_path = null
+    where id = current_setting('rls.setup_member_id')::uuid;
+    raise exception 'a member wrote profile_photo_path directly';
+  exception when insufficient_privilege then null;
+  end;
+
+  begin
+    update public.user_info set role_access = 'admin'
+    where id = current_setting('rls.setup_member_id')::uuid;
+    raise exception 'a member promoted themselves alongside setup';
+  exception when insufficient_privilege then null;
+  end;
+
+  begin
+    update public.user_info set diets = array['paleo']
+    where id = current_setting('rls.setup_member_id')::uuid;
+    raise exception 'a diet outside the list was saved';
+  exception when check_violation then null;
+  end;
+
+  begin
+    update public.user_info set allergies = array['dairy', 'dairy']
+    where id = current_setting('rls.setup_member_id')::uuid;
+    raise exception 'a repeated allergy was saved';
+  exception when check_violation then null;
+  end;
+
+  begin
+    update public.user_info set other_allergies = array['Kiwi', 'kiwi']
+    where id = current_setting('rls.setup_member_id')::uuid;
+    raise exception 'a repeated other allergy was saved';
+  exception when check_violation then null;
+  end;
+
+  begin
+    update public.user_info set other_allergies = array[' Kiwi']
+    where id = current_setting('rls.setup_member_id')::uuid;
+    raise exception 'an untrimmed other allergy was saved';
+  exception when check_violation then null;
+  end;
+
+  begin
+    update public.user_info set other_allergies = array[repeat('x', 201)]
+    where id = current_setting('rls.setup_member_id')::uuid;
+    raise exception 'an over-long other allergy was saved';
+  exception when check_violation then null;
+  end;
+
+  begin
+    update public.user_info set avatar_preset = 'hubbo'
+    where id = current_setting('rls.setup_member_id')::uuid;
+    raise exception 'an unknown avatar preset was saved';
+  exception when check_violation then null;
+  end;
+
+  begin
+    update public.user_info set setup_step = 'welcome'
+    where id = current_setting('rls.setup_member_id')::uuid;
+    raise exception 'an unknown setup step was saved';
+  exception when check_violation then null;
+  end;
+end;
+$$;
+
+reset role;
+
+\o /dev/null
+select set_config(
+  'request.jwt.claims',
+  json_build_object(
+    'sub', :'setup_manager_auth_user_id',
+    'email', :'setup_manager_email',
+    'role', 'authenticated'
+  )::text,
+  true
+);
+\o
+
+set local role authenticated;
+
+do $$
+declare
+  changed_count integer;
+begin
+  update public.user_info set allergies = array['soy']
+  where id = current_setting('rls.setup_other_id')::uuid;
+  get diagnostics changed_count = row_count;
+  if changed_count <> 1 then
+    raise exception 'a manager could not edit a member''s dietary needs';
+  end if;
+
+  begin
+    update public.user_info set interests = array['ux-research']
+    where id = current_setting('rls.setup_other_id')::uuid;
+    raise exception 'a manager wrote interests from the browser client';
+  exception when insufficient_privilege then null;
+  end;
+end;
+$$;
+
+reset role;
+
+\o /dev/null
+select set_config('request.jwt.claims', '{}', true);
+\o
+
+-- Account deletion clears every setup answer.
+select public.delete_account(:'setup_member_auth_user_id');
+
+do $$
+declare
+  v_row public.user_info%rowtype;
+begin
+  select * into v_row from public.user_info where id = current_setting('rls.setup_member_id')::uuid;
+  if v_row.deleted_at is null
+     or v_row.diets <> '{}' or v_row.allergies <> '{}' or v_row.other_allergies <> '{}'
+     or v_row.avatar_preset is not null or v_row.dietary_restrictions is not null
+     or v_row.user_type_confirmed_at is not null then
+    raise exception 'account deletion left setup answers behind';
+  end if;
+end;
+$$;
 
 \ir event-publication.sql
 

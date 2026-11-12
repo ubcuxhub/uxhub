@@ -44,6 +44,49 @@ export type Database = {
           },
         ]
       }
+      application_review_notes: {
+        Row: {
+          application_id: string
+          author_id: string
+          body: string
+          created_at: string
+          edited_at: string | null
+          id: string
+        }
+        ComputedFields: never
+        Insert: {
+          application_id: string
+          author_id?: string
+          body: string
+          created_at?: string
+          edited_at?: string | null
+          id?: string
+        }
+        Update: {
+          application_id?: string
+          author_id?: string
+          body?: string
+          created_at?: string
+          edited_at?: string | null
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "application_review_notes_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "event_applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "application_review_notes_author_id_fkey"
+            columns: ["author_id"]
+            isOneToOne: false
+            referencedRelation: "user_info"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       check_in_sessions: {
         Row: {
           created_at: string | null
@@ -305,6 +348,7 @@ export type Database = {
           id: string
           offer_expires_at: string | null
           status: Database["public"]["Enums"]["event_application_status"]
+          submitted_at: string | null
           updated_at: string
           user_id: string
         }
@@ -315,6 +359,7 @@ export type Database = {
           id?: string
           offer_expires_at?: string | null
           status?: Database["public"]["Enums"]["event_application_status"]
+          submitted_at?: string | null
           updated_at?: string
           user_id: string
         }
@@ -324,6 +369,7 @@ export type Database = {
           id?: string
           offer_expires_at?: string | null
           status?: Database["public"]["Enums"]["event_application_status"]
+          submitted_at?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -344,21 +390,69 @@ export type Database = {
           },
         ]
       }
+      event_links: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          label: string | null
+          sort_order: number
+          type: Database["public"]["Enums"]["event_link_type"]
+          updated_at: string
+          url: string
+          visibility: Database["public"]["Enums"]["event_link_visibility"]
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          label?: string | null
+          sort_order?: number
+          type: Database["public"]["Enums"]["event_link_type"]
+          updated_at?: string
+          url: string
+          visibility?: Database["public"]["Enums"]["event_link_visibility"]
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          label?: string | null
+          sort_order?: number
+          type?: Database["public"]["Enums"]["event_link_type"]
+          updated_at?: string
+          url?: string
+          visibility?: Database["public"]["Enums"]["event_link_visibility"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_links_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_mentors: {
         Row: {
           event_id: string
           mentor_id: string
+          section_id: string
           sort_order: number
         }
         ComputedFields: never
         Insert: {
           event_id: string
           mentor_id: string
+          section_id: string
           sort_order?: number
         }
         Update: {
           event_id?: string
           mentor_id?: string
+          section_id?: string
           sort_order?: number
         }
         Relationships: [
@@ -374,6 +468,85 @@ export type Database = {
             columns: ["mentor_id"]
             isOneToOne: false
             referencedRelation: "mentors"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "event_mentors_section_id_fkey"
+            columns: ["event_id", "section_id"]
+            isOneToOne: false
+            referencedRelation: "event_people_sections"
+            referencedColumns: ["event_id", "id"]
+          },
+        ]
+      }
+      event_people_sections: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          sort_order: number
+          title: string
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          sort_order?: number
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          sort_order?: number
+          title?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_people_sections_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_private_details: {
+        Row: {
+          created_at: string
+          event_id: string
+          meeting_id: string | null
+          meeting_passcode: string | null
+          meeting_url: string
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          event_id: string
+          meeting_id?: string | null
+          meeting_passcode?: string | null
+          meeting_url: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          meeting_id?: string | null
+          meeting_passcode?: string | null
+          meeting_url?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_private_details_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "events"
             referencedColumns: ["id"]
           },
         ]
@@ -468,19 +641,29 @@ export type Database = {
       events: {
         Row: {
           agenda: Json | null
+          agenda_enabled: boolean
           created_at: string | null
           description: string
           description_images: string[] | null
           ends_at: string | null
+          event_colour: string | null
           event_type: Database["public"]["Enums"]["event_type"]
+          header_colour: string | null
+          header_image_url: string | null
           id: string
           image_url: string | null
+          is_featured: boolean
+          location_address: string | null
           location_address_url: string | null
           location_building: string | null
           location_room: string | null
+          location_type: Database["public"]["Enums"]["event_location_type"]
+          marketing_url: string | null
           max_capacity: number
+          max_team_size: number | null
           member_price: number
           mentors_enabled: boolean
+          min_team_size: number | null
           name: string
           publish_at: string | null
           registration_closes_at: string | null
@@ -492,24 +675,36 @@ export type Database = {
           sponsors_enabled: boolean
           starts_at: string | null
           status: Database["public"]["Enums"]["event_status"]
+          team_deadline: string | null
+          teams_enabled: boolean
           updated_at: string | null
         }
         ComputedFields: never
         Insert: {
           agenda?: Json | null
+          agenda_enabled?: boolean
           created_at?: string | null
           description: string
           description_images?: string[] | null
           ends_at?: string | null
+          event_colour?: string | null
           event_type?: Database["public"]["Enums"]["event_type"]
+          header_colour?: string | null
+          header_image_url?: string | null
           id?: string
           image_url?: string | null
+          is_featured?: boolean
+          location_address?: string | null
           location_address_url?: string | null
           location_building?: string | null
           location_room?: string | null
+          location_type?: Database["public"]["Enums"]["event_location_type"]
+          marketing_url?: string | null
           max_capacity: number
+          max_team_size?: number | null
           member_price?: number
           mentors_enabled?: boolean
+          min_team_size?: number | null
           name: string
           publish_at?: string | null
           registration_closes_at?: string | null
@@ -521,23 +716,35 @@ export type Database = {
           sponsors_enabled?: boolean
           starts_at?: string | null
           status?: Database["public"]["Enums"]["event_status"]
+          team_deadline?: string | null
+          teams_enabled?: boolean
           updated_at?: string | null
         }
         Update: {
           agenda?: Json | null
+          agenda_enabled?: boolean
           created_at?: string | null
           description?: string
           description_images?: string[] | null
           ends_at?: string | null
+          event_colour?: string | null
           event_type?: Database["public"]["Enums"]["event_type"]
+          header_colour?: string | null
+          header_image_url?: string | null
           id?: string
           image_url?: string | null
+          is_featured?: boolean
+          location_address?: string | null
           location_address_url?: string | null
           location_building?: string | null
           location_room?: string | null
+          location_type?: Database["public"]["Enums"]["event_location_type"]
+          marketing_url?: string | null
           max_capacity?: number
+          max_team_size?: number | null
           member_price?: number
           mentors_enabled?: boolean
+          min_team_size?: number | null
           name?: string
           publish_at?: string | null
           registration_closes_at?: string | null
@@ -549,6 +756,8 @@ export type Database = {
           sponsors_enabled?: boolean
           starts_at?: string | null
           status?: Database["public"]["Enums"]["event_status"]
+          team_deadline?: string | null
+          teams_enabled?: boolean
           updated_at?: string | null
         }
         Relationships: []
@@ -711,24 +920,30 @@ export type Database = {
         Row: {
           brand_logo_path: string | null
           created_at: string
+          description: string | null
           id: string
           name: string
           updated_at: string
+          website_url: string | null
         }
         ComputedFields: never
         Insert: {
           brand_logo_path?: string | null
           created_at?: string
+          description?: string | null
           id?: string
           name: string
           updated_at?: string
+          website_url?: string | null
         }
         Update: {
           brand_logo_path?: string | null
           created_at?: string
+          description?: string | null
           id?: string
           name?: string
           updated_at?: string
+          website_url?: string | null
         }
         Relationships: []
       }
@@ -757,13 +972,99 @@ export type Database = {
         }
         Relationships: []
       }
+      team_members: {
+        Row: {
+          event_id: string
+          joined_at: string
+          team_id: string
+          user_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          event_id: string
+          joined_at?: string
+          team_id: string
+          user_id: string
+        }
+        Update: {
+          event_id?: string
+          joined_at?: string
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_members_team_id_event_id_fkey"
+            columns: ["team_id", "event_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id", "event_id"]
+          },
+          {
+            foreignKeyName: "team_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_info"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teams: {
+        Row: {
+          created_at: string
+          event_id: string
+          id: string
+          invite_code: string
+          name: string | null
+          owner_id: string | null
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          event_id: string
+          id?: string
+          invite_code?: string
+          name?: string | null
+          owner_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          event_id?: string
+          id?: string
+          invite_code?: string
+          name?: string | null
+          owner_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teams_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teams_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "user_info"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_info: {
         Row: {
+          allergies: string[]
           auth_user_id: string | null
+          avatar_preset: string | null
           birth_date: string | null
           created_at: string | null
           deleted_at: string | null
           dietary_restrictions: string | null
+          diets: string[]
           email: string
           faculty: string | null
           faculty_email: string | null
@@ -777,11 +1078,13 @@ export type Database = {
           membership_type_id: string | null
           newsletter: boolean
           order_date_deprecated: string | null
+          other_allergies: string[]
           phone: string | null
           preferred_pronouns: string | null
           profile_photo_path: string | null
           role_access: Database["public"]["Enums"]["role_access_enum"]
           school_institution: string | null
+          setup_step: string
           square_customer_id: string | null
           student_number: number | null
           student_status: Database["public"]["Enums"]["student_status"] | null
@@ -789,15 +1092,19 @@ export type Database = {
           student_verified_by: string | null
           updated_at: string | null
           user_type: Database["public"]["Enums"]["user_type"]
+          user_type_confirmed_at: string | null
           year: Database["public"]["Enums"]["uni_year"] | null
         }
         ComputedFields: never
         Insert: {
+          allergies?: string[]
           auth_user_id?: string | null
+          avatar_preset?: string | null
           birth_date?: string | null
           created_at?: string | null
           deleted_at?: string | null
           dietary_restrictions?: string | null
+          diets?: string[]
           email: string
           faculty?: string | null
           faculty_email?: string | null
@@ -811,11 +1118,13 @@ export type Database = {
           membership_type_id?: string | null
           newsletter?: boolean
           order_date_deprecated?: string | null
+          other_allergies?: string[]
           phone?: string | null
           preferred_pronouns?: string | null
           profile_photo_path?: string | null
           role_access: Database["public"]["Enums"]["role_access_enum"]
           school_institution?: string | null
+          setup_step?: string
           square_customer_id?: string | null
           student_number?: number | null
           student_status?: Database["public"]["Enums"]["student_status"] | null
@@ -823,14 +1132,18 @@ export type Database = {
           student_verified_by?: string | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"]
+          user_type_confirmed_at?: string | null
           year?: Database["public"]["Enums"]["uni_year"] | null
         }
         Update: {
+          allergies?: string[]
           auth_user_id?: string | null
+          avatar_preset?: string | null
           birth_date?: string | null
           created_at?: string | null
           deleted_at?: string | null
           dietary_restrictions?: string | null
+          diets?: string[]
           email?: string
           faculty?: string | null
           faculty_email?: string | null
@@ -844,11 +1157,13 @@ export type Database = {
           membership_type_id?: string | null
           newsletter?: boolean
           order_date_deprecated?: string | null
+          other_allergies?: string[]
           phone?: string | null
           preferred_pronouns?: string | null
           profile_photo_path?: string | null
           role_access?: Database["public"]["Enums"]["role_access_enum"]
           school_institution?: string | null
+          setup_step?: string
           square_customer_id?: string | null
           student_number?: number | null
           student_status?: Database["public"]["Enums"]["student_status"] | null
@@ -856,6 +1171,7 @@ export type Database = {
           student_verified_by?: string | null
           updated_at?: string | null
           user_type?: Database["public"]["Enums"]["user_type"]
+          user_type_confirmed_at?: string | null
           year?: Database["public"]["Enums"]["uni_year"] | null
         }
         Relationships: [
@@ -887,14 +1203,42 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_edit_application_response: {
+        Args: { p_application_id: string; p_question_id: string }
+        Returns: boolean
+      }
+      can_read_application_file: { Args: { p_name: string }; Returns: boolean }
+      can_remove_application_file: {
+        Args: { p_name: string }
+        Returns: boolean
+      }
+      can_upload_application_file: {
+        Args: { p_name: string }
+        Returns: boolean
+      }
+      create_team: {
+        Args: { p_event_id: string; p_name?: string; p_user_id: string }
+        Returns: {
+          failure_reason: string
+          team_id: string
+        }[]
+      }
       current_user_info_id: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      current_user_team_ids: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
       }
       delete_account: { Args: { p_auth_user_id: string }; Returns: undefined }
       delete_event_atomically: {
         Args: { target_event_id: string }
         Returns: undefined
+      }
+      delete_team: {
+        Args: { p_team_id: string; p_user_id: string }
+        Returns: string
       }
       event_is_public: {
         Args: {
@@ -925,6 +1269,17 @@ export type Database = {
       is_admin: { Args: Record<PropertyKey, never>; Returns: boolean }
       is_authenticated: { Args: Record<PropertyKey, never>; Returns: boolean }
       is_manager: { Args: Record<PropertyKey, never>; Returns: boolean }
+      join_team: {
+        Args: { p_invite_code: string; p_user_id: string }
+        Returns: {
+          failure_reason: string
+          team_id: string
+        }[]
+      }
+      leave_team: {
+        Args: { p_event_id: string; p_user_id: string }
+        Returns: string
+      }
       publish_due_events: { Args: Record<PropertyKey, never>; Returns: number }
       release_event_ticket: {
         Args: { p_purchase_id: string }
@@ -954,6 +1309,14 @@ export type Database = {
         }
         Returns: Json
       }
+      save_event_application_questions: {
+        Args: { p_event_id: string; p_questions: Json }
+        Returns: Json
+      }
+      save_event_check_in_sessions: {
+        Args: { p_event_id: string; p_sessions: Json }
+        Returns: Json
+      }
       set_user_role: {
         Args: {
           p_role: Database["public"]["Enums"]["role_access_enum"]
@@ -961,14 +1324,38 @@ export type Database = {
         }
         Returns: Database["public"]["Enums"]["role_access_enum"]
       }
+      submit_event_application: {
+        Args: { p_application_id: string }
+        Returns: {
+          missing_question_ids: string[]
+          status: string
+        }[]
+      }
+      team_change_blocked: {
+        Args: { p_event_id: string; p_user_id: string }
+        Returns: string
+      }
+      valid_option_list: {
+        Args: { allowed: string[]; choices: string[] }
+        Returns: boolean
+      }
+      valid_other_allergies: { Args: { entries: string[] }; Returns: boolean }
       valid_user_interests: { Args: { tags: string[] }; Returns: boolean }
     }
     Enums: {
       event_application_status:
+        | "draft"
         | "submitted"
         | "accepted"
         | "rejected"
         | "waitlisted"
+      event_link_type:
+        | "slack_workspace"
+        | "participant_package"
+        | "event_recap"
+        | "other"
+      event_link_visibility: "everyone" | "going" | "after_event"
+      event_location_type: "in_person" | "online" | "hybrid"
       event_status: "draft" | "active"
       event_type: "regular" | "flagship"
       response_type:
@@ -1110,11 +1497,20 @@ export const Constants = {
   public: {
     Enums: {
       event_application_status: [
+        "draft",
         "submitted",
         "accepted",
         "rejected",
         "waitlisted",
       ],
+      event_link_type: [
+        "slack_workspace",
+        "participant_package",
+        "event_recap",
+        "other",
+      ],
+      event_link_visibility: ["everyone", "going", "after_event"],
+      event_location_type: ["in_person", "online", "hybrid"],
       event_status: ["draft", "active"],
       event_type: ["regular", "flagship"],
       response_type: [

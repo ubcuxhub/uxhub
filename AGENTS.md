@@ -64,8 +64,12 @@ row owned by a hand-made account (a purchase, say) still references it.
 Purchases, tickets and applications are pruned only when they belong to one of
 the fixture accounts, never to an account created by hand.
 
-The eleven fixture accounts all sign in with password `123456`; see
-`scripts/seed/README.md` for the membership x role grid.
+The twelve login fixtures all sign in with password `123456`; see
+`scripts/seed/README.md` for the membership x role grid. The seed also writes a
+"crowd" of 42 profile-only accounts (no Auth user, so nobody can sign in as
+one) on the reserved `crowd.uxhub.test` and `crowd.ubc.ca` domains, for volume
+in admin screens. Pruning deletes a crowd account the data no longer lists, so
+never sign up with one of those domains.
 
 `pnpm seed --target=prod` writes demo events for admins while the student-facing
 events feature is unlaunched. It never deletes, never writes user fixtures, and
@@ -117,6 +121,20 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
   the app). Both layouts wrap children in `MembershipFlowDialog`, differing only
   by `mode`. Add a page to one tree and you must add it to the other; put shared
   behavior in the feature component so both pick it up.
+- Admin records (a user, an event) don't use `@flow`: they are nested routes.
+  Each list is a layout (`(shell)/admin/users/layout.tsx`,
+  `(shell)/admin/events/(browse)/layout.tsx`) that renders the list and
+  `RecordFrame` from `src/components/shared/RecordDrawer` around its
+  `children`; each record is a child route (`users/[userId]/page.tsx`,
+  `events/(browse)/[event]/page.tsx`) whose content (`RecordView`) opens in a
+  side peek drawer over the list, on a row click and on a refresh alike. The
+  `(browse)` group keeps the event builder (`events/[event]/edit`),
+  `check-in`, `review-applications` and `create-new` out of the list layout,
+  as full pages; the builder wears the drawer's top bar (`RecordPageTopBar`).
+  Record route components still call `requireAdmin()` before they fetch
+  (layouts and pages render in parallel). Every `@flow` page has a canonical
+  twin, and no `@flow/(.)admin` route exists; `src/app/flow-routes.test.ts`
+  enforces both.
 - Prefer the typed helpers in `src/lib/supabase-helpers` over scattering raw
   `.from(...)` calls. Use `TABLES` for table names. Keep RLS-bypassing
   service-role work server-only in `src/lib/supabase/admin.ts` and
@@ -129,7 +147,9 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
   handlers for callbacks, webhooks, uploads, and flows that require an HTTP
   endpoint.
 - Student-facing event and checkout routes use slugs. Admin event routes use
-  event IDs.
+  event IDs (a slug redirects to the ID): `/admin/events/<id>` is the event's
+  overview (the record drawer, with a quick edit of its status and dates) and
+  `/admin/events/<id>/edit` is the full builder.
 - Settings are a hash-driven dialog (`#settings/<tab>`), not standalone portal
   pages. Use `openSettings(tab)` from
   `src/features/settings/components/SettingsDialog`.

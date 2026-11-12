@@ -104,11 +104,12 @@ staff reach drafts and members get a 404. Fulfillment
 
 Only for events with `requires_application`.
 
-`event_applications.status` (enum `event_application_status`) has exactly four
+`event_applications.status` (enum `event_application_status`) has exactly five
 values. The database enforces the moves below:
 
 | `status` | Meaning | Next |
 | --- | --- | --- |
+| `draft` | The applicant is still filling it in | `submitted`, only through `submit_event_application` |
 | `submitted` | Waiting for review | `accepted`, `waitlisted`, `rejected` |
 | `waitlisted` | Not yet; may be accepted later | `accepted`, `rejected` |
 | `accepted` | Offered a spot until `offer_expires_at` | `rejected` |
@@ -130,6 +131,20 @@ not `status` values; they're worked out from the deadline and the ticket:
   `offer_expires_at`.
 - Taking back an offer before the person registers changes it to Rejected.
 
+Drafts belong to the applicant alone:
+
+- Members create applications only as drafts, inside the registration window.
+  `submit_event_application` submits one after checking that it is theirs, the
+  window is open, and every required question has an answer (and a file answer
+  names one of their uploads). It records `submitted_at`, which the review
+  list sorts by.
+- Answers and uploaded files can change only while the application is a
+  draft. The applicant may delete their draft; nobody can delete a submitted
+  one.
+- Admins never see drafts: RLS hides them and their answers and files, the
+  review list and its counts leave them out, and no decision can move one.
+  Drafts hold no seat.
+
 ## Students: event badge
 
 Every event card shows exactly one badge: the student's own badge if they have
@@ -139,6 +154,9 @@ one, otherwise the event's availability badge. Once an event has ended, it shows
 ### The student's own badge
 
 Shown once they've applied or registered.
+
+A `draft` is not an application yet for badges: the student sees the event's
+availability badge until they submit.
 
 | Badge | Shown when |
 | --- | --- |
@@ -173,9 +191,34 @@ Use the first rule that matches:
 
 So a student who's going to an event that has since filled up still sees
 "Going", not "Full".
+As well, "Registration closed" beats "Full" so that students can't register even if spots open up.  
+
+## Students: teams
+
+Only for events with `teams_enabled`. Teams form after registering: every
+team action needs a ticket to the event.
+
+- A student creates a team, which gets an invite link, or joins one with a
+  teammate's link. They're on at most one team per event.
+- A team holds up to `max_team_size` people; its link stops working when full.
+- The owner can delete the team, which removes everyone on it. Anyone else can
+  leave. The owner can't leave without deleting it.
+- At `team_deadline` teams lock: nobody creates, joins, leaves or deletes, and
+  admins place anyone without a team. A team admins make has no owner.
+- `min_team_size` isn't enforced: admins sort out small teams at the deadline.
+- Deleting an account frees the student's team spots. A team they owned passes
+  to the teammate who joined first, or is deleted if nobody else is on it.
+  Their ticket stays, as for any deleted account.
+
+The server makes these changes through `create_team`, `join_team`,
+`leave_team` and `delete_team`, which return why a change was refused
+(`NO_TICKET`, `TEAMS_LOCKED`, `TEAM_FULL`, ...) instead of failing.
 
 ## Seats
 
 Seats taken = tickets + accepted offers that haven't expired and have no ticket
 yet. Since nobody gives a spot back, a full event only reopens when an offer
 expires.
+
+## Check-in status for multi-day events
+Currently, if an event spans multiple days and requires check-in for multiple days, the badge will show 'Checked-in' from the first day they check in until the end of the event, regardless of whether they need to check in again at a later day in the event. 

@@ -26,9 +26,9 @@ export interface SectionNavigatorProps {
 }
 
 function SectionMark({ state, size = "menu" }: { state: SectionState; size?: "menu" | "pill" }) {
-  const sizeClass = size === "pill" ? "size-4" : "size-[18px]"
+  const sizeClass = size === "pill" ? "size-4" : "size-5"
   if (state === "complete") return <span role="img" aria-label="Complete" className={cn("inline-flex shrink-0 items-center justify-center rounded-full bg-success-solid", sizeClass)}><Check aria-hidden className="size-3 stroke-[2.5] text-primary-foreground" /></span>
-  if (state === "attention") return <span role="img" aria-label="Needs attention" className={cn("inline-flex shrink-0 items-center justify-center rounded-full bg-destructive", sizeClass)}><AlertCircle aria-hidden className="size-3.5 stroke-[2.5] text-destructive-foreground" /></span>
+  if (state === "attention") return <span role="img" aria-label="Needs attention" className={cn("inline-flex shrink-0 items-center justify-center rounded-full bg-destructive", sizeClass)}><AlertCircle aria-hidden className="size-4 stroke-[2.5] text-destructive-foreground" /></span>
   return <span role="img" aria-label={state === "optional" ? "Optional" : "Not started"} className={cn("inline-block shrink-0 rounded-full border-[1.5px] border-border", state === "optional" && "border-dashed", sizeClass)} />
 }
 
@@ -59,7 +59,7 @@ export function SectionNavigator({ title, sections, currentId, onNavigate, class
 
   return <DropdownMenu open={open} onOpenChange={setOpen}>
     <DropdownMenuTrigger asChild>
-      <button type="button" aria-label={accessibleName} className={cn("fixed bottom-6 left-1/2 z-50 flex h-14 max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-full border border-border bg-popover py-2 pr-4 pl-2 text-foreground shadow-lg hover:bg-accent focus-visible:focus-ring", className)}>
+      <button type="button" aria-label={accessibleName} className={cn("fixed bottom-6 left-1/2 z-50 flex transition-[left] duration-200 ease-out md:group-has-[[data-slot=sidebar][data-state=expanded]]/sidebar-wrapper:left-[calc(50%+var(--sidebar-width)/2)] md:group-has-[[data-slot=sidebar][data-state=collapsed]]/sidebar-wrapper:left-[calc(50%+var(--sidebar-width-icon)/2)] h-14 max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-full border border-border bg-popover py-2 pr-4 pl-2 text-foreground shadow-lg hover:bg-accent focus-visible:focus-ring", className)}>
         <span className="relative flex size-10 shrink-0 items-center justify-center" aria-hidden>
           <svg className="absolute inset-0 size-10 -rotate-90" viewBox="0 0 40 40">
             <circle cx="20" cy="20" r="16" fill="none" stroke="currentColor" strokeWidth="3" className="text-border" />
@@ -68,7 +68,7 @@ export function SectionNavigator({ title, sections, currentId, onNavigate, class
           <span className="text-label font-semibold tabular-nums">{String(currentIndex + 1).padStart(2, "0")}</span>
         </span>
         <span className="min-w-0 truncate text-small font-semibold">{current.title}</span>
-        {issueCount > 0 ? <span className="flex shrink-0 items-center gap-1 text-label text-destructive"><AlertCircle aria-hidden className="size-3.5" />{issueCount} {issueCount === 1 ? "issue" : "issues"}</span> : null}
+        {issueCount > 0 ? <span className="flex shrink-0 items-center gap-1 text-label text-destructive"><AlertCircle aria-hidden className="size-4" />{issueCount} {issueCount === 1 ? "issue" : "issues"}</span> : null}
         {!issueCount ? <SectionMark state={current.state} size="pill" /> : null}
         <span className="shrink-0 text-label tabular-nums text-muted-foreground">{String(currentIndex + 1).padStart(2, "0")}/{String(sections.length).padStart(2, "0")}</span>
         <ChevronDown aria-hidden className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />

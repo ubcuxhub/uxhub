@@ -168,6 +168,31 @@ export class Fixtures {
   }
 
   /**
+   * Creates a membership tier. `user_info` restricts deleting a tier it
+   * references, so create it before any user that will point at it: cleanup
+   * runs newest first.
+   */
+  async createMembershipType(
+    overrides: Partial<Database["public"]["Tables"]["membership_types"]["Insert"]> = {}
+  ) {
+    const { data, error } = await this.supabase
+      .from("membership_types")
+      .insert({
+        name: `Integration tier ${this.tag}`,
+        slug: `integration-tier-${this.tag}`,
+        description: "Created by an integration test.",
+        price: 10,
+        ...overrides,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+    this.track("membership_types", data.id);
+    return data;
+  }
+
+  /**
    * Creates an auth user and the matching `user_info` row, the pairing the app
    * assumes everywhere.
    */

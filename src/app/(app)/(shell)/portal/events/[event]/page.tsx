@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { FlowLink } from "@/components/shared/FlowLink";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { EventAgendaTable } from "@/features/events/components/EventAgendaTable";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { requireAuth } from "@/lib/auth/guards";
@@ -15,6 +16,8 @@ import { formatEventDate, formatEventTime, pacificDate } from "@/lib/date";
 import { resolveImagePreviewSrc } from "@/lib/event-image";
 import { fetchEventMentors, fetchEventSponsors } from "@/lib/supabase-helpers/event-people";
 import { EventPeopleCard } from "@/features/events/components/EventPeopleCard";
+import { loadEventBadges } from "@/features/events/lib/event-badge";
+import { ApplicationStatusCallout } from "@/features/applications/components/ApplicationStatusCallout";
 
 interface PortalEventPageProps {
   params: Promise<{ event: string }>;
@@ -26,7 +29,7 @@ export default async function PortalEventPage({
   if (!FLAGS.studentEvents) notFound();
 
   const { event: slug } = await params;
-  await requireAuth();
+  const user = await requireAuth();
   const supabase = await createClient();
   // No status filter: RLS returns drafts to admins and managers only, who
   // can open one to test it (docs/event-states.md, "Drafts for admins").
@@ -36,12 +39,14 @@ export default async function PortalEventPage({
     notFound();
   }
   
-  const [agenda, mentors, sponsors] = await Promise.all([
+  const [agenda, mentors, sponsors, badges] = await Promise.all([
     fetchEventAgenda(supabase, event.id),
     // Admins switch these sections off per event, as the public event page does.
     event.mentors_enabled ? fetchEventMentors(supabase, event.id) : [],
     event.sponsors_enabled ? fetchEventSponsors(supabase, event.id) : [],
+    loadEventBadges(supabase, user.id, [event]),
   ]);
+  const badge = badges[event.id];
 
   const startTime = formatEventTime(event.starts_at);
   const endTime = formatEventTime(event.ends_at);
@@ -53,6 +58,8 @@ export default async function PortalEventPage({
       {event.status !== "active" && (
         <Alert>Draft: only admins can see this.</Alert>
       )}
+      {/* Application status and entry point; renders nothing without applications. */}
+      <ApplicationStatusCallout event={event} userId={user.id} />
       
       <div className="border-border-subtle rounded-md border">
         <div className="w-full h-51 bg-brand-blue-200 relative rounded-t-md">
@@ -68,13 +75,16 @@ export default async function PortalEventPage({
         </div>
         <div className="px-6 pb-6">
           <div className="my-10 flex flex-col gap-6">
-            <h1 className="text-h1">{event.name}</h1>
+            <div className="flex flex-col items-start gap-3">
+              <h1 className="text-h1">{event.name}</h1>
+              {badge && <StatusBadge {...badge} size="large" />}
+            </div>
 
             <hr className="w-full border-border-subtle" />
 
             <div className="flex flex-col sm:flex-row justify-between gap-4"> 
               <div className="flex items-center gap-3 text-small">
-                <Calendar className="p-3 h-fit w-fit text-muted-foreground border-[0.8px] rounded-md" />
+                <span className="flex size-12 shrink-0 items-center justify-center rounded-md border-[0.8px] text-muted-foreground"><Calendar className="size-5" aria-hidden /></span>
                 <div className="flex flex-col gap-1">
                   <p className="font-medium">
                     {formatEventDate(event.starts_at, { year: "numeric", month: "short" }) ?? "TBD"}
@@ -92,7 +102,7 @@ export default async function PortalEventPage({
               </div>
 
               <div className="flex items-start gap-3 text-small">
-                <MapPin className="p-3 h-fit w-fit text-muted-foreground border-[0.8px] rounded-md" />
+                <span className="flex size-12 shrink-0 items-center justify-center rounded-md border-[0.8px] text-muted-foreground"><MapPin className="size-5" aria-hidden /></span>
                 <div className="flex flex-col gap-1">
                   <p className="font-medium">{event.location_building || "TBD"}</p>
                   <p className="text-muted-foreground">{event.location_room || ""}</p>
@@ -100,7 +110,7 @@ export default async function PortalEventPage({
               </div>
 
               <div className="flex items-center gap-3 text-small">
-                <Link2 className="p-3 h-fit w-fit text-muted-foreground border-[0.8px] rounded-md"/>
+                <span className="flex size-12 shrink-0 items-center justify-center rounded-md border-[0.8px] text-muted-foreground"><Link2 className="size-5" aria-hidden /></span>
                 <div className="flex flex-col gap-1">
                   <p className="font-medium">Event details</p>
                   {/* TODO: make this the actual event website - does this need a migration? */}

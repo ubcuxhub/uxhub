@@ -29,9 +29,9 @@ and runs the idempotent TypeScript seed reconciler. It never targets the linked 
 
 The seed data lives under `scripts/seed/data/` and includes memberships, past,
 ongoing, and upcoming events, purchases, tickets, applications, check-ins, and these
-eleven local login fixtures (all use password `123456`). Ten cover every
-membership state crossed with admin and non-admin, and one is the dedicated
-manager. The grid is listed in
+twelve local login fixtures (all use password `123456`). Ten cover every
+membership state crossed with admin and non-admin, one is the dedicated
+manager, and `new-member@example.com` starts member setup at step 1. The grid is listed in
 [`scripts/seed/README.md`](../scripts/seed/README.md); the most useful are:
 
 - `admin-explorer@example.com` — administrator with an Explorer membership
@@ -181,6 +181,7 @@ helper file, and fix it in one place.
 | `app_settings`                | `src/lib/supabase-helpers/app-settings.ts`        |
 | `user_info` (service-role)    | `src/lib/supabase-helpers/admin-server.ts`        |
 | `event-images` (storage)      | `src/lib/supabase-helpers/admin-server.ts`        |
+| `application-files` (storage) | `src/lib/supabase-helpers/application-files.ts`   |
 
 Supporting files:
 
@@ -210,9 +211,16 @@ reference and attempts storage cleanup after anonymization. Cleanup failures
 are logged and do not undo a successful database change.
 
 The four admin-profile migrations also add manual student verification,
-`birth_date`, and `interests`. New columns deliberately have no authenticated
-UPDATE grants: managers edit through authorized server endpoints. User-facing
-editing is deferred. Anonymization triggers clear all four additions during
+`birth_date`, and `interests`. Those columns deliberately have no authenticated
+UPDATE grants: managers edit through authorized server endpoints, and members
+edit their own `interests` through server actions (setup and Settings). The
+later member setup migration does grant members UPDATE on its own columns
+(`setup_step`, `diets`, `allergies`, `other_allergies`, `avatar_preset`), held
+to valid values by CHECK constraints, and the one after it on
+`user_type_confirmed_at` (whether the member answered "What best describes
+you?"; null means never asked, since `user_type` always has a default).
+`user_type` itself stays privileged: the setup and membership actions change
+it with the service role, and only without an active or pending membership. Anonymization triggers clear all four additions during
 the existing `delete_account` transaction; changes to student number or user
 type invalidate manual verification.
 
@@ -255,6 +263,18 @@ Seed covers use the separate `seed/covers/<file>` prefix and stable keys, since
 the seed wants idempotency more than cache-busting (they carry a short
 `cache-control` instead). The split prefix is also what lets `pnpm seed` clear
 stale seed images without ever deleting a cover somebody uploaded by hand.
+
+Application files live in the private `application-files` bucket (PDF, 5 MB),
+keyed `<user_info_id>/<application_id>/<question_id>/<file name>`; the answer
+to a file question stores that key. Unlike the two public buckets, members
+upload and remove these themselves with their own session, so this bucket
+**does** have `storage.objects` policies
+(`20261106193115_application_files_bucket.sql`): members write only into their
+own draft, under a file question of its event, and remove only while it is a
+draft; they read their own files, and admins read those of submitted
+applications. Downloads use short-lived signed URLs
+(`createApplicationFileUrl`). Deleting a draft removes its files first
+(`deleteDraftApplication`), since the database cannot reach Storage.
 
 ## Type-safety gaps to watch (these do NOT fail `tsc`)
 

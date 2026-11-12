@@ -1,0 +1,130 @@
+"use client";
+
+import type { ReactNode } from "react";
+
+import { AppSidebarNav } from "@/components/shared/AppSidebar";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  SidebarInset,
+  SidebarProvider,
+  SidebarTrigger,
+} from "@/components/ui/sidebar";
+
+import { Composition, Specimen, SpecimenGroup } from "@/app/dev/_shell/Specimen";
+
+/**
+ * The sidebar positions itself with `position: fixed`. A transform on the
+ * frame makes it the containing block, so the sidebar sits inside the frame
+ * instead of the viewport; the container and wrapper sizes are pinned to the
+ * frame for the same reason.
+ */
+function SidebarFrame({ children }: { children: ReactNode }) {
+  return (
+    <div className="relative h-[680px] overflow-hidden rounded-xl border [transform:translateZ(0)] [&_[data-slot=sidebar-container]]:h-full! [&_[data-slot=sidebar-wrapper]]:h-full [&_[data-slot=sidebar-wrapper]]:min-h-0!">
+      {children}
+    </div>
+  );
+}
+
+function PageBody() {
+  return (
+    <SidebarInset className="min-h-0 overflow-auto">
+      <div className="flex flex-col gap-4 p-6">
+        <div className="flex items-center gap-3">
+          <SidebarTrigger />
+          <h3 className="text-h2">Manage Events</h3>
+        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle>UXathon 2026</CardTitle>
+          </CardHeader>
+          <CardContent className="text-small text-muted-foreground">
+            Below 768px the sidebar becomes a sheet; the trigger opens it.
+          </CardContent>
+        </Card>
+      </div>
+    </SidebarInset>
+  );
+}
+
+/** A sidebar on its own, in a frame as tall as the shell. */
+function SidebarOnly({
+  defaultOpen = true,
+  isAdmin,
+  isManager,
+  pathname,
+}: {
+  defaultOpen?: boolean;
+  isAdmin: boolean;
+  isManager: boolean;
+  pathname: string;
+}) {
+  return (
+    <div className="relative h-[680px] w-fit overflow-hidden rounded-xl border [transform:translateZ(0)] [&_[data-slot=sidebar-container]]:h-full! [&_[data-slot=sidebar-wrapper]]:h-full [&_[data-slot=sidebar-wrapper]]:min-h-0!">
+      <SidebarProvider defaultOpen={defaultOpen}>
+        <AppSidebarNav isAdmin={isAdmin} isManager={isManager} pathname={pathname} />
+      </SidebarProvider>
+    </div>
+  );
+}
+
+function AppSidebarDemo() {
+  return (
+    <div className="flex flex-col gap-8">
+      <SpecimenGroup
+        surface="page"
+        title="Sidebar"
+        spec="§3.4"
+        description="AppSidebarNav with fixture flags. Members see Browse; admins add Admin; managers add Club Settings. Collapsed is the 88px icon rail."
+      >
+        <Specimen label="Member · Home selected">
+          <SidebarOnly isAdmin={false} isManager={false} pathname="/portal" />
+        </Specimen>
+        <Specimen label="Admin · Manage Events selected">
+          <SidebarOnly isAdmin isManager={false} pathname="/admin/events/new" />
+        </Specimen>
+        <Specimen label="Manager · Club Settings selected">
+          <SidebarOnly isAdmin isManager pathname="/admin/settings" />
+        </Specimen>
+        <Specimen label="Admin · collapsed (88px)">
+          <SidebarOnly
+            defaultOpen={false}
+            isAdmin
+            isManager
+            pathname="/admin/users"
+          />
+        </Specimen>
+      </SpecimenGroup>
+
+      <Composition
+        title="Sidebar"
+        description="The shell: AppSidebarNav beside a page title and a card, expanded and collapsed."
+      >
+        <div className="grid gap-6">
+          <Specimen label="Expanded">
+            <div className="w-full">
+              <SidebarFrame>
+                <SidebarProvider defaultOpen>
+                  <AppSidebarNav isAdmin isManager pathname="/admin/events" />
+                  <PageBody />
+                </SidebarProvider>
+              </SidebarFrame>
+            </div>
+          </Specimen>
+          <Specimen label="Collapsed (88px icon rail)">
+            <div className="w-full">
+              <SidebarFrame>
+                <SidebarProvider defaultOpen={false}>
+                  <AppSidebarNav isAdmin isManager pathname="/admin/events" />
+                  <PageBody />
+                </SidebarProvider>
+              </SidebarFrame>
+            </div>
+          </Specimen>
+        </div>
+      </Composition>
+    </div>
+  );
+}
+
+export default AppSidebarDemo;

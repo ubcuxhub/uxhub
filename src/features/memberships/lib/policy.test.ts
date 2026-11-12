@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   buildEligibilityUpdate,
+  CHANGE_USER_TYPE_PATH,
+  confirmedJoinPath,
   hasActiveOrPendingMembership,
   isEligibleForMembership,
+  userTypeConfirmation,
 } from "./policy";
 
 const PAST = "2020-01-01T00:00:00.000Z";
@@ -230,5 +233,31 @@ describe("buildEligibilityUpdate", () => {
       student_status: null,
       year: null,
     });
+  });
+});
+
+describe("join skips an answered \"What best describes you?\"", () => {
+  const answered = { user_type: "faculty" as const, user_type_confirmed_at: PAST };
+
+  it("goes straight to the details for the answered type", () => {
+    expect(confirmedJoinPath(answered, false)).toBe("/portal/membership/join/faculty");
+    expect(
+      confirmedJoinPath({ user_type: "nonUbc", user_type_confirmed_at: PAST }, false),
+    ).toBe("/portal/membership/join/non-ubc");
+  });
+
+  it("asks when the type was never answered, whatever the stored default", () => {
+    expect(
+      confirmedJoinPath({ user_type: "ubcStudent", user_type_confirmed_at: null }, false),
+    ).toBeNull();
+  });
+
+  it("asks again when the member chose to change it", () => {
+    expect(confirmedJoinPath(answered, true)).toBeNull();
+    expect(CHANGE_USER_TYPE_PATH).toBe("/portal/membership/join?change=1");
+  });
+
+  it("stamps the answer when a join or Settings save writes the type", () => {
+    expect(userTypeConfirmation(new Date(FUTURE))).toEqual({ user_type_confirmed_at: FUTURE });
   });
 });

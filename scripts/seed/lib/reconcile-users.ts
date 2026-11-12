@@ -1,9 +1,51 @@
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 
 import type { SeedRegistration, SeedUser } from "../data/users.ts";
+import { CROWD_EMAIL_DOMAINS } from "../data/crowd.ts";
 import { emptyCounts, type Counts } from "./reconcile.ts";
 import { planPrune, pruneKey } from "./prune.ts";
-import { getUserFixtureTotals } from "./user-fixtures.ts";
+import { minimalPdf } from "./pdf.ts";
+import { releaseReviewNotesBy } from "./review-notes.ts";
+import { answeredQuestions, getUserFixtureTotals } from "./user-fixtures.ts";
+
+/** Mirrors BUCKETS.applicationFiles in src/lib/supabase-helpers/buckets.ts. */
+const APPLICATION_FILES_BUCKET = "application-files";
+
+/**
+ * How many values one `.in()` filter carries. The filter travels in the URL,
+ * and a hundred idempotency keys would crowd the gateway's request-line limit.
+ */
+const IN_CHUNK = 40;
+
+function chunk<T>(values: readonly T[], size = IN_CHUNK): T[][] {
+  const chunks: T[][] = [];
+  for (let start = 0; start < values.length; start += size) {
+    chunks.push(values.slice(start, start + size));
+  }
+  return chunks;
+}
+
+/** `select ... where column in (values)`, a chunk at a time. */
+async function selectIn<Row>(
+  supabase: SupabaseClient,
+  table: string,
+  columns: string,
+  column: string,
+  values: readonly string[],
+  label = table
+): Promise<Row[]> {
+  const rows: Row[] = [];
+  for (const part of chunk([...new Set(values)])) {
+    const { data, error } = await supabase.from(table).select(columns).in(column, part);
+    if (error) throw new Error(`Reading ${label} failed: ${error.message}`);
+    rows.push(...((data ?? []) as unknown as Row[]));
+  }
+  return rows;
+}
+
+function isLogin(fixture: SeedUser): boolean {
+  return fixture.password !== null;
+}
 
 const TABLE = {
   appSettings: "app_settings",
@@ -31,6 +73,8 @@ export interface UserSeedSummary {
   tickets: Counts;
   applications: Counts;
   responses: Counts;
+  /** PDFs in `application-files` behind file answers. */
+  files: Counts;
   checkIns: Counts;
   /** Fixture email -> `user_info.id`, for the prune pass in `index.ts`. */
   profileIds: Map<string, string>;
@@ -76,6 +120,7 @@ function emptySummary(): UserSeedSummary {
     tickets: emptyCounts(),
     applications: emptyCounts(),
     responses: emptyCounts(),
+    files: emptyCounts(),
     checkIns: emptyCounts(),
     profileIds: new Map(),
   };
@@ -100,21 +145,23 @@ async function inspectIdentityState(
 ): Promise<IdentityState> {
   const authUsers = await listAllAuthUsers(supabase);
   const fixtureEmails = fixtures.map((fixture) => fixture.email);
+  const loginEmails = fixtures.filter(isLogin).map((fixture) => fixture.email);
   const authByEmail = new Map<string, User>();
 
   for (const authUser of authUsers) {
     const email = authUser.email?.trim().toLowerCase();
-    if (email && fixtureEmails.includes(email)) authByEmail.set(email, authUser);
+    if (email && loginEmails.includes(email)) authByEmail.set(email, authUser);
   }
 
   const authIds = [...authByEmail.values()].map((user) => user.id);
-  const byEmailResult = await supabase
-    .from(TABLE.userInfo)
-    .select("id, email, auth_user_id")
-    .in("email", fixtureEmails);
-  if (byEmailResult.error) {
-    throw new Error(`Reading user profiles failed: ${byEmailResult.error.message}`);
-  }
+  const byEmailRows = await selectIn<ProfileRow>(
+    supabase,
+    TABLE.userInfo,
+    "id, email, auth_user_id",
+    "email",
+    fixtureEmails,
+    "user profiles"
+  );
 
   let byAuthRows: ProfileRow[] = [];
   if (authIds.length > 0) {
@@ -130,15 +177,24 @@ async function inspectIdentityState(
 
   const profileByEmail = new Map<string, ProfileRow>();
   const profileByAuthId = new Map<string, ProfileRow>();
-  for (const profile of [
-    ...((byEmailResult.data ?? []) as ProfileRow[]),
-    ...byAuthRows,
-  ]) {
+  for (const profile of [...byEmailRows, ...byAuthRows]) {
     profileByEmail.set(profile.email.trim().toLowerCase(), profile);
     if (profile.auth_user_id) profileByAuthId.set(profile.auth_user_id, profile);
   }
 
   for (const fixture of fixtures) {
+    if (!isLogin(fixture)) {
+      // Somebody signed up with a crowd address and `ensureUserInfo` adopted
+      // the row: it is a person's account now, not the seed's.
+      if (profileByEmail.get(fixture.email)?.auth_user_id) {
+        throw new Error(
+          `Crowd profile "${fixture.email}" is linked to an Auth user; refusing to overwrite it. ` +
+            "Crowd domains are reserved for the seed (data/crowd.ts)."
+        );
+      }
+      continue;
+    }
+
     const authUser = authByEmail.get(fixture.email);
     const emailProfile = profileByEmail.get(fixture.email);
     const authProfile = authUser ? profileByAuthId.get(authUser.id) : undefined;
@@ -172,6 +228,7 @@ async function loadDependencies(
     ...new Set(
       fixtures.flatMap((fixture) => [
         ...(fixture.membershipSlug ? [fixture.membershipSlug] : []),
+        ...(fixture.membershipPreOrderedSlug ? [fixture.membershipPreOrderedSlug] : []),
         ...fixture.purchases.flatMap((purchase) =>
           purchase.membershipSlug ? [purchase.membershipSlug] : []
         ),
@@ -282,7 +339,7 @@ async function loadDependencies(
   const missingChildren: string[] = [];
   for (const fixture of fixtures) {
     for (const registration of fixture.registrations) {
-      for (const question of Object.keys(registration.responses ?? {})) {
+      for (const question of answeredQuestions(registration)) {
         if (!questionIds.has(key(registration.eventSlug, question))) {
           missingChildren.push(`question:${registration.eventSlug}:${question}`);
         }
@@ -314,17 +371,65 @@ function getMembershipExpiry(): string {
   return expiry.toISOString();
 }
 
+/** The membership columns of a fixture's profile. */
+function membershipColumns(fixture: SeedUser, dependencies: DependencyReferences) {
+  const idOf = (slug: string) => {
+    const id = dependencies.membershipIds.get(slug);
+    if (!id) throw new Error(`No ID found for membership "${slug}"`);
+    return id;
+  };
+  const membershipTypeId = fixture.membershipSlug ? idOf(fixture.membershipSlug) : null;
+  return {
+    membership_expires_at: membershipTypeId
+      ? (fixture.membershipExpiresAt ?? getMembershipExpiry())
+      : null,
+    membership_pre_ordered_type_id: fixture.membershipPreOrderedSlug
+      ? idOf(fixture.membershipPreOrderedSlug)
+      : null,
+    membership_type_id: membershipTypeId,
+  };
+}
+
+/**
+ * The crowd's profiles, in one upsert on email. No Auth user: `auth_user_id`
+ * is left out, so a new row gets null and an existing one keeps its own.
+ */
+async function reconcileCrowdProfiles(
+  supabase: SupabaseClient,
+  crowd: SeedUser[],
+  dependencies: DependencyReferences,
+  profileIds: Map<string, string>
+): Promise<void> {
+  if (crowd.length === 0) return;
+  const { data, error } = await supabase
+    .from(TABLE.userInfo)
+    .upsert(
+      crowd.map((fixture) => ({
+        ...fixture.profile,
+        email: fixture.email,
+        ...membershipColumns(fixture, dependencies),
+      })),
+      { onConflict: "email" }
+    )
+    .select("id, email");
+  if (error) throw new Error(`Upserting crowd profiles failed: ${error.message}`);
+  for (const row of (data ?? []) as { id: string; email: string }[]) {
+    profileIds.set(row.email, row.id);
+  }
+}
+
 async function reconcileIdentities(
   supabase: SupabaseClient,
   fixtures: SeedUser[],
   dependencies: DependencyReferences,
   state: IdentityState
 ): Promise<{ authUsers: Counts; profiles: Counts; profileIds: Map<string, string> }> {
-  const authUsers = countsFor(fixtures.length, state.authByEmail.size);
+  const authUsers = countsFor(fixtures.filter(isLogin).length, state.authByEmail.size);
   const profiles = countsFor(fixtures.length, state.profileByEmail.size);
   const profileIds = new Map<string, string>();
 
   for (const fixture of fixtures) {
+    if (fixture.password === null) continue;
     let authUser = state.authByEmail.get(fixture.email);
     const authAttributes = {
       email: fixture.email,
@@ -354,21 +459,12 @@ async function reconcileIdentities(
       authUser = data.user;
     }
 
-    const membershipTypeId = fixture.membershipSlug
-      ? dependencies.membershipIds.get(fixture.membershipSlug)
-      : null;
-    if (fixture.membershipSlug && !membershipTypeId) {
-      throw new Error(`No ID found for membership "${fixture.membershipSlug}"`);
-    }
-
     const existingProfile = state.profileByEmail.get(fixture.email);
     const payload = {
       ...fixture.profile,
       auth_user_id: authUser.id,
       email: fixture.email,
-      membership_expires_at: membershipTypeId ? getMembershipExpiry() : null,
-      membership_pre_ordered_type_id: null,
-      membership_type_id: membershipTypeId,
+      ...membershipColumns(fixture, dependencies),
     };
 
     if (existingProfile) {
@@ -394,6 +490,13 @@ async function reconcileIdentities(
       profileIds.set(fixture.email, (data as { id: string }).id);
     }
   }
+
+  await reconcileCrowdProfiles(
+    supabase,
+    fixtures.filter((fixture) => !isLogin(fixture)),
+    dependencies,
+    profileIds
+  );
 
   return { authUsers, profiles, profileIds };
 }
@@ -436,17 +539,15 @@ async function reconcilePurchases(
     fixture.purchases.map((purchase) => ({ fixture, purchase }))
   );
   const keys = purchases.map(({ purchase }) => purchase.idempotencyKey);
-  const { data: existing, error: readError } = await supabase
-    .from(TABLE.purchases)
-    .select("id, idempotency_key, user_id")
-    .in("idempotency_key", keys);
-  if (readError) throw new Error(`Reading purchases failed: ${readError.message}`);
-
-  const existingByKey = new Map(
-    ((existing ?? []) as { id: string; idempotency_key: string; user_id: string }[]).map(
-      (row) => [row.idempotency_key, row]
-    )
+  const existing = await selectIn<{ id: string; idempotency_key: string; user_id: string }>(
+    supabase,
+    TABLE.purchases,
+    "id, idempotency_key, user_id",
+    "idempotency_key",
+    keys
   );
+
+  const existingByKey = new Map(existing.map((row) => [row.idempotency_key, row]));
 
   const rows = purchases.map(({ fixture, purchase }) => {
     const userId = profileIds.get(fixture.email);
@@ -527,13 +628,17 @@ async function readFixtureRows(
   columns = "id, event_id, user_id"
 ) {
   if (userIds.length === 0 || eventIds.length === 0) return [];
-  const { data, error } = await supabase
-    .from(table)
-    .select(columns)
-    .in("user_id", userIds)
-    .in("event_id", eventIds);
-  if (error) throw new Error(`Reading ${table} failed: ${error.message}`);
-  return (data ?? []) as unknown as (EventUserRow & Record<string, unknown>)[];
+  const rows: (EventUserRow & Record<string, unknown>)[] = [];
+  for (const part of chunk(userIds)) {
+    const { data, error } = await supabase
+      .from(table)
+      .select(columns)
+      .in("user_id", part)
+      .in("event_id", eventIds);
+    if (error) throw new Error(`Reading ${table} failed: ${error.message}`);
+    rows.push(...((data ?? []) as unknown as (EventUserRow & Record<string, unknown>)[]));
+  }
+  return rows;
 }
 
 function fixtureRows<T>(
@@ -619,6 +724,9 @@ async function reconcileApplications(
           event_id: ids.eventId,
           offer_expires_at: registration.application.offerExpiresAt ?? null,
           status: registration.application.status,
+          // Written every run: left null, the database stamps the run time on
+          // anything past draft, and the review list's order would drift.
+          submitted_at: registration.application.submittedAt ?? null,
           user_id: ids.userId,
         }
       : null
@@ -648,16 +756,12 @@ async function reconcileApplications(
     );
     return desired && desired.status !== row.status;
   });
-  if (moved.length > 0) {
-    const { error } = await supabase
-      .from(TABLE.eventApplications)
-      .delete()
-      .in(
-        "id",
-        moved.map((row) => row.id)
-      );
-    if (error) throw new Error(`Resetting event applications failed: ${error.message}`);
-  }
+  await deleteByIds(
+    supabase,
+    TABLE.eventApplications,
+    moved.map((row) => row.id),
+    "event applications (reset)"
+  );
 
   const { data, error } = await supabase
     .from(TABLE.eventApplications)
@@ -678,16 +782,62 @@ async function reconcileApplications(
   };
 }
 
+/**
+ * The object key the app would give a file answer:
+ * `<user_info_id>/<application_id>/<question_id>/<file name>`, as
+ * `applicationFilePath` in src/lib/supabase-helpers/application-files.ts
+ * builds it. Storage policies read the first two segments, so the shape
+ * matters to who can open it.
+ */
+function applicationFilePath(
+  userId: string,
+  applicationId: string,
+  questionId: string,
+  fileName: string
+): string {
+  return [userId, applicationId, questionId, fileName].join("/");
+}
+
+/**
+ * Uploads each file once. An object already at its path is left alone: the
+ * path names the application, so the same path means the same answer.
+ */
+async function uploadApplicationFiles(
+  supabase: SupabaseClient,
+  files: { path: string; title: string }[]
+): Promise<Counts> {
+  const counts = emptyCounts();
+  for (const file of files) {
+    const { error } = await supabase.storage
+      .from(APPLICATION_FILES_BUCKET)
+      .upload(file.path, minimalPdf([file.title, "Seed fixture: a stand-in portfolio."]), {
+        contentType: "application/pdf",
+        upsert: false,
+      });
+    if (!error) {
+      counts.created += 1;
+    } else if (/exists|duplicate/i.test(error.message)) {
+      counts.updated += 1;
+    } else {
+      throw new Error(`Uploading application file "${file.path}" failed: ${error.message}`);
+    }
+  }
+  return counts;
+}
+
 async function reconcileResponses(
   supabase: SupabaseClient,
   fixtures: SeedUser[],
+  profileIds: Map<string, string>,
   applicationIds: Map<string, string>,
   dependencies: DependencyReferences
-): Promise<Counts> {
+): Promise<{ counts: Counts; files: Counts }> {
+  const uploads: { path: string; title: string }[] = [];
   const rows = fixtures.flatMap((fixture) =>
     fixture.registrations.flatMap((registration) => {
       const responses = Object.entries(registration.responses ?? {});
-      if (responses.length === 0) return [];
+      const files = Object.entries(registration.files ?? {});
+      if (responses.length === 0 && files.length === 0) return [];
 
       const applicationId = applicationIds.get(
         key(fixture.email, registration.eventSlug)
@@ -697,8 +847,7 @@ async function reconcileResponses(
           `No application ID found for "${fixture.email}" and "${registration.eventSlug}"`
         );
       }
-
-      return responses.map(([question, response]) => {
+      const questionIdOf = (question: string) => {
         const questionId = dependencies.questionIds.get(
           key(registration.eventSlug, question)
         );
@@ -707,41 +856,60 @@ async function reconcileResponses(
             `No question ID found for "${registration.eventSlug}" and "${question}"`
           );
         }
-        return {
-          application_id: applicationId,
-          event_application_question_id: questionId,
-          response,
-        };
+        return questionId;
+      };
+
+      const fileAnswers = files.map(([question, fileName]) => {
+        const path = applicationFilePath(
+          profileIds.get(fixture.email)!,
+          applicationId,
+          questionIdOf(question),
+          fileName
+        );
+        uploads.push({
+          path,
+          title: `${fixture.profile.first_name} ${fixture.profile.last_name} - Portfolio`,
+        });
+        return [question, path] as const;
       });
+
+      return [...responses, ...fileAnswers].map(([question, response]) => ({
+        application_id: applicationId,
+        event_application_question_id: questionIdOf(question),
+        response,
+      }));
     })
   );
 
-  if (rows.length === 0) return emptyCounts();
-  const applicationIdValues = [...new Set(rows.map((row) => row.application_id))];
-  const { data: existing, error: readError } = await supabase
-    .from(TABLE.eventApplicationResponses)
-    .select("event_application_question_id, application_id")
-    .in("application_id", applicationIdValues);
-  if (readError) {
-    throw new Error(`Reading application responses failed: ${readError.message}`);
-  }
+  if (rows.length === 0) return { counts: emptyCounts(), files: emptyCounts() };
+  const existing = await selectIn<{
+    event_application_question_id: string;
+    application_id: string;
+  }>(
+    supabase,
+    TABLE.eventApplicationResponses,
+    "event_application_question_id, application_id",
+    "application_id",
+    rows.map((row) => row.application_id),
+    "application responses"
+  );
 
   const existingKeys = new Set(
-    ((existing ?? []) as {
-      event_application_question_id: string;
-      application_id: string;
-    }[]).map((row) => key(row.event_application_question_id, row.application_id))
+    existing.map((row) => key(row.event_application_question_id, row.application_id))
   );
   const existingDesiredCount = rows.filter((row) =>
     existingKeys.has(key(row.event_application_question_id, row.application_id))
   ).length;
+
+  // Files first, so no answer ever names an object that isn't there.
+  const files = await uploadApplicationFiles(supabase, uploads);
 
   const { error } = await supabase.from(TABLE.eventApplicationResponses).upsert(rows, {
     onConflict: "event_application_question_id,application_id",
   });
   if (error) throw new Error(`Upserting application responses failed: ${error.message}`);
 
-  return countsFor(rows.length, existingDesiredCount);
+  return { counts: countsFor(rows.length, existingDesiredCount), files };
 }
 
 async function reconcileCheckIns(
@@ -781,18 +949,17 @@ async function reconcileCheckIns(
   );
 
   if (rows.length === 0) return emptyCounts();
-  const ticketIdValues = [...new Set(rows.map((row) => row.ticket_id))];
-  const { data: existing, error: readError } = await supabase
-    .from(TABLE.checkIns)
-    .select("check_in_session_id, ticket_id")
-    .in("ticket_id", ticketIdValues);
-  if (readError) throw new Error(`Reading check-ins failed: ${readError.message}`);
+  const existing = await selectIn<{ check_in_session_id: string; ticket_id: string }>(
+    supabase,
+    TABLE.checkIns,
+    "check_in_session_id, ticket_id",
+    "ticket_id",
+    rows.map((row) => row.ticket_id),
+    "check-ins"
+  );
 
   const existingKeys = new Set(
-    ((existing ?? []) as {
-      check_in_session_id: string;
-      ticket_id: string;
-    }[]).map((row) => key(row.check_in_session_id, row.ticket_id))
+    existing.map((row) => key(row.check_in_session_id, row.ticket_id))
   );
   const existingDesiredCount = rows.filter((row) =>
     existingKeys.has(key(row.check_in_session_id, row.ticket_id))
@@ -829,6 +996,17 @@ async function planDryRun(
     summary.tickets = createdCounts(totals.tickets);
     summary.applications = createdCounts(totals.applications);
     summary.responses = createdCounts(totals.responses);
+    summary.files = createdCounts(
+      fixtures.reduce(
+        (count, fixture) =>
+          count +
+          fixture.registrations.reduce(
+            (sum, registration) => sum + Object.keys(registration.files ?? {}).length,
+            0
+          ),
+        0
+      )
+    );
     summary.checkIns = createdCounts(totals.checkIns);
     return summary;
   }
@@ -838,17 +1016,14 @@ async function planDryRun(
   const purchaseKeys = fixtures.flatMap((fixture) =>
     fixture.purchases.map((purchase) => purchase.idempotencyKey)
   );
-  const purchaseResult = await supabase
-    .from(TABLE.purchases)
-    .select("idempotency_key")
-    .in("idempotency_key", purchaseKeys);
-  if (purchaseResult.error) {
-    throw new Error(`Reading purchases failed: ${purchaseResult.error.message}`);
-  }
-  summary.purchases = countsFor(
-    totals.purchases,
-    (purchaseResult.data ?? []).length
+  const purchaseRows = await selectIn<{ idempotency_key: string }>(
+    supabase,
+    TABLE.purchases,
+    "idempotency_key",
+    "idempotency_key",
+    purchaseKeys
   );
+  summary.purchases = countsFor(totals.purchases, purchaseRows.length);
 
   const userIds = [...profileIds.values()];
   const eventIds = [...dependencies.eventIds.values()];
@@ -881,41 +1056,35 @@ async function planDryRun(
     ).length
   );
 
-  const [responseResult, checkInResult] = await Promise.all([
-    applicationIds.size > 0
-      ? supabase
-          .from(TABLE.eventApplicationResponses)
-          .select("event_application_question_id, application_id")
-          .in("application_id", [...applicationIds.values()])
-      : Promise.resolve({ data: [], error: null }),
-    ticketIds.size > 0
-      ? supabase
-          .from(TABLE.checkIns)
-          .select("check_in_session_id, ticket_id")
-          .in("ticket_id", [...ticketIds.values()])
-      : Promise.resolve({ data: [], error: null }),
+  const [responseRows, checkInRows] = await Promise.all([
+    selectIn<{ event_application_question_id: string; application_id: string }>(
+      supabase,
+      TABLE.eventApplicationResponses,
+      "event_application_question_id, application_id",
+      "application_id",
+      [...applicationIds.values()],
+      "application responses"
+    ),
+    selectIn<{ check_in_session_id: string; ticket_id: string }>(
+      supabase,
+      TABLE.checkIns,
+      "check_in_session_id, ticket_id",
+      "ticket_id",
+      [...ticketIds.values()],
+      "check-ins"
+    ),
   ]);
-  if (responseResult.error) {
-    throw new Error(`Reading application responses failed: ${responseResult.error.message}`);
-  }
-  if (checkInResult.error) {
-    throw new Error(`Reading check-ins failed: ${checkInResult.error.message}`);
-  }
 
   const responseKeys = new Set(
-    ((responseResult.data ?? []) as {
-      event_application_question_id: string;
-      application_id: string;
-    }[]).map((row) => key(row.event_application_question_id, row.application_id))
+    responseRows.map((row) => key(row.event_application_question_id, row.application_id))
   );
   const checkInKeys = new Set(
-    ((checkInResult.data ?? []) as {
-      check_in_session_id: string;
-      ticket_id: string;
-    }[]).map((row) => key(row.check_in_session_id, row.ticket_id))
+    checkInRows.map((row) => key(row.check_in_session_id, row.ticket_id))
   );
 
   let existingResponses = 0;
+  let existingFiles = 0;
+  let totalFiles = 0;
   let existingCheckIns = 0;
   for (const fixture of fixtures) {
     for (const registration of fixture.registrations) {
@@ -923,12 +1092,15 @@ async function planDryRun(
       const applicationId = applicationIds.get(fixtureKey);
       const ticketId = ticketIds.get(fixtureKey);
 
-      for (const question of Object.keys(registration.responses ?? {})) {
+      for (const question of answeredQuestions(registration)) {
         const questionId = dependencies.questionIds.get(
           key(registration.eventSlug, question)
         );
+        const isFile = Boolean(registration.files?.[question]);
+        if (isFile) totalFiles += 1;
         if (questionId && applicationId && responseKeys.has(key(questionId, applicationId))) {
           existingResponses += 1;
+          if (isFile) existingFiles += 1;
         }
       }
       for (const session of Object.keys(registration.checkIns ?? {})) {
@@ -943,6 +1115,8 @@ async function planDryRun(
   }
 
   summary.responses = countsFor(totals.responses, existingResponses);
+  // A file whose answer is already written was uploaded with it.
+  summary.files = countsFor(totalFiles, existingFiles);
   summary.checkIns = countsFor(totals.checkIns, existingCheckIns);
   return summary;
 }
@@ -993,6 +1167,7 @@ export async function reconcileUserFixtures(
   const responses = await reconcileResponses(
     supabase,
     fixtures,
+    identity.profileIds,
     applications.applicationIds,
     dependencies
   );
@@ -1009,7 +1184,8 @@ export async function reconcileUserFixtures(
     purchases: purchases.counts,
     tickets: tickets.counts,
     applications: applications.counts,
-    responses,
+    responses: responses.counts,
+    files: responses.files,
     checkIns,
     profileIds: identity.profileIds,
   };
@@ -1020,6 +1196,7 @@ export interface UserPruneSummary {
   tickets: number;
   applications: number;
   responses: number;
+  files: number;
   checkIns: number;
 }
 
@@ -1029,6 +1206,7 @@ function emptyPruneSummary(): UserPruneSummary {
     tickets: 0,
     applications: 0,
     responses: 0,
+    files: 0,
     checkIns: 0,
   };
 }
@@ -1039,9 +1217,48 @@ async function deleteByIds(
   ids: string[],
   label: string
 ) {
-  if (ids.length === 0) return;
-  const { error } = await supabase.from(table).delete().in("id", ids);
-  if (error) throw new Error(`Deleting stale ${label} failed: ${error.message}`);
+  for (const part of chunk(ids)) {
+    const { error } = await supabase.from(table).delete().in("id", part);
+    if (error) throw new Error(`Deleting stale ${label} failed: ${error.message}`);
+  }
+}
+
+/**
+ * Every object in `application-files` under these accounts' folders. Keys are
+ * `<user>/<application>/<question>/<file>`, and Storage lists one level at a
+ * time, so this walks down three levels.
+ */
+async function listApplicationFiles(
+  supabase: SupabaseClient,
+  userIds: string[]
+): Promise<string[]> {
+  const bucket = supabase.storage.from(APPLICATION_FILES_BUCKET);
+  const list = async (prefix: string) => {
+    const { data, error } = await bucket.list(prefix, { limit: 1000 });
+    if (error) throw new Error(`Listing application files failed: ${error.message}`);
+    // Folders come back with a null id.
+    return (data ?? []).map((entry) => ({
+      path: `${prefix}/${entry.name}`,
+      isFolder: entry.id === null,
+    }));
+  };
+
+  let level = userIds;
+  for (let depth = 0; depth < 3; depth += 1) {
+    const entries = (await Promise.all(level.map(list))).flat();
+    level = entries.filter((entry) => entry.isFolder).map((entry) => entry.path);
+    if (depth === 2) {
+      return entries.filter((entry) => !entry.isFolder).map((entry) => entry.path);
+    }
+  }
+  return [];
+}
+
+async function removeApplicationFiles(supabase: SupabaseClient, paths: string[]) {
+  for (const part of chunk(paths, 100)) {
+    const { error } = await supabase.storage.from(APPLICATION_FILES_BUCKET).remove(part);
+    if (error) throw new Error(`Deleting application files failed: ${error.message}`);
+  }
 }
 
 /**
@@ -1102,14 +1319,8 @@ export async function pruneUserFixtures(
       })
     );
 
-  const readOwned = async (table: string) => {
-    const { data, error } = await supabase
-      .from(table)
-      .select("id, event_id, user_id")
-      .in("user_id", userIds);
-    if (error) throw new Error(`Reading ${table} failed: ${error.message}`);
-    return (data ?? []) as EventUserRow[];
-  };
+  const readOwned = (table: string) =>
+    selectIn<EventUserRow>(supabase, table, "id, event_id, user_id", "user_id", userIds);
 
   /* ── Tickets and applications ── */
   const [ticketRows, applicationRows] = await Promise.all([
@@ -1152,16 +1363,16 @@ export async function pruneUserFixtures(
     )
   );
 
-  const { data: purchaseRows, error: purchaseError } = await supabase
-    .from(TABLE.purchases)
-    .select("id, idempotency_key, user_id")
-    .in("user_id", userIds);
-  if (purchaseError) {
-    throw new Error(`Reading purchases failed: ${purchaseError.message}`);
-  }
+  const purchaseRows = await selectIn<{ id: string; idempotency_key: string }>(
+    supabase,
+    TABLE.purchases,
+    "id, idempotency_key, user_id",
+    "user_id",
+    userIds
+  );
 
   const purchasePlan = planPrune(
-    (purchaseRows ?? []) as { id: string; idempotency_key: string }[],
+    purchaseRows,
     (row) => row.idempotency_key,
     desiredPurchaseKeys
   );
@@ -1210,7 +1421,7 @@ export async function pruneUserFixtures(
       const applicationId = keptApplicationIds.get(fixtureKey);
       const ticketId = keptTicketIds.get(fixtureKey);
 
-      for (const question of Object.keys(registration.responses ?? {})) {
+      for (const question of answeredQuestions(registration)) {
         if (applicationId) desiredResponses.add(pruneKey(applicationId, question));
       }
       for (const session of Object.keys(registration.checkIns ?? {})) {
@@ -1221,39 +1432,35 @@ export async function pruneUserFixtures(
 
   const applicationIds = applicationPlan.keep.map((row) => row.id);
   const ticketIds = ticketPlan.keep.map((row) => row.id);
-  const [responseResult, checkInResult] = await Promise.all([
-    applicationIds.length > 0
-      ? supabase
-          .from(TABLE.eventApplicationResponses)
-          .select("id, application_id, event_application_questions(question)")
-          .in("application_id", applicationIds)
-      : Promise.resolve({ data: [], error: null }),
-    ticketIds.length > 0
-      ? supabase
-          .from(TABLE.checkIns)
-          .select("id, ticket_id, check_in_sessions(name)")
-          .in("ticket_id", ticketIds)
-      : Promise.resolve({ data: [], error: null }),
-  ]);
-  if (responseResult.error) {
-    throw new Error(`Reading application responses failed: ${responseResult.error.message}`);
-  }
-  if (checkInResult.error) {
-    throw new Error(`Reading check-ins failed: ${checkInResult.error.message}`);
-  }
-
   // Embedded selects come back typed as unknown to PostgREST's parser; the
   // shapes are asserted here rather than inferred.
-  const responseRows = (responseResult.data ?? []) as unknown as {
-    id: string;
-    application_id: string;
-    event_application_questions: { question: string } | null;
-  }[];
-  const checkInRows = (checkInResult.data ?? []) as unknown as {
-    id: string;
-    ticket_id: string;
-    check_in_sessions: { name: string } | null;
-  }[];
+  const [responseRows, checkInRows] = await Promise.all([
+    selectIn<{
+      id: string;
+      application_id: string;
+      response: string | null;
+      event_application_questions: { question: string; response_type: string } | null;
+    }>(
+      supabase,
+      TABLE.eventApplicationResponses,
+      "id, application_id, response, event_application_questions(question, response_type)",
+      "application_id",
+      applicationIds,
+      "application responses"
+    ),
+    selectIn<{
+      id: string;
+      ticket_id: string;
+      check_in_sessions: { name: string } | null;
+    }>(
+      supabase,
+      TABLE.checkIns,
+      "id, ticket_id, check_in_sessions(name)",
+      "ticket_id",
+      ticketIds,
+      "check-ins"
+    ),
+  ]);
 
   const responsePlan = planPrune(
     responseRows,
@@ -1272,7 +1479,25 @@ export async function pruneUserFixtures(
     desiredCheckIns
   );
 
+  /* ── Application files no kept answer names ──
+   * A file answer is the object's key, so anything under a fixture's folder
+   * that no surviving answer points at is left over: an application the run
+   * recreated or pruned, or a file uploaded through the app. */
+  const referencedFiles = new Set(
+    responsePlan.keep.flatMap((row) =>
+      row.event_application_questions?.response_type === "file_upload" && row.response
+        ? [row.response]
+        : []
+    )
+  );
+  const filePlan = planPrune(
+    await listApplicationFiles(supabase, userIds),
+    (path) => path,
+    referencedFiles
+  );
+
   summary.responses = responsePlan.remove.length;
+  summary.files = filePlan.remove.length;
   summary.checkIns = checkInPlan.remove.length;
 
   if (options.dryRun) return summary;
@@ -1283,6 +1508,10 @@ export async function pruneUserFixtures(
     responsePlan.remove.map((entry) => entry.row.id),
     "application responses"
   );
+  await removeApplicationFiles(
+    supabase,
+    filePlan.remove.map((entry) => entry.row)
+  );
   await deleteByIds(
     supabase,
     TABLE.checkIns,
@@ -1291,6 +1520,48 @@ export async function pruneUserFixtures(
   );
 
   return summary;
+}
+
+/**
+ * Deletes crowd accounts `data/crowd.ts` no longer lists, with everything they
+ * hold. Only rows on a crowd domain with no Auth user are candidates: one
+ * somebody signed up with has stopped being the seed's (the reconcile refuses
+ * to write it, too).
+ *
+ * Tickets and applications are `no action` on `user_info`, so they go first;
+ * their check-ins and answers cascade, as do purchases off the profile.
+ */
+export async function pruneCrowdProfiles(
+  supabase: SupabaseClient,
+  crowdEmails: readonly string[],
+  options: { dryRun: boolean }
+): Promise<number> {
+  const { data, error } = await supabase
+    .from(TABLE.userInfo)
+    .select("id, email, auth_user_id")
+    .or(CROWD_EMAIL_DOMAINS.map((domain) => `email.like.*@${domain}`).join(","));
+  if (error) throw new Error(`Reading crowd profiles failed: ${error.message}`);
+
+  const plan = planPrune(
+    ((data ?? []) as ProfileRow[]).filter((row) => row.auth_user_id === null),
+    (row) => row.email.trim().toLowerCase(),
+    crowdEmails
+  );
+  const ids = plan.remove.map((entry) => entry.row.id);
+  if (ids.length === 0 || options.dryRun) return ids.length;
+
+  await removeApplicationFiles(supabase, await listApplicationFiles(supabase, ids));
+  await releaseReviewNotesBy(supabase, ids);
+  for (const table of [TABLE.eventTickets, TABLE.eventApplications]) {
+    for (const part of chunk(ids)) {
+      const { error: deleteError } = await supabase.from(table).delete().in("user_id", part);
+      if (deleteError) {
+        throw new Error(`Deleting crowd ${table} failed: ${deleteError.message}`);
+      }
+    }
+  }
+  await deleteByIds(supabase, TABLE.userInfo, ids, "crowd profiles");
+  return ids.length;
 }
 
 /**
@@ -1361,6 +1632,10 @@ export async function removeRetiredFixtures(
         );
       }
     }
+
+    // Reviewer notes are `no action` on their author: a real account is
+    // anonymised, never deleted, so its notes stay. A fixture leaves nothing.
+    await releaseReviewNotesBy(supabase, profileIds);
 
     // `app_settings.updated_by` records who last moved the membership term
     // date. It is attribution, not data anyone depends on, and the reference is

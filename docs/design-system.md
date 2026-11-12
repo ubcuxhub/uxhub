@@ -103,21 +103,25 @@ Status (always text on its own background, always with a word):
 One family, **DM Sans**, weights 400/500/600, 13 text styles; every line
 height on the 4px grid.
 
-| Token | Size / line | Weight | Use |
-| --- | --- | --- | --- |
-| `header-1` | 32 / 40 | 600 | Sign-in heading, member home greeting |
-| `header-2` | 24 / 32 | 600 | Page titles, timeline months |
-| `header-3` | 20 / 28 | 600 | Page sections, dialog titles |
-| `subheading` | 18 / 26 | 500 | Card and panel titles |
-| `body` | 16 / 24 | 400 | Copy, inputs, sidebar items |
-| `body-medium` | 16 / 24 | 500 | Form labels, emphasis |
-| `body-small` | 14 / 20 | 400 | Metadata, helper text |
-| `table-text` | 14 / 20 | 400 | Table cells |
-| `table-heading` | 16 / 24 | 500 | Column headings |
-| `button` | 16 / 24 | 500 | Button labels |
-| `button-small` | 14 / 20 | 500 | Small buttons |
-| `label` | 13 / 18 | 500 | Chips, tags, counts, sidebar group labels |
-| `status-label` | 12 / 16 | 500 | Status badges |
+| Token | Class | Size / line | Weight | Use |
+| --- | --- | --- | --- | --- |
+| `header-1` | `text-h1` | 32 / 40 | 600 | Sign-in heading, member home greeting |
+| `header-2` | `text-h2` | 24 / 32 | 600 | Page titles, timeline months |
+| `header-3` | `text-h3` | 20 / 28 | 600 | Page sections, dialog titles |
+| `subheading` | `text-subheading` | 18 / 26 | 500 | Card and panel titles |
+| `body` | `text-body` | 16 / 24 | 400 | Copy, inputs, sidebar items |
+| `body-medium` | `text-body-medium` | 16 / 24 | 500 | Form labels, emphasis |
+| `body-small` | `text-small` | 14 / 20 | 400 | Metadata, helper text |
+| `table-text` | `text-table` | 14 / 20 | 400 | Table cells |
+| `table-heading` | `text-table-heading` | 16 / 24 | 500 | Column headings |
+| `button` | `text-button` | 16 / 24 | 500 | Button labels |
+| `button-small` | `text-button-small` | 14 / 20 | 500 | Small buttons |
+| `label` | `text-label` | 13 / 18 | 500 | Chips, tags, counts, sidebar group labels |
+| `status-label` | `text-badge` | 12 / 16 | 500 | Status badges |
+
+The token names are the Figma style names; code uses the class column (keys in
+`src/app/globals.css`). Figma's extra weight styles have no class of their own:
+add a weight, e.g. `text-small font-medium`, `text-body font-semibold`.
 
 No all caps or letter-spacing anywhere. Marketing only: `display-xl` 56/64 and
 `display-lg` 40/48, never in the portal.
@@ -134,15 +138,18 @@ No all caps or letter-spacing anywhere. Marketing only: `display-xl` 56/64 and
   starts 40px from the top. Page actions like Publish sit in the title row,
   never above it. No header bar fills the space. Sidebar-less screens (Sign in)
   centre content.
-- Side peek drawer top bars start at 40px too. Dialogs centre but stay ≥40px
-  from the top; taller ones scroll inside.
+- Side peek drawer top bars (and a record's full page, which uses the same
+  bar) start at 40px too from `sm` up; on phones the bar is compact (12px).
+  Dialogs centre but stay ≥40px from the top; taller ones scroll inside.
 - Content blocks span whole columns. Tables scroll sideways inside their card
   on small screens.
 
 ### 2.4 Spacing and density
 
 4px scale: `space-1` 4, `-2` 8, `-3` 12, `-4` 16, `-5` 20, `-6` 24, `-8` 32,
-`-10` 40, `-12` 48, `-16` 64 (CSS `--space-*`).
+`-10` 40, `-12` 48, `-16` 64. Code uses Tailwind's spacing scale, which has
+the same values (`space/4` → `gap-4`, `p-4`); there are no `--space-*`
+variables.
 
 | Density | Where | `size-control` | `size-table-row` | `size-nav-row` |
 | --- | --- | --- | --- | --- |
@@ -169,8 +176,12 @@ Everything clickable or typeable is a pill; containers soften as they grow.
 | `radius-4xl` | 32 | Hero media |
 | `radius-full` | 999 | Buttons, inputs, chips, tabs, avatars, badges, tags |
 
-Stroke: `thin` 1px (default borders), `medium` 1.5px (emphasized outlines,
-all icons), `thick` 2px (focus rings, selected states).
+Code uses Tailwind's default `rounded-*` classes, which have the same values
+(`radius-xl` → `rounded-xl`); there are no `--radius-*` variables.
+
+Stroke: `thin` 1px (default borders, `border`), `medium` 1.5px (emphasized
+outlines, all icons, `border-[1.5px]`), `thick` 2px (focus rings, selected
+states, `border-2`; focus rings use the `focus-ring` utility).
 
 ### 2.6 Elevation
 
@@ -190,9 +201,25 @@ Never stronger, no coloured shadows, glows or neon focus.
 
 Lucide (`lucide-static` 1.55.0; `lucide-react` in code), 1.5px stroke.
 
-- **Sizes:** 16px beside 16px text (8px gap, centred); 14px beside small text.
+- **Sizes:** two, and nothing between. **20px (`size-5`) for app chrome:** the
+  sidebar nav (12px gap) and its trigger, the side peek drawer and record page
+  top bar (close, expand, collapse), empty-state icons, large placeholder or
+  illustrative icons (ImageUpload, the EventCard no-image calendar), the
+  builder's section navigator status marks, and the ConfirmDialog title icon
+  and SettingsDialog list chevron on phones. **16px (`size-4`) for everything
+  else:** beside text of any size (8px gap, centred), in buttons of every size
+  (including `sm` and `icon-sm`), badges, menus, fields, inline status icons,
+  stat cards, the calendar caption, Ticket. There is no 14px or 24px icon.
   Icon-only buttons are 28–32px circles with a `border-subtle` edge, an
-  accessible label and a tooltip.
+  accessible label and a tooltip; their icon is 16px, 20px only in the chrome
+  above.
+- **Exception:** a glyph inside a small mark scales with the mark: the switch
+  thumb check, avatar fallback icons, toast status dots, and the remove × in a
+  searchable-dropdown chip or a colour-picker swatch. Non-icon `size-*` uses
+  (decorative circles, thumbs, spinners, boxes) are not icons.
+- **In code:** a container sets the default (`[&_svg:not([class*='size-'])]:size-4`
+  in Button and Badge, the shadcn pattern), so an icon's own `size-*` class
+  always wins. A plain `[&_svg]:size-*` on a container would out-specify it.
 - **Colour:** `text-secondary` by default; status colour inside badges.
 - Decorative icons have no hover/pointer and are hidden from screen readers.
 - No emoji. No brand icons: use the company's own logo file (e.g. LinkedIn).
@@ -217,6 +244,25 @@ One curve, ease-out `cubic-bezier(0, 0, 0.2, 1)`; never linear or bounce.
 
 Reduced motion keeps only fades. Cards never lift. Buttons show progress in
 place; content loads into shaped skeletons.
+
+**Ambient brand motion.** The one place motion is decoration rather than
+feedback: the auth shell's brand panel (`BrandMotion`, used on sign-in,
+sign-up, password reset and setup).
+
+- **Decorative only:** `aria-hidden`, no pointer events, never carries
+  information or blocks a control.
+- **Once:** the shape tiles fall and settle a single time when the shell
+  mounts (about 2s, staggered) on the ease-out curve, with no overshoot or
+  bounce, and never loop or replay while the member moves between auth
+  screens. After that, only a slow sway of a few pixels and about a degree
+  (ease-in-out, 9–14s cycles, since it never starts or stops).
+- **Cursor glow** only for a fine, hovering pointer (`(hover: hover) and
+  (pointer: fine)`); nothing on touch.
+- **Cheap:** `transform` and `opacity` only; paused while the tab is hidden.
+- **Reduced motion** shows the finished still frame: settled tiles, no sway,
+  no glow.
+- **Never behind text the member is reading:** it lives in the brand panel
+  only; below `lg` the panel becomes a static header with no motion.
 
 ### 2.9 Writing and terminology
 
@@ -295,14 +341,16 @@ classes use one shadcn-style vocabulary and follow the table below.
 | Colour Primitives | Value | 49 raw colours in Figma (`--colour-<hue>-<step>`): neutral, blue, purple, green, yellow, red, dark. Hide from publishing |
 | Colour Tokens | Light, Dark | 36 semantic tokens, each aliasing a primitive; `overlay/scrim` is raw |
 | Radius Tokens | Value | `radius/none` … `radius/full` |
-| Stroke Tokens | Value | `thickness/thin`, `medium`, `thick` (`--stroke-thickness-*`) |
+| Stroke Tokens | Value | `thickness/thin`, `medium`, `thick` (classes `border`, `border-[1.5px]`, `border-2`) |
 | Spacing Tokens | Value | `space/1` … `space/16` |
 | Density | Comfortable, Compact | `size/control`, `size/table-row`, `size/nav-row` |
 | Icon colour | 10 modes | `icon/colour` → text and status tokens per mode |
 
-Text styles map to classes (`Headers/Header 1` → `.header-1`, …,
-`Badge/Labels/Status Label` → `.status-label`). Effect style `Shadow/Overlay` →
-`--shadow-overlay`.
+Text styles map to the classes in the 2.2 table (`Headers/Header 1` →
+`text-h1`, `Body/Small Body` → `text-small`, `Badge/Labels/Status Label` →
+`text-badge`). Effect style `Shadow/Overlay` → `--shadow-overlay`. Radius,
+Spacing and Stroke map to Tailwind's default classes (2.4, 2.5); only the
+Density variables exist in CSS, used as `h-(--size-control)`.
 
 Rules: bind every fill, stroke, radius, gap and padding to a variable (a raw
 hex or typed number is a bug); screens use Colour Tokens only.
@@ -462,13 +510,13 @@ Badges report state (not clickable); chips filter a list and toggle.
 | Not selected | neutral | Not accepted this time |
 | Past | neutral | Event has ended |
 
-Every badge has a 14px icon and a label; one badge per item (current status
+Every badge has a 16px icon and a label; one badge per item (current status
 only). Sizes Default and Large. FilterChips (optional count, Selected, Disabled)
 combine, sit above the list in one row with any Select.
 
 **Student event-card badge decision (to sync to Figma):** Use the exact labels
 from [event-states.md](event-states.md), with the existing status tones and a
-14px Lucide icon. Dates in badge labels use the short Pacific form shown below;
+16px Lucide icon. Dates in badge labels use the short Pacific form shown below;
 the date is part of the label, not a separate badge. This is a display mapping,
 not a new stored event or application status. It supersedes `Pending` and
 `Accepted` as *student event-card* labels; the nine-badge table above remains a
@@ -500,7 +548,7 @@ and error meanings for the other rows.
   Events); admins also see Admin (Dashboard, Manage Events, Manage Users,
   Change Log). Profile, Log Out, Collapse Sidebar at the bottom. Selected item:
   `background-surface-subtle` at `radius-md`, no underline, bar or bold-only.
-  16px icon in `text-secondary`, 8px gap. Group labels use `label`, sentence
+  20px icon in `text-secondary`, 12px gap. Group labels use `label`, sentence
   case.
 - **Tabs:** sections of one object (Overview, Registrations 128, Teams 32,
   Judges); counts in `text-secondary`.
@@ -619,8 +667,29 @@ scrolls there and closes. Enter/Space opens, arrows move, Esc returns focus.
   over the page at 560px; the row stays highlighted; the table stays
   scrollable; another row swaps the content. Doesn't dim the page (use a Dialog
   when a decision is required).
-- Top bar at 40px: double-chevron close first (tooltip names action and
-  shortcut; Esc closes), "Open as full page" (own page with back pill).
+- The drawer is the record's URL: the list is the route's layout, so a refresh
+  shows the list with the drawer open. Close (chevron, Esc, browser Back)
+  returns to the list.
+- Top bar at 40px (12px on phones) with 20px icons (§2.7): double-chevron
+  close first (tooltip names action and shortcut); the record's actions on the
+  right (Edit user, Edit event).
+- Users open only in the drawer: no full page, no expand. An event's "Edit
+  event", and the expand button beside close ("Open as full page"), open its
+  builder, a full page that keeps the portal's page width and margins and
+  wears the same top bar in place of a back pill: close returns to the list
+  (tooltip names it), collapse ("Collapse to drawer") to the list with the
+  event's drawer open. The builder's unsaved-changes guard asks before either.
+  Below `sm` the drawer fills the screen and the page shows close only, and on
+  phones the builder hides the app header, as the drawer covers it.
+- Expand (and "Edit event") and collapse are one panel resizing: the drawer
+  grows leftward into the builder's page, or the page shrinks back into the
+  drawer, the two cross-fading inside it, while the list fades out or in
+  behind (200ms ease-out, §2.8). It is a React `<ViewTransition>` pair
+  (`RecordFrame` ↔ `RecordPage`, list in `RecordList`), switched on only by
+  those links' transition types: opening from a row still slides in, close
+  slides out, swapping records doesn't animate, and close from the builder
+  is instant. No morph on phones, with reduced motion, or without View
+  Transitions support; the page swaps instantly there.
 - Viewing: label/value text rows, not disabled inputs. Editing: fields with a
   pinned Cancel / Save changes footer; closing with unsaved changes asks first.
 - Profile header: name in 24/32 with verified icon and pronouns. Interests are
@@ -842,11 +911,30 @@ Organization lead), and Patterns parts (`Ticket`, `Hubbo/Placeholder`,
   `text-secondary`.
 - `text/secondary` and `text/muted` are duplicate aliases in both modes, as
   are `background/default` and `background/surface-default`.
-- The Figma page says there are 49 colour primitives; the committed primitive
-  token sheet contains 48.
+- Figma has 49 colour primitives and code has 48: the extra one is
+  `neutral/500`, which Radio, ColourSwatch, ImageUpload and SectionNavigator
+  bind directly instead of a token. The 2.11 page's own primitive table lists
+  only 32.
 - 1.1 says 3.10–3.16 are drawings not yet in the library, but the Library page
   already has components for all of them.
 - 4.3 still marks the missed-confirmation outcome as TBD in Figma; §3.3 now
   resolves its student badge as Offer expired and needs syncing to Figma.
-- Open placeholders: email templates (4.3), Hubbo illustrations, illustrator
-  name and master-file link (5.2).
+- Open placeholders: email templates (4.3), illustrator name and master-file
+  link (5.2). The Hubbo emotion artwork is drawn; 5.2 still marks it [WIP].
+- Every variable's **Code syntax → Web** shows `var(--…)` instead of the class
+  in the 2.11 table, and Radius, Spacing and Stroke point at `--radius-*`,
+  `--space-*` and `--stroke-thickness-*`, which code doesn't define.
+- Text style descriptions name `.header-1`-style classes that don't exist; the
+  classes are in the 2.2 table.
+- Hover fills use `background/surface-hover` (1.02:1 on white, invisible) or
+  `background/secondary`. Code uses `surface-subtle` (`bg-muted`) for hover and
+  `border-subtle` for pressed (`src/components/ui/button.tsx`).
+- StatusBadge lacks the five student labels code ships (§3.3). IconButton is
+  drawn at 40px (code and its own description: 32px), Toast has an Info tone
+  code can't render, Button lacks Ghost, and the Link label is black (code:
+  `text-info-foreground`).
+- **Figma follow-ups for the two-size icon scale (§2.7):** badge icons 14 to
+  16; small and icon-sm button icons 14 to 16; sidebar nav icons 16 to 20; the
+  side peek drawer and record page top bar icons 20; the 24px and 18px icons
+  (ConfirmDialog title on phones, image upload and event-card placeholders,
+  section navigator marks) redrawn at 16 or 20.

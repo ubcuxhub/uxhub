@@ -3,8 +3,13 @@
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
-import { Field, FieldError, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from "@/components/ui/field";
+import { PasswordInput } from "@/components/ui/password-input";
 import { withDeadline } from "@/lib/async/deadline";
 import { useNavigationRecovery } from "@/hooks/use-navigation-recovery";
 import { createClient } from "@/lib/supabase/client";
@@ -13,15 +18,25 @@ import {
   AUTH_ACTION_ERRORS,
   getAuthActionErrorMessage,
 } from "../auth-errors";
+import {
+  PASSWORD_HINT,
+  PASSWORD_TOO_SHORT_ERROR,
+  isPasswordLongEnough,
+} from "../password-rules";
 import { AuthPanel } from "./AuthPanel";
 import { AuthSubmitButton } from "./AuthSubmitButton";
 
 export function UpdatePasswordForm({
+  email,
   className,
   ...props
-}: React.ComponentPropsWithoutRef<"div">) {
+}: React.ComponentPropsWithoutRef<"div"> & {
+  /** The account being recovered, from the recovery session. */
+  email?: string;
+}) {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const submittingRef = useRef(false);
   const router = useRouter();
@@ -37,10 +52,17 @@ export function UpdatePasswordForm({
     e.preventDefault();
     if (submittingRef.current) return;
 
+    setError(null);
+
+    if (!isPasswordLongEnough(password)) {
+      setPasswordError(PASSWORD_TOO_SHORT_ERROR);
+      return;
+    }
+    setPasswordError(null);
+
     const supabase = createClient();
     submittingRef.current = true;
     setIsLoading(true);
-    setError(null);
     let navigationStarted = false;
 
     try {
@@ -53,9 +75,13 @@ export function UpdatePasswordForm({
       navigationStarted = true;
       recoverStalledNavigation();
     } catch (error: unknown) {
-      setError(
-        getAuthActionErrorMessage(error, AUTH_ACTION_ERRORS.passwordUpdate),
-      );
+      if ((error as { code?: unknown } | null)?.code === "weak_password") {
+        setPasswordError(PASSWORD_TOO_SHORT_ERROR);
+      } else {
+        setError(
+          getAuthActionErrorMessage(error, AUTH_ACTION_ERRORS.passwordUpdate),
+        );
+      }
     } finally {
       if (!navigationStarted) {
         submittingRef.current = false;
@@ -66,30 +92,43 @@ export function UpdatePasswordForm({
 
   return (
     <AuthPanel
-      title="Reset your password"
-      description="Please enter your new password below."
+      title="Set a new password"
+      description={
+        <>
+          Choose a new password for{" "}
+          {email ? (
+            <strong className="font-medium text-foreground">{email}</strong>
+          ) : (
+            "your account"
+          )}
+          . You&rsquo;ll be signed in once it&rsquo;s saved.
+        </>
+      }
       className={className}
       {...props}
     >
-      <form onSubmit={handleUpdatePassword} className="space-y-6">
-        <Field>
-          <FieldLabel htmlFor="password">
-            New password
-          </FieldLabel>
-          <Input
+      <form onSubmit={handleUpdatePassword} className="flex flex-col gap-6">
+        <Field data-invalid={passwordError ? true : undefined}>
+          <FieldLabel htmlFor="password">New password</FieldLabel>
+          <PasswordInput
             id="password"
-            type="password"
-            placeholder="Enter your new password"
+            autoComplete="new-password"
             required
+            aria-invalid={passwordError ? true : undefined}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
+          {passwordError ? (
+            <FieldError>{passwordError}</FieldError>
+          ) : (
+            <FieldDescription>{PASSWORD_HINT}</FieldDescription>
+          )}
         </Field>
 
         {error ? <FieldError>{error}</FieldError> : null}
 
-        <AuthSubmitButton type="submit" disabled={isLoading}>
-          {isLoading ? "Saving..." : "Save new password"}
+        <AuthSubmitButton type="submit" loading={isLoading}>
+          Save password
         </AuthSubmitButton>
       </form>
     </AuthPanel>

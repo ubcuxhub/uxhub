@@ -51,8 +51,33 @@ describe("ForgotPasswordForm", () => {
     );
     expect(routerMocks.push).toHaveBeenCalledWith("/auth/check-email");
     expect(
-      (screen.getByRole("button", { name: "Sending..." }) as HTMLButtonElement)
+      (screen.getByRole("button", { name: "Send reset link" }) as HTMLButtonElement)
         .disabled,
     ).toBe(true);
+  });
+
+  it("starts with the email carried over from Sign in", () => {
+    sessionStorage.setItem("uxhub-pending-auth-email", "carried@example.com");
+    render(<ForgotPasswordForm />);
+
+    expect(
+      (screen.getByLabelText("Email") as HTMLInputElement).value,
+    ).toBe("carried@example.com");
+  });
+
+  it("names an invalid address on the field without calling Supabase", async () => {
+    render(<ForgotPasswordForm />);
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "jamie.lee@gmail" },
+    });
+
+    await act(async () => {
+      fireEvent.submit(
+        screen.getByRole("button", { name: "Send reset link" }),
+      );
+    });
+
+    expect(screen.getByText("Enter a valid email address.")).toBeTruthy();
+    expect(authMocks.resetPasswordForEmail).not.toHaveBeenCalled();
   });
 });

@@ -32,6 +32,9 @@ const checkIns = vi.hoisted(() => ({
 const applications = vi.hoisted(() => ({
   updateEventApplication: vi.fn(),
 }));
+const applicationFiles = vi.hoisted(() => ({
+  removeApplicationFiles: vi.fn(),
+}));
 const eventPeople = vi.hoisted(() => ({
   saveMentor: vi.fn(),
   saveSponsor: vi.fn(),
@@ -52,6 +55,7 @@ vi.mock("@/lib/supabase-helpers/admin-server", () => adminServer);
 vi.mock("@/lib/supabase-helpers/events", () => events);
 vi.mock("@/lib/supabase-helpers/check-ins", () => checkIns);
 vi.mock("@/lib/supabase-helpers/event-applications", () => applications);
+vi.mock("@/lib/supabase-helpers/application-files", () => applicationFiles);
 vi.mock("@/lib/supabase-helpers/event-people", () => eventPeople);
 vi.mock("@/lib/supabase/admin", () => ({ supabaseAdmin: { rpc: adminRpc } }));
 vi.mock("@/lib/supabase/server", () => ({
@@ -133,7 +137,7 @@ describe("updateManagerUserAction: the column allowlist", () => {
     expect(adminServer.adminUpdateUserInfoById).toHaveBeenCalledWith("user-1", {
       [field]: "value",
     });
-    expect(revalidatePath).toHaveBeenCalledWith("/admin/users");
+    expect(revalidatePath).toHaveBeenCalledWith("/admin/users", "layout");
   });
 
   it("maps the form's order_date onto the deprecated column", async () => {
@@ -229,7 +233,7 @@ describe("updateUserRoleAction: the role check", () => {
         p_target_user_id: "user-1",
         p_role: role,
       });
-      expect(revalidatePath).toHaveBeenCalledWith("/admin/users");
+      expect(revalidatePath).toHaveBeenCalledWith("/admin/users", "layout");
     },
   );
 
@@ -351,6 +355,8 @@ describe("saveAdminEventAction", () => {
   it.each(["2099-08-01T18:00:00.000Z", null])("saves the publish schedule %s", async (publish_at) => {
     await saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, status: "draft", publish_at } });
     expect(adminRpc.mock.calls[0][1].p_event.publish_at).toBe(publish_at);
+    // The list, and the overview (drawer and page) and builder beneath it.
+    expect(revalidatePath).toHaveBeenCalledWith("/admin/events", "layout");
     expect(revalidatePath).toHaveBeenCalledWith("/events", "layout");
   });
 
@@ -424,6 +430,78 @@ describe("saveAdminEventAction", () => {
     ).rejects.toThrow(/cover image was changed somewhere else/);
   });
 
+  it("returns the session and question ids the save gave, in the order sent", async () => {
+    adminRpc.mockResolvedValue({
+      data: {
+        id: "event-1",
+        check_in_session_ids: ["s-1"],
+        question_ids: ["q-1", "q-2"],
+        removed_files: [],
+      },
+      error: null,
+    });
+
+    await expect(
+      saveAdminEventAction({ ...saveInput, eventId: "event-1" }),
+    ).resolves.toEqual({
+      id: "event-1",
+      checkInSessionIds: ["s-1"],
+      questionIds: ["q-1", "q-2"],
+    });
+    expect(applicationFiles.removeApplicationFiles).not.toHaveBeenCalled();
+  });
+
+  it("returns a refused question change as a message for the admin", async () => {
+    const message =
+      '"Why?" has answers on submitted applications, so it cannot be removed.';
+    adminRpc.mockResolvedValue({
+      data: null,
+      error: { message, hint: "APPLICATION_QUESTIONS_CONFLICT" },
+    });
+
+    await expect(
+      saveAdminEventAction({ ...saveInput, eventId: "event-1" }),
+    ).resolves.toEqual({ error: message });
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("returns a refused check-in session change as a message for the admin", async () => {
+    const message =
+      'Attendees have already checked in to "Doors", so it cannot be removed.';
+    adminRpc.mockResolvedValue({
+      data: null,
+      error: { message, hint: "CHECK_IN_SESSIONS_CONFLICT" },
+    });
+
+    await expect(
+      saveAdminEventAction({ ...saveInput, eventId: "event-1" }),
+    ).resolves.toEqual({ error: message });
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("removes the files of removed questions, and keeps the save if that fails", async () => {
+    adminRpc.mockResolvedValue({
+      data: { id: "event-1", question_ids: [], removed_files: ["u/a/q/cv.pdf"] },
+      error: null,
+    });
+    applicationFiles.removeApplicationFiles.mockRejectedValue(
+      new Error("storage down"),
+    );
+    const consoleLog = vi
+      .spyOn(console, "log")
+      .mockImplementation(() => undefined);
+
+    await expect(
+      saveAdminEventAction({ ...saveInput, eventId: "event-1" }),
+    ).resolves.toEqual({ id: "event-1", checkInSessionIds: [], questionIds: [] });
+    expect(applicationFiles.removeApplicationFiles).toHaveBeenCalledWith(
+      expect.anything(),
+      ["u/a/q/cv.pdf"],
+    );
+
+    consoleLog.mockRestore();
+  });
+
   it("passes through an unrelated database error", async () => {
     const failure = new Error("null value in column");
     adminRpc.mockResolvedValue({ data: null, error: failure });
@@ -489,7 +567,7 @@ describe("saveAdminEventAction", () => {
         expectedImageUrl: "https://store/old.png",
         event: { name: "Design Sprint", image_url: "https://store/new.png" },
       }),
-    ).resolves.toEqual({ id: "event-1" });
+    ).resolves.toEqual({ id: "event-1", checkInSessionIds: [], questionIds: [] });
 
     consoleError.mockRestore();
   });
@@ -523,7 +601,7 @@ describe("deleteAdminEventAction", () => {
     expect(adminServer.adminDeleteEventImageByUrl).toHaveBeenCalledWith(
       "https://store/cover.png",
     );
-    expect(revalidatePath).toHaveBeenCalledWith("/admin/events");
+    expect(revalidatePath).toHaveBeenCalledWith("/admin/events", "layout");
   });
 
   it("keeps the image when the delete fails", async () => {
@@ -850,6 +928,23 @@ describe("fetchAdminCheckInSnapshotAction", () => {
 
 describe("updateApplicationDecisionAction", () => {
   const tomorrow = () => new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+  beforeEach(() => {
+    applications.updateEventApplication.mockImplementation(
+      async (_client: unknown, id: string, update: object) => ({ id, ...update }),
+    );
+  });
+
+  it("refuses to report a draft as decided", async () => {
+    applications.updateEventApplication.mockResolvedValue({
+      id: "application-1",
+      status: "draft",
+    });
+
+    await expect(
+      updateApplicationDecisionAction("application-1", "reject", null),
+    ).rejects.toThrow("A draft application cannot be decided.");
+  });
 
   it("accepts with the offer deadline", async () => {
     const deadline = tomorrow();

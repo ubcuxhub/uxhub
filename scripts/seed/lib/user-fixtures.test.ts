@@ -3,31 +3,38 @@ import { describe, expect, it } from "vitest";
 import { membershipTypes } from "../data/membership-types.ts";
 import { buildSeedEvents } from "../data/events.ts";
 import { buildSeedUsers, SEED_PASSWORD } from "../data/users.ts";
+import { buildSeedCrowd, isCrowdEmail } from "../data/crowd.ts";
 import {
   classifySeedEvent,
   getUserFixtureTotals,
+  isActiveSeedMember,
   validateUserFixtures,
 } from "./user-fixtures.ts";
 
 const fixedNow = new Date("2026-07-31T19:00:00.000Z");
 const seedEvents = buildSeedEvents(fixedNow);
 const seedUsers = buildSeedUsers(seedEvents, fixedNow);
+const crowd = buildSeedCrowd(seedEvents, fixedNow);
+const everyone = [...seedUsers, ...crowd];
 
 describe("user seed fixtures", () => {
   it("reference valid memberships, events, questions, sessions, and purchases", () => {
     expect(() =>
       validateUserFixtures(seedUsers, seedEvents, membershipTypes, fixedNow)
     ).not.toThrow();
+    expect(() =>
+      validateUserFixtures(everyone, seedEvents, membershipTypes, fixedNow)
+    ).not.toThrow();
   });
 
   it("reports the representative dataset totals", () => {
     expect(getUserFixtureTotals(seedUsers)).toEqual({
-      authUsers: 11,
-      profiles: 11,
+      authUsers: 12,
+      profiles: 12,
       purchases: 18,
-      tickets: 11,
-      applications: 5,
-      responses: 22,
+      tickets: 12,
+      applications: 6,
+      responses: 27,
       checkIns: 6,
     });
   });
@@ -50,8 +57,26 @@ describe("user seed fixtures", () => {
         "none/basic",
         "none/admin",
         "none/manager",
+        "none/basic",
       ].sort()
     );
+  });
+
+  it("leaves member setup unfinished for the new-member fixture only", () => {
+    const unfinished = seedUsers.filter(
+      (user) => (user.profile.setup_step ?? "about") !== "done"
+    );
+
+    expect(unfinished.map((user) => user.email)).toEqual([
+      "new-member@example.com",
+    ]);
+    expect(unfinished[0].profile.setup_step).toBe("about");
+  });
+
+  it("leaves \"What best describes you?\" unanswered for the new-member fixture only", () => {
+    const unanswered = seedUsers.filter((user) => !user.profile.user_type_confirmed_at);
+
+    expect(unanswered.map((user) => user.email)).toEqual(["new-member@example.com"]);
   });
 
   it("reaches every user type", () => {
@@ -64,7 +89,7 @@ describe("user seed fixtures", () => {
     for (const user of seedUsers) {
       expect(user.password).toBe(SEED_PASSWORD);
       // Supabase enforces minimum_password_length = 6 (supabase/config.toml).
-      expect(user.password.length).toBeGreaterThanOrEqual(6);
+      expect(user.password?.length).toBeGreaterThanOrEqual(6);
     }
   });
 
@@ -98,6 +123,33 @@ describe("user seed fixtures", () => {
     }
   });
 
+  it("lets only a draft leave required questions unanswered", () => {
+    const draft = seedUsers
+      .flatMap((user) => user.registrations)
+      .find((registration) => registration.application?.status === "draft");
+    expect(draft?.eventSlug).toBe("uxathon-upcoming");
+
+    const submitted = structuredClone(seedUsers);
+    submitted
+      .flatMap((user) => user.registrations)
+      .find((registration) => registration.application?.status === "draft")!
+      .application = { status: "submitted", submittedAt: fixedNow.toISOString() };
+    expect(() =>
+      validateUserFixtures(submitted, seedEvents, membershipTypes, fixedNow)
+    ).toThrow("is missing required response");
+  });
+
+  it("checks each option of a checkbox answer, in either stored form", () => {
+    const invalid = structuredClone(seedUsers);
+    invalid[0].registrations.find(
+      (registration) => registration.eventSlug === "design-sprint-past"
+    )!.responses!["Any dietary restrictions we should know about for lunch?"] =
+      '["Vegetarian","Pescatarian"]';
+    expect(() =>
+      validateUserFixtures(invalid, seedEvents, membershipTypes, fixedNow)
+    ).toThrow('Response "Pescatarian" is invalid');
+  });
+
   it("keeps applications to events that take them, with a deadline when accepted", () => {
     const withoutApplication = structuredClone(seedUsers);
     const sprint = withoutApplication[0].registrations.find(
@@ -119,7 +171,7 @@ describe("user seed fixtures", () => {
     const unaccepted = structuredClone(seedUsers);
     unaccepted[0].registrations.find(
       (registration) => registration.eventSlug === "design-sprint-past"
-    )!.application = { status: "waitlisted" };
+    )!.application = { status: "waitlisted", submittedAt: fixedNow.toISOString() };
     expect(() =>
       validateUserFixtures(unaccepted, seedEvents, membershipTypes, fixedNow)
     ).toThrow("has a ticket without an accepted application");
@@ -167,7 +219,7 @@ describe("user seed fixtures", () => {
         membershipTypes,
         fixedNow
       )
-    ).toThrow("cannot have a membership purchase");
+    ).toThrow("cannot have a completed membership purchase");
 
     const wrongTicket = structuredClone(seedUsers);
     wrongTicket[1].registrations[0].purchaseKey =
@@ -185,11 +237,12 @@ describe("user seed fixtures", () => {
       seedUsers.filter(
         (user) => user.profile.birth_date === null && user.profile.interests?.length === 0
       ).map((user) => user.email)
-    ).toEqual(["admin-no-membership@example.com"]);
+    ).toEqual(["admin-no-membership@example.com", "new-member@example.com"]);
     // Written on every run so changes made through the admin dialog are undone.
     for (const user of seedUsers) {
       expect(user.profile).toMatchObject({
         profile_photo_path: null,
+        avatar_preset: null,
         student_verified_at: null,
         student_verified_by: null,
       });
@@ -217,5 +270,139 @@ describe("user seed fixtures", () => {
     expect(() =>
       validateUserFixtures(inFuture, seedEvents, membershipTypes, fixedNow)
     ).toThrow("cannot be verified in the future");
+  });
+});
+
+describe("the crowd", () => {
+  it("is 30 to 50 profile-only accounts on the crowd domains", () => {
+    expect(crowd.length).toBeGreaterThanOrEqual(30);
+    expect(crowd.length).toBeLessThanOrEqual(50);
+    for (const user of crowd) {
+      expect(user.password).toBeNull();
+      expect(isCrowdEmail(user.email)).toBe(true);
+      expect(user.profile.role_access).toBe("basic");
+      expect(user.fullEventHistory).toBe(false);
+    }
+    for (const user of seedUsers) expect(isCrowdEmail(user.email)).toBe(false);
+    expect(getUserFixtureTotals(crowd).authUsers).toBe(0);
+  });
+
+  it("builds the same people with the same answers every time", () => {
+    expect(buildSeedCrowd(seedEvents, fixedNow)).toEqual(crowd);
+  });
+
+  it("spreads across every user type and membership tier", () => {
+    expect(new Set(crowd.map((user) => user.profile.user_type))).toEqual(
+      new Set(["ubcStudent", "faculty", "nonUbc"])
+    );
+    expect(new Set(crowd.map((user) => user.membershipSlug))).toEqual(
+      new Set([null, "explorer", "innovator", "faculty", "non-ubc"])
+    );
+  });
+
+  it("fills the upcoming UXathon's review queue with every state admins see", () => {
+    const states = new Set(
+      crowd.flatMap((user) =>
+        user.registrations
+          .filter((registration) => registration.eventSlug === "uxathon-upcoming")
+          .map(({ application, ticket }) => {
+            if (application?.status !== "accepted") return application?.status;
+            if (ticket) return "registered";
+            return new Date(application.offerExpiresAt!) > fixedNow
+              ? "accepted"
+              : "offer_expired";
+          })
+      )
+    );
+    expect(states).toEqual(
+      new Set([
+        "submitted",
+        "waitlisted",
+        "accepted",
+        "registered",
+        "offer_expired",
+        "rejected",
+      ])
+    );
+  });
+
+  it("attaches portfolio PDFs to some UXathon applications", () => {
+    const files = crowd.flatMap((user) =>
+      user.registrations.flatMap((registration) => Object.values(registration.files ?? {}))
+    );
+    expect(files.length).toBeGreaterThan(0);
+    for (const file of files) expect(file).toMatch(/^[A-Za-z0-9._ ()-]+\.pdf$/);
+  });
+
+  it("covers lapsed, pre-ordered, pending and canceled memberships", () => {
+    const lapsed = crowd.filter(
+      (user) => user.membershipSlug && !isActiveSeedMember(user, fixedNow)
+    );
+    expect(lapsed.length).toBeGreaterThanOrEqual(2);
+    expect(crowd.filter((user) => user.membershipPreOrderedSlug)).toHaveLength(1);
+
+    const statuses = new Set(
+      crowd.flatMap((user) => user.purchases.map((purchase) => purchase.status))
+    );
+    for (const status of ["completed", "pending", "canceled", "failed"]) {
+      expect(statuses).toContain(status);
+    }
+  });
+
+  it("rejects a crowd account that could sign in, or a login fixture on a crowd domain", () => {
+    const withPassword = structuredClone(everyone);
+    withPassword[seedUsers.length].password = SEED_PASSWORD;
+    expect(() =>
+      validateUserFixtures(withPassword, seedEvents, membershipTypes, fixedNow)
+    ).toThrow("cannot use a crowd domain");
+
+    const loginOnCrowd = structuredClone(everyone);
+    loginOnCrowd[0].password = null;
+    expect(() =>
+      validateUserFixtures(loginOnCrowd, seedEvents, membershipTypes, fixedNow)
+    ).toThrow("is not on a crowd domain");
+  });
+
+  it("rejects a pre-order without a pending purchase, or over an active membership", () => {
+    const index = everyone.findIndex((user) => user.membershipPreOrderedSlug);
+
+    const unpaid = structuredClone(everyone);
+    unpaid[index].purchases = unpaid[index].purchases.filter(
+      (purchase) => purchase.status !== "pending"
+    );
+    expect(() =>
+      validateUserFixtures(unpaid, seedEvents, membershipTypes, fixedNow)
+    ).toThrow("without a pending purchase");
+
+    const active = structuredClone(everyone);
+    delete active[index].membershipExpiresAt;
+    expect(() =>
+      validateUserFixtures(active, seedEvents, membershipTypes, fixedNow)
+    ).toThrow("while one is still active");
+  });
+
+  it("rejects more seats than an event holds", () => {
+    const overbooked = structuredClone(everyone);
+    const spare = overbooked.find(
+      (user) =>
+        user.password === null &&
+        !user.registrations.some((registration) => registration.eventSlug === "figma-basics-workshop") &&
+        !user.purchases.some((purchase) => purchase.eventSlug === "figma-basics-workshop")
+    )!;
+    spare.registrations.push({ eventSlug: "figma-basics-workshop", ticket: true });
+    expect(() =>
+      validateUserFixtures(overbooked, seedEvents, membershipTypes, fixedNow)
+    ).toThrow('"figma-basics-workshop" has 21 seats taken but holds only 20');
+  });
+
+  it("needs a submitted time on every application past draft", () => {
+    const missing = structuredClone(everyone);
+    const application = missing[seedUsers.length].registrations.find(
+      (registration) => registration.application
+    )!.application!;
+    delete application.submittedAt;
+    expect(() =>
+      validateUserFixtures(missing, seedEvents, membershipTypes, fixedNow)
+    ).toThrow("needs a submitted time exactly when it is not a draft");
   });
 });

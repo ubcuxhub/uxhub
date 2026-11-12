@@ -42,6 +42,37 @@ describe("EventTimeline", () => {
     expect(screen.getAllByRole("link").map((link) => link.textContent)).toEqual(["Spring Mixer"]);
   });
 
+  it("shows each event's badge, including dated ones", () => {
+    render(
+      <EventTimeline
+        upcomingEvents={UPCOMING}
+        pastEvents={PAST}
+        badges={{
+          kickoff: { status: "going" },
+          workshop: { status: "opens", date: "Jan 12" },
+        }}
+      />
+    );
+    expect(screen.getByText("Going")).toBeTruthy();
+    expect(screen.getByText("Opens Jan 12")).toBeTruthy();
+    // Café Chat has no badge, and an upcoming event never falls back to Past.
+    expect(document.querySelectorAll("[data-slot='badge']")).toHaveLength(2);
+  });
+
+  it("shows a past event's own badge, and Past without one", () => {
+    const past = [...PAST, event("talk", "Design Talk", "2026-02-10T18:00:00Z")];
+    render(
+      <EventTimeline
+        upcomingEvents={UPCOMING}
+        pastEvents={past}
+        badges={{ mixer: { status: "checked_in" } }}
+      />
+    );
+    fireEvent.click(screen.getByRole("switch", { name: "Show past events" }));
+    expect(screen.getByText("Checked in")).toBeTruthy();
+    expect(screen.getByText("Past")).toBeTruthy();
+  });
+
   it("announces nothing until there is a query", () => {
     render(<EventTimeline upcomingEvents={UPCOMING} pastEvents={PAST} />);
     expect(status()).toBeNull();

@@ -1,182 +1,223 @@
 "use client";
 
-import { useState } from "react";
-import {
-  ApplicantInfoCard,
-} from "@/features/admin/components/ApplicantInfoCard";
-import {
-  ApplicationResponseCard,
-} from "@/features/admin/components/ApplicationResponseCard";
-import {
-  StatusUpdateSection,
-} from "@/features/admin/components/StatusUpdateSection";
-import type { EventApplicationRow, EventRow } from "@/lib/supabase/models";
-import { Card, CardContent } from "@/components/ui/card";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
+
+import { BackButton } from "@/components/shared/BackButton";
 import { PageContainer } from "@/components/shared/PageContainer";
-import { SuccessOverlay } from "@/components/shared/SuccessOverlay";
+import { Avatar } from "@/components/ui/avatar";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import type { DateTimeValue } from "@/components/ui/date-time-field";
+import { toast } from "@/components/ui/toast";
 import { updateApplicationDecisionAction } from "@/features/admin/actions";
+import { ApplicantPager, type PagerTarget } from "@/features/admin/components/ApplicantPager";
+import { ApplicationDecisionCard } from "@/features/admin/components/ApplicationDecisionCard";
+import { ReviewStateBadge } from "@/features/admin/components/ReviewStateBadge";
 import {
   getApplicationReviewState,
   type ApplicationDecision,
 } from "@/features/admin/lib/application-review";
-import { formatUserName } from "@/lib/user-name";
+import { ApplicationAnswersReadOnly } from "@/features/applications/components/ApplicationAnswersReadOnly";
+import type {
+  ApplicationAnswers,
+  ApplicationQuestion,
+} from "@/features/applications/lib/application-form";
+import { formatTimestamp } from "@/lib/date";
+import type { SubmittedApplicationRow } from "@/lib/supabase/models";
 
-export interface AdminApplicationUser {
-  id: string;
-  first_name: string;
-  last_name: string;
+export interface AdminApplicant {
+  name: string;
   email: string;
-}
-
-export interface AdminApplicationResponse {
-  id: string;
-  application_id: string;
-  event_application_question_id: string;
-  response: string;
-  created_at: string;
-  event_application_questions: {
-    id: string;
-    question: string;
-    response_type: string;
-    max_char_limit: number | null;
-    response_options: string[] | null;
-  } | null;
+  program: string | null;
 }
 
 interface ApplicationReviewClientProps {
-  application: EventApplicationRow;
+  eventName: string;
+  application: SubmittedApplicationRow;
   hasTicket: boolean;
-  userInfo: AdminApplicationUser;
-  event: EventRow;
-  responses: AdminApplicationResponse[];
+  applicant: AdminApplicant;
+  questions: ApplicationQuestion[];
+  answers: ApplicationAnswers;
+  /** Signed download links for file answers, by question id. */
+  fileLinks?: Record<string, string>;
+  /** The list the reviewer came from, with its query and this row's page. */
+  backHref: string;
+  pager: {
+    position: number;
+    total: number;
+    scope: string;
+    previous: PagerTarget | null;
+    next: PagerTarget | null;
+  };
+  defaultDeadline: DateTimeValue;
+  /**
+   * The reviewer-notes thread. It sits in the aside under the decision (and
+   * after it on one column), where the notes inform the decision and are read
+   * beside the answers. Nothing renders until it is given.
+   */
+  notes?: ReactNode;
 }
 
-const SUCCESS_MESSAGES: Record<ApplicationDecision, string> = {
-  accept: "Offer sent",
-  waitlist: "Application waitlisted",
-  reject: "Application rejected",
-};
+const firstName = (name: string) => name.split(" ")[0] || name;
 
+/**
+ * One application (docs/design/application-review.md, §3): the applicant, the
+ * answers, the decision, and room for reviewer notes. Two columns when the
+ * content area is wide enough (container query, since the admin shell has a
+ * sidebar); DOM order equals visual order at every width.
+ */
 export function ApplicationReviewClient({
+  eventName,
   application: initialApplication,
   hasTicket,
-  userInfo,
-  event,
-  responses,
+  applicant,
+  questions,
+  answers,
+  fileLinks = {},
+  backHref,
+  pager,
+  defaultDeadline,
+  notes,
 }: ApplicationReviewClientProps) {
+  const router = useRouter();
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const [application, setApplication] =
-    useState<EventApplicationRow>(initialApplication);
-  const [error, setError] = useState<string | null>(null);
-  const [isUpdating, setIsUpdating] = useState(false);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+    useState<SubmittedApplicationRow>(initialApplication);
   const state = getApplicationReviewState(application, hasTicket);
+  const name = firstName(applicant.name);
 
-  const handleDecision = async (
+  // A new applicant is a new page: focus the name, so moving to the next one
+  // is announced.
+  useEffect(() => {
+    headingRef.current?.focus();
+  }, []);
+
+  const decide = async (
     decision: ApplicationDecision,
     offerExpiresAt: string | null
   ) => {
-    if (isUpdating) return;
-
-    setIsUpdating(true);
-    setError(null);
-
+    let updated: SubmittedApplicationRow;
     try {
-      setApplication(
-        await updateApplicationDecisionAction(
-          application.id,
-          decision,
-          offerExpiresAt
-        )
+      updated = await updateApplicationDecisionAction(
+        application.id,
+        decision,
+        offerExpiresAt
       );
-      setSuccessMessage(SUCCESS_MESSAGES[decision]);
-    } catch (err) {
-      console.error("Error updating status:", err);
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Failed to update application status"
-      );
-    } finally {
-      setIsUpdating(false);
+    } catch (error) {
+      console.error("Error updating application decision:", error);
+      throw error;
     }
+    setApplication(updated);
+    const next = pager.next;
+    toast.success(
+      decision === "accept"
+        ? `${name} accepted`
+        : decision === "waitlist"
+          ? `${name} waitlisted`
+          : `${name} rejected`,
+      {
+        description:
+          decision === "accept"
+            ? `Register by ${formatTimestamp(updated.offer_expires_at)}`
+            : undefined,
+        action: next
+          ? { label: "Next applicant", onClick: () => router.push(next.href) }
+          : undefined,
+      }
+    );
   };
 
   return (
-    <>
-      <PageContainer
-        backHref="/admin/events"
-        backLabel="Back to Events"
-        className="flex flex-col gap-8"
-      >
-            {/* Header */}
-            <div>
-              <h1 className="text-h2">Application Review</h1>
-              <p className="mt-1 text-small text-muted-foreground">
-                {event.name}
-              </p>
+    <PageContainer className="@container flex flex-col gap-8">
+      <BackButton
+        link={backHref}
+        label="Back to applications"
+        className="-mb-2 w-fit"
+      />
+
+      <header className="flex flex-col gap-5 @2xl:flex-row @2xl:items-end @2xl:justify-between">
+        <div className="flex min-w-0 items-center gap-4">
+          <Avatar name={applicant.name} size={56} decorative />
+          <div className="flex min-w-0 flex-col gap-1.5">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
+              <h1
+                ref={headingRef}
+                tabIndex={-1}
+                className="text-h2 outline-none"
+              >
+                {applicant.name}
+              </h1>
+              <ReviewStateBadge state={state} />
             </div>
-
-            {/* Applicant Information */}
-            <ApplicantInfoCard
-              name={formatUserName(userInfo)}
-              email={userInfo.email}
-              applicationDate={application.created_at}
-              state={state}
-              offerExpiresAt={application.offer_expires_at}
-            />
-
-            {/* Application Responses */}
-            <div className="space-y-4">
-              <div>
-                <h2 className="text-h3">Application Responses</h2>
-                <p className="mt-1 text-small text-muted-foreground">
-                  Review the applicant&apos;s responses to the application
-                  questions
-                </p>
-              </div>
-
-              {responses.length === 0 ? (
-                <Card>
-                  <CardContent className="py-12 text-center">
-                    <p className="text-small text-muted-foreground">
-                      No application responses found.
-                    </p>
-                  </CardContent>
-                </Card>
-              ) : (
-                <div className="space-y-4">
-                  {responses.map((response) => {
-                    const question = response.event_application_questions;
-                    if (!question) return null;
-
-                    return (
-                      <ApplicationResponseCard
-                        key={response.id}
-                        question={question.question}
-                        response={response.response}
-                      />
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Status Update Section */}
-            <StatusUpdateSection
-              state={state}
-              isUpdating={isUpdating}
-              onDecision={handleDecision}
-              error={error}
-            />
-      </PageContainer>
-
-      {/* Success Overlay */}
-      {successMessage && (
-        <SuccessOverlay
-          message={successMessage}
-          onClose={() => setSuccessMessage(null)}
+            <p className="text-small text-muted-foreground">
+              {applicant.program ? `${applicant.program} · ` : null}
+              <a
+                href={`mailto:${applicant.email}`}
+                className="text-info-foreground underline-offset-4 hover:underline focus-visible:focus-ring"
+              >
+                {applicant.email}
+              </a>
+            </p>
+            <p className="text-small text-muted-foreground">
+              Submitted{" "}
+              {formatTimestamp(application.submitted_at ?? application.created_at)}
+            </p>
+          </div>
+        </div>
+        <ApplicantPager
+          position={pager.position}
+          total={pager.total}
+          scope={pager.scope}
+          previous={pager.previous}
+          next={pager.next}
+          className="shrink-0"
         />
-      )}
-    </>
+      </header>
+
+      <div className="grid items-start gap-6 @4xl:grid-cols-[minmax(0,1fr)_minmax(0,23rem)]">
+        <Card role="region" aria-labelledby="application-answers">
+          <CardHeader>
+            <CardTitle id="application-answers" role="heading" aria-level={2}>
+              Answers
+            </CardTitle>
+            <CardDescription>
+              {eventName} application · {questions.length}{" "}
+              {questions.length === 1 ? "question" : "questions"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-5">
+            {questions.length === 0 ? (
+              <p className="text-small text-muted-foreground">
+                This application has no questions.
+              </p>
+            ) : (
+              <ApplicationAnswersReadOnly
+                questions={questions}
+                answers={answers}
+                fileLinks={fileLinks}
+              />
+            )}
+          </CardContent>
+        </Card>
+
+        <div className="flex flex-col gap-6">
+          <ApplicationDecisionCard
+            key={state}
+            state={state}
+            firstName={name}
+            offerExpiresAt={application.offer_expires_at}
+            defaultDeadline={defaultDeadline}
+            onDecide={decide}
+          />
+          {notes}
+        </div>
+      </div>
+    </PageContainer>
   );
 }
