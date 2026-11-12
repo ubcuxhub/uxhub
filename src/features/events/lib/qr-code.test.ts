@@ -1,27 +1,13 @@
 import jsQR from "jsqr";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import { createCheckInToken, verifyCheckInToken } from "@/lib/check-in-token";
+import { describe, expect, it } from "vitest";
 
 import { type QrSvg, toQrSvg } from "./qr-code";
 
-vi.mock("server-only", () => ({}));
-
-const TICKET_ID = "3f1c9a52-8d4e-4b7a-9c61-2e5f0d8b7a14";
-const OTHER_TICKET_ID = "a7e2b310-5c9d-4f68-8b23-91d4c6e0f257";
+// The shape of `event_tickets.qr_token`: 16 random bytes as hex.
+const QR_TOKEN = "9f86d081884c7d659a2feaa0c55ad015";
+const OTHER_QR_TOKEN = "2c26b46b68ffc68ff99b453c1d304134";
 const MODULE = /M(\d+) (\d+)h1v1h-1z/g;
 const PIXELS_PER_MODULE = 4;
-
-beforeEach(() => {
-  vi.stubEnv(
-    "CHECK_IN_TOKEN_SECRET",
-    "test-secret-that-is-at-least-32-characters-long",
-  );
-});
-
-afterEach(() => {
-  vi.unstubAllEnvs();
-});
 
 /** Paints the code onto a white bitmap and reads it back the way a scanner would. */
 function scan({ size, path }: QrSvg): string | undefined {
@@ -40,31 +26,26 @@ function scan({ size, path }: QrSvg): string | undefined {
 }
 
 describe("toQrSvg", () => {
-  it("scans back to a check-in token for the same registration", () => {
-    const token = createCheckInToken(TICKET_ID);
+  it("scans back to the ticket's token", () => {
+    expect(scan(toQrSvg(QR_TOKEN))).toBe(QR_TOKEN);
+  });
 
-    const scanned = scan(toQrSvg(token));
+  it("scans back to a link, for the scanner's open-on-your-phone code", () => {
+    const url = "https://www.ubcuxhub.ca/admin/events/3f1c9a52-8d4e-4b7a-9c61-2e5f0d8b7a14/check-in/scan";
 
-    expect(scanned).toBe(token);
-    expect(verifyCheckInToken(scanned ?? "")).toBe(TICKET_ID);
+    expect(scan(toQrSvg(url))).toBe(url);
   });
 
   it("draws the same code every time, so a screenshot keeps working", () => {
-    const first = toQrSvg(createCheckInToken(TICKET_ID));
-    const second = toQrSvg(createCheckInToken(TICKET_ID));
-
-    expect(second).toEqual(first);
+    expect(toQrSvg(QR_TOKEN)).toEqual(toQrSvg(QR_TOKEN));
   });
 
-  it("draws a different code for a different registration", () => {
-    const first = toQrSvg(createCheckInToken(TICKET_ID));
-    const other = toQrSvg(createCheckInToken(OTHER_TICKET_ID));
-
-    expect(other.path).not.toBe(first.path);
+  it("draws a different code for a different ticket", () => {
+    expect(toQrSvg(OTHER_QR_TOKEN).path).not.toBe(toQrSvg(QR_TOKEN).path);
   });
 
   it("leaves a four-module quiet zone around the code", () => {
-    const { size, path } = toQrSvg(createCheckInToken(TICKET_ID));
+    const { size, path } = toQrSvg(QR_TOKEN);
     const coordinates = [...path.matchAll(MODULE)].flatMap(([, x, y]) => [
       Number(x),
       Number(y),

@@ -4,7 +4,7 @@ import { Calendar, Clock, MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { StatusBadge, type Status } from "@/components/ui/status-badge";
 import { cn } from "@/lib/utils";
-import { toQrSvg } from "@/features/events/lib/qr-code";
+import { QrCode } from "@/features/events/components/QrCode";
 import type {
   TicketBadge,
   TicketEvent,
@@ -19,8 +19,8 @@ export interface EventTicketProps {
   /** Date in the "Register by Oct 20" badge, such as "Oct 20". */
   registerBy?: string | null;
   /**
-   * Check-in token from `createCheckInToken`, drawn as the QR code. Shown only
-   * for `going` and `checked_in`.
+   * The ticket's `qr_token`, drawn as the QR code. Shown only for `going` and
+   * `checked_in`.
    */
   qrToken?: string | null;
   className?: string;
@@ -76,7 +76,7 @@ export function EventTicket({
             </p>
           )}
         </div>
-        {hasCode && qrToken && <TicketQrCode token={qrToken} />}
+        {hasCode && qrToken && <QrCode value={qrToken} label="Check-in QR code" />}
       </div>
     </article>
   );
@@ -145,23 +145,5 @@ function TicketPerforation() {
       <div className="mx-5 border-t border-dashed" />
       <div className="absolute top-1/2 -right-3 size-6 -translate-y-1/2 rounded-full border bg-background" />
     </div>
-  );
-}
-
-// Stays black on white in dark mode, since many scanners cannot read an
-// inverted code.
-function TicketQrCode({ token }: { token: string }) {
-  const { size, path } = toQrSvg(token);
-
-  return (
-    <svg
-      role="img"
-      aria-label="Check-in QR code"
-      viewBox={`0 0 ${size} ${size}`}
-      shapeRendering="crispEdges"
-      className="mx-auto size-48 rounded-lg bg-white text-black"
-    >
-      <path d={path} fill="currentColor" />
-    </svg>
   );
 }
