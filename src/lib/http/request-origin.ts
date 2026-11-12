@@ -26,6 +26,23 @@ export function getRequestOrigin(request: Request) {
   return `${protocol}://${host}`;
 }
 
+/**
+ * The same, from a server component's `headers()`, which has no request URL
+ * to fall back on. Without forwarded headers, a local host is assumed to be
+ * plain http and anything else https. Null when there's no host at all.
+ */
+export function getHeadersOrigin(headers: Headers) {
+  const host =
+    firstHeaderValue(headers.get("x-forwarded-host")) ??
+    firstHeaderValue(headers.get("host"));
+  if (!host) return null;
+
+  const local = /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(host);
+  const protocol =
+    firstHeaderValue(headers.get("x-forwarded-proto")) ?? (local ? "http" : "https");
+  return `${protocol}://${host}`;
+}
+
 /** Forwarded headers may carry a comma-separated proxy chain. */
 function firstHeaderValue(value: string | null) {
   const first = value?.split(",")[0]?.trim();

@@ -1285,6 +1285,10 @@ export type Database = {
         Args: { p_purchase_id: string }
         Returns: undefined
       }
+      rename_team: {
+        Args: { p_name: string; p_team_id: string; p_user_id: string }
+        Returns: string
+      }
       reschedule_event_publication: {
         Args: Record<PropertyKey, never>
         Returns: undefined

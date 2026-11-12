@@ -106,8 +106,8 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
 
 ## Important Patterns
 
-- `src/proxy.ts` refreshes sessions for `/portal/*`, `/admin/*`, and `/api/*`;
-  it does not authorize users.
+- `src/proxy.ts` refreshes sessions for `/portal/*`, `/admin/*`, `/join/*`
+  (team invite links), and `/api/*`; it does not authorize users.
 - `src/app/(app)/layout.tsx` calls `requireAuth()` and provides the current user.
   `src/app/(app)/(shell)/admin/layout.tsx` adds `requireAdmin()`. Keep access
   control in these server-side guards rather than relying on client UI.
