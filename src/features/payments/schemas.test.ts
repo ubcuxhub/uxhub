@@ -76,3 +76,11 @@ describe("parseCheckoutRequest", () => {
     expect(parseCheckoutRequest(validPayload).verificationToken).toBeNull();
   });
 });
+
+it("accepts a cardless event request but still requires a token for membership", () => {
+  expect(parseCheckoutRequest({ ...validPayload, kind: "event_ticket", token: null, expectedAmountCents: 0 })).toMatchObject({ token: null, expectedAmountCents: 0 });
+  expect(() => parseCheckoutRequest({ ...validPayload, token: null })).toThrow("Payment token is required");
+  for (const expectedAmountCents of [-1, 0.1, "0", NaN, Infinity]) {
+    expect(() => parseCheckoutRequest({ ...validPayload, expectedAmountCents })).toThrow("Invalid expected amount");
+  }
+});

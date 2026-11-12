@@ -5,22 +5,20 @@ import { fetchEventById, fetchEventPricingLocked } from "@/lib/supabase-helpers/
 const config = { configured_slug_edited: false, configured_marketing_mode: "external", configured_marketing_url: "https://devpost.com/design", configured_slug: "design", configured_pricing_mode: "paid", configured_price: 12.5, is_featured: true };
 
 describe("form-first event configuration", () => {
-  it("persists configuration atomically without activating it or rewriting legacy prices/links", () => withFixtures(async fixtures => {
+  it("activates explicitly configured prices atomically while retaining marketing links", () => withFixtures(async fixtures => {
     const event = await fixtures.createEvent({ marketing_url: "https://existing.example.com", regular_price: 20, member_price: 5, status: "draft" });
     const configured = { ...config, configured_slug: `config-${fixtures.tag}` };
     const result = await fixtures.supabase.rpc("save_admin_event_builder", { p_event_id: event.id, p_event: configured, p_draft_id: null!, p_draft_revision: 0, p_slug: null!, p_expected_image_url: null!, p_expected_header_image_url: null!, p_check_in_sessions: [], p_application_questions: [], p_mentors: [], p_sponsors: [] });
     expect(result.error).toBeNull();
-    expect(await fetchEventById(fixtures.supabase, event.id)).toMatchObject({ ...configured, regular_price: 20, member_price: 5, marketing_url: "https://existing.example.com", slug: event.slug, pricing_policy: "legacy" });
+    expect(await fetchEventById(fixtures.supabase, event.id)).toMatchObject({ ...configured, regular_price: 12.5, member_price: 0, marketing_url: "https://existing.example.com", slug: event.slug, pricing_policy: "figma" });
   }));
-  it("keeps new-policy events as drafts and rejects premature purchases and tickets", () => withFixtures(async fixtures => {
-    const event = await fixtures.createEvent({ ...config, configured_slug: `new-config-${fixtures.tag}`, status: "draft" });
-    expect(event.pricing_policy).toBe("figma_pending");
-    for (const update of [{ status: "active" as const }, { publish_at: "2099-01-01T00:00:00Z" }, { pricing_policy: "legacy" }]) {
-      expect((await fixtures.supabase.from("events").update(update).eq("id", event.id)).error).not.toBeNull();
+  it("publishes and schedules configured Free/Paid events without temporary blockers", () => withFixtures(async fixtures => {
+    for (const mode of ["free", "paid"]) {
+      const event = await fixtures.createEvent({ configured_pricing_mode: mode, configured_price: mode === "free" ? 0 : 12.5, status: "draft", slug: `${mode}-${fixtures.tag}` });
+      expect(event).toMatchObject({ pricing_policy: "figma", regular_price: mode === "free" ? 0 : 12.5, member_price: 0 });
+      expect((await fixtures.supabase.from("events").update({ publish_at: "2099-01-01T00:00:00Z" }).eq("id", event.id)).error).toBeNull();
+      expect((await fixtures.supabase.from("events").update({ status: "active", publish_at: null }).eq("id", event.id)).error).toBeNull();
     }
-    const user = await fixtures.createUser();
-    expect((await fixtures.supabase.from("event_tickets").insert({ event_id: event.id, user_id: user.id })).error?.message).toMatch(/integration/);
-    expect((await fixtures.supabase.from("purchases").insert({ event_id: event.id, user_id: user.id, amount_cents: 1250, currency: "CAD", status: "pending", kind: "event_ticket", idempotency_key: `pending-${fixtures.tag}` })).error?.message).toMatch(/integration/);
   }));
   it("locks both pricing representations once a registration exists while allowing unrelated edits", () => withFixtures(async fixtures => {
     const event = await fixtures.createEvent();

@@ -38,6 +38,7 @@ vi.mock("@/lib/supabase-helpers/events", () => ({
 
 // Reserving and releasing stay real so the RPCs they call are asserted.
 const ticketsMocks = vi.hoisted(() => ({
+  initializeEventCheckout: vi.fn(),
   fetchEventTicketByPurchaseId: vi.fn(),
   fetchUserEventTicket: vi.fn(),
 }));
@@ -176,6 +177,7 @@ beforeEach(() => {
   purchasesMocks.recordSquareWebhookEvent.mockResolvedValue(true);
   purchasesMocks.forgetSquareWebhookEvent.mockResolvedValue(undefined);
 
+  ticketsMocks.initializeEventCheckout.mockResolvedValue({ purchase_id: "purchase-1", amount_cents: 2000, failure_reason: null, created: true });
   ticketsMocks.fetchUserEventTicket.mockResolvedValue(null);
   ticketsMocks.fetchEventTicketByPurchaseId.mockResolvedValue({ id: "ticket-1" });
 
@@ -221,6 +223,39 @@ beforeEach(() => {
 });
 
 describe("event ticket checkout", () => {
+  it("fulfills a free registration without any Square customer or payment call", async () => {
+    purchasesMocks.fetchPurchaseById.mockResolvedValue(purchase({ amount_cents: 0, status: "completed", fulfilled_at: "2026-11-11T00:00:00Z" }));
+    const result = await executeCheckoutForUser(user, { ...ticketInput, token: null, expectedAmountCents: 0 });
+    expect(result).toMatchObject({ ok: true, resolution: "completed", purchaseId: "purchase-1" });
+    expect(customerMocks.ensureSquareCustomerId).not.toHaveBeenCalled();
+    expect(squareMocks.create).not.toHaveBeenCalled();
+    expect(squareMocks.complete).not.toHaveBeenCalled();
+    expect(revalidationMocks.revalidatePurchasePaths).toHaveBeenCalledWith(adminDb, "purchase-1");
+    expect(afterMocks.after).toHaveBeenCalled();
+  });
+
+  it("rejects a stale free quote before any Square interaction", async () => {
+    ticketsMocks.initializeEventCheckout.mockResolvedValue({ purchase_id: null, amount_cents: 2000, failure_reason: "PRICE_CHANGED" });
+    const result = await executeCheckoutForUser(user, { ...ticketInput, token: null, expectedAmountCents: 0 });
+    expect(result).toMatchObject({ ok: false, terminal: true, error: expect.stringContaining("price has changed") });
+    expect(customerMocks.ensureSquareCustomerId).not.toHaveBeenCalled();
+    expect(squareMocks.create).not.toHaveBeenCalled();
+  });
+
+  it("does not start a second external payment for a concurrently initialized paid attempt", async () => {
+    ticketsMocks.initializeEventCheckout.mockResolvedValue({ purchase_id: "purchase-1", amount_cents: 2000, failure_reason: null, created: false });
+    expect(await executeCheckoutForUser(user, ticketInput)).toMatchObject({ ok: true, resolution: "processing" });
+    expect(customerMocks.ensureSquareCustomerId).not.toHaveBeenCalled();
+    expect(squareMocks.create).not.toHaveBeenCalled();
+  });
+
+  it("reports a failed customer initialization without starting a payment", async () => {
+    customerMocks.ensureSquareCustomerId.mockRejectedValue(new Error("Customer unavailable"));
+    expect(await executeCheckoutForUser(user, ticketInput)).toMatchObject({ ok: false, terminal: true });
+    expect(squareMocks.create).not.toHaveBeenCalled();
+    expect(purchasesMocks.updatePurchase).toHaveBeenCalledWith(adminDb, "purchase-1", expect.objectContaining({ status: "failed" }));
+  });
+
   it("cancels the Square payment and marks the purchase canceled when the seat reservation fails", async () => {
     adminDb.rpc.mockImplementation(async (fn: string) => {
       if (fn === "reserve_event_ticket") {
@@ -352,15 +387,15 @@ describe("event ticket checkout", () => {
     expect(squareMocks.create).not.toHaveBeenCalled();
   });
 
-  it("charges members the member price", async () => {
+  it("charges the authoritative database amount rather than a stale user or client amount", async () => {
+    purchasesMocks.fetchPurchaseById.mockResolvedValue(purchase({ amount_cents: 1000 }));
     await executeCheckoutForUser(
       { ...user, membership_type_id: "membership-type-1" } as UserInfoRow,
       ticketInput
     );
 
-    expect(purchasesMocks.createPurchase).toHaveBeenCalledWith(
-      adminDb,
-      expect.objectContaining({ amount_cents: 1000 })
+    expect(ticketsMocks.initializeEventCheckout).toHaveBeenCalledWith(
+      adminDb, expect.objectContaining({ eventId: "event-1", userId: "user-1", freeOnly: false })
     );
     expect(squareMocks.create).toHaveBeenCalledWith(
       expect.objectContaining({

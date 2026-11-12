@@ -2488,5 +2488,6 @@ $$;
 \ir event-application-settings.sql
 \ir event-team-settings.sql
 \ir event-content.sql
+\ir event-checkout.sql
 
 rollback;

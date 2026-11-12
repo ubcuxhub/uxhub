@@ -6,6 +6,7 @@ import type { DemoLoader } from "@/app/dev/_shell/types";
  * only the component page imports this, and it loads one demo.
  */
 export const dataDemos: Record<string, DemoLoader> = {
+  checkout: () => import("../_demos/checkout"),
   card: () => import("../_demos/card"),
   badge: () => import("../_demos/badge"),
   "status-badge": () => import("../_demos/status-badge"),
@@ -27,4 +28,5 @@ export const dataDemos: Record<string, DemoLoader> = {
   "event-card": () => import("../_demos/event-card"),
   "sponsor-logo-grid": () => import("../_demos/sponsor-logo-grid"),
   ticket: () => import("../_demos/ticket"),
+  "registration-ticket": () => import("../_demos/registration-ticket"),
 };

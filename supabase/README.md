@@ -451,3 +451,17 @@ schedule changes. A dedicated resource RPC validates and replaces only links,
 preserving historical sections and child identities. Authenticated direct event
 and child-setting writes are also locked. Trusted service-role seed/maintenance
 writes remain available; first-party mutations must use the guarded actions.
+
+### Operational event pricing and free registration
+
+Explicit Free/Paid configuration synchronizes `regular_price` and zero
+`member_price` with `pricing_policy = 'figma'`. Legacy records retain their
+amounts on unrelated saves; pricing stays locked once offers, tickets or
+nonfailed purchases exist. `initialize_event_checkout` is service-role only and
+serializes on the event plus attempt key. It reads current membership expiry and
+club term, rejects stale quotes, and snapshots a paid amount before Square.
+For zero amounts it calls the existing reservation function and commits the
+purchase, ticket and fulfilled status together. A rejected reservation leaves no
+purchase or seat. Retries return the same receipt. No Square customer or payment
+is used for zero amounts; ordinary confirmation, history and check-in read the
+same purchase/ticket records as paid registration.

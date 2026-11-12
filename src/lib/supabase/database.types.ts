@@ -1475,6 +1475,10 @@ export type Database = {
         Args: { p_team_id: string; p_user_id: string }
         Returns: string
       }
+      event_checkout_amount: {
+        Args: { p_event_id: string; p_user_id: string }
+        Returns: number
+      }
       event_has_ended: {
         Args: {
           e: Omit<
@@ -1510,6 +1514,21 @@ export type Database = {
         }[]
       }
       get_user_info_id: { Args: Record<PropertyKey, never>; Returns: string }
+      initialize_event_checkout: {
+        Args: {
+          p_event_id: string
+          p_expected_amount_cents?: number
+          p_free_only?: boolean
+          p_idempotency_key: string
+          p_user_id: string
+        }
+        Returns: {
+          amount_cents: number
+          created: boolean
+          failure_reason: string
+          purchase_id: string
+        }[]
+      }
       is_admin: { Args: Record<PropertyKey, never>; Returns: boolean }
       is_authenticated: { Args: Record<PropertyKey, never>; Returns: boolean }
       is_manager: { Args: Record<PropertyKey, never>; Returns: boolean }

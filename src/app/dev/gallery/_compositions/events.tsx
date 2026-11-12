@@ -3,6 +3,7 @@
 import { useId, useState } from "react";
 import { CalendarDays, Clock, Info, MapPin, Ticket as TicketIcon } from "lucide-react";
 
+import { CheckoutPaymentSection } from "@/components/shared/CheckoutPaymentSection";
 import { DetailList, DetailRow } from "@/components/shared/DetailRow";
 import { EventCard, EventCardDates } from "@/components/shared/EventCard";
 import { Hubbo } from "@/components/shared/Hubbo";
@@ -33,6 +34,7 @@ import { Separator } from "@/components/ui/separator";
 import { StatusBadge, type Status } from "@/components/ui/status-badge";
 import { ToastView, toast } from "@/components/ui/toast";
 import { EventTicket } from "@/features/events/components/EventTicket";
+import { EventRegistrationTicket } from "@/features/events/components/EventRegistrationTicket";
 
 import { ART_BLUE, HERE, PEOPLE, QR_TOKEN } from "../_fixtures";
 import { LIFT, Panel } from "./frame";
@@ -163,6 +165,16 @@ function ScannableTicket() {
   );
 }
 
+function RegisteredEvent() {
+  return <EventRegistrationTicket
+    eventName="Portfolio Review Night"
+    holderName="Aubrey Ventura"
+    checkedIn={false}
+    qrToken={QR_TOKEN}
+    participantPackages={[]}
+  />;
+}
+
 const DISCOUNT = "UXHUB10";
 
 function CheckoutSummary() {
@@ -227,6 +239,19 @@ function CheckoutSummary() {
       </CardFooter>
     </Panel>
   );
+}
+
+function FreeRegistration() {
+  return <Panel>
+    <CardContent>
+      <CheckoutPaymentSection
+        amount="$0.00" amountCents={0} kind="event_ticket"
+        title="Confirm registration" description="Reserve your free Design Sprint ticket."
+        framed={false} disabled slug="gallery-demo" userId="gallery-demo"
+        initialEmail="member@example.test" initialFirstName="Demo" initialLastName="Member"
+      />
+    </CardContent>
+  </Panel>;
 }
 
 function Toasts() {
@@ -349,7 +374,9 @@ export const EVENT_COMPONENTS = {
   "event-registration": EventRegistration,
   "featured-event": FeaturedEvent,
   "event-ticket": ScannableTicket,
+  "registered-event": RegisteredEvent,
   "checkout-summary": CheckoutSummary,
+  "free-registration": FreeRegistration,
   "toasts": Toasts,
   "no-events": NoEvents,
   "event-search": EventSearch,

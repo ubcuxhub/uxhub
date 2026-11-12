@@ -486,8 +486,8 @@ export function useEventForm({
           configured_pricing_mode: state.pricing_mode,
           configured_price: state.pricing_mode === "free" ? 0 : Number(state.pricing_amount),
         }),
-        // Effective amounts on existing events are deliberately omitted. New
-        // events cannot activate or register until deferred fulfillment lands.
+        // Configured amounts are normalized atomically by the database;
+        // omitting legacy amounts preserves unrelated existing-event saves.
         ...(!eventId ? {
           regular_price: state.pricing_mode === "legacy" ? Number(state.regular_price) : state.pricing_mode === "free" ? 0 : Number(state.pricing_amount),
           member_price: state.pricing_mode === "legacy" ? Number(state.member_price) : 0,

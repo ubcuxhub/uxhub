@@ -855,6 +855,16 @@ logo or Hubbo in the grid.
   columns). Admin page: StatCards, one filter row above the table, Table and
   Pagination in one Card.
 
+**Checkout composites.** `CheckoutLayout` owns the summary, busy screen and
+`FlowDialog` close protection; `CheckoutPaymentSection` owns framed/unframed
+payment content. For `kind="event_ticket"` with zero cents, both render a
+cardless **Confirm spot** path: no Square setup, card fields or payment-security
+claims. Membership and positive-price event checkout keep tokenization and buyer
+verification. Prices are quotes; the database checks the amount and eligibility
+before fulfillment. A changed quote asks the member to refresh. Timeouts retain
+an attempt key; confirmation navigates to the existing receipt and real ticket.
+Examples: `/dev/components/checkout`.
+
 ### 4.5 Back navigation
 
 Pill link at the top of every detail page: 40px tall, fully rounded, 20px side
@@ -986,6 +996,17 @@ the default `"padded"` preserves `07/10` and `07` for existing consumers.
 matching event sponsor item 4619:1025. Cell height follows content plus padding. It preserves native table semantics, density, selection,
 keyboard actions and the internal horizontal scroller. The default joined rows
 remain unchanged. See `/dev/components/table` for separated rows.
+
+`RegistrationTicket` composes the registered-attendee card from Figma 4619:149:
+a divided Registration / 1 ticket header and slots for title, description,
+Ticket and actions. At a card width of 56rem, the copy column grows to 480px,
+followed by a 40px gap and a 444px ticket; surplus space stays at the right.
+Narrower containers order text, ticket, then vertically stacked actions, each
+up to 444px wide. Actions retain natural widths in the wide layout. Features own
+ticket state, QR dialogs and authorized resource links; omit a package action
+when there is no accessible configured resource. See
+`/dev/components/registration-ticket` for wide, phone, half-width and checked-in
+examples. Existing Ticket colours, contrast, QR and used-state behavior remain.
 
 ### 3.18 Sortable section
 

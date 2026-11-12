@@ -96,7 +96,7 @@ Keep the event in Draft afterwards, or delete it along with its registrations.
 
 The portal event page and checkout read the event under the viewer's RLS, so
 staff reach drafts and members get a 404. Fulfillment
-(`createSquarePaymentForEventTicket`) uses the service role, so it drops the
+(`checkoutEventTicket`) uses the service role, so it drops the
 `status = active` filter only for admins and managers, and
 `reserve_event_ticket` checks the role again.
 
@@ -228,18 +228,27 @@ The form-first builder stores desired marketing and pricing configuration in
 `events.configured_marketing_mode`, `configured_marketing_url`, `configured_slug`,
 `configured_pricing_mode` and `configured_price`. `configured_slug_edited`
 remembers whether the URL was deliberately edited, so automatic URLs continue
-following name changes after reload. These fields do not activate
-new marketing views or pricing rules. Existing consumers continue to read
+following name changes after reload. Marketing configuration does not activate
+new marketing views. Existing consumers continue to read
 `slug`, `marketing_url`, `regular_price` and `member_price`; unrelated form
 updates omit effective prices. `is_featured` saves the staff choice without
 claiming portal Home selection/display is delivered.
 
-Existing events keep `pricing_policy = 'legacy'`. New builder events with
-Free/Paid configuration get `figma_pending`: they can be saved as drafts, but
-publication, scheduling, purchases, tickets and accepted offers are rejected at
-the database boundary until the pricing and free-registration follow-up enables
-them. This includes staff checkout of these drafts. Existing legacy staff draft
-checkout remains supported. A form save cannot change the effective policy.
+New Free/Paid configuration activates `pricing_policy = 'figma'`, synchronizing
+`regular_price` to the configured non-member amount and `member_price` to zero.
+Active membership requires both personal expiry and club-term checks. Existing
+legacy events retain their policy/amounts on unrelated saves; explicitly changing
+pricing configuration converts an eligible event. The temporary pricing
+publication/scheduling/registration blockers have been removed. Staff may still
+test drafts; ordinary required-field, authorization and pricing locks remain.
+
+`initialize_event_checkout` snapshots paid prices under the event lock. A zero
+amount reserves its ticket and completes the zero-dollar purchase in one
+transaction, without Square customer creation, card collection or a charge.
+The purchase supplies existing history, confirmation and receipt paths; its ticket
+supplies Going/private access, QR and check-in. Equal attempt keys return the
+same receipt; rejected free reservations leave no purchase. A changed quote
+requires refresh rather than charging an unreviewed amount.
 
 `first_published_at` records first activation and survives a return to Draft.
 Existing active rows are backfilled when the migration runs. Both effective
@@ -284,3 +293,13 @@ controls are omitted without clearing existing descriptions. Staff working draft
 can contain incomplete questions and moments; materialized Application events
 need at least one valid question before publication or scheduling through the
 builder. Member upload/response permissions retain their existing contract.
+
+### Finding an issued event ticket
+
+The attendee’s `/portal/events/<slug>` page reads their own ticket and renders
+**Registration** below the event details. It shows a shared Ticket with its signed
+QR and **View ticket**, which opens a larger scannable code. Signing stays on the
+server and uses the authenticated attendee’s ticket ID, never an ID supplied by
+the browser. A Going badge alone does not supply the ticket view. Checked-in
+attendees keep their ticket/code; people without a ticket see no issued QR.
+Completed checkout invalidates the event detail route as well as checkout.

@@ -156,6 +156,7 @@ export function SquareCheckoutForm({
   userId,
 }: SquareCheckoutFormProps) {
   const router = useRouter();
+  const freeEvent = kind === "event_ticket" && amountCents === 0;
   const theme = useSyncExternalStore(
     subscribeTheme,
     getThemeSnapshot,
@@ -174,7 +175,7 @@ export function SquareCheckoutForm({
       process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID,
   );
   const [loadingCard, setLoadingCard] = useState(true);
-  const initializing = !disabled && squareConfigured && loadingCard;
+  const initializing = !freeEvent && !disabled && squareConfigured && loadingCard;
   const [submitting, setSubmitting] = useState(false);
   /**
    * The redirect to the confirmation page is a transition, so it stays pending
@@ -187,13 +188,13 @@ export function SquareCheckoutForm({
   const [message, setMessage] = useState(disabledMessage ?? "");
   const shownMessage =
     message ||
-    (!disabled && !squareConfigured
+    (!freeEvent && !disabled && !squareConfigured
       ? "Square is not configured yet for this environment."
       : "");
   const recoverStalledNavigation = useNavigationRecovery(() => {
     setRedirectTimedOut(true);
     setMessage(
-      "Your payment was submitted, but the confirmation page did not load. Check Purchases before trying again.",
+      "Your request was submitted, but the confirmation page did not load. Check Purchases before trying again.",
     );
   });
   const checkoutScope = useMemo(
@@ -226,7 +227,7 @@ export function SquareCheckoutForm({
     const applicationId = process.env.NEXT_PUBLIC_SQUARE_APP_ID;
     const locationId = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID;
 
-    if (disabled || !applicationId || !locationId) {
+    if (freeEvent || disabled || !applicationId || !locationId) {
       return;
     }
 
@@ -304,7 +305,7 @@ export function SquareCheckoutForm({
       mounted = false;
       void nextCard?.destroy();
     };
-  }, [containerId, disabled]);
+  }, [containerId, disabled, freeEvent]);
 
   useEffect(() => {
     onSubmittingChange?.(busy);
@@ -325,8 +326,7 @@ export function SquareCheckoutForm({
 
     if (
       disabled ||
-      !card ||
-      !squarePayments ||
+      (!freeEvent && (!card || !squarePayments)) ||
       busy
     ) {
       return;
@@ -339,69 +339,76 @@ export function SquareCheckoutForm({
     setMessage("");
 
     try {
-      const billingContact: BillingContact = {
-        countryCode: "CA",
-        email: buyerEmail,
-        familyName: buyerLastName,
-        givenName: buyerFirstName,
-        phone: buyerPhone || undefined,
-        postalCode: billingPostalCode || undefined,
-      };
-      const verificationDetails: ChargeCardVerificationDetails = {
-        amount: (amountCents / 100).toFixed(2),
-        billingContact,
-        customerInitiated: true,
-        currencyCode: "CAD",
-        intent: "CHARGE",
-        sellerKeyedIn: false,
-      };
+      let token: string | null = null;
+      let verificationToken: string | null = null;
+      if (!freeEvent) {
+        const billingContact: BillingContact = {
+          countryCode: "CA",
+          email: buyerEmail,
+          familyName: buyerLastName,
+          givenName: buyerFirstName,
+          phone: buyerPhone || undefined,
+          postalCode: billingPostalCode || undefined,
+        };
+        const verificationDetails: ChargeCardVerificationDetails = {
+          amount: (amountCents / 100).toFixed(2),
+          billingContact,
+          customerInitiated: true,
+          currencyCode: "CAD",
+          intent: "CHARGE",
+          sellerKeyedIn: false,
+        };
 
-      const tokenized = await withDeadline(
-        () => card.tokenize(verificationDetails),
-        {
-          operation: "Verifying card details",
-          timeoutMs: ASYNC_DEADLINES.checkout,
-        },
-      );
-
-      if (tokenized.status !== "OK" || !tokenized.token) {
-        setMessage(
-          getTokenizationMessage(tokenized) ||
-            "Card details could not be verified. Please check your information."
-        );
-        return;
-      }
-
-      /**
-       * Issuers may require Strong Customer Authentication before they will
-       * authorize a card-not-present payment. This runs the buyer through the
-       * bank's challenge when one is needed, and the resulting token is what
-       * tells Square the buyer was verified.
-       */
-      let verification;
-      try {
-        verification = await withDeadline(
-          () => squarePayments.verifyBuyer(tokenized.token, verificationDetails),
+        const tokenized = await withDeadline(
+          () => card!.tokenize(verificationDetails),
           {
-            operation: "Verifying payment with your bank",
+            operation: "Verifying card details",
             timeoutMs: ASYNC_DEADLINES.checkout,
           },
         );
-      } catch (verificationError) {
-        console.error("Square buyer verification failed.");
-        setMessage(
-          isAsyncTimeoutError(verificationError)
-            ? getAsyncErrorMessage(verificationError)
-            : "Your bank could not verify this payment. Please try again or use a different card.",
-        );
-        return;
-      }
 
-      if (!verification?.token) {
-        setMessage(
-          "Your bank could not verify this payment. Please try again or use a different card.",
-        );
-        return;
+        if (tokenized.status !== "OK" || !tokenized.token) {
+          setMessage(
+            getTokenizationMessage(tokenized) ||
+              "Card details could not be verified. Please check your information."
+          );
+          return;
+        }
+
+        /**
+         * Issuers may require Strong Customer Authentication before they will
+         * authorize a card-not-present payment. This runs the buyer through the
+         * bank's challenge when one is needed, and the resulting token is what
+         * tells Square the buyer was verified.
+         */
+        let verification;
+        try {
+          verification = await withDeadline(
+            () => squarePayments!.verifyBuyer(tokenized.token, verificationDetails),
+            {
+              operation: "Verifying payment with your bank",
+              timeoutMs: ASYNC_DEADLINES.checkout,
+            },
+          );
+        } catch (verificationError) {
+          console.error("Square buyer verification failed.");
+          setMessage(
+            isAsyncTimeoutError(verificationError)
+              ? getAsyncErrorMessage(verificationError)
+              : "Your bank could not verify this payment. Please try again or use a different card.",
+          );
+          return;
+        }
+
+        if (!verification?.token) {
+          setMessage(
+            "Your bank could not verify this payment. Please try again or use a different card.",
+          );
+          return;
+        }
+
+        token = tokenized.token;
+        verificationToken = verification.token;
       }
 
       const result = await withDeadline(
@@ -415,11 +422,12 @@ export function SquareCheckoutForm({
             idempotencyKey,
             kind,
             slug,
-            token: tokenized.token,
-            verificationToken: verification.token,
+            token,
+            verificationToken,
+            expectedAmountCents: amountCents,
           }),
         {
-          operation: "Confirming payment",
+          operation: freeEvent ? "Confirming registration" : "Confirming payment",
           timeoutMs: ASYNC_DEADLINES.checkout,
         },
       );
@@ -457,7 +465,7 @@ export function SquareCheckoutForm({
       setMessage(
         isAsyncTimeoutError(error)
           ? getAsyncErrorMessage(error)
-          : "Payment could not be confirmed. Check your purchases before trying again.",
+          : "Checkout could not be confirmed. Check your purchases before trying again.",
       );
     } finally {
       setSubmitting(false);
@@ -466,7 +474,7 @@ export function SquareCheckoutForm({
 
   return (
     <form onSubmit={handleCheckout} className="space-y-4">
-      {collectBuyerDetails ? (
+      {collectBuyerDetails && !freeEvent ? (
         <>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
@@ -538,13 +546,12 @@ export function SquareCheckoutForm({
         </div>
       ) : null}
 
-      <div
-        id={containerId}
-        className="min-h-24"
-      />
+      {!freeEvent && <div id={containerId} className="min-h-24" />}
 
       {shownMessage ? (
-        <p className="text-small text-destructive">{shownMessage}</p>
+        <p role="alert" className="text-small text-destructive">{shownMessage}</p>
+      ) : freeEvent ? (
+        <p className="text-small text-muted-foreground">No payment details are needed. Confirm to reserve your ticket.</p>
       ) : showSecurityMessage ? (
         <p className="text-small text-muted-foreground">
           Your card details are tokenized by Square. Prices and eligibility are
@@ -558,12 +565,11 @@ export function SquareCheckoutForm({
           disabled ||
           initializing ||
           busy ||
-          !card ||
-          !squarePayments
+          (!freeEvent && (!card || !squarePayments))
         }
         type="submit"
       >
-        {busy ? "Processing..." : buttonLabel}
+        {busy ? "Processing..." : freeEvent ? "Confirm spot" : buttonLabel}
       </Button>
     </form>
   );

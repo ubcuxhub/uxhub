@@ -40,6 +40,5 @@ export function EventPricing({ state, locked, effectivePrices, onChange, showErr
         </FieldSet>
         {state.pricing_mode === "paid" && <Field data-invalid={!!error || undefined} className="@min-[34rem]/pricing:max-w-[calc(50%-8px)]"><FieldLabel htmlFor="configured-price">Non-member price (CAD)</FieldLabel><Input id="configured-price" className="min-h-11 sm:min-h-10" type="text" inputMode="decimal" placeholder="E.g. 10.00" value={state.pricing_amount} onChange={event => onChange("pricing_amount", event.target.value)} /><FieldDescription>Use up to two decimal places.</FieldDescription>{error && <FieldError><span className="flex items-start gap-1.5"><CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />{error}</span></FieldError>}</Field>}
       </>}
-    <p className="text-small text-muted-foreground">{effectivePrices ? `Current checkout prices remain unchanged: ${summary}. ` : "New events remain drafts until the new pricing and free-registration flows are available. "}Save Free/Paid configuration for the new pricing flows.</p>
   </div>;
 }

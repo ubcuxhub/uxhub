@@ -35,8 +35,20 @@ function getSquareEnvironment() {
     : SquareEnvironment.Sandbox;
 }
 
-export const squareClient = new SquareClient({
-  token: requiredEnv("SQUARE_ACCESS_TOKEN"),
-  environment: getSquareEnvironment(),
-  version: "2026-09-16",
-});
+let client: SquareClient | undefined;
+
+function getClient() {
+  client ??= new SquareClient({
+    token: requiredEnv("SQUARE_ACCESS_TOKEN"),
+    environment: getSquareEnvironment(),
+    version: "2026-09-16",
+  });
+  return client;
+}
+
+// Importing checkout must not require payment credentials for free events.
+// Paid operations still validate configuration before contacting Square.
+export const squareClient = {
+  get payments() { return getClient().payments; },
+  get customers() { return getClient().customers; },
+};

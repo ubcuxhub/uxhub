@@ -6,6 +6,11 @@ import { FlowLink } from "@/components/shared/FlowLink";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { EventRegistrationTicket } from "@/features/events/components/EventRegistrationTicket";
+import { fetchUserEventTicket } from "@/lib/supabase-helpers/event-tickets";
+import { fetchEventLinks } from "@/lib/supabase-helpers/event-links";
+import { createCheckInToken } from "@/lib/check-in-token";
+import { formatUserName } from "@/lib/user-name";
 import { EventAgendaTable } from "@/features/events/components/EventAgendaTable";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { requireAuth } from "@/lib/auth/guards";
@@ -41,14 +46,18 @@ export default async function PortalEventPage({
     notFound();
   }
   
-  const [agenda, mentors, sponsors, badges] = await Promise.all([
+  const [agenda, mentors, sponsors, badges, ticket] = await Promise.all([
     event.agenda_enabled ? fetchEventAgenda(supabase, event.id) : [],
     // Admins switch these sections off per event, as the public event page does.
     event.mentors_enabled ? fetchEventMentors(supabase, event.id) : [],
     event.sponsors_enabled ? fetchEventSponsors(supabase, event.id) : [],
     loadEventBadges(supabase, user.id, [event]),
+    fetchUserEventTicket(supabase, event.id, user.id),
   ]);
   const badge = badges[event.id];
+  const participantPackages = ticket
+    ? (await fetchEventLinks(supabase, event.id)).filter((link) => link.type === "participant_package")
+    : [];
 
   const startTime = formatEventTime(event.starts_at);
   const endTime = formatEventTime(event.ends_at);
@@ -137,6 +146,15 @@ export default async function PortalEventPage({
       </div>
 
       
+      {ticket && <EventRegistrationTicket
+        eventName={event.name}
+        eventColour={event.event_colour}
+        holderName={formatUserName(user)}
+        checkedIn={badge?.status === "checked_in"}
+        qrToken={createCheckInToken(ticket.id)}
+        participantPackages={participantPackages}
+      />}
+
       <EventAgendaTable eventName={event.name} agenda={agenda} />
 
       <EventPeopleCard type="mentors" people={mentors} />

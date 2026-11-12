@@ -407,8 +407,6 @@ export async function saveAdminEventAction(
       "This page URL is already in use.",
       "The page URL is locked after first publication.",
       "Pricing is locked because registrations or payments exist.",
-      "New pricing is saved as a draft. Publication requires the pricing and free-registration integration.",
-      "Pricing activation requires the pricing integration.",
     ];
     if (configurationMessages.includes(error.message)) return { error: error.message };
     if (error.code === "23505" && /events_slug|event_url_claims/.test(error.message)) throw new Error("This page URL is already in use.");

@@ -30,6 +30,7 @@ export async function revalidatePurchasePaths(
     revalidatePath("/portal");
     if (event?.slug) {
       revalidatePath(`/events/${event.slug}`);
+      revalidatePath(`/portal/events/${event.slug}`);
       revalidatePath(`/portal/events/${event.slug}/checkout`);
     }
   }

@@ -3,6 +3,8 @@
 import { CheckoutLayout } from "@/components/shared/CheckoutLayout";
 import { useFlowDialog } from "@/components/shared/FlowDialog";
 import { Button } from "@/components/ui/button";
+import { useUser } from "@/lib/auth/user-context";
+import { hasActiveMembership } from "@/features/memberships/lib/expiry";
 import { withReturnTo } from "@/lib/auth/paths";
 import type { EventRow, UserInfoRow } from "@/lib/supabase/models";
 
@@ -24,7 +26,10 @@ export function EventCheckout({
   user,
 }: EventCheckoutProps) {
   const { close } = useFlowDialog();
-  const isMember = Boolean(user.membership_type_id);
+  const { membershipTermEndsAt } = useUser();
+  const isMember = event.pricing_policy === "figma"
+    ? hasActiveMembership(user, membershipTermEndsAt)
+    : Boolean(user.membership_type_id);
   const price = isMember ? event.member_price : event.regular_price;
 
   const confirmationHref = (purchaseId: string) =>
@@ -62,7 +67,7 @@ export function EventCheckout({
         successHref: confirmationHref,
       }}
       price={price}
-      processingMessage="Please don’t close or refresh this page. We’re confirming your payment and event registration."
+      processingMessage={price === 0 ? "Please don’t close or refresh this page. We’re confirming your event registration." : "Please don’t close or refresh this page. We’re confirming your payment and event registration."}
       user={user}
     />
   );

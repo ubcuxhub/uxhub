@@ -13,6 +13,11 @@ import type { CompositionMeta } from "./types";
 export const MANIFEST = [
   // Column 1: Student events and checkout
   {
+    id: "registered-event",
+    column: 1,
+    uses: ["registration-ticket", "ticket", "button", "dialog"],
+  },
+  {
     id: "event-registration",
     column: 1,
     uses: ["card", "status-badge", "avatar", "separator", "radio-group", "field", "checkbox", "button", "toast"],
@@ -31,6 +36,11 @@ export const MANIFEST = [
     id: "checkout-summary",
     column: 1,
     uses: ["card", "detail-row", "field", "input", "button", "alert"],
+  },
+  {
+    id: "free-registration",
+    column: 1,
+    uses: ["checkout", "card"],
   },
   {
     id: "toasts",
