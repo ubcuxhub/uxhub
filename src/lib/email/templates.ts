@@ -127,3 +127,37 @@ function renderEventDetailRows(
     detailRow("Order ID", purchase.id),
   ].join("");
 }
+
+/**
+ * The 6-digit code that proves a UBC address (docs/design/ubc-email-verification.md).
+ * The code stays out of the subject so it doesn't land in notification
+ * previews and mail logs, and sits in the body as plain text so mail clients
+ * and iOS can offer it for autofill.
+ */
+export function renderUbcVerificationCodeEmail({
+  code,
+  expiresInMinutes = 10,
+}: {
+  code: string;
+  expiresInMinutes?: number;
+}) {
+  const codeBlock = `<p style="margin:0 0 24px;font-family:'SFMono-Regular',Menlo,Consolas,monospace;font-size:32px;font-weight:600;letter-spacing:8px;color:#111827;">${escapeHtml(code)}</p>`;
+  const notes = [
+    `It expires in ${expiresInMinutes} minutes.`,
+    "If you didn't request this, ignore this email. Someone may have typed your address by mistake. UX Hub will never ask you for this code.",
+  ]
+    .map(
+      (line) =>
+        `<p style="margin:0 0 12px;font-size:14px;line-height:1.5;color:#4b5563;">${escapeHtml(line)}</p>`,
+    )
+    .join("");
+
+  return {
+    html: renderEmailLayout({
+      heading: "Your verification code",
+      intro: "Use this code to verify your UBC email for UX Hub.",
+      body: `${codeBlock}${notes}`,
+    }),
+    subject: "Your UX Hub verification code",
+  };
+}

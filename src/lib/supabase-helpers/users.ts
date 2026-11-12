@@ -148,12 +148,14 @@ export async function fetchAdminUserRecordById(supabase: DbClient, id: string) {
   if (error) throw error;
   if (!row) return null;
 
+  // The manager behind a manual UBC verification.
+  const verifierId = row.ubc_verified_by;
   let verifier: StudentVerifier | null = null;
-  if (row.student_verified_by) {
+  if (verifierId) {
     const { data, error: verifierError } = await supabase
       .from(TABLES.userInfo)
       .select("id, first_name, last_name")
-      .eq("id", row.student_verified_by)
+      .eq("id", verifierId)
       .is("deleted_at", null)
       .maybeSingle();
     if (verifierError) throw verifierError;

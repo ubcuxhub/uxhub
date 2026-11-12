@@ -5,13 +5,16 @@ import type {
   UserType,
 } from "@/lib/supabase/models";
 import {
-  hasActiveMembership,
+  hasActiveOrPendingMembership,
   isMembershipTermClosed,
 } from "@/features/memberships/lib/expiry";
+import { validateStudentNumber } from "@/features/memberships/lib/validation";
 import {
-  validateFacultyEmail,
-  validateStudentNumber,
-} from "@/features/memberships/lib/validation";
+  hasPurchaseUbcVerification,
+  normalizeUbcEmail,
+  tierRequiresUbcVerification,
+  validateUbcEmail,
+} from "@/features/memberships/lib/ubc-verification";
 
 export const MEMBERSHIP_AUDIENCES = [
   "student",
@@ -88,6 +91,9 @@ export type MembershipEligibilityUser = Pick<
   | "membership_pre_ordered_type_id"
   | "membership_type_id"
   | "student_number"
+  | "ubc_email"
+  | "ubc_verified_at"
+  | "ubc_verified_via"
   | "user_type"
   | "year"
 >;
@@ -99,26 +105,25 @@ export type MembershipEligibilityType = Pick<
 >;
 
 /**
- * Whether the user holds a membership that blocks buying another one.
- *
- * A pre-order blocks unconditionally — it is pending, not expired, and the
- * payment may still land. A held membership only blocks while it is still
- * active: `membership_type_id` is never cleared when a membership lapses, so
- * checking it alone would leave every expired member permanently unable to
- * renew, and would lock the whole club out the day the term end passes.
+ * Whether an unverified UBC member must verify before buying, given the tiers
+ * on offer: some active tier for their type is for UBC audiences alone. The
+ * plans route sends them to the code step then, instead of listing only the
+ * tiers they could buy unverified.
  */
-export function hasActiveOrPendingMembership(
-  user: Pick<
-    MembershipEligibilityUser,
-    | "membership_expires_at"
-    | "membership_pre_ordered_type_id"
-    | "membership_type_id"
-  >,
-  termEndsAt: string | null,
+export function needsUbcVerificationForTiers(
+  user: MembershipEligibilityUser,
+  membershipTypes: MembershipEligibilityType[],
 ) {
-  if (user.membership_pre_ordered_type_id) return true;
-  return hasActiveMembership(user, termEndsAt);
+  if (hasPurchaseUbcVerification(user)) return false;
+  return membershipTypes.some(
+    (membership) =>
+      membership.active &&
+      membership.eligible_user_types.includes(user.user_type) &&
+      tierRequiresUbcVerification(membership),
+  );
 }
+
+export { hasActiveOrPendingMembership };
 
 export function canEditMembershipClassification(
   user: UserInfoRow,
@@ -138,6 +143,7 @@ const ELIGIBILITY_COLUMNS = [
   "school_institution",
   "student_number",
   "student_status",
+  "ubc_email",
   "year",
 ] as const;
 
@@ -150,8 +156,8 @@ type EligibilityColumn = (typeof ELIGIBILITY_COLUMNS)[number];
  * stale value from a previous one.
  */
 const OWNED_COLUMNS: Record<UserType, ReadonlySet<EligibilityColumn>> = {
-  ubcStudent: new Set(["faculty", "major", "student_number", "year"]),
-  faculty: new Set(["faculty", "faculty_email"]),
+  ubcStudent: new Set(["faculty", "major", "student_number", "ubc_email", "year"]),
+  faculty: new Set(["faculty", "faculty_email", "ubc_email"]),
   nonUbc: new Set(["school_institution", "student_status", "year"]),
 };
 
@@ -167,7 +173,11 @@ export function buildEligibilityUpdate(input: {
   userType: UserType;
   studentNumber: number | null;
   faculty?: string | null;
-  facultyEmail?: string | null;
+  /**
+   * The UBC address. Faculty also mirror it into `faculty_email`, which the
+   * code in production reads until a cleanup migration drops it.
+   */
+  ubcEmail?: string | null;
 }): UserInfoUpdate {
   const owned = OWNED_COLUMNS[input.userType];
   const update: UserInfoUpdate = { user_type: input.userType };
@@ -181,8 +191,9 @@ export function buildEligibilityUpdate(input: {
   if (owned.has("faculty") && input.faculty !== undefined) {
     update.faculty = input.faculty?.trim() || null;
   }
-  if (owned.has("faculty_email") && input.facultyEmail !== undefined) {
-    update.faculty_email = input.facultyEmail?.trim() || null;
+  if (owned.has("ubc_email") && input.ubcEmail !== undefined) {
+    update.ubc_email = input.ubcEmail ? normalizeUbcEmail(input.ubcEmail) || null : null;
+    if (owned.has("faculty_email")) update.faculty_email = update.ubc_email;
   }
   return update;
 }
@@ -194,12 +205,13 @@ export function isMembershipProfileComplete(user: MembershipEligibilityUser) {
         validateStudentNumber(String(user.student_number)) === null &&
         user.faculty &&
         user.year &&
-        user.major?.trim(),
+        user.major?.trim() &&
+        validateUbcEmail(user.ubc_email ?? "", "student") === null,
     );
   }
 
   if (user.user_type === "faculty") {
-    return validateFacultyEmail(user.faculty_email ?? "") === null;
+    return validateUbcEmail(user.ubc_email ?? "", "faculty") === null;
   }
 
   return true;
@@ -210,6 +222,11 @@ export function isMembershipProfileComplete(user: MembershipEligibilityUser) {
  * payment server action. `eligible_user_types` on the tier row is the source of
  * truth for which audiences may buy it — do not reintroduce a slug list here,
  * or the two checks drift and the UI offers purchases the server rejects.
+ *
+ * A tier for UBC audiences alone also needs a purchase-valid UBC
+ * verification (`hasPurchaseUbcVerification`), so the checkout route and the
+ * payment action refuse an unverified member. A tier Non-UBC members can buy
+ * too isn't gated (`tierRequiresUbcVerification`).
  *
  * `termEndsAt` closes sales once the club-wide term has ended. Enforcing it
  * here rather than only in the UI is what stops a direct link to the checkout
@@ -225,6 +242,7 @@ export function isEligibleForMembership(
     !isMembershipTermClosed(termEndsAt) &&
     !hasActiveOrPendingMembership(user, termEndsAt) &&
     isMembershipProfileComplete(user) &&
+    (!tierRequiresUbcVerification(membership) || hasPurchaseUbcVerification(user)) &&
     membership.eligible_user_types.includes(user.user_type)
   );
 }

@@ -99,6 +99,59 @@ export interface SeedUser {
    * the manager's row, which a fresh database has not created yet.
    */
   studentVerification?: { verifiedByEmail: string; verifiedAt: string };
+  /**
+   * A UBC verification by code or sign-in email. Left out, `withUbcVerification`
+   * derives the rest: `manual` comes from `studentVerification`, an active or
+   * pending UBC member is `grandfathered` (as the migration stamped them), and
+   * anyone else is unverified, so the code flow can be tried through the dev
+   * log. A faculty account's `ubc_email` is its `faculty_email`.
+   */
+  ubcVerification?: SeedUbcVerification;
+}
+
+export interface SeedUbcVerification {
+  via: "code" | "sign_in_email";
+  /** Must qualify for the account's type; a `sign_in_email` one is the account's own. */
+  email: string;
+  verifiedAt: string;
+}
+
+/**
+ * When grandfathered fixtures were stamped. Fixed, so a second run writes the
+ * same value and changes nothing.
+ */
+export const SEED_UBC_GRANDFATHERED_AT = "2026-11-10T05:09:57.000Z";
+
+function holdsActiveOrPendingMembership(user: SeedUser, now: Date) {
+  if (user.membershipPreOrderedSlug) return true;
+  if (!user.membershipSlug) return false;
+  return !user.membershipExpiresAt || new Date(user.membershipExpiresAt) > now;
+}
+
+/**
+ * Writes the UBC verification columns into a fixture's profile, so every run
+ * resets them to what the data describes. `manual` is applied later, once the
+ * verifying manager's row exists (see `reconcileStudentVerification`).
+ */
+export function withUbcVerification(user: SeedUser, now: Date): SeedUser {
+  const { profile } = user;
+  const columns: Pick<
+    SeedProfile,
+    "ubc_email" | "ubc_verified_at" | "ubc_verified_via" | "ubc_verified_by"
+  > = { ubc_email: null, ubc_verified_at: null, ubc_verified_via: null, ubc_verified_by: null };
+
+  if (profile.user_type === "ubcStudent" || profile.user_type === "faculty") {
+    if (profile.user_type === "faculty") columns.ubc_email = profile.faculty_email ?? null;
+    if (user.ubcVerification) {
+      columns.ubc_email = user.ubcVerification.email;
+      columns.ubc_verified_at = user.ubcVerification.verifiedAt;
+      columns.ubc_verified_via = user.ubcVerification.via;
+    } else if (!user.studentVerification && holdsActiveOrPendingMembership(user, now)) {
+      columns.ubc_verified_at = SEED_UBC_GRANDFATHERED_AT;
+      columns.ubc_verified_via = "grandfathered";
+    }
+  }
+  return { ...user, profile: { ...profile, ...columns } };
 }
 
 /** Every fixture account signs in with this. Local only — see `lib/targets.ts`. */
@@ -360,7 +413,7 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
 
   const gridPurchaseTime = timestamp(addDays(today, -60), 15);
 
-  return [
+  const users: SeedUser[] = [
   /* ── Deep fixtures ───────────────────────────────────────────────────────
    * Three accounts carrying purchased registrations across every phase. These
    * are what the portal history, receipts, applications, and check-in screens
@@ -772,6 +825,11 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
   {
     email: "faculty-member@ubc.ca",
     password: SEED_PASSWORD,
+    ubcVerification: {
+      via: "sign_in_email",
+      email: "faculty-member@ubc.ca",
+      verifiedAt: gridPurchaseTime,
+    },
     membershipSlug: "faculty",
     fullEventHistory: false,
     profile: facultyProfile({
@@ -813,6 +871,12 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
   {
     email: "admin-innovator@example.com",
     password: SEED_PASSWORD,
+    // Joined after the code step shipped.
+    ubcVerification: {
+      via: "code",
+      email: "seed-admin-innovator@student.ubc.ca",
+      verifiedAt: gridPurchaseTime,
+    },
     membershipSlug: "innovator",
     fullEventHistory: false,
     profile: studentProfile({
@@ -837,6 +901,11 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
   {
     email: "admin-faculty@ubc.ca",
     password: SEED_PASSWORD,
+    ubcVerification: {
+      via: "sign_in_email",
+      email: "admin-faculty@ubc.ca",
+      verifiedAt: gridPurchaseTime,
+    },
     membershipSlug: "faculty",
     fullEventHistory: false,
     profile: facultyProfile({
@@ -879,6 +948,12 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
   {
     email: "admin-no-membership@example.com",
     password: SEED_PASSWORD,
+    // Verified over a year ago: shown as expired, and the next join asks again.
+    ubcVerification: {
+      via: "code",
+      email: "seed-admin-no-membership@student.ubc.ca",
+      verifiedAt: timestamp(addDays(today, -400), 18),
+    },
     membershipSlug: null,
     fullEventHistory: false,
     profile: studentProfile({
@@ -900,6 +975,12 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
   {
     email: "manager-no-membership@example.com",
     password: SEED_PASSWORD,
+    // Verified recently, so joining skips the code.
+    ubcVerification: {
+      via: "code",
+      email: "seed-manager@student.ubc.ca",
+      verifiedAt: timestamp(addDays(today, -20), 18),
+    },
     membershipSlug: null,
     fullEventHistory: false,
     profile: studentProfile({
@@ -947,6 +1028,7 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
     registrations: [],
   },
   ];
+  return users.map((user) => withUbcVerification(user, now));
 }
 
 export const seedUsers = buildSeedUsers(seedEvents, new Date());

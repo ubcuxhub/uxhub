@@ -24,11 +24,17 @@ import {
 } from "@/components/ui/table";
 import type { MembershipTypeOption, UserRecord } from "@/features/admin/types";
 import { formatMembershipTypeName } from "@/features/memberships/lib/display";
+import { useUser } from "@/lib/auth/user-context";
 import type { RoleAccess } from "@/lib/supabase/models";
 import { formatUserName } from "@/lib/user-name";
 import { useListPage } from "../hooks/use-list-page";
 import { useRecordRows } from "../hooks/use-record-rows";
 import { toggleSetValue } from "../lib/directory";
+import {
+  UBC_VERIFICATION_FILTERS,
+  ubcVerificationFilterValue,
+  type UbcVerificationFilter,
+} from "../lib/ubc-verification-display";
 import { ChipFilterSection } from "./ChipFilterSection";
 
 interface AdminUsersManagerProps {
@@ -83,6 +89,13 @@ function sortUsers(users: UserRecord[], sort: UserSort) {
   });
 }
 
+function matchesUbcFilter(
+  selected: ReadonlySet<UbcVerificationFilter>,
+  value: UbcVerificationFilter | null,
+) {
+  return value !== null && selected.has(value);
+}
+
 /**
  * Manage users: search, sort, filter and page the directory. Each row links
  * to the user's record, which opens in a drawer over the list.
@@ -92,6 +105,10 @@ export function AdminUsersManager({ users, membershipTypes }: AdminUsersManagerP
   const [sort, setSort] = useState<UserSort>(DEFAULT_SORT);
   const [tierFilter, setTierFilter] = useState<Set<string>>(new Set());
   const [roleFilter, setRoleFilter] = useState<Set<RoleAccess>>(new Set());
+  // UBC verification only applies to UBC students and faculty; picking any
+  // chip leaves Non-UBC users out.
+  const [ubcFilter, setUbcFilter] = useState<Set<UbcVerificationFilter>>(new Set());
+  const { membershipTermEndsAt } = useUser();
   const searchRef = useRef<HTMLInputElement>(null);
   const records = useRecordRows(LIST_HREF);
 
@@ -111,7 +128,7 @@ export function AdminUsersManager({ users, membershipTypes }: AdminUsersManagerP
   }, [membershipTypes, users]);
 
   const search = query.trim().toLowerCase();
-  const filterCount = tierFilter.size + roleFilter.size;
+  const filterCount = tierFilter.size + roleFilter.size + ubcFilter.size;
   const filtering = search !== "" || filterCount > 0;
 
   const results = useMemo(
@@ -121,16 +138,17 @@ export function AdminUsersManager({ users, membershipTypes }: AdminUsersManagerP
           (user) =>
             (tierFilter.size === 0 || tierFilter.has(user.membership_type_id ?? NO_MEMBERSHIP)) &&
             (roleFilter.size === 0 || roleFilter.has(user.role_access)) &&
+            (ubcFilter.size === 0 || matchesUbcFilter(ubcFilter, ubcVerificationFilterValue(user, membershipTermEndsAt))) &&
             (!search ||
               formatUserName(user).toLowerCase().includes(search) ||
               user.email.toLowerCase().includes(search)),
         ),
         sort,
       ),
-    [users, search, sort, tierFilter, roleFilter],
+    [users, search, sort, tierFilter, roleFilter, ubcFilter, membershipTermEndsAt],
   );
 
-  const view = JSON.stringify([search, sort, [...tierFilter].sort(), [...roleFilter].sort()]);
+  const view = JSON.stringify([search, sort, [...tierFilter].sort(), [...roleFilter].sort(), [...ubcFilter].sort()]);
   const paging = useListPage(results, view, {
     startIndex: results.findIndex((user) => userHref(user) === records.activePath),
   });
@@ -140,6 +158,7 @@ export function AdminUsersManager({ users, membershipTypes }: AdminUsersManagerP
   const clearFilters = () => {
     setTierFilter(new Set());
     setRoleFilter(new Set());
+    setUbcFilter(new Set());
   };
   const showAll = () => {
     setQuery("");
@@ -209,6 +228,12 @@ export function AdminUsersManager({ users, membershipTypes }: AdminUsersManagerP
                   options={ROLE_OPTIONS}
                   selected={roleFilter}
                   onToggle={(value) => setRoleFilter((current) => toggleSetValue(current, value))}
+                />
+                <ChipFilterSection
+                  title="UBC verification"
+                  options={UBC_VERIFICATION_FILTERS}
+                  selected={ubcFilter}
+                  onToggle={(value) => setUbcFilter((current) => toggleSetValue(current, value))}
                 />
               </SortFilterPanel>
             }

@@ -12,6 +12,7 @@ import {
 import { FACULTIES, STUDENT_STATUSES, YEAR_LEVELS } from "@/lib/constants";
 import { formatEventDate } from "@/lib/date";
 import { getEffectiveMembershipExpiry } from "@/features/memberships/lib/expiry";
+import { ubcVerificationStatus } from "@/features/memberships/lib/ubc-verification";
 import { cn } from "@/lib/utils";
 import type {
   StudentStatus,
@@ -152,6 +153,13 @@ export function ProfileFields({
                 hint="Locked while your membership is active or pending. Ask the UX Hub team to correct it."
               />
             )}
+            {user.ubc_email ? (
+              <LockedField
+                label="UBC email"
+                value={user.ubc_email}
+                hint={ubcEmailHint(user, membershipTermEndsAt)}
+              />
+            ) : null}
           </>
         ) : user.user_type === "faculty" ? (
           <>
@@ -159,7 +167,13 @@ export function ProfileFields({
               value={formData.faculty}
               onChange={(faculty) => patch({ faculty })}
             />
-            <LockedField label="Faculty email" value={user.faculty_email} />
+            {user.ubc_email ? (
+              <LockedField
+                label="UBC email"
+                value={user.ubc_email}
+                hint={ubcEmailHint(user, membershipTermEndsAt)}
+              />
+            ) : null}
           </>
         ) : (
           <>
@@ -284,6 +298,19 @@ function Field({
  * A value the member cannot edit here, shaped like an input so it lines up
  * with the fields beside it while reading as plainly locked.
  */
+/**
+ * Where the UBC address stands. It changes in the join flow, which asks for a
+ * code when it needs one; Settings never sends codes.
+ */
+function ubcEmailHint(user: UserInfoRow, termEndsAt: string | null) {
+  const status = ubcVerificationStatus(user, { termEndsAt });
+  if (status.state === "verified") return "Verified.";
+  if (status.state === "expired") {
+    return "Verification expired. You’ll confirm it with a code when you renew.";
+  }
+  return "Not verified yet. You’ll confirm it with a code when you join.";
+}
+
 function LockedField({
   label,
   value,

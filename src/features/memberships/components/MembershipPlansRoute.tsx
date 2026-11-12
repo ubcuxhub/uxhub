@@ -14,6 +14,7 @@ import {
   hasActiveOrPendingMembership,
   isMembershipProfileComplete,
   membershipDetailsPath,
+  needsUbcVerificationForTiers,
 } from "@/features/memberships/lib/policy";
 
 function MembershipNotice({
@@ -70,6 +71,13 @@ export async function MembershipPlansRoute({ returnTo }: { returnTo?: string }) 
   const membershipTypes = await fetchMembershipTypes(supabase, {
     orderBy: "price",
   });
+  // An unverified UBC member goes back to the details step, which opens on
+  // the code state when a code is pending, rather than seeing only the tiers
+  // open to everyone.
+  if (needsUbcVerificationForTiers(user, membershipTypes)) {
+    redirect(withReturnTo(membershipDetailsPath(user.user_type), returnTo));
+  }
+
   const eligible = getEligibleMembershipTypes(user, membershipTypes, termEndsAt);
 
   if (eligible.length === 1) {

@@ -1,6 +1,7 @@
 # UBC email verification for student and faculty memberships
 
-Status: proposal v2 · 2026-11-09 · blocking code verification
+Status: accepted v2 · 2026-11-10 · blocking code verification, implemented in
+one PR (see [Implementation notes](#implementation-notes))
 
 Builds on `main` after #259 (setup `user_type`, `user_type_confirmed_at`) and
 #260. Replaces v1 (email link, non-blocking): the link, the token module, the
@@ -37,13 +38,16 @@ notice are gone.
    no prompt, banner or email. Grandfathering lasts until their current
    membership ends. Since nobody can buy while a membership is active or
    pending, this means it never covers a purchase: the next purchase or renewal
-   asks for a code. The user still needs to confirm this; see Open question 1.
+   asks for a code. Confirmed; see [Resolved](#resolved) 1.
 6. **365-day validity.** A `code`, `sign_in_email` or `manual` verification
    counts for 365 days, matching the membership year. After that, the next
    purchase asks again. Members whose sign-in email qualifies are re-verified
    automatically on save.
-7. **One verified account per address.** A partial unique index on `ubc_email`
-   among verified, live rows stops a friend from reusing someone else's inbox.
+7. **One account per proven address.** A partial unique index on `ubc_email`
+   among live rows verified by `code` or `sign_in_email` stops a friend from
+   reusing someone else's inbox. Only those two methods prove an address, so
+   only they hold one: a `manual` or `grandfathered` stamp vouches for the
+   member, and an address they save later can't block its real owner.
 8. **Student number.** The member-side check exists (`validateStudentNumber`:
    8 digits, no obvious fakes). Close the gap in the admin edit path
    (`src/features/admin/lib/user-edit.ts` accepts any digits) by reusing it.
@@ -104,7 +108,7 @@ The guard and UI already load this row, and members may read their own.
     `scrub_user_student_verification`)
   - `deleted_at` is set: also nulls `ubc_email`
 - After the backfill:
-  `create unique index user_info_ubc_email_verified_key on public.user_info (ubc_email) where ubc_verified_at is not null and ubc_email is not null and deleted_at is null;`
+  `create unique index user_info_ubc_email_verified_key on public.user_info (ubc_email) where ubc_verified_via in ('code', 'sign_in_email') and ubc_email is not null and deleted_at is null;`
 
 ### `ubc_verification_codes`: the pending code
 
@@ -157,8 +161,8 @@ including the first send, when no code row exists yet.
     `ubc_email`.
   - Refuses `already_verified` when that address is currently verified on
     this account.
-  - Refuses `taken` when it is verified on another live account within 365
-    days.
+  - Refuses `taken` when another live account proved it (`code` or
+    `sign_in_email`) within 365 days.
   - Enforces the 60-second cooldown and the 5-per-24-hours cap. The window
     resets when `window_started_at` is over 24 hours old. Cooldown and cap
     are per member, not per address, so switching addresses can't bypass
@@ -177,8 +181,8 @@ including the first send, when no code row exists yet.
   - Returns `verified | already_verified | stale | taken`.
   - Requires the code row to be the same send (`last_sent_at` matches) for the
     same address, so a code from a superseded send can't complete.
-  - Releases another account's hold on the address if that verification is
-    over 365 days old (clears its stamp).
+  - Releases another account's hold on the address (a `code` or
+    `sign_in_email` stamp) if it is over 365 days old (clears its stamp).
   - Then sets `ubc_verified_at = now()`, `ubc_verified_via = 'code'`, and nulls
     the code fields.
   - A unique violation maps to `taken`.
@@ -217,10 +221,10 @@ order, on live rows (`deleted_at is null`):
      That mirrors `hasActiveMembership`.
    - Sets `ubc_verified_at = now()`, `via = 'grandfathered'`, and leaves
      `ubc_email` as found (usually null).
-5. **Clear shared addresses.** Null `ubc_email` on any `manual` or
-   `grandfathered` row whose address another verified row also holds, so the
-   index can't fail the deploy.
-6. Create the unique index.
+5. Create the unique index. Only step 2 writes proven addresses, and auth
+   emails are unique, so it can't fail the deploy. (An earlier draft cleared
+   shared addresses on `manual` and `grandfathered` rows first; with those out
+   of the index there is nothing to clear.)
 
 ### Backward compatibility
 
@@ -275,7 +279,9 @@ Module `src/features/memberships/lib/ubc-code.ts` (server-only).
   cooldown still applies, so a send to the new address may show the countdown.
 - **Two tabs, two sends.** The row lock lets one win; the other gets
   `cooldown`. When a live code exists for the same address, the UI treats
-  `cooldown` as "code sent".
+  `cooldown` as "code sent". After an address change, `cooldown` carries no
+  expiry (the last code went to the old address), so the step says no code
+  was sent yet and offers "Send a new code" when the timer runs out.
 - **Two tabs, same correct code.** Both attempts count, both compare equal.
   The first `complete` stamps, the second returns `already_verified`, and both
   continue.
@@ -352,6 +358,11 @@ All in `src/features/memberships/actions.ts`. The pure helpers go in
 
 ## Payment guard
 
+- **Scope:** UBC-only tiers, those whose `eligible_user_types` leave out
+  `nonUbc` (`tierRequiresUbcVerification`). A tier Non-UBC members can buy
+  too, like the production payment smoke-test tier, proves nothing about UBC
+  and isn't gated. The plans route sends an unverified UBC member to the code
+  step whenever an active UBC-only tier is offered to their type.
 - **Location:** `createSquarePaymentForMembership` in
   `src/features/payments/fulfillment.ts`, reached from `submitCheckoutAction`.
   - The `user` there comes from `requireAuth()` in the same request, so the
@@ -360,7 +371,8 @@ All in `src/features/memberships/actions.ts`. The pure helpers go in
     `ensureSquareCustomerId`, `createPurchase` and the Square call, so no
     purchase row or charge exists for an unverified member.
 - **Two layers:**
-  1. An explicit `hasPurchaseUbcVerification(user)` check first. It returns
+  1. An explicit `hasPurchaseUbcVerification(user)` check first, for a
+     UBC-only tier. It returns
      `{ error: "Verify your UBC email before paying.", terminal: true }` and
      logs `payment.membership_ubc_unverified` (warn).
   2. `isEligibleForMembership` includes the same rule, so the UI and the server
@@ -576,7 +588,9 @@ token. `RESEND_API_KEY` and `EMAIL_FROM` are already required for receipts.
 
 ## PR breakdown
 
-Two PRs, about 2,300 lines in total, roughly half of it tests.
+Planned as two PRs, about 2,300 lines in total, roughly half of it tests. It
+shipped as one (PR 1 and 2 together), so there is no window between the two
+deploys and no second migration rerunning `grandfather_ubc_members()`.
 
 | PR | Contents | Lines |
 | --- | --- | --- |
@@ -584,20 +598,63 @@ Two PRs, about 2,300 lines in total, roughly half of it tests.
 | 2. Blocking member flow | `validateUbcEmail`, code module, actions, email template, `loadCurrentUser` sign-in email, details-form code states, plans and checkout redirects, payment guard, Settings field, seed, unit, component and integration tests, plus a one-line migration rerunning `grandfather_ubc_members()` so members who joined between the two deploys are covered | ~1,300 |
 | 3. Cleanup (after a term) | Drop `faculty_email`, `student_verified_*`, `grandfather_ubc_members()` | ~60 |
 
-PR 2 is the behaviour change. Merge it when exec contacts know about the
-"Can't get the code?" path. Keep each migration's timestamp the newest on
-`main`.
+The behaviour change ships with the merge. Merge it when exec contacts know
+about the "Can't get the code?" path. Keep each migration's timestamp the
+newest on `main`.
 
-## Open questions
+## Resolved
 
-1. **How long does grandfathering last?**
-   - Recommended: until the member's current membership ends, so their next
-     purchase or renewal asks for a code.
-   - The alternative is 365 days from the migration, which would let them
-     renew next fall with no code.
-   - This decides one branch of `hasPurchaseUbcVerification`.
-2. **Is a per-member send cap enough?** Someone could type a victim's UBC
-   address from several accounts, up to 5 emails a day each. Capping per
-   address as well needs a send-log table instead of the single code row.
-   Recommended: per member only for now; account creation already requires a
-   confirmed email.
+1. **How long does grandfathering last?** Until the member's current
+   membership ends, and it never covers a new purchase: their next purchase or
+   renewal asks for a code.
+   - "Current membership" is whatever is active or pending, read the way
+     `hasActiveOrPendingMembership` reads it (`expiry.ts`): a pre-order, or a
+     held tier whose effective expiry (the earlier of `membership_expires_at`
+     and the club-wide `membership_term_ends_at`) is unset or in the future.
+     A member pending at migration time is grandfathered through the
+     membership that pre-order becomes.
+   - `ubcVerificationStatus` shows `grandfathered` as verified only while that
+     holds, and expired after. `hasPurchaseUbcVerification` never accepts it,
+     and nobody can buy while a membership is active or pending, so the two
+     agree: the stamp can't carry into a purchase.
+   - The 365-days-from-migration alternative was rejected.
+2. **Is a per-member send cap enough?** Yes, for now: 5 sends per rolling 24
+   hours and the 60-second cooldown are per member, with no per-address send
+   log. Someone typing a victim's address from several accounts can send at
+   most 5 emails a day from each, and every account needs a confirmed email.
+   Revisit with a send-log table if abuse shows up.
+
+## Implementation notes
+
+Where the code differs from, or settles details the plan left open:
+
+- **Cap before cooldown.** `claim_ubc_code_send` answers `daily_cap` once five
+  sends are used, even inside the 60 seconds after the fifth, since a
+  countdown would only lead to the cap.
+- **Attempts left.** `begin_ubc_code_attempt` also returns `attempts_left`, so
+  "That code isn't right. 3 tries left." needs no extra read. A wrong fifth
+  guess answers `locked` straight away.
+- **Verify results** add `malformed` (refused before an attempt is counted)
+  and `error` (the database failed) to the list above.
+- **A changed address** is its own result, `address_changed`, for a send whose
+  claim answers `mismatch` and for an attempt `begin_ubc_code_attempt` calls
+  `stale` (the code went to another address than the saved one). Both take
+  the member back to the form, which says the address changed. A `stale` at
+  completion still means a newer code went to the same address.
+- **Address rule in SQL.** The backfill uses `public.ubc_email_qualifies`, the
+  same domain rule as `validateUbcEmail`; it is service-role only.
+- **Settings** shows the UBC email read-only with its status, for students and
+  faculty who have one; it replaces the "Faculty email" field. The address
+  changes in the join flow. `updateEligibilityProfileAction` still accepts
+  `ubcEmail` (validated by domain), keeps a saved address across a type change
+  only while it qualifies, fills an empty one from a qualifying confirmed
+  sign-in email and stamps that.
+- **Manual verification** checks first whether another live account proved
+  the same address (by code or sign-in, within the year) and says so. A manual
+  stamp doesn't hold the address, so this is a safeguard, not the index. It
+  also writes the legacy `student_verified_*` columns for faculty.
+- **Changing a student number in admin** unticks "Verified" only for a manual
+  verification, matching the trigger; a code or sign-in stamp doesn't depend
+  on the number.
+- **Admin record line** for a waiting code reads "Code sent Nov 10 · not
+  entered", and Non-UBC members read "Not needed for Non-UBC members".

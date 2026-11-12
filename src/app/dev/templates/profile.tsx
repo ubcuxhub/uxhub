@@ -74,6 +74,10 @@ const BASE: UserInfoRow = {
   square_customer_id: null,
   student_verified_at: null,
   student_verified_by: null,
+  ubc_email: null,
+  ubc_verified_at: null,
+  ubc_verified_via: null,
+  ubc_verified_by: null,
 };
 
 /** Signed up a minute ago and skipped setup: only the sign-up fields are set. */

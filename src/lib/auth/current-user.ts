@@ -6,7 +6,15 @@ import { ensureUserInfo } from "@/lib/auth/ensure-user-info";
 import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";
 
 export type CurrentUserResult =
-  | { status: "authenticated"; user: UserInfoRow }
+  | {
+      status: "authenticated";
+      user: UserInfoRow;
+      /**
+       * The sign-in address when auth has confirmed it, else null. Read from
+       * auth rather than `user_info.email`, which isn't kept in sync.
+       */
+      confirmedEmail: string | null;
+    }
   | { status: "unauthenticated" }
   | { status: "error"; message: string };
 
@@ -40,12 +48,15 @@ export const loadCurrentUser = cache(async (): Promise<CurrentUserResult> => {
     return { status: "unauthenticated" };
   }
 
+  const confirmedEmail =
+    authUser.email && authUser.email_confirmed_at ? authUser.email : null;
+
   const existing = await fetchUserInfoByAuthId(supabase, authUser.id).catch(
     () => null
   );
 
   if (existing) {
-    return { status: "authenticated", user: existing };
+    return { status: "authenticated", user: existing, confirmedEmail };
   }
 
   // An authenticated user without a profile row predates the sign-up flow that
@@ -67,5 +78,14 @@ export const loadCurrentUser = cache(async (): Promise<CurrentUserResult> => {
     return { status: "error", message: "Unable to load your profile." };
   }
 
-  return { status: "authenticated", user: repaired };
+  return { status: "authenticated", user: repaired, confirmedEmail };
 });
+
+/**
+ * The signed-in member's confirmed sign-in address, or null. Shares
+ * `loadCurrentUser`'s cached `getUser()`, so it costs no extra auth round trip.
+ */
+export async function getConfirmedSignInEmail(): Promise<string | null> {
+  const result = await loadCurrentUser();
+  return result.status === "authenticated" ? result.confirmedEmail : null;
+}

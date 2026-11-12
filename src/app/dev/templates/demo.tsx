@@ -78,6 +78,7 @@ import { Composition } from "@/app/dev/_shell/Specimen";
 import { ApplicationReviewFlow, ApplicationsEmpty } from "./application-review";
 import { PROFILE_SCENARIOS, ProfileTemplate, type ProfileScenarioId } from "./profile";
 import { SETUP_TEMPLATE_STARTS, SetupTemplate } from "./setup";
+import { UBC_CODE_SCENARIOS, UbcCodeTemplate, type UbcCodeScenarioId } from "./ubc-code";
 import type { SectionProps } from "@/app/dev/_shell/types";
 
 const TEMPLATES = [
@@ -95,6 +96,16 @@ const TEMPLATES = [
   { id: "profile-new", title: "Settings Profile, brand-new member", spec: "proposal" },
   { id: "profile-saving", title: "Settings Profile, saving", spec: "proposal" },
   { id: "profile-error", title: "Settings Profile, save error", spec: "proposal" },
+  { id: "ubc-details", title: "Join details, UBC email", spec: "ubc-email-verification" },
+  { id: "ubc-details-signin", title: "Join details, sign-in email verified", spec: "ubc-email-verification" },
+  { id: "ubc-code-sent", title: "UBC code, sent (Resend countdown)", spec: "ubc-email-verification" },
+  { id: "ubc-code-wrong", title: "UBC code, wrong code", spec: "ubc-email-verification" },
+  { id: "ubc-code-expired", title: "UBC code, expired", spec: "ubc-email-verification" },
+  { id: "ubc-code-locked", title: "UBC code, too many tries", spec: "ubc-email-verification" },
+  { id: "ubc-code-daily-cap", title: "UBC code, daily cap", spec: "ubc-email-verification" },
+  { id: "ubc-code-taken", title: "UBC code, address taken", spec: "ubc-email-verification" },
+  { id: "ubc-code-send-failed", title: "UBC code, send failed", spec: "ubc-email-verification" },
+  { id: "ubc-code-verified", title: "UBC code, verified", spec: "ubc-email-verification" },
 ] as const;
 type TemplateId = (typeof TEMPLATES)[number]["id"];
 
@@ -785,6 +796,7 @@ function TemplateBody({ id }: { id: TemplateId }) {
   if (id === "application-review") return <ApplicationReviewFlow start="detail" />;
   if (id in SETUP_TEMPLATE_STARTS) return <SetupTemplate start={SETUP_TEMPLATE_STARTS[id]} />;
   if (id in PROFILE_SCENARIOS) return <ProfileTemplate key={id} scenario={id as ProfileScenarioId} />;
+  if (id in UBC_CODE_SCENARIOS) return <UbcCodeTemplate key={id} scenario={id as UbcCodeScenarioId} />;
   return <EventsTemplate />;
 }
 
@@ -832,7 +844,7 @@ function Section({ open }: SectionProps) {
     <div className="flex flex-col gap-10">
       <Composition
         title={`${template.title} (${template.spec}), desktop`}
-        description={`Built from the real components on fixture data: no fetching, no auth. Pick another template with the Force open links above. Laid out at the width of your window; the page container caps at 1152px.${template.id === "event-builder" ? " The section pill floats at the bottom of the window, as it does on the real page." : ""}${template.id.startsWith("application") ? " A design proposal (docs/design/application-review.md): open a row, decide, add a note, then go back; the list keeps its filters, page and your row." : ""}${template.id.startsWith("setup") ? " Member setup at /portal/setup, on the auth shell, with an in-memory fake server (600ms per write). Every step works: Save, Skip, Back, the crop dialog (uploads stay in the browser), and Welcome." : ""}${template.id.startsWith("profile") ? " A design proposal (docs/design/profile-settings.md) for the Settings dialog's Profile tab, in a static copy of the dialog. Saving is faked per section (800ms debounce, then 600ms); Retry and the photo chooser work." : ""}`}
+        description={`Built from the real components on fixture data: no fetching, no auth. Pick another template with the Force open links above. Laid out at the width of your window; the page container caps at 1152px.${template.id === "event-builder" ? " The section pill floats at the bottom of the window, as it does on the real page." : ""}${template.id.startsWith("application") ? " A design proposal (docs/design/application-review.md): open a row, decide, add a note, then go back; the list keeps its filters, page and your row." : ""}${template.id.startsWith("setup") ? " Member setup at /portal/setup, on the auth shell, with an in-memory fake server (600ms per write). Every step works: Save, Skip, Back, the crop dialog (uploads stay in the browser), and Welcome." : ""}${template.id.startsWith("ubc-") ? " The join details step's UBC email code states (docs/design/ubc-email-verification.md) in a frame shaped like the membership dialog, with a fake server (600ms per call): 123456 is the right code, anything else is wrong." : ""}${template.id.startsWith("profile") ? " A design proposal (docs/design/profile-settings.md) for the Settings dialog's Profile tab, in a static copy of the dialog. Saving is faked per section (800ms debounce, then 600ms); Retry and the photo chooser work." : ""}`}
       >
         <div className="overflow-hidden rounded-xl border border-border-subtle bg-background">
           <TemplateBody id={template.id} />

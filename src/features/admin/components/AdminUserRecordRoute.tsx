@@ -9,6 +9,8 @@ import { createClient } from "@/lib/supabase/server";
 import { fetchMembershipTypeOptions } from "@/lib/supabase-helpers/memberships";
 import { fetchPurchasesForUser } from "@/lib/supabase-helpers/purchases";
 import { fetchAdminUserRecordById } from "@/lib/supabase-helpers/users";
+import { fetchPendingUbcCode } from "@/lib/supabase-helpers/ubc-verification";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { formatUserName } from "@/lib/user-name";
 
 import { RECENT_PURCHASE_LIMIT, toUserPurchaseSummary } from "../lib/user-purchases";
@@ -35,12 +37,23 @@ export async function AdminUserRecordRoute({ userId }: { userId: string }) {
   if (!result) return <RecordNotFound noun="user" />;
 
   const record = toUserRecord(result.row);
+  // "Code sent · not entered" needs the code row, which only the service role
+  // reads; one record at a time, never the list.
+  let ubcCodeSentAt: string | null = null;
+  if (record.user_type !== "nonUbc" && !record.ubc_verified_at) {
+    try {
+      ubcCodeSentAt = (await fetchPendingUbcCode(supabaseAdmin, record.id))?.sentAt ?? null;
+    } catch (error) {
+      log.error("admin.ubc_code_load_failed", { userId: record.id, ...errorFields(error) });
+    }
+  }
   return (
     <AdminUserRecord
       // A different user is a fresh record: no draft carries over.
       key={record.id}
       record={record}
       verifierName={result.verifier ? formatUserName(result.verifier) : null}
+      ubcCodeSentAt={ubcCodeSentAt}
       membershipTypes={membershipTypes}
       canManage={hasManagerAccess(currentUser.role_access)}
       currentUserId={currentUser.id}

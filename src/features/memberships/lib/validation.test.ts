@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateFacultyEmail, validateStudentNumber } from "./validation";
+import { validateStudentNumber } from "./validation";
 
 describe("membership validation", () => {
   it.each(["10000001", " 28471936 "])(
@@ -31,20 +31,4 @@ describe("membership validation", () => {
       "Please enter your actual UBC student number.",
     );
   });
-
-  it.each([
-    "person@ubc.ca",
-    "person@student.ubc.ca",
-    "person@cs.ubc.ca",
-    " PERSON@UBC.CA ",
-  ])("accepts UBC email %s", (email) => {
-    expect(validateFacultyEmail(email)).toBeNull();
-  });
-
-  it.each(["person@example.com", "person@fakeubc.ca", "person@ubc.ca.example.com"])(
-    "rejects non-UBC email %s",
-    (email) => {
-      expect(validateFacultyEmail(email)).toContain("must end in ubc.ca");
-    }
-  );
 });

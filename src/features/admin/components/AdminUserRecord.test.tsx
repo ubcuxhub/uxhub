@@ -19,7 +19,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../user-profile-actions", () => ({ setStudentVerificationAction: mocks.verifyStudent, removeUserProfilePhotoAction: mocks.removePhoto }));
 vi.mock("../actions", () => ({ saveManagerUserDetailsAction: mocks.saveDetails, updateUserRoleAction: mocks.updateRole }));
 vi.mock("@/lib/supabase/client", () => ({ createClient: () => ({ storage: { from: () => ({ getPublicUrl: (path: string) => ({ data: { publicUrl: `http://localhost/${path}` } }) }) } }) }));
-vi.mock("@/lib/auth/user-context", () => ({ useUser: () => ({ refreshUser: mocks.refreshUser }) }));
+vi.mock("@/lib/auth/user-context", () => ({ useUser: () => ({ refreshUser: mocks.refreshUser, membershipTermEndsAt: null }) }));
 vi.mock("next/navigation", () => ({ useRouter: () => mocks.router, usePathname: () => "/admin/users/dora" }));
 vi.mock("next/link", () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode } & React.ComponentProps<"a">) => (
@@ -45,6 +45,7 @@ let savedUsers: Map<string, UserRecord>;
 function user(overrides: Partial<UserRecord> = {}): UserRecord {
   return {
     birth_date: null, interests: [], profile_photo_path: null, student_verified_at: null, student_verified_by: null,
+    ubc_email: null, ubc_verified_at: null, ubc_verified_via: null, ubc_verified_by: null,
     id: "dora", auth_user_id: "auth-dora", first_name: "Dora", last_name: "Hu",
     email: "z@example.com", phone: "604-555-0100", preferred_pronouns: "She/Her",
     created_at: "2026-07-21T12:00:00Z", updated_at: null, deleted_at: null,
@@ -57,6 +58,7 @@ function user(overrides: Partial<UserRecord> = {}): UserRecord {
     ...overrides,
   };
 }
+const MANUAL_BY_IRIS = { ubc_verified_at: "2026-10-14T19:00:00Z", ubc_verified_via: "manual", ubc_verified_by: "iris" } as const;
 const iris = user({ id: "iris", first_name: "Iris", last_name: "Chan", email: "m@example.com", role_access: "admin", membership_type_id: "explorer", membership_type_name: "Explorer" });
 const membershipTypes = [{ id: "innovator", name: "Innovator" }, { id: "explorer", name: "Explorer" }];
 const nonUbcTypes = [...membershipTypes, { id: "non-ubc", name: "nonUbc" }];
@@ -67,13 +69,21 @@ beforeEach(() => {
   savedUsers = new Map([user(), iris].map((item) => [item.id, { ...item }]));
   mocks.saveDetails.mockImplementation(async (id: string, changes: Partial<UserRecord>) => {
     const saved = { ...savedUsers.get(id)!, ...changes };
-    if ("student_number" in changes) { saved.student_verified_at = null; saved.student_verified_by = null; }
+    if ("student_number" in changes) {
+      saved.student_verified_at = null; saved.student_verified_by = null;
+      if (saved.ubc_verified_via === "manual") { saved.ubc_verified_at = null; saved.ubc_verified_via = null; saved.ubc_verified_by = null; }
+    }
     savedUsers.set(id, saved);
     return saved;
   });
   mocks.updateRole.mockImplementation(async (_id: string, role: string) => role);
   mocks.verifyStudent.mockImplementation(async (id: string, verified: boolean) => {
-    const saved = { ...savedUsers.get(id)!, student_verified_at: verified ? "2026-10-14T19:00:00Z" : null, student_verified_by: verified ? "me" : null };
+    const stamp = verified ? "2026-10-14T19:00:00Z" : null;
+    const saved: UserRecord = {
+      ...savedUsers.get(id)!,
+      student_verified_at: stamp, student_verified_by: verified ? "me" : null,
+      ubc_verified_at: stamp, ubc_verified_via: verified ? "manual" : null, ubc_verified_by: verified ? "me" : null,
+    };
     savedUsers.set(id, saved);
     return saved;
   });
@@ -148,16 +158,34 @@ describe("AdminUserRecord: viewing", () => {
 
   it("shows No membership, the verifier and the verified mark", () => {
     renderRecord({
-      record: user({ membership_type_id: null, membership_type_name: null, student_verified_at: "2026-10-14T19:00:00Z", student_verified_by: "iris" }),
+      record: user({ membership_type_id: null, membership_type_name: null, student_verified_at: "2026-10-14T19:00:00Z", student_verified_by: "iris", ...MANUAL_BY_IRIS }),
       verifierName: "Iris Chan",
     });
     expect(screen.getByText("No membership", { selector: "[data-slot=badge]" })).toBeTruthy();
-    expect(screen.getByText("Verified student")).toBeTruthy();
-    expect(shown("Verification")).toBe("Verified · Oct 14, 2026 · by Iris Chan");
+    expect(screen.getByText("UBC verified")).toBeTruthy();
+    expect(shown("Verification")).toBe("Verified manually · Oct 14, 2026 · by Iris Chan");
+  });
+
+  it("shows the UBC address and an unentered code", () => {
+    renderRecord({
+      record: user({ ubc_email: "dora@student.ubc.ca" }),
+      ubcCodeSentAt: "2026-11-10T19:55:00Z",
+    });
+    expect(shown("UBC email")).toBe("dora@student.ubc.ca");
+    expect(shown("Verification")).toBe("Code sent Nov 10, 2026 · not entered");
+    expect(screen.queryByText("UBC verified")).toBeNull();
+  });
+
+  it("marks a code-verified member without naming a manager", () => {
+    renderRecord({
+      record: user({ ubc_email: "dora@student.ubc.ca", ubc_verified_at: "2026-10-14T19:00:00Z", ubc_verified_via: "code" }),
+    });
+    expect(screen.getByText("UBC verified")).toBeTruthy();
+    expect(shown("Verification")).toBe("Verified by code · dora@student.ubc.ca · Oct 14, 2026");
   });
 
   it("names a verifier whose profile is gone as a former manager", () => {
-    renderRecord({ record: user({ student_verified_at: "2026-10-14T19:00:00Z", student_verified_by: "gone" }) });
+    renderRecord({ record: user({ student_verified_at: "2026-10-14T19:00:00Z", student_verified_by: "gone", ubc_verified_at: "2026-10-14T19:00:00Z", ubc_verified_via: "manual", ubc_verified_by: "gone" }) });
     expect(shown("Verification")).toContain("by a former or unavailable manager");
   });
 
@@ -193,14 +221,14 @@ describe("AdminUserRecord: editing", () => {
     expect(screen.getByRole("combobox", { name: "Year" }).textContent).toBe("2");
     expect(screen.getByRole("combobox", { name: "Role" }).textContent).toBe("Manager");
     expect(checkbox("Subscribed to the newsletter").checked).toBe(true);
-    expect(checkbox("Verified student").checked).toBe(false);
+    expect(checkbox("Verified").checked).toBe(false);
     expect(screen.getByRole("button", { name: "Remove interest Design" })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Edit user" })).toBeNull();
 
     fireEvent.change(textbox("First name"), { target: { value: "  Dorothy  " } });
     fireEvent.change(textbox("Area of study"), { target: { value: "Design" } });
     fireEvent.click(checkbox("Subscribed to the newsletter"));
-    fireEvent.click(checkbox("Verified student"));
+    fireEvent.click(checkbox("Verified"));
     fireEvent.change(birthday(), { target: { value: "2001-01-01" } });
     // A tag still in the box is saved with the rest.
     fireEvent.change(textbox("Interests"), { target: { value: "Research" } });
@@ -213,7 +241,7 @@ describe("AdminUserRecord: editing", () => {
     expect(mocks.updateRole).not.toHaveBeenCalled();
     expect(mocks.router.refresh).toHaveBeenCalledOnce();
     expect(screen.getByRole("heading", { level: 2, name: "Dorothy Hu" })).toBeTruthy();
-    expect(shown("Verification")).toBe("Verified · Oct 14, 2026 · by you");
+    expect(shown("Verification")).toBe("Verified manually · Oct 14, 2026 · by you");
     expect(shown("Birthday")).toBe("Jan 1, 2001");
   });
 
@@ -228,11 +256,11 @@ describe("AdminUserRecord: editing", () => {
   });
 
   it("clears verification when the student number changes", () => {
-    renderRecord({ record: user({ student_verified_at: "2026-10-14T19:00:00Z", student_verified_by: "iris" }) });
+    renderRecord({ record: user({ student_verified_at: "2026-10-14T19:00:00Z", student_verified_by: "iris", ...MANUAL_BY_IRIS }) });
     edit();
-    expect(checkbox("Verified student").checked).toBe(true);
-    fireEvent.change(textbox("Student number"), { target: { value: "54321" } });
-    expect(checkbox("Verified student").checked).toBe(false);
+    expect(checkbox("Verified").checked).toBe(true);
+    fireEvent.change(textbox("Student number"), { target: { value: "38475610" } });
+    expect(checkbox("Verified").checked).toBe(false);
   });
 
   it("locks a UBC member's school while editing and says why", async () => {

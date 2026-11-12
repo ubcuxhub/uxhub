@@ -28,6 +28,9 @@ describe("fetchAdminUserRecordById against local Supabase", () => {
         membership_type_id: tier.id,
         student_verified_at: "2026-10-14T19:00:00Z",
         student_verified_by: manager.id,
+        ubc_verified_at: "2026-10-14T19:00:00Z",
+        ubc_verified_via: "manual",
+        ubc_verified_by: manager.id,
       });
 
       const result = await fetchAdminUserRecordById(clientAs(admin), member.id);
@@ -45,6 +48,9 @@ describe("fetchAdminUserRecordById against local Supabase", () => {
       const member = await fixtures.createUser({
         student_verified_at: "2026-10-14T19:00:00Z",
         student_verified_by: manager.id,
+        ubc_verified_at: "2026-10-14T19:00:00Z",
+        ubc_verified_via: "manual",
+        ubc_verified_by: manager.id,
       });
       await fixtures.supabase.from("user_info").update({ deleted_at: new Date().toISOString() }).eq("id", manager.id).throwOnError();
 

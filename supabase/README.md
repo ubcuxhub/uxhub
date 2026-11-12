@@ -180,6 +180,7 @@ helper file, and fix it in one place.
 | `square_webhook_events`       | `src/lib/supabase-helpers/purchases.ts`           |
 | `app_settings`                | `src/lib/supabase-helpers/app-settings.ts`        |
 | `user_info` (service-role)    | `src/lib/supabase-helpers/admin-server.ts`        |
+| `ubc_verification_codes`      | `src/lib/supabase-helpers/ubc-verification.ts`    |
 | `event-images` (storage)      | `src/lib/supabase-helpers/admin-server.ts`        |
 | `application-files` (storage) | `src/lib/supabase-helpers/application-files.ts`   |
 

@@ -1,4 +1,6 @@
 import type { RoleAccess } from "@/lib/supabase/models";
+import { ubcVerificationStatus } from "@/features/memberships/lib/ubc-verification";
+import { validateStudentNumber } from "@/features/memberships/lib/validation";
 import type { MembershipTypeOption, UserRecord } from "../types";
 import { normalizeInterests, validateBirthDate } from "./user-profile";
 
@@ -25,7 +27,16 @@ export function canEditUserSchool(user: UserRecord, membershipTypeId: string | n
   return name === "nonUbc";
 }
 
-export function createUserEditDraft(user: UserRecord): UserEditDraft {
+/**
+ * Whether the "Verified" box starts checked: any verification that counts
+ * right now, whatever its method (code, sign-in email, manual, or a
+ * grandfathered membership still running).
+ */
+export function isUbcVerifiedNow(user: UserRecord, termEndsAt: string | null) {
+  return ubcVerificationStatus(user, { termEndsAt }).state === "verified";
+}
+
+export function createUserEditDraft(user: UserRecord, termEndsAt: string | null = null): UserEditDraft {
   return {
     fields: Object.fromEntries(USER_EDIT_FIELDS.map((field) => [field,
       field === "order_date" ? user.order_date_deprecated ?? "" : String(user[field] ?? ""),
@@ -33,13 +44,13 @@ export function createUserEditDraft(user: UserRecord): UserEditDraft {
     birthDate: user.birth_date ?? "",
     interests: [...user.interests],
     newInterest: "",
-    verified: !!user.student_verified_at,
+    verified: isUbcVerifiedNow(user, termEndsAt),
     role: user.role_access,
   };
 }
 
-export function hasUserEdits(user: UserRecord, draft: UserEditDraft): boolean {
-  const original = createUserEditDraft(user);
+export function hasUserEdits(user: UserRecord, draft: UserEditDraft, termEndsAt: string | null = null): boolean {
+  const original = createUserEditDraft(user, termEndsAt);
   return USER_EDIT_FIELDS.some((field) => draft.fields[field] !== original.fields[field]) ||
     draft.birthDate !== original.birthDate || JSON.stringify(draft.interests) !== JSON.stringify(original.interests) ||
     !!draft.newInterest.trim() || draft.verified !== original.verified || draft.role !== original.role || draft.photo !== undefined;
@@ -57,7 +68,15 @@ export function userEditChanges(user: UserRecord, draft: UserEditDraft, membersh
       changes[field] = value.trim();
     } else if (field === "newsletter") changes[field] = value === "true";
     else if (field === "student_number") {
-      if (value && (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)))) throw new Error("Enter a valid student number.");
+      // The member-side rule: 8 digits, no obvious fakes. Clearing is allowed.
+      const error = value ? validateStudentNumber(value) : null;
+      if (error) {
+        throw new Error(
+          error.includes("actual")
+            ? "Enter a real student number, not a placeholder like 12345678."
+            : "Enter a valid 8-digit student number.",
+        );
+      }
       changes[field] = value ? Number(value) : null;
     } else if (field === "membership_type_id") changes[field] = value || null;
     else if (field === "year") {

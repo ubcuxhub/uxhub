@@ -521,7 +521,13 @@ async function reconcileStudentVerification(
 
     const { error } = await supabase
       .from(TABLE.userInfo)
-      .update({ student_verified_at: verifiedAt, student_verified_by: verifierId })
+      .update({
+        student_verified_at: verifiedAt,
+        student_verified_by: verifierId,
+        ubc_verified_at: verifiedAt,
+        ubc_verified_via: "manual",
+        ubc_verified_by: verifierId,
+      })
       .eq("id", profileIds.get(fixture.email));
     if (error) {
       throw new Error(`Verifying "${fixture.email}" failed: ${error.message}`);

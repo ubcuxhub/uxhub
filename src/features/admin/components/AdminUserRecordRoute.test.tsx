@@ -15,7 +15,12 @@ const mocks = vi.hoisted(() => ({
   fetchTiers: vi.fn(),
   fetchPurchases: vi.fn(),
   logError: vi.fn(),
+  fetchPendingCode: vi.fn(),
 }));
+
+vi.mock("server-only", () => ({}));
+vi.mock("@/lib/supabase/admin", () => ({ supabaseAdmin: { name: "service client" } }));
+vi.mock("@/lib/supabase-helpers/ubc-verification", () => ({ fetchPendingUbcCode: mocks.fetchPendingCode }));
 
 vi.mock("@/lib/auth/guards", () => ({ requireAdmin: mocks.requireAdmin }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: mocks.createClient }));
@@ -79,6 +84,19 @@ describe("AdminUserRecordRoute", () => {
   it("lets an admin look but not edit", async () => {
     mocks.requireAdmin.mockResolvedValue({ id: "me", role_access: "admin" });
     expect((await route()).props.canManage).toBe(false);
+  });
+
+  it("reads an unentered UBC code for an unverified UBC member only", async () => {
+    const student = { ...row, user_type: "ubcStudent", ubc_verified_at: null };
+    mocks.fetchRecord.mockResolvedValue({ row: student, verifier: null });
+    mocks.fetchPendingCode.mockResolvedValue({ sentAt: "2026-11-10T19:55:00Z" });
+    expect((await route()).props.ubcCodeSentAt).toBe("2026-11-10T19:55:00Z");
+    expect(mocks.fetchPendingCode).toHaveBeenCalledWith({ name: "service client" }, row.id);
+
+    mocks.fetchPendingCode.mockClear();
+    mocks.fetchRecord.mockResolvedValue({ row: { ...student, user_type: "nonUbc" }, verifier: null });
+    expect((await route()).props.ubcCodeSentAt).toBeNull();
+    expect(mocks.fetchPendingCode).not.toHaveBeenCalled();
   });
 
   it("passes no verifier name when the verifier's profile is gone", async () => {

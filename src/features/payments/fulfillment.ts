@@ -43,6 +43,10 @@ import {
   normalizeSquareStatus,
 } from "./fulfillment-rules";
 import { isEligibleForMembership } from "@/features/memberships/lib/policy";
+import {
+  hasPurchaseUbcVerification,
+  tierRequiresUbcVerification,
+} from "@/features/memberships/lib/ubc-verification";
 import { resolveMembershipExpiry } from "@/features/memberships/lib/expiry";
 import { fetchMembershipTermEndsAt } from "@/lib/supabase-helpers/app-settings";
 import { ensureSquareCustomerId } from "./customer";
@@ -251,6 +255,21 @@ async function createSquarePaymentForMembership(
 
   if (!membershipType) {
     return { error: "Membership plan not found.", terminal: true } as const;
+  }
+
+  // Nobody pays for a UBC-only tier unverified. `user` comes from
+  // requireAuth() in this request, so the stamp is fresh; checked before any
+  // purchase row or charge exists. Fulfilment doesn't recheck: by then the
+  // money is taken. A tier open to Non-UBC members too isn't gated.
+  if (tierRequiresUbcVerification(membershipType) && !hasPurchaseUbcVerification(user)) {
+    log.warn("payment.membership_ubc_unverified", {
+      userId: user.id,
+      membershipTypeId: membershipType.id,
+    });
+    return {
+      error: "Verify your UBC email before paying.",
+      terminal: true,
+    } as const;
   }
 
   const termEndsAt = await fetchMembershipTermEndsAt(adminDb);
