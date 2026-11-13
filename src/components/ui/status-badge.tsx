@@ -10,6 +10,7 @@ import {
   History,
   Hourglass,
   Lock,
+  PencilLine,
   UserCheck,
   type LucideIcon,
 } from "lucide-react";
@@ -38,6 +39,9 @@ export type CoreStatus =
 export type StudentEventStatus =
   | "opens"
   | "registration_closed"
+  | "applications_open"
+  | "applications_closed"
+  | "draft"
   | "under_review"
   | "register_by"
   | "offer_expired";
@@ -82,6 +86,21 @@ const STUDENT_STATUS_CONFIG: Record<
     tone: "neutral",
     label: () => "Registration closed",
     icon: DoorClosed,
+  },
+  applications_open: {
+    tone: "success",
+    label: () => "Applications open",
+    icon: DoorOpen,
+  },
+  applications_closed: {
+    tone: "neutral",
+    label: () => "Applications closed",
+    icon: DoorClosed,
+  },
+  draft: {
+    tone: "neutral",
+    label: () => "Draft",
+    icon: PencilLine,
   },
   under_review: {
     tone: "warning",

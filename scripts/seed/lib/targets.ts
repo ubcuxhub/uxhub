@@ -14,7 +14,7 @@
  *   seed data no longer describes.
  * - `prod` holds real data, so the seed only ever adds and updates. It writes
  *   demo events for admins to work with while the student-facing events feature
- *   is unlaunched, and it never writes user fixtures.
+ *   is unlaunched, and it never writes user fixtures or membership tiers.
  */
 
 export type SeedTarget = "local" | "prod";
@@ -26,6 +26,11 @@ export interface TargetPolicy {
   prune: boolean;
   /** Write auth users, profiles, purchases, and registrations. */
   users: boolean;
+  /**
+   * Write membership tiers. Production's are live (students buy them) and
+   * admins edit them in Club Settings, so a prod run would revert those edits.
+   */
+  memberships: boolean;
   /**
    * Force every seeded event to `draft`.
    *
@@ -39,8 +44,8 @@ export interface TargetPolicy {
 }
 
 export const TARGET_POLICIES: Record<SeedTarget, TargetPolicy> = {
-  local: { prune: true, users: true, forceDraft: false },
-  prod: { prune: false, users: false, forceDraft: true },
+  local: { prune: true, users: true, memberships: true, forceDraft: false },
+  prod: { prune: false, users: false, memberships: false, forceDraft: true },
 };
 
 /** Env var names each target reads its connection from. */

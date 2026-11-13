@@ -29,44 +29,27 @@ export interface TicketEvent {
   location: string | null;
 }
 
-export interface TicketHolder {
-  name: string;
-  email?: string | null;
-}
-
 /**
- * The student's own badge on their ticket, once they've applied or registered
- * (docs/event-states.md). A code is shown for `going` and `checked_in`. There
- * is no cancelled state.
- */
-export type TicketBadge =
-  | "under_review"
-  | "waitlisted"
-  | "register_by"
-  | "offer_expired"
-  | "not_selected"
-  | "going"
-  | "checked_in";
-
-/**
- * The badge on a student's event card and event page: their own badge, or the
- * event's availability (see more at docs/event-states.md). `date` completes "Opens" and
- * "Register by". Build one with `eventBadgeFor`.
+ * The badge on a student's event card and event page, naming their event
+ * state (docs/event-states.md). `date` completes "Opens" and "Register by".
+ * Build one with `eventBadgeFor`.
  */
 export interface EventBadge {
   status:
-    | "going"
-    | "checked_in"
-    | "under_review"
-    | "waitlisted"
-    | "register_by"
-    | "offer_expired"
-    | "not_selected"
     | "opens"
     | "registration_open"
     | "full"
     | "registration_closed"
-    | "past";
+    | "going"
+    | "checked_in"
+    | "past"
+    | "applications_open"
+    | "draft"
+    | "pending"
+    | "waitlisted"
+    | "register_by"
+    | "not_selected"
+    | "applications_closed";
   date?: string;
 }
 

@@ -145,53 +145,99 @@ Drafts belong to the applicant alone:
   review list and its counts leave them out, and no decision can move one.
   Drafts hold no seat.
 
-## Students: event badge
+## Students: event states
 
-Every event card shows exactly one badge: the student's own badge if they have
-one, otherwise the event's availability badge. Once an event has ended, it shows
-"Checked in" or "Past" either way.
+A student is in exactly one state for each event, worked out by
+`eventStateFor` in `src/features/events/lib/event-states.ts`. The badge on the
+event card and event page (`eventBadgeFor`) and the event page's registration
+panel both read that state; neither decides it.
 
-### The student's own badge
+Events without applications go `reg-open` → `reg-going` → `reg-checked-in` →
+`reg-past-attended`. Events with `requires_application` go through the `app-*`
+states first, and an accepted student joins the same ticket states once they
+register.
 
-Shown once they've applied or registered.
+| State | Badge | When |
+| --- | --- | --- |
+| `reg-upcoming` | Opens Oct 12 | Before `registration_opens_at` |
+| `reg-open` | Registration open | Registration is open and seats are left |
+| `reg-full` | Full | No seats left; can reopen if an offer expires |
+| `reg-closed` | Registration closed | After the close |
+| `reg-going` | Going | They have a ticket |
+| `reg-checked-in` | Checked in | A check-in on their ticket is active ([below](#multi-day-check-in)) |
+| `reg-past` | Past | The event has ended and they had no ticket |
+| `reg-past-attended` | Past | The event has ended and they had a ticket |
+| `app-upcoming` | Opens Oct 12 | Before `registration_opens_at`, for an application event |
+| `app-open` | Applications open | Applications are open and they haven't started one |
+| `app-draft` | Draft | Their application is a `draft`, and applications are open |
+| `app-in-review` | Pending | Their application is `submitted` |
+| `app-waitlisted` | Waitlisted | Their application is `waitlisted` |
+| `app-accepted` | Register by Oct 20 | Accepted, before the offer deadline, no ticket yet |
+| `app-rejected` | Not selected | Their application is `rejected` |
+| `app-missed` | Applications closed | Applications closed and they never started one |
+| `app-draft-expired` | Applications closed | Applications closed before their draft was submitted |
+| `app-offer-expired` | Applications open, or Applications closed | Accepted, but the deadline passed without registering; the badge follows the window |
 
-A `draft` is not an application yet for badges: the student sees the event's
-availability badge until they submit.
+- **The close** is `registration_closes_at`. When it's empty, registration for
+  an event without applications stays open until the event starts (a UI rule:
+  the database treats an empty close as no limit), and applications stay open
+  until the event ends. The application window is the apply page's own
+  (`applicationWindow`), so the panel and the apply page always agree.
+- **An event ends** at `ends_at`, or at `starts_at` when it has no end.
+- **A boundary instant** belongs to the earlier side, as in the database:
+  registration is open at `registration_opens_at` and still open at the
+  close, an event hasn't ended at `ends_at`, and an offer lapses at
+  `offer_expires_at`.
+- **Decisions outlast the close.** Applications closing only stops new
+  applications: `app-in-review`, `app-waitlisted` and `app-accepted` stand,
+  and an accepted student can register until their offer expires.
+- **Application events are never Full.** Accepted offers hold their seats, and
+  the database doesn't check seats for an application event, so an open
+  window reads as `app-open` however many seats are left.
+- **An expired offer** reads as Applications open while the window is open
+  (they'll be able to reapply once that exists) and Applications closed after.
 
-| Badge | Shown when |
-| --- | --- |
-| Under review | Their application is `submitted` |
-| Waitlisted | Their application is `waitlisted` |
-| Register by Oct 20 | Accepted, before the offer deadline, no ticket yet |
-| Offer expired | Accepted, but the deadline passed without registering |
-| Not selected | Their application is `rejected` |
-| Going | They have a ticket |
-| Checked in | Their ticket has been scanned |
+### Registration panel
 
-### Event availability badge
-
-Shown when they haven't applied or registered.
-
-| Badge | Shown when |
-| --- | --- |
-| Opens Oct 12 | Before `registration_opens_at` |
-| Registration open | Registration is open and seats are left |
-| Full | No seats left; can reopen if an offer expires |
-| Registration closed | After `registration_closes_at` |
-| Past | After `ends_at` |
+The portal event page's Registration card (`RegistrationPanel`) renders the
+state as one of three layouts: an alert, an action with one button, or the
+ticket. `getPanelSpec` in `src/features/events/lib/registration-panel.ts`
+holds each state's layout and copy. The card is titled Application while the
+student is applying and Registration otherwise, including once they're
+accepted. The ticket is locked until they register, and View ticket opens the
+"Your ticket" dialog with the scannable code.
 
 ### When more than one applies
 
 Use the first rule that matches:
 
-1. The event has ended: "Checked in" if they attended, otherwise "Past".
-2. They have a ticket: "Checked in" or "Going".
-3. They have an application: its badge.
-4. Otherwise: the availability badge.
+1. The event has ended: `reg-past-attended` if they had a ticket, otherwise
+   `reg-past`.
+2. They have a ticket: `reg-checked-in` or `reg-going`, over any application
+   state.
+3. An application event: a submitted or decided application's state
+   (`app-in-review`, `app-waitlisted`, `app-accepted`, `app-rejected`,
+   `app-offer-expired`), even before registration opens, in case an admin moved
+   the opening later. Then `app-upcoming`, then `app-draft` or
+   `app-draft-expired` for a draft, otherwise `app-open` or `app-missed`.
+4. Otherwise: `reg-upcoming`, then `reg-closed`, then `reg-full`, then
+   `reg-open`. Closed beats Full so that students can't register even if spots
+   open up.
 
 So a student who's going to an event that has since filled up still sees
 "Going", not "Full".
-As well, "Registration closed" beats "Full" so that students can't register even if spots open up.  
+
+### Multi-day check-in
+
+Each check-in belongs to one of the event's check-in sessions. A student is
+`reg-checked-in` from the moment of a scan until that session's `end_time`, or
+until the event ends when the session has no end time, and `reg-going` before
+their first scan and between sessions. Any active check-in counts when
+sessions overlap. Unticking a check-in in the admin table returns them to
+`reg-going`.
+
+The page reads the state when it loads, so it changes on the next visit or
+refresh rather than live.
 
 ## Students: teams
 
@@ -223,6 +269,3 @@ The server makes these changes through `create_team`, `join_team`,
 Seats taken = tickets + accepted offers that haven't expired and have no ticket
 yet. Since nobody gives a spot back, a full event only reopens when an offer
 expires.
-
-## Check-in status for multi-day events
-Currently, if an event spans multiple days and requires check-in for multiple days, the badge will show 'Checked-in' from the first day they check in until the end of the event, regardless of whether they need to check in again at a later day in the event. 

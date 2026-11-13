@@ -1,9 +1,7 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { FlowLink } from "@/components/shared/FlowLink";
 import { Alert } from "@/components/ui/alert";
-import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EventAgendaTable } from "@/features/events/components/EventAgendaTable";
 import { PageContainer } from "@/components/shared/PageContainer";
@@ -17,8 +15,9 @@ import { formatEventDate, formatEventTime, pacificDate } from "@/lib/date";
 import { resolveImagePreviewSrc } from "@/lib/event-image";
 import { fetchEventMentors, fetchEventSponsors } from "@/lib/supabase-helpers/event-people";
 import { EventPeopleCard } from "@/features/events/components/EventPeopleCard";
-import { loadEventBadges } from "@/features/events/lib/event-badge";
-import { ApplicationStatusCallout } from "@/features/applications/components/ApplicationStatusCallout";
+import { eventBadgeFor } from "@/features/events/lib/event-badge";
+import { loadEventStates } from "@/features/events/lib/event-states";
+import { RegistrationPanel } from "@/features/events/components/RegistrationPanel";
 import { TeamCard, TeamInviteNotice } from "@/features/events/components/teams/TeamCard";
 import { loadTeamCard, type TeamCardData } from "@/features/events/lib/team-card-data";
 import { getHeadersOrigin } from "@/lib/http/request-origin";
@@ -48,17 +47,17 @@ export default async function PortalEventPage({
   
   const joinCode = typeof join === "string" ? join : null;
   const origin = getHeadersOrigin(await headers()) ?? "";
-  const [agenda, mentors, sponsors, badges, teams] = await Promise.all([
+  const [agenda, mentors, sponsors, states, teams] = await Promise.all([
     fetchEventAgenda(supabase, event.id),
     // Admins switch these sections off per event, as the public event page does.
     event.mentors_enabled ? fetchEventMentors(supabase, event.id) : [],
     event.sponsors_enabled ? fetchEventSponsors(supabase, event.id) : [],
-    loadEventBadges(supabase, user.id, [event]),
+    loadEventStates(supabase, user.id, [event]),
     event.teams_enabled
       ? loadTeamCard({ supabase, event, userId: user.id, joinCode, origin })
       : null as TeamCardData | null,
   ]);
-  const badge = badges[event.id];
+  const badge = eventBadgeFor(states[event.id]);
 
   const startTime = formatEventTime(event.starts_at);
   const endTime = formatEventTime(event.ends_at);
@@ -70,8 +69,6 @@ export default async function PortalEventPage({
       {event.status !== "active" && (
         <Alert>Draft: only admins can see this.</Alert>
       )}
-      {/* Application status and entry point; renders nothing without applications. */}
-      <ApplicationStatusCallout event={event} userId={user.id} />
       
       <div className="border-border-subtle rounded-md border">
         <div className="w-full h-51 bg-brand-blue-200 relative rounded-t-md">
@@ -134,23 +131,19 @@ export default async function PortalEventPage({
             </div>
           </div>
           <p className="whitespace-pre-wrap">{event.description}</p>
-          {/* The public page shows active events only. */}
-          <Button asChild className="mt-6">
-            {event.status === "active" ? (
-              <Link href={`/events/${event.slug}`}>View full event details</Link>
-            ) : (
-              <FlowLink href={`/portal/events/${event.slug}/checkout`}>Register</FlowLink>
-            )}
-          </Button>
         </div>
       </div>
 
-      {/* Ticket holders only. Will sit beside the registration ticket once
-          that card exists. */}
+      {/* Registration and applications: one card whose layout follows the student's state. */}
+      <RegistrationPanel event={{ ...event, slug }} user={user} state={states[event.id]} />
+
+      {/* Ticket holders only. Stacked under the registration panel for now;
+          placing it beside the panel is a follow-up. */}
       {teams?.show ? <TeamCard {...teams.props} /> : null}
       {teams && !teams.show && teams.inviteError ? (
         <TeamInviteNotice inviteError={teams.inviteError} />
       ) : null}
+
 
       <EventAgendaTable eventName={event.name} agenda={agenda} />
 
