@@ -1203,6 +1203,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_event_analytics: { Args: { p_now?: string }; Returns: Json }
+      admin_membership_analytics: { Args: { p_now?: string }; Returns: Json }
       can_edit_application_response: {
         Args: { p_application_id: string; p_question_id: string }
         Returns: boolean

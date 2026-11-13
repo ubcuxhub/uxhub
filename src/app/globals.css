@@ -13,6 +13,10 @@
    `--text-color-*` and `--border-color-*` namespaces. Any other `--text-*`
    key in `@theme` is a font size. */
 
+.admin-dashboard {
+  font-family: var(--font-dm-sans), sans-serif;
+}
+
 @theme inline {
   --font-sans: var(--font-dm-sans);
 
