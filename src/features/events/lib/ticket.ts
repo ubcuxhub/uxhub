@@ -9,7 +9,7 @@ type TicketEventSource = Pick<
   | "ends_at"
   | "location_building"
   | "location_room"
->;
+> & { event_colour?: string | null };
 
 function range(start: string | null, end: string | null): string | null {
   if (!start) return null;
@@ -23,6 +23,7 @@ export function toTicketEvent(event: TicketEventSource): TicketEvent {
 
   return {
     name: event.name,
+    ...(event.event_colour ? { eventColour: event.event_colour } : {}),
     date: range(
       formatEventDate(event.starts_at),
       formatEventDate(event.ends_at)

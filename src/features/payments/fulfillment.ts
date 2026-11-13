@@ -9,6 +9,7 @@ import type { Database, Json } from "@/lib/supabase/database.types";
 import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
 import { errorFields, log } from "@/lib/log";
 import {
+  initializeEventCheckout,
   fetchEventTicketByPurchaseId,
   fetchUserEventTicket,
   releaseEventTicket,
@@ -219,11 +220,11 @@ async function reconcilePurchaseIfPossible(
 
 async function handleExistingCheckoutAttempt(
   user: UserInfoRow,
-  idempotencyKey: string
+  input: CheckoutRequestInput
 ): Promise<CheckoutActionResult | null> {
   const existingPurchase = await fetchPurchaseByIdempotencyKey(
     adminDb,
-    idempotencyKey
+    input.idempotencyKey
   );
 
   if (!existingPurchase) {
@@ -234,6 +235,15 @@ async function handleExistingCheckoutAttempt(
     return getExistingCheckoutResult(existingPurchase, user.id);
   }
 
+  if (existingPurchase.kind !== input.kind) {
+    return { ok: false, error: formatReservationFailure("ATTEMPT_MISMATCH"), terminal: true };
+  }
+  if (input.kind === "event_ticket") {
+    const event = await fetchEventBySlug(adminDb, input.slug);
+    if (!event || event.id !== existingPurchase.event_id) {
+      return { ok: false, error: formatReservationFailure("ATTEMPT_MISMATCH"), terminal: true };
+    }
+  }
   const reconciledPurchase = await reconcilePurchaseIfPossible(existingPurchase);
 
   if (reconciledPurchase.status === "completed") {
@@ -313,7 +323,7 @@ async function createSquarePaymentForMembership(
       locationId: getSquareLocationId(),
       note: `UX Hub membership purchase: ${membershipType.name}`,
       referenceId: purchase.id,
-      sourceId: input.token,
+      sourceId: input.token!,
       verificationToken: input.verificationToken ?? undefined,
     });
 
@@ -362,7 +372,7 @@ async function createSquarePaymentForMembership(
   }
 }
 
-async function createSquarePaymentForEventTicket(
+async function checkoutEventTicket(
   user: UserInfoRow,
   input: CheckoutRequestInput
 ) {
@@ -382,33 +392,48 @@ async function createSquarePaymentForEventTicket(
   const existingTicket = await fetchUserEventTicket(adminDb, event.id, user.id);
 
   if (existingTicket) {
+    const retry = await handleExistingCheckoutAttempt(user, input);
+    if (retry?.ok) return { purchaseId: retry.purchaseId, resolution: retry.resolution } as const;
     return {
       error: formatReservationFailure("ALREADY_REGISTERED"),
       terminal: true,
     } as const;
   }
 
-  const customerId = await ensureSquareCustomerId(user, input);
-  const amountCents = Math.round(
-    (user.membership_type_id ? event.member_price : event.regular_price) * 100
-  );
-
-  const purchase = await createPurchase(adminDb, {
-    amount_cents: amountCents,
-    currency: SQUARE_CURRENCY,
-    event_id: event.id,
-    idempotency_key: input.idempotencyKey,
-    kind: "event_ticket",
-    square_customer_id: customerId,
-    status: "pending",
-    user_id: user.id,
+  const initialized = await initializeEventCheckout(adminDb, {
+    eventId: event.id,
+    userId: user.id,
+    idempotencyKey: input.idempotencyKey,
+    freeOnly: !input.token,
+    expectedAmountCents: input.expectedAmountCents,
   });
+  if (initialized.failure_reason || !initialized.purchase_id) {
+    return { error: formatReservationFailure(initialized.failure_reason), terminal: true } as const;
+  }
+  const purchase = await fetchPurchaseById(adminDb, initialized.purchase_id);
+  if (!purchase) throw new Error("Initialized purchase not found.");
+  if (purchase.status !== "pending") {
+    if (purchase.status === "completed") await fulfillCompletedPurchase(purchase.id);
+    const existing = getExistingCheckoutResult(purchase, user.id);
+    if (!existing.ok) return { error: existing.error, terminal: existing.terminal } as const;
+    await revalidatePurchasePaths(adminDb, purchase.id);
+    return { purchaseId: existing.purchaseId, resolution: existing.resolution } as const;
+  }
+  // Only the transaction that created a paid attempt may start its external
+  // payment. Concurrent requests observe processing, avoiding competing card
+  // tokens/customer failures for the same durable snapshot.
+  if (!initialized.created) return { purchaseId: purchase.id, resolution: "processing" } as const;
+  if (purchase.amount_cents === 0) throw new Error("Free registration was not committed atomically.");
 
-  if (!purchase) {
-    return {
-      error: "Could not initialize the purchase.",
-      terminal: false,
-    } as const;
+  // The database snapshot locks pricing before any external payment request.
+  // Free registration never creates a Square customer or touches a card.
+  let customerId: string;
+  try {
+    customerId = await ensureSquareCustomerId(user, input);
+  } catch (error) {
+    log.error("payment.ticket_customer_failed", { purchaseId: purchase.id, ...errorFields(error) });
+    await updatePurchase(adminDb, purchase.id, { status: "failed", failure_reason: "Payment could not be initialized. Please try again." });
+    return { error: "Payment could not be initialized. Please try again.", terminal: true } as const;
   }
 
   try {
@@ -426,7 +451,7 @@ async function createSquarePaymentForEventTicket(
       locationId: getSquareLocationId(),
       note: `UX Hub event ticket: ${event.name}`,
       referenceId: purchase.id,
-      sourceId: input.token,
+      sourceId: input.token!,
       verificationToken: input.verificationToken ?? undefined,
     });
 
@@ -526,7 +551,7 @@ export async function executeCheckoutForUser(
 ): Promise<CheckoutActionResult> {
   const existingAttempt = await handleExistingCheckoutAttempt(
     user,
-    input.idempotencyKey
+    input
   );
 
   if (existingAttempt) {
@@ -536,7 +561,7 @@ export async function executeCheckoutForUser(
   const result =
     input.kind === "membership"
       ? await createSquarePaymentForMembership(user, input)
-      : await createSquarePaymentForEventTicket(user, input);
+      : await checkoutEventTicket(user, input);
 
   if ("error" in result && result.error) {
     return {

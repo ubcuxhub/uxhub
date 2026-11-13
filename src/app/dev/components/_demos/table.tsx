@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { TableRowCount, TableToolbar } from "@/components/shared/TableToolbar";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { IconButton } from "@/components/ui/icon-button";
 import { Pagination } from "@/components/ui/pagination";
 import { SearchField } from "@/components/ui/search-field";
@@ -305,6 +306,26 @@ function TableDemo() {
       </Composition>
 
       <Composition
+        title="Event drafts in the events table"
+        description="Manage Events includes saved working drafts in the same table, search, Draft filter and date sort as events. Working-draft links open /admin/events/drafts/<draft> or /admin/events/<event>/edit; saved-event links retain their overview drawer. A working draft replaces its source event's row, and missing dates or registration counts show a dash."
+      >
+        <TableCard>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Name</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead><TableHead>Registration</TableHead><TableHead>Registered</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow>
+                <TableCell>Untitled event</TableCell><TableCell><TableNone /></TableCell><TableCell><Badge variant="neutral">Draft</Badge></TableCell><TableCell><Badge variant="neutral">N/A</Badge></TableCell><TableCell><TableNone /></TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </TableCard>
+      </Composition>
+
+      <Composition
         title="Compact density"
         description="Admin tables run at 40px rows (data-density=compact)."
       >
@@ -318,6 +339,12 @@ function TableDemo() {
         <div className="max-w-2xl">
           <ManageUsers stickyFirstColumn minWidth="min-w-[64rem]" />
         </div>
+      </Composition>
+
+      <Composition title="Separated item rows" description="Rounded rows with gaps and 16px horizontal / 12px vertical cell padding, for editable people or sponsor lists. Scroll stays inside the table. Works in both densities and themes.">
+        <Table variant="separated" aria-label="People" className="min-w-[28rem]">
+          <TableBody>{USERS.slice(0, 3).map(user => <TableRow key={user.id} className="bg-transparent [&>td]:bg-section"><TableCell>{user.name}</TableCell><TableCell>{user.email}</TableCell><TableCell><Button variant="outline" aria-label={`Edit ${user.name}`}>Edit</Button></TableCell></TableRow>)}</TableBody>
+        </Table>
       </Composition>
 
       <SpecimenGroup

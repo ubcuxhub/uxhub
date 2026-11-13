@@ -21,6 +21,8 @@
  * the index; `scripts/seed/lib/event-timeline.test.ts` holds it to that shape.
  */
 
+import { seedDateLocation, seedEventProjection } from "../lib/builder-settings.ts";
+import type { EventDateLocationDraft } from "../../../src/features/admin/lib/event-date-location.ts";
 import type { TablesInsert } from "../../../src/lib/supabase/database.types.ts";
 import {
   addDays,
@@ -83,16 +85,11 @@ type SeedAgendaDay = {
 };
 
 export interface SeedEvent {
+  dateLocation?: EventDateLocationDraft;
   event: Omit<TablesInsert<"events">, "image_url"> & { slug: string };
   /** File name in `scripts/seed/data/images`, uploaded and used as the cover. */
   imageKey: string;
-  /**
-   * In page order. Mentors only for now: the builder still loads every person
-   * on the event as a mentor and saves them back as `p_mentors`, so a Judges
-   * or Speakers section would turn into mentors, or fail the save when one
-   * person is in two sections. Add other sections once the builder and the
-   * event page read them.
-   */
+  /** Ordered groups supported by the delivered builder; attendee expansion is deferred. */
   peopleSections?: PeopleSection[];
   sponsors?: SeedSponsor[];
   links?: Omit<TablesInsert<"event_links">, "event_id">[];
@@ -165,6 +162,27 @@ export const EVENT_PHASES = {
  * offers, so login fixtures can buy, re-seed, and buy again.
  */
 export const PURCHASABLE_MIN_SEATS_LEFT = 3;
+
+const shortOverviews: Record<string, string> = {
+  "get-to-know-ux-hub": "Meet the people behind UX Hub.",
+  "design-sprint-past": "Six sessions from brief to prototype.",
+  "design-sprint-upcoming": "Six sessions from brief to prototype.",
+  "uxathon-past": "A weekend of teamwork and design.",
+  "uxathon-upcoming": "A weekend of teamwork and design.",
+  "industry-talk-ai-and-ux": "Explore how AI changes UX practice.",
+  "open-studio": "Make space for your next design project.",
+  "coffee-chat-series": "Connect with designers over coffee.",
+  "mentorship-program": "Build your design skills with a mentor.",
+  "design-jam-today": "Turn a fresh brief into a prototype.",
+  "figma-basics-workshop": "Build your first clickable Figma flow.",
+  "thinkbox-office-tour": "Step inside a working design studio.",
+  "portfolio-review-night": "Get feedback on your portfolio.",
+  "student-panel": "Hear how students started their UX careers.",
+  "industry-talk-design-systems": "Learn how teams build design systems.",
+  "spring-showcase": "Share your work and meet other designers.",
+  "ux-research-workshop": "Practice interviewing and UX research.",
+  "accessibility-audit-clinic": "Find and fix accessibility barriers.",
+};
 
 /** Every slug the seed owns, in declaration order. */
 export const SEED_EVENT_SLUGS = Object.values(EVENT_PHASES).flat();
@@ -707,9 +725,9 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       slug: "design-sprint-past",
       status: "active",
       description:
-        "One day, one brief, one clickable prototype. Teams of four run a compressed design sprint from problem framing through guerrilla research to a final critique in front of working designers. Our biggest first-term event and the fastest way to get something real into your portfolio.",
+        "Six sessions, one brief, one clickable prototype. Teams of four run a compressed design sprint from problem framing through guerrilla research to a final critique in front of working designers. Our biggest first-term event and the fastest way to get something real into your portfolio.",
       regular_price: 15.0,
-      member_price: 5.0,
+      member_price: 0,
       location_building: "Neville Scarfe Building",
       location_room: "Room 100",
       location_address_url: "https://maps.app.goo.gl/vNq7CkS3Wm2hZr4A9",
@@ -762,7 +780,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       description:
         "Our flagship event: 32 hours, one open-ended brief, and a room full of teams turning it into something defensible. Mentors from across the Vancouver design scene rotate through all weekend, and the final round is judged on how well you argue for your decisions — not just how good the screens look. Food, snacks, and swag included.",
       regular_price: 25.0,
-      member_price: 15.0,
+      member_price: 0,
       location_building: "ICICS/CS X-wing",
       location_room: "Room 100",
       location_address_url: "https://maps.app.goo.gl/6dK2sYqR8fV1nB7t5",
@@ -912,7 +930,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       description:
         "A long-running mentorship program pairing students with peer and industry mentors. Members join monthly critiques, portfolio working sessions, and career conversations throughout the program.",
       regular_price: 20,
-      member_price: 10,
+      member_price: 0,
       location_building: "Life Sciences Centre",
       location_room: "Atrium",
       location_address_url: "https://maps.app.goo.gl/T4wR8bLp1Vz6Yn3H8",
@@ -992,7 +1010,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       description:
         "Two hours from a blank canvas to a clickable prototype: frames, auto-layout, components, and just enough prototyping to share a flow. Laptops required. Twenty seats so every table gets a facilitator — it fills up fast.",
       regular_price: 6,
-      member_price: 3,
+      member_price: 0,
       location_building: "Irving K. Barber Learning Centre",
       location_room: "Room 182",
       location_address_url: "https://maps.app.goo.gl/Hq2nT7vYw4Lr9Kc81",
@@ -1020,10 +1038,9 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       status: "active",
       description:
         "A small-group visit to Thinkbox's Vancouver studio. Walk the space, see how their design team actually works day to day, and stay for an informal Q&A with two of their product designers. Capacity is tight because they are hosting us in one room — sign up early.",
-      // Flat cost, no member discount: the checkout path where a member pays
-      // the same as everyone else.
+      // Paid for non-members and lapsed members; active members enter free.
       regular_price: 10.0,
-      member_price: 10.0,
+      member_price: 0,
       location_building: "Thinkbox Studio",
       location_room: "Main Lobby",
       location_address_url: "https://maps.app.goo.gl/PLACEHOLDER-thinkbox",
@@ -1066,7 +1083,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       description:
         "Our flagship event: 32 hours, one open-ended brief, and a room full of teams turning it into something defensible. Mentors from across the Vancouver design scene rotate through all weekend, and the final round is judged on how well you argue for your decisions — not just how good the screens look. Food, snacks, and swag included.",
       regular_price: 25.0,
-      member_price: 15.0,
+      member_price: 0,
       location_building: "ICICS/CS X-wing",
       location_room: "Room 100",
       location_address_url: "https://maps.app.goo.gl/6dK2sYqR8fV1nB7t5",
@@ -1168,9 +1185,9 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       slug: "design-sprint-upcoming",
       status: "active",
       description:
-        "One day, one brief, one clickable prototype. Teams of four run a compressed design sprint from problem framing through guerrilla research to a final critique in front of working designers. Our biggest first-term event and the fastest way to get something real into your portfolio.",
+        "Six sessions, one brief, one clickable prototype. Teams of four run a compressed design sprint from problem framing through guerrilla research to a final critique in front of working designers. Our biggest first-term event and the fastest way to get something real into your portfolio.",
       regular_price: 15.0,
-      member_price: 5.0,
+      member_price: 0,
       location_building: "Neville Scarfe Building",
       location_room: "Room 100",
       location_address_url: "https://maps.app.goo.gl/vNq7CkS3Wm2hZr4A9",
@@ -1266,7 +1283,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       description:
         "Two staff designers on what a design system looks like once it has more than a hundred consumers — governance, deprecation, the components nobody uses, and the arguments you have to keep having. Registration for this one has already closed.",
       regular_price: 5.0,
-      member_price: 3.0,
+      member_price: 0,
       location_building: "Henry Angus Building",
       location_room: "Room 098",
       location_address_url: "https://maps.app.goo.gl/Xk4mP2rT8wQ6nB3v1",
@@ -1332,7 +1349,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       description:
         "A hands-on afternoon on research methods that fit a student timeline: writing a screener, running a usable interview, and turning six messy conversations into something a team can act on. Still being planned — details will change.",
       regular_price: 12.0,
-      member_price: 6.0,
+      member_price: 0,
       location_building: "Neville Scarfe Building",
       location_room: "Room 204",
       location_address_url: "https://maps.app.goo.gl/vNq7CkS3Wm2hZr4A9",
@@ -1392,10 +1409,48 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
   // events only exposes 'active' rows, so draft fixtures are invisible on the
   // marketing site and in the portal. Spread first so a fixture can still opt
   // into its own status.
-  return seeded.map((seed) => ({
-    ...seed,
-    event: { status: "active" as const, ...seed.event },
-  }));
+  return seeded.map((seed) => {
+    const result: SeedEvent = {
+      ...seed,
+      peopleSections: seed.event.slug === "design-sprint-upcoming" ? [
+        ...(seed.peopleSections ?? []),
+        { title: "Judges", people: [designSprintMentors[0]] },
+        { title: "Workshop hosts", people: [designSprintMentors[1]] },
+      ] : seed.peopleSections,
+      event: {
+        status: "active" as const,
+        ...seed.event,
+        short_description: shortOverviews[seed.event.slug],
+        description_rich: null,
+        configured_slug: seed.event.slug,
+        configured_marketing_mode: seed.event.slug === "ux-research-workshop" ? "disabled" :
+          seed.event.slug === "uxathon-upcoming" ? "external" : "hosted",
+        configured_marketing_url: seed.event.slug === "uxathon-upcoming" ? "https://example.com/uxathon" : null,
+        configured_pricing_mode: Number(seed.event.regular_price) === 0 ? "free" : "paid",
+        configured_price: Number(seed.event.regular_price),
+        pricing_policy: "figma",
+        member_price: 0,
+      },
+    };
+    if (seed.event.slug === "design-sprint-upcoming") {
+      result.checkInSessions = seed.agendaDays!.map((day, index) => ({
+        name: day.title ?? `Day ${index + 1}`,
+        start_time: pacificTimestamp(day.date, day.items[0].start),
+        end_time: pacificTimestamp(day.date, day.items.at(-1)!.end),
+      }));
+    } else if (["student-panel", "ux-research-workshop", "thinkbox-office-tour"].includes(seed.event.slug)) {
+      const start = Date.parse(seed.event.starts_at!);
+      const end = Date.parse(seed.event.ends_at!);
+      result.checkInSessions = seed.checkInSessions.map((session, index, sessions) => ({
+        ...session,
+        start_time: new Date(start + (end - start) * index / sessions.length).toISOString(),
+        end_time: new Date(start + (end - start) * (index + 1) / sessions.length).toISOString(),
+      }));
+    }
+    result.dateLocation = seedDateLocation(result) ?? undefined;
+    Object.assign(result.event, seedEventProjection(result));
+    return result;
+  });
 }
 
 export const seedEvents = buildSeedEvents(new Date());

@@ -14,6 +14,67 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_event_drafts: {
+        Row: {
+          document: NonNullable<Json>
+          event_id: string | null
+          id: string
+          materialized: boolean
+          materialized_result: Json | null
+          revision: number
+          updated_at: string
+        }
+        ComputedFields: never
+        Insert: {
+          document: NonNullable<Json>
+          event_id?: string | null
+          id: string
+          materialized?: boolean
+          materialized_result?: Json | null
+          revision?: number
+          updated_at?: string
+        }
+        Update: {
+          document?: NonNullable<Json>
+          event_id?: string | null
+          id?: string
+          materialized?: boolean
+          materialized_result?: Json | null
+          revision?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_event_drafts_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      admin_event_mutations: {
+        Row: {
+          created_at: string
+          id: string
+          request: NonNullable<Json>
+          result: NonNullable<Json>
+        }
+        ComputedFields: never
+        Insert: {
+          created_at?: string
+          id: string
+          request: NonNullable<Json>
+          result: NonNullable<Json>
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          request?: NonNullable<Json>
+          result?: NonNullable<Json>
+        }
+        Relationships: []
+      }
       app_settings: {
         Row: {
           id: boolean
@@ -341,6 +402,36 @@ export type Database = {
           },
         ]
       }
+      event_application_settings: {
+        Row: {
+          confirmation_deadline: string | null
+          decisions_release_at: string | null
+          event_id: string
+          questions_locked_at: string | null
+        }
+        ComputedFields: never
+        Insert: {
+          confirmation_deadline?: string | null
+          decisions_release_at?: string | null
+          event_id: string
+          questions_locked_at?: string | null
+        }
+        Update: {
+          confirmation_deadline?: string | null
+          decisions_release_at?: string | null
+          event_id?: string
+          questions_locked_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_application_settings_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_applications: {
         Row: {
           created_at: string
@@ -386,6 +477,60 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "user_info"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_content_settings: {
+        Row: {
+          document: NonNullable<Json>
+          event_id: string
+          revision: number
+        }
+        ComputedFields: never
+        Insert: {
+          document: NonNullable<Json>
+          event_id: string
+          revision?: number
+        }
+        Update: {
+          document?: NonNullable<Json>
+          event_id?: string
+          revision?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_content_settings_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_date_location_settings: {
+        Row: {
+          document: NonNullable<Json>
+          event_id: string
+          revision: number
+        }
+        ComputedFields: never
+        Insert: {
+          document: NonNullable<Json>
+          event_id: string
+          revision?: number
+        }
+        Update: {
+          document?: NonNullable<Json>
+          event_id?: string
+          revision?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_date_location_settings_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "events"
             referencedColumns: ["id"]
           },
         ]
@@ -638,16 +783,48 @@ export type Database = {
           },
         ]
       }
+      event_url_claims: {
+        Row: {
+          event_id: string
+          slug: string
+        }
+        ComputedFields: never
+        Insert: {
+          event_id: string
+          slug: string
+        }
+        Update: {
+          event_id?: string
+          slug?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_url_claims_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       events: {
         Row: {
           agenda: Json | null
           agenda_enabled: boolean
+          configured_marketing_mode: string | null
+          configured_marketing_url: string | null
+          configured_price: number | null
+          configured_pricing_mode: string | null
+          configured_slug: string | null
+          configured_slug_edited: boolean
           created_at: string | null
           description: string
           description_images: string[] | null
+          description_rich: Json | null
           ends_at: string | null
           event_colour: string | null
           event_type: Database["public"]["Enums"]["event_type"]
+          first_published_at: string | null
           header_colour: string | null
           header_image_url: string | null
           id: string
@@ -665,11 +842,13 @@ export type Database = {
           mentors_enabled: boolean
           min_team_size: number | null
           name: string
+          pricing_policy: string
           publish_at: string | null
           registration_closes_at: string | null
           registration_opens_at: string | null
           regular_price: number
           requires_application: boolean
+          revision: number
           short_description: string | null
           slug: string
           sponsors_enabled: boolean
@@ -678,17 +857,26 @@ export type Database = {
           team_deadline: string | null
           teams_enabled: boolean
           updated_at: string | null
+          event_has_ended: boolean | null
         }
-        ComputedFields: never
+        ComputedFields: "event_has_ended"
         Insert: {
           agenda?: Json | null
           agenda_enabled?: boolean
+          configured_marketing_mode?: string | null
+          configured_marketing_url?: string | null
+          configured_price?: number | null
+          configured_pricing_mode?: string | null
+          configured_slug?: string | null
+          configured_slug_edited?: boolean
           created_at?: string | null
           description: string
           description_images?: string[] | null
+          description_rich?: Json | null
           ends_at?: string | null
           event_colour?: string | null
           event_type?: Database["public"]["Enums"]["event_type"]
+          first_published_at?: string | null
           header_colour?: string | null
           header_image_url?: string | null
           id?: string
@@ -706,11 +894,13 @@ export type Database = {
           mentors_enabled?: boolean
           min_team_size?: number | null
           name: string
+          pricing_policy?: string
           publish_at?: string | null
           registration_closes_at?: string | null
           registration_opens_at?: string | null
           regular_price: number
           requires_application?: boolean
+          revision?: number
           short_description?: string | null
           slug: string
           sponsors_enabled?: boolean
@@ -723,12 +913,20 @@ export type Database = {
         Update: {
           agenda?: Json | null
           agenda_enabled?: boolean
+          configured_marketing_mode?: string | null
+          configured_marketing_url?: string | null
+          configured_price?: number | null
+          configured_pricing_mode?: string | null
+          configured_slug?: string | null
+          configured_slug_edited?: boolean
           created_at?: string | null
           description?: string
           description_images?: string[] | null
+          description_rich?: Json | null
           ends_at?: string | null
           event_colour?: string | null
           event_type?: Database["public"]["Enums"]["event_type"]
+          first_published_at?: string | null
           header_colour?: string | null
           header_image_url?: string | null
           id?: string
@@ -746,11 +944,13 @@ export type Database = {
           mentors_enabled?: boolean
           min_team_size?: number | null
           name?: string
+          pricing_policy?: string
           publish_at?: string | null
           registration_closes_at?: string | null
           registration_opens_at?: string | null
           regular_price?: number
           requires_application?: boolean
+          revision?: number
           short_description?: string | null
           slug?: string
           sponsors_enabled?: boolean
@@ -806,6 +1006,7 @@ export type Database = {
           full_name: string
           id: string
           linkedin_url: string | null
+          owner_event_id: string | null
           position: string | null
           profile_image_path: string | null
           updated_at: string
@@ -817,6 +1018,7 @@ export type Database = {
           full_name: string
           id?: string
           linkedin_url?: string | null
+          owner_event_id?: string | null
           position?: string | null
           profile_image_path?: string | null
           updated_at?: string
@@ -827,11 +1029,20 @@ export type Database = {
           full_name?: string
           id?: string
           linkedin_url?: string | null
+          owner_event_id?: string | null
           position?: string | null
           profile_image_path?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "mentors_owner_event_id_fkey"
+            columns: ["owner_event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       purchases: {
         Row: {
@@ -923,6 +1134,7 @@ export type Database = {
           description: string | null
           id: string
           name: string
+          owner_event_id: string | null
           updated_at: string
           website_url: string | null
         }
@@ -933,6 +1145,7 @@ export type Database = {
           description?: string | null
           id?: string
           name: string
+          owner_event_id?: string | null
           updated_at?: string
           website_url?: string | null
         }
@@ -942,10 +1155,19 @@ export type Database = {
           description?: string | null
           id?: string
           name?: string
+          owner_event_id?: string | null
           updated_at?: string
           website_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sponsors_owner_event_id_fkey"
+            columns: ["owner_event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       square_webhook_events: {
         Row: {
@@ -1203,6 +1425,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_event_pricing_locked: {
+        Args: { p_event_id: string }
+        Returns: boolean
+      }
+      admin_event_team_settings: { Args: { p_event_id: string }; Returns: Json }
       can_edit_application_response: {
         Args: { p_application_id: string; p_question_id: string }
         Returns: boolean
@@ -1232,13 +1459,34 @@ export type Database = {
         Returns: string[]
       }
       delete_account: { Args: { p_auth_user_id: string }; Returns: undefined }
+      delete_admin_event_safely: {
+        Args: { p_event_id: string; p_operation_id: string }
+        Returns: Json
+      }
       delete_event_atomically: {
+        Args: { target_event_id: string }
+        Returns: undefined
+      }
+      delete_event_before_safe_mutations: {
         Args: { target_event_id: string }
         Returns: undefined
       }
       delete_team: {
         Args: { p_team_id: string; p_user_id: string }
         Returns: string
+      }
+      event_checkout_amount: {
+        Args: { p_event_id: string; p_user_id: string }
+        Returns: number
+      }
+      event_has_ended: {
+        Args: {
+          e: Omit<
+            Database["public"]["Tables"]["events"]["Row"],
+            Database["public"]["Tables"]["events"]["ComputedFields"]
+          >
+        }
+        Returns: boolean
       }
       event_is_public: {
         Args: {
@@ -1266,6 +1514,21 @@ export type Database = {
         }[]
       }
       get_user_info_id: { Args: Record<PropertyKey, never>; Returns: string }
+      initialize_event_checkout: {
+        Args: {
+          p_event_id: string
+          p_expected_amount_cents?: number
+          p_free_only?: boolean
+          p_idempotency_key: string
+          p_user_id: string
+        }
+        Returns: {
+          amount_cents: number
+          created: boolean
+          failure_reason: string
+          purchase_id: string
+        }[]
+      }
       is_admin: { Args: Record<PropertyKey, never>; Returns: boolean }
       is_authenticated: { Args: Record<PropertyKey, never>; Returns: boolean }
       is_manager: { Args: Record<PropertyKey, never>; Returns: boolean }
@@ -1300,6 +1563,7 @@ export type Database = {
           ticket_id: string
         }[]
       }
+      safe_event_content_url: { Args: { p_url: string }; Returns: boolean }
       save_admin_event_atomically: {
         Args: {
           p_application_questions: Json
@@ -1313,12 +1577,117 @@ export type Database = {
         }
         Returns: Json
       }
+      save_admin_event_before_application_settings: {
+        Args: {
+          p_application_questions: Json
+          p_check_in_sessions: Json
+          p_event: Json
+          p_event_id: string
+          p_expected_image_url: string
+          p_mentors: Json
+          p_slug: string
+          p_sponsors: Json
+        }
+        Returns: Json
+      }
+      save_admin_event_before_content: {
+        Args: {
+          p_application_questions: Json
+          p_check_in_sessions: Json
+          p_event: Json
+          p_event_id: string
+          p_expected_image_url: string
+          p_mentors: Json
+          p_slug: string
+          p_sponsors: Json
+        }
+        Returns: Json
+      }
+      save_admin_event_before_date_locations: {
+        Args: {
+          p_application_questions: Json
+          p_check_in_sessions: Json
+          p_event: Json
+          p_event_id: string
+          p_expected_image_url: string
+          p_mentors: Json
+          p_slug: string
+          p_sponsors: Json
+        }
+        Returns: Json
+      }
+      save_admin_event_builder: {
+        Args: {
+          p_application_questions: Json
+          p_check_in_sessions: Json
+          p_draft_id: string
+          p_draft_revision: number
+          p_event: Json
+          p_event_id: string
+          p_expected_header_image_url: string
+          p_expected_image_url: string
+          p_mentors: Json
+          p_slug: string
+          p_sponsors: Json
+        }
+        Returns: Json
+      }
+      save_admin_event_builder_before_publication: {
+        Args: {
+          p_application_questions: Json
+          p_check_in_sessions: Json
+          p_draft_id: string
+          p_draft_revision: number
+          p_event: Json
+          p_event_id: string
+          p_expected_header_image_url: string
+          p_expected_image_url: string
+          p_mentors: Json
+          p_slug: string
+          p_sponsors: Json
+        }
+        Returns: Json
+      }
+      save_admin_event_builder_before_safe_mutations: {
+        Args: {
+          p_application_questions: Json
+          p_check_in_sessions: Json
+          p_draft_id: string
+          p_draft_revision: number
+          p_event: Json
+          p_event_id: string
+          p_expected_header_image_url: string
+          p_expected_image_url: string
+          p_mentors: Json
+          p_slug: string
+          p_sponsors: Json
+        }
+        Returns: Json
+      }
+      save_admin_event_draft: {
+        Args: {
+          p_document: Json
+          p_event_id: string
+          p_id: string
+          p_revision: number
+        }
+        Returns: Json
+      }
       save_event_application_questions: {
         Args: { p_event_id: string; p_questions: Json }
         Returns: Json
       }
       save_event_check_in_sessions: {
         Args: { p_event_id: string; p_sessions: Json }
+        Returns: Json
+      }
+      save_past_event_resources: {
+        Args: {
+          p_event_id: string
+          p_links: Json
+          p_operation_id: string
+          p_revision: number
+        }
         Returns: Json
       }
       set_user_role: {
@@ -1339,12 +1708,75 @@ export type Database = {
         Args: { p_event_id: string; p_user_id: string }
         Returns: string
       }
+      update_admin_event_schedule: {
+        Args: { p_event_id: string; p_patch: Json }
+        Returns: {
+          agenda: Json | null
+          agenda_enabled: boolean
+          configured_marketing_mode: string | null
+          configured_marketing_url: string | null
+          configured_price: number | null
+          configured_pricing_mode: string | null
+          configured_slug: string | null
+          configured_slug_edited: boolean
+          created_at: string | null
+          description: string
+          description_images: string[] | null
+          description_rich: Json | null
+          ends_at: string | null
+          event_colour: string | null
+          event_type: Database["public"]["Enums"]["event_type"]
+          first_published_at: string | null
+          header_colour: string | null
+          header_image_url: string | null
+          id: string
+          image_url: string | null
+          is_featured: boolean
+          location_address: string | null
+          location_address_url: string | null
+          location_building: string | null
+          location_room: string | null
+          location_type: Database["public"]["Enums"]["event_location_type"]
+          marketing_url: string | null
+          max_capacity: number
+          max_team_size: number | null
+          member_price: number
+          mentors_enabled: boolean
+          min_team_size: number | null
+          name: string
+          pricing_policy: string
+          publish_at: string | null
+          registration_closes_at: string | null
+          registration_opens_at: string | null
+          regular_price: number
+          requires_application: boolean
+          revision: number
+          short_description: string | null
+          slug: string
+          sponsors_enabled: boolean
+          starts_at: string | null
+          status: Database["public"]["Enums"]["event_status"]
+          team_deadline: string | null
+          teams_enabled: boolean
+          updated_at: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "events"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       valid_option_list: {
         Args: { allowed: string[]; choices: string[] }
         Returns: boolean
       }
       valid_other_allergies: { Args: { entries: string[] }; Returns: boolean }
       valid_user_interests: { Args: { tags: string[] }; Returns: boolean }
+      validate_event_content: {
+        Args: { p_document: Json; p_draft?: boolean }
+        Returns: undefined
+      }
     }
     Enums: {
       event_application_status:

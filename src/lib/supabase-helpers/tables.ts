@@ -8,9 +8,14 @@
 export const TABLES = {
   appSettings: "app_settings",
   events: "events",
+  eventUrlClaims: "event_url_claims",
+  eventDateLocationSettings: "event_date_location_settings",
+  adminEventMutations: "admin_event_mutations",
+  adminEventDrafts: "admin_event_drafts",
   userInfo: "user_info",
   eventTickets: "event_tickets",
   eventApplications: "event_applications",
+  eventApplicationSettings: "event_application_settings",
   eventApplicationQuestions: "event_application_questions",
   eventApplicationResponses: "event_application_responses",
   applicationReviewNotes: "application_review_notes",
@@ -28,6 +33,7 @@ export const TABLES = {
   eventAgendaItems: "event_agenda_items",
   teams: "teams",
   teamMembers: "team_members",
+  eventContentSettings: "event_content_settings",
   eventLinks: "event_links",
   eventPrivateDetails: "event_private_details",
 } as const;

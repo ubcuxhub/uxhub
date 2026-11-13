@@ -40,9 +40,6 @@ export interface CheckInSessionDraft {
   end_time: string;
 }
 
-/** The fields of a check-in session the builder edits. */
-export type CheckInSessionField = Exclude<keyof CheckInSessionDraft, "id">;
-
 /** A ticket holder on the check-in page. `id` is the ticket's. */
 export interface CheckInAttendee {
   id: string;

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { UserInfoRow } from "@/lib/supabase/models";
+import { defaultFormState } from "./components/event-form/event-form-schema";
 
 vi.mock("server-only", () => ({}));
 
@@ -16,9 +17,11 @@ const adminServer = vi.hoisted(() => ({
 }));
 const events = vi.hoisted(() => ({
   fetchEventById: vi.fn(),
-  fetchEventIdByImageUrl: vi.fn(),
   fetchEventSlugsByPrefix: vi.fn(),
 }));
+const eventImageIsReferenced = vi.hoisted(() => vi.fn());
+const eventDrafts = vi.hoisted(() => ({ saveEventDraft: vi.fn(), fetchEventDraft: vi.fn() }));
+vi.mock("@/lib/supabase-helpers/event-drafts", () => ({ eventImageIsReferenced, ...eventDrafts }));
 const checkIns = vi.hoisted(() => ({
   checkInTicket: vi.fn(),
   deleteCheckIn: vi.fn(),
@@ -36,8 +39,8 @@ const applicationFiles = vi.hoisted(() => ({
   removeApplicationFiles: vi.fn(),
 }));
 const eventPeople = vi.hoisted(() => ({
-  saveMentor: vi.fn(),
-  saveSponsor: vi.fn(),
+  searchMentors: vi.fn(),
+  searchSponsors: vi.fn(),
 }));
 const saveAdminProfile = vi.hoisted(() => vi.fn());
 const fetchMembershipTypeById = vi.hoisted(() => vi.fn());
@@ -72,8 +75,7 @@ import {
   discardUnusedEventImageAction,
   fetchAdminCheckInSnapshotAction,
   saveAdminEventAction,
-  saveAdminMentorAction,
-  saveAdminSponsorAction,
+  saveAdminEventDraftAction,
   setMembershipTermEndsAtAction,
   toggleCheckInAction,
   updateApplicationDecisionAction,
@@ -88,6 +90,7 @@ const admin = { id: "admin-1" } as UserInfoRow;
 
 beforeEach(() => {
   vi.clearAllMocks();
+  eventImageIsReferenced.mockResolvedValue(false);
   fetchMembershipTypeById.mockResolvedValue(null);
   guards.requireManager.mockResolvedValue(manager);
   guards.requireAdmin.mockResolvedValue(admin);
@@ -285,7 +288,7 @@ describe("updateUserRoleAction: the role check", () => {
 
 describe("discardUnusedEventImageAction: the reference check", () => {
   it("leaves an image that an event still references", async () => {
-    events.fetchEventIdByImageUrl.mockResolvedValue("event-9");
+    eventImageIsReferenced.mockResolvedValue(true);
 
     await discardUnusedEventImageAction("https://store/img.png");
 
@@ -295,7 +298,7 @@ describe("discardUnusedEventImageAction: the reference check", () => {
   });
 
   it("deletes an image no event references", async () => {
-    events.fetchEventIdByImageUrl.mockResolvedValue(null);
+    eventImageIsReferenced.mockResolvedValue(false);
 
     await discardUnusedEventImageAction("https://store/orphan.png");
 
@@ -307,12 +310,12 @@ describe("discardUnusedEventImageAction: the reference check", () => {
   it("ignores an empty url without querying", async () => {
     await discardUnusedEventImageAction("");
 
-    expect(events.fetchEventIdByImageUrl).not.toHaveBeenCalled();
+    expect(eventImageIsReferenced).not.toHaveBeenCalled();
     expect(adminServer.adminDeleteEventImageByUrl).not.toHaveBeenCalled();
   });
 
   it("swallows a storage failure", async () => {
-    events.fetchEventIdByImageUrl.mockResolvedValue(null);
+    eventImageIsReferenced.mockResolvedValue(false);
     adminServer.adminDeleteEventImageByUrl.mockRejectedValue(
       new Error("storage down"),
     );
@@ -334,7 +337,7 @@ describe("discardUnusedEventImageAction: the reference check", () => {
     await expect(
       discardUnusedEventImageAction("https://store/orphan.png"),
     ).rejects.toBe(redirect);
-    expect(events.fetchEventIdByImageUrl).not.toHaveBeenCalled();
+    expect(eventImageIsReferenced).not.toHaveBeenCalled();
   });
 });
 
@@ -343,15 +346,46 @@ describe("discardUnusedEventImageAction: the reference check", () => {
 // ---------------------------------------------------------------------------
 
 const saveInput = {
+  expectedRevision: 0,
   expectedImageUrl: null,
-  event: { name: "Design Sprint" },
+  event: { name: "Design Sprint", short_description: "Overview", description: "Long overview", slug: "design-sprint", starts_at: "2099-08-01T18:00:00Z", ends_at: "2099-08-01T19:00:00Z", max_capacity: 10 },
   checkInSessions: [],
   mentorIds: [],
   sponsorIds: [],
   applicationQuestions: [],
 };
 
+describe("saveAdminEventDraftAction", () => {
+  it("refreshes the list layout when saving an incomplete working document", async () => {
+    const document = { version: 1 as const, formState: defaultFormState, checkInEvents: [], mentors: [], sponsors: [], applicationTemplate: [] };
+    eventDrafts.fetchEventDraft.mockResolvedValue(null);
+    eventDrafts.saveEventDraft.mockResolvedValue({ id: "draft-1", revision: 1, document });
+
+    await expect(saveAdminEventDraftAction({ id: "draft-1", eventId: null, revision: 0, document }))
+      .resolves.toEqual({ id: "draft-1", revision: 1 });
+    expect(revalidatePath).toHaveBeenCalledWith("/admin/events", "layout");
+    expect(adminRpc).not.toHaveBeenCalled();
+  });
+});
+
 describe("saveAdminEventAction", () => {
+  it.each([true, false])("passes the saved agenda visibility %s to the atomic builder", async enabled => {
+    await saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, agenda_enabled: enabled } });
+    expect(adminRpc.mock.calls[0][1].p_event.agenda_enabled).toBe(enabled);
+  });
+
+  it.each([null, "false", 0])("rejects forged agenda visibility %s before writing", async value => {
+    const event = { ...saveInput.event, agenda_enabled: value } as unknown as Parameters<typeof saveAdminEventAction>[0]["event"];
+    await expect(saveAdminEventAction({ ...saveInput, event })).resolves.toEqual({ error: "Schedule visibility must be on or off." });
+    expect(adminRpc).not.toHaveBeenCalled();
+  });
+
+  it("requires authorization before saving agenda visibility", async () => {
+    const denied = new Error("Access denied");
+    guards.requireAdmin.mockRejectedValueOnce(denied);
+    await expect(saveAdminEventAction({ ...saveInput, event: { agenda_enabled: false } })).rejects.toBe(denied);
+    expect(adminRpc).not.toHaveBeenCalled();
+  });
   it.each(["2099-08-01T18:00:00.000Z", null])("saves the publish schedule %s", async (publish_at) => {
     await saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, status: "draft", publish_at } });
     expect(adminRpc.mock.calls[0][1].p_event.publish_at).toBe(publish_at);
@@ -405,6 +439,44 @@ describe("saveAdminEventAction", () => {
       "event",
     );
     expect(adminRpc.mock.calls[0][1].p_slug).toBeTruthy();
+  });
+
+  it("numbers an unedited page URL past every URL another event claims", async () => {
+    events.fetchEventSlugsByPrefix.mockResolvedValue(["coffee-chat"]);
+    await saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, name: "Coffee Chat", configured_slug_edited: false, configured_slug: "coffee-chat" } });
+
+    expect(events.fetchEventSlugsByPrefix).toHaveBeenCalledWith(expect.anything(), "coffee-chat", { exceptEventId: null });
+    expect(adminRpc.mock.calls[0][1].p_event.configured_slug).toBe("coffee-chat-1");
+    expect(adminRpc.mock.calls[0][1].p_slug).toBe("coffee-chat-1");
+  });
+
+  it("derives an unedited page URL from the name, not the value the client sent", async () => {
+    await saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, name: "Coffee Chat", configured_slug_edited: false, configured_slug: "forged" } });
+    expect(adminRpc.mock.calls[0][1].p_event.configured_slug).toBe("coffee-chat");
+  });
+
+  it("keeps the unedited page URL an existing event already holds", async () => {
+    events.fetchEventById.mockResolvedValueOnce({ id: "event-1", name: "Coffee Chat", configured_slug: "coffee-chat-1", first_published_at: null });
+    events.fetchEventSlugsByPrefix.mockResolvedValue(["coffee-chat"]);
+    await saveAdminEventAction({ ...saveInput, eventId: "event-1", event: { ...saveInput.event, name: "Coffee Chat", configured_slug_edited: false, configured_slug: "coffee-chat" } });
+
+    expect(events.fetchEventSlugsByPrefix).toHaveBeenCalledWith(expect.anything(), "coffee-chat", { exceptEventId: "event-1" });
+    expect(adminRpc.mock.calls[0][1].p_event.configured_slug).toBe("coffee-chat-1");
+  });
+
+  it("leaves a published event's locked page URL to the database", async () => {
+    events.fetchEventById.mockResolvedValueOnce({ id: "event-1", name: "Coffee Chat", configured_slug: "coffee-chat", first_published_at: "2026-01-01T00:00:00Z" });
+    await saveAdminEventAction({ ...saveInput, eventId: "event-1", event: { ...saveInput.event, name: "Renamed", configured_slug_edited: false, configured_slug: "coffee-chat" } });
+
+    expect(events.fetchEventSlugsByPrefix).not.toHaveBeenCalled();
+    expect(adminRpc.mock.calls[0][1].p_event.configured_slug).toBe("coffee-chat");
+  });
+
+  it("sends an edited page URL as typed, so a taken one is refused", async () => {
+    adminRpc.mockResolvedValue({ data: null, error: { message: "This page URL is already in use.", code: "P0001" } });
+    await expect(saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, name: "Coffee Chat", configured_slug_edited: true, configured_slug: "coffee-chat" } }))
+      .resolves.toEqual({ error: "This page URL is already in use." });
+    expect(adminRpc.mock.calls[0][1].p_event.configured_slug).toBe("coffee-chat");
   });
 
   it("forwards the cover image the form loaded with as the precondition", async () => {
@@ -529,6 +601,51 @@ describe("saveAdminEventAction", () => {
       "https://store/old.png",
     );
   });
+
+  it("sends draft and header preconditions while retaining child IDs and cleanup", async () => {
+    adminRpc.mockResolvedValue({
+      data: {
+        id: "event-1",
+        check_in_session_ids: ["s-1"],
+        question_ids: ["q-1"],
+        removed_files: ["u/a/q/cv.pdf"],
+      },
+      error: null,
+    });
+    applicationFiles.removeApplicationFiles.mockResolvedValue(undefined);
+
+    const result = await saveAdminEventAction({
+      ...saveInput,
+      eventId: "event-1",
+      draftId: "draft-1",
+      draftRevision: 3,
+      expectedHeaderImageUrl: "https://store/old-header.png",
+      event: { name: "Design Sprint", header_image_url: "https://store/new-header.png" },
+    });
+
+    expect(adminRpc).toHaveBeenCalledWith("save_admin_event_builder", expect.objectContaining({
+      p_draft_id: "draft-1",
+      p_draft_revision: 3,
+      p_expected_header_image_url: "https://store/old-header.png",
+    }));
+    expect(result).toEqual({ id: "event-1", checkInSessionIds: ["s-1"], questionIds: ["q-1"] });
+    expect(adminServer.adminDeleteEventImageByUrl).toHaveBeenCalledWith("https://store/old-header.png");
+    expect(applicationFiles.removeApplicationFiles).toHaveBeenCalledWith(expect.anything(), ["u/a/q/cv.pdf"]);
+    expect(revalidatePath).toHaveBeenCalledWith("/admin/events", "layout");
+  });
+
+  it.each([{}, { header_image_url: "https://store/same-header.png" }])(
+    "keeps an omitted or unchanged header image: %j",
+    async (event) => {
+      await saveAdminEventAction({
+        ...saveInput,
+        eventId: "event-1",
+        expectedHeaderImageUrl: "https://store/same-header.png",
+        event,
+      });
+      expect(adminServer.adminDeleteEventImageByUrl).not.toHaveBeenCalled();
+    },
+  );
 
   it("keeps the cover image when it did not change", async () => {
     await saveAdminEventAction({
@@ -992,31 +1109,6 @@ describe("updateApplicationDecisionAction", () => {
   });
 });
 
-describe("saveAdminMentorAction and saveAdminSponsorAction", () => {
-  it("rejects a blank mentor name", async () => {
-    await expect(
-      saveAdminMentorAction({ full_name: "   " } as never),
-    ).rejects.toThrow("Mentor name is required.");
-    expect(eventPeople.saveMentor).not.toHaveBeenCalled();
-  });
-
-  it("rejects a blank sponsor name", async () => {
-    await expect(
-      saveAdminSponsorAction({ name: "   " } as never),
-    ).rejects.toThrow("Sponsor name is required.");
-    expect(eventPeople.saveSponsor).not.toHaveBeenCalled();
-  });
-
-  it("saves a named mentor", async () => {
-    const mentor = { id: "mentor-1", full_name: "Ada" };
-    eventPeople.saveMentor.mockResolvedValue(mentor);
-
-    await expect(
-      saveAdminMentorAction({ full_name: "Ada" } as never),
-    ).resolves.toBe(mentor);
-  });
-});
-
 describe("setMembershipTermEndsAtAction", () => {
   it.each(["2026-1-05", "05-01-2026", "next friday", "2026-01-05T10:00"])(
     "rejects the malformed date %s",
@@ -1188,4 +1280,59 @@ describe("saveManagerUserDetailsAction", () => {
     await expect(saveManagerUserDetailsAction("user-1", { first_name: "Jamie" })).rejects.toThrow("Forbidden");
     expect(saveAdminProfile).not.toHaveBeenCalled();
   });
+});
+
+
+describe("overview write validation", () => {
+  it.each([{ short_description: "x".repeat(51) }, { description: "x".repeat(3001) }])("enforces the same limits on the server", fields => expect(saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, ...fields } })).rejects.toThrow(/character limit/));
+  it("rejects unsafe rich links before persistence", async () => {
+    await expect(saveAdminEventAction({ ...saveInput, event: { description: "Link", description_rich: [{ type: "paragraph", spans: [{ text: "Link", href: "javascript:alert(1)" }] }] } })).rejects.toThrow(/formatting/);
+    expect(adminRpc).not.toHaveBeenCalled();
+  });
+});
+
+
+describe("event configuration server validation", () => {
+  it.each([
+    { configured_slug: "admin" },
+    { configured_marketing_mode: "external", configured_marketing_url: "javascript:alert(1)" },
+    { configured_marketing_mode: "external", configured_marketing_url: null },
+    { configured_pricing_mode: "paid", configured_price: -1 },
+    { configured_pricing_mode: "paid", configured_price: 1.001 },
+  ])("rejects invalid configuration before the mutation: %j", async fields => {
+    await expect(saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, ...fields } })).rejects.toThrow();
+    expect(adminRpc).not.toHaveBeenCalled();
+  });
+  it("normalizes international external hostnames without changing the effective destination", async () => {
+    await saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, configured_marketing_mode: "external", configured_marketing_url: "https://例子.com/event" } });
+    expect(adminRpc).toHaveBeenCalledWith("save_admin_event_builder", expect.objectContaining({ p_event: expect.objectContaining({ configured_marketing_url: "https://xn--fsqu00a.com/event" }) }));
+  });
+  it.each(["This page URL is already in use.", "Pricing is locked because registrations or payments exist.", "The page URL is locked after first publication."])("returns a useful configuration rejection: %s", async message => {
+    adminRpc.mockResolvedValueOnce({ data: null, error: { message, code: "P0001" } });
+    await expect(saveAdminEventAction(saveInput)).resolves.toEqual({ error: message });
+  });
+});
+
+
+describe("team settings action boundary", () => {
+  it.each([{ min_team_size: 0 }, { max_team_size: 1.5 }, { min_team_size: 5, max_team_size: 4 }, { team_deadline: "2026-11-16T10:00" }])("rejects invalid input before the RPC: %j", async fields => {
+    const result = await saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, ...fields } });
+    expect(result).toHaveProperty("error");
+    expect(adminRpc).not.toHaveBeenCalled();
+  });
+  it("returns a settings conflict without claiming the save succeeded", async () => {
+    adminRpc.mockResolvedValue({ data: null, error: { hint: "EVENT_SETTINGS_CONFLICT", message: "Teams cannot be turned off because teams already exist." } });
+    expect(await saveAdminEventAction({ ...saveInput, eventId: "event-1", event: { teams_enabled: false } })).toEqual({ error: "Teams cannot be turned off because teams already exist." });
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+  it("requires staff authorization before team settings writes", async () => {
+    guards.requireAdmin.mockRejectedValue(new Error("Staff access required"));
+    await expect(saveAdminEventAction({ ...saveInput, event: { teams_enabled: true } })).rejects.toThrow("Staff access required");
+    expect(adminRpc).not.toHaveBeenCalled();
+  });
+});
+
+it("refuses an existing-event update without a revision before touching the database", async () => {
+  expect(await saveAdminEventAction({ ...saveInput, eventId: "event-1", expectedRevision: undefined })).toEqual({ error: "Reload this event before updating; its saved revision is missing." });
+  expect(adminRpc).not.toHaveBeenCalled();
 });

@@ -8,7 +8,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SquareError } from "square";
 
 import type { UserInfoRow } from "@/lib/supabase/models";
-import { createIntegrationClient, withFixtures, type Fixtures } from "@/test/integration";
+import { clientAs, createIntegrationClient, withFixtures, type Fixtures } from "@/test/integration";
+import { fetchEventById } from "@/lib/supabase-helpers/events";
+import { fetchUserEventTicket } from "@/lib/supabase-helpers/event-tickets";
+import { fetchPurchasesForUser } from "@/lib/supabase-helpers/purchases";
+import { fetchCheckInSessions, fetchCheckInStatuses, checkInTicket } from "@/lib/supabase-helpers/check-ins";
 import type { CheckoutRequestInput } from "./types";
 
 vi.mock("server-only", () => ({}));
@@ -88,6 +92,57 @@ beforeEach(() => {
 });
 
 describe("event ticket checkout", () => {
+  it.each(["free", "paid"] as const)("carries a new %s builder event through scheduled publication, checkout, check-in and history", (mode) =>
+    withFixtures(async (fixtures) => {
+      const now = Date.now();
+      const starts = new Date(now - day).toISOString();
+      const ends = new Date(now + day).toISOString();
+      const opens = new Date(now - day / 2).toISOString();
+      const closes = new Date(now + day / 2).toISOString();
+      const slug = `release-${mode}-${fixtures.tag}`;
+      const saved = await db.rpc("save_admin_event_builder", {
+        p_event_id: null!, p_draft_id: null!, p_draft_revision: 0,
+        p_slug: slug, p_expected_image_url: null!, p_expected_header_image_url: null!,
+        p_event: {
+          name: `Release ${mode}`, short_description: "Release lifecycle", description: "Saved event content.",
+          status: "draft", publish_at: new Date(now + 60_000).toISOString(),
+          starts_at: starts, ends_at: ends, registration_opens_at: opens, registration_closes_at: closes,
+          max_capacity: 10, configured_marketing_mode: "disabled", configured_slug: slug,
+          configured_pricing_mode: mode, configured_price: mode === "free" ? 0 : 12.5,
+        },
+        p_check_in_sessions: [{ name: "Door", start_time: starts, end_time: ends }],
+        p_application_questions: [], p_mentors: [], p_sponsors: [],
+      });
+      expect(saved.error).toBeNull();
+      const eventId = fixtures.track("events", (saved.data as { id: string }).id);
+      const user = await buyer(fixtures);
+      expect(await fetchEventById(clientAs(user), eventId)).toBeNull();
+
+      // Make the persisted schedule due, then use the actual scheduler RPC.
+      expect((await db.from("events").update({ publish_at: new Date(now - 60_000).toISOString() }).eq("id", eventId)).error).toBeNull();
+      expect((await db.rpc("publish_due_events")).error).toBeNull();
+      const published = await fetchEventById(clientAs(user), eventId);
+      expect(published).toMatchObject({ status: "active", publish_at: null, description: "Saved event content.", pricing_policy: "figma", regular_price: mode === "free" ? 0 : 12.5, member_price: 0 });
+      expect(Date.parse(published!.registration_opens_at!)).toBe(Date.parse(opens));
+      expect(Date.parse(published!.registration_closes_at!)).toBe(Date.parse(closes));
+
+      const request = { ...checkoutInput(slug), expectedAmountCents: mode === "free" ? 0 : 1250 };
+      const result = await executeCheckoutForUser(user, request);
+      expect(result).toMatchObject({ ok: true, resolution: "completed" });
+      if (!result.ok) throw new Error("Checkout failed");
+      const ticket = await fetchUserEventTicket(clientAs(user), eventId, user.id);
+      expect(ticket).toMatchObject({ purchase_id: result.purchaseId });
+      const history = await fetchPurchasesForUser(clientAs(user), user.id);
+      expect(history).toContainEqual(expect.objectContaining({ id: result.purchaseId, status: "completed", amount_cents: request.expectedAmountCents }));
+      const sessions = await fetchCheckInSessions(db, eventId);
+      expect(sessions).toHaveLength(1);
+      await checkInTicket(db, ticket!.id, sessions[0].id);
+      expect((await fetchCheckInStatuses(db, eventId)).get(`${ticket!.id}_${sessions[0].id}`)).toBeTruthy();
+      expect(await fetchUserEventTicket(clientAs(user), eventId, user.id)).toMatchObject({ id: ticket!.id });
+      if (mode === "free") expect(square.create).not.toHaveBeenCalled();
+      else expect(square.create).toHaveBeenCalledWith(expect.objectContaining({ amountMoney: { amount: BigInt(1250), currency: "CAD" } }));
+    }));
+
   it("issues the ticket for the purchase and fulfills it", () =>
     withFixtures(async (fixtures) => {
       const event = await fixtures.createEvent({ status: "active" });

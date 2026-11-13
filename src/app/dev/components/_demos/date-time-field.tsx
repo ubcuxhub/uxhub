@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import {
   DateField,
   DateTimeField,
+  DateTimeFieldPair,
   TimeField,
   type DateTimeValue,
 } from "@/components/ui/date-time-field";
@@ -270,7 +271,7 @@ function DateTimeFieldDemo({ open }: SectionProps) {
       <SpecimenGroup
         title="Time field"
         spec="§3.11"
-        description="A combobox over a list of times. Without AM or PM, a time reads as PM."
+        description="A combobox over a list of times. Without AM or PM, a time reads as PM by default. The event-builder option reads 7–11 as AM and 12–6 as PM."
       >
         <Specimen label="placeholder" className="w-64">
           <div className="w-full">
@@ -278,6 +279,11 @@ function DateTimeFieldDemo({ open }: SectionProps) {
               <TimeField id={id("t-empty")} value={null} onValueChange={() => {}} />
             </Labelled>
           </div>
+        </Specimen>
+        <Specimen label="Event-builder daytime parsing" className="w-64">
+          <Labelled label="Event start time" htmlFor={id("t-daytime")}>
+            <TimeField id={id("t-daytime")} ambiguousStart="daytime" value={null} onValueChange={() => {}} />
+          </Labelled>
         </Specimen>
         <Specimen label="filled" className="w-64">
           <div className="w-full">
@@ -363,6 +369,15 @@ function DateTimeFieldDemo({ open }: SectionProps) {
         </Specimen>
       </SpecimenGroup>
 
+      <Composition title="Registration date/time proportions" description='timeWidth="wide" reserves 9rem for time and shortens the flexible date by 1rem, retaining the 24rem stacking threshold.'>
+        <div className="w-full max-w-xl resize-x overflow-auto p-1">
+          <DateTimeFieldPair
+            timeWidth="wide"
+            date={<Labelled label="Registration date" htmlFor={id("wide-pair-date")}><DateField id={id("wide-pair-date")} value={picked} onValueChange={setPicked} /></Labelled>}
+            time={<Labelled label="Registration time" htmlFor={id("wide-pair-time")}><TimeField id={id("wide-pair-time")} value={time} onValueChange={setTime} /></Labelled>}
+          />
+        </div>
+      </Composition>
       <SpecimenGroup
         title="Date and time"
         spec="§3.11"
@@ -393,6 +408,14 @@ function DateTimeFieldDemo({ open }: SectionProps) {
           />
         </Specimen>
       </SpecimenGroup>
+      <Composition title="Responsive date/time pair" description="DateTimeFieldPair responds to its own available width: stacked below 24rem (384px), a date plus an 8rem time column at 24rem and above. Resize the gallery or place it inside a narrow card; labels and tab order stay date then time. Check phone, sidebar-expanded and collapsed layouts, both themes and densities.">
+        <div className="w-full max-w-xl resize-x overflow-auto p-1">
+          <DateTimeFieldPair
+            date={<Labelled label="Date" htmlFor={id("pair-date")}><DateField id={id("pair-date")} value={picked} onValueChange={setPicked} /></Labelled>}
+            time={<Labelled label="Time" htmlFor={id("pair-time")}><TimeField id={id("pair-time")} value={time} onValueChange={setTime} /></Labelled>}
+          />
+        </div>
+      </Composition>
 
       <Composition
         title="Event schedule"

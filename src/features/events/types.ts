@@ -12,6 +12,8 @@ export { ResponseType };
  * answers to it, keep that id.
  */
 export interface ApplicationQuestionTemplate {
+  /** Stable editor identity while a server-assigned id is pending. */
+  clientKey?: string;
   id?: string;
   question: string;
   description: string;
@@ -23,6 +25,7 @@ export interface ApplicationQuestionTemplate {
 
 /** Display-ready event details for a ticket; build one with `toTicketEvent`. */
 export interface TicketEvent {
+  eventColour?: string;
   name: string;
   date: string | null;
   time: string | null;

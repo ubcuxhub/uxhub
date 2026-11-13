@@ -8,18 +8,17 @@ import type {
 export type AppSettingsRow = Tables<"app_settings">;
 export type AppSettingsUpdate = TablesUpdate<"app_settings">;
 
-export type EventRow = Tables<"events">;
+export type EventContentSettingsRow = Tables<"event_content_settings">;
+
+// PostgREST computed fields are returned only when explicitly selected.
+export type EventRow = Omit<Tables<"events">, "event_has_ended">;
 export type EventInsert = TablesInsert<"events">;
 export type EventUpdate = TablesUpdate<"events">;
 export type EventStatus = Enums<"event_status">;
 export type EventType = Enums<"event_type">;
 
 export type MentorRow = Tables<"mentors">;
-export type MentorInsert = TablesInsert<"mentors">;
-export type MentorUpdate = TablesUpdate<"mentors">;
 export type SponsorRow = Tables<"sponsors">;
-export type SponsorInsert = TablesInsert<"sponsors">;
-export type SponsorUpdate = TablesUpdate<"sponsors">;
 export type EventMentorInsert = TablesInsert<"event_mentors">;
 export type EventPeopleSectionRow = Tables<"event_people_sections">;
 export type EventPeopleSectionInsert = TablesInsert<"event_people_sections">;
@@ -49,6 +48,8 @@ export type SquareWebhookEventInsert = TablesInsert<"square_webhook_events">;
 export type SquareWebhookEventUpdate = TablesUpdate<"square_webhook_events">;
 
 export type EventTicketRow = Tables<"event_tickets">;
+
+export type EventApplicationSettingsRow = Tables<"event_application_settings">;
 
 export type EventApplicationRow = Tables<"event_applications">;
 export type EventApplicationInsert = TablesInsert<"event_applications">;
@@ -112,3 +113,5 @@ export const ResponseType = {
   dropdown: "dropdown",
   file_upload: "file_upload",
 } as const satisfies Record<ResponseType, ResponseType>;
+
+export type EventDateLocationSettingsRow = Tables<"event_date_location_settings">;

@@ -163,6 +163,7 @@ helper file, and fix it in one place.
 
 | Table                         | Helper file                                       |
 | ----------------------------- | ------------------------------------------------- |
+| `event_date_location_settings` | `src/lib/supabase-helpers/event-date-locations.ts` (staff editor only) |
 | `events`                      | `src/lib/supabase-helpers/events.ts`              |
 | `event_tickets`               | `src/lib/supabase-helpers/event-tickets.ts`       |
 | `event_applications`          | `src/lib/supabase-helpers/event-applications.ts`  |
@@ -379,3 +380,88 @@ external HTTP requests.
   `20260907120000_simplify_membership_benefits.sql` set the descriptions
   because no other path reached the production rows; it is the last of its kind.
   `name` and `slug` are not editable, so they stay migration-owned.
+
+## Event builder dates and locations
+
+`event_date_location_settings` stores the staff-only editor document and revision,
+including inactive location-type values and per-date whole-location overrides.
+Never include this table in member/public payloads. The atomic save synchronizes
+one check-in session per date, retains session IDs, derives the events envelope,
+and writes only the audience-approved summary/physical fields to `events`.
+Exact restricted physical details stay in the editor document; default meeting
+details also use the existing Going/staff `event_private_details` boundary.
+Member per-date/physical-private rendering and broader audience integration remain
+deferred under the form-first spec. Registration capacity and mode are guarded
+on all event writes using the same event row lock as reservations.
+
+
+### Application form configuration
+
+`event_application_settings` stores staff-only release/confirmation configuration
+and the durable first-submission question lock. Browser roles have only RLS-scoped
+staff reads; writes run through the authorized builder transaction or submission
+trigger. `save_event_application_questions` and direct question-write triggers
+serialize on the event row with `submit_event_application`; submitted questions
+remain unchanged even when they have no answers. No migration rewrites offers,
+responses or attachment objects. Timing fields are configuration only until the
+attendee release/offer integration is implemented. See
+[application editor settings](../docs/event-states.md#application-editor-settings).
+
+### Team form configuration
+
+The builder reuses `events.teams_enabled`, nullable min/max sizes and deadline.
+No retains hidden configuration. `guard_event_team_settings` blocks disabling
+formed teams (including empty/ownerless teams) and lowering max below the largest
+team. Team creation/growth and settings writes serialize on the event row; the
+existing attendee RPCs take that lock before their checks and team locks. Direct
+service-role team writes also honor enabled/capacity guards. No memberships or
+historical records are rewritten. `admin_event_team_settings` supplies staff-only
+aggregate editor locks via `src/lib/supabase-helpers/teams.ts`. Member/invite and
+staff assignment interfaces remain deferred; nullable limits and deadline keep
+their existing unlimited/no-lock meaning.
+
+
+### People and resource form configuration
+
+`event_content_settings` stores the staff-only ordered editor document and a
+revision checked under the event row lock. Applied saves synchronize people
+sections, mentor/sponsor associations and viewer-scoped `event_links` atomically
+through the existing builder save chain. Directory rows have null `owner_event_id`;
+new/edited event entries use owned rows and never mutate shared sources. Searches
+exclude owned rows. Browser roles cannot write the document or invoke saves.
+Every included section needs an item, including in working drafts; incomplete
+entry fields/link rows remain recoverable in working documents. HTTP(S) URL
+safety is checked in application validation and the database. Going-only links
+retain existing RLS after an event ends; after-event public links remain distinct.
+The section-aware attendee renderer remains deferred.
+
+## Event builder mutation safety
+
+`events.revision` increments for every event-row update, including overview and
+scheduled publication. Builder server actions send the loaded revision and a
+stable operation UUID. `admin_event_mutations` stores committed responses in the
+same transaction and is service-role only; retrying the same operation returns
+its receipt without repeating the write. Deletion receipts retain asset cleanup
+targets after the event is removed. Keep these receipts private and intact while
+clients may still retry.
+
+Ended active events use `ends_at` (final date envelope), falling back to
+`starts_at`. The builder refuses full historical saves; the overview RPC refuses
+schedule changes. A dedicated resource RPC validates and replaces only links,
+preserving historical sections and child identities. Authenticated direct event
+and child-setting writes are also locked. Trusted service-role seed/maintenance
+writes remain available; first-party mutations must use the guarded actions.
+
+### Operational event pricing and free registration
+
+Explicit Free/Paid configuration synchronizes `regular_price` and zero
+`member_price` with `pricing_policy = 'figma'`. Legacy records retain their
+amounts on unrelated saves; pricing stays locked once offers, tickets or
+nonfailed purchases exist. `initialize_event_checkout` is service-role only and
+serializes on the event plus attempt key. It reads current membership expiry and
+club term, rejects stale quotes, and snapshots a paid amount before Square.
+For zero amounts it calls the existing reservation function and commits the
+purchase, ticket and fulfilled status together. A rejected reservation leaves no
+purchase or seat. Retries return the same receipt. No Square customer or payment
+is used for zero amounts; ordinary confirmation, history and check-in read the
+same purchase/ticket records as paid registration.

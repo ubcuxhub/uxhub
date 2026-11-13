@@ -14,6 +14,8 @@ import {
   type PanelContext,
   type TicketLayoutProps,
 } from "@/features/events/lib/registration-panel";
+import { hasActiveMembership } from "@/features/memberships/lib/expiry";
+import { getMembershipTermEndsAt } from "@/features/memberships/lib/term";
 import { hasApplicationAnswer } from "@/lib/application-response";
 import { formatEventDateLabel, pacificDate } from "@/lib/date";
 import { createClient } from "@/lib/supabase/server";
@@ -42,6 +44,7 @@ type PanelEvent = Pick<
   | "image_url"
   | "member_price"
   | "regular_price"
+  | "pricing_policy"
 >;
 
 interface RegistrationPanelProps {
@@ -73,13 +76,16 @@ export async function RegistrationPanel({ event, user, state }: RegistrationPane
   const supabase = await createClient();
   const holdsTicket = state.kind === "reg-going" || state.kind === "reg-checked-in";
 
-  const [links, draftProgress, ticketRow] = await Promise.all([
+  const [links, draftProgress, membershipTermEndsAt, ticketRow] = await Promise.all([
     holdsTicket ? fetchEventLinks(supabase, event.id) : [],
     state.kind === "app-draft" ? loadDraftProgress(supabase, event.id, user.id) : null,
+    event.pricing_policy === "figma" ? getMembershipTermEndsAt() : null,
     "ticketId" in state ? fetchUserEventTicket(supabase, event.id, user.id) : null,
   ]);
 
-  const isMember = Boolean(user.membership_type_id);
+  const isMember = event.pricing_policy === "figma"
+    ? hasActiveMembership(user, membershipTermEndsAt)
+    : Boolean(user.membership_type_id);
   const context: PanelContext = {
     eventName: event.name,
     eventSlug: event.slug,
@@ -105,6 +111,11 @@ export async function RegistrationPanel({ event, user, state }: RegistrationPane
         ) : (
           <TicketLayout
             {...spec.props}
+            packageActions={links.filter((link) => link.type === "participant_package").map((link) => ({
+              kind: "external",
+              label: !link.label || link.label === "Participant package" ? "View participant package" : link.label,
+              href: link.url,
+            }))}
             ticket={{
               eventName: event.name,
               holderName: holderName(user),
@@ -159,8 +170,10 @@ function TicketLayout({
   primary,
   secondary,
   ticket,
-}: TicketLayoutProps & { ticket: TicketView }) {
-  const hasActions = Boolean(primary || secondary);
+  packageActions,
+}: TicketLayoutProps & { ticket: TicketView; packageActions: PanelAction[] }) {
+  const secondaryActions = packageActions.length ? packageActions : secondary ? [secondary] : [];
+  const hasActions = Boolean(primary || secondaryActions.length);
 
   return (
     <div className="grid gap-4 @4xl:grid-cols-[minmax(0,480px)_444px] @4xl:items-center @4xl:gap-x-10">
@@ -182,7 +195,7 @@ function TicketLayout({
       {hasActions ? (
         <div className="flex flex-col gap-3 @4xl:flex-row @4xl:flex-wrap @4xl:self-start">
           {primary ? <PanelButton action={primary} ticket={ticket} /> : null}
-          {secondary ? <PanelButton action={secondary} variant="secondary" ticket={ticket} /> : null}
+          {secondaryActions.map((action, index) => <PanelButton key={index} action={action} variant="secondary" ticket={ticket} />)}
         </div>
       ) : null}
     </div>

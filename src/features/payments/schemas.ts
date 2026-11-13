@@ -43,10 +43,20 @@ export function parseCheckoutRequest(
     throw new Error("Enter a valid email address.");
   }
 
+  const kind = asPurchaseKind(payload.kind);
+  const token = kind === "membership"
+    ? asNonEmptyString(payload.token, "Payment token")
+    : asOptionalString(payload.token);
+  const expectedAmountCents = payload.expectedAmountCents;
+  if (expectedAmountCents !== undefined &&
+      (typeof expectedAmountCents !== "number" || !Number.isSafeInteger(expectedAmountCents) || expectedAmountCents < 0)) {
+    throw new Error("Invalid expected amount.");
+  }
   return {
-    kind: asPurchaseKind(payload.kind),
+    kind,
     slug: asNonEmptyString(payload.slug, "Product slug"),
-    token: asNonEmptyString(payload.token, "Payment token"),
+    token,
+    ...(expectedAmountCents !== undefined ? { expectedAmountCents: expectedAmountCents as number } : {}),
     idempotencyKey: asNonEmptyString(
       payload.idempotencyKey,
       "Checkout idempotency key"

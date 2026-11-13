@@ -106,6 +106,10 @@ describe("formatDateInput", () => {
 });
 
 describe("parseTimeInput", () => {
+  it.each([["7", "07:00"], ["9:30", "09:30"], ["11", "11:00"], ["12", "12:00"], ["6", "18:00"], ["9pm", "21:00"], ["06:00", "06:00"], ["21:00", "21:00"]])("reads builder start %s as %s", (input, expected) => {
+    expect(parseTimeInput(input, { ambiguousStart: "daytime" })).toBe(expected);
+  });
+
   it.each([
     ["9", "21:00"],
     ["9pm", "21:00"],

@@ -1,78 +1,23 @@
-import type {
-  MentorInsert,
-  MentorRow,
-  MentorUpdate,
-  SponsorInsert,
-  SponsorRow,
-  SponsorUpdate,
-} from "@/lib/supabase/models";
+import type { MentorRow, SponsorRow } from "@/lib/supabase/models";
 import { TABLES } from "./tables";
 import type { DbClient } from "./types";
 
-export interface MentorInput {
-  id?: string;
-  full_name: string;
-  position?: string | null;
-  linkedin_url?: string | null;
-  description?: string | null;
-  profile_image_path?: string | null;
-}
-
-export interface SponsorInput {
-  id?: string;
-  name: string;
-  brand_logo_path?: string | null;
-}
-
-export async function saveMentor(
-  supabase: DbClient,
-  input: MentorInput
-): Promise<MentorRow> {
-  const payload: MentorInsert | MentorUpdate = {
-    full_name: input.full_name.trim(),
-    position: input.position?.trim() || null,
-    linkedin_url: input.linkedin_url?.trim() || null,
-    description: input.description?.trim() || null,
-    profile_image_path: input.profile_image_path?.trim() || null,
-  };
-  const request = input.id
-    ? supabase.from(TABLES.mentors).update(payload).eq("id", input.id)
-    : supabase.from(TABLES.mentors).insert(payload as MentorInsert);
-  const { data, error } = await request.select("*").single();
-  if (error) throw error;
-  return data;
-}
-
-export async function saveSponsor(
-  supabase: DbClient,
-  input: SponsorInput
-): Promise<SponsorRow> {
-  const payload: SponsorInsert | SponsorUpdate = {
-    name: input.name.trim(),
-    brand_logo_path: input.brand_logo_path?.trim() || null,
-  };
-  const request = input.id
-    ? supabase.from(TABLES.sponsors).update(payload).eq("id", input.id)
-    : supabase.from(TABLES.sponsors).insert(payload as SponsorInsert);
-  const { data, error } = await request.select("*").single();
-  if (error) throw error;
-  return data;
-}
-
-/**
- * Every person linked to the event, in order. Until the builder adds other
- * people sections, an event's only section is Mentors. This reads no section
- * columns on purpose: preview deploys run against production's schema, which
- * has none until the people-sections migration is merged.
- */
+/** Compatibility reader for the existing Mentors card. Other groups remain
+ * in the editor until section-aware attendee rendering is delivered. */
 export async function fetchEventMentors(
   supabase: DbClient,
   eventId: string
 ): Promise<MentorRow[]> {
+  const { data: sections, error: sectionError } = await supabase
+    .from(TABLES.eventPeopleSections).select("id, title").eq("event_id", eventId);
+  if (sectionError) throw sectionError;
+  const mentorSections = (sections ?? []).filter(section => section.title.trim().toLowerCase() === "mentors");
+  if (!mentorSections.length) return [];
   const { data: links, error: linksError } = await supabase
     .from(TABLES.eventMentors)
     .select("mentor_id, sort_order")
     .eq("event_id", eventId)
+    .in("section_id", mentorSections.map(section => section.id))
     .order("sort_order", { ascending: true });
 
   if (linksError) throw linksError;
@@ -128,6 +73,7 @@ export async function searchMentors(
   let request = supabase
     .from(TABLES.mentors)
     .select("*")
+    .is("owner_event_id", null)
     .order("full_name")
     .limit(20);
 
@@ -147,6 +93,7 @@ export async function searchSponsors(
   let request = supabase
     .from(TABLES.sponsors)
     .select("*")
+    .is("owner_event_id", null)
     .order("name")
     .limit(20);
 

@@ -29,7 +29,7 @@ interface SquareEnv {
   endpoints?: string;
 }
 
-// The client is constructed at module scope, so each case needs a fresh import.
+// Each case gets a fresh lazy client and environment.
 async function loadClient(env: SquareEnv = {}) {
   vi.resetModules();
   squareMocks.constructorOptions.length = 0;
@@ -42,6 +42,7 @@ async function loadClient(env: SquareEnv = {}) {
   vi.stubEnv("SQUARE_WEBHOOK_ENDPOINTS", env.endpoints);
 
   const client = await import("./client");
+  void client.squareClient.payments;
 
   return { client, options: squareMocks.constructorOptions.at(-1) };
 }
@@ -89,13 +90,21 @@ describe("Square environment selection", () => {
 });
 
 describe("required environment variables", () => {
-  it("refuses to load without an access token", async () => {
+  it("loads without payment credentials for free registration, validating only paid operations", async () => {
     vi.resetModules();
     vi.stubEnv("SQUARE_ACCESS_TOKEN", undefined);
+    const client = await import("./client");
+    expect(squareMocks.constructorOptions).toHaveLength(0);
+    expect(client.SQUARE_CURRENCY).toBe("CAD");
+    expect(() => client.squareClient.payments).toThrow("Missing required environment variable: SQUARE_ACCESS_TOKEN");
+    expect(() => client.squareClient.customers).toThrow("Missing required environment variable: SQUARE_ACCESS_TOKEN");
+  });
 
-    await expect(import("./client")).rejects.toThrow(
-      "Missing required environment variable: SQUARE_ACCESS_TOKEN"
-    );
+  it("shares one configured client between payment and customer requests", async () => {
+    const { client } = await loadClient();
+    void client.squareClient.customers;
+    void client.squareClient.payments;
+    expect(squareMocks.constructorOptions).toHaveLength(1);
   });
 
   it("returns the configured location id", async () => {

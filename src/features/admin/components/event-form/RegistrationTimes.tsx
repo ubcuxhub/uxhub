@@ -1,189 +1,37 @@
 "use client";
 
 import { useState } from "react";
-
-import { DatePickerButton } from "../DatePickerButton";
-import { Calendar } from "@/components/ui/calendar";
+import { DateField, DateTimeFieldPair, TimeField } from "@/components/ui/date-time-field";
 import { Button } from "@/components/ui/button";
-import {
-  Field,
-  FieldError,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { strictPacificTimestamp } from "@/lib/date";
+import type { IsoDate, WallTime } from "@/lib/date-input";
 
-interface RegistrationTimesProps {
-  registration_opens_at: string;
-  registration_closes_at: string;
-  onFieldChange: <K extends keyof RegistrationTimesState>(
-    field: K,
-    value: RegistrationTimesState[K]
-  ) => void;
-}
-
-export interface RegistrationTimesState {
+interface RegistrationTimesState {
   registration_opens_at: string;
   registration_closes_at: string;
 }
 
-const dateFormatter = new Intl.DateTimeFormat("en-US", {
-  dateStyle: "medium",
-});
-
-const splitDateTimeLocal = (value: string) => {
+function RegistrationMoment({ id, label, value, after, onChange }: { id: string; label: string; value: string; after?: string; onChange: (value: string) => void }) {
   const [date = "", time = ""] = value.split("T");
+  const [dateError, setDateError] = useState<string | null>(null);
+  const [timeError, setTimeError] = useState<string | null>(null);
+  const update = (date: string, time: string) => onChange(!date && !time ? "" : `${date}T${time}`);
+  const clockError = date && time && !strictPacificTimestamp(value) ? "Use an unambiguous, valid Pacific date and time." : null;
+  const error = dateError ?? timeError ?? clockError;
+  return <Field data-invalid={!!error}>
+    <FieldLabel htmlFor={`${id}-date`}>{label}</FieldLabel>
+    <DateTimeFieldPair timeWidth="wide" date={<DateField id={`${id}-date`} value={(date || null) as IsoDate | null} onValueChange={next => update(next ?? "", time)} onValidityChange={setDateError} />} time={<TimeField id={`${id}-time`} aria-label={`${label} time`} ambiguousStart="daytime" value={(time || null) as WallTime | null} after={(after || undefined) as WallTime | undefined} onValueChange={next => update(date, next ?? "")} onValidityChange={setTimeError} />} />
+    {error && <FieldError>{error}</FieldError>}
+    {value && <Button type="button" variant="ghost" className="w-fit" onClick={() => onChange("")}>Clear {label.toLowerCase()}</Button>}
+  </Field>;
+}
 
-  return {
-    date,
-    time,
-  };
-};
-
-const dateStringToDate = (value: string) => {
-  if (!value) return undefined;
-
-  const [year, month, day] = value.split("-").map(Number);
-
-  if (!year || !month || !day) return undefined;
-
-  return new Date(year, month - 1, day);
-};
-
-const isSameDate = (left: string, right: string) =>
-  Boolean(left && right && left === right);
-
-const dateToDateString = (date: Date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-
-  return `${year}-${month}-${day}`;
-};
-
-const combineDateTimeLocal = (date: string, time: string) => {
-  if (!date && !time) return "";
-
-  return `${date}T${time}`;
-};
-
-const isDateTimeRangeInvalid = (start: string, end: string) => {
-  if (!start || !end) return false;
-
-  return new Date(start) >= new Date(end);
-};
-
-const RegistrationDateTimeField = ({
-  id,
-  label,
-  value,
-  minDate,
-  minTime,
-  onChange,
-}: {
-  id: keyof RegistrationTimesState;
-  label: string;
-  value: string;
-  minDate?: Date;
-  minTime?: string;
-  onChange: (value: string) => void;
-}) => {
-  const [open, setOpen] = useState(false);
-  const { date, time } = splitDateTimeLocal(value);
-  const selectedDate = dateStringToDate(date);
-
-  return (
-    <Field>
-      <FieldLabel htmlFor={`${id}_date`}>{label}</FieldLabel>
-      <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-        <Popover open={open} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <DatePickerButton
-              id={`${id}_date`}
-              label={selectedDate ? dateFormatter.format(selectedDate) : undefined}
-            />
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              defaultMonth={selectedDate}
-              disabled={minDate ? { before: minDate } : undefined}
-              onSelect={(newDate) => {
-                if (!newDate) return;
-
-                onChange(combineDateTimeLocal(dateToDateString(newDate), time));
-                setOpen(false);
-              }}
-            />
-          </PopoverContent>
-        </Popover>
-        <Input
-          id={`${id}_time`}
-          type="time"
-          value={time}
-          min={minTime}
-          onChange={(event) =>
-            onChange(combineDateTimeLocal(date, event.target.value))
-          }
-          aria-label={`${label} time`}
-          className="sm:w-32"
-        />
-      </div>
-      {value && (
-        <Button type="button" variant="ghost" className="w-fit" onClick={() => onChange("")}>
-          Clear {label.toLowerCase()}
-        </Button>
-      )}
-    </Field>
-  );
-};
-
-export const RegistrationTimes = ({
-  registration_opens_at,
-  registration_closes_at,
-  onFieldChange,
-}: RegistrationTimesProps) => {
-  const { date: startDateString } = splitDateTimeLocal(
-    registration_opens_at
-  );
-  const { date: endDateString } = splitDateTimeLocal(registration_closes_at);
-  const startDate = dateStringToDate(startDateString);
-  const minEndTime = isSameDate(startDateString, endDateString)
-    ? splitDateTimeLocal(registration_opens_at).time
-    : undefined;
-  const hasInvalidRange = isDateTimeRangeInvalid(
-    registration_opens_at,
-    registration_closes_at
-  );
-
-  return (
-    <FieldGroup className="grid gap-4 md:grid-cols-2">
-      <RegistrationDateTimeField
-        id="registration_opens_at"
-        label="Registration Opens"
-        value={registration_opens_at}
-        onChange={(value) => onFieldChange("registration_opens_at", value)}
-      />
-      <RegistrationDateTimeField
-        id="registration_closes_at"
-        label="Registration Closes"
-        value={registration_closes_at}
-        minDate={startDate}
-        minTime={minEndTime}
-        onChange={(value) => onFieldChange("registration_closes_at", value)}
-      />
-      {hasInvalidRange && (
-        <FieldError className="md:col-span-2">
-          Registration end time must be after the start time.
-        </FieldError>
-      )}
-    </FieldGroup>
-  );
-};
-
+export function RegistrationTimes({ registration_opens_at: opens, registration_closes_at: closes, onFieldChange }: RegistrationTimesState & { onFieldChange: <K extends keyof RegistrationTimesState>(key: K, value: RegistrationTimesState[K]) => void }) {
+  const sameDate = !!opens && opens.split("T")[0] === closes.split("T")[0];
+  return <FieldGroup className="grid gap-4 @min-[36rem]/field-group:grid-cols-2">
+    <RegistrationMoment id="registration_opens_at" label="Registration Opens" value={opens} onChange={value => onFieldChange("registration_opens_at", value)} />
+    <RegistrationMoment id="registration_closes_at" label="Registration Closes" value={closes} after={sameDate ? opens.split("T")[1] : undefined} onChange={value => onFieldChange("registration_closes_at", value)} />
+    {opens && closes && opens >= closes && <FieldError className="@min-[36rem]/field-group:col-span-2">Registration end time must be after the start time.</FieldError>}
+  </FieldGroup>;
+}

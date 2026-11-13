@@ -1,3 +1,5 @@
+import Image from "next/image";
+import { EventDescription } from "@/components/shared/EventDescription";
 import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
@@ -48,7 +50,7 @@ export default async function PortalEventPage({
   const joinCode = typeof join === "string" ? join : null;
   const origin = getHeadersOrigin(await headers()) ?? "";
   const [agenda, mentors, sponsors, states, teams] = await Promise.all([
-    fetchEventAgenda(supabase, event.id),
+    event.agenda_enabled ? fetchEventAgenda(supabase, event.id) : [],
     // Admins switch these sections off per event, as the public event page does.
     event.mentors_enabled ? fetchEventMentors(supabase, event.id) : [],
     event.sponsors_enabled ? fetchEventSponsors(supabase, event.id) : [],
@@ -71,7 +73,8 @@ export default async function PortalEventPage({
       )}
       
       <div className="border-border-subtle rounded-md border">
-        <div className="w-full h-51 bg-brand-blue-200 relative rounded-t-md">
+        <div className="w-full h-51 bg-muted relative rounded-t-md" style={{ backgroundColor: event.header_colour || undefined }}>
+          {event.header_image_url && <Image src={resolveImagePreviewSrc(event.header_image_url)} alt="" fill className="object-cover" unoptimized />}
           {/* cover image placeholder */}
           {event.image_url && (
             // eslint-disable-next-line @next/next/no-img-element
@@ -130,7 +133,7 @@ export default async function PortalEventPage({
               </div>
             </div>
           </div>
-          <p className="whitespace-pre-wrap">{event.description}</p>
+          <EventDescription rich={event.description_rich} text={event.description} />
         </div>
       </div>
 

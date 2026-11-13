@@ -76,20 +76,40 @@ export async function fetchEventBySlug(
   return data;
 }
 
-/** Returns existing slugs that start with the given prefix (for uniqueness). */
+/**
+ * Returns the event URLs starting with `prefix` (for uniqueness): every
+ * event's `slug` and every URL claimed in `event_url_claims`, which also holds
+ * each event's configured page URL. Pass `exceptEventId` to leave out that
+ * event's own URLs, so re-saving it does not count them as taken.
+ *
+ * Needs the service-role client: `event_url_claims` has no browser grants.
+ */
 export async function fetchEventSlugsByPrefix(
   supabase: DbClient,
-  prefix: string
+  prefix: string,
+  options: { exceptEventId?: string | null } = {}
 ): Promise<string[]> {
-  const { data, error } = await supabase
+  const { exceptEventId } = options;
+  let events = supabase
     .from(TABLES.events)
     .select("slug")
     .ilike("slug", `${prefix}%`);
+  let claims = supabase
+    .from(TABLES.eventUrlClaims)
+    .select("slug")
+    .ilike("slug", `${prefix}%`);
+  if (exceptEventId) {
+    events = events.neq("id", exceptEventId);
+    claims = claims.neq("event_id", exceptEventId);
+  }
 
-  if (error) throw error;
-  return (data ?? [])
-    .map((row: Pick<EventRow, "slug">) => row.slug)
+  const [eventsResult, claimsResult] = await Promise.all([events, claims]);
+  if (eventsResult.error) throw eventsResult.error;
+  if (claimsResult.error) throw claimsResult.error;
+  const slugs = [...eventsResult.data, ...claimsResult.data]
+    .map((row: { slug: string | null }) => row.slug)
     .filter((slug): slug is string => slug !== null);
+  return [...new Set(slugs)];
 }
 
 export async function insertEvent(
@@ -148,56 +168,16 @@ export async function updateEventSchedule(
   patch: EventSchedulePatch
 ): Promise<EventRow | null> {
   const { data, error } = await supabase
-    .from(TABLES.events)
-    .update(patch)
-    .eq("id", id)
-    .select("*")
+    .rpc("update_admin_event_schedule", { p_event_id: id, p_patch: patch })
     .maybeSingle();
 
   if (error) throw error;
   return data;
 }
 
-/**
- * Updates an event only while its stored cover image still matches
- * `expectedImageUrl`.
- *
- * Returns `null` when no row matched, which the caller must treat as a
- * conflict rather than retrying unconditionally: another writer replaced the
- * cover (and deleted the object this payload still points at) since the form
- * was loaded, so an unguarded write would leave the row referencing an image
- * that no longer exists.
- */
-export async function updateEventIfImageMatches(
-  supabase: DbClient,
-  id: string,
-  payload: EventUpdate,
-  expectedImageUrl: string | null
-): Promise<{ id: string } | null> {
-  const pending = supabase.from(TABLES.events).update(payload).eq("id", id);
-  const guarded =
-    expectedImageUrl === null
-      ? pending.is("image_url", null)
-      : pending.eq("image_url", expectedImageUrl);
-
-  const { data, error } = await guarded.select("id").maybeSingle();
-
+/** Staff-only aggregate, including in-flight purchases that lock repricing. */
+export async function fetchEventPricingLocked(supabase: DbClient, eventId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("admin_event_pricing_locked", { p_event_id: eventId });
   if (error) throw error;
-  return data ?? null;
-}
-
-/** Finds an event still referencing `imageUrl`, if any. */
-export async function fetchEventIdByImageUrl(
-  supabase: DbClient,
-  imageUrl: string
-): Promise<string | null> {
-  const { data, error } = await supabase
-    .from(TABLES.events)
-    .select("id")
-    .eq("image_url", imageUrl)
-    .limit(1)
-    .maybeSingle();
-
-  if (error) throw error;
-  return data?.id ?? null;
+  return data;
 }

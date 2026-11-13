@@ -132,6 +132,8 @@ returning id \gset draft_agenda_item_
 insert into public.event_tickets (event_id, user_id)
 values (:'event_id', :'user_a_id'), (:'event_id', :'user_b_id');
 
+update public.events set teams_enabled = true where id = :'event_id';
+
 -- User A owns a team with user B on it; another team on the event has neither.
 insert into public.teams (event_id, owner_id)
 values (:'event_id', :'user_a_id')
@@ -2481,5 +2483,11 @@ end;
 $$;
 
 \ir event-publication.sql
+\ir event-drafts.sql
+\ir event-date-locations.sql
+\ir event-application-settings.sql
+\ir event-team-settings.sql
+\ir event-content.sql
+\ir event-checkout.sql
 
 rollback;

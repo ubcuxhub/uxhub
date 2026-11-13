@@ -2,6 +2,8 @@
 
 import type { ReactNode } from "react";
 
+import { AppShellHeader } from "@/components/shared/AppShellHeader";
+import { RecordPageTopBar } from "@/components/shared/RecordDrawer";
 import { AppSidebarNav } from "@/components/shared/AppSidebar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -26,9 +28,17 @@ function SidebarFrame({ children }: { children: ReactNode }) {
   );
 }
 
-function PageBody() {
+function PageBody({ recordPage = false }: { recordPage?: boolean }) {
   return (
-    <SidebarInset className="min-h-0 overflow-auto">
+    <SidebarInset className="group/shell min-h-0 overflow-auto">
+      <AppShellHeader />
+      {recordPage && (
+        <RecordPageTopBar
+          listHref="/dev/components/app-sidebar"
+          listLabel="Back to sidebar examples"
+          recordHref="/dev/components/app-sidebar"
+        />
+      )}
       <div className="flex flex-col gap-4 p-6">
         <div className="flex items-center gap-3">
           <SidebarTrigger />
@@ -98,7 +108,7 @@ function AppSidebarDemo() {
 
       <Composition
         title="Sidebar"
-        description="The shell: AppSidebarNav beside a page title and a card, expanded and collapsed."
+        description="The shell, expanded and collapsed. Below 768px, AppShellHeader provides a sticky Open menu button. Record pages hide that header while their own close/collapse bar is present. Check both phone examples, themes and densities."
       >
         <div className="grid gap-6">
           <Specimen label="Expanded">
@@ -117,6 +127,16 @@ function AppSidebarDemo() {
                 <SidebarProvider defaultOpen={false}>
                   <AppSidebarNav isAdmin isManager pathname="/admin/events" />
                   <PageBody />
+                </SidebarProvider>
+              </SidebarFrame>
+            </div>
+          </Specimen>
+          <Specimen label="Record page (phone header hidden)">
+            <div className="w-full">
+              <SidebarFrame>
+                <SidebarProvider defaultOpen>
+                  <AppSidebarNav isAdmin isManager pathname="/admin/events" />
+                  <PageBody recordPage />
                 </SidebarProvider>
               </SidebarFrame>
             </div>

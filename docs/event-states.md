@@ -96,7 +96,7 @@ Keep the event in Draft afterwards, or delete it along with its registrations.
 
 The portal event page and checkout read the event under the viewer's RLS, so
 staff reach drafts and members get a 404. Fulfillment
-(`createSquarePaymentForEventTicket`) uses the service role, so it drops the
+(`checkoutEventTicket`) uses the service role, so it drops the
 `status = active` filter only for admins and managers, and
 `reserve_event_ticket` checks the role again.
 
@@ -269,3 +269,85 @@ The server makes these changes through `create_team`, `join_team`,
 Seats taken = tickets + accepted offers that haven't expired and have no ticket
 yet. Since nobody gives a spot back, a full event only reopens when an offer
 expires.
+
+## Saved builder configuration
+
+The form-first builder stores desired marketing and pricing configuration in
+`events.configured_marketing_mode`, `configured_marketing_url`, `configured_slug`,
+`configured_pricing_mode` and `configured_price`. `configured_slug_edited`
+remembers whether the URL was deliberately edited, so automatic URLs continue
+following name changes after reload. Marketing configuration does not activate
+new marketing views. Existing consumers continue to read
+`slug`, `marketing_url`, `regular_price` and `member_price`; unrelated form
+updates omit effective prices. `is_featured` saves the staff choice without
+claiming portal Home selection/display is delivered.
+
+New Free/Paid configuration activates `pricing_policy = 'figma'`, synchronizing
+`regular_price` to the configured non-member amount and `member_price` to zero.
+Active membership requires both personal expiry and club-term checks. Existing
+legacy events retain their policy/amounts on unrelated saves; explicitly changing
+pricing configuration converts an eligible event. The temporary pricing
+publication/scheduling/registration blockers have been removed. Staff may still
+test drafts; ordinary required-field, authorization and pricing locks remain.
+
+`initialize_event_checkout` snapshots paid prices under the event lock. A zero
+amount reserves its ticket and completes the zero-dollar purchase in one
+transaction, without Square customer creation, card collection or a charge.
+The purchase supplies existing history, confirmation and receipt paths; its ticket
+supplies Going/private access, QR and check-in. Equal attempt keys return the
+same receipt; rejected free reservations leave no purchase. A changed quote
+requires refresh rather than charging an unreviewed amount.
+
+`first_published_at` records first activation and survives a return to Draft.
+Existing active rows are backfilled when the migration runs. Both effective
+and configured URLs lock after publication. Pre-publication desired URLs share
+an atomic claim namespace with existing event slugs, so collisions cannot be
+saved under concurrent requests. Marketing mode/external URL configuration
+remains independently editable; existing public destinations are preserved.
+
+Pricing configuration and effective prices lock when an event has a ticket,
+an unexpired accepted offer, or a nonfailed purchase (including an in-flight
+payment). Purchase/ticket/offer writes take the event lock used by reservation;
+form checks run after that lock and see committed registrations. Historical
+purchase amounts and ticket records are never rewritten by configuration saves.
+`admin_event_pricing_locked` exposes only the staff aggregate; URL claims have
+no browser grants. The event's existing RLS and staff server-action guards
+continue to govern form access and writes.
+
+
+### Application editor settings
+
+The admin builder saves application timing in staff-only
+`event_application_settings`, separately from public event rows and existing
+per-offer `offer_expires_at`. Release decisions on and Confirm by are optional
+Pacific moments; entered values need a complete, unambiguous date and time, and
+confirmation follows release when both are set. Elapsed values remain editable.
+These form settings do not yet embargo decisions, change outstanding offers,
+reopen expired offers or send emails. Those attendee behaviours remain deferred.
+The intended common deadline/release policy is provisional pending product review.
+
+First submission records a durable `questions_locked_at`. Application drafts
+alone do not lock questions. After submission the builder shows ordered summaries,
+and direct question writes and atomic saves reject changes, additions, removals
+and replacements. Unchanged saves preserve question/response identity and stored
+descriptions. The lock survives application removal. Event deletion retains its
+existing payment protections and cascade behaviour. Question edits and submission
+serialize on the event row; submission validates the question set it locks.
+
+Before that lock, the builder supports Short form, Long form, Checkboxes,
+Multiple choice, Dropdown and one private PDF up to 5 MiB; Required, optional
+positive integer text limits, choice options and ordering persist. Description
+controls are omitted without clearing existing descriptions. Staff working drafts
+can contain incomplete questions and moments; materialized Application events
+need at least one valid question before publication or scheduling through the
+builder. Member upload/response permissions retain their existing contract.
+
+### Finding an issued event ticket
+
+The attendee’s `/portal/events/<slug>` page reads their own ticket and renders
+**Registration** below the event details. It shows a shared Ticket with its signed
+QR and **View ticket**, which opens a larger scannable code. Signing stays on the
+server and uses the authenticated attendee’s ticket ID, never an ID supplied by
+the browser. A Going badge alone does not supply the ticket view. Checked-in
+attendees keep their ticket/code; people without a ticket see no issued QR.
+Completed checkout invalidates the event detail route as well as checkout.

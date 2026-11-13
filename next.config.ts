@@ -3,6 +3,10 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   reactCompiler: true,
+  // Keep page-data collection and prerendering within WSL's resource budget.
+  experimental: {
+    cpus: 1,
+  },
 };
 
 // Source maps upload only when SENTRY_AUTH_TOKEN is set (Vercel builds). CI and

@@ -1,4 +1,4 @@
-import { CircleAlert, Info, TriangleAlert } from "lucide-react";
+import { CircleAlert, Info, Lock, TriangleAlert } from "lucide-react";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
@@ -10,8 +10,14 @@ function AlertDemo() {
       <SpecimenGroup
         title="Alert"
         spec="§3.8"
-        description="warning, info and destructive, each with a 16px icon and a title."
+        description="neutral, warning, info and destructive, each with a 16px icon and a title."
       >
+        <Specimen label="neutral · locked setting" className="w-96">
+          <Alert className="w-full" variant="neutral" icon={<Lock aria-hidden strokeWidth={1.5} />}>
+            <AlertTitle>Paid · $10.00 for non-members, free for members</AlertTitle>
+            <AlertDescription>Locked because people have registered.</AlertDescription>
+          </Alert>
+        </Specimen>
         <Specimen label="warning" className="w-96">
           <Alert className="w-full" variant="warning" icon={<TriangleAlert />}>
             <AlertTitle>Membership ends Apr 30</AlertTitle>

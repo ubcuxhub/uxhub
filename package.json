@@ -5,7 +5,7 @@
   "packageManager": "pnpm@10.6.2",
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "RAYON_NUM_THREADS=1 next build",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",

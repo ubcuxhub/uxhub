@@ -144,3 +144,21 @@ export async function releaseEventTicket(
 
   if (error) throw error;
 }
+
+/** Authoritative price snapshot; free registration also issues its ticket atomically. */
+export async function initializeEventCheckout(
+  supabase: DbClient,
+  input: { eventId: string; userId: string; idempotencyKey: string; freeOnly: boolean; expectedAmountCents?: number },
+) {
+  const { data, error } = await supabase.rpc("initialize_event_checkout", {
+    p_event_id: input.eventId,
+    p_user_id: input.userId,
+    p_idempotency_key: input.idempotencyKey,
+    p_free_only: input.freeOnly,
+    p_expected_amount_cents: input.expectedAmountCents,
+  });
+  if (error) throw error;
+  const row = data?.[0];
+  if (!row) throw new Error("Checkout initialization returned no result.");
+  return row;
+}

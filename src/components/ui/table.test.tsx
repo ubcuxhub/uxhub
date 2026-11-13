@@ -28,9 +28,9 @@ globalThis.ResizeObserver ??= class {
 };
 
 describe("Table", () => {
-  it("is a native table with column headers", () => {
+  it.each(["default", "separated"] as const)("%s rows preserve native table semantics", (variant) => {
     render(
-      <Table>
+      <Table variant={variant}>
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
@@ -144,10 +144,10 @@ describe("TableRowButton", () => {
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
-  it("in a sticky table, a click elsewhere on the row opens it once", () => {
+  it.each(["default", "separated"] as const)("%s sticky rows forward clicks once", (variant) => {
     const onClick = vi.fn();
     render(
-      <Table stickyFirstColumn>
+      <Table stickyFirstColumn variant={variant}>
         <TableBody>
           <TableRow>
             <TableCell>

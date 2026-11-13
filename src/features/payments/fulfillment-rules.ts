@@ -218,6 +218,10 @@ export function getSquareErrorDiagnostic(error: unknown) {
 
 export function formatReservationFailure(reason: string | null | undefined) {
   switch (reason) {
+    case "PRICE_CHANGED":
+      return "Your ticket price has changed. Refresh checkout to review the current price.";
+    case "ATTEMPT_MISMATCH":
+      return "This checkout attempt belongs to another registration. Refresh and try again.";
     case "APPLICATION_REQUIRED":
       return "This event takes applications. You can register once your application is accepted.";
     case "OFFER_EXPIRED":

@@ -6,6 +6,18 @@ import type { RegistryEntry } from "./types";
  */
 export const dataEntries: readonly RegistryEntry[] = [
   {
+    slug: "checkout",
+    title: "Checkout",
+    category: "Data display",
+    tier: "app",
+    description: "CheckoutLayout and CheckoutPaymentSection share paid checkout and cardless event registration. Zero-price event tickets use Confirm spot without loading Square; membership checkout retains its payment form.",
+    importPath: "@/components/shared/CheckoutLayout",
+    importNames: ["CheckoutLayout", "CheckoutPaymentSection"],
+    source: "src/components/shared/CheckoutLayout.tsx",
+    spec: "§4.4",
+    layout: "page",
+  },
+  {
     slug: "card",
     title: "Card",
     category: "Data display",
@@ -85,7 +97,7 @@ export const dataEntries: readonly RegistryEntry[] = [
     category: "Data display",
     tier: "primitive",
     description:
-      "A table of records with selection, sticky columns and loading and empty states, such as Manage Users. Pair it with TableToolbar and Pagination.",
+      "A table of records with selection, sticky columns, separated rounded item rows and loading and empty states, such as Manage Users. Pair it with TableToolbar and Pagination.",
     importPath: "@/components/ui/table",
     importNames: [
       "Table",
@@ -168,7 +180,7 @@ export const dataEntries: readonly RegistryEntry[] = [
     category: "Feedback",
     tier: "primitive",
     description:
-      "An inline notice in the page: a warning, something to know, or an error, with an icon and an optional title.",
+      "An inline notice in the page: neutral status, a warning, something to know, or an error, with an icon and an optional title.",
     importPath: "@/components/ui/alert",
     importNames: ["Alert", "AlertDescription", "AlertTitle"],
     source: "src/components/ui/alert.tsx",
@@ -307,5 +319,17 @@ export const dataEntries: readonly RegistryEntry[] = [
     source: "src/components/shared/Ticket.tsx",
     spec: "§2.1, §4.3",
     layout: "split",
+  },
+  {
+    slug: "registration-ticket",
+    title: "Registration ticket",
+    category: "Data display",
+    tier: "composite",
+    description: "A Registration card with a divided ticket-count header, copy, ticket and actions. Wide containers place the ticket beside the copy; narrow containers stack text, ticket and actions.",
+    importPath: "@/components/shared/RegistrationTicket",
+    importNames: ["RegistrationTicket"],
+    source: "src/components/shared/RegistrationTicket.tsx",
+    spec: "§4.3",
+    layout: "page",
   },
 ];

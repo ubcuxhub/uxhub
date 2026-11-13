@@ -574,7 +574,7 @@ async function reconcilePurchases(
       membership_type_id: purchase.membershipSlug
         ? dependencies.membershipIds.get(purchase.membershipSlug)
         : null,
-      square_customer_id: fixture.profile.square_customer_id ?? null,
+      square_customer_id: purchase.amountCents === 0 ? null : (fixture.profile.square_customer_id ?? null),
       square_payment_id: purchase.squarePaymentId ?? null,
       status: purchase.status,
       user_id: userId,
