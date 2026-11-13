@@ -13,7 +13,7 @@ afterEach(cleanup);
 const base = {
   eventName: "Design Sprint",
   holderName: "Ada Lovelace",
-  qrToken: "3f1c9a52-8d4e-4b7a-9c61-2e5f0d8b7a14.q1v8Zx3mR0aT9cLwP2nYkA",
+  qrToken: "9f86d081884c7d659a2feaa0c55ad015",
 };
 const QR_CODE = { name: "Check-in QR code" };
 

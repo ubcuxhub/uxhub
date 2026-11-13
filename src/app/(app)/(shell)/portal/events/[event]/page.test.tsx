@@ -5,12 +5,12 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 const fixtures = vi.hoisted(() => ({
   state: { kind: "reg-going", ticketId: "ticket-1" } as import("@/features/events/lib/event-states").EventState,
-  sign: vi.fn(() => "signed-ticket-token"),
+  fetchTicket: vi.fn(),
   fetchLinks: vi.fn(),
   termEndsAt: null as string | null,
   user: { id: "user-1", first_name: "Ada", last_name: "Lovelace", email: "ada@example.test", membership_type_id: "tier", membership_expires_at: "2099-01-01T00:00:00Z" },
   event: { id: "event-1", slug: "sprint", name: "Design Sprint", status: "active", starts_at: "2099-01-01T18:00:00Z", ends_at: "2099-01-01T20:00:00Z", agenda_enabled: false, mentors_enabled: false, sponsors_enabled: false, description: "An event.", pricing_policy: "figma", regular_price: 20, member_price: 0 },
-  ticket: { id: "ticket-1", event_id: "event-1", user_id: "user-1" },
+  ticket: { id: "ticket-1", event_id: "event-1", user_id: "user-1", qr_token: "ticket-qr-token" },
 }));
 vi.mock("@/lib/log", () => ({ log: { error: vi.fn() }, errorFields: vi.fn() }));
 vi.mock("@/lib/flags", () => ({ FLAGS: { studentEvents: true } }));
@@ -21,7 +21,7 @@ vi.mock("@/lib/supabase-helpers/events", () => ({ fetchEventBySlug: async () => 
 vi.mock("@/lib/supabase-helpers/event-agenda", () => ({ fetchEventAgenda: async () => [] }));
 vi.mock("@/lib/supabase-helpers/event-people", () => ({ fetchEventMentors: async () => [], fetchEventSponsors: async () => [] }));
 vi.mock("@/lib/supabase-helpers/event-links", () => ({ fetchEventLinks: fixtures.fetchLinks }));
-vi.mock("@/lib/check-in-token", () => ({ createCheckInToken: fixtures.sign }));
+vi.mock("@/lib/supabase-helpers/event-tickets", () => ({ fetchUserEventTicket: fixtures.fetchTicket }));
 vi.mock("@/features/events/lib/event-states", () => ({ loadEventStates: async () => ({ "event-1": fixtures.state }) }));
 vi.mock("@/features/memberships/lib/term", () => ({ getMembershipTermEndsAt: async () => fixtures.termEndsAt }));
 vi.mock("@/components/shared/PageContainer", () => ({ PageContainer: ({ children }: { children: ReactNode }) => <main>{children}</main> }));
@@ -49,6 +49,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   fixtures.state = { kind: "reg-going", ticketId: fixtures.ticket.id };
   fixtures.fetchLinks.mockResolvedValue([]);
+  fixtures.fetchTicket.mockResolvedValue(fixtures.ticket);
   fixtures.termEndsAt = null;
   fixtures.user.membership_expires_at = "2099-01-01T00:00:00Z";
   fixtures.event.pricing_policy = "figma";
@@ -56,7 +57,7 @@ beforeEach(() => {
 
 it("shows a scannable ticket on the event page after registration, alongside Going", async () => {
   await renderPage();
-  expect(fixtures.sign).toHaveBeenCalledWith("ticket-1");
+  expect(fixtures.fetchTicket).toHaveBeenCalledWith(expect.anything(), "event-1", "user-1");
   expect(screen.getAllByText("Going").length).toBeGreaterThan(0);
   expect(screen.getByRole("img", { name: /QR code/i })).toBeTruthy();
   expect(screen.getByText("Registration")).toBeTruthy();
@@ -69,12 +70,12 @@ it("shows a scannable ticket on the event page after registration, alongside Goi
   expect(within(dialog).getByRole("img", { name: /QR code/i })).toBeTruthy();
 });
 
-it("does not render or sign an issued QR for an accepted applicant without a ticket", async () => {
+it("does not render or fetch an issued QR for an accepted applicant without a ticket", async () => {
   fixtures.state = { kind: "app-accepted", offerExpiresAt: null };
   await renderPage();
   expect(screen.queryByRole("img", { name: /QR code/i })).toBeNull();
   expect(screen.queryByRole("button", { name: "View ticket" })).toBeNull();
-  expect(fixtures.sign).not.toHaveBeenCalled();
+  expect(fixtures.fetchTicket).not.toHaveBeenCalled();
   expect(fixtures.fetchLinks).not.toHaveBeenCalled();
 });
 
