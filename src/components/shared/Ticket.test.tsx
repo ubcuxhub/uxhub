@@ -141,6 +141,22 @@ describe("Ticket", () => {
     );
   });
 
+  it("shows a lock instead of the code while locked, in full colour", () => {
+    const { container } = render(
+      <Ticket {...base} state="locked" code={<svg data-testid="qr" />} />,
+    );
+
+    expect(screen.queryByTestId("qr")).toBeNull();
+    expect(
+      screen.getByRole("article", {
+        name: "Ticket for Design Sprint, not registered yet",
+      }),
+    ).toBeTruthy();
+    expect(
+      container.querySelector("[data-slot='ticket-shape']")?.className,
+    ).not.toContain("grayscale");
+  });
+
   it("renders the action", () => {
     render(
       <Ticket {...base} action={<button type="button">View ticket</button>} />,

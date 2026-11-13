@@ -11,6 +11,9 @@
  * The `name` values mirror production exactly. Slugs follow the mapping baked
  * into
  * supabase/migrations/20260529110000_add_slugs_for_events_and_memberships.sql.
+ *
+ * Local only. Admins edit the production tiers in Club Settings, so
+ * `--target=prod` never writes these; the descriptions here copy production's.
  */
 
 import type { TablesInsert } from "../../../src/lib/supabase/database.types.ts";
@@ -23,7 +26,7 @@ export const membershipTypes: TablesInsert<"membership_types">[] = [
     eligible_user_types: ["ubcStudent"],
     price: 12.0,
     description:
-      "Free or discounted entry to every UX Hub event, except UXathon.",
+      "Free or discounted entry to every UX Hub event.",
   },
   {
     active: true,
@@ -41,7 +44,7 @@ export const membershipTypes: TablesInsert<"membership_types">[] = [
     eligible_user_types: ["faculty"],
     price: 18.0,
     description:
-      "Free or discounted entry to every UX Hub event, except UXathon.",
+      "Free or discounted entry to every UX Hub event.",
   },
   {
     active: true,
@@ -50,6 +53,6 @@ export const membershipTypes: TablesInsert<"membership_types">[] = [
     eligible_user_types: ["nonUbc"],
     price: 24.0,
     description:
-      "Free or discounted entry to every UX Hub event, except UXathon.",
+      "Free or discounted entry to every UX Hub event.",
   },
 ];

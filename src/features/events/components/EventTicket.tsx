@@ -1,149 +1,126 @@
 import type { ReactNode } from "react";
-import { Calendar, Clock, MapPin } from "lucide-react";
+import Image from "next/image";
+import { Image as ImageIcon } from "lucide-react";
 
-import { Badge } from "@/components/ui/badge";
-import { StatusBadge, type Status } from "@/components/ui/status-badge";
+import { notchMaskStyle, ticketAppearance } from "@/components/shared/Ticket";
+import { resolveImagePreviewSrc } from "@/lib/event-image";
+import { DEFAULT_EVENT_COLOUR } from "@/lib/event-colour";
 import { cn } from "@/lib/utils";
-import { QrCode } from "@/features/events/components/QrCode";
-import type {
-  TicketBadge,
-  TicketEvent,
-  TicketHolder,
-} from "@/features/events/types";
+
+import { QrCode } from "./QrCode";
+import { TicketFlip } from "./TicketFlip";
 
 export interface EventTicketProps {
-  event: TicketEvent;
-  holder: TicketHolder;
-  /** Student-facing event badge. Defaults to `going`. */
-  badge?: TicketBadge;
-  /** Date in the "Register by Oct 20" badge, such as "Oct 20". */
-  registerBy?: string | null;
-  /**
-   * The ticket's `qr_token`, drawn as the QR code. Shown only for `going` and
-   * `checked_in`.
-   */
-  qrToken?: string | null;
+  eventName: string;
+  holderName: string;
+  /** Any hex; defaults to the event Blue, as on the compact `Ticket`. */
+  eventColour?: string | null;
+  /** The event's image, shown on a white tile. An image icon stands in without one. */
+  imageUrl?: string | null;
+  /** The ticket's `qr_token`, drawn as the QR code. */
+  qrToken: string;
   className?: string;
 }
 
+/** The white label `ticketAppearance` picks for deep colours. */
+const LIGHT_LABEL = "#FFFFFF";
+
+/**
+ * The scannable ticket in the "Your ticket" dialog (Figma "TicketPass"). The
+ * front has the check-in code on a white tile, a perforation, then the event
+ * image, the event name and the holder; clicking flips it to the stacked UX
+ * Hub logo on the back. 316 × 340 on phones, 420 × 420 from `sm` up.
+ *
+ * The fill and label colour come from `ticketAppearance`, so it matches the
+ * compact `Ticket` on the event page, and the logo follows the label: white on
+ * deep colours, black on pale ones. The notches are cut out of the shape, so
+ * the dialog surface shows through in either theme.
+ */
 export function EventTicket({
-  event,
-  holder,
-  badge = "going",
-  registerBy,
+  eventName,
+  holderName,
+  eventColour,
+  imageUrl,
   qrToken,
   className,
 }: EventTicketProps) {
-  const hasCode = badge === "going" || badge === "checked_in";
+  const { label, fill } = ticketAppearance(eventColour ?? DEFAULT_EVENT_COLOUR);
+  const logo = label === LIGHT_LABEL ? "white" : "black";
 
   return (
     <article
-      aria-label={`Ticket for ${event.name}`}
+      aria-label={`Ticket for ${eventName}`}
       className={cn(
-        "w-full max-w-sm overflow-hidden rounded-xl border bg-card text-card-foreground",
+        // `--notch-y` is where the perforation sits: 244px on phones, 308px from sm.
+        "h-[340px] w-[316px] max-w-full [--notch-y:244px] sm:h-[420px] sm:w-[420px] sm:[--notch-y:308px]",
         className
       )}
+      style={{ color: label }}
     >
-      <div className="space-y-4 p-5">
-        <div className="flex items-start justify-between gap-3">
-          <h2 className="text-h3">{event.name}</h2>
-          <TicketStatusBadge badge={badge} registerBy={registerBy} />
-        </div>
-        <dl className="space-y-2 text-small">
-          <TicketDetail icon={<Calendar />} label="Date">
-            {event.date ?? "TBD"}
-          </TicketDetail>
-          {event.time && (
-            <TicketDetail icon={<Clock />} label="Time">
-              {event.time}
-            </TicketDetail>
-          )}
-          <TicketDetail icon={<MapPin />} label="Location">
-            {event.location ?? "TBD"}
-          </TicketDetail>
-        </dl>
-      </div>
+      <TicketFlip
+        className="size-full"
+        front={
+          <TicketFace fill={fill}>
+            {/* The code needs a light ground to scan, so the tile stays white in every theme. */}
+            <div className="relative mt-[30px] flex size-[184px] items-center justify-center rounded-xl bg-white sm:mt-10 sm:size-[232px]">
+              <QrCode token={qrToken} className="size-[152px] sm:size-[186px]" />
+            </div>
 
-      <TicketPerforation />
-
-      <div className="space-y-4 p-5">
-        <div className="min-w-0">
-          <p className="text-label text-muted-foreground">Ticket holder</p>
-          <p className="truncate text-body-medium">{holder.name}</p>
-          {holder.email && (
-            <p className="truncate text-small text-muted-foreground">
-              {holder.email}
-            </p>
-          )}
-        </div>
-        {hasCode && qrToken && <QrCode value={qrToken} label="Check-in QR code" />}
-      </div>
+            {/* The text (68px) is taller than the image tile, so the row is placed by its centre. */}
+            <div className="relative mt-auto mb-3.5 flex w-full items-center gap-4 px-6 sm:mb-[22px]">
+              <div className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white text-black/60 sm:size-16">
+                {imageUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={resolveImagePreviewSrc(imageUrl)} alt="" className="size-full object-cover" />
+                ) : (
+                  <ImageIcon aria-hidden className="size-6" strokeWidth={1.5} />
+                )}
+              </div>
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+                <p className="text-label">Ticket</p>
+                <p className="truncate text-subheading">{eventName}</p>
+                <p className="truncate text-small">{holderName}</p>
+              </div>
+            </div>
+          </TicketFace>
+        }
+        back={
+          <TicketFace fill={fill}>
+            <Image
+              src={`/brand/logo-stacked-${logo}.svg`}
+              alt="UBC UX Hub"
+              width={132}
+              height={163}
+              className="relative mt-[60px] h-[129px] w-auto sm:mt-[78px] sm:h-[163px]"
+            />
+          </TicketFace>
+        }
+      />
     </article>
   );
 }
 
-/**
- * Ticket badges that are one of the design system's statuses. "Under review"
- * reads as "Pending". The rest are dated or one-off states with no status of
- * their own, so they render as a tag.
- */
-const BADGE_STATUS: Partial<Record<TicketBadge, Status>> = {
-  under_review: "pending",
-  waitlisted: "waitlisted",
-  not_selected: "not_selected",
-  going: "going",
-  checked_in: "checked_in",
-};
-
-const TAG_LABEL: Partial<Record<TicketBadge, string>> = {
-  register_by: "Register by",
-  offer_expired: "Offer expired",
-};
-
-function TicketStatusBadge({
-  badge,
-  registerBy,
-}: {
-  badge: TicketBadge;
-  registerBy?: string | null;
-}) {
-  const status = BADGE_STATUS[badge];
-  if (status) return <StatusBadge status={status} />;
-
-  const label =
-    badge === "register_by" && registerBy
-      ? `Register by ${registerBy}`
-      : TAG_LABEL[badge];
-
-  return <Badge variant="tag">{label}</Badge>;
-}
-
-function TicketDetail({
-  icon,
-  label,
-  children,
-}: {
-  icon: ReactNode;
-  label: string;
-  children: ReactNode;
-}) {
+/** One side of the ticket: the event-colour fill, the notches and the perforation. */
+function TicketFace({ fill, children }: { fill: string; children: ReactNode }) {
   return (
-    <div className="flex items-start gap-2">
-      <dt className="mt-0.5 text-muted-foreground [&_svg]:size-4">
-        {icon}
-        <span className="sr-only">{label}</span>
-      </dt>
-      <dd>{children}</dd>
-    </div>
-  );
-}
-
-function TicketPerforation() {
-  return (
-    <div aria-hidden className="relative">
-      <div className="absolute top-1/2 -left-3 size-6 -translate-y-1/2 rounded-full border bg-background" />
-      <div className="mx-5 border-t border-dashed" />
-      <div className="absolute top-1/2 -right-3 size-6 -translate-y-1/2 rounded-full border bg-background" />
+    <div className="relative flex size-full flex-col items-center">
+      <div
+        aria-hidden
+        className="absolute inset-0 rounded-2xl"
+        style={{
+          background: fill,
+          ...notchMaskStyle(
+            [
+              ["0", "var(--notch-y)"],
+              ["100%", "var(--notch-y)"],
+            ],
+            "12px"
+          ),
+        }}
+      >
+        <span className="absolute inset-x-5 top-(--notch-y) border-t-2 border-dashed border-current opacity-80" />
+      </div>
+      {children}
     </div>
   );
 }

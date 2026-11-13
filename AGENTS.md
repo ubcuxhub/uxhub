@@ -72,8 +72,9 @@ in admin screens. Pruning deletes a crowd account the data no longer lists, so
 never sign up with one of those domains.
 
 `pnpm seed --target=prod` writes demo events for admins while the student-facing
-events feature is unlaunched. It never deletes, never writes user fixtures, and
-forces every event to `draft` so nothing fabricated is reachable through the
+events feature is unlaunched. It never deletes, never writes user fixtures or
+membership tiers (admins edit the live tiers in Club Settings), and forces every
+event to `draft` so nothing fabricated is reachable through the
 public API. It reads `SEED_PROD_SUPABASE_URL` and `SEED_PROD_SUPABASE_SECRET_KEY`
 and expects migrations to be applied already. Each target rejects a URL that does
 not match it, so a stale `.env.local` cannot silently redirect a run.
@@ -106,8 +107,8 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
 
 ## Important Patterns
 
-- `src/proxy.ts` refreshes sessions for `/portal/*`, `/admin/*`, and `/api/*`;
-  it does not authorize users.
+- `src/proxy.ts` refreshes sessions for `/portal/*`, `/admin/*`, `/join/*`
+  (team invite links), and `/api/*`; it does not authorize users.
 - `src/app/(app)/layout.tsx` calls `requireAuth()` and provides the current user.
   `src/app/(app)/(shell)/admin/layout.tsx` adds `requireAdmin()`. Keep access
   control in these server-side guards rather than relying on client UI.

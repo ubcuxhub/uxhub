@@ -13,6 +13,7 @@ import {
   fetchUserTeam,
   joinTeam,
   leaveTeam,
+  renameTeam,
 } from "@/lib/supabase-helpers/teams";
 import { clientAs, createIntegrationClient, withFixtures, type Fixtures } from "@/test/integration";
 
@@ -278,6 +279,39 @@ describe("deleteTeam", () => {
       expect(await deleteTeam(db, { teamId, userId: member.id })).toBe("NOT_OWNER");
       await db.from("events").update({ team_deadline: at(-hour) }).eq("id", event.id);
       expect(await deleteTeam(db, { teamId, userId: owner.id })).toBe("TEAMS_LOCKED");
+    }));
+});
+
+describe("renameTeam", () => {
+  it("renames the owner's team, and clears the name when it's blank", () =>
+    withFixtures(async (fixtures) => {
+      const event = await teamEvent(fixtures);
+      const owner = await going(fixtures, event.id);
+      const { teamId } = await ownTeam(event.id, owner.id, "Pixel Pushers");
+
+      expect(await renameTeam(db, { teamId, userId: owner.id, name: "  Grid Sisters " })).toBeNull();
+      expect((await fetchUserTeam(db, event.id, owner.id))?.name).toBe("Grid Sisters");
+
+      expect(await renameTeam(db, { teamId, userId: owner.id, name: "   " })).toBeNull();
+      expect((await fetchUserTeam(db, event.id, owner.id))?.name).toBeNull();
+    }));
+
+  it("refuses anyone but the owner, an unknown team, and the owner after the deadline", () =>
+    withFixtures(async (fixtures) => {
+      const event = await teamEvent(fixtures);
+      const owner = await going(fixtures, event.id);
+      const member = await going(fixtures, event.id);
+      const { teamId, inviteCode } = await ownTeam(event.id, owner.id, "Pixel Pushers");
+      await joinTeam(db, { inviteCode, userId: member.id });
+
+      expect(await renameTeam(db, { teamId, userId: member.id, name: "Mine now" })).toBe("NOT_OWNER");
+      expect(
+        await renameTeam(db, { teamId: crypto.randomUUID(), userId: owner.id, name: "Ghost" })
+      ).toBe("TEAM_NOT_FOUND");
+
+      await db.from("events").update({ team_deadline: at(-hour) }).eq("id", event.id);
+      expect(await renameTeam(db, { teamId, userId: owner.id, name: "Too late" })).toBe("TEAMS_LOCKED");
+      expect((await fetchUserTeam(db, event.id, owner.id))?.name).toBe("Pixel Pushers");
     }));
 });
 

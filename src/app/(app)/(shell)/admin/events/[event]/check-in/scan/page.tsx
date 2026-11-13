@@ -39,8 +39,9 @@ export default async function CheckInScanPage({ params }: CheckInScanPageProps) 
   const origin = getHeadersOrigin(requestHeaders);
   const phoneLink = origin ? (
     <QrCode
-      value={`${origin}/admin/events/${eventId}/check-in/scan`}
+      token={`${origin}/admin/events/${eventId}/check-in/scan`}
       label="Link to this scanner"
+      className="mx-auto size-48 rounded-lg bg-white"
     />
   ) : null;
 
