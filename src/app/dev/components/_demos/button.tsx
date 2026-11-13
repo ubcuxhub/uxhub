@@ -49,7 +49,7 @@ function ButtonDemo() {
 
       <SpecimenGroup
         title="Button · with icon"
-        description="16px icon (14px at sm), 8px gap (6px at sm). Leading and trailing."
+        description="16px icon at every size, 8px gap (6px at sm). Leading and trailing."
       >
         {VARIANTS.filter((v) => v !== "link").flatMap((variant) =>
           SIZES.map((size) => (

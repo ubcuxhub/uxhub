@@ -18,18 +18,31 @@ import { isUuid } from "@/lib/uuid";
  * - anything else is a 404.
  *
  * `suffix` is the rest of the path after the event segment (for example
- * `/check-in`), kept on the redirect. Call this before any query that takes
- * the param, and only after `requireAdmin()`.
+ * `/check-in` or `/edit`), kept on the redirect. Call this before any query
+ * that takes the param, and only after `requireAdmin()`.
  */
 export async function resolveAdminEventId(
   supabase: DbClient,
   param: string,
   suffix = ""
 ): Promise<string> {
+  return (await findAdminEventId(supabase, param, suffix)) ?? notFound();
+}
+
+/**
+ * `resolveAdminEventId`, but returns null for a param that matches no event
+ * instead of a 404: for the record drawer, which shows its own "Event not
+ * found" over the list.
+ */
+export async function findAdminEventId(
+  supabase: DbClient,
+  param: string,
+  suffix = ""
+): Promise<string | null> {
   if (isUuid(param)) return param;
 
   const event = await fetchEventBySlug(supabase, param);
-  if (!event) notFound();
+  if (!event) return null;
 
   redirect(`/admin/events/${event.id}${suffix}`);
 }

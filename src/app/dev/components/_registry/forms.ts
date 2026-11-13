@@ -52,6 +52,19 @@ export const formsEntries: readonly RegistryEntry[] = [
     aliases: [{ id: "form-controls" }],
   },
   {
+    slug: "password-input",
+    title: "Password input",
+    category: "Forms",
+    tier: "primitive",
+    description:
+      "A password field with a show/hide button, for sign-in, sign-up and password resets.",
+    importPath: "@/components/ui/password-input",
+    importNames: ["PasswordInput"],
+    source: "src/components/ui/password-input.tsx",
+    spec: "§3.2",
+    layout: "split",
+  },
+  {
     slug: "textarea",
     title: "Textarea",
     category: "Forms",
@@ -185,9 +198,9 @@ export const formsEntries: readonly RegistryEntry[] = [
     category: "Forms",
     tier: "primitive",
     description:
-      "Typed date and time fields with their pickers, for event schedules and deadlines.",
+      "Typed date and time fields with their pickers, and the two together as one moment, for event schedules and deadlines.",
     importPath: "@/components/ui/date-time-field",
-    importNames: ["DateField", "TimeField"],
+    importNames: ["DateField", "TimeField", "DateTimeField"],
     source: "src/components/ui/date-time-field.tsx",
     spec: "§3.11",
     layout: "split",

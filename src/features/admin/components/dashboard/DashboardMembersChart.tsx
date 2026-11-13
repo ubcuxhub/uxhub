@@ -6,7 +6,7 @@ import type { MembershipAnalytics } from "@/lib/supabase-helpers/admin-dashboard
 import { formatMembershipTypeName } from "@/features/memberships/lib/display";
 
 export function DashboardMembersChart({ data }: { data: MembershipAnalytics | null }) {
-  if (!data) return <p role="status" className="py-24 text-center text-small text-fg-secondary">Membership statistics unavailable. Please try again later.</p>;
+  if (!data) return <p role="status" className="py-24 text-center text-small text-muted-foreground">Membership statistics unavailable. Please try again later.</p>;
   const tiers = data.tiers.map((tier, index) => ({
     ...tier,
     name: formatMembershipTypeName(tier.name),
@@ -40,14 +40,14 @@ export function DashboardMembersChart({ data }: { data: MembershipAnalytics | nu
             </Pie>
           </PieChart>
         </ChartContainer>
-      ) : <div className="flex min-h-64 flex-col items-center justify-center gap-2"><p className="text-h1">0</p><p className="text-small text-fg-secondary">No active members</p></div>}
+      ) : <div className="flex min-h-64 flex-col items-center justify-center gap-2"><p className="text-h1">0</p><p className="text-small text-muted-foreground">No active members</p></div>}
       <ul aria-label="Membership distribution" className="space-y-2 text-small">
         {tiers.map((tier) => <li key={tier.id} className="flex items-center justify-between gap-3">
           <span className="flex min-w-0 items-center gap-2"><span aria-hidden="true" className="size-2.5 shrink-0 rounded-sm" style={{ backgroundColor: tier.color }} />{tier.name}</span>
-          <span className="shrink-0 tabular-nums">{tier.count.toLocaleString("en-CA")} <span className="text-fg-secondary">({data.activeMembers ? Math.round(tier.count / data.activeMembers * 100) : 0}%)</span></span>
+          <span className="shrink-0 tabular-nums">{tier.count.toLocaleString("en-CA")} <span className="text-muted-foreground">({data.activeMembers ? Math.round(tier.count / data.activeMembers * 100) : 0}%)</span></span>
         </li>)}
       </ul>
-      <p className="border-t pt-4 text-small text-fg-secondary"><span className="font-semibold text-foreground">{data.buyersLast30Days.toLocaleString("en-CA")}</span> membership buyers in the last 30 days</p>
+      <p className="border-t pt-4 text-small text-muted-foreground"><span className="font-semibold text-foreground">{data.buyersLast30Days.toLocaleString("en-CA")}</span> membership buyers in the last 30 days</p>
     </div>
   );
 }

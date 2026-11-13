@@ -123,16 +123,18 @@ describe("target policies", () => {
     expect(TARGET_POLICIES.local).toEqual({
       prune: true,
       users: true,
+      memberships: true,
       forceDraft: false,
     });
   });
 
-  it("keeps prod additive, fixture-free, and out of the public API", () => {
+  it("keeps prod additive, fixture-free, off the live tiers, and out of the public API", () => {
     // Each of these is load-bearing. Flipping one silently changes what a
     // `--target=prod` run can do to the deployed database.
     expect(TARGET_POLICIES.prod).toEqual({
       prune: false,
       users: false,
+      memberships: false,
       forceDraft: true,
     });
   });

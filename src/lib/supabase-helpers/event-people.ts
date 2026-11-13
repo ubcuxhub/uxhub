@@ -59,6 +59,12 @@ export async function saveSponsor(
   return data;
 }
 
+/**
+ * Every person linked to the event, in order. Until the builder adds other
+ * people sections, an event's only section is Mentors. This reads no section
+ * columns on purpose: preview deploys run against production's schema, which
+ * has none until the people-sections migration is merged.
+ */
 export async function fetchEventMentors(
   supabase: DbClient,
   eventId: string

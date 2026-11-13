@@ -33,9 +33,9 @@ export function DashboardUpcomingEvent({ event, rsvpCount, showStudentLink }: {
 }) {
   if (!event) return (
     <DashboardPanel className="min-h-64 items-center justify-center gap-3 text-center">
-      <CalendarDays aria-hidden="true" className="size-8 text-fg-secondary" />
+      <CalendarDays aria-hidden="true" className="size-8 text-muted-foreground" />
       <p className="text-h3">No upcoming events</p>
-      <p className="text-small text-fg-secondary">Published upcoming events will appear here.</p>
+      <p className="text-small text-muted-foreground">Published upcoming events will appear here.</p>
     </DashboardPanel>
   );
   const location = [event.location_building, event.location_room].filter(Boolean).join(", ");
@@ -46,9 +46,9 @@ export function DashboardUpcomingEvent({ event, rsvpCount, showStudentLink }: {
         {event.image_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={event.image_url} alt={event.name} className="aspect-square w-44 shrink-0 rounded border object-cover" />
-        ) : <div className="flex aspect-square w-44 shrink-0 items-center justify-center rounded border bg-background text-fg-secondary"><CalendarDays aria-label="No event image" className="size-10" /></div>}
+        ) : <div className="flex aspect-square w-44 shrink-0 items-center justify-center rounded border bg-background text-muted-foreground"><CalendarDays aria-label="No event image" className="size-10" /></div>}
         <div className="min-w-0 space-y-4">
-          <Badge className="rounded-sm border-0 bg-success-bg font-medium text-success hover:bg-success-bg">{rsvpCount == null ? "RSVPs unavailable" : `${rsvpCount.toLocaleString("en-CA")} RSVPs`}</Badge>
+          <Badge className="rounded-sm border-0 bg-success font-medium text-success-foreground hover:bg-success">{rsvpCount == null ? "RSVPs unavailable" : `${rsvpCount.toLocaleString("en-CA")} RSVPs`}</Badge>
           <h3 className="text-h3 break-words">{event.name}</h3>
           {event.short_description && <p className="line-clamp-3 text-small">{event.short_description}</p>}
         </div>
@@ -57,14 +57,14 @@ export function DashboardUpcomingEvent({ event, rsvpCount, showStudentLink }: {
       <dl aria-label="Event details" className="flex flex-col gap-4 text-small">
         <div className="flex items-center gap-3">
           <dt className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
-            <CalendarDays aria-hidden="true" className="size-4 text-fg-secondary" />
+            <CalendarDays aria-hidden="true" className="size-4 text-muted-foreground" />
             <span className="sr-only">Date</span>
           </dt>
           <dd>{formatEventDate(event.starts_at, { weekday: "long" }) || "TBD"}</dd>
         </div>
         <div className="flex items-center gap-3">
           <dt className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
-            <MapPin aria-hidden="true" className="size-4 text-fg-secondary" />
+            <MapPin aria-hidden="true" className="size-4 text-muted-foreground" />
             <span className="sr-only">Location</span>
           </dt>
           <dd className="min-w-0 break-words">
@@ -77,14 +77,14 @@ export function DashboardUpcomingEvent({ event, rsvpCount, showStudentLink }: {
         </div>
         <div className="flex items-center gap-3">
           <dt className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
-            <DollarSign aria-hidden="true" className="size-4 text-fg-secondary" />
+            <DollarSign aria-hidden="true" className="size-4 text-muted-foreground" />
             <span className="sr-only">Price</span>
           </dt>
           <dd className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <span>{formatPrice(Number(event.regular_price))}</span>
             {hasMemberPrice && (
-              <span className="text-fg-secondary">
-                Members: <span className="text-success">{formatPrice(Number(event.member_price))}</span>
+              <span className="text-muted-foreground">
+                Members: <span className="text-success-foreground">{formatPrice(Number(event.member_price))}</span>
               </span>
             )}
           </dd>

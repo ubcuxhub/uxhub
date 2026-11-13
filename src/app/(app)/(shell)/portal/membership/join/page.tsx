@@ -3,9 +3,10 @@ import { MembershipClassificationRoute } from "@/features/memberships/components
 export default async function MembershipJoinPage({
   searchParams,
 }: {
-  searchParams: Promise<{ returnTo?: string }>;
+  searchParams: Promise<{ returnTo?: string; change?: string }>;
 }) {
+  const { returnTo, change } = await searchParams;
   return (
-    <MembershipClassificationRoute returnTo={(await searchParams).returnTo} />
+    <MembershipClassificationRoute returnTo={returnTo} change={change != null} />
   );
 }

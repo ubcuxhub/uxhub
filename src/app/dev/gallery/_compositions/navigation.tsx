@@ -3,6 +3,7 @@
 import { useId, useState, type ReactNode } from "react";
 import type { DateRange } from "react-day-picker";
 import {
+  CalendarDays,
   ChevronRight,
   Mail,
   PanelRight,
@@ -15,6 +16,12 @@ import {
 import { AppSidebarNav } from "@/components/shared/AppSidebar";
 import { CopyCode } from "@/components/shared/CopyCode";
 import { DetailList, DetailRow } from "@/components/shared/DetailRow";
+import {
+  RecordField,
+  RecordFrame,
+  RecordSection,
+  RecordView,
+} from "@/components/shared/RecordDrawer";
 import { SponsorLogoGrid } from "@/components/shared/SponsorLogoGrid";
 import { Avatar, AvatarGroup } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
@@ -377,6 +384,48 @@ function AttendeePeek() {
   );
 }
 
+/** An event record as the Manage Events drawer shows it. */
+function EventRecordPeek() {
+  const [session, setSession] = useState(0);
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button
+        variant="ghost"
+        className="w-full justify-start px-3"
+        aria-expanded={open}
+        onClick={() => {
+          if (!open) setSession((current) => current + 1);
+          setOpen(true);
+        }}
+      >
+        <ActionRow icon={<CalendarDays aria-hidden />}>Open event overview</ActionRow>
+      </Button>
+      <RecordFrame listHref="/dev/gallery" open={open} onClose={() => setOpen(false)}>
+        <RecordView
+          key={session}
+          title="UXathon 2027"
+          subtitle="Saturday, January 16, 2027 · 9:00 AM"
+          status={<StatusBadge status="registration_open" />}
+          details={
+            <>
+              <RecordSection title="Venue">
+                <RecordField label="Location" value="AMS Nest, Room 2306" />
+                <RecordField label="Capacity" value="150" />
+              </RecordSection>
+              <RecordSection title="Tickets">
+                <RecordField label="Members" value="Free" />
+                <RecordField label="Non-members" value="$10.00" />
+                <RecordField label="Applications" value="Required" />
+              </RecordSection>
+            </>
+          }
+        />
+      </RecordFrame>
+    </>
+  );
+}
+
 function SharePopover() {
   return (
     <Popover>
@@ -410,6 +459,7 @@ function EventActions() {
         <EditDetails />
         <FilterSheet />
         <AttendeePeek />
+        <EventRecordPeek />
         <SharePopover />
       </CardContent>
     </Panel>

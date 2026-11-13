@@ -16,7 +16,32 @@ export interface TableToolbarProps {
   /** E.g. `<Button variant="secondary" size="sm"><Download />Export to CSV</Button>`. */
   bulkActions?: React.ReactNode;
   onClearSelection?: () => void;
+  /**
+   * How many rows are listed, on a line under the toolbar: "142 users", or
+   * "38 of 142 users" while a search or filter hides some. A paged list puts
+   * its count in the Pagination footer instead (`TableRowCount`).
+   */
+  count?: TableRowCountValue;
+  /** With `count`, a "Show all" button while filtering. Clear the search too. */
+  onClearFilters?: () => void;
+  /** The toolbar row's classes. */
   className?: string;
+}
+
+export interface TableRowCountValue {
+  /** Rows listed after search and filters. */
+  shown: number;
+  /** Rows before search and filters. */
+  total: number;
+  /** "user" and "users". Picked by the number it follows. */
+  noun: { one: string; other: string };
+  /** Whether a search or filter is applied. Defaults to `shown !== total`. */
+  filtered?: boolean;
+  /**
+   * The rows on this page, 1-based and inclusive, for a paged list:
+   * "Showing 1–25 of 142 users". Ignored when nothing is shown.
+   */
+  range?: { from: number; to: number };
 }
 
 const FOCUSABLE = "button:not(:disabled), a[href], [tabindex]:not([tabindex='-1'])";
@@ -37,6 +62,8 @@ function TableToolbar({
   selectedCount = 0,
   bulkActions,
   onClearSelection,
+  count,
+  onClearFilters,
   className,
 }: TableToolbarProps) {
   const selecting = selectedCount > 0;
@@ -58,7 +85,7 @@ function TableToolbar({
     target?.focus();
   }, [selecting]);
 
-  return (
+  const toolbar = (
     <div
       ref={rootRef}
       data-slot="table-toolbar"
@@ -97,6 +124,90 @@ function TableToolbar({
       ) : null}
     </div>
   );
+
+  if (!count) return toolbar;
+  return (
+    <div className="flex flex-col gap-3">
+      {toolbar}
+      <TableRowCount
+        count={count}
+        onClearFilters={
+          onClearFilters
+            ? () => {
+                onClearFilters();
+                // The button goes with the filters; keep focus in the toolbar.
+                rootRef.current?.querySelector<HTMLElement>("input")?.focus();
+              }
+            : undefined
+        }
+      />
+    </div>
+  );
 }
 
-export { TableToolbar };
+const NUMBER = new Intl.NumberFormat("en-CA");
+
+/**
+ * The row count's wording, for every list (§3.16):
+ *
+ * - "142 users"; "38 of 142 users" while a search or filter hides some.
+ * - With a page `range`: "Showing 1–25 of 142 users", and while filtered
+ *   "Showing 1–25 of 38 users · filtered from 142", so the full list's size
+ *   is always in view.
+ * - A filter that leaves nothing reads "0 of 142 users".
+ */
+function formatRowCount({
+  shown,
+  total,
+  noun,
+  filtered = shown !== total,
+  range,
+}: TableRowCountValue) {
+  const word = (n: number) => (n === 1 ? noun.one : noun.other);
+  if (range && shown > 0) {
+    const span =
+      shown === 1
+        ? `Showing 1 of 1 ${noun.one}`
+        : `Showing ${NUMBER.format(range.from)}–${NUMBER.format(range.to)} of ${NUMBER.format(shown)} ${word(shown)}`;
+    return filtered ? `${span} · filtered from ${NUMBER.format(total)}` : span;
+  }
+  return filtered
+    ? `${NUMBER.format(shown)} of ${NUMBER.format(total)} ${word(total)}`
+    : `${NUMBER.format(total)} ${word(total)}`;
+}
+
+/**
+ * The row count line (§3.16): under a table toolbar (`TableToolbar`'s
+ * `count`), or in a paged list's footer as `Pagination`'s `summary`, with the
+ * page's `range`. While a search or filter hides rows it offers "Show all";
+ * the caller clears the search and filters, and moves focus (the button goes
+ * with them).
+ *
+ * The count is a polite live region that stays mounted, so a change (a
+ * filter, a search, a page) is announced and the first render is not.
+ */
+function TableRowCount({
+  count,
+  onClearFilters,
+  className,
+}: {
+  count: TableRowCountValue;
+  onClearFilters?: () => void;
+  className?: string;
+}) {
+  const filtered = count.filtered ?? count.shown !== count.total;
+  return (
+    <div data-slot="table-row-count" className={cn("flex flex-wrap items-center gap-x-3 gap-y-1", className)}>
+      <p role="status" className="text-small text-muted-foreground tabular-nums">
+        {formatRowCount(count)}
+      </p>
+      {filtered && onClearFilters ? (
+        <Button type="button" variant="link" size="sm" onClick={onClearFilters}>
+          Show all
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+export { formatRowCount, TableRowCount, TableToolbar };

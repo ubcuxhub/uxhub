@@ -270,3 +270,31 @@
     height: env(safe-area-inset-bottom, 0px);
   }
 }
+
+/* ── Record drawer ↔ full page (RecordDrawer.tsx) ─────────────────────────
+   Expand and collapse are one view transition pair (`record-morph`): the
+   box grows from the drawer's panel to the record's page, or shrinks back,
+   while the two cross-fade inside it. Each stays pinned top-right, where it
+   sits on screen, so neither stretches; the box's moving left edge reveals
+   or covers them. The list fades behind (`record-fade`), under the box.
+   200ms ease-out, as panels entering (§2.8). Only the expand and collapse
+   links start these; reduced motion and phones get no morph at all. */
+::view-transition-group(.record-morph),
+::view-transition-old(.record-morph),
+::view-transition-new(.record-morph),
+::view-transition-old(.record-fade),
+::view-transition-new(.record-fade) {
+  animation-duration: 200ms;
+  animation-timing-function: cubic-bezier(0, 0, 0.2, 1);
+}
+
+::view-transition-group(.record-morph) {
+  z-index: 1;
+}
+
+::view-transition-old(.record-morph),
+::view-transition-new(.record-morph) {
+  height: 100%;
+  object-fit: none;
+  object-position: right top;
+}

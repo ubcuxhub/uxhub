@@ -14,7 +14,7 @@ export default async function AdminDashboard() {
       <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="space-y-2">
           <h1 className="text-h1">Dashboard</h1>
-          <p className="text-fg-secondary">View events, users, and statistics at a glance.</p>
+          <p className="text-muted-foreground">View events, users, and statistics at a glance.</p>
         </div>
       </header>
       <div className="grid items-start gap-[30px] lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">

@@ -2,7 +2,7 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { FormEvent } from "react";
-import type { EventRow } from "@/lib/supabase/models";
+import type { EventApplicationQuestionRow, EventRow } from "@/lib/supabase/models";
 import { useEventForm } from "./use-event-form";
 
 vi.mock("next/navigation", () => ({
@@ -13,7 +13,11 @@ vi.mock("./use-event-form-draft", () => ({
 }));
 vi.mock("./use-unsaved-changes-guard", () => ({ useUnsavedChangesGuard: vi.fn() }));
 vi.mock("@/features/admin/actions", () => ({
-  saveAdminEventAction: vi.fn(async () => ({ id: "event-1" })),
+  saveAdminEventAction: vi.fn(async () => ({
+    id: "event-1",
+    checkInSessionIds: [],
+    questionIds: [],
+  })),
   deleteAdminEventAction: vi.fn(),
   discardUnusedEventImageAction: vi.fn(),
 }));
@@ -137,5 +141,159 @@ describe("event form publishing schedule", () => {
       "requires_application", "short_description", "sponsors_enabled",
       "starts_at", "status",
     ]);
+  });
+});
+
+describe("event form application questions", () => {
+  const checkIn = {
+    id: "check-in-1",
+    created_at: null,
+    updated_at: null,
+    event_id: event.id,
+    name: "Doors",
+    start_time: "2024-07-01T17:00:00Z",
+    end_time: "2024-07-01T18:00:00Z",
+  };
+  const saved = {
+    id: "question-1",
+    event_id: event.id,
+    question: "Why?",
+    description: null,
+    response_type: "long_text",
+    is_required: true,
+    sort_order: 0,
+    max_char_limit: 500,
+    response_options: null,
+    restrict_file_types: false,
+    allowed_file_types: null,
+    max_file_size_bytes: null,
+    created_at: null,
+    updated_at: null,
+  } as EventApplicationQuestionRow;
+  const submit = (result: { current: ReturnType<typeof useEventForm> }) =>
+    act(async () => {
+      await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as FormEvent<HTMLFormElement>);
+    });
+  const sentIds = (call: number) =>
+    vi.mocked(saveAdminEventAction).mock.calls[call][0].applicationQuestions.map(
+      (question) => question.id
+    );
+
+  it("sends saved question ids and adopts the ids of new ones", async () => {
+    vi.mocked(saveAdminEventAction).mockResolvedValue({
+      id: event.id,
+      checkInSessionIds: ["check-in-1"],
+      questionIds: ["question-1", "question-2"],
+    });
+    const { result } = renderHook(() => useEventForm({
+      eventId: event.id,
+      initialEvent: { ...event, publish_at: null },
+      initialCheckInSessions: [checkIn],
+      initialApplicationQuestions: [saved],
+    }));
+    act(() => result.current.addApplicationQuestion("short_text"));
+    act(() => result.current.updateApplicationQuestion(1, "question", "Team?"));
+
+    await submit(result);
+    expect(result.current.error).toBeNull();
+    expect(sentIds(0)).toEqual(["question-1", null]);
+
+    // Saving again updates the new question rather than adding it twice.
+    await submit(result);
+    expect(sentIds(1)).toEqual(["question-1", "question-2"]);
+  });
+
+  it("shows a refused question change", async () => {
+    vi.mocked(saveAdminEventAction).mockResolvedValue({
+      error: '"Why?" has answers on submitted applications, so it cannot be removed.',
+    });
+    const { result } = renderHook(() => useEventForm({
+      eventId: event.id,
+      initialEvent: { ...event, publish_at: null },
+      initialCheckInSessions: [checkIn],
+      initialApplicationQuestions: [saved],
+    }));
+    act(() => result.current.removeApplicationQuestion(0));
+
+    await submit(result);
+    expect(result.current.error).toMatch(/cannot be removed/);
+    expect(result.current.successMessage).toBeNull();
+  });
+});
+
+describe("event form check-in sessions", () => {
+  const doors = {
+    id: "check-in-1",
+    created_at: null,
+    updated_at: null,
+    event_id: event.id,
+    name: "Doors",
+    start_time: "2024-07-01T17:00:00Z",
+    end_time: "2024-07-01T18:00:00Z",
+  };
+  const workshop = { ...doors, id: "check-in-2", name: "Workshop" };
+  const submit = (result: { current: ReturnType<typeof useEventForm> }) =>
+    act(async () => {
+      await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as FormEvent<HTMLFormElement>);
+    });
+  const sent = (call: number) =>
+    vi.mocked(saveAdminEventAction).mock.calls[call][0].checkInSessions;
+
+  it("sends saved session ids and adopts the ids of new ones", async () => {
+    vi.mocked(saveAdminEventAction).mockResolvedValue({
+      id: event.id,
+      checkInSessionIds: ["check-in-1", "check-in-3"],
+      questionIds: [],
+    });
+    const { result } = renderHook(() => useEventForm({
+      eventId: event.id,
+      initialEvent: { ...event, publish_at: null },
+      initialCheckInSessions: [doors],
+    }));
+    act(() => result.current.updateCheckInEvent(0, "end_time", "2024-07-01T12:00"));
+    act(() => result.current.addCheckInEvent());
+    act(() => {
+      result.current.updateCheckInEvent(1, "name", "Lunch");
+      result.current.updateCheckInEvent(1, "start_time", "2024-07-01T12:00");
+      result.current.updateCheckInEvent(1, "end_time", "2024-07-01T13:00");
+    });
+
+    await submit(result);
+    expect(result.current.error).toBeNull();
+    expect(sent(0)).toEqual([
+      {
+        id: "check-in-1",
+        name: "Doors",
+        start_time: "2024-07-01T17:00:00.000Z",
+        end_time: "2024-07-01T19:00:00.000Z",
+      },
+      {
+        id: null,
+        name: "Lunch",
+        start_time: "2024-07-01T19:00:00.000Z",
+        end_time: "2024-07-01T20:00:00.000Z",
+      },
+    ]);
+
+    // Saving again updates the new session rather than adding it twice.
+    await submit(result);
+    expect(sent(1).map((session) => session.id)).toEqual(["check-in-1", "check-in-3"]);
+  });
+
+  it("leaves a removed session out, and shows a refused removal", async () => {
+    const message =
+      'Attendees have already checked in to "Workshop", so it cannot be removed.';
+    vi.mocked(saveAdminEventAction).mockResolvedValue({ error: message });
+    const { result } = renderHook(() => useEventForm({
+      eventId: event.id,
+      initialEvent: { ...event, publish_at: null },
+      initialCheckInSessions: [doors, workshop],
+    }));
+    act(() => result.current.removeCheckInEvent(1));
+
+    await submit(result);
+    expect(sent(0).map((session) => session.id)).toEqual(["check-in-1"]);
+    expect(result.current.error).toBe(message);
+    expect(result.current.successMessage).toBeNull();
   });
 });

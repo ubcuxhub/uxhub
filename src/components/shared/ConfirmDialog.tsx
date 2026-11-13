@@ -37,7 +37,13 @@ export interface ConfirmDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: React.ReactNode;
-  description: React.ReactNode;
+  /** Omit when `children` already says what happens. */
+  description?: React.ReactNode;
+  /**
+   * Shown between the header and the buttons, before any confirmation input:
+   * a list of consequences, say.
+   */
+  children?: React.ReactNode;
   /** Rendered beside the title, e.g. a lucide warning icon. */
   icon?: React.ReactNode;
   /** Omit for a plain confirm with no typed challenge. */
@@ -95,6 +101,9 @@ export function ConfirmDialog({
       <DialogContent
         closeDisabled={pending}
         mobileFullscreen
+        // Without a description there's nothing to point at; saying so keeps
+        // Radix from warning about a missing one.
+        {...(body.description ? {} : { "aria-describedby": undefined })}
         onOpenAutoFocus={() => {
           // Runs before focus moves in, so this is still the opener.
           openedFrom.current =
@@ -132,6 +141,7 @@ type ConfirmDialogBodyProps = Omit<
 function ConfirmDialogBody({
   title,
   description,
+  children,
   icon,
   confirmation,
   confirmLabel = "Confirm",
@@ -149,7 +159,7 @@ function ConfirmDialogBody({
 
   const satisfied = confirmation ? confirmation.matches(typed) : true;
   const mismatch = Boolean(confirmation && typed && !satisfied);
-  const hasBody = Boolean(confirmation || error);
+  const hasBody = Boolean(children || confirmation || error);
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-0 sm:h-auto sm:gap-4">
@@ -157,18 +167,19 @@ function ConfirmDialogBody({
         <DialogTitle
           className={cn(
             icon &&
-              "flex items-center gap-3 text-destructive [&_svg]:size-6 sm:gap-2 sm:[&_svg]:size-4",
+              "flex items-center gap-3 text-destructive [&_svg]:size-5 sm:gap-2 sm:[&_svg]:size-4",
           )}
         >
           {icon}
           {title}
         </DialogTitle>
-        <DialogDescription>{description}</DialogDescription>
+        {description ? <DialogDescription>{description}</DialogDescription> : null}
       </DialogHeader>
 
       {hasBody ? (
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:overflow-visible sm:p-0">
           <div className="mx-auto w-full max-w-lg space-y-4">
+            {children}
             {confirmation ? (
               <div className="space-y-2">
                 <Label htmlFor={inputId}>{confirmation.label}</Label>

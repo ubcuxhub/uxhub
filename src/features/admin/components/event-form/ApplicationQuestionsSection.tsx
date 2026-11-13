@@ -23,20 +23,13 @@ import {
   FieldSet,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import {
   ResponseType,
   type ApplicationQuestionTemplate,
 } from "@/features/events/types";
+import { APPLICATION_FILE_MAX_BYTES } from "@/lib/supabase-helpers/application-files";
 
 interface ApplicationQuestionsSectionProps {
   enabled: boolean;
@@ -77,8 +70,6 @@ const choiceTypes = new Set<ResponseType>([
   ResponseType.multiple_choice,
   ResponseType.dropdown,
 ]);
-
-const fileTypes = ["PNG", "JPEG", "PDF"] as const;
 
 export function ApplicationQuestionsSection({
   enabled,
@@ -252,84 +243,10 @@ export function ApplicationQuestionsSection({
                 )}
 
                 {question.response === ResponseType.file_upload && (
-                  <FieldGroup className="gap-4">
-                    <FieldDescription>
-                      File responses are configurable now, but uploading and
-                      downloading files will be implemented separately.
-                    </FieldDescription>
-                    <div className="flex items-center gap-2">
-                      <Switch
-                        id={`restrict_file_types_${index}`}
-                        checked={question.restrict_file_types}
-                        onCheckedChange={(checked) =>
-                          onUpdate(index, "restrict_file_types", checked)
-                        }
-                      />
-                      <FieldLabel htmlFor={`restrict_file_types_${index}`}>
-                        Allow only specific file types
-                      </FieldLabel>
-                    </div>
-                    {question.restrict_file_types && (
-                      <div className="flex flex-wrap gap-4">
-                        {fileTypes.map((fileType) => (
-                          <div key={fileType} className="flex items-center gap-2">
-                            <Checkbox
-                              id={`file_type_${index}_${fileType}`}
-                              checked={question.allowed_file_types.includes(
-                                fileType.toLowerCase()
-                              )}
-                              onCheckedChange={(checked) =>
-                                onUpdate(
-                                  index,
-                                  "allowed_file_types",
-                                  checked
-                                    ? [
-                                        ...question.allowed_file_types,
-                                        fileType.toLowerCase(),
-                                      ]
-                                    : question.allowed_file_types.filter(
-                                        (value) =>
-                                          value !== fileType.toLowerCase()
-                                      )
-                                )
-                              }
-                            />
-                            <FieldLabel
-                              htmlFor={`file_type_${index}_${fileType}`}
-                            >
-                              {fileType}
-                            </FieldLabel>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    <Field className="max-w-xs">
-                      <FieldLabel>Maximum File Size</FieldLabel>
-                      <Select
-                        value={String(question.max_file_size_bytes || 10_485_760)}
-                        onValueChange={(value) =>
-                          onUpdate(
-                            index,
-                            "max_file_size_bytes",
-                            Number(value)
-                          )
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectGroup>
-                            <SelectItem value="5242880">5 MB</SelectItem>
-                            <SelectItem value="10485760">10 MB</SelectItem>
-                            <SelectItem value="26214400">25 MB</SelectItem>
-                            <SelectItem value="52428800">50 MB</SelectItem>
-                            <SelectItem value="104857600">100 MB</SelectItem>
-                          </SelectGroup>
-                        </SelectContent>
-                      </Select>
-                    </Field>
-                  </FieldGroup>
+                  <FieldDescription>
+                    Applicants upload one PDF, up to{" "}
+                    {APPLICATION_FILE_MAX_BYTES / (1024 * 1024)} MB.
+                  </FieldDescription>
                 )}
               </div>
             );

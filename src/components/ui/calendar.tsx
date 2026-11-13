@@ -83,7 +83,7 @@ function Calendar({
           "select-none",
           captionLayout === "label"
             ? "text-table"
-            : "flex h-8 items-center gap-1 rounded-full pr-2 pl-3 text-table [&>svg]:size-3.5 [&>svg]:text-muted-foreground",
+            : "flex h-8 items-center gap-1 rounded-full pr-2 pl-3 text-table [&>svg]:size-4 [&>svg]:text-muted-foreground",
           defaultClassNames.caption_label
         ),
         month_grid: "w-full border-collapse",

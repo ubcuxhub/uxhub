@@ -1,4 +1,4 @@
-import { Hourglass } from "lucide-react";
+import { Hourglass, Lock, QrCode } from "lucide-react";
 import * as React from "react";
 
 import {
@@ -57,20 +57,32 @@ function ticketAppearance(eventColour: string): {
  * whatever surface the ticket sits on (page, popover, section panel, either
  * theme) shows through. Two radial masks, each with one hole, intersected.
  */
+function notchMaskStyle(
+  notches: [x: string, y: string][],
+  radius: string,
+): React.CSSProperties {
+  const mask = notches
+    .map(
+      ([x, y]) =>
+        `radial-gradient(circle ${radius} at ${x} ${y}, transparent calc(${radius} - 0.5px), #000 ${radius})`,
+    )
+    .join(", ");
+  return {
+    maskImage: mask,
+    maskComposite: "intersect",
+    WebkitMaskImage: mask,
+    WebkitMaskComposite: "source-in",
+  };
+}
+
 const NOTCH_X = "calc(75% - 10px)";
-const NOTCH_RADIUS = "9px";
-const NOTCH_MASK = [["top", "0"], ["bottom", "100%"]]
-  .map(
-    ([, y]) =>
-      `radial-gradient(circle ${NOTCH_RADIUS} at ${NOTCH_X} ${y}, transparent calc(${NOTCH_RADIUS} - 0.5px), #000 ${NOTCH_RADIUS})`,
-  )
-  .join(", ");
-const NOTCH_MASK_STYLE: React.CSSProperties = {
-  maskImage: NOTCH_MASK,
-  maskComposite: "intersect",
-  WebkitMaskImage: NOTCH_MASK,
-  WebkitMaskComposite: "source-in",
-};
+const NOTCH_MASK_STYLE = notchMaskStyle(
+  [
+    [NOTCH_X, "0"],
+    [NOTCH_X, "100%"],
+  ],
+  "9px",
+);
 
 export interface TicketProps
   extends Omit<React.ComponentProps<"article">, "children"> {
@@ -81,9 +93,11 @@ export interface TicketProps
   /**
    * `active` shows the code. `pending` (accepted, not yet confirmed) is greyed
    * and shows no code, since none exists yet. `used` (checked in) dims the code.
+   * `locked` (offered a spot, not yet registered) keeps the event colour and
+   * shows a lock where the code will be.
    */
-  state?: "active" | "pending" | "used";
-  /** The QR slot, drawn inside a 72px white tile. Ignored while `pending`. */
+  state?: "active" | "pending" | "used" | "locked";
+  /** The QR slot, drawn inside a 72px white tile. Ignored while `pending` or `locked`. */
   code?: React.ReactNode;
   /**
    * A line above the event name, such as "Confirm by Nov 14". Without one,
@@ -120,10 +134,17 @@ function Ticket({
 }: TicketProps) {
   const pending = state === "pending";
   const used = state === "used";
+  const locked = state === "locked";
   const { label, fill } = ticketAppearance(eventColour);
   const captionContent =
     caption ?? (pending ? "Not confirmed yet" : used ? "Checked in" : null);
-  const stateName = pending ? "not confirmed" : used ? "checked in" : null;
+  const stateName = pending
+    ? "not confirmed"
+    : used
+      ? "checked in"
+      : locked
+        ? "not registered yet"
+        : null;
 
   return (
     <article
@@ -160,7 +181,7 @@ function Ticket({
                 data-slot="ticket-caption"
                 className="inline-flex items-center gap-1 text-label"
               >
-                {pending ? <Hourglass className="size-3.5" aria-hidden /> : null}
+                {pending ? <Hourglass className="size-4" aria-hidden /> : null}
                 {captionContent}
               </span>
             ) : null}
@@ -193,7 +214,16 @@ function Ticket({
               used && "opacity-50",
             )}
           >
-            {code}
+            {locked ? (
+              // No code exists until they register, so a faded stand-in sits
+              // under the lock rather than anything scannable.
+              <span aria-hidden className="relative flex size-full items-center justify-center">
+                <QrCode className="absolute size-[70%] opacity-25 blur-[1px]" />
+                <Lock className="relative size-5" />
+              </span>
+            ) : (
+              code
+            )}
           </span>
         )}
       </div>
@@ -201,4 +231,4 @@ function Ticket({
   );
 }
 
-export { Ticket, ticketAppearance };
+export { notchMaskStyle, Ticket, ticketAppearance };

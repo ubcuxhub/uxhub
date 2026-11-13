@@ -14,6 +14,7 @@ import {
   adminUpdateUserInfoById,
 } from "@/lib/supabase-helpers/admin-server";
 import { datetimeLocalToTimestamptz } from "@/lib/date";
+import { assertPublishAt } from "@/features/admin/lib/event-publication";
 import {
   validateMembershipTypeInput,
   type MembershipTypeInput,
@@ -31,6 +32,7 @@ import {
   type MentorInput,
   type SponsorInput,
 } from "@/lib/supabase-helpers/event-people";
+import { removeApplicationFiles } from "@/lib/supabase-helpers/application-files";
 import { updateEventApplication } from "@/lib/supabase-helpers/event-applications";
 import {
   fetchEventById,
@@ -38,14 +40,16 @@ import {
   fetchEventSlugsByPrefix,
 } from "@/lib/supabase-helpers/events";
 import type {
-  CheckInSessionInsert,
-  EventApplicationQuestionInsert,
+  ApplicationQuestionInput,
+  CheckInSessionInput,
+} from "@/features/admin/types";
+import type {
   EventUpdate,
   MentorRow,
   SponsorRow,
   UserInfoUpdate,
 } from "@/lib/supabase/models";
-import type { EventApplicationRow, RoleAccess } from "@/lib/supabase/models";
+import type { RoleAccess, SubmittedApplicationRow } from "@/lib/supabase/models";
 import { fetchActiveProfile, saveAdminProfile } from "@/lib/supabase-helpers/admin-user-profile";
 import { fetchMembershipTypeById } from "@/lib/supabase-helpers/memberships";
 import { normalizeInterests, validateBirthDate } from "./lib/user-profile";
@@ -115,7 +119,7 @@ export async function updateManagerUserAction(
 
   const payload = assertManagerUserUpdate(field, value);
   await adminUpdateUserInfoById(userId, payload);
-  revalidatePath("/admin/users");
+  revalidatePath("/admin/users", "layout");
 }
 
 /** Save the form's profile fields together; roles retain their separate RPC guard. */
@@ -145,7 +149,7 @@ export async function saveManagerUserDetailsAction(userId: string, changes: Reco
     }
   }
   const user = await saveAdminProfile(supabaseAdmin, userId, patch);
-  revalidatePath("/admin/users");
+  revalidatePath("/admin/users", "layout");
   return user;
 }
 
@@ -171,7 +175,7 @@ export async function updateUserRoleAction(
   if (error) throw error;
   if (!data) throw new Error("The role update returned no role.");
 
-  revalidatePath("/admin/users");
+  revalidatePath("/admin/users", "layout");
   return data;
 }
 
@@ -183,11 +187,19 @@ export interface SaveAdminEventInput {
    */
   expectedImageUrl: string | null;
   event: EventUpdate;
-  checkInSessions: Omit<CheckInSessionInsert, "event_id">[];
+  checkInSessions: CheckInSessionInput[];
   mentorIds: string[];
   sponsorIds: string[];
-  applicationQuestions: Omit<EventApplicationQuestionInsert, "event_id">[];
+  applicationQuestions: ApplicationQuestionInput[];
 }
+
+/**
+ * The saved event's id and the ids of its check-in sessions and application
+ * questions, each in the order they were sent, or why the save was refused.
+ */
+export type SaveAdminEventResult =
+  | { id: string; checkInSessionIds: string[]; questionIds: string[] }
+  | { error: string };
 
 // Not exported: a "use server" module may only export async functions, and the
 // form surfaces this by displaying the thrown error's message.
@@ -196,6 +208,16 @@ const IMAGE_CONFLICT_SENTINEL = "EVENT_IMAGE_CONFLICT";
 
 const SAVE_CONFLICT_ERROR =
   "This event's cover image was changed somewhere else since this page loaded. Reload the page and apply your changes again.";
+
+// The hints save_admin_event_atomically gives a refusal over application
+// questions (removing or retyping answered ones, or a stale question id) or
+// check-in sessions (removing one with check-ins, or a stale session id). Its
+// message is written for the admin, and is returned rather than thrown, since
+// production builds withhold a thrown error's message from the client.
+const REFUSAL_EVENTS = new Map([
+  ["APPLICATION_QUESTIONS_CONFLICT", "admin.event_questions_save_refused"],
+  ["CHECK_IN_SESSIONS_CONFLICT", "admin.event_check_in_sessions_save_refused"],
+]);
 
 /**
  * Removes a cover image that is no longer referenced by any event.
@@ -211,6 +233,20 @@ async function discardEventImage(imageUrl: string | null | undefined) {
     await adminDeleteEventImageByUrl(imageUrl);
   } catch (error) {
     log.error("admin.event_image_delete_failed", errorFields(error));
+  }
+}
+
+/**
+ * Removes uploaded application files nothing answers with any more. Best
+ * effort, like `discardEventImage`: the save has already committed.
+ */
+async function discardApplicationFiles(paths: string[]) {
+  if (paths.length === 0) return;
+
+  try {
+    await removeApplicationFiles(supabaseAdmin, paths);
+  } catch (error) {
+    log.warn("admin.application_files_delete_failed", errorFields(error));
   }
 }
 
@@ -232,26 +268,10 @@ export async function discardUnusedEventImageAction(imageUrl: string) {
 
 export async function saveAdminEventAction(
   input: SaveAdminEventInput
-): Promise<{ id: string }> {
+): Promise<SaveAdminEventResult> {
   await requireAdmin();
 
-  if (
-    input.event.publish_at != null &&
-    (typeof input.event.publish_at !== "string" ||
-      !/^\d{4}-\d{2}-\d{2}T.*(?:Z|[+-]\d{2}:\d{2})$/.test(input.event.publish_at) ||
-      !Number.isFinite(Date.parse(input.event.publish_at)))
-  ) {
-    throw new Error("Publish date must be a valid timestamp with a timezone.");
-  }
-
-  if (input.event.publish_at != null) {
-    if (input.event.status !== "draft") {
-      throw new Error("Only draft events can have a publish date.");
-    }
-    if (Date.parse(input.event.publish_at) <= Date.now()) {
-      throw new Error("Publish date must be in the future.");
-    }
-  }
+  assertPublishAt(input.event.status, input.event.publish_at);
 
   let slug: string | null = null;
 
@@ -290,19 +310,38 @@ export async function saveAdminEventAction(
     if (error.message.includes(IMAGE_CONFLICT_SENTINEL)) {
       throw new Error(SAVE_CONFLICT_ERROR);
     }
+    const refusal = REFUSAL_EVENTS.get(error.hint);
+    if (refusal) {
+      log.warn(refusal, { eventId: input.eventId ?? null });
+      return { error: error.message };
+    }
     throw error;
   }
-  if (!data?.id) throw new Error("The event save returned no event id.");
+  const saved = data as {
+    id?: string;
+    check_in_session_ids?: string[];
+    question_ids?: string[];
+    removed_files?: string[];
+  } | null;
+  if (!saved?.id) throw new Error("The event save returned no event id.");
 
   // The save landed, so the image it replaced is unreferenced.
   if (input.eventId && (input.event.image_url ?? null) !== input.expectedImageUrl) {
     await discardEventImage(input.expectedImageUrl);
   }
 
-  revalidatePath("/admin/events");
-  revalidatePath(`/admin/events/${data.id}`);
+  // Files answering questions the save removed, from drafts only: a question
+  // with submitted answers cannot be removed.
+  await discardApplicationFiles(saved.removed_files ?? []);
+
+  // The list, and the event's overview (page and drawer) and builder below it.
+  revalidatePath("/admin/events", "layout");
   revalidatePath("/events", "layout");
-  return { id: data.id };
+  return {
+    id: saved.id,
+    checkInSessionIds: saved.check_in_session_ids ?? [],
+    questionIds: saved.question_ids ?? [],
+  };
 }
 
 export async function saveAdminMentorAction(
@@ -313,7 +352,7 @@ export async function saveAdminMentorAction(
     throw new Error("Mentor name is required.");
   }
   const mentor = await saveMentor(supabaseAdmin, input);
-  revalidatePath("/admin/events");
+  revalidatePath("/admin/events", "layout");
   return mentor;
 }
 
@@ -325,7 +364,7 @@ export async function saveAdminSponsorAction(
     throw new Error("Sponsor name is required.");
   }
   const sponsor = await saveSponsor(supabaseAdmin, input);
-  revalidatePath("/admin/events");
+  revalidatePath("/admin/events", "layout");
   return sponsor;
 }
 
@@ -342,7 +381,7 @@ export async function deleteAdminEventAction(eventId: string) {
 
   await discardEventImage(existing?.image_url);
 
-  revalidatePath("/admin/events");
+  revalidatePath("/admin/events", "layout");
 }
 
 /**
@@ -354,13 +393,23 @@ export async function updateApplicationDecisionAction(
   applicationId: string,
   decision: ApplicationDecision,
   offerExpiresAt: string | null
-): Promise<EventApplicationRow> {
+): Promise<SubmittedApplicationRow> {
   await requireAdmin();
 
   const result = buildApplicationDecisionUpdate(decision, offerExpiresAt);
   if (!result.ok) throw new Error(result.error);
 
-  return updateEventApplication(supabaseAdmin, applicationId, result.update);
+  // The database refuses to decide a draft, so the row that comes back has
+  // been submitted.
+  const updated = await updateEventApplication(
+    supabaseAdmin,
+    applicationId,
+    result.update
+  );
+  if (updated.status === "draft") {
+    throw new Error("A draft application cannot be decided.");
+  }
+  return { ...updated, status: updated.status };
 }
 
 /** Checks a ticket in to a session, or removes a mistaken check-in. */

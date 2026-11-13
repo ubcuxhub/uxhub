@@ -6,16 +6,19 @@ import {
 
 export { ResponseType };
 
+/**
+ * An application question in the admin builder. `id` is the saved question's,
+ * absent until the first save; saving sends it back so the question, and the
+ * answers to it, keep that id.
+ */
 export interface ApplicationQuestionTemplate {
+  id?: string;
   question: string;
   description: string;
   response: ResponseTypeValue;
   is_required: boolean;
   max_char_limit: number | "";
   response_options: string[];
-  restrict_file_types: boolean;
-  allowed_file_types: string[];
-  max_file_size_bytes: number | "";
 }
 
 /** Display-ready event details for a ticket; build one with `toTicketEvent`. */
@@ -26,23 +29,29 @@ export interface TicketEvent {
   location: string | null;
 }
 
-export interface TicketHolder {
-  name: string;
-  email?: string | null;
-}
-
 /**
- * The student-facing event badge from docs/event-states.md. A code is shown
- * for `going` and `checked_in`. There is no cancelled state.
+ * The badge on a student's event card and event page, naming their event
+ * state (docs/event-states.md). `date` completes "Opens" and "Register by".
+ * Build one with `eventBadgeFor`.
  */
-export type TicketBadge =
-  | "under_review"
-  | "waitlisted"
-  | "register_by"
-  | "offer_expired"
-  | "not_selected"
-  | "going"
-  | "checked_in";
+export interface EventBadge {
+  status:
+    | "opens"
+    | "registration_open"
+    | "full"
+    | "registration_closed"
+    | "going"
+    | "checked_in"
+    | "past"
+    | "applications_open"
+    | "draft"
+    | "pending"
+    | "waitlisted"
+    | "register_by"
+    | "not_selected"
+    | "applications_closed";
+  date?: string;
+}
 
 export interface EventGroup {
   key: string;

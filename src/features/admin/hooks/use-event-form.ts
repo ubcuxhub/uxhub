@@ -7,10 +7,6 @@ import {
   discardUnusedEventImageAction,
   saveAdminEventAction,
 } from "@/features/admin/actions";
-import {
-  ResponseType,
-  type ApplicationQuestionTemplate,
-} from "@/features/events/types";
 import { EVENT_IMAGE_ERRORS } from "@/lib/event-image";
 import type {
   CheckInSessionRow,
@@ -20,20 +16,27 @@ import type {
   MentorRow,
   SponsorRow,
 } from "@/lib/supabase/models";
-import type { CheckInSessionDraft } from "@/features/admin/types";
+import type {
+  CheckInSessionDraft,
+  CheckInSessionField,
+} from "@/features/admin/types";
 import {
+  checkInDraftsFromRows,
   createFormSnapshot,
   EMPTY_CHECK_IN_SESSION,
+  formStateFromEvent,
   getInitialFormState,
+  toApplicationQuestionInputs,
+  toCheckInSessionInputs,
+  questionsFromRows,
   validateEventForm,
+  withSavedCheckInSessionIds,
+  withSavedQuestionIds,
   type EventFormState,
   type MentorDraft,
   type SponsorDraft,
 } from "../components/event-form/event-form-schema";
-import {
-  datetimeLocalToTimestamptz,
-  timestamptzToDatetimeLocal,
-} from "@/lib/date";
+import { datetimeLocalToTimestamptz } from "@/lib/date";
 import { useApplicationQuestions } from "./use-application-questions";
 import { useEventFormDraft } from "./use-event-form-draft";
 import { useUnsavedChangesGuard } from "./use-unsaved-changes-guard";
@@ -46,52 +49,6 @@ interface UseEventFormOptions {
   initialMentors?: MentorRow[];
   initialSponsors?: SponsorRow[];
   onSuccess?: (id: string) => void;
-}
-
-function formStateFromEvent(event: EventRow): EventFormState {
-  return {
-    name: event.name ?? "",
-    short_description: event.short_description ?? "",
-    description: event.description ?? "",
-    status: event.status,
-    publish_at: timestamptzToDatetimeLocal(event.publish_at),
-    event_type: event.event_type,
-    regular_price: String(event.regular_price ?? ""),
-    member_price: String(event.member_price ?? ""),
-    location_building: event.location_building ?? "",
-    location_room: event.location_room ?? "",
-    location_address_url: event.location_address_url ?? "",
-    starts_at: timestamptzToDatetimeLocal(event.starts_at),
-    ends_at: timestamptzToDatetimeLocal(event.ends_at),
-    max_capacity: String(event.max_capacity ?? ""),
-    image_url: event.image_url ?? "",
-    registration_opens_at: timestamptzToDatetimeLocal(
-      event.registration_opens_at
-    ),
-    registration_closes_at: timestamptzToDatetimeLocal(
-      event.registration_closes_at
-    ),
-    created_at: event.created_at ?? "",
-    mentors_enabled: event.mentors_enabled,
-    sponsors_enabled: event.sponsors_enabled,
-    requires_application: event.requires_application,
-  };
-}
-
-function questionsFromRows(
-  questions: EventApplicationQuestionRow[]
-): ApplicationQuestionTemplate[] {
-  return questions.map((question) => ({
-    question: question.question ?? "",
-    description: question.description ?? "",
-    response: question.response_type,
-    is_required: question.is_required,
-    max_char_limit: question.max_char_limit ?? "",
-    response_options: question.response_options ?? [],
-    restrict_file_types: question.restrict_file_types,
-    allowed_file_types: question.allowed_file_types ?? [],
-    max_file_size_bytes: question.max_file_size_bytes ?? "",
-  }));
 }
 
 export function useEventForm({
@@ -111,11 +68,7 @@ export function useEventForm({
   const startingCheckIns = useMemo(
     () =>
       initialCheckInSessions.length
-        ? initialCheckInSessions.map((session) => ({
-            name: session.name ?? "",
-            start_time: timestamptzToDatetimeLocal(session.start_time),
-            end_time: timestamptzToDatetimeLocal(session.end_time),
-          }))
+        ? checkInDraftsFromRows(initialCheckInSessions)
         : [{ ...EMPTY_CHECK_IN_SESSION }],
     [initialCheckInSessions]
   );
@@ -215,7 +168,7 @@ export function useEventForm({
 
   const updateCheckInEvent = (
     index: number,
-    field: keyof CheckInSessionDraft,
+    field: CheckInSessionField,
     value: string
   ) => {
     resetSuccessMessage();
@@ -354,46 +307,9 @@ export function useEventForm({
           formState.registration_closes_at
         ),
       };
-      const checkInSessions = checkInEvents.map((session) => ({
-        name: session.name,
-        start_time: datetimeLocalToTimestamptz(session.start_time)!,
-        end_time: datetimeLocalToTimestamptz(session.end_time)!,
-      }));
-      const applicationQuestions = questions.applicationTemplate.map(
-        (question, sortOrder) => ({
-          question: question.question,
-          description: question.description || null,
-          response_type: question.response,
-          is_required: question.is_required,
-          sort_order: sortOrder,
-          max_char_limit:
-            question.response === ResponseType.short_text ||
-            question.response === ResponseType.long_text
-              ? question.max_char_limit === ""
-                ? 5000
-                : question.max_char_limit
-              : null,
-          response_options:
-            question.response === ResponseType.checkbox ||
-            question.response === ResponseType.multiple_choice ||
-            question.response === ResponseType.dropdown
-              ? question.response_options || []
-              : null,
-          restrict_file_types:
-            question.response === ResponseType.file_upload
-              ? question.restrict_file_types
-              : false,
-          allowed_file_types:
-            question.response === ResponseType.file_upload &&
-            question.restrict_file_types
-              ? question.allowed_file_types
-              : null,
-          max_file_size_bytes:
-            question.response === ResponseType.file_upload &&
-            question.max_file_size_bytes !== ""
-              ? question.max_file_size_bytes
-              : null,
-        })
+      const checkInSessions = toCheckInSessionInputs(checkInEvents);
+      const applicationQuestions = toApplicationQuestionInputs(
+        questions.applicationTemplate
       );
       const result = await saveAdminEventAction({
         eventId,
@@ -404,6 +320,20 @@ export function useEventForm({
         sponsorIds: sponsors.map((sponsor) => sponsor.id!),
         applicationQuestions,
       });
+      // A refusal the admin can act on, such as removing a question people
+      // have applied with or a session people have checked in to. Nothing was
+      // saved, so the image cleanup below runs.
+      if ("error" in result) throw new Error(result.error);
+      const savedCheckIns = withSavedCheckInSessionIds(
+        checkInEvents,
+        result.checkInSessionIds
+      );
+      setCheckInEvents(savedCheckIns);
+      const savedTemplate = withSavedQuestionIds(
+        questions.applicationTemplate,
+        result.questionIds
+      );
+      questions.setApplicationTemplate(savedTemplate);
       const savedFormState = { ...formState, image_url: imageUrl };
       persistedImageUrl.current = imageUrl || null;
       setFormState(savedFormState);
@@ -411,10 +341,10 @@ export function useEventForm({
       setCleanSnapshot(
         createFormSnapshot(
           savedFormState,
-          checkInEvents,
+          savedCheckIns,
           mentors,
           sponsors,
-          questions.applicationTemplate
+          savedTemplate
         )
       );
       setSuccessMessage(

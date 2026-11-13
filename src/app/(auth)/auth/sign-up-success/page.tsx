@@ -1,15 +1,13 @@
-import { SignUpSuccessMessage } from "@/features/auth/components/SignUpSuccessMessage";
-import { getSafeInternalPath } from "@/lib/auth/paths";
-import { redirectIfAuthenticated } from "@/lib/auth/guards";
+import { redirect } from "next/navigation";
 
+import { getSafeInternalPath } from "@/lib/auth/paths";
+
+/** The old name of the Verify email screen; kept so existing links still work. */
 export default async function Page({
   searchParams,
 }: {
   searchParams: Promise<{ next?: string }>;
 }) {
-  const params = await searchParams;
-  const nextPath = getSafeInternalPath(params.next);
-  await redirectIfAuthenticated(nextPath);
-
-  return <SignUpSuccessMessage nextPath={nextPath} />;
+  const nextPath = getSafeInternalPath((await searchParams).next);
+  redirect(`/auth/verify-email?next=${encodeURIComponent(nextPath)}`);
 }

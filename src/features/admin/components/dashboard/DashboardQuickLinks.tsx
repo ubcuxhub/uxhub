@@ -23,7 +23,7 @@ export function DashboardQuickLinks() {
         {links.map(({ name, description, icon: Icon, href }) => {
           const content = <>
             <Icon aria-hidden="true" className="size-7 shrink-0" />
-            <span className="min-w-0"><span className="block font-medium">{name}</span><span className="block text-label text-fg-secondary">{description}</span></span>
+            <span className="min-w-0"><span className="block font-medium">{name}</span><span className="block text-label text-muted-foreground">{description}</span></span>
           </>;
 
           return href ? (

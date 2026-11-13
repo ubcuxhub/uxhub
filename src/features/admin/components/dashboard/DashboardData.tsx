@@ -39,7 +39,7 @@ export async function DashboardEventData({ now }: { now: string }) {
   const db = await createClient();
   // An envelope distinguishes an empty result from a failed query.
   const result = await readDashboardData("next_event", async () => ({ event: await fetchNextDashboardEvent(db, now) }));
-  if (!result) return <DashboardPanel className="min-h-64 items-center justify-center"><p className="text-small text-fg-secondary">Upcoming event unavailable. Please try again later.</p></DashboardPanel>;
+  if (!result) return <DashboardPanel className="min-h-64 items-center justify-center"><p className="text-small text-muted-foreground">Upcoming event unavailable. Please try again later.</p></DashboardPanel>;
   const event = result.event;
   const rsvpCount = event
     ? await readDashboardData("event_rsvps", () => fetchConfirmedEventRegistrationCount(db, event.id))

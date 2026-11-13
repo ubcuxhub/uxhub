@@ -17,6 +17,7 @@ export const interactionDemos: Record<string, DemoLoader> = {
   sheet: () => import("../_demos/sheet"),
   tooltip: () => import("../_demos/tooltip"),
   "side-peek-drawer": () => import("../_demos/side-peek-drawer"),
+  "record-drawer": () => import("../_demos/record-drawer"),
   "dropdown-menu": () => import("../_demos/dropdown-menu"),
   sidebar: () => import("../_demos/sidebar"),
   tabs: () => import("../_demos/tabs"),

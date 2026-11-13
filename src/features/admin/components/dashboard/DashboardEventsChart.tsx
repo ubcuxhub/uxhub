@@ -32,7 +32,7 @@ export function DashboardEventsChart({ data }: { data: EventAnalytics | null }) 
 
   if (!data) {
     return (
-      <p role="status" className="py-24 text-center text-small text-fg-secondary">
+      <p role="status" className="py-24 text-center text-small text-muted-foreground">
         Event statistics unavailable. Please try again later.
       </p>
     );
@@ -47,18 +47,18 @@ export function DashboardEventsChart({ data }: { data: EventAnalytics | null }) 
           <p className="text-h2 tabular-nums">
             {data.currentEvent ? data.currentEvent.registrations.toLocaleString("en-CA") : "—"}
           </p>
-          <p className="text-label text-fg-secondary">
+          <p className="text-label text-muted-foreground">
             {data.currentEvent ? `Registrations · ${data.currentEvent.name}` : "No upcoming event"}
           </p>
         </div>
         <div>
           <p className="text-h2 tabular-nums">{data.uniqueParticipants.toLocaleString("en-CA")}</p>
-          <p className="text-label text-fg-secondary">
+          <p className="text-label text-muted-foreground">
             Unique participants · {data.schoolYearLabel} (Sep–Apr)
           </p>
         </div>
       </div>
-      {total === 0 ? <p className="py-20 text-center text-small text-fg-secondary">No published events to show.</p> : <>
+      {total === 0 ? <p className="py-20 text-center text-small text-muted-foreground">No published events to show.</p> : <>
         <div tabIndex={0} role="group" aria-label="Event registration and attendance chart" aria-describedby="event-chart-help"
           className="rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           onKeyDown={onKeyDown}>
@@ -103,10 +103,10 @@ export function DashboardEventsChart({ data }: { data: EventAnalytics | null }) 
             </Button>
           </div>
         </div>
-        <p aria-live="polite" className="text-label text-fg-secondary">Events {window.start + 1}–{window.start + window.size} of {total}</p>
-        <p id="event-chart-help" className="text-label text-fg-secondary">Use the buttons to zoom. Focus the chart and use ← / → to explore events.</p>
+        <p aria-live="polite" className="text-label text-muted-foreground">Events {window.start + 1}–{window.start + window.size} of {total}</p>
+        <p id="event-chart-help" className="text-label text-muted-foreground">Use the buttons to zoom. Focus the chart and use ← / → to explore events.</p>
         <details className="text-small">
-          <summary className="cursor-pointer text-fg-secondary">View chart data</summary>
+          <summary className="cursor-pointer text-muted-foreground">View chart data</summary>
           <ul className="mt-2 space-y-2">
             {visible.map((event) => (
               <li key={event.id}>

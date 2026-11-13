@@ -13,13 +13,17 @@ import {
   AUTH_ACTION_ERRORS,
   getAuthActionErrorMessage,
 } from "../auth-errors";
+import { AuthDivider } from "./AuthDivider";
 
 interface GoogleOAuthButtonProps {
   nextPath?: string;
+  /** Label on the rule between Google and the email form. */
+  dividerLabel: string;
 }
 
 export function GoogleOAuthButton({
   nextPath = "/portal",
+  dividerLabel,
 }: GoogleOAuthButtonProps) {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -70,25 +74,23 @@ export function GoogleOAuthButton({
   };
 
   return (
-    <div>
+    <div className="flex flex-col gap-6">
       <Button
         type="button"
         variant="outline"
         className="w-full"
-        disabled={isLoading}
+        loading={isLoading}
         onClick={handleGoogleOAuth}
       >
         <FcGoogle />
-        {isLoading ? "Redirecting..." : "Continue with Google"}
+        Continue with Google
       </Button>
 
-      {error ? <FieldError className="mt-3">{error}</FieldError> : null}
+      {error ? <FieldError className="-mt-3">{error}</FieldError> : null}
 
       {/* The provider set must stay identical on login and sign-up: with OAuth
           the same button both creates and signs in to an account. */}
-      <p className="my-6 text-center text-body text-muted-foreground">
-        or continue with email
-      </p>
+      <AuthDivider>{dividerLabel}</AuthDivider>
     </div>
   );
 }
