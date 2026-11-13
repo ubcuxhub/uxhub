@@ -215,8 +215,6 @@ Local values belong in the git-ignored `.env.local`.
 - Sentry: `NEXT_PUBLIC_SENTRY_DSN` enables error reporting; leave it unset
   locally. Build-time `SENTRY_ORG`, `SENTRY_PROJECT`, and secret
   `SENTRY_AUTH_TOKEN` upload source maps on Vercel builds
-- Check-in: server-only `CHECK_IN_TOKEN_SECRET` signs ticket QR codes
- (`src/lib/check-in-token.ts`); rotating it invalidates every issued ticket
 - Discount codes: server-only `DISCOUNT_CODE_<BUSINESS>`, one per partner in
   `src/features/memberships/lib/discount-codes.ts`, kept out of the public repo.
   A code whose variable is unset is not shown
@@ -233,8 +231,8 @@ Local values belong in the git-ignored `.env.local`.
 only for production credentials.
 
 Never expose the Supabase secret keys, migrations database URL, Square access
-token, webhook signature key, Resend API key, Sentry auth token, or check-in
-token secret to client components.
+token, webhook signature key, Resend API key, or Sentry auth token to client
+components.
 
 ## Quality
 

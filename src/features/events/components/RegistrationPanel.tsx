@@ -15,9 +15,7 @@ import {
   type TicketLayoutProps,
 } from "@/features/events/lib/registration-panel";
 import { hasApplicationAnswer } from "@/lib/application-response";
-import { createCheckInToken } from "@/lib/check-in-token";
 import { formatEventDateLabel, pacificDate } from "@/lib/date";
-import { errorFields, log } from "@/lib/log";
 import { createClient } from "@/lib/supabase/server";
 import type { EventRow, UserInfoRow } from "@/lib/supabase/models";
 import {
@@ -26,6 +24,7 @@ import {
   fetchUserEventApplication,
 } from "@/lib/supabase-helpers/event-applications";
 import { fetchEventLinks } from "@/lib/supabase-helpers/event-links";
+import { fetchUserEventTicket } from "@/lib/supabase-helpers/event-tickets";
 import type { DbClient } from "@/lib/supabase-helpers/types";
 import { cn } from "@/lib/utils";
 
@@ -57,7 +56,7 @@ interface TicketView {
   holderName: string;
   eventColour: string | null;
   imageUrl: string | null;
-  /** `null` when the code couldn't be signed; the ticket then shows none. */
+  /** The ticket's `qr_token`; `null` when the ticket wasn't found, and then it shows none. */
   qrToken: string | null;
   dateLabel: string | null;
 }
@@ -65,17 +64,19 @@ interface TicketView {
 /**
  * The Registration card on the portal event page: one of three layouts (an
  * alert, an action, or the ticket) chosen and worded by `getPanelSpec` from
- * the student's event state. A server component, so it signs the ticket's
- * check-in code itself and fetches only what the state needs: the
- * participant package for a ticket holder, and a draft's progress.
+ * the student's event state. A server component, so it draws the ticket's
+ * check-in code itself and fetches only what the state needs: the ticket's
+ * `qr_token` and participant package for a ticket holder, and a draft's
+ * progress.
  */
 export async function RegistrationPanel({ event, user, state }: RegistrationPanelProps) {
   const supabase = await createClient();
   const holdsTicket = state.kind === "reg-going" || state.kind === "reg-checked-in";
 
-  const [links, draftProgress] = await Promise.all([
+  const [links, draftProgress, ticketRow] = await Promise.all([
     holdsTicket ? fetchEventLinks(supabase, event.id) : [],
     state.kind === "app-draft" ? loadDraftProgress(supabase, event.id, user.id) : null,
+    "ticketId" in state ? fetchUserEventTicket(supabase, event.id, user.id) : null,
   ]);
 
   const isMember = Boolean(user.membership_type_id);
@@ -109,7 +110,7 @@ export async function RegistrationPanel({ event, user, state }: RegistrationPane
               holderName: holderName(user),
               eventColour: event.event_colour,
               imageUrl: event.image_url,
-              qrToken: "ticketId" in state ? signTicket(state.ticketId) : null,
+              qrToken: ticketRow?.qr_token ?? null,
               dateLabel: ticketDateLabel(event.starts_at, event.ends_at),
             }}
           />
@@ -226,7 +227,7 @@ function PanelButton({
       );
     case "view-ticket": {
       const button = <Button {...props}>{action.label}</Button>;
-      // Without a signed code there's nothing to show.
+      // Without a code there's nothing to show.
       if (!ticket?.qrToken) return <Button {...props} disabled>{action.label}</Button>;
       return (
         <TicketDialog
@@ -240,16 +241,6 @@ function PanelButton({
         />
       );
     }
-  }
-}
-
-/** The check-in code for a ticket, or `null` (logged) when it can't be signed. */
-function signTicket(ticketId: string): string | null {
-  try {
-    return createCheckInToken(ticketId);
-  } catch (error) {
-    log.error("event.check_in_token_failed", { ticketId, ...errorFields(error) });
-    return null;
   }
 }
 

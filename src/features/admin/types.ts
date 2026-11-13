@@ -51,6 +51,15 @@ export interface CheckInAttendee {
   user_email: string;
 }
 
+/** Why a scan or a manual check-in was refused. */
+export type CheckInRejection = "invalid_code" | "not_found" | "wrong_event";
+
+/** What the door sees after a scan or a manual check-in. */
+export type CheckInResult =
+  | { status: "checked_in"; name: string; checkedInAt: string }
+  | { status: "already_checked_in"; name: string; checkedInAt: string }
+  | { status: "rejected"; reason: CheckInRejection };
+
 export type UserRecord = UserInfoRow & {
   membership_type_name?: string | null;
   order_date?: string | null;

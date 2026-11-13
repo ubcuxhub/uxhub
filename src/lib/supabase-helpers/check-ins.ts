@@ -18,6 +18,40 @@ type CheckInAttendeeQueryRow = Pick<EventTicketRow, "id" | "user_id"> & {
   } | null;
 };
 
+type AttendeeNameFields = {
+  first_name: string | null;
+  last_name: string | null;
+} | null;
+
+/** The ticket a scan or a manual lookup points at. */
+export interface CheckInTicket {
+  id: string;
+  event_id: string;
+  user_name: string;
+}
+
+export interface CheckInRecord {
+  checkedInAt: string;
+  /** True when an earlier check-in already set `checkedInAt`. */
+  alreadyCheckedIn: boolean;
+}
+
+const CHECK_IN_TICKET_COLUMNS =
+  "id, event_id, user_info!user_id(first_name, last_name)";
+
+// The row can only vanish between two reads if an admin un-checks the ticket
+// at that moment, so one retry is nearly always enough.
+const CHECK_IN_ATTEMPTS = 3;
+
+function attendeeName(userInfo: AttendeeNameFields): string {
+  return userInfo?.first_name && userInfo.last_name
+    ? formatUserName({
+        first_name: userInfo.first_name,
+        last_name: userInfo.last_name,
+      })
+    : "Unknown User";
+}
+
 export async function fetchCheckInSessions(
   supabase: DbClient,
   eventId: string
@@ -52,21 +86,66 @@ export async function fetchCheckInAttendees(
   if (error) throw error;
   if (!data || data.length === 0) return [];
 
-  return data.map((ticket: CheckInAttendeeQueryRow) => {
-    const userInfo = ticket.user_info;
-    return {
-      id: ticket.id,
-      user_id: ticket.user_id,
-      user_name:
-        userInfo?.first_name && userInfo.last_name
-          ? formatUserName({
-              first_name: userInfo.first_name,
-              last_name: userInfo.last_name,
-            })
-          : "Unknown User",
-      user_email: userInfo?.email || "",
-    };
-  });
+  return data.map((ticket: CheckInAttendeeQueryRow) => ({
+    id: ticket.id,
+    user_id: ticket.user_id,
+    user_name: attendeeName(ticket.user_info),
+    user_email: ticket.user_info?.email || "",
+  }));
+}
+
+/** The ticket whose QR code holds `qrToken`, or null when no ticket does. */
+export async function fetchCheckInTicketByToken(
+  supabase: DbClient,
+  qrToken: string
+): Promise<CheckInTicket | null> {
+  const { data, error } = await supabase
+    .from(TABLES.eventTickets)
+    .select(CHECK_IN_TICKET_COLUMNS)
+    .eq("qr_token", qrToken)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data && toCheckInTicket(data);
+}
+
+export async function fetchCheckInTicketById(
+  supabase: DbClient,
+  ticketId: string
+): Promise<CheckInTicket | null> {
+  const { data, error } = await supabase
+    .from(TABLES.eventTickets)
+    .select(CHECK_IN_TICKET_COLUMNS)
+    .eq("id", ticketId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data && toCheckInTicket(data);
+}
+
+function toCheckInTicket(
+  row: Pick<EventTicketRow, "id" | "event_id"> & { user_info: AttendeeNameFields }
+): CheckInTicket {
+  return {
+    id: row.id,
+    event_id: row.event_id,
+    user_name: attendeeName(row.user_info),
+  };
+}
+
+/** The event a check-in session belongs to, or null if the session is gone. */
+export async function fetchCheckInSessionEventId(
+  supabase: DbClient,
+  sessionId: string
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from(TABLES.checkInSessions)
+    .select("event_id")
+    .eq("id", sessionId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data?.event_id ?? null;
 }
 
 /**
@@ -99,29 +178,66 @@ export async function fetchCheckInStatuses(
 }
 
 /**
- * Checks a ticket in to a session now and returns the stored time. Checking
- * in again restamps it.
+ * Checks a ticket in to a session, keeping the first time. Checking in again
+ * returns that time with `alreadyCheckedIn`, and of two simultaneous calls
+ * only one records the check-in: the insert skips an existing row on the
+ * unique (ticket, session) pair, and the update only takes a row whose time
+ * is still empty, so Postgres settles each race.
  */
-export async function upsertCheckIn(
+export async function checkInTicket(
   supabase: DbClient,
   ticketId: string,
   sessionId: string
-): Promise<string> {
-  const { data, error } = await supabase
-    .from(TABLES.checkIns)
-    .upsert(
-      {
-        ticket_id: ticketId,
-        check_in_session_id: sessionId,
-        checked_in_at: new Date().toISOString(),
-      },
-      { onConflict: "ticket_id,check_in_session_id" }
-    )
-    .select("checked_in_at")
-    .single();
+): Promise<CheckInRecord> {
+  const checkedInAt = new Date().toISOString();
 
-  if (error) throw error;
-  return data.checked_in_at ?? new Date().toISOString();
+  for (let attempt = 0; attempt < CHECK_IN_ATTEMPTS; attempt++) {
+    const { data: inserted, error: insertError } = await supabase
+      .from(TABLES.checkIns)
+      .upsert(
+        {
+          ticket_id: ticketId,
+          check_in_session_id: sessionId,
+          checked_in_at: checkedInAt,
+        },
+        { onConflict: "ticket_id,check_in_session_id", ignoreDuplicates: true }
+      )
+      .select("checked_in_at");
+
+    if (insertError) throw insertError;
+    if (inserted[0]?.checked_in_at) {
+      return { checkedInAt: inserted[0].checked_in_at, alreadyCheckedIn: false };
+    }
+
+    const { data: existing, error: existingError } = await supabase
+      .from(TABLES.checkIns)
+      .select("checked_in_at")
+      .eq("ticket_id", ticketId)
+      .eq("check_in_session_id", sessionId)
+      .maybeSingle();
+
+    if (existingError) throw existingError;
+    if (existing?.checked_in_at) {
+      return { checkedInAt: existing.checked_in_at, alreadyCheckedIn: true };
+    }
+    if (!existing) continue;
+
+    // Un-checking used to clear the time instead of deleting the row.
+    const { data: stamped, error: stampError } = await supabase
+      .from(TABLES.checkIns)
+      .update({ checked_in_at: checkedInAt })
+      .eq("ticket_id", ticketId)
+      .eq("check_in_session_id", sessionId)
+      .is("checked_in_at", null)
+      .select("checked_in_at");
+
+    if (stampError) throw stampError;
+    if (stamped[0]?.checked_in_at) {
+      return { checkedInAt: stamped[0].checked_in_at, alreadyCheckedIn: false };
+    }
+  }
+
+  throw new Error("The check-in kept changing while it was being recorded.");
 }
 
 /** Removes a mistaken check-in so the ticket can be checked in again. */
