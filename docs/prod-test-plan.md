@@ -37,7 +37,7 @@ The draft **QA Team Test** is already set up: free, teams on (max 3), one check-
 7. On a laptop, open the [check-in page](https://www.ubcuxhub.ca/admin/events/ba0548e5-ed36-44b2-967e-04e312961890/check-in). ✅ A–D are checked in.
 
 ## 5. Quick check
-- Open [Events](https://www.ubcuxhub.ca/portal/events). ✅ "No events scheduled yet" (the test event is a draft).
+- Open [Events](https://www.ubcuxhub.ca/portal/events). ✅ "Events coming soon" (the test event is a draft).
 
 ## 6. Cleanup (Host)
 1. **A** and **C:** **Manage team → Delete team**.
