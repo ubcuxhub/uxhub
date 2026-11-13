@@ -441,6 +441,44 @@ describe("saveAdminEventAction", () => {
     expect(adminRpc.mock.calls[0][1].p_slug).toBeTruthy();
   });
 
+  it("numbers an unedited page URL past every URL another event claims", async () => {
+    events.fetchEventSlugsByPrefix.mockResolvedValue(["coffee-chat"]);
+    await saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, name: "Coffee Chat", configured_slug_edited: false, configured_slug: "coffee-chat" } });
+
+    expect(events.fetchEventSlugsByPrefix).toHaveBeenCalledWith(expect.anything(), "coffee-chat", { exceptEventId: null });
+    expect(adminRpc.mock.calls[0][1].p_event.configured_slug).toBe("coffee-chat-1");
+    expect(adminRpc.mock.calls[0][1].p_slug).toBe("coffee-chat-1");
+  });
+
+  it("derives an unedited page URL from the name, not the value the client sent", async () => {
+    await saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, name: "Coffee Chat", configured_slug_edited: false, configured_slug: "forged" } });
+    expect(adminRpc.mock.calls[0][1].p_event.configured_slug).toBe("coffee-chat");
+  });
+
+  it("keeps the unedited page URL an existing event already holds", async () => {
+    events.fetchEventById.mockResolvedValueOnce({ id: "event-1", name: "Coffee Chat", configured_slug: "coffee-chat-1", first_published_at: null });
+    events.fetchEventSlugsByPrefix.mockResolvedValue(["coffee-chat"]);
+    await saveAdminEventAction({ ...saveInput, eventId: "event-1", event: { ...saveInput.event, name: "Coffee Chat", configured_slug_edited: false, configured_slug: "coffee-chat" } });
+
+    expect(events.fetchEventSlugsByPrefix).toHaveBeenCalledWith(expect.anything(), "coffee-chat", { exceptEventId: "event-1" });
+    expect(adminRpc.mock.calls[0][1].p_event.configured_slug).toBe("coffee-chat-1");
+  });
+
+  it("leaves a published event's locked page URL to the database", async () => {
+    events.fetchEventById.mockResolvedValueOnce({ id: "event-1", name: "Coffee Chat", configured_slug: "coffee-chat", first_published_at: "2026-01-01T00:00:00Z" });
+    await saveAdminEventAction({ ...saveInput, eventId: "event-1", event: { ...saveInput.event, name: "Renamed", configured_slug_edited: false, configured_slug: "coffee-chat" } });
+
+    expect(events.fetchEventSlugsByPrefix).not.toHaveBeenCalled();
+    expect(adminRpc.mock.calls[0][1].p_event.configured_slug).toBe("coffee-chat");
+  });
+
+  it("sends an edited page URL as typed, so a taken one is refused", async () => {
+    adminRpc.mockResolvedValue({ data: null, error: { message: "This page URL is already in use.", code: "P0001" } });
+    await expect(saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, name: "Coffee Chat", configured_slug_edited: true, configured_slug: "coffee-chat" } }))
+      .resolves.toEqual({ error: "This page URL is already in use." });
+    expect(adminRpc.mock.calls[0][1].p_event.configured_slug).toBe("coffee-chat");
+  });
+
   it("forwards the cover image the form loaded with as the precondition", async () => {
     await saveAdminEventAction({
       ...saveInput,

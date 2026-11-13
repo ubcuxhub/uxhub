@@ -15,7 +15,7 @@ import { parseEventDescription, descriptionText } from "@/lib/event-description"
 import { revalidatePath } from "next/cache";
 
 import { requireAdmin, requireManager } from "@/lib/auth/guards";
-import { eventSlugError, priceError, websiteUrlError } from "./lib/event-configuration";
+import { eventSlugError, eventSlugStem, priceError, suggestedEventSlug, uniqueEventSlug, websiteUrlError } from "./lib/event-configuration";
 import { createUniqueSlug, slugify } from "@/lib/slug";
 import { errorFields, log } from "@/lib/log";
 import { supabaseAdmin } from "@/lib/supabase/admin";
@@ -312,6 +312,22 @@ export async function saveAdminEventDraftAction(input: { id: string; eventId: st
   return { id: saved.id, revision: saved.revision };
 }
 
+/**
+ * The page URL for an event whose admin has not edited it: made from the
+ * name and numbered past every URL another event holds (`coffee-chat-1`), so a
+ * second event with the same name saves. The event's own URLs don't count as
+ * taken, and a URL it already holds is kept, so re-saving or renaming an event
+ * never bumps its own URL. A published event's URL is locked, so the one the
+ * form sent is left for the database to hold to that lock.
+ */
+async function automaticPageSlug(eventId: string | null, name: string | null | undefined, sent: string | null | undefined) {
+  const current = eventId ? await fetchEventById(supabaseAdmin, eventId) : null;
+  if (current?.first_published_at) return sent;
+  const base = suggestedEventSlug(name ?? current?.name ?? "") || "event";
+  const taken = await fetchEventSlugsByPrefix(supabaseAdmin, eventSlugStem(base), { exceptEventId: eventId });
+  return uniqueEventSlug(base, taken, current?.configured_slug);
+}
+
 export async function saveAdminEventAction(
   input: SaveAdminEventInput
 ): Promise<SaveAdminEventResult> {
@@ -344,6 +360,10 @@ export async function saveAdminEventAction(
   if (input.event.description_rich != null) {
     const rich = parseEventDescription(input.event.description_rich);
     if (!rich || descriptionText(rich) !== input.event.description) throw new Error("Invalid long overview formatting.");
+  }
+  if (input.event.configured_slug_edited === false) {
+    const configuredSlug = await automaticPageSlug(input.eventId ?? null, input.event.name, input.event.configured_slug);
+    input = { ...input, event: { ...input.event, configured_slug: configuredSlug } };
   }
   if (input.event.configured_slug != null) {
     const error = eventSlugError(input.event.configured_slug);

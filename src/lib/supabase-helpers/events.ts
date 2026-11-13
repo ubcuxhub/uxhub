@@ -76,20 +76,40 @@ export async function fetchEventBySlug(
   return data;
 }
 
-/** Returns existing slugs that start with the given prefix (for uniqueness). */
+/**
+ * Returns the event URLs starting with `prefix` (for uniqueness): every
+ * event's `slug` and every URL claimed in `event_url_claims`, which also holds
+ * each event's configured page URL. Pass `exceptEventId` to leave out that
+ * event's own URLs, so re-saving it does not count them as taken.
+ *
+ * Needs the service-role client: `event_url_claims` has no browser grants.
+ */
 export async function fetchEventSlugsByPrefix(
   supabase: DbClient,
-  prefix: string
+  prefix: string,
+  options: { exceptEventId?: string | null } = {}
 ): Promise<string[]> {
-  const { data, error } = await supabase
+  const { exceptEventId } = options;
+  let events = supabase
     .from(TABLES.events)
     .select("slug")
     .ilike("slug", `${prefix}%`);
+  let claims = supabase
+    .from(TABLES.eventUrlClaims)
+    .select("slug")
+    .ilike("slug", `${prefix}%`);
+  if (exceptEventId) {
+    events = events.neq("id", exceptEventId);
+    claims = claims.neq("event_id", exceptEventId);
+  }
 
-  if (error) throw error;
-  return (data ?? [])
-    .map((row: Pick<EventRow, "slug">) => row.slug)
+  const [eventsResult, claimsResult] = await Promise.all([events, claims]);
+  if (eventsResult.error) throw eventsResult.error;
+  if (claimsResult.error) throw claimsResult.error;
+  const slugs = [...eventsResult.data, ...claimsResult.data]
+    .map((row: { slug: string | null }) => row.slug)
     .filter((slug): slug is string => slug !== null);
+  return [...new Set(slugs)];
 }
 
 export async function insertEvent(
