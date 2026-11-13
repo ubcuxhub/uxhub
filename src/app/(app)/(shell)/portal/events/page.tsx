@@ -1,7 +1,8 @@
 import { PageContainer } from "@/components/shared/PageContainer";
 import { EventTimeline } from "@/features/events/components/EventTimeline";
 import { EventsComingSoon } from "@/features/events/components/EventsComingSoon";
-import { loadEventBadges } from "@/features/events/lib/event-badge";
+import { eventBadgeFor } from "@/features/events/lib/event-badge";
+import { loadEventStates } from "@/features/events/lib/event-states";
 import { splitEventsByTime } from "@/features/events/lib/event-timeline";
 import { requireAuth } from "@/lib/auth/guards";
 import { FLAGS } from "@/lib/flags";
@@ -17,7 +18,10 @@ export default async function PortalEvents() {
 
   const now = new Date();
   const { upcomingEvents, pastEvents } = splitEventsByTime(events, now);
-  const badges = await loadEventBadges(supabase, user.id, events, now);
+  const states = await loadEventStates(supabase, user.id, events, now);
+  const badges = Object.fromEntries(
+    Object.entries(states).map(([id, state]) => [id, eventBadgeFor(state)])
+  );
 
   return (
     <PageContainer>

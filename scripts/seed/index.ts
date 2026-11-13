@@ -921,7 +921,8 @@ async function main(): Promise<void> {
   const host = new URL(url).hostname;
 
   // The target's policy is not negotiable from the command line: prod never
-  // deletes and never writes login fixtures, whatever the flags say.
+  // deletes and never writes login fixtures or membership tiers, whatever the
+  // flags say.
   if (!policy.prune) options.prune = false;
 
   if (!policy.users && options.only.has("users")) {
@@ -932,7 +933,15 @@ async function main(): Promise<void> {
     );
   }
 
+  if (!policy.memberships && options.only.has("memberships")) {
+    throw new Error(
+      `--only=memberships is not available with --target=${options.target}.\n` +
+        "  Production's tiers are live and edited in Club Settings."
+    );
+  }
+
   const skipUsers = !policy.users;
+  const writeMemberships = policy.memberships && shouldRun(options, "memberships");
   const notices: string[] = [];
 
   if (options.target === "prod") {
@@ -942,6 +951,9 @@ async function main(): Promise<void> {
     }
     if (skipUsers) {
       notices.push("User fixtures, purchases, tickets, and applications are skipped.");
+    }
+    if (!policy.memberships) {
+      notices.push("Membership tiers are skipped.");
     }
   }
 
@@ -980,7 +992,7 @@ async function main(): Promise<void> {
     );
   }
 
-  if (shouldRun(options, "memberships")) {
+  if (writeMemberships) {
     const { counts } = await upsertBySlug(
       supabase,
       TABLE.membershipTypes,

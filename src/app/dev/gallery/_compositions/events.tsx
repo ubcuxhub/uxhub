@@ -151,15 +151,9 @@ function FeaturedEvent() {
 function ScannableTicket() {
   return (
     <EventTicket
-      className={`max-w-none ${LIFT}`}
-      event={{
-        name: "Intro to Figma Workshop",
-        date: "Monday, January 25, 2027",
-        time: "5:30 PM – 7:30 PM",
-        location: "UBC Hennings 200",
-      }}
-      holder={{ name: "Alex Chen", email: "alex.chen@student.ubc.ca" }}
-      badge="going"
+      className={LIFT}
+      eventName="Intro to Figma Workshop"
+      holderName="Alex Chen"
       qrToken={QR_TOKEN}
     />
   );

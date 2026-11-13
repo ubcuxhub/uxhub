@@ -11,6 +11,9 @@
  * The `name` values mirror production exactly. Slugs follow the mapping baked
  * into
  * supabase/migrations/20260529110000_add_slugs_for_events_and_memberships.sql.
+ *
+ * Local only. Admins edit the production tiers in Club Settings, so
+ * `--target=prod` never writes these; the descriptions here copy production's.
  */
 
 import type { TablesInsert } from "../../../src/lib/supabase/database.types.ts";

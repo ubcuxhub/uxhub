@@ -16,7 +16,7 @@ interface EventTimelineProps {
   upcomingEvents: EventRow[];
   pastEvents: EventRow[];
   /**
-   * Each event's badge, keyed by event id; build it with `loadEventBadges`.
+   * Each event's badge, keyed by event id; build it with `eventBadgeFor`.
    * An event without one shows "past" in the past list and no badge otherwise.
    */
   badges?: Record<string, EventBadge>;

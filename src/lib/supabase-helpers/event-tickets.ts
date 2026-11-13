@@ -1,10 +1,20 @@
 import type { DbClient } from "./types";
 import { TABLES } from "./tables";
-import type { CheckInRow, EventTicketRow } from "@/lib/supabase/models";
+import type {
+  CheckInRow,
+  CheckInSessionRow,
+  EventTicketRow,
+} from "@/lib/supabase/models";
 
-/** A ticket with its check-ins, one per session scanned. Empty until scanned. */
+/**
+ * A ticket with its check-ins, one per session scanned, each with when its
+ * session ends (docs/event-states.md, "Multi-day check-in"). Empty until
+ * scanned.
+ */
 export type EventTicketWithCheckIns = EventTicketRow & {
-  check_ins: Pick<CheckInRow, "checked_in_at">[];
+  check_ins: (Pick<CheckInRow, "checked_in_at"> & {
+    session: Pick<CheckInSessionRow, "end_time"> | null;
+  })[];
 };
 
 export interface EventSeatCount {
@@ -46,7 +56,8 @@ export async function fetchUserEventTicket(
 
 /**
  * A user's tickets to many events in one round trip, keyed by event id, each
- * with its check-ins. An event the user has no ticket to is absent.
+ * with its check-ins and their sessions' end times. An event the user has no
+ * ticket to is absent.
  */
 export async function fetchUserEventTickets(
   supabase: DbClient,
@@ -57,7 +68,7 @@ export async function fetchUserEventTickets(
 
   const { data, error } = await supabase
     .from(TABLES.eventTickets)
-    .select("*, check_ins(checked_in_at)")
+    .select("*, check_ins(checked_in_at, session:check_in_sessions(end_time))")
     .eq("user_id", userId)
     .in("event_id", eventIds);
 

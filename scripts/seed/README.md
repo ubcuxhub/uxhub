@@ -24,6 +24,7 @@ mispaste fails instead of hitting the wrong project.
 | Deletes stale rows     | yes, unless `--no-prune`      | **never**                       |
 | Login fixtures         | yes                           | **never**                       |
 | Crowd accounts         | yes                           | **never**                       |
+| Membership tiers       | yes                           | **never** (edited in Club Settings) |
 | Event status           | as written in `data/events.ts`| forced to `draft`               |
 | `event-images` bucket  | created if missing            | must already exist              |
 
@@ -231,7 +232,10 @@ version of the seed created.
 Fixtures reference them by file name through `imageKey`; `image_url` is filled
 in at run time from the target's own host.
 
-`data/membership-types.ts` — the four tiers. Names mirror production.
+`data/membership-types.ts` — the four tiers. Names and descriptions mirror
+production. Local only: production's tiers are live and admins edit them in
+Club Settings, so `--target=prod` skips them rather than revert those edits.
+Copy a production edit here by hand to keep local in step.
 
 ## Layout
 
