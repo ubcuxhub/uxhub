@@ -151,6 +151,20 @@ export async function leaveTeam(
   return (data as TeamFailureReason | null) ?? null;
 }
 
+/** Renames the owner's team; a blank name clears it. Service role only. */
+export async function renameTeam(
+  supabase: DbClient,
+  input: { teamId: string; userId: string; name: string | null }
+): Promise<TeamFailureReason | null> {
+  const { data, error } = await supabase.rpc("rename_team", {
+    p_team_id: input.teamId,
+    p_user_id: input.userId,
+    p_name: input.name ?? "",
+  });
+  if (error) throw error;
+  return (data as TeamFailureReason | null) ?? null;
+}
+
 /** Deletes the owner's team and removes everyone on it. Service role only. */
 export async function deleteTeam(
   supabase: DbClient,

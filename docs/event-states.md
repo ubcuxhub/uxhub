@@ -247,10 +247,14 @@ team action needs a ticket to the event.
 - A student creates a team, which gets an invite link, or joins one with a
   teammate's link. They're on at most one team per event.
 - A team holds up to `max_team_size` people; its link stops working when full.
-- The owner can delete the team, which removes everyone on it. Anyone else can
-  leave. The owner can't leave without deleting it.
-- At `team_deadline` teams lock: nobody creates, joins, leaves or deletes, and
-  admins place anyone without a team. A team admins make has no owner.
+- The owner can rename or delete the team; deleting removes everyone on it.
+  Anyone else can leave. The owner can't leave without deleting it.
+- An unnamed team shows as its owner's: "Aubrey's team".
+- An invite link is `/join/<code>`. It signs the student in, then opens
+  "Join [team]?" on the event's portal page (`?join=<code>`). The team card
+  shows only to ticket holders.
+- At `team_deadline` teams lock: nobody creates, joins, renames, leaves or
+  deletes, and admins place anyone without a team. A team admins make has no owner.
 - `min_team_size` isn't enforced: admins sort out small teams at the deadline.
 - Deleting an account frees the student's team spots. A team they owned passes
   to the teammate who joined first, or is deleted if nobody else is on it.

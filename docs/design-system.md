@@ -602,7 +602,7 @@ Border + `shadow-overlay`, enter in 200ms.
   warning treatment for existing consumers remain unchanged.
 
 - **Toast:** bottom right, stacked, 380px, auto-dismiss after 5s. Tones Success,
-  Neutral, Error; optional action ("Try again"). Every admin result gets one.
+  Neutral, Info, Warning, Error; optional action ("Try again"). Every admin result gets one.
   Text only, no Hubbo.
 - **ActionBanner:** top of Home or an event page, one at a time; button names
   the step ("Confirm spot").
@@ -970,9 +970,8 @@ Organization lead), and Patterns parts (`Ticket`, `Hubbo/Placeholder`,
   `background/secondary`. Code uses `surface-subtle` (`bg-muted`) for hover and
   `border-subtle` for pressed (`src/components/ui/button.tsx`).
 - StatusBadge lacks the five student labels code ships (§3.3). IconButton is
-  drawn at 40px (code and its own description: 32px), Toast has an Info tone
-  code can't render, Button lacks Ghost, and the Link label is black (code:
-  `text-info-foreground`).
+  drawn at 40px (code and its own description: 32px), Button lacks Ghost, and
+  the Link label is black (code: `text-info-foreground`).
 - **Figma follow-ups for the two-size icon scale (§2.7):** badge icons 14 to
   16; small and icon-sm button icons 14 to 16; sidebar nav icons 16 to 20; the
   side peek drawer and record page top bar icons 20; the 24px and 18px icons

@@ -14,6 +14,7 @@ const fixtures = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/log", () => ({ log: { error: vi.fn() }, errorFields: vi.fn() }));
 vi.mock("@/lib/flags", () => ({ FLAGS: { studentEvents: true } }));
+vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 vi.mock("@/lib/auth/guards", () => ({ requireAuth: async () => fixtures.user }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({}) }));
 vi.mock("@/lib/supabase-helpers/events", () => ({ fetchEventBySlug: async () => fixtures.event }));
@@ -27,13 +28,15 @@ vi.mock("@/components/shared/PageContainer", () => ({ PageContainer: ({ children
 vi.mock("@/components/shared/FlowLink", () => ({ FlowLink: ({ children }: { children: ReactNode }) => <span>{children}</span> }));
 vi.mock("@/features/events/components/EventAgendaTable", () => ({ EventAgendaTable: () => null }));
 vi.mock("@/features/events/components/EventPeopleCard", () => ({ EventPeopleCard: () => null }));
+vi.mock("@/features/events/components/teams/TeamCard", () => ({ TeamCard: () => null, TeamInviteNotice: () => null }));
+vi.mock("@/features/events/lib/team-card-data", () => ({ loadTeamCard: async () => null }));
 
 import PortalEventPage from "./page";
 import { RegistrationPanel } from "@/features/events/components/RegistrationPanel";
 
 // Resolve the async server child before rendering its client controls in jsdom.
 async function renderPage() {
-  const page = await PortalEventPage({ params: Promise.resolve({ event: "sprint" }) });
+  const page = await PortalEventPage({ params: Promise.resolve({ event: "sprint" }), searchParams: Promise.resolve({}) });
   const children = await Promise.all(Children.toArray(page.props.children).map(async (child) =>
     isValidElement<Parameters<typeof RegistrationPanel>[0]>(child) && child.type === RegistrationPanel
       ? cloneElement(await RegistrationPanel(child.props), { key: child.key })
