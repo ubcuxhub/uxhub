@@ -9,7 +9,11 @@ declare
   v_result record;
   v_index integer;
 begin
-  select id into v_tier from public.membership_types limit 1;
+  -- CI applies migrations without seed data. Own this fixture so the active
+  -- member case cannot silently become a non-member on an empty database.
+  insert into public.membership_types(name,slug,description,price)
+    values('RLS checkout boundary','rls-checkout-boundary','Rollback-only fixture',12)
+    returning id into v_tier;
   insert into public.user_info(email,first_name,last_name,membership_type_id,membership_expires_at,role_access)
     values('rls-checkout-boundary@example.test','Boundary','Member',v_tier,now()+interval '1 year','basic') returning id into v_user;
   insert into public.events(name,description,slug,status,configured_pricing_mode,configured_price,max_capacity,regular_price,member_price)
