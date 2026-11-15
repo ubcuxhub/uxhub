@@ -107,3 +107,20 @@ it("shows a taken Page URL inline, focuses it and clears the error when correcte
   await waitFor(() => expect(slug.hasAttribute("aria-invalid")).toBe(false));
   expect(within(field).queryByRole("alert")).toBeNull();
 });
+
+it.each([
+  ["active", null, "2099-08-01T19:00:00Z", true],
+  ["draft", null, "2099-08-01T19:00:00Z", false],
+  ["draft", "2099-07-01T18:00:00Z", "2099-08-01T19:00:00Z", false],
+  ["active", null, "2020-08-01T19:00:00Z", false],
+] as const)("offers Revert to draft only for a current published event (%s, %s, %s)", async (status, publish_at, ends_at, visible) => {
+  const event = { id: "event-1", name: "Published event", slug: "published-event", status, publish_at, ends_at, starts_at: "2099-08-01T18:00:00Z", short_description: "Overview", description: "Description", regular_price: 0, member_price: 0, max_capacity: 10 } as import("@/lib/supabase/models").EventRow;
+  const { container } = render(<EventCreateModify eventId={event.id} initialEvent={event} />);
+  const settings = within(container.querySelector("#builder-settings")! as HTMLElement);
+  const action = settings.queryByRole("button", { name: "Revert to draft" });
+  expect(!!action).toBe(visible);
+  if (visible) {
+    expect(settings.getByText(/Save your changes and hide this event from members/)).toBeTruthy();
+    expect(settings.getByRole("button", { name: "Delete event" }).parentElement?.className).toContain("border-t");
+  }
+});

@@ -104,6 +104,7 @@ export function useEventForm({
   const router = useRouter();
   const [eventId, setEventId] = useState(initialEventId);
   const [publication, setPublication] = useState({ status: initialEvent?.status ?? "draft", publish_at: initialEvent?.publish_at ?? null });
+  const [urlLocked, setUrlLocked] = useState(!!initialEvent?.first_published_at || initialEvent?.status === "active");
   const expectedPublication = useRef(initialEvent ? { status: initialEvent.status, publish_at: initialEvent.publish_at } : null);
   const [publicationSuccess, setPublicationSuccess] = useState<null | { id: string; name: string; status: string; publish_at: string | null; registration_opens_at: string | null; registration_closes_at: string | null; completed_at: number; updated?: boolean }>(null);
   const savedRevision = useRef(initialEvent?.revision ?? 0);
@@ -192,8 +193,8 @@ export function useEventForm({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const deleteOperation = useRef(crypto.randomUUID());
   const [isDeleting, setIsDeleting] = useState(false);
-  const [draftId, setDraftId] = useState(() => initialDraft?.id ?? crypto.randomUUID());
-  const draftRevision = useRef(initialDraft?.revision ?? 0);
+  const [draftId, setDraftId] = useState(() => initialDraft?.id ?? initialEvent?.id ?? eventId ?? crypto.randomUUID());
+  const draftRevision = useRef(initialDraft?.revision ?? initialEvent?.working_revision ?? 0);
   const hasSavedDraft = useRef(!!initialDraft);
   const lastSavedDraftState = useRef<EventFormState | null>(null);
   const [showDraftSaved, setShowDraftSaved] = useState(false);
@@ -301,7 +302,7 @@ export function useEventForm({
         starts_at: value.dates.map(row => `${row.date}T${row.start}`).sort()[0] ?? "",
         ends_at: value.dates.map(row => `${row.date}T${row.end}`).sort().at(-1) ?? "",
       } : {}),
-      ...(field === "name" && !current.slug_edited && !initialEvent?.first_published_at && initialEvent?.status !== "active" ? { page_slug: suggestedEventSlug(String(value)) } : {}),
+      ...(field === "name" && !current.slug_edited && !urlLocked ? { page_slug: suggestedEventSlug(String(value)) } : {}),
       ...(field === "page_slug" ? { slug_edited: true } : {}),
       ...(field === "status" && value !== "draft" ? { publish_at: "" } : {}),
     }));
@@ -598,8 +599,9 @@ export function useEventForm({
       }));
       hasSavedDraft.current = false;
       clearRecoveredLegacyDraft();
-      draftRevision.current = 0;
-      setDraftId(crypto.randomUUID());
+      // Publication clears the working document, but its revision and permanent
+      // event identity survive for a later return to draft.
+      setDraftId(result.id);
       const savedFormState = { ...state, page_slug: result.pageSlug ?? state.page_slug, content: result.content ?? state.content, image_url: imageUrl, header_image_url: headerUrl,
         date_location_revision: result.dateLocationRevision ?? state.date_location_revision,
         date_location: state.date_location ? { ...state.date_location, dates: state.date_location.dates.map((row, index) => ({ ...row, session_id: (attempt.resources ? row.session_id : result.checkInSessionIds[index]) ?? row.session_id })) } : null };
@@ -610,6 +612,7 @@ export function useEventForm({
       const savedPublication = result.publication ?? { id: result.id, name: savedFormState.name, status: savedFormState.status, publish_at: datetimeLocalToTimestamptz(savedFormState.publish_at), registration_opens_at: datetimeLocalToTimestamptz(savedFormState.registration_opens_at), registration_closes_at: datetimeLocalToTimestamptz(savedFormState.registration_closes_at) };
       expectedPublication.current = { status: savedPublication.status as EventFormState["status"], publish_at: savedPublication.publish_at };
       setPublication(expectedPublication.current);
+      if (savedPublication.status === "active") setUrlLocked(true);
       setEventId(result.id);
       const actualState = { ...savedFormState, status: savedPublication.status as EventFormState["status"], publish_at: timestamptzToDatetimeLocal(savedPublication.publish_at) };
       setSavedEnd(datetimeLocalToTimestamptz(actualState.ends_at || actualState.starts_at));
@@ -707,6 +710,7 @@ export function useEventForm({
   };
 
   return {
+    urlLocked,
     formState,
     eventId,
     past,

@@ -628,6 +628,75 @@ it.each([true, false])("round-trips schedule visibility %s through working draft
 });
 
 describe("builder publication commands", () => {
+  it.each([false, true])("saves repeatedly after reverting an event with retained draft revision (publish in this session: %s)", async publishFirst => {
+    const existing = { ...event, status: publishFirst ? "draft" as const : "active" as const, publish_at: null, revision: 6, working_revision: 3, configured_slug: event.slug, configured_slug_edited: false };
+    const initialDraft = publishFirst ? { id: existing.id, revision: 3, document: { version: 1 as const, formState: formStateFromEvent(existing), checkInEvents: [], mentors: [], sponsors: [], applicationTemplate: [] } } : null;
+    const { result } = renderHook(() => useEventForm({ eventId: existing.id, initialEvent: existing, initialDraft }));
+    let workingRevision = 3;
+    vi.mocked(saveAdminEventDraftAction).mockImplementation(async input => {
+      if (input.revision !== workingRevision) return { error: "This draft changed in another tab. Reload it before saving again." };
+      return { id: input.id, eventId: existing.id, revision: ++workingRevision };
+    });
+    if (publishFirst) await act(async () => { expect(await result.current.handlePublication("publish")).toBe(true); });
+    await act(async () => { expect(await result.current.handlePublication("revert")).toBe(true); });
+    expect(result.current.urlLocked).toBe(true);
+    for (const name of ["First draft edit", "Second draft edit"]) {
+      act(() => result.current.handleFieldChange("name", name));
+      expect(result.current.formState.page_slug).toBe(existing.slug);
+      await act(async () => { expect(await result.current.handleSaveDraft(false)).toBe(true); });
+      expect(saveAdminEventDraftAction).toHaveBeenLastCalledWith(expect.objectContaining({ id: existing.id, eventId: existing.id }));
+      expect(result.current.error).toBeNull();
+      expect(result.current.hasUnsavedChanges).toBe(false);
+    }
+    expect(workingRevision).toBe(5);
+  });
+
+  it("reverts a published event with current edits using the loaded revision and updates draft controls", async () => {
+    const live = { ...event, status: "active" as const, publish_at: null, revision: 4 };
+    const { result } = renderHook(() => useEventForm({ eventId: live.id, initialEvent: live }));
+    act(() => result.current.handleFieldChange("name", "Revised event"));
+    vi.mocked(saveAdminEventAction).mockResolvedValueOnce({ id: live.id, revision: 5, checkInSessionIds: [], questionIds: [] });
+    await act(async () => { expect(await result.current.handlePublication("revert")).toBe(true); });
+    expect(saveAdminEventAction).toHaveBeenCalledWith(expect.objectContaining({
+      eventId: live.id,
+      expectedRevision: 4,
+      expectedPublication: { status: "active", publish_at: null },
+      event: expect.objectContaining({ name: "Revised event", status: "draft", publish_at: null }),
+    }));
+    expect(saveAdminEventDraftAction).not.toHaveBeenCalled();
+    expect(result.current.publication).toEqual({ status: "draft", publish_at: null });
+    expect(result.current.formState.status).toBe("draft");
+    expect(result.current.showDraftSaved).toBe(true);
+    expect(result.current.publicationSuccess).toBeNull();
+    expect(result.current.hasUnsavedChanges).toBe(false);
+    await act(async () => { expect(await result.current.handlePublication("publish")).toBe(true); });
+    expect(saveAdminEventAction).toHaveBeenLastCalledWith(expect.objectContaining({ expectedRevision: 5, expectedPublication: { status: "draft", publish_at: null }, event: expect.objectContaining({ status: "active" }) }));
+  });
+
+  it("keeps a failed revert published with edits intact and retries the revert", async () => {
+    const live = { ...event, status: "active" as const, publish_at: null };
+    const { result } = renderHook(() => useEventForm({ eventId: live.id, initialEvent: live }));
+    act(() => result.current.handleFieldChange("name", "Keep my edits"));
+    vi.mocked(saveAdminEventAction).mockResolvedValueOnce({ error: "Connection lost" });
+    await act(async () => { expect(await result.current.handlePublication("revert")).toBe(false); });
+    expect(result.current.publication.status).toBe("active");
+    expect(result.current.showDraftSaved).toBe(false);
+    expect(result.current.formState.name).toBe("Keep my edits");
+    expect(result.current.hasUnsavedChanges).toBe(true);
+    const options = vi.mocked(toast.error).mock.calls.at(-1)![1]!;
+    await act(async () => { options.action!.onClick(); });
+    expect(result.current.publication.status).toBe("draft");
+    expect(result.current.showDraftSaved).toBe(true);
+  });
+
+  it("refuses to revert a past event", async () => {
+    const live = { ...event, status: "active" as const, publish_at: null, ends_at: "2020-01-01T19:00:00Z" };
+    const { result } = renderHook(() => useEventForm({ eventId: live.id, initialEvent: live }));
+    await act(async () => { expect(await result.current.handlePublication("revert")).toBe(false); });
+    expect(saveAdminEventAction).not.toHaveBeenCalled();
+    expect(result.current.publication.status).toBe("active");
+  });
+
   it("reveals required issues only after attempting Publish and keeps incomplete drafts savable", async () => {
     const { result } = renderHook(() => useEventForm({}));
     expect(result.current.publishAttempted).toBe(false);
