@@ -171,6 +171,22 @@ describe("AdminEventRecord overview", () => {
     expect(review.textContent).toBe("Review applications3 to review");
   });
 
+  it("says when the builder has unsaved changes to resume, and only then", () => {
+    renderRecord({
+      event: event({ status: "draft" }),
+      workingDraftUpdatedAt: "2026-11-14T19:30:00.000Z",
+    });
+    const note = screen.getByRole("note");
+    expect(within(note).getByText("Unsaved changes in the builder")).toBeTruthy();
+    expect(note.textContent).toContain("Last edited Nov 14, 2026, 12:30 PM");
+    expect(screen.getByRole("link", { name: "Edit event" }).getAttribute("href")).toBe(
+      `/admin/events/${EVENT_ID}/edit`
+    );
+    cleanup();
+    renderRecord({ event: event({ status: "draft" }) });
+    expect(screen.queryByText("Unsaved changes in the builder")).toBeNull();
+  });
+
   it("says when a draft publishes itself", () => {
     renderRecord({ event: event({ status: "draft", publish_at: "2026-11-12T18:00:00.000Z" }) });
 

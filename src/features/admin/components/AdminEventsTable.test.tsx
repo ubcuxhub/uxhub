@@ -323,15 +323,21 @@ describe("working drafts in Manage Events", () => {
     expect(rowNames()).toEqual(["Working Workshop"]);
   });
 
-  it("links standalone and existing-event drafts directly to their editors, including while a drawer is open", () => {
+  it("opens a saved event's working draft in its overview drawer, and a never-saved draft in its builder", () => {
+    render(<AdminEventsTable rows={buildAdminEventTableRows(rows, [draft("new-draft", null, "New work"), draft("existing-draft", "draft", "Existing work")])} />);
+    const existing = screen.getByRole("link", { name: "Existing work" });
+    expect(existing.getAttribute("href")).toBe("/admin/events/draft");
+    expect(existing.getAttribute("data-slot")).toBe("table-row-link");
+    const fresh = screen.getByRole("link", { name: "New work" });
+    expect(fresh.getAttribute("href")).toBe("/admin/events/drafts/new-draft");
+    expect(fresh.getAttribute("data-slot")).toBe("table-row-link");
+  });
+
+  it("swaps a working draft's drawer like any record while one is open, but stacks a never-saved draft's builder", () => {
     pathname = "/admin/events/newer";
     render(<AdminEventsTable rows={buildAdminEventTableRows(rows, [draft("new-draft", null, "New work"), draft("existing-draft", "draft", "Existing work")])} />);
-    for (const [name, href] of [["New work", "/admin/events/drafts/new-draft"], ["Existing work", "/admin/events/draft/edit"]]) {
-      const link = screen.getByRole("link", { name });
-      expect(link.getAttribute("href")).toBe(href);
-      expect(link.getAttribute("data-slot")).toBe("table-row-link");
-      expect(link.hasAttribute("data-replace")).toBe(false);
-    }
+    expect(screen.getByRole("link", { name: "Existing work" }).hasAttribute("data-replace")).toBe(true);
+    expect(screen.getByRole("link", { name: "New work" }).hasAttribute("data-replace")).toBe(false);
     expect(screen.getByRole("link", { name: "Design Meetup" }).hasAttribute("data-replace")).toBe(true);
   });
 
@@ -362,7 +368,7 @@ describe("working drafts in Manage Events", () => {
     const source = { ...rows[2], event: { ...rows[2].event, requires_application: true }, applicationsToReview: 3 };
     render(<AdminEventsTable rows={buildAdminEventTableRows([source], [draft("working", "draft", "Working application event")])} />);
     const editor = screen.getByRole("link", { name: "Working application event" });
-    expect(editor.getAttribute("href")).toBe("/admin/events/draft/edit");
+    expect(editor.getAttribute("href")).toBe("/admin/events/draft");
     const tableRow = editor.closest("tr")!;
     expect(within(tableRow).getByText("By application")).toBeTruthy();
     expect(tableRow.textContent).toContain("7 /");
@@ -371,7 +377,7 @@ describe("working drafts in Manage Events", () => {
     expect(review.parentElement?.closest("a")).toBeNull();
   });
 
-  it("keeps the source event's drawer on its table page when its row resumes a working draft", () => {
+  it("keeps the source event's drawer on its table page and marks its working-draft row as the open record", () => {
     const many = Array.from({ length: 27 }, (_, index) => {
       const n = String(index + 1).padStart(2, "0");
       return row(`e${n}`, `Event ${n}`, `2026-10-${n}T17:00:00.000Z`, "draft", false);
@@ -379,11 +385,10 @@ describe("working drafts in Manage Events", () => {
     pathname = "/admin/events/e02";
     render(<AdminEventsTable rows={buildAdminEventTableRows(many, [draft("working", "e02", "Working Event 02", "2026-10-02T10:00")])} />);
     expect(screen.getByText("Page 2 of 2")).toBeTruthy();
-    const editor = screen.getByRole("link", { name: "Working Event 02" });
-    expect(editor.getAttribute("href")).toBe("/admin/events/e02/edit");
-    expect(editor.closest("tr")?.hasAttribute("data-active")).toBe(true);
-    // The active record is the overview; the editor link is a different page.
-    expect(editor.getAttribute("aria-current")).toBeNull();
+    const link = screen.getByRole("link", { name: "Working Event 02" });
+    expect(link.getAttribute("href")).toBe("/admin/events/e02");
+    expect(link.closest("tr")?.hasAttribute("data-active")).toBe(true);
+    expect(link.getAttribute("aria-current")).toBe("page");
   });
 
   it("paginates drafts with saved events and keeps the total accurate", () => {

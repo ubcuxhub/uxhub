@@ -30,6 +30,15 @@ interface WorkingDraft {
   document: EventWorkingDocument;
 }
 
+/**
+ * Whether the builder (`/admin/events/<id>/edit`) resumes an event's working
+ * document rather than the saved event: only for an unscheduled draft. A
+ * published or scheduled event's leftover working document is obsolete.
+ */
+export function resumesWorkingDraft(event: Pick<EventRow, "status" | "publish_at">) {
+  return event.status === "draft" && !event.publish_at;
+}
+
 /** Project incomplete working documents into the list without fabricating event rows. */
 export function buildAdminEventTableRows(
   events: AdminEventTableRow[],
@@ -58,7 +67,7 @@ export function buildAdminEventTableRows(
   return [
     ...events.map(row => {
       const draft = byEvent.get(row.event.id);
-      return draft && row.event.status === "draft" && !row.event.publish_at
+      return draft && resumesWorkingDraft(row.event)
         ? draftRow(draft, row)
         : row;
     }),

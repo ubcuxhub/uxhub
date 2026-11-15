@@ -3,7 +3,7 @@
 import { useId, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ClipboardList, ExternalLink, Pencil, QrCode } from "lucide-react";
+import { ClipboardList, ExternalLink, Info, Pencil, QrCode } from "lucide-react";
 
 import { CopyCode } from "@/components/shared/CopyCode";
 import {
@@ -12,6 +12,7 @@ import {
   RecordView,
   useRecordMorphTypes,
 } from "@/components/shared/RecordDrawer";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -61,6 +62,11 @@ export interface AdminEventRecordProps {
   event: EventRow;
   seats: { tickets: number; seatsLeft: number };
   applications: EventApplicationStatusCounts;
+  /**
+   * When the builder last saved unsaved changes to this event (its working
+   * document), or null when it has none to resume. Optional, as none.
+   */
+  workingDraftUpdatedAt?: string | null;
   /** When the server rendered this, so the registration window reads the same on both sides. */
   now: string;
   /** Whether the public event pages are live (the student events flag). */
@@ -267,6 +273,7 @@ export function AdminEventRecord({
   event: loaded,
   seats,
   applications,
+  workingDraftUpdatedAt = null,
   now,
   publicPages,
 }: AdminEventRecordProps) {
@@ -411,6 +418,15 @@ export function AdminEventRecord({
       saveLabel="Save schedule"
       details={
         <>
+          {workingDraftUpdatedAt ? (
+            <Alert variant="info" icon={<Info aria-hidden />}>
+              <AlertTitle>Unsaved changes in the builder</AlertTitle>
+              <AlertDescription>
+                Last edited {formatTimestamp(workingDraftUpdatedAt)}. This overview shows the saved
+                event; Edit event picks up where you left off.
+              </AlertDescription>
+            </Alert>
+          ) : null}
           <RecordSection title="At a glance" kind="content" className="gap-4">
             <div
               className={

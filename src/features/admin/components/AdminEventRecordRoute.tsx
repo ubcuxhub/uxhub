@@ -1,10 +1,12 @@
 import { RecordNotFound } from "@/components/shared/RecordDrawer";
 import { AdminEventRecord } from "@/features/admin/components/AdminEventRecord";
+import { resumesWorkingDraft } from "@/features/admin/lib/admin-event-table";
 import { findAdminEventId } from "@/features/admin/lib/resolve-event-param";
 import { requireAdmin } from "@/lib/auth/guards";
 import { FLAGS } from "@/lib/flags";
 import { createClient } from "@/lib/supabase/server";
 import { fetchEventApplicationStatusCounts } from "@/lib/supabase-helpers/event-applications";
+import { fetchEventDraftForEvent } from "@/lib/supabase-helpers/event-drafts";
 import { fetchEventSeatCounts } from "@/lib/supabase-helpers/event-tickets";
 import { fetchEventById } from "@/lib/supabase-helpers/events";
 
@@ -25,10 +27,11 @@ export async function AdminEventRecordRoute({ eventParam }: { eventParam: string
   const eventId = await findAdminEventId(supabase, eventParam);
   if (!eventId) return <RecordNotFound noun="event" />;
 
-  const [event, seatCounts, applications] = await Promise.all([
+  const [event, seatCounts, applications, workingDraft] = await Promise.all([
     fetchEventById(supabase, eventId),
     fetchEventSeatCounts(supabase, [eventId]),
     fetchEventApplicationStatusCounts(supabase, eventId),
+    fetchEventDraftForEvent(supabase, eventId),
   ]);
   if (!event) return <RecordNotFound noun="event" />;
 
@@ -42,6 +45,9 @@ export async function AdminEventRecordRoute({ eventParam }: { eventParam: string
         seatsLeft: seats?.seatsLeft ?? event.max_capacity,
       }}
       applications={applications}
+      workingDraftUpdatedAt={
+        workingDraft && resumesWorkingDraft(event) ? workingDraft.updated_at : null
+      }
       now={new Date().toISOString()}
       publicPages={FLAGS.studentEvents}
     />

@@ -60,19 +60,18 @@ const EVENT_NOUN = { one: "event", other: "events" };
 const LIST_HREF = "/admin/events";
 const COLUMNS = 5;
 
-const eventHref = (row: AdminEventDirectoryRow) => {
-  if ("draftId" in row) {
-    return row.eventId
-      ? `${LIST_HREF}/${row.eventId}/edit`
-      : `${LIST_HREF}/drafts/${row.draftId}`;
-  }
-  return `${LIST_HREF}/${row.event.id}`;
-};
+/** A working draft that has never been saved: no event record yet, only its builder. */
+const isNewDraft = (row: AdminEventDirectoryRow) => "draftId" in row && !row.eventId;
 
-/** A working draft still belongs to its source event when its drawer is open. */
-const eventRecordHref = (row: AdminEventDirectoryRow) => {
-  const eventId = "draftId" in row ? row.eventId : row.event.id;
-  return eventId ? `${LIST_HREF}/${eventId}` : eventHref(row);
+/**
+ * Where a row's name links. A saved event opens its overview drawer, even when
+ * its row shows a working draft (unsaved builder changes): the drawer's "Edit
+ * event" resumes that draft. A new draft has no event to show, so it opens in
+ * its builder.
+ */
+const eventHref = (row: AdminEventDirectoryRow) => {
+  if (!("draftId" in row)) return `${LIST_HREF}/${row.event.id}`;
+  return row.eventId ? `${LIST_HREF}/${row.eventId}` : `${LIST_HREF}/drafts/${row.draftId}`;
 };
 
 /** A draft takes no registrations, so it has no registration status. */
@@ -94,7 +93,8 @@ function sortEvents(rows: AdminEventDirectoryRow[], sort: EventSort) {
 
 /**
  * Manage events: search, sort, filter and page the events. Each row links to
- * the event's overview drawer, or resumes a working draft in its editor.
+ * the event's overview drawer, including an event with a working draft; only a
+ * draft that was never saved opens straight in its builder.
  */
 export function AdminEventsTable({ rows }: { rows: AdminEventDirectoryRow[] }) {
   const [query, setQuery] = useState("");
@@ -124,7 +124,7 @@ export function AdminEventsTable({ rows }: { rows: AdminEventDirectoryRow[] }) {
 
   const view = JSON.stringify([search, sort, [...statusFilter].sort(), [...registrationFilter].sort()]);
   const paging = useListPage(results, view, {
-    startIndex: results.findIndex((row) => eventRecordHref(row) === records.activePath),
+    startIndex: results.findIndex((row) => eventHref(row) === records.activePath),
   });
 
   const count = { shown: results.length, total: rows.length, noun: EVENT_NOUN, filtered: filtering };
@@ -211,12 +211,12 @@ export function AdminEventsTable({ rows }: { rows: AdminEventDirectoryRow[] }) {
                 const href = eventHref(row);
                 const reviewEventId = workingDraft ? row.eventId : row.event.id;
                 const registration = getRegistrationStatus(row);
-                const recordHref = eventRecordHref(row);
-                const linkProps = records.linkProps(recordHref);
+                const linkProps = records.linkProps(href);
                 return (
-                  <TableRow key={workingDraft ? `draft:${row.draftId}` : row.event.id} {...records.rowProps(recordHref)}>
+                  <TableRow key={workingDraft ? `draft:${row.draftId}` : row.event.id} {...records.rowProps(href)}>
                     <TableCell className="max-w-72 truncate">
-                      <TableRowLink {...linkProps} href={href} replace={workingDraft ? false : linkProps.replace} aria-current={workingDraft ? undefined : linkProps["aria-current"]}>{row.event.name}</TableRowLink>
+                      {/* A new draft's builder is a full page, not a record: stack it, so Back returns to the drawer. */}
+                      <TableRowLink {...linkProps} replace={isNewDraft(row) ? false : linkProps.replace}>{row.event.name}</TableRowLink>
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-muted-foreground">
                       {formatEventDate(row.event.starts_at, { month: "short" }) ?? <TableNone />}
