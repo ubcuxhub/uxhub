@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ClipboardList, ExternalLink, Pencil, QrCode } from "lucide-react";
@@ -56,6 +56,7 @@ import {
 } from "../lib/event-registration-window";
 import { isCompleteDateTime } from "./event-form/event-form-schema";
 import { EventStatusBadge, EVENT_STATUS_LABELS } from "./EventStatusBadge";
+import { eventMarketingHref } from "../lib/event-presentation";
 
 export interface AdminEventRecordProps {
   event: EventRow;
@@ -97,7 +98,7 @@ function sameDraft(a: ScheduleDraft, b: ScheduleDraft) {
  * once converted, so it's caught here, before the conversion hides it.
  */
 function incompleteDateProblem(draft: ScheduleDraft): string | null {
-  if (!isCompleteDateTime(draft.starts_at) || !isCompleteDateTime(draft.ends_at)) {
+  if ([draft.starts_at, draft.ends_at].some(value => value && !isCompleteDateTime(value)) || ((draft.status === "active" || draft.publish_at) && (!isCompleteDateTime(draft.starts_at) || !isCompleteDateTime(draft.ends_at)))) {
     return "Event start and end dates and times are required.";
   }
   if (
@@ -228,7 +229,8 @@ const currency = new Intl.NumberFormat("en-CA", {
   currency: "CAD",
 });
 
-function formatPrice(value: number) {
+function formatPrice(value: number | null) {
+  if (value === null) return "Not set";
   return Number(value) === 0 ? "Free" : currency.format(Number(value));
 }
 
@@ -279,6 +281,8 @@ export function AdminEventRecord({
   const [draft, setDraft] = useState<ScheduleDraft | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const pendingOperation = useRef<{ key: string; id: string } | null>(null);
+  const editRevision = useRef(event.revision);
   // What each date and time field reports about its own text ("Use a real date").
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<MomentKey, string>>>({});
   const editing = draft !== null;
@@ -290,6 +294,7 @@ export function AdminEventRecord({
   const registration = registrationWindow(event, new Date(now));
 
   const startEditing = () => {
+    editRevision.current = event.revision;
     setError(null);
     setFieldErrors({});
     setDraft(draftFrom(event));
@@ -341,13 +346,16 @@ export function AdminEventRecord({
     }
     setSaving(true);
     setError(null);
+    const key = JSON.stringify([event.id, editRevision.current, input]);
+    if (pendingOperation.current?.key !== key) pendingOperation.current = { key, id: crypto.randomUUID() };
     try {
-      const result = await updateEventScheduleAction(event.id, input);
+      const result = await updateEventScheduleAction(event.id, { ...input, operationId: pendingOperation.current.id, expectedRevision: editRevision.current });
       if (!result.ok) {
         setError(result.error);
         return;
       }
       setSaved({ from: loaded, row: result.event });
+      pendingOperation.current = null;
       setDraft(null);
       router.refresh();
     } catch {
@@ -395,12 +403,15 @@ export function AdminEventRecord({
       }
       fullPageHref={`${base}/edit`}
       actions={
+        <>
         <Button asChild variant="secondary" size="sm">
           <Link href={`${base}/edit`} transitionTypes={expandTypes}>
             <Pencil aria-hidden />
             Edit event
           </Link>
         </Button>
+        {eventMarketingHref(event, publicPages) && <Button asChild variant="outline" size="sm"><a href={eventMarketingHref(event, publicPages)!} target="_blank" rel="noopener noreferrer"><ExternalLink aria-hidden />View marketing page<span className="sr-only"> (opens in a new tab)</span></a></Button>}
+        </>
       }
       editing={editing}
       dirty={dirty}
@@ -423,10 +434,10 @@ export function AdminEventRecord({
                 kind="rate"
                 label="Registered"
                 count={seats.tickets}
-                total={event.max_capacity}
+                total={event.max_capacity ?? 0}
                 noun="seats"
               />
-              <StatCard kind="value" label="Seats left" value={Math.max(0, seats.seatsLeft)} />
+              {event.max_capacity == null ? <StatCard kind="insufficient" label="Seats left" reason="Capacity is not set" /> : <StatCard kind="value" label="Seats left" value={Math.max(0, seats.seatsLeft)} />}
               {event.requires_application ? (
                 <StatCard kind="value" label="Applications" value={applications.total} />
               ) : null}
@@ -450,15 +461,6 @@ export function AdminEventRecord({
                       </Badge>
                     ) : null}
                   </Link>
-                </Button>
-              ) : null}
-              {publicPages && event.status === "active" ? (
-                <Button asChild variant="ghost" size="sm">
-                  <a href={`/events/${event.slug}`} target="_blank" rel="noreferrer">
-                    <ExternalLink aria-hidden />
-                    View public page
-                    <span className="sr-only"> (opens in a new tab)</span>
-                  </a>
                 </Button>
               ) : null}
             </div>
@@ -628,7 +630,7 @@ export function AdminEventRecord({
           <RecordSection title="Tickets">
             <RecordField label="Regular price" value={formatPrice(event.regular_price)} />
             <RecordField label="Member price" value={formatPrice(event.member_price)} />
-            <RecordField label="Capacity" value={`${event.max_capacity} seats`} />
+            <RecordField label="Capacity" value={event.max_capacity == null ? "Not set" : `${event.max_capacity} seats`} />
             <RecordField
               label="Event type"
               value={event.event_type === "flagship" ? "Flagship" : "Regular"}

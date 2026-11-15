@@ -39,21 +39,23 @@ returning id as auth_user_id, email
 \gset unprofiled_
 
 insert into public.events (
+  short_description, starts_at, ends_at,
   name, description, regular_price, member_price, max_capacity, slug,
   registration_opens_at, registration_closes_at, status, requires_application
 )
 values (
-  'RLS Event', 'RLS test event', 0, 0, 10, 'rls-event',
+  'RLS event', now()+interval '1 day', now()+interval '2 days', 'RLS Event', 'RLS test event', 0, 0, 10, 'rls-event',
   now() - interval '1 hour', now() + interval '1 hour', 'active', true
 )
 returning id \gset event_
 
 insert into public.events (
+  short_description, starts_at, ends_at,
   name, description, regular_price, member_price, max_capacity, slug,
   registration_opens_at, registration_closes_at, status
 )
 values (
-  'RLS Draft Event', 'RLS draft event', 0, 0, 10, 'rls-draft-event',
+  'RLS event', now()+interval '1 day', now()+interval '2 days', 'RLS Draft Event', 'RLS draft event', 0, 0, 10, 'rls-draft-event',
   now() - interval '1 hour', now() + interval '1 hour', 'draft'
 )
 returning id \gset draft_event_
@@ -1027,11 +1029,12 @@ select role_access as user_a_saved_role from public.user_info where id = :'user_
 update public.user_info set role_access = 'basic' where id = :'user_a_id';
 
 insert into public.events (
+  short_description, starts_at, ends_at,
   name, description, regular_price, member_price, max_capacity, slug,
   registration_opens_at, registration_closes_at, status, requires_application
 )
 values (
-  'RLS Application Event', 'RLS application event', 0, 0, 10, 'rls-application-event',
+  'RLS event', now()+interval '1 day', now()+interval '2 days', 'RLS Application Event', 'RLS application event', 0, 0, 10, 'rls-application-event',
   now() - interval '1 hour', now() + interval '1 hour', 'active', true
 )
 returning id \gset application_event_
@@ -1303,31 +1306,37 @@ values (:'user_c_auth_user_id', :'user_c_email', 'RLS', 'User C', 'basic')
 returning id \gset user_c_
 
 insert into public.events (
+  short_description, starts_at, ends_at,
   name, description, regular_price, member_price, max_capacity, slug,
   registration_opens_at, registration_closes_at, status, requires_application
 )
 values
-  ('RLS Drafts Event', 'RLS drafts event', 0, 0, 10, 'rls-drafts-event',
+  ('RLS event', now()+interval '1 day', now()+interval '2 days', 'RLS Drafts Event', 'RLS drafts event', 0, 0, 10, 'rls-drafts-event',
    now() - interval '1 hour', now() + interval '1 hour', 'active', true)
 returning id \gset drafts_event_
 
 insert into public.events (
+  short_description, starts_at, ends_at,
   name, description, regular_price, member_price, max_capacity, slug,
   registration_opens_at, registration_closes_at, status, requires_application
 )
 values
-  ('RLS Second Drafts Event', 'RLS second drafts event', 0, 0, 10, 'rls-drafts-event-2',
+  ('RLS event', now()+interval '1 day', now()+interval '2 days', 'RLS Second Drafts Event', 'RLS second drafts event', 0, 0, 10, 'rls-drafts-event-2',
    now() - interval '1 hour', now() + interval '1 hour', 'active', true)
 returning id \gset drafts_event_2_
 
 insert into public.events (
+  short_description, starts_at, ends_at,
   name, description, regular_price, member_price, max_capacity, slug,
   registration_opens_at, registration_closes_at, status, requires_application
 )
 values
-  ('RLS Closed Drafts Event', 'RLS closed drafts event', 0, 0, 10, 'rls-drafts-closed',
+  ('RLS event', now()+interval '1 day', now()+interval '2 days', 'RLS Closed Drafts Event', 'RLS closed drafts event', 0, 0, 10, 'rls-drafts-closed',
    now() - interval '2 hours', now() - interval '1 hour', 'active', true)
 returning id \gset drafts_closed_event_
+
+insert into public.event_application_questions(event_id,question,response_type)
+values (:'drafts_closed_event_id','Why attend?','short_text');
 
 insert into public.event_application_questions (event_id, question, response_type, sort_order)
 values (:'drafts_event_id', 'Why?', 'long_text', 0)
@@ -1823,14 +1832,18 @@ values ('rls-notes-drafter@example.test', 'RLS', 'Notes Drafter', 'basic')
 returning id \gset notes_drafter_
 
 insert into public.events (
+  short_description, starts_at, ends_at,
   name, description, regular_price, member_price, max_capacity, slug,
   registration_opens_at, registration_closes_at, status, requires_application
 )
 values (
-  'RLS Notes Event', 'RLS reviewer notes event', 0, 0, 10, 'rls-notes-event',
+  'RLS event', now()+interval '1 day', now()+interval '2 days', 'RLS Notes Event', 'RLS reviewer notes event', 0, 0, 10, 'rls-notes-event',
   now() - interval '1 hour', now() + interval '1 hour', 'active', true
 )
 returning id \gset notes_event_
+
+insert into public.event_application_questions(event_id,question,response_type)
+values (:'notes_event_id','Why attend?','short_text');
 
 insert into public.event_applications (event_id, user_id)
 values (:'notes_event_id', :'notes_applicant_id')

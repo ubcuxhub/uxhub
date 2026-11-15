@@ -1,6 +1,13 @@
 import Image from "next/image";
 import { EventDescription } from "@/components/shared/EventDescription";
 import { notFound, redirect } from "next/navigation";
+import { unstable_noStore as noStore } from "next/cache";
+import { createClient } from "@/lib/supabase/server";
+import { loadCurrentUser } from "@/lib/auth/current-user";
+import { hasAdminAccess } from "@/lib/auth/roles";
+import { EventDraftSections } from "@/features/events/components/EventDraftSections";
+import { eventWorkingDocument } from "@/features/admin/lib/event-presentation";
+import { Alert } from "@/components/ui/alert";
 import { BackPill } from "@/components/shared/BackButton";
 import { FLAGS } from "@/lib/flags";
 import { Badge } from "@/components/ui/badge";
@@ -75,17 +82,26 @@ export async function generateStaticParams() {
 
 interface EventDetailPageProps {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ preview?: string }>;
 }
 
 export default async function EventDetailPage({
   params,
+  searchParams,
 }: EventDetailPageProps) {
-  if (!FLAGS.studentEvents) redirect("/#events");
+  const preview = (await searchParams).preview === "draft";
+  if (preview) {
+    noStore();
+    const current = await loadCurrentUser();
+    if (current.status !== "authenticated" || !hasAdminAccess(current.user.role_access)) notFound();
+  } else if (!FLAGS.studentEvents) redirect("/#events");
 
   const { slug } = await params;
-  const supabase = createPublicClient();
-  const event = await fetchEventBySlug(supabase, slug, { status: "active" });
+  const supabase = preview ? await createClient() : createPublicClient();
+  const event = await fetchEventBySlug(supabase, slug, { status: preview ? "draft" : "active" });
   if (!event) notFound();
+  if (preview && (event.configured_marketing_mode === "disabled" || event.configured_marketing_mode === "external")) notFound();
+  const unfinished = preview && !!eventWorkingDocument(event);
   const [seatCounts, mentors, sponsors] = await Promise.all([
     fetchEventSeatCounts(supabase, [event.id]),
     fetchEventMentors(supabase, event.id),
@@ -95,7 +111,7 @@ export default async function EventDetailPage({
   /* ── Derived data ── */
   const regStatus = getRegistrationStatus(event);
   // Held offers count as taken (docs/event-states.md, "Seats").
-  const spotsLeft = seatCounts.get(event.id)?.seatsLeft ?? event.max_capacity;
+  const spotsLeft = seatCounts.get(event.id)?.seatsLeft ?? event.max_capacity ?? 0;
   const canRegister = regStatus === "open" && spotsLeft > 0;
   const registerLabel = regStatus === "upcoming"
       ? "Registration Opens Soon"
@@ -127,6 +143,7 @@ export default async function EventDetailPage({
       <div className="font-sans text-body text-foreground">
         {/* ────────────────────── HERO SECTION ────────────────────── */}
         <section className="mt-20 px-[5%] pb-12 pt-8 md:px-[10%] lg:px-[15%]">
+        {preview && <Alert className="mb-6">Draft preview: only admins and managers can see this. Registration and applications are disabled.</Alert>}
         {(event.header_image_url || event.header_colour) && <div className="relative mb-6 h-48 overflow-hidden rounded-xl" style={{ backgroundColor: event.header_colour || undefined }}>{event.header_image_url && <Image src={event.header_image_url} alt="" fill className="object-cover" unoptimized />}</div>}
         {/* Back link */}
         <BackPill href="/events" label="Back to Events" className="mb-6" />
@@ -161,7 +178,7 @@ export default async function EventDetailPage({
               <Badge variant="neutral" size="large">
                 <DollarSign className="text-muted-foreground" />
                 <span>
-                  {isFree
+                  {event.regular_price == null ? "Price to be confirmed" : isFree
                     ? "Free"
                     : `$${Number(event.regular_price).toFixed(2)}`}
                 </span>
@@ -215,12 +232,12 @@ export default async function EventDetailPage({
             </div>
 
             {/* Register Button */}
-            <EventRegistrationAction
+            {preview ? <Button disabled>Registration unavailable in draft preview</Button> : <EventRegistrationAction
               eventId={event.id}
               eventSlug={event.slug ?? slug}
               registrationAvailable={canRegister}
               unavailableLabel={registerLabel}
-            />
+            />}
           </div>
         </div>
         </section>
@@ -229,7 +246,8 @@ export default async function EventDetailPage({
         <Separator />
         <section className="px-[5%] py-12 md:px-[10%] lg:px-[15%]">
         <h2 className="mb-6 text-h2">Event Description</h2>
-        <div className="mb-8 max-w-3xl"><EventDescription rich={event.description_rich} text={event.description} /></div>
+        <div className="mb-8 max-w-3xl"><EventDescription rich={event.description_rich} text={event.description ?? ""} /></div>
+        {preview && <EventDraftSections event={event} />}
 
         {/* Description gallery */}
         {descriptionImages.length > 0 && (
@@ -252,7 +270,7 @@ export default async function EventDetailPage({
         </section>
 
       {/* ────────────────────── MENTORS ────────────────────── */}
-      {event.mentors_enabled && mentors.length > 0 && (
+      {!unfinished && event.mentors_enabled && mentors.length > 0 && (
         <>
           <Separator />
           <section className="px-[5%] py-12 md:px-[10%] lg:px-[15%]">
@@ -353,7 +371,7 @@ export default async function EventDetailPage({
       )}
 
       {/* ────────────────────── SPONSORS ────────────────────── */}
-      {event.sponsors_enabled && sponsors.length > 0 && (
+      {!unfinished && event.sponsors_enabled && sponsors.length > 0 && (
         <>
           <Separator />
           <section className="px-[5%] py-12 md:px-[10%] lg:px-[15%]">

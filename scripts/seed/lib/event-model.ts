@@ -12,7 +12,7 @@ export function validateSeedEvents(events: SeedEvent[]): void {
     if (slugs.has(event.slug)) fail("duplicate slug");
     slugs.add(event.slug);
     if (!event.short_description?.trim() || event.short_description.length > 50) fail("short overview must be 1–50 characters");
-    if (!event.description.trim() || event.description.length > 3000) fail("long overview must be 1–3000 characters");
+    if (!event.description?.trim() || event.description.length > 3000) fail("long overview must be 1–3000 characters");
     const price = Number(event.configured_price);
     if (event.pricing_policy !== "figma" || !["free", "paid"].includes(event.configured_pricing_mode ?? "") ||
         event.configured_price == null || !Number.isFinite(price) || price < 0 || price >= 1000000 || Math.abs(price * 100 - Math.round(price * 100)) > 0.000001 ||

@@ -29,6 +29,7 @@ function event(overrides: Partial<EventRow> = {}): EventRow {
     short_description: "Show your work.",
     description: "A night of portfolio reviews.",
     description_rich: null,
+    working_document: null, working_revision: 0, legacy_draft_ids: [],
     configured_marketing_mode: null,
     configured_marketing_url: null,
     configured_price: null,
@@ -147,19 +148,19 @@ describe("AdminEventRecord overview", () => {
     expect(screen.getByRole("link", { name: "Check-in" }).getAttribute("href")).toBe(
       `/admin/events/${EVENT_ID}/check-in`
     );
-    const publicPage = screen.getByRole("link", { name: /^View public page/ });
-    expect(publicPage.textContent).toBe("View public page (opens in a new tab)");
+    const publicPage = screen.getByRole("link", { name: /^View marketing page/ });
+    expect(publicPage.textContent).toBe("View marketing page (opens in a new tab)");
     expect(publicPage.getAttribute("href")).toBe("/events/portfolio-night");
     expect(publicPage.getAttribute("target")).toBe("_blank");
     expect(screen.queryByRole("link", { name: /Review applications/ })).toBeNull();
   });
 
-  it("hides the public page link for a draft, or while event pages are off", () => {
+  it("previews drafts even while public browsing is gated", () => {
     renderRecord({ event: event({ status: "draft" }) });
-    expect(screen.queryByRole("link", { name: /View public page/ })).toBeNull();
+    expect(screen.getByRole("link", { name: /View marketing page/ }).getAttribute("href")).toBe("/events/portfolio-night?preview=draft");
     cleanup();
     renderRecord({ publicPages: false });
-    expect(screen.queryByRole("link", { name: /View public page/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /View marketing page/ })).toBeNull();
   });
 
   it("shows applications and how many wait for review when the event takes them", () => {
@@ -282,6 +283,7 @@ describe("AdminEventRecord quick edit", () => {
 
     await waitFor(() => expect(router.refresh).toHaveBeenCalled());
     expect(updateEventScheduleAction).toHaveBeenCalledWith(EVENT_ID, {
+      operationId: expect.any(String), expectedRevision: 0,
       status: "active",
       publish_at: null,
       starts_at: "2026-11-20T02:30:00.000Z",

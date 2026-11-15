@@ -2,9 +2,10 @@ import { describe, expect, it } from "vitest";
 import { changeResourceType, legacyEventContent, emptyContent, emptyContentEntry, eventContentProblem, parseEventContent, RESOURCE_DEFAULTS, safeContentUrl, type EventContent, type ResourceLink } from "./event-content";
 const content = (): EventContent => ({ ...emptyContent(), sections: [{ key: crypto.randomUUID(), kind: "Judges", title: "Judges", items: [{ ...emptyContentEntry(), name: "Alex Chen" }] }] });
 describe("event content boundaries", () => {
-  it("requires an item even for working drafts, while optional content may be absent", () => {
+  it("preserves unfinished empty sections but requires an item for publication", () => {
     const doc = content(); doc.sections[0].items = [];
-    expect(eventContentProblem(doc, true)).toContain("at least one item");
+    expect(eventContentProblem(doc, true)).toBeNull();
+    expect(eventContentProblem(doc)).toContain("at least one item");
     expect(eventContentProblem(emptyContent())).toBeNull();
   });
   it("permits incomplete entry names in working documents but validates applied saves", () => {

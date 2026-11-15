@@ -356,14 +356,22 @@ const saveInput = {
 };
 
 describe("saveAdminEventDraftAction", () => {
+  it("returns a readable URL collision instead of throwing a production-masked server error", async () => {
+    const document = { version: 1 as const, formState: defaultFormState, checkInEvents: [], mentors: [], sponsors: [], applicationTemplate: [] };
+    eventDrafts.fetchEventDraft.mockResolvedValue(null);
+    eventDrafts.saveEventDraft.mockRejectedValueOnce({ message: "This page URL is already in use.", code: "P0001" });
+    await expect(saveAdminEventDraftAction({ id: "draft-1", eventId: null, revision: 0, document })).resolves.toEqual({ error: "This page URL is already in use." });
+  });
   it("refreshes the list layout when saving an incomplete working document", async () => {
     const document = { version: 1 as const, formState: defaultFormState, checkInEvents: [], mentors: [], sponsors: [], applicationTemplate: [] };
     eventDrafts.fetchEventDraft.mockResolvedValue(null);
     eventDrafts.saveEventDraft.mockResolvedValue({ id: "draft-1", revision: 1, document });
 
     await expect(saveAdminEventDraftAction({ id: "draft-1", eventId: null, revision: 0, document }))
-      .resolves.toEqual({ id: "draft-1", revision: 1 });
+      .resolves.toEqual({ id: "draft-1", revision: 1, pageSlug: "", eventRevision: undefined });
     expect(revalidatePath).toHaveBeenCalledWith("/admin/events", "layout");
+    expect(revalidatePath).toHaveBeenCalledWith("/portal/events", "layout");
+    expect(revalidatePath).toHaveBeenCalledWith("/events", "layout");
     expect(adminRpc).not.toHaveBeenCalled();
   });
 });
@@ -1334,5 +1342,12 @@ describe("team settings action boundary", () => {
 
 it("refuses an existing-event update without a revision before touching the database", async () => {
   expect(await saveAdminEventAction({ ...saveInput, eventId: "event-1", expectedRevision: undefined })).toEqual({ error: "Reload this event before updating; its saved revision is missing." });
+  expect(adminRpc).not.toHaveBeenCalled();
+});
+
+it("refuses to drop saved unfinished sections by omitting them from a complete save", async () => {
+  const { defaultFormState } = await import("./components/event-form/event-form-schema");
+  eventDrafts.fetchEventDraft.mockResolvedValueOnce({ document: { formState: { ...defaultFormState, content: {revision:0,sections:[],links:[]} } } });
+  expect(await saveAdminEventAction({...saveInput,eventId:"event-1"})).toEqual({error:"Reload saved people and resources before publishing."});
   expect(adminRpc).not.toHaveBeenCalled();
 });

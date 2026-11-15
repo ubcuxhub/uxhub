@@ -28,6 +28,8 @@ async function save(fixtures: Fixtures, mentorIds: string[], eventId?: string) {
     p_event: {
       name: `People sections ${fixtures.tag}`,
       description: "People sections integration test.",
+      short_description: "People sections test",
+      starts_at: "2099-08-01T18:00:00Z", ends_at: "2099-08-01T20:00:00Z",
       status: "active",
       regular_price: 10,
       member_price: 5,

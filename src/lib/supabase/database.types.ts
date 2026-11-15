@@ -18,6 +18,7 @@ export type Database = {
         Row: {
           document: NonNullable<Json>
           event_id: string | null
+          event_revision: number | null
           id: string
           materialized: boolean
           materialized_result: Json | null
@@ -28,6 +29,7 @@ export type Database = {
         Insert: {
           document: NonNullable<Json>
           event_id?: string | null
+          event_revision?: number | null
           id: string
           materialized?: boolean
           materialized_result?: Json | null
@@ -37,6 +39,7 @@ export type Database = {
         Update: {
           document?: NonNullable<Json>
           event_id?: string | null
+          event_revision?: number | null
           id?: string
           materialized?: boolean
           materialized_result?: Json | null
@@ -818,7 +821,7 @@ export type Database = {
           configured_slug: string | null
           configured_slug_edited: boolean
           created_at: string | null
-          description: string
+          description: string | null
           description_images: string[] | null
           description_rich: Json | null
           ends_at: string | null
@@ -830,15 +833,16 @@ export type Database = {
           id: string
           image_url: string | null
           is_featured: boolean
+          legacy_draft_ids: string[]
           location_address: string | null
           location_address_url: string | null
           location_building: string | null
           location_room: string | null
           location_type: Database["public"]["Enums"]["event_location_type"]
           marketing_url: string | null
-          max_capacity: number
+          max_capacity: number | null
           max_team_size: number | null
-          member_price: number
+          member_price: number | null
           mentors_enabled: boolean
           min_team_size: number | null
           name: string
@@ -846,7 +850,7 @@ export type Database = {
           publish_at: string | null
           registration_closes_at: string | null
           registration_opens_at: string | null
-          regular_price: number
+          regular_price: number | null
           requires_application: boolean
           revision: number
           short_description: string | null
@@ -857,6 +861,8 @@ export type Database = {
           team_deadline: string | null
           teams_enabled: boolean
           updated_at: string | null
+          working_document: Json | null
+          working_revision: number
           event_has_ended: boolean | null
         }
         ComputedFields: "event_has_ended"
@@ -870,7 +876,7 @@ export type Database = {
           configured_slug?: string | null
           configured_slug_edited?: boolean
           created_at?: string | null
-          description: string
+          description?: string | null
           description_images?: string[] | null
           description_rich?: Json | null
           ends_at?: string | null
@@ -882,15 +888,16 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_featured?: boolean
+          legacy_draft_ids?: string[]
           location_address?: string | null
           location_address_url?: string | null
           location_building?: string | null
           location_room?: string | null
           location_type?: Database["public"]["Enums"]["event_location_type"]
           marketing_url?: string | null
-          max_capacity: number
+          max_capacity?: number | null
           max_team_size?: number | null
-          member_price?: number
+          member_price?: number | null
           mentors_enabled?: boolean
           min_team_size?: number | null
           name: string
@@ -898,7 +905,7 @@ export type Database = {
           publish_at?: string | null
           registration_closes_at?: string | null
           registration_opens_at?: string | null
-          regular_price: number
+          regular_price?: number | null
           requires_application?: boolean
           revision?: number
           short_description?: string | null
@@ -909,6 +916,8 @@ export type Database = {
           team_deadline?: string | null
           teams_enabled?: boolean
           updated_at?: string | null
+          working_document?: Json | null
+          working_revision?: number
         }
         Update: {
           agenda?: Json | null
@@ -920,7 +929,7 @@ export type Database = {
           configured_slug?: string | null
           configured_slug_edited?: boolean
           created_at?: string | null
-          description?: string
+          description?: string | null
           description_images?: string[] | null
           description_rich?: Json | null
           ends_at?: string | null
@@ -932,15 +941,16 @@ export type Database = {
           id?: string
           image_url?: string | null
           is_featured?: boolean
+          legacy_draft_ids?: string[]
           location_address?: string | null
           location_address_url?: string | null
           location_building?: string | null
           location_room?: string | null
           location_type?: Database["public"]["Enums"]["event_location_type"]
           marketing_url?: string | null
-          max_capacity?: number
+          max_capacity?: number | null
           max_team_size?: number | null
-          member_price?: number
+          member_price?: number | null
           mentors_enabled?: boolean
           min_team_size?: number | null
           name?: string
@@ -948,7 +958,7 @@ export type Database = {
           publish_at?: string | null
           registration_closes_at?: string | null
           registration_opens_at?: string | null
-          regular_price?: number
+          regular_price?: number | null
           requires_application?: boolean
           revision?: number
           short_description?: string | null
@@ -959,6 +969,8 @@ export type Database = {
           team_deadline?: string | null
           teams_enabled?: boolean
           updated_at?: string | null
+          working_document?: Json | null
+          working_revision?: number
         }
         Relationships: []
       }
@@ -1475,6 +1487,13 @@ export type Database = {
         Args: { p_team_id: string; p_user_id: string }
         Returns: string
       }
+      draft_event_integer: {
+        Args: { minimum?: number; value: string }
+        Returns: number
+      }
+      draft_event_number: { Args: { value: string }; Returns: number }
+      draft_event_timestamp: { Args: { value: string }; Returns: string }
+      draft_event_wall_time: { Args: { value: string }; Returns: string }
       event_checkout_amount: {
         Args: { p_event_id: string; p_user_id: string }
         Returns: number
@@ -1664,7 +1683,32 @@ export type Database = {
         }
         Returns: Json
       }
+      save_admin_event_builder_before_unified_drafts: {
+        Args: {
+          p_application_questions: Json
+          p_check_in_sessions: Json
+          p_draft_id: string
+          p_draft_revision: number
+          p_event: Json
+          p_event_id: string
+          p_expected_header_image_url: string
+          p_expected_image_url: string
+          p_mentors: Json
+          p_slug: string
+          p_sponsors: Json
+        }
+        Returns: Json
+      }
       save_admin_event_draft: {
+        Args: {
+          p_document: Json
+          p_event_id: string
+          p_id: string
+          p_revision: number
+        }
+        Returns: Json
+      }
+      save_admin_event_draft_before_url_activation: {
         Args: {
           p_document: Json
           p_event_id: string
@@ -1679,6 +1723,17 @@ export type Database = {
       }
       save_event_check_in_sessions: {
         Args: { p_event_id: string; p_sessions: Json }
+        Returns: Json
+      }
+      save_event_working_document: {
+        Args: {
+          p_document: Json
+          p_event_id: string
+          p_event_revision?: number
+          p_id: string
+          p_operation_id?: string
+          p_revision: number
+        }
         Returns: Json
       }
       save_past_event_resources: {
@@ -1720,7 +1775,7 @@ export type Database = {
           configured_slug: string | null
           configured_slug_edited: boolean
           created_at: string | null
-          description: string
+          description: string | null
           description_images: string[] | null
           description_rich: Json | null
           ends_at: string | null
@@ -1732,15 +1787,16 @@ export type Database = {
           id: string
           image_url: string | null
           is_featured: boolean
+          legacy_draft_ids: string[]
           location_address: string | null
           location_address_url: string | null
           location_building: string | null
           location_room: string | null
           location_type: Database["public"]["Enums"]["event_location_type"]
           marketing_url: string | null
-          max_capacity: number
+          max_capacity: number | null
           max_team_size: number | null
-          member_price: number
+          member_price: number | null
           mentors_enabled: boolean
           min_team_size: number | null
           name: string
@@ -1748,7 +1804,7 @@ export type Database = {
           publish_at: string | null
           registration_closes_at: string | null
           registration_opens_at: string | null
-          regular_price: number
+          regular_price: number | null
           requires_application: boolean
           revision: number
           short_description: string | null
@@ -1759,6 +1815,8 @@ export type Database = {
           team_deadline: string | null
           teams_enabled: boolean
           updated_at: string | null
+          working_document: Json | null
+          working_revision: number
         }[]
         SetofOptions: {
           from: "*"

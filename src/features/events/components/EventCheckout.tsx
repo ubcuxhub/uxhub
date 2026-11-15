@@ -1,5 +1,6 @@
 "use client";
 
+import { Alert } from "@/components/ui/alert";
 import { CheckoutLayout } from "@/components/shared/CheckoutLayout";
 import { useFlowDialog } from "@/components/shared/FlowDialog";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,8 @@ export function EventCheckout({
     ? hasActiveMembership(user, membershipTermEndsAt)
     : Boolean(user.membership_type_id);
   const price = isMember ? event.member_price : event.regular_price;
+
+  if (price === null) return <Alert>Registration is unavailable until event pricing is configured.</Alert>;
 
   const confirmationHref = (purchaseId: string) =>
     withReturnTo(

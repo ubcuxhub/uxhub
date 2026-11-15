@@ -5,12 +5,12 @@ import { fetchEventById, fetchEventPricingLocked } from "@/lib/supabase-helpers/
 const config = { configured_slug_edited: false, configured_marketing_mode: "external", configured_marketing_url: "https://devpost.com/design", configured_slug: "design", configured_pricing_mode: "paid", configured_price: 12.5, is_featured: true };
 
 describe("form-first event configuration", () => {
-  it("activates explicitly configured prices atomically while retaining marketing links", () => withFixtures(async fixtures => {
+  it("activates configured prices and URL atomically while preserving the external destination", () => withFixtures(async fixtures => {
     const event = await fixtures.createEvent({ marketing_url: "https://existing.example.com", regular_price: 20, member_price: 5, status: "draft" });
-    const configured = { ...config, configured_slug: `config-${fixtures.tag}` };
+    const configured = { ...config, name: `Config ${fixtures.tag}`, configured_slug: `config-${fixtures.tag}` };
     const result = await fixtures.supabase.rpc("save_admin_event_builder", { p_event_id: event.id, p_event: configured, p_draft_id: null!, p_draft_revision: 0, p_slug: null!, p_expected_image_url: null!, p_expected_header_image_url: null!, p_check_in_sessions: [], p_application_questions: [], p_mentors: [], p_sponsors: [] });
     expect(result.error).toBeNull();
-    expect(await fetchEventById(fixtures.supabase, event.id)).toMatchObject({ ...configured, regular_price: 12.5, member_price: 0, marketing_url: "https://existing.example.com", slug: event.slug, pricing_policy: "figma" });
+    expect(await fetchEventById(fixtures.supabase, event.id)).toMatchObject({ ...configured, regular_price: 12.5, member_price: 0, marketing_url: "https://existing.example.com", slug: configured.configured_slug, pricing_policy: "figma" });
   }));
   it("publishes and schedules configured Free/Paid events without temporary blockers", () => withFixtures(async fixtures => {
     for (const mode of ["free", "paid"]) {

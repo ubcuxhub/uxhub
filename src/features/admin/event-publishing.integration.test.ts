@@ -26,6 +26,8 @@ function payload(fixtures: Fixtures, publish_at: string | null) {
   return {
     name: `Scheduled event ${fixtures.tag}`,
     description: "Publishing schedule integration test.",
+    short_description: "Publication test",
+    starts_at: "2099-08-01T18:00:00Z", ends_at: "2099-08-01T20:00:00Z",
     status: "draft" as const,
     event_type: "regular" as const,
     mentors_enabled: false,

@@ -51,6 +51,17 @@ it("retries a failed draft save with the latest edited values and preserves leav
   expect(toast.dismiss).toHaveBeenCalledWith(options.id);
 });
 
+it("keeps a rejected duplicate URL editable and displays the server's readable refusal", async () => {
+  const { result } = renderHook(() => useEventForm({}));
+  act(() => result.current.handleFieldChange("page_slug", "taken-url"));
+  vi.mocked(saveAdminEventDraftAction).mockResolvedValueOnce({ error: "This page URL is already in use." });
+  await act(async () => { expect(await result.current.handleSaveDraft(false)).toBe(false); });
+  expect(result.current.formState.page_slug).toBe("taken-url");
+  expect(result.current.hasUnsavedChanges).toBe(true);
+  expect(result.current.error).toBe("This page URL is already in use.");
+  expect(vi.mocked(toast.error).mock.calls.at(-1)![1]!.description).toContain("This page URL is already in use.");
+});
+
 describe("legacy browser draft recovery", () => {
   const key = "event_create_form_draft";
   it("restores incomplete work as dirty and keeps the browser copy until a durable save succeeds", async () => {
@@ -471,6 +482,18 @@ describe("drafts with saved event children", () => {
   const options = { eventId: event.id, initialEvent: storedEvent, initialCheckInSessions: [session], initialApplicationQuestions: [question] };
   const submit = (result: { current: ReturnType<typeof useEventForm> }) => act(async () => {
     await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as FormEvent<HTMLFormElement>);
+  });
+
+  it("uses the canonical URL and event revision returned by Save draft for subsequent publication", async () => {
+    const { result } = renderHook(() => useEventForm({ ...options, initialEvent: { ...storedEvent, configured_slug_edited: false } }));
+    act(() => result.current.handleFieldChange("name", "Workshop"));
+    vi.mocked(saveAdminEventDraftAction).mockResolvedValueOnce({ id: "draft-1", revision: 2, eventRevision: 7, pageSlug: "workshop-1" });
+    await act(async () => { expect(await result.current.handleSaveDraft(false)).toBe(true); });
+    expect(result.current.formState.page_slug).toBe("workshop-1");
+    expect(result.current.hasUnsavedChanges).toBe(false);
+    await submit(result);
+    expect(result.current.error).toBeNull();
+    expect(saveAdminEventAction).toHaveBeenLastCalledWith(expect.objectContaining({ expectedRevision: 7, draftRevision: 2, event: expect.objectContaining({ configured_slug: "workshop-1" }) }));
   });
 
   it("loads branding and formatting and round-trips saved IDs through a working document", async () => {

@@ -8,7 +8,7 @@ const config = (): EventDateLocationDraft & { dates: (EventDateDraft & { start_t
 async function save(f: Fixtures, document = config(), id?: string, revision = 0, status: "draft" | "active" = "draft") {
   return f.supabase.rpc("save_admin_event_atomically", {
     p_event_id: id ?? null!, p_slug: `dates-${f.tag}`, p_expected_image_url: null!,
-    p_event: { name: `Dates ${f.tag}`, description: "Test", status, event_type: "regular", max_capacity: 10, regular_price: 0, member_price: 0, _date_location: document, _date_revision: revision } as unknown as Json,
+    p_event: { name: `Dates ${f.tag}`, description: "Test", short_description: "Date/location test", status, event_type: "regular", max_capacity: 10, regular_price: 0, member_price: 0, _date_location: document, _date_revision: revision } as unknown as Json,
     p_check_in_sessions: [], p_application_questions: [], p_mentors: [], p_sponsors: [],
   });
 }

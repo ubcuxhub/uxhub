@@ -276,11 +276,27 @@ The form-first builder stores desired marketing and pricing configuration in
 `events.configured_marketing_mode`, `configured_marketing_url`, `configured_slug`,
 `configured_pricing_mode` and `configured_price`. `configured_slug_edited`
 remembers whether the URL was deliberately edited, so automatic URLs continue
-following name changes after reload. Marketing configuration does not activate
-new marketing views. Existing consumers continue to read
+following name changes after reload. The drawer marketing action uses the saved hosted/external destination;
+staff draft previews use the marketing layout. Existing operational consumers read
 `slug`, `marketing_url`, `regular_price` and `member_price`; unrelated form
 updates omit effective prices. `is_featured` saves the staff choice without
 claiming portal Home selection/display is delivered.
+
+An existing unpublished event has one active URL: Save draft synchronizes
+`slug` and `configured_slug` in the same transaction as the working document.
+The new URL works immediately for staff; the old URL stops resolving and its
+claim is released. Other incomplete editor values remain in the same event row’s nullable
+working document. URL lookup retains its existing status/RLS visibility.
+Automatic URLs are numbered past other events' claims for duplicate names under
+the save transaction lock, including complete/publication saves;
+deliberately edited conflicting URLs are rejected without committing either
+the document or rename. The returned canonical URL and saved `event_revision`
+keep the editor and subsequent publication revision checks in sync. A retry
+returns the original saved revision, rather than adopting later event writes.
+The first Save draft creates its permanent event/portal identity, even when
+other event fields remain incomplete.
+The editor disables the URL field with the library's grey disabled style after
+first publication, including when that event is later returned to Draft.
 
 New Free/Paid configuration activates `pricing_policy = 'figma'`, synchronizing
 `regular_price` to the configured non-member amount and `member_price` to zero.
@@ -351,3 +367,27 @@ server and uses the authenticated attendee’s ticket ID, never an ID supplied b
 the browser. A Going badge alone does not supply the ticket view. Checked-in
 attendees keep their ticket/code; people without a ticket see no issued QR.
 Completed checkout invalidates the event detail route as well as checkout.
+
+
+### Unified saved drafts and staff previews
+
+The first Save draft creates the permanent `events.id`. Unscheduled drafts may
+have missing capacity, prices, description and dates. `working_document` retains
+unfinished nested sections and exact saved form strings; `working_revision` and
+`events.revision` protect competing edits. Related operational tables are written
+on a validated full save/publication. Publication/scheduling clear the working
+document atomically; published edits remain local until Update. Quick publication
+of a saved document uses the same complete builder validation and transaction.
+The database rejects private documents on scheduled/published rows and checks
+publication readiness, including scheduler and quick-edit transitions.
+
+Every saved event, including a first-save draft, opens `/admin/events/<id>` in
+the drawer. Its editor is `/admin/events/<id>/edit`; legacy draft routes redirect
+there using recorded aliases. Protected deletion includes unfinished images and
+releases URL claims. Staff can visit the latest saved draft through its canonical
+portal slug, including while public event browsing is gated. Hosted marketing
+previews use `/events/<slug>?preview=draft`: admin/manager only, 404 for everyone
+else, no response caching, a draft notice, and disabled registration/application
+actions. Public browsing keeps its feature gate. The drawer's marketing action
+uses the saved hosted slug or a validated saved external URL, and hides unavailable
+destinations. Renaming activates the new slug atomically; the old URL returns 404.

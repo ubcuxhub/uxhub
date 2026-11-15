@@ -111,6 +111,8 @@ export function publicationReadinessProblem({
 
 /** The overview's quick edit: an event's status and dates, as timestamptz. */
 export interface EventScheduleInput {
+  operationId?: string;
+  expectedRevision?: number;
   status: EventStatus;
   publish_at: string | null;
   starts_at: string | null;
@@ -146,10 +148,10 @@ export function eventScheduleProblem(
   }
   const { starts_at, ends_at, registration_opens_at, registration_closes_at } =
     input as Partial<Record<(typeof SCHEDULE_DATES)[number], string | null>>;
-  if (!starts_at || !ends_at) {
+  if ((!starts_at || !ends_at) && (input.status === "active" || input.publish_at)) {
     return "Event start and end dates and times are required.";
   }
-  if (Date.parse(starts_at) >= Date.parse(ends_at)) {
+  if (starts_at && ends_at && Date.parse(starts_at) >= Date.parse(ends_at)) {
     return "Event end time must be after the start time.";
   }
   if (

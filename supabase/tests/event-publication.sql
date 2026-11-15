@@ -47,8 +47,8 @@ where id = :'event_id';
 select pg_temp.assert_publication_jobs();
 
 -- A second event can become the earliest; deleting it restores the first.
-insert into public.events (name, description, regular_price, member_price, max_capacity, slug, status, publish_at)
-values ('RLS publication', 'Rollback fixture', 0, 0, 10, 'rls-publication-delete', 'draft',
+insert into public.events (short_description, starts_at, ends_at, name, description, regular_price, member_price, max_capacity, slug, status, publish_at)
+values ('Publication fixture', now()+interval '5 days', now()+interval '6 days', 'RLS publication', 'Rollback fixture', 0, 0, 10, 'rls-publication-delete', 'draft',
   date_trunc('minute', now()) + interval '1 day')
 returning id as publication_delete_id \gset
 select pg_temp.assert_publication_jobs();
@@ -290,16 +290,17 @@ $$;
 
 -- Exercise the actual upgrade SQL against legacy rows. Remove only the new
 -- guard/constraint within this rollback-only transaction to recreate old data.
+set constraints all immediate;
 drop trigger guard_event_publish_schedule on public.events;
 drop function public.guard_event_publish_schedule();
 alter table public.events drop constraint events_publish_schedule_requires_draft;
 drop index public.events_pending_publication_idx;
 drop function public.publish_due_events();
-insert into public.events (name, description, regular_price, member_price, max_capacity, slug, status, publish_at)
+insert into public.events (short_description, starts_at, ends_at, name, description, regular_price, member_price, max_capacity, slug, status, publish_at)
 values
- ('Legacy scheduled', 'Rollback fixture', 0, 0, 10, 'rls-legacy-scheduled', 'active', now() + interval '2 days'),
- ('Legacy published', 'Rollback fixture', 0, 0, 10, 'rls-legacy-published', 'active', now() - interval '2 days'),
- ('Legacy draft', 'Rollback fixture', 0, 0, 10, 'rls-legacy-draft', 'draft', now() + interval '2 days');
+ ('Legacy event', now()+interval '5 days', now()+interval '6 days', 'Legacy scheduled', 'Rollback fixture', 0, 0, 10, 'rls-legacy-scheduled', 'active', now() + interval '2 days'),
+ ('Legacy event', now()+interval '5 days', now()+interval '6 days', 'Legacy published', 'Rollback fixture', 0, 0, 10, 'rls-legacy-published', 'active', now() - interval '2 days'),
+ ('Legacy event', now()+interval '5 days', now()+interval '6 days', 'Legacy draft', 'Rollback fixture', 0, 0, 10, 'rls-legacy-draft', 'draft', now() + interval '2 days');
 \ir ../migrations/20261027230346_activate_scheduled_drafts.sql
 
 do $$

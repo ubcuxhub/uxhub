@@ -1,6 +1,6 @@
 "use client";
 
-import { emptyContent, eventContentProblem, legacyEventContent, type EventContent } from "../lib/event-content";
+import { emptyContent, legacyEventContent, type EventContent } from "../lib/event-content";
 
 import type { ApplicationQuestionTemplate } from "@/features/events/types";
 import type { EventApplicationSettingsRow } from "@/lib/supabase/models";
@@ -352,7 +352,7 @@ export function useEventForm({
     return data.url;
   };
 
-  const pendingDraft = useRef<{ id: string; revision: number; state: EventFormState; document: EventWorkingDocument } | null>(null);
+  const pendingDraft = useRef<{ id: string; revision: number; operationId: string; state: EventFormState; document: EventWorkingDocument } | null>(null);
   const draftErrorToastId = useId();
   const retryDraftSave = useRef<(showSuccess: boolean) => void>(() => {});
   useEffect(() => () => toast.dismiss(draftErrorToastId), [draftErrorToastId]);
@@ -370,37 +370,56 @@ export function useEventForm({
     setError(null);
     const uploads: string[] = [];
     try {
-      if (formState.content) { const problem = eventContentProblem(formState.content, true); if (problem) { setShowConfigurationErrors(true); window.dispatchEvent(new Event("event-content-invalid")); throw new Error(problem); } }
       const previous = pendingDraft.current;
       if (previous) {
-        const recovered = await recoverAdminEventDraftAction(previous.id).catch(() => null);
-        if (recovered && sameWorkingDocument(recovered.document, previous.document)) draftRevision.current = recovered.revision;
+        const recovered = await recoverAdminEventDraftAction(previous.id, previous.operationId).catch(() => null);
+        if (recovered && sameWorkingDocument(
+          previous.document.formState.slug_edited ? recovered.document :
+            { ...recovered.document, formState: { ...recovered.document.formState, page_slug: previous.document.formState.page_slug } },
+          previous.document,
+        )) {
+          draftRevision.current = recovered.revision;
+          savedRevision.current = recovered.eventRevision ?? savedRevision.current;
+        }
         pendingDraft.current = null;
       }
       const saved = { ...formState };
       if (pendingImageFile && !pendingDraft.current) { saved.image_url = await uploadImage(pendingImageFile); uploads.push(saved.image_url); }
       if (pendingHeaderFile && !pendingDraft.current) { saved.header_image_url = await uploadImage(pendingHeaderFile, "header"); saved.header_colour = ""; uploads.push(saved.header_image_url); }
-      const attempt = { id: draftId, revision: draftRevision.current, state: saved, document: { version: 1 as const, formState: saved, checkInEvents, mentors, sponsors, applicationTemplate: questions.applicationTemplate } };
+      const attempt = { id: draftId, revision: draftRevision.current, operationId: crypto.randomUUID(), state: saved, document: { version: 1 as const, formState: saved, checkInEvents, mentors, sponsors, applicationTemplate: questions.applicationTemplate } };
       pendingDraft.current = attempt;
-      const result = await saveAdminEventDraftAction({ id: attempt.id, eventId: eventId ?? null, revision: attempt.revision, document: attempt.document });
+      const result = await saveAdminEventDraftAction({ id: attempt.id, eventId: eventId ?? null, revision: attempt.revision, document: attempt.document, eventRevision: savedRevision.current, operationId: attempt.operationId });
+      if ("error" in result) {
+        pendingDraft.current = null;
+        throw new Error(result.error);
+      }
       pendingDraft.current = null;
+      attempt.state = { ...attempt.state, page_slug: result.pageSlug ?? attempt.state.page_slug };
+      attempt.document.formState = attempt.state;
       lastSavedDraftState.current = attempt.state;
       draftRevision.current = result.revision;
+      savedRevision.current = result.eventRevision ?? savedRevision.current;
+      const permanentId = result.eventId ?? eventId ?? result.id;
+      setEventId(permanentId);
+      persistedImageUrl.current = attempt.state.image_url || null;
+      persistedHeaderUrl.current = attempt.state.header_image_url || null;
+      expectedPublication.current = { status: "draft", publish_at: null };
       clearRecoveredLegacyDraft();
       hasSavedDraft.current = true;
       setFormState(attempt.state); setPendingImageFile(null); setPendingHeaderFile(null);
       setCleanSnapshot(createFormSnapshot(attempt.state, attempt.document.checkInEvents, attempt.document.mentors, attempt.document.sponsors, attempt.document.applicationTemplate));
       setSuccessMessage("Draft saved");
       if (showSuccess) setShowDraftSaved(true);
-      if (!eventId) window.history.replaceState(window.history.state, "", `/admin/events/drafts/${draftId}`);
+      if (!eventId) window.history.replaceState(window.history.state, "", `/admin/events/${permanentId}/edit`);
       return true;
     } catch (error) {
       if (!pendingDraft.current) await Promise.allSettled(uploads.map(url => discardUnusedEventImageAction(url)));
-      setError(error instanceof Error ? error.message : "Failed to save draft.");
+      const message = error instanceof Error ? error.message : "Failed to save draft.";
+      setError(message);
       toast.error("Couldn’t save your draft", {
         id: draftErrorToastId,
         duration: Infinity,
-        description: "Your changes are still here. Check your connection and try again.",
+        description: `${message} Your changes are still here.`,
         action: { label: "Try again", onClick: () => retryDraftSave.current(showSuccess) },
       });
       return false;
@@ -512,7 +531,7 @@ export function useEventForm({
       const input: SaveAdminEventInput = {
         operationId: crypto.randomUUID(),
         expectedRevision: savedRevision.current,
-        eventId,
+        eventId: eventId ?? (hasSavedDraft.current ? draftId : undefined),
         expectedPublication: expectedPublication.current,
         content: state.content ?? undefined,
         draftId: hasSavedDraft.current ? draftId : undefined,
@@ -568,7 +587,7 @@ export function useEventForm({
       clearRecoveredLegacyDraft();
       draftRevision.current = 0;
       setDraftId(crypto.randomUUID());
-      const savedFormState = { ...state, content: result.content ?? state.content, image_url: imageUrl, header_image_url: headerUrl,
+      const savedFormState = { ...state, page_slug: result.pageSlug ?? state.page_slug, content: result.content ?? state.content, image_url: imageUrl, header_image_url: headerUrl,
         date_location_revision: result.dateLocationRevision ?? state.date_location_revision,
         date_location: state.date_location ? { ...state.date_location, dates: state.date_location.dates.map((row, index) => ({ ...row, session_id: (attempt.resources ? row.session_id : result.checkInSessionIds[index]) ?? row.session_id })) } : null };
       persistedHeaderUrl.current = headerUrl || null;

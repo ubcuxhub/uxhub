@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { EventCreateModify } from "./EventCreateModify";
 
-vi.mock("@/components/shared/Hubbo", () => ({ Hubbo: () => <span>Hubbo</span> }));
+vi.mock("@/components/shared/Hubbo", () => ({ Hubbo: ({ emotion, className }: { emotion: string; className: string }) => <span data-testid="hubbo" data-emotion={emotion} className={className}>Hubbo</span> }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }) }));
 vi.mock("@/features/admin/actions", () => ({ recoverAdminEventDraftAction: vi.fn(async () => null), recoverAdminEventMutationAction: vi.fn(async () => null), savePastEventResourcesAction: vi.fn(), loadAdminEventDeletionInfoAction: vi.fn(async () => null), saveAdminEventDraftAction: vi.fn(), saveAdminEventAction: vi.fn(), deleteAdminEventAction: vi.fn(), discardUnusedEventImageAction: vi.fn(), searchAdminEventPeopleAction: vi.fn(async () => []) }));
 
@@ -65,4 +65,19 @@ it("shows optional section badges and replaces them when the section is complete
   fireEvent.click(teams.getByRole("radio", { name: "No" }));
   expect(teams.getByText("Optional")).toBeTruthy();
   expect(teams.queryByText("Complete")).toBeNull();
+});
+
+
+it("uses Proud Hubbo at 200px after the first draft save and enables saved-draft deletion", async () => {
+  const { saveAdminEventDraftAction } = await import("../actions");
+  vi.mocked(saveAdminEventDraftAction).mockResolvedValueOnce({ id: "saved-id", eventId: "saved-id", revision: 1, eventRevision: 1, pageSlug: "saved-draft" });
+  render(<EventCreateModify />);
+  fireEvent.change(screen.getByLabelText("Event name"), { target: { value: "Saved draft" } });
+  fireEvent.click(screen.getAllByRole("button", { name: "Save draft" })[0]);
+  const dialog = await screen.findByRole("dialog", { name: "Draft saved" });
+  expect(within(dialog).getByTestId("hubbo").getAttribute("data-emotion")).toBe("proud");
+  expect(within(dialog).getByTestId("hubbo").className).toContain("h-50");
+  fireEvent.click(within(dialog).getByRole("button", { name: "Keep editing" }));
+  await waitFor(() => expect(screen.queryByRole("dialog", { name: "Draft saved" })).toBeNull());
+  expect(screen.getByRole("button", { name: "Delete event" })).toBeTruthy();
 });

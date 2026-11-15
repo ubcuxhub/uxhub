@@ -125,12 +125,12 @@ describe("team form persistence and locks", () => {
     expect((await stored(f, event.id)).teams_enabled).toBe(true);
   }));
 
-  it("persists incomplete team working drafts without applying them to the event", () => withFixtures(async f => {
+  it("preserves incomplete team strings while synchronizing representable event fields", () => withFixtures(async f => {
     const event = await f.createEvent({ status: "draft", teams_enabled: true, min_team_size: 2 });
     const id = randomUUID();
     const doc = { version: 1 as const, formState: { ...defaultFormState, teams_enabled: false, min_team_size: "0", team_deadline: "2099-01-01T" }, checkInEvents: [], applicationTemplate: [], mentors: [], sponsors: [] };
     await saveEventDraft(f.supabase, id, event.id, 0, doc);
-    expect((await fetchEventDraft(f.supabase, id))?.document).toEqual(doc);
-    expect(await stored(f, event.id)).toMatchObject({ teams_enabled: true, min_team_size: 2 });
+    expect((await fetchEventDraft(f.supabase, id))?.document).toEqual({ ...doc, formState: { ...doc.formState, page_slug: event.slug } });
+    expect(await stored(f, event.id)).toMatchObject({ teams_enabled: false, min_team_size: null, team_deadline: null });
   }));
 });

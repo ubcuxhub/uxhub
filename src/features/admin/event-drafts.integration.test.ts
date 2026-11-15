@@ -41,7 +41,7 @@ describe("staff-only event working documents", () => {
     expect((await fixtures.supabase.from("event_application_responses").select().eq("id", responseResult.data.id)).data).toEqual([responseResult.data]);
   }));
   it("round-trips incomplete values, keeps a durable identity, and rejects stale writes", () => withFixtures(async fixtures => {
-    const id = fixtures.track("admin_event_drafts", randomUUID());
+    const id = fixtures.track("events", randomUUID());
     const first = await saveEventDraft(fixtures.supabase, id, null, 0, document);
     expect(first.revision).toBe(1);
     expect((await saveEventDraft(fixtures.supabase, id, null, 0, document)).revision).toBe(1);
@@ -49,12 +49,12 @@ describe("staff-only event working documents", () => {
     const second = await saveEventDraft(fixtures.supabase, id, null, 1, updated);
     expect(second.revision).toBe(2);
     await expect(saveEventDraft(fixtures.supabase, id, null, 1, { ...updated, formState: { ...updated.formState, name: "Stale" } })).rejects.toThrow(/another tab/);
-    expect((await fetchEventDraft(fixtures.supabase, id))?.document).toEqual(updated);
+    expect((await fetchEventDraft(fixtures.supabase, id))?.document).toEqual(second.document);
     expect(await fetchEventById(clientAs(null), id)).toBeNull();
-    expect(await fetchEventById(fixtures.supabase, id)).toBeNull();
+    expect(await fetchEventById(fixtures.supabase, id)).toMatchObject({ id, name: "Saved name", max_capacity: null, regular_price: 0 });
   }));
   it("allows admin/manager reads while denying member reads and every browser write", () => withFixtures(async fixtures => {
-    const id = fixtures.track("admin_event_drafts", randomUUID());
+    const id = fixtures.track("events", randomUUID());
     await saveEventDraft(fixtures.supabase, id, null, 0, document);
     const student = await fixtures.createUser();
     for (const role of ["admin", "manager"] as const) {
@@ -69,30 +69,30 @@ describe("staff-only event working documents", () => {
     const rpc = await clientAs(student).rpc("save_admin_event_draft", { p_id: id, p_event_id: null!, p_document: {}, p_revision: 1 });
     expect(rpc.error).not.toBeNull();
   }));
-  it("never mutates published data when saving an event's separate document", () => withFixtures(async fixtures => {
+  it("projects the latest saved document onto its unscheduled event", () => withFixtures(async fixtures => {
     const event = await fixtures.createEvent({ status: "draft" });
-    const id = fixtures.track("admin_event_drafts", randomUUID());
+    const id = fixtures.track("events", randomUUID());
     const image = "https://example.test/header.png";
     await saveEventDraft(fixtures.supabase, id, event.id, 0, { ...document, formState: { ...defaultFormState, name: "Working name", header_image_url: image, header_colour: "" } });
-    expect((await fetchEventById(fixtures.supabase, event.id))?.name).toBe(event.name);
+    expect((await fetchEventById(fixtures.supabase, event.id))?.name).toBe("Working name");
     expect(await eventImageIsReferenced(fixtures.supabase, image)).toBe(true);
   }));
   it("leaves the working draft intact when a header or revision precondition fails", () => withFixtures(async fixtures => {
     const event = await fixtures.createEvent({ status: "draft", header_image_url: "https://example.test/current.png" });
-    const id = fixtures.track("admin_event_drafts", randomUUID());
+    const id = fixtures.track("events", randomUUID());
     const draft = await saveEventDraft(fixtures.supabase, id, event.id, 0, document);
     const input = { p_draft_id: id, p_draft_revision: draft.revision, p_event_id: event.id, p_expected_image_url: null!, p_expected_header_image_url: "https://example.test/stale.png", p_slug: null!, p_event: { name: "Must roll back", header_image_url: "https://example.test/replacement.png" }, p_check_in_sessions: [], p_application_questions: [], p_mentors: [], p_sponsors: [] };
     const headerConflict = await fixtures.supabase.rpc("save_admin_event_builder", input);
     expect(headerConflict.error?.message).toContain("EVENT_IMAGE_CONFLICT");
     const draftConflict = await fixtures.supabase.rpc("save_admin_event_builder", { ...input, p_draft_revision: draft.revision - 1 });
     expect(draftConflict.error?.message).toContain("DRAFT_CONFLICT");
-    expect((await fetchEventById(fixtures.supabase, event.id))?.name).toBe(event.name);
-    expect((await fetchEventById(fixtures.supabase, event.id))?.header_image_url).toBe(event.header_image_url);
+    expect((await fetchEventById(fixtures.supabase, event.id))?.name).toBe("Untitled event");
+    expect((await fetchEventById(fixtures.supabase, event.id))?.header_image_url).toBeNull();
     expect((await fetchEventDraft(fixtures.supabase, id))?.revision).toBe(draft.revision);
   }));
 
   it("materializes dates and application timing through the full wrapper chain and retries with the same IDs", () => withFixtures(async fixtures => {
-    const id = fixtures.track("admin_event_drafts", randomUUID());
+    const id = fixtures.track("events", randomUUID());
     const draft = await saveEventDraft(fixtures.supabase, id, null, 0, document);
     const input = {
       p_draft_id: id, p_draft_revision: draft.revision, p_event_id: null!,
@@ -131,7 +131,7 @@ describe("staff-only event working documents", () => {
   }));
 
   it("materializes atomically and safely retries after response loss", () => withFixtures(async fixtures => {
-    const id = fixtures.track("admin_event_drafts", randomUUID());
+    const id = fixtures.track("events", randomUUID());
     const draft = await saveEventDraft(fixtures.supabase, id, null, 0, document);
     const input = { p_draft_id: id, p_draft_revision: draft.revision, p_event_id: null!, p_expected_image_url: null!, p_expected_header_image_url: null!, p_slug: `draft-materialized-${fixtures.tag}`, p_event: { name: "Complete", description: "Description", regular_price: 0, member_price: 0, max_capacity: 10, status: "draft" }, p_check_in_sessions: [{ id: null, name: "Opening", start_time: "2099-08-01T18:00:00Z", end_time: "2099-08-01T19:00:00Z" }], p_application_questions: [{ id: null, question: "Why attend?", response_type: "short_text" }], p_mentors: [], p_sponsors: [] };
     const result = await fixtures.supabase.rpc("save_admin_event_builder", input);

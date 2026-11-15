@@ -9,10 +9,10 @@ import { defaultFormState, type EventFormState } from "./event-form-schema";
 beforeAll(() => vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} }));
 afterEach(cleanup);
 
-function Form({ legacy = false, locked = false, showErrors = false }: { legacy?: boolean; locked?: boolean; showErrors?: boolean }) {
-  const [state, setState] = useState<EventFormState>({ ...defaultFormState, page_slug: "design-sprint", pricing_mode: legacy ? "legacy" : "free", regular_price: "10", member_price: "5" });
+function Form({ legacy = false, locked = false, showErrors = false, missingPrices = false }: { legacy?: boolean; locked?: boolean; showErrors?: boolean; missingPrices?: boolean }) {
+  const [state, setState] = useState<EventFormState>({ ...defaultFormState, page_slug: "design-sprint", pricing_mode: legacy ? "legacy" : "free", regular_price: missingPrices ? "" : "10", member_price: missingPrices ? "" : "5" });
   const change = <K extends keyof EventFormState>(field: K, value: EventFormState[K]) => setState(current => ({ ...current, [field]: value }));
-  return <><EventMarketing showErrors={showErrors} state={state} urlLocked={locked} onChange={change} /><EventFeatured state={state} onChange={change} /><EventPricing showErrors={showErrors} state={state} locked={locked} effectivePrices={legacy ? { regular: 10, member: 5 } : undefined} onChange={change} /></>;
+  return <><EventMarketing showErrors={showErrors} state={state} urlLocked={locked} onChange={change} /><EventFeatured state={state} onChange={change} /><EventPricing showErrors={showErrors} state={state} locked={locked} effectivePrices={legacy && !missingPrices ? { regular: 10, member: 5 } : undefined} onChange={change} /></>;
 }
 
 describe("event configuration controls", () => {
@@ -43,11 +43,19 @@ describe("event configuration controls", () => {
     expect(screen.getByRole("radio", { name: /^Paid/ }).getAttribute("aria-checked")).toBe("true");
     expect(screen.getByLabelText("Non-member price (CAD)")).toHaveProperty("value", "10");
   });
-  it("shows a locked summary and read-only hosted URL", () => {
+  it("keeps missing legacy prices unset when configuring pricing", () => {
+    render(<Form legacy missingPrices />);
+    expect(screen.getByText("Non-members: Not set · Members: Not set")).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Configure Free/Paid pricing" }));
+    expect(screen.getByRole("radio", { name: /^Paid/ }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByLabelText("Non-member price (CAD)")).toHaveProperty("value", "");
+  });
+  it("shows a locked summary and disabled hosted URL after publication", () => {
     render(<Form legacy locked />);
     expect(screen.getByRole("note", { name: "Pricing is locked" })).not.toBeNull();
     expect(screen.queryByRole("button", { name: /Configure Free/ })).toBeNull();
-    expect(screen.getByLabelText("Page URL")).toHaveProperty("readOnly", true);
+    expect(screen.getByLabelText("Page URL")).toHaveProperty("disabled", true);
+    expect(screen.getByText("The page URL is locked after first publication.")).not.toBeNull();
   });
   it("switches destinations, preserves external input, and saves a featured choice without claiming Home delivery", () => {
     render(<Form />);

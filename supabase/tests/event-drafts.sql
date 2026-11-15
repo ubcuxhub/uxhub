@@ -6,4 +6,12 @@ begin
   if has_table_privilege('authenticated', 'public.admin_event_drafts', 'insert,update,delete') then raise exception 'Browser role can mutate draft documents'; end if;
   if not (select relrowsecurity from pg_class where oid = 'public.admin_event_drafts'::regclass) then raise exception 'Draft RLS is disabled'; end if;
   if has_function_privilege('authenticated', 'public.save_admin_event_draft(uuid,uuid,jsonb,integer)', 'execute') or has_function_privilege('anon', 'public.save_admin_event_draft(uuid,uuid,jsonb,integer)', 'execute') then raise exception 'Draft save RPC exposed to browser'; end if;
+  if has_column_privilege('authenticated','public.events','working_document','update')
+    or has_column_privilege('authenticated','public.events','working_revision','insert')
+    or has_column_privilege('authenticated','public.events','legacy_draft_ids','update') then
+    raise exception 'Browser role can bypass unified working-document saves';
+  end if;
+  if has_function_privilege('authenticated','public.save_event_working_document(uuid,uuid,jsonb,integer,integer,uuid)','execute') then
+    raise exception 'Unified draft save RPC exposed to browser';
+  end if;
 end $$;
