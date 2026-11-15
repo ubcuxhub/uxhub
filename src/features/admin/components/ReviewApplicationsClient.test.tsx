@@ -49,7 +49,7 @@ const items: ReviewListItem[] = Array.from({ length: 30 }, (_, index) => {
 function renderList(applications = items) {
   return render(
     <ReviewApplicationsClient
-      eventId="e1"
+      eventPath="/admin/events/e1"
       eventName="UXathon"
       subtitle="Applications closed Nov 3"
       capacity={60}

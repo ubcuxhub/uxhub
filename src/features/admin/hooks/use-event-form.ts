@@ -58,6 +58,21 @@ import { useApplicationQuestions } from "./use-application-questions";
 import { parseWorkingDocument, type EventWorkingDocument } from "../lib/event-working-document";
 import type { Json } from "@/lib/supabase/database.types";
 import { useUnsavedChangesGuard } from "./use-unsaved-changes-guard";
+import { adminEventPath } from "../lib/admin-event-path";
+
+/**
+ * Puts the saved event's builder URL (`/admin/events/<slug>/edit`) in the
+ * address bar without a navigation, so the form keeps its state. A new
+ * event's first save moves it there from `create-new`, and an unpublished
+ * event's page URL can change on any save, which releases the old one. With
+ * no slug in the response, an existing event's URL is left alone rather than
+ * swapped for its ID.
+ */
+function showSavedEventUrl(id: string, slug: string | undefined, isNew: boolean) {
+  if (!slug && !isNew) return;
+  const path = adminEventPath({ id, slug: slug ?? null }, "/edit");
+  if (window.location.pathname !== path) window.history.replaceState(window.history.state, "", path);
+}
 
 interface UseEventFormOptions {
   /** Validate uncommitted control text before using the model’s last value. */
@@ -106,7 +121,7 @@ export function useEventForm({
   const [publication, setPublication] = useState({ status: initialEvent?.status ?? "draft", publish_at: initialEvent?.publish_at ?? null });
   const [urlLocked, setUrlLocked] = useState(!!initialEvent?.first_published_at || initialEvent?.status === "active");
   const expectedPublication = useRef(initialEvent ? { status: initialEvent.status, publish_at: initialEvent.publish_at } : null);
-  const [publicationSuccess, setPublicationSuccess] = useState<null | { id: string; name: string; status: string; publish_at: string | null; registration_opens_at: string | null; registration_closes_at: string | null; completed_at: number; updated?: boolean }>(null);
+  const [publicationSuccess, setPublicationSuccess] = useState<null | { id: string; name: string; status: string; publish_at: string | null; registration_opens_at: string | null; registration_closes_at: string | null; completed_at: number; updated?: boolean; /** The event's overview drawer. */ href: string }>(null);
   const savedRevision = useRef(initialEvent?.revision ?? 0);
   const [resetKey, setResetKey] = useState(0);
   const [unresolvedSave, setUnresolvedSave] = useState(false);
@@ -423,7 +438,7 @@ export function useEventForm({
       setSuccessMessage("Draft saved");
       setRejectedPageSlug(null);
       if (showSuccess) setShowDraftSaved(true);
-      if (!eventId) window.history.replaceState(window.history.state, "", `/admin/events/${permanentId}/edit`);
+      showSavedEventUrl(permanentId, result.pageSlug, !eventId);
       return true;
     } catch (error) {
       if (!pendingDraft.current) await Promise.allSettled(uploads.map(url => discardUnusedEventImageAction(url)));
@@ -624,8 +639,8 @@ export function useEventForm({
       setSuccessMessage(intent === "revert" ? "Event reverted to draft." : intent === "cancel" ? "Schedule cancelled. Draft saved." : "Changes saved");
       if (intent === "revert" && savedPublication.status === "draft" && !savedPublication.publish_at) setShowDraftSaved(true);
       setRejectedPageSlug(null);
-      if (!eventId) window.history.replaceState(window.history.state, "", `/admin/events/${result.id}/edit`);
-      if (intent === "publish" || intent === "schedule" || (intent === "save" && savedPublication.status === "active")) setPublicationSuccess({ ...savedPublication, updated: intent === "save", completed_at: Date.now() });
+      showSavedEventUrl(result.id, result.pageSlug, !eventId);
+      if (intent === "publish" || intent === "schedule" || (intent === "save" && savedPublication.status === "active")) setPublicationSuccess({ ...savedPublication, href: adminEventPath({ id: result.id, slug: result.pageSlug ?? null }), updated: intent === "save", completed_at: Date.now() });
       if (onSuccess) onSuccess(result.id);
       return true;
     } catch (saveError) {

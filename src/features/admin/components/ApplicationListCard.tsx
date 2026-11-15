@@ -15,7 +15,8 @@ interface ApplicationListCardProps {
   email: string;
   applicationDate: string;
   state: ApplicationReviewState;
-  eventId: string;
+  /** The event's admin URL (`adminEventPath`). */
+  eventPath: string;
 }
 
 export function ApplicationListCard({
@@ -24,11 +25,11 @@ export function ApplicationListCard({
   email,
   applicationDate,
   state,
-  eventId,
+  eventPath,
 }: ApplicationListCardProps) {
   return (
     <Link
-      href={`/admin/events/${eventId}/review-applications/${applicationId}`}
+      href={`${eventPath}/review-applications/${applicationId}`}
     >
       <Card className="cursor-pointer transition-colors hover:bg-muted">
         <CardHeader>

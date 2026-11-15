@@ -13,7 +13,7 @@ const updateEventScheduleAction = vi.hoisted(() => vi.fn());
 
 vi.mock("next/navigation", () => ({
   useRouter: () => router,
-  usePathname: () => `/admin/events/${EVENT_ID}`,
+  usePathname: () => `/admin/events/portfolio-night`,
 }));
 vi.mock("next/link", () => ({
   default: ({ href, children, ...props }: { href: string; children: React.ReactNode } & React.ComponentProps<"a">) => (
@@ -143,10 +143,10 @@ describe("AdminEventRecord overview", () => {
     renderRecord();
 
     expect(screen.getByRole("link", { name: "Edit event" }).getAttribute("href")).toBe(
-      `/admin/events/${EVENT_ID}/edit`
+      `/admin/events/portfolio-night/edit`
     );
     expect(screen.getByRole("link", { name: "Check-in" }).getAttribute("href")).toBe(
-      `/admin/events/${EVENT_ID}/check-in`
+      `/admin/events/portfolio-night/check-in`
     );
     const publicPage = screen.getByRole("link", { name: /^View marketing page/ });
     expect(publicPage.textContent).toBe("View marketing page (opens in a new tab)");
@@ -168,7 +168,7 @@ describe("AdminEventRecord overview", () => {
 
     expect(within(screen.getByRole("group", { name: "Applications" })).getByText("4")).toBeTruthy();
     const review = screen.getByRole("link", { name: /^Review applications/ });
-    expect(review.getAttribute("href")).toBe(`/admin/events/${EVENT_ID}/review-applications`);
+    expect(review.getAttribute("href")).toBe(`/admin/events/portfolio-night/review-applications`);
     expect(review.textContent).toBe("Review applications3 to review");
   });
 

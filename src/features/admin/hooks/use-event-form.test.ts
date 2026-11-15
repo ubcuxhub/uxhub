@@ -802,3 +802,47 @@ it.each(["setPendingImageFile", "setPendingHeaderFile"] as const)("includes pend
   act(() => result.current[setter](null));
   expect(result.current.hasUnsavedChanges).toBe(false);
 });
+
+describe("the builder's URL follows the saved event's slug", () => {
+  const draftEvent = { ...event, publish_at: null, first_published_at: null };
+  const atPath = (path: string) => window.history.replaceState(null, "", path);
+
+  it("moves a new event from create-new to its slug on the first save", async () => {
+    atPath("/admin/events/create-new");
+    const { result } = renderHook(() => useEventForm({}));
+    act(() => result.current.handleFieldChange("name", "Workshop"));
+    vi.mocked(saveAdminEventDraftAction).mockResolvedValueOnce({ id: "new-event", eventId: "new-event", revision: 1, pageSlug: "workshop" });
+    await act(async () => { expect(await result.current.handleSaveDraft(false)).toBe(true); });
+    expect(window.location.pathname).toBe("/admin/events/workshop/edit");
+  });
+
+  it("replaces the URL when a save changes the slug, keeping the form", async () => {
+    atPath("/admin/events/scheduled-event/edit");
+    const { result } = renderHook(() => useEventForm({ eventId: event.id, initialEvent: draftEvent }));
+    act(() => result.current.handleFieldChange("name", "Renamed workshop"));
+    vi.mocked(saveAdminEventDraftAction).mockResolvedValueOnce({ id: "draft-1", eventId: event.id, revision: 2, pageSlug: "renamed-workshop" });
+    await act(async () => { expect(await result.current.handleSaveDraft(false)).toBe(true); });
+    expect(window.location.pathname).toBe("/admin/events/renamed-workshop/edit");
+    expect(result.current.formState).toMatchObject({ name: "Renamed workshop", page_slug: "renamed-workshop" });
+    expect(result.current.eventId).toBe(event.id);
+  });
+
+  it("leaves an existing event's URL alone when the save reports no slug", async () => {
+    atPath("/admin/events/scheduled-event/edit");
+    const { result } = renderHook(() => useEventForm({ eventId: event.id, initialEvent: draftEvent }));
+    act(() => result.current.handleFieldChange("name", "Renamed"));
+    vi.mocked(saveAdminEventDraftAction).mockResolvedValueOnce({ id: "draft-1", eventId: event.id, revision: 2 });
+    await act(async () => { expect(await result.current.handleSaveDraft(false)).toBe(true); });
+    expect(window.location.pathname).toBe("/admin/events/scheduled-event/edit");
+  });
+
+  it("links the publication dialog to the overview at the saved slug", async () => {
+    atPath("/admin/events/scheduled-event/edit");
+    const { result } = renderHook(() => useEventForm({ eventId: event.id, initialEvent: draftEvent }));
+    vi.mocked(saveAdminEventAction).mockResolvedValueOnce({ id: event.id, pageSlug: "scheduled-event", checkInSessionIds: [], questionIds: [], publication: { id: event.id, name: event.name, status: "active", publish_at: null, registration_opens_at: null, registration_closes_at: null } });
+    await act(async () => { await result.current.handlePublication("publish"); });
+    expect(result.current.error).toBeNull();
+    expect(result.current.publicationSuccess?.href).toBe("/admin/events/scheduled-event");
+    expect(window.location.pathname).toBe("/admin/events/scheduled-event/edit");
+  });
+});

@@ -56,7 +56,8 @@ import {
 import { formatEventDate } from "@/lib/date";
 
 interface ReviewApplicationsClientProps {
-  eventId: string;
+  /** The event's admin URL (`adminEventPath`); the list and each application sit below it. */
+  eventPath: string;
   eventName: string;
   /** "Applications closed Nov 3 · Event Jan 9–10", composed on the server. */
   subtitle?: string;
@@ -117,7 +118,7 @@ function useReviewListQuery() {
 }
 
 export function ReviewApplicationsClient({
-  eventId,
+  eventPath,
   eventName,
   subtitle,
   capacity = 0,
@@ -135,7 +136,7 @@ export function ReviewApplicationsClient({
     page * REVIEW_PAGE_SIZE
   );
   const showNotes = applications.some((item) => item.noteCount !== undefined);
-  const base = `/admin/events/${eventId}/review-applications`;
+  const base = `${eventPath}/review-applications`;
 
   // Back from an application: focus its row, as a drawer's close does.
   useEffect(() => {

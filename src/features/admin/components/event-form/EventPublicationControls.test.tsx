@@ -9,12 +9,12 @@ vi.mock("@/components/shared/Hubbo", () => ({ Hubbo: ({ emotion, className }: { 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 it.each([{ status: "active", updated: false }, { status: "draft", updated: false }, { status: "active", updated: true }])("uses saved data and the correct Hubbo for $status success (updated: $updated)", async ({ status, updated }) => {
   const close = vi.fn();
-  const form = { publicationSuccess: { updated, id: "saved-event", name: "Saved event name", status, publish_at: status === "draft" ? "2099-08-01T17:00:00Z" : null, registration_opens_at: "2099-08-02T17:00:00Z", registration_closes_at: null, completed_at: Date.parse("2024-01-01T00:00:00Z") }, setPublicationSuccess: close } as unknown as ReturnType<typeof useEventForm>;
+  const form = { publicationSuccess: { updated, id: "saved-event", href: "/admin/events/saved-event-slug", name: "Saved event name", status, publish_at: status === "draft" ? "2099-08-01T17:00:00Z" : null, registration_opens_at: "2099-08-02T17:00:00Z", registration_closes_at: null, completed_at: Date.parse("2024-01-01T00:00:00Z") }, setPublicationSuccess: close } as unknown as ReturnType<typeof useEventForm>;
   const content = (current: typeof form) => <><div id="event-builder-header"><button type="button">Update event</button></div><EventPublicationSuccess form={current} /></>;
   const { rerender } = render(content(form));
   expect(screen.getByRole("dialog", { name: updated ? "Event updated" : status === "draft" ? "Event scheduled" : "Event published" })).toBeTruthy();
   expect(screen.getByText(/Saved event name/).textContent).toContain(updated ? "latest version" : status === "draft" ? "goes live" : "Registration opens");
-  expect(screen.getByRole("link", { name: "View event page" }).getAttribute("href")).toBe("/admin/events/saved-event");
+  expect(screen.getByRole("link", { name: "View event page" }).getAttribute("href")).toBe("/admin/events/saved-event-slug");
   expect(screen.getByTestId("hubbo").getAttribute("data-emotion")).toBe(updated ? "proud" : "excited");
   expect(screen.getByTestId("hubbo").className).toContain("h-50");
   fireEvent.click(screen.getByRole("button", { name: "Keep editing" }));

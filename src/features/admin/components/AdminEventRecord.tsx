@@ -43,6 +43,7 @@ import {
   timestamptzToDatetimeLocal,
 } from "@/lib/date";
 import type { IsoDate, WallTime } from "@/lib/date-input";
+import { adminEventPath } from "@/features/admin/lib/admin-event-path";
 import type { EventRow, EventStatus } from "@/lib/supabase/models";
 import type { EventApplicationStatusCounts } from "@/lib/supabase-helpers/event-applications";
 import { updateEventScheduleAction } from "../event-overview-actions";
@@ -288,7 +289,7 @@ export function AdminEventRecord({
   const editing = draft !== null;
   const dirty = draft !== null && !sameDraft(draft, draftFrom(event));
 
-  const base = `/admin/events/${event.id}`;
+  const base = adminEventPath(event);
   // "Edit event" grows the drawer into the builder, as expand does.
   const expandTypes = useRecordMorphTypes("expand");
   const registration = registrationWindow(event, new Date(now));

@@ -1,18 +1,17 @@
 import { RecordNotFound } from "@/components/shared/RecordDrawer";
 import { AdminEventRecord } from "@/features/admin/components/AdminEventRecord";
-import { findAdminEventId } from "@/features/admin/lib/resolve-event-param";
+import { findAdminEvent } from "@/features/admin/lib/resolve-event-param";
 import { requireAdmin } from "@/lib/auth/guards";
 import { FLAGS } from "@/lib/flags";
 import { createClient } from "@/lib/supabase/server";
 import { fetchEventApplicationStatusCounts } from "@/lib/supabase-helpers/event-applications";
 import { fetchEventSeatCounts } from "@/lib/supabase-helpers/event-tickets";
-import { fetchEventById } from "@/lib/supabase-helpers/events";
 
 /**
- * An event's admin overview, for `/admin/events/<id>`: the content of the
- * drawer the events layout opens over the list. Guards, resolves the param (a
- * slug redirects to the ID), fetches, and hands the client `AdminEventRecord`
- * everything it shows.
+ * An event's admin overview, for `/admin/events/<slug>`: the content of
+ * the drawer the events layout opens over the list. Guards, resolves the param
+ * (an event ID redirects to the slug), fetches, and hands the client
+ * `AdminEventRecord` everything it shows.
  *
  * Guards before any query, although the admin layout already has: layouts
  * and pages render in parallel, so the layout's guard doesn't stop this
@@ -22,15 +21,14 @@ export async function AdminEventRecordRoute({ eventParam }: { eventParam: string
   await requireAdmin();
 
   const supabase = await createClient();
-  const eventId = await findAdminEventId(supabase, eventParam);
-  if (!eventId) return <RecordNotFound noun="event" />;
+  const event = await findAdminEvent(supabase, eventParam);
+  if (!event) return <RecordNotFound noun="event" />;
+  const eventId = event.id;
 
-  const [event, seatCounts, applications] = await Promise.all([
-    fetchEventById(supabase, eventId),
+  const [seatCounts, applications] = await Promise.all([
     fetchEventSeatCounts(supabase, [eventId]),
     fetchEventApplicationStatusCounts(supabase, eventId),
   ]);
-  if (!event) return <RecordNotFound noun="event" />;
 
   const seats = seatCounts.get(eventId);
 

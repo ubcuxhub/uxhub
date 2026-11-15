@@ -81,7 +81,7 @@ function row(id: string, name: string, starts_at: string | null, status: EventSt
       registration_opens_at: null,
       requires_application: false,
       short_description: null,
-      slug: id,
+      slug: `${id}-page`,
       sponsors_enabled: false,
       max_team_size: null,
       min_team_size: null,
@@ -180,14 +180,21 @@ describe("AdminEventsTable", () => {
   it("links each event's name to its overview, which opens as a drawer over the list", () => {
     render(<AdminEventsTable rows={rows} />);
     const link = screen.getByRole("link", { name: "Design Workshop" });
-    expect(link.getAttribute("href")).toBe("/admin/events/newer");
+    expect(link.getAttribute("href")).toBe("/admin/events/newer-page");
     expect(link.getAttribute("data-slot")).toBe("table-row-link");
     expect(link.hasAttribute("data-replace")).toBe(false);
     expect(document.querySelectorAll("[data-record-row]")).toHaveLength(4);
   });
 
+  it("keys links by the event's slug, falling back to the ID for a slug a static route shadows", () => {
+    const shadowed = row("event-id", "Drafts Social", null, "draft", false);
+    render(<AdminEventsTable rows={[rows[1], { ...shadowed, event: { ...shadowed.event, slug: "drafts" } }]} />);
+    expect(screen.getByRole("link", { name: "Design Workshop" }).getAttribute("href")).toBe("/admin/events/newer-page");
+    expect(screen.getByRole("link", { name: "Drafts Social" }).getAttribute("href")).toBe("/admin/events/event-id");
+  });
+
   it("marks the open event's row and replaces rather than stacks records", () => {
-    pathname = "/admin/events/newer";
+    pathname = "/admin/events/newer-page";
     render(<AdminEventsTable rows={rows} />);
     const open = screen.getByRole("link", { name: "Design Workshop" });
     expect(open.getAttribute("aria-current")).toBe("page");
@@ -218,7 +225,7 @@ describe("Manage events pagination", () => {
     expect(rowNames()).toEqual(["Event 02", "Event 01"]);
     expect(count()).toBe("Showing 26–27 of 27 events");
 
-    pathname = "/admin/events/e01";
+    pathname = "/admin/events/e01-page";
     rerender(<AdminEventsTable rows={many} />);
     expect(screen.getByText("Page 2 of 2")).toBeTruthy();
 
@@ -228,7 +235,7 @@ describe("Manage events pagination", () => {
   });
 
   it("opens on the page of the event in the URL", () => {
-    pathname = "/admin/events/e02";
+    pathname = "/admin/events/e02-page";
     render(<AdminEventsTable rows={many} />);
     expect(screen.getByText("Page 2 of 2")).toBeTruthy();
     expect(screen.getByRole("link", { name: "Event 02" }).getAttribute("aria-current")).toBe("page");
@@ -280,7 +287,7 @@ describe("application signals", () => {
   it("links an 'N to review' badge to the submitted applications, named for the event", () => {
     render(<AdminEventsTable rows={[applicationRow("uxathon", "UXathon 2026", 8)]} />);
     const link = screen.getByRole("link", { name: "8 applications to review for UXathon 2026" });
-    expect(link.getAttribute("href")).toBe("/admin/events/uxathon/review-applications?status=submitted");
+    expect(link.getAttribute("href")).toBe("/admin/events/uxathon-page/review-applications?status=submitted");
     expect(link.textContent).toBe("8 to review");
     // A sibling of the row's link, not nested in it.
     expect(link.parentElement?.closest("a")).toBeNull();
@@ -326,9 +333,9 @@ describe("working drafts in Manage Events", () => {
   });
 
   it("links saved drafts to their permanent event drawers, including while a drawer is open", () => {
-    pathname = "/admin/events/newer";
+    pathname = "/admin/events/newer-page";
     render(<AdminEventsTable rows={[rows[0], rows[1], savedRow(rows[2], "Existing work"), ...rows.slice(3), savedRow(row("new-draft", "", null, "draft", false), "New work")]} />);
-    for (const [name, href] of [["New work", "/admin/events/new-draft"], ["Existing work", "/admin/events/draft"]]) {
+    for (const [name, href] of [["New work", "/admin/events/new-draft-page"], ["Existing work", "/admin/events/draft-page"]]) {
       const link = screen.getByRole("link", { name });
       expect(link.getAttribute("href")).toBe(href);
       expect(link.getAttribute("data-slot")).toBe("table-row-link");
@@ -349,7 +356,7 @@ describe("working drafts in Manage Events", () => {
     const application = { ...rows[1], event: { ...rows[1].event, requires_application: true }, applicationsToReview: 2 };
     render(<AdminEventsTable rows={[application, savedRow(rows[2], "Working workshop")]} />);
     expect(screen.getByRole("link", { name: "2 applications to review for Design Workshop" }).getAttribute("href"))
-      .toBe("/admin/events/newer/review-applications?status=submitted");
+      .toBe("/admin/events/newer-page/review-applications?status=submitted");
     expect(screen.getByRole("link", { name: "Design Workshop" }).closest("tr")?.textContent).toContain("7 / 30");
     const existingDraft = screen.getByRole("link", { name: "Working workshop" }).closest("tr")!;
     expect(existingDraft.textContent).toContain("7 /");
@@ -360,12 +367,12 @@ describe("working drafts in Manage Events", () => {
     const source = { ...rows[2], event: { ...rows[2].event, requires_application: true }, applicationsToReview: 3 };
     render(<AdminEventsTable rows={[savedRow(source, "Working application event")]} />);
     const editor = screen.getByRole("link", { name: "Working application event" });
-    expect(editor.getAttribute("href")).toBe("/admin/events/draft");
+    expect(editor.getAttribute("href")).toBe("/admin/events/draft-page");
     const tableRow = editor.closest("tr")!;
     expect(within(tableRow).getByText("By application")).toBeTruthy();
     expect(tableRow.textContent).toContain("7 /");
     const review = within(tableRow).getByRole("link", { name: "3 applications to review for Working application event" });
-    expect(review.getAttribute("href")).toBe("/admin/events/draft/review-applications?status=submitted");
+    expect(review.getAttribute("href")).toBe("/admin/events/draft-page/review-applications?status=submitted");
     expect(review.parentElement?.closest("a")).toBeNull();
   });
 
@@ -374,11 +381,11 @@ describe("working drafts in Manage Events", () => {
       const n = String(index + 1).padStart(2, "0");
       return row(`e${n}`, `Event ${n}`, `2026-10-${n}T17:00:00.000Z`, "draft", false);
     });
-    pathname = "/admin/events/e02";
+    pathname = "/admin/events/e02-page";
     render(<AdminEventsTable rows={many.map(source => source.event.id === "e02" ? savedRow(source, "Working Event 02", "2026-10-02T10:00") : source)} />);
     expect(screen.getByText("Page 2 of 2")).toBeTruthy();
     const editor = screen.getByRole("link", { name: "Working Event 02" });
-    expect(editor.getAttribute("href")).toBe("/admin/events/e02");
+    expect(editor.getAttribute("href")).toBe("/admin/events/e02-page");
     expect(editor.closest("tr")?.hasAttribute("data-active")).toBe(true);
     // The active record is the overview; the editor link is a different page.
     expect(editor.getAttribute("aria-current")).toBe("page");

@@ -45,6 +45,8 @@ type Status =
 
 interface CheckInScannerProps {
   eventId: string;
+  /** The event's admin URL (`adminEventPath`), for the way back to check-in. */
+  eventPath: string;
   eventName: string;
   sessions: CheckInSession[];
   initialAttendees: CheckInAttendee[];
@@ -65,6 +67,7 @@ function sessionLabel(session: CheckInSession): string {
  */
 export function CheckInScanner({
   eventId,
+  eventPath,
   eventName,
   sessions,
   initialAttendees,
@@ -83,7 +86,7 @@ export function CheckInScanner({
   const lastCodeRef = useRef<string | null>(null);
   const resumedAtRef = useRef(0);
 
-  const checkInPath = `/admin/events/${eventId}/check-in`;
+  const checkInPath = `${eventPath}/check-in`;
 
   async function submit(checkIn: (sessionId: string) => Promise<CheckInResult>) {
     if (busyRef.current || !sessionId) return;

@@ -381,9 +381,11 @@ of a saved document uses the same complete builder validation and transaction.
 The database rejects private documents on scheduled/published rows and checks
 publication readiness, including scheduler and quick-edit transitions.
 
-Every saved event, including a first-save draft, opens `/admin/events/<id>` in
-the drawer. Its editor is `/admin/events/<id>/edit`; legacy draft routes redirect
-there using recorded aliases. Protected deletion includes unfinished images and
+Every saved event, including a first-save draft, opens `/admin/events/<slug>`
+in the drawer. Its editor is `/admin/events/<slug>/edit`; an event ID in either
+URL, and a legacy draft route (through its recorded aliases), redirects there.
+When a save changes an unpublished event's URL, the builder replaces its address
+with the new slug in place. Protected deletion includes unfinished images and
 releases URL claims. Staff can visit the latest saved draft through its canonical
 portal slug, including while public event browsing is gated. Hosted marketing
 previews use `/events/<slug>?preview=draft`: admin/manager only, 404 for everyone

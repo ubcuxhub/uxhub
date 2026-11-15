@@ -75,6 +75,7 @@ function renderScanner(overrides: { sessions?: CheckInSession[] } = {}) {
   return render(
     <CheckInScanner
       eventId="event-1"
+      eventPath="/admin/events/design-sprint"
       eventName="Design Sprint"
       sessions={overrides.sessions ?? sessions}
       initialAttendees={[ada]}

@@ -25,6 +25,7 @@ import { formatEventDate } from "@/lib/date";
 import type { EventStatus } from "@/lib/supabase/models";
 import { useListPage } from "../hooks/use-list-page";
 import { useRecordRows } from "../hooks/use-record-rows";
+import { adminEventPath } from "../lib/admin-event-path";
 import type { AdminEventTableRow } from "../lib/admin-event-table";
 import { toggleSetValue } from "../lib/directory";
 import { ChipFilterSection } from "./ChipFilterSection";
@@ -60,7 +61,8 @@ const EVENT_NOUN = { one: "event", other: "events" };
 const LIST_HREF = "/admin/events";
 const COLUMNS = 5;
 
-const eventHref = (row: AdminEventTableRow) => `${LIST_HREF}/${row.event.id}`;
+/** A row opens its event's overview drawer, at the event's slug. */
+const eventHref = (row: AdminEventTableRow) => adminEventPath(row.event);
 const eventRecordHref = eventHref;
 
 /** A draft takes no registrations, so it has no registration status. */
@@ -81,8 +83,9 @@ function sortEvents(rows: AdminEventTableRow[], sort: EventSort) {
 }
 
 /**
- * Manage events: search, sort, filter and page the events. Each row links to
- * the event's overview drawer, or resumes a working draft in its editor.
+ * Manage events: search, sort, filter and page the events. Each row, a draft's
+ * included, links to the event's overview drawer at `/admin/events/<slug>`;
+ * the drawer's "Edit event" opens the builder.
  */
 export function AdminEventsTable({ rows }: { rows: AdminEventTableRow[] }) {
   const [query, setQuery] = useState("");
@@ -196,7 +199,6 @@ export function AdminEventsTable({ rows }: { rows: AdminEventTableRow[] }) {
             ) : (
               paging.pageRows.map((row) => {
                 const href = eventHref(row);
-                const reviewEventId = row.event.id;
                 const registration = getRegistrationStatus(row);
                 const recordHref = eventRecordHref(row);
                 const linkProps = records.linkProps(recordHref);
@@ -226,10 +228,10 @@ export function AdminEventsTable({ rows }: { rows: AdminEventTableRow[] }) {
                           <span className="text-muted-foreground">/ {row.event.max_capacity ?? <TableNone />}</span>
                         </>
                       )}
-                      {reviewEventId && row.event.requires_application && (row.applicationsToReview ?? 0) > 0 ? (
+                      {row.event.requires_application && (row.applicationsToReview ?? 0) > 0 ? (
                         <div className="mt-1">
                           <Link
-                            href={`${LIST_HREF}/${reviewEventId}/review-applications?status=submitted`}
+                            href={adminEventPath(row.event, "/review-applications?status=submitted")}
                             aria-label={`${row.applicationsToReview} ${
                               row.applicationsToReview === 1 ? "application" : "applications"
                             } to review for ${row.event.name}`}

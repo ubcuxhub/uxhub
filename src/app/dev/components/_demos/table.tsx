@@ -307,7 +307,7 @@ function TableDemo() {
 
       <Composition
         title="Event drafts in the events table"
-        description="Manage Events includes saved working drafts in the same table, search, Draft filter and date sort as events. Working-draft links open /admin/events/drafts/<draft> or /admin/events/<event>/edit; saved-event links retain their overview drawer. A working draft replaces its source event's row, and missing dates or registration counts show a dash."
+        description="Manage Events includes saved working drafts in the same table, search, Draft filter and date sort as events. Every row, a draft's included, opens its overview drawer at /admin/events/<slug>. A working draft replaces its source event's row, and missing dates or registration counts show a dash."
       >
         {/* Pinned name and a badge with a second line, as in AdminEventsTable: below md the name scrolls with the rest. */}
         <TableCard>

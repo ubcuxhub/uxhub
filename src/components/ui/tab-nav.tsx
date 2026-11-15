@@ -40,11 +40,11 @@ interface TabNavProps extends React.ComponentProps<"nav"> {
  *
  * ```tsx
  * <TabNav aria-label="Event pages">
- *   <TabNavLink href={`/admin/events/${id}`} exact>Overview</TabNavLink>
- *   <TabNavLink href={`/admin/events/${id}/review-applications`} count={12}>
+ *   <TabNavLink href={`/admin/events/${slug}`} exact>Overview</TabNavLink>
+ *   <TabNavLink href={`/admin/events/${slug}/review-applications`} count={12}>
  *     Applications
  *   </TabNavLink>
- *   <TabNavLink href={`/admin/events/${id}/check-in`}>Check-in</TabNavLink>
+ *   <TabNavLink href={`/admin/events/${slug}/check-in`}>Check-in</TabNavLink>
  * </TabNav>
  * ```
  *

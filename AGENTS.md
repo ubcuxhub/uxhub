@@ -147,10 +147,16 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
 - Prefer colocated server actions for first-party mutations. Reserve route
   handlers for callbacks, webhooks, uploads, and flows that require an HTTP
   endpoint.
-- Student-facing event and checkout routes use slugs. Admin event routes use
-  event IDs (a slug redirects to the ID): `/admin/events/<id>` is the event's
-  overview (the record drawer, with a quick edit of its status and dates) and
-  `/admin/events/<id>/edit` is the full builder.
+- Event routes use slugs, student-facing and admin alike:
+  `/admin/events/<slug>` is the event's overview (the record drawer, with a
+  quick edit of its status and dates) and `/admin/events/<slug>/edit` is the
+  full builder. Build admin event URLs with `adminEventPath`
+  (`src/features/admin/lib/admin-event-path.ts`), never from `event.id`. Pages
+  resolve the segment once with `resolveAdminEvent` (after `requireAdmin()`)
+  and query by the event's ID from there; an ID in the URL redirects to the
+  slug, so old links keep working. An event whose slug a static route shadows
+  (`create-new`, `drafts`) keeps its ID in the URL. Renaming an unpublished
+  event's URL moves the builder to the new slug, and the old one 404s.
 - Settings are a hash-driven dialog (`#settings/<tab>`), not standalone portal
   pages. Use `openSettings(tab)` from
   `src/features/settings/components/SettingsDialog`.

@@ -7,6 +7,7 @@ import type { EventRow } from "@/lib/supabase/models";
 vi.mock("server-only", () => ({}));
 
 const EVENT_ID = "123e4567-e89b-12d3-a456-426614174000";
+const SLUG = "portfolio-night";
 
 const calls = vi.hoisted(() => [] as string[]);
 const mocks = vi.hoisted(() => ({
@@ -53,7 +54,19 @@ import { AdminEventRecordRoute } from "./AdminEventRecordRoute";
 const counts = { submitted: 2, accepted: 1, rejected: 0, waitlisted: 0, total: 3 };
 
 function event(overrides: Partial<EventRow> = {}) {
-  return { id: EVENT_ID, max_capacity: 40, ...overrides } as EventRow;
+  return { id: EVENT_ID, slug: SLUG, max_capacity: 40, ...overrides } as EventRow;
+}
+
+/** Serve `row` for both lookups, as the database would for its slug and ID. */
+function serve(row: EventRow | null) {
+  mocks.fetchEventBySlug.mockImplementation(async (_client: unknown, slug: string) => {
+    calls.push("fetch");
+    return row && row.slug === slug ? row : null;
+  });
+  mocks.fetchEventById.mockImplementation(async (_client: unknown, id: string) => {
+    calls.push("fetch");
+    return row && row.id === id ? row : null;
+  });
 }
 
 async function route(eventParam: string) {
@@ -68,22 +81,22 @@ beforeEach(() => {
   mocks.requireAdmin.mockImplementation(async () => {
     calls.push("guard");
   });
-  mocks.fetchEventById.mockImplementation(async () => {
-    calls.push("fetch");
-    return event();
-  });
+  serve(event());
   mocks.fetchEventSeatCounts.mockResolvedValue(
     new Map([[EVENT_ID, { tickets: 12, heldOffers: 1, seatsLeft: 27 }]])
   );
   mocks.fetchEventApplicationStatusCounts.mockResolvedValue(counts);
-  mocks.fetchEventBySlug.mockResolvedValue(null);
 });
 
 describe("AdminEventRecordRoute", () => {
-  it("guards before fetching, then renders the record", async () => {
-    const element = await route(EVENT_ID);
+  it("guards, resolves the slug, then renders the record", async () => {
+    const element = await route(SLUG);
 
     expect(calls).toEqual(["guard", "fetch"]);
+    expect(mocks.fetchEventBySlug).toHaveBeenCalledWith({}, SLUG);
+    // Everything after the slug is queried by the event's ID.
+    expect(mocks.fetchEventSeatCounts).toHaveBeenCalledWith({}, [EVENT_ID]);
+    expect(mocks.fetchEventApplicationStatusCounts).toHaveBeenCalledWith({}, EVENT_ID);
     expect(element.type.name).toBe("AdminEventRecord");
     expect(element.props).toMatchObject({
       event: { id: EVENT_ID },
@@ -95,7 +108,7 @@ describe("AdminEventRecordRoute", () => {
   it("stops at the guard for someone who isn't an admin", async () => {
     mocks.requireAdmin.mockRejectedValue(new Error("NEXT_REDIRECT /401"));
 
-    await expect(AdminEventRecordRoute({ eventParam: EVENT_ID })).rejects.toThrow("/401");
+    await expect(AdminEventRecordRoute({ eventParam: SLUG })).rejects.toThrow("/401");
     expect(mocks.fetchEventById).not.toHaveBeenCalled();
     expect(mocks.fetchEventBySlug).not.toHaveBeenCalled();
   });
@@ -103,28 +116,29 @@ describe("AdminEventRecordRoute", () => {
   it("falls back to the capacity when the seat count has no row", async () => {
     mocks.fetchEventSeatCounts.mockResolvedValue(new Map());
 
-    const element = await route(EVENT_ID);
+    const element = await route(SLUG);
 
     expect(element.props.seats).toEqual({ tickets: 0, seatsLeft: 40 });
   });
 
-  it("shows not found in the drawer for a missing event", async () => {
-    mocks.fetchEventById.mockResolvedValue(null);
-
-    expect((await route(EVENT_ID)).type).toBe(RecordNotFound);
+  it("shows not found in the drawer for an unknown slug, without a uuid query", async () => {
+    expect((await route("nope")).type).toBe(RecordNotFound);
+    expect(mocks.fetchEventById).not.toHaveBeenCalled();
     expect(mocks.notFound).not.toHaveBeenCalled();
   });
 
-  it("handles an unknown slug the same way, without a uuid query", async () => {
-    expect((await route("nope")).type).toBe(RecordNotFound);
-    expect(mocks.fetchEventById).not.toHaveBeenCalled();
+  it("shows not found in the drawer for an unknown ID", async () => {
+    serve(null);
+
+    expect((await route(EVENT_ID)).type).toBe(RecordNotFound);
+    expect(mocks.notFound).not.toHaveBeenCalled();
+    expect(mocks.redirect).not.toHaveBeenCalled();
   });
 
-  it("redirects a slug to the id", async () => {
-    mocks.fetchEventBySlug.mockResolvedValue({ id: EVENT_ID });
-
-    await expect(AdminEventRecordRoute({ eventParam: "portfolio-night" })).rejects.toThrow(
-      `NEXT_REDIRECT /admin/events/${EVENT_ID}`
+  it("redirects an event ID to the slug", async () => {
+    await expect(AdminEventRecordRoute({ eventParam: EVENT_ID })).rejects.toThrow(
+      `NEXT_REDIRECT /admin/events/${SLUG}`
     );
+    expect(mocks.fetchEventSeatCounts).not.toHaveBeenCalled();
   });
 });

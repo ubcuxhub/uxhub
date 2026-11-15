@@ -1,18 +1,20 @@
-import { notFound } from "next/navigation";
-
 import { ReviewApplicationsClient } from "@/features/admin/components/ReviewApplicationsClient";
 import { withReviewState } from "@/features/admin/lib/application-review";
-import { resolveAdminEventId } from "@/features/admin/lib/resolve-event-param";
+import { adminEventPath } from "@/features/admin/lib/admin-event-path";
+import {
+  querySuffix,
+  resolveAdminEvent,
+} from "@/features/admin/lib/resolve-event-param";
 import { requireAdmin } from "@/lib/auth/guards";
 import { formatEventDate, formatEventDateLabel } from "@/lib/date";
 import { createClient } from "@/lib/supabase/server";
 import type { EventRow } from "@/lib/supabase/models";
-import { fetchEventById } from "@/lib/supabase-helpers/events";
 import { fetchReviewerNoteCounts } from "@/lib/supabase-helpers/application-review-notes";
 import { fetchEventApplicationSummaries } from "@/lib/supabase-helpers/event-applications";
 
 interface ReviewApplicationsPageProps {
   params: Promise<{ event: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
 
 /** "Applications closed Nov 3 · Event Jan 9–10". */
@@ -38,21 +40,19 @@ function describeSchedule(
 
 export default async function ReviewApplicationsPage({
   params,
+  searchParams,
 }: ReviewApplicationsPageProps) {
   await requireAdmin();
-  const { event: eventParam } = await params;
+  const [{ event: eventParam }, query] = await Promise.all([params, searchParams]);
   const supabase = await createClient();
-  const eventId = await resolveAdminEventId(
+  // The list's filters live in the query string; an ID link keeps them.
+  const event = await resolveAdminEvent(
     supabase,
     eventParam,
-    "/review-applications"
+    `/review-applications${querySuffix(query)}`
   );
-  const [event, summaries] = await Promise.all([
-    fetchEventById(supabase, eventId),
-    fetchEventApplicationSummaries(supabase, eventId),
-  ]);
-
-  if (!event) notFound();
+  const eventId = event.id;
+  const summaries = await fetchEventApplicationSummaries(supabase, eventId);
   const noteCounts = await fetchReviewerNoteCounts(
     supabase,
     summaries.map((summary) => summary.applicationId)
@@ -62,7 +62,7 @@ export default async function ReviewApplicationsPage({
 
   return (
     <ReviewApplicationsClient
-      eventId={eventId}
+      eventPath={adminEventPath(event)}
       eventName={event.name}
       subtitle={subtitle}
       capacity={event.max_capacity ?? undefined}

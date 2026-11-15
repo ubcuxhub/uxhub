@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { ScanLine } from "lucide-react";
 import { CheckInTable } from "@/features/admin/components/CheckInTable";
+import { adminEventPath } from "@/features/admin/lib/admin-event-path";
 import { searchCheckInAttendees } from "@/features/admin/lib/check-in-search";
 import {
   type CheckInAttendee,
@@ -216,7 +217,7 @@ export function CheckInManager({
                 </p>
               </div>
               <Button asChild>
-                <Link href={`/admin/events/${eventId}/check-in/scan`}>
+                <Link href={adminEventPath(event, "/check-in/scan")}>
                   <ScanLine aria-hidden />
                   Scan tickets
                 </Link>

@@ -6,9 +6,9 @@ vi.mock("@/lib/supabase/server",()=>({createClient:async()=>"staff-client"}));
 vi.mock("@/lib/supabase-helpers/events",()=>({fetchEventByLegacyDraftId:mocks.fetch}));
 import Page from "./page";
 const id="10000000-0000-4000-8000-000000000001";
-beforeEach(()=>{vi.clearAllMocks();mocks.guard.mockResolvedValue({});mocks.fetch.mockResolvedValue({id:"permanent-event-id"})});
+beforeEach(()=>{vi.clearAllMocks();mocks.guard.mockResolvedValue({});mocks.fetch.mockResolvedValue({id:"permanent-event-id",slug:"design-sprint"})});
 it("redirects a recorded legacy identity to the permanent event editor",async()=>{
- await expect(Page({params:Promise.resolve({draft:id})})).rejects.toThrow("redirect:/admin/events/permanent-event-id/edit");
+ await expect(Page({params:Promise.resolve({draft:id})})).rejects.toThrow("redirect:/admin/events/design-sprint/edit");
  expect(mocks.fetch).toHaveBeenCalledWith("staff-client",id);
 });
 it("guards before looking up aliases and returns 404 for absent identities",async()=>{

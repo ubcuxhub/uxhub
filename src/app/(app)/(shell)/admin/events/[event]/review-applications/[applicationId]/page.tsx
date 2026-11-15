@@ -10,7 +10,11 @@ import {
   withReviewState,
   type ReviewListItem,
 } from "@/features/admin/lib/application-review";
-import { resolveAdminEventId } from "@/features/admin/lib/resolve-event-param";
+import { adminEventPath } from "@/features/admin/lib/admin-event-path";
+import {
+  querySuffix,
+  resolveAdminEvent,
+} from "@/features/admin/lib/resolve-event-param";
 import { answersFromResponses } from "@/features/applications/lib/application-form";
 import { requireAdmin } from "@/lib/auth/guards";
 import { pacificDate } from "@/lib/date";
@@ -24,7 +28,6 @@ import {
   isSubmittedApplication,
 } from "@/lib/supabase-helpers/event-applications";
 import { fetchReviewerNotes } from "@/lib/supabase-helpers/application-review-notes";
-import { fetchEventById } from "@/lib/supabase-helpers/events";
 import { isUuid } from "@/lib/uuid";
 
 interface ApplicationReviewPageProps {
@@ -54,11 +57,12 @@ export default async function ApplicationReviewPage({
   // is a 404 rather than a thrown Postgres error.
   if (!isUuid(applicationId)) notFound();
   const supabase = await createClient();
-  const eventId = await resolveAdminEventId(
+  const event = await resolveAdminEvent(
     supabase,
     eventParam,
-    `/review-applications/${applicationId}`
+    `/review-applications/${applicationId}${querySuffix(rawQuery)}`
   );
+  const eventId = event.id;
   const application = await fetchEventApplicationById(supabase, applicationId);
 
   // Drafts are the applicant's alone; RLS hides them from admins as well.
@@ -70,8 +74,7 @@ export default async function ApplicationReviewPage({
     notFound();
   }
 
-  const [event, summaries, questions, responses, notes] = await Promise.all([
-    fetchEventById(supabase, application.event_id),
+  const [summaries, questions, responses, notes] = await Promise.all([
     fetchEventApplicationSummaries(supabase, eventId),
     fetchApplicationQuestions(supabase, eventId),
     fetchApplicationResponses(supabase, applicationId),
@@ -82,7 +85,7 @@ export default async function ApplicationReviewPage({
     withReviewState(summary)
   );
   const current = summaries.find((item) => item.applicationId === applicationId);
-  if (!event || !current) notFound();
+  if (!current) notFound();
 
   const query = parseReviewListQuery(
     new URLSearchParams(
@@ -94,7 +97,7 @@ export default async function ApplicationReviewPage({
   const neighbours = getReviewNeighbours(items, query, applicationId);
   if (!neighbours) notFound();
 
-  const base = `/admin/events/${eventId}/review-applications`;
+  const base = adminEventPath(event, "/review-applications");
   const target = (item: ReviewListItem | null) =>
     item
       ? {

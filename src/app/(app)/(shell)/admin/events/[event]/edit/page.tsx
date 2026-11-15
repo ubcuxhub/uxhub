@@ -4,17 +4,17 @@ import { fetchEventTeamSettingsInfo } from "@/lib/supabase-helpers/teams";
 import { fetchEventApplicationSettings } from "@/lib/supabase-helpers/event-application-settings";
 import { fetchEventDateLocationSettings, fetchEventRegistrationSettings } from "@/lib/supabase-helpers/event-date-locations";
 import { fetchEventDraftForEvent } from "@/lib/supabase-helpers/event-drafts";
-import { notFound } from "next/navigation";
 
 import { PageContainer } from "@/components/shared/PageContainer";
 import { RecordPage } from "@/components/shared/RecordDrawer";
 import { EventCreateModify } from "@/features/admin/components/EventCreateModify";
-import { resolveAdminEventId } from "@/features/admin/lib/resolve-event-param";
+import { adminEventPath } from "@/features/admin/lib/admin-event-path";
+import { resolveAdminEvent } from "@/features/admin/lib/resolve-event-param";
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchApplicationQuestions } from "@/lib/supabase-helpers/event-applications";
 import { fetchCheckInSessions } from "@/lib/supabase-helpers/check-ins";
-import { fetchEventById, fetchEventPricingLocked } from "@/lib/supabase-helpers/events";
+import { fetchEventPricingLocked } from "@/lib/supabase-helpers/events";
 import {
   fetchEventMentors,
   fetchEventSponsors,
@@ -37,9 +37,9 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
   await requireAdmin();
   const { event: eventParam } = await params;
   const supabase = await createClient();
-  const eventId = await resolveAdminEventId(supabase, eventParam, "/edit");
+  const event = await resolveAdminEvent(supabase, eventParam, "/edit");
+  const eventId = event.id;
   const [
-    event,
     checkInSessions,
     applicationQuestions,
     mentors,
@@ -48,7 +48,6 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
     sponsorOptions,
   ] =
     await Promise.all([
-      fetchEventById(supabase, eventId),
       fetchCheckInSessions(supabase, eventId),
       fetchApplicationQuestions(supabase, eventId),
       fetchEventMentors(supabase, eventId),
@@ -57,7 +56,6 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
       searchSponsors(supabase, ""),
     ]);
 
-  if (!event) notFound();
   const pricingLocked = await fetchEventPricingLocked(supabase, eventId);
   const [dateLocation, registrationInfo, applicationSettings, teamInfo, content, historyInfo] = await Promise.all([fetchEventDateLocationSettings(supabase, eventId), fetchEventRegistrationSettings(supabase, eventId), fetchEventApplicationSettings(supabase, eventId), fetchEventTeamSettingsInfo(supabase, eventId), fetchEventContent(supabase, eventId), fetchEventHistoryInfo(supabase, eventId)]);
   const workingDraft = event.status === "draft" && !event.publish_at ? await fetchEventDraftForEvent(supabase, eventId) : null;
@@ -66,7 +64,7 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
     <RecordPage
       listHref="/admin/events"
       listLabel="Back to Manage Events"
-      recordHref={`/admin/events/${eventId}`}
+      recordHref={adminEventPath(event)}
     >
       <PageContainer className="max-w-none min-[821px]:px-12 lg:px-12">
         <EventCreateModify
