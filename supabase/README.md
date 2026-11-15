@@ -477,8 +477,8 @@ psql postgresql://postgres:postgres@127.0.0.1:15432/postgres -v ON_ERROR_STOP=1 
 The test replays the actual expand backfill for standalone, attached and
 materialized fixtures and confirms that a manual collision blocks cutover without
 losing its document. Run it with RLS and integration checks before deployment.
-Follow the [staged rollout](../docs/rollouts/unified-events.md): deploy its
-legacy-route compatibility patch first, then migrations, then the unified app.
+Follow the [staged rollout](../docs/rollouts/unified-events.md): deploy the
+legacy-route redirect (#270) first, then this migration and the unified app.
 The build switches application reads/writes after migrations succeed. If cutover reports a collision, resolve that saved manual URL with its
 owner and rerun the deployment; do not delete or overwrite the saved document.
 
