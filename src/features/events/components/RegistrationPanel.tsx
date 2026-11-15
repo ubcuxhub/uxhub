@@ -86,12 +86,14 @@ export async function RegistrationPanel({ event, user, state }: RegistrationPane
   const isMember = event.pricing_policy === "figma"
     ? hasActiveMembership(user, membershipTermEndsAt)
     : Boolean(user.membership_type_id);
+  const amount = isMember ? event.member_price : event.regular_price;
+  if (amount === null) return <Alert>Registration is unavailable until event pricing is configured.</Alert>;
   const context: PanelContext = {
     eventName: event.name,
     eventSlug: event.slug,
     endsAt: event.ends_at ?? event.starts_at,
     // The checkout's own rule (EventCheckout), so the two never disagree.
-    price: { amount: isMember ? event.member_price : event.regular_price, isMember },
+    price: { amount, isMember },
     participantPackageUrl: links.find((link) => link.type === "participant_package")?.url ?? null,
     draftProgress,
   };

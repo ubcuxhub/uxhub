@@ -1,5 +1,6 @@
 import type { DbClient } from "./types";
 import { TABLES } from "./tables";
+import { eventPresentation } from "@/features/admin/lib/event-presentation";
 import type {
   EventInsert,
   EventRow,
@@ -38,7 +39,7 @@ export async function fetchEvents(
   const { data, error } = await query;
 
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map(eventPresentation);
 }
 
 export async function fetchEventById(
@@ -52,7 +53,7 @@ export async function fetchEventById(
     .maybeSingle();
 
   if (error) throw error;
-  return data;
+  return data ? eventPresentation(data) : null;
 }
 
 export async function fetchEventBySlug(
@@ -73,7 +74,14 @@ export async function fetchEventBySlug(
   const { data, error } = await query.maybeSingle();
 
   if (error) throw error;
-  return data;
+  return data ? eventPresentation(data) : null;
+}
+
+/** Canonical IDs and recorded legacy routes share the same permanent event. */
+export async function fetchEventByLegacyDraftId(supabase: DbClient, id: string) {
+  const { data, error } = await supabase.from(TABLES.events).select("*").or(`id.eq.${id},legacy_draft_ids.cs.{${id}}`).maybeSingle();
+  if (error) throw error;
+  return data ? eventPresentation(data) : null;
 }
 
 /**
@@ -165,14 +173,16 @@ export type EventSchedulePatch = Pick<
 export async function updateEventSchedule(
   supabase: DbClient,
   id: string,
-  patch: EventSchedulePatch
+  patch: EventSchedulePatch,
+  expectedRevision?: number,
+  operationId?: string
 ): Promise<EventRow | null> {
   const { data, error } = await supabase
-    .rpc("update_admin_event_schedule", { p_event_id: id, p_patch: patch })
+    .rpc("update_admin_event_schedule", { p_event_id: id, p_patch: { ...patch, ...(expectedRevision !== undefined ? { _expected_revision: expectedRevision } : {}), ...(operationId ? { _operation_id: operationId } : {}) } })
     .maybeSingle();
 
   if (error) throw error;
-  return data;
+  return data ? eventPresentation(data) : null;
 }
 
 /** Staff-only aggregate, including in-flight purchases that lock repricing. */

@@ -21,6 +21,10 @@ import {
   type EventSchedulePatch,
 } from "@/lib/supabase-helpers/events";
 import { isUuid } from "@/lib/uuid";
+import { workingDocumentSaveInput } from "./lib/event-working-save";
+import { eventWorkingDocument } from "./lib/event-presentation";
+import { pacificDate } from "@/lib/date";
+import { hasEventScheduleReceipt } from "@/lib/supabase-helpers/event-mutations";
 
 export type UpdateEventScheduleResult =
   | { ok: true; event: EventRow }
@@ -56,8 +60,10 @@ export async function updateEventScheduleAction(
   if (typeof eventId !== "string" || !isUuid(eventId)) {
     return { ok: false, error: NOT_FOUND };
   }
+  if (!input || (input.expectedRevision !== undefined && (!Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 0))) return { ok: false, error: SAVE_FAILED };
+  if (input.operationId && !isUuid(input.operationId)) return { ok: false, error: SAVE_FAILED };
   const problem = eventScheduleProblem(input ?? {});
-  if (problem) return { ok: false, error: problem };
+  if (problem && !input.operationId) return { ok: false, error: problem };
 
   const patch: EventSchedulePatch = {
     status: input.status,
@@ -73,8 +79,20 @@ export async function updateEventScheduleAction(
     const supabase = await createClient();
     const current = await fetchEventById(supabase, eventId);
     if (!current) return { ok: false, error: NOT_FOUND };
+    if (input.operationId && await hasEventScheduleReceipt(supabaseAdmin, input.operationId, eventId, input)) return { ok: true, event: current };
+    if (problem) return { ok: false, error: problem };
 
     if (isPublishing(current, { status: input.status, publish_at: patch.publish_at ?? null })) {
+      const dates = eventWorkingDocument(current)?.formState.date_location?.dates;
+      if (dates && ((dates.length > 1 && (Date.parse(current.starts_at ?? "") !== Date.parse(input.starts_at ?? "") || Date.parse(current.ends_at ?? "") !== Date.parse(input.ends_at ?? ""))) || (dates.length === 1 && pacificDate(input.starts_at) !== pacificDate(input.ends_at)))) return { ok: false, error: "Edit individual event dates in the event form." };
+      const workingInput = workingDocumentSaveInput(current, input);
+      if (workingInput) {
+        const { saveAdminEventAction } = await import("./actions");
+        const result = await saveAdminEventAction(workingInput);
+        if ("error" in result) return { ok: false, error: result.error };
+        const saved = await fetchEventById(supabase, eventId);
+        return saved ? { ok: true, event: saved } : { ok: false, error: NOT_FOUND };
+      }
       const [checkInSessions, applicationQuestions] = await Promise.all([
         fetchCheckInSessions(supabase, eventId),
         fetchApplicationQuestions(supabase, eventId),
@@ -88,7 +106,7 @@ export async function updateEventScheduleAction(
     }
 
     const writer = user.role_access === "admin" ? supabase : supabaseAdmin;
-    const saved = await updateEventSchedule(writer, eventId, patch);
+    const saved = await updateEventSchedule(writer, eventId, patch, input.expectedRevision ?? current.revision, input.operationId);
     if (!saved) return { ok: false, error: NOT_FOUND };
 
     // The list and this event's overview (drawer and page), and the public
@@ -97,7 +115,7 @@ export async function updateEventScheduleAction(
     revalidatePath("/events", "layout");
     return { ok: true, event: saved };
   } catch (error) {
-    if (error && typeof error === "object" && "hint" in error && ["EVENT_SETTINGS_CONFLICT", "EVENT_HISTORY_LOCKED"].includes(String(error.hint)) && "message" in error && typeof error.message === "string") return { ok: false, error: error.message };
+    if (error && typeof error === "object" && "hint" in error && ["EVENT_SETTINGS_CONFLICT", "EVENT_HISTORY_LOCKED", "EVENT_PUBLICATION_INVALID", "EVENT_REVISION_CONFLICT"].includes(String(error.hint)) && "message" in error && typeof error.message === "string") return { ok: false, error: error.message };
     log.error("admin.event_schedule_save_failed", {
       eventId,
       ...errorFields(error),

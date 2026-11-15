@@ -40,6 +40,7 @@ function storedEvent(overrides: Partial<EventRow> = {}): EventRow {
     short_description: "Show your work.",
     description: "A night of portfolio reviews.",
     description_rich: null,
+    working_document: null, working_revision: 0, legacy_draft_ids: [],
     configured_marketing_mode: null,
     configured_marketing_url: null,
     configured_price: null,
@@ -127,7 +128,7 @@ describe("updateEventScheduleAction", () => {
       ends_at: input.ends_at,
       registration_opens_at: input.registration_opens_at,
       registration_closes_at: null,
-    });
+    }, 0, undefined);
     expect(revalidatePath).toHaveBeenCalledWith("/admin/events", "layout");
     expect(revalidatePath).toHaveBeenCalledWith("/events", "layout");
   });
@@ -137,7 +138,7 @@ describe("updateEventScheduleAction", () => {
 
     await updateEventScheduleAction(EVENT_ID, input);
 
-    expect(events.updateEventSchedule).toHaveBeenCalledWith(serviceClient, EVENT_ID, expect.any(Object));
+    expect(events.updateEventSchedule).toHaveBeenCalledWith(serviceClient, EVENT_ID, expect.any(Object), 0, undefined);
     // Reads still go through the session.
     expect(events.fetchEventById).toHaveBeenCalledWith(sessionClient, EVENT_ID);
   });

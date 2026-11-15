@@ -16,8 +16,8 @@ begin
     returning id into v_tier;
   insert into public.user_info(email,first_name,last_name,membership_type_id,membership_expires_at,role_access)
     values('rls-checkout-boundary@example.test','Boundary','Member',v_tier,now()+interval '1 year','basic') returning id into v_user;
-  insert into public.events(name,description,slug,status,configured_pricing_mode,configured_price,max_capacity,regular_price,member_price)
-    values('RLS checkout boundary','Rollback-only fixture','rls-checkout-boundary','active','paid',12.5,10,12.5,0) returning id into v_event;
+  insert into public.events(short_description,starts_at,ends_at,name,description,slug,status,configured_pricing_mode,configured_price,max_capacity,regular_price,member_price)
+    values('Checkout fixture',now()+interval '1 day',now()+interval '2 days','RLS checkout boundary','Rollback-only fixture','rls-checkout-boundary','active','paid',12.5,10,12.5,0) returning id into v_event;
   for v_index in 1..3 loop
     if v_index = 1 then
       update public.app_settings set membership_term_ends_at = now();

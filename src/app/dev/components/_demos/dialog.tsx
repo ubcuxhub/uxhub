@@ -30,7 +30,7 @@ function DialogDemo({ open }: SectionProps) {
             <DialogTrigger asChild><Button variant="outline">Open action-only dialog</Button></DialogTrigger>
             <DialogContent showCloseButton={false}>
               <DialogHeader><DialogTitle>Leave without saving?</DialogTitle><DialogDescription>Save a draft to keep your changes, or leave and lose them. Esc and outside clicks still dismiss this dialog.</DialogDescription></DialogHeader>
-              <DialogFooter><DialogClose asChild><Button variant="outline">Keep editing</Button></DialogClose><DialogClose asChild><Button>Save draft and leave</Button></DialogClose></DialogFooter>
+              <DialogFooter className="flex-wrap gap-4 sm:gap-4 sm:space-x-0"><DialogClose asChild><Button variant="outline">Keep editing</Button></DialogClose><DialogClose asChild><Button variant="outline">Leave without saving</Button></DialogClose><DialogClose asChild><Button>Save draft and leave</Button></DialogClose></DialogFooter>
             </DialogContent>
           </Dialog>
         </Specimen>

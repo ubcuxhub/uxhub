@@ -9,8 +9,8 @@ import { searchMentors, searchSponsors } from "@/lib/supabase-helpers/event-peop
 
 import { parseDateLocationDraft, dateLocationProblem, dateSessions, type EventDateLocationDraft } from "./lib/event-date-location";
 
-import { saveEventDraft, fetchEventDraft, eventImageIsReferenced } from "@/lib/supabase-helpers/event-drafts";
-import type { EventWorkingDocument } from "./lib/event-working-document";
+import { saveEventDraft, fetchEventDraft, eventImageIsReferenced, recoverEventDraftReceipt } from "@/lib/supabase-helpers/event-drafts";
+import { workingDocumentImageUrls, type EventWorkingDocument } from "./lib/event-working-document";
 import { parseEventDescription, descriptionText } from "@/lib/event-description";
 import { revalidatePath } from "next/cache";
 
@@ -228,7 +228,7 @@ export interface SaveAdminEventInput {
  * questions, each in the order they were sent, or why the save was refused.
  */
 export type SaveAdminEventResult =
-  | { revision?: number; id: string; checkInSessionIds: string[]; questionIds: string[]; dateLocationRevision?: number; content?: EventContent; publication?: SavedEventPublication }
+  | { revision?: number; pageSlug?: string; id: string; checkInSessionIds: string[]; questionIds: string[]; dateLocationRevision?: number; content?: EventContent; publication?: SavedEventPublication }
   | { error: string };
 
 // Not exported: a "use server" module may only export async functions, and the
@@ -297,7 +297,7 @@ export async function discardUnusedEventImageAction(imageUrl: string) {
   await discardEventImage(imageUrl);
 }
 
-export async function saveAdminEventDraftAction(input: { id: string; eventId: string | null; revision: number; document: EventWorkingDocument }) {
+export async function saveAdminEventDraftAction(input: { id: string; eventId: string | null; revision: number; document: EventWorkingDocument; eventRevision?: number; operationId?: string }): Promise<{ id: string; eventId?: string; revision: number; pageSlug?: string; eventRevision?: number } | { error: string }> {
   await requireAdmin();
   // Live edits remain local until the deliberate Update action.
   if (input.eventId) {
@@ -305,11 +305,24 @@ export async function saveAdminEventDraftAction(input: { id: string; eventId: st
     if (!event || event.status !== "draft" || event.publish_at) throw new Error("Only unscheduled drafts can save working documents.");
   }
   const previous = await fetchEventDraft(supabaseAdmin, input.id);
-  const saved = await saveEventDraft(supabaseAdmin, input.id, input.eventId, input.revision, input.document);
-  await discardEventImage(previous?.document.formState.image_url);
-  await discardEventImage(previous?.document.formState.header_image_url);
+  let saved: Awaited<ReturnType<typeof saveEventDraft>>;
+  try {
+    saved = await saveEventDraft(supabaseAdmin, input.id, input.eventId, input.revision, input.document, input.eventRevision, input.operationId);
+  } catch (error) {
+    const message = error && typeof error === "object" && "message" in error ? error.message : null;
+    if (typeof message === "string" && [
+      "This page URL is already in use.",
+      "The page URL is locked after first publication.",
+      "Use a valid, non-reserved page URL of at most 100 characters.",
+      "This draft changed in another tab. Reload it before saving again.",
+    ].includes(message)) return { error: message };
+    throw error;
+  }
+  if (previous) await Promise.all(workingDocumentImageUrls(previous.document).map(discardEventImage));
   revalidatePath("/admin/events", "layout");
-  return { id: saved.id, revision: saved.revision };
+  revalidatePath("/portal/events", "layout");
+  revalidatePath("/events", "layout");
+  return { id: saved.id, eventId: saved.eventId, revision: saved.revision, pageSlug: saved.document.formState.page_slug, eventRevision: saved.eventRevision };
 }
 
 /**
@@ -402,6 +415,14 @@ export async function saveAdminEventAction(
   // The cover-image precondition is checked inside the same statement that
   // writes the row, so a stale tab cannot overwrite a replacement made
   // elsewhere between this form loading and saving.
+  const draftIdentity = input.draftId ?? input.eventId;
+  const previousDraft = draftIdentity ? await fetchEventDraft(supabaseAdmin, draftIdentity) : null;
+  if (previousDraft) {
+    const state = previousDraft.document.formState;
+    if (state.content && !input.content) return { error: "Reload saved people and resources before publishing." };
+    if (state.date_location && !input.dateLocation) return { error: "Reload saved dates and locations before publishing." };
+    if ((state.decisions_release_at || state.confirmation_deadline) && !input.applicationTiming) return { error: "Reload saved application timing before publishing." };
+  }
   const { data, error } = await supabaseAdmin.rpc(
     "save_admin_event_builder",
     {
@@ -435,7 +456,7 @@ export async function saveAdminEventAction(
       "Pricing is locked because registrations or payments exist.",
     ];
     if (configurationMessages.includes(error.message)) return { error: error.message };
-    if (error.code === "23505" && /events_slug|event_url_claims/.test(error.message)) throw new Error("This page URL is already in use.");
+    if (error.code === "23505" && /events_slug|idx_events_slug|event_url_claims/.test(error.message)) return { error: "This page URL is already in use." };
     if (error.code === "23514" && /events_configured_/.test(error.message)) throw new Error("Review the marketing destination and pricing before saving.");
     if (error.code === "23514" && /events_(min_team_size|max_team_size|team_size_range)_check/.test(error.message)) return { error: "Team sizes must be positive whole numbers with minimum no greater than maximum." };
     if (error.hint === "EVENT_CONTENT_INVALID") return { error: error.message };
@@ -451,8 +472,10 @@ export async function saveAdminEventAction(
     content?: EventContent;
     date_location_revision?: number;
     publication?: SavedEventPublication;
+    page_slug?: string;
   } | null;
   if (!saved?.id) throw new Error("The event save returned no event id.");
+  if (previousDraft) await Promise.all(workingDocumentImageUrls(previousDraft.document).map(discardEventImage));
 
   // The save landed, so the image it replaced is unreferenced.
   if (input.eventId && (input.event.image_url ?? null) !== input.expectedImageUrl) {
@@ -478,6 +501,7 @@ export async function saveAdminEventAction(
   return {
     id: saved.id,
     revision: saved.revision,
+    pageSlug: saved.page_slug ?? input.event.configured_slug ?? slug ?? undefined,
     publication: saved.publication,
     content: saved.content,
     dateLocationRevision: saved.date_location_revision,
@@ -780,8 +804,10 @@ export async function loadAdminEventDeletionInfoAction(eventId: string) {
   return { name: event.name, ...await fetchEventHistoryInfo(supabaseAdmin, eventId) };
 }
 
-export async function recoverAdminEventDraftAction(id: string) {
+export async function recoverAdminEventDraftAction(id: string, operationId?: string) {
   await requireAdmin();
+  if (operationId) return recoverEventDraftReceipt(supabaseAdmin, operationId);
   const draft = await fetchEventDraft(supabaseAdmin, id);
-  return draft ? { revision: draft.revision, document: draft.document } : null;
+  if (!draft) return null;
+  return { revision: draft.revision, document: draft.document, eventRevision: draft.event_revision ?? undefined };
 }

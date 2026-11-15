@@ -25,7 +25,7 @@ import { formatEventDate } from "@/lib/date";
 import type { EventStatus } from "@/lib/supabase/models";
 import { useListPage } from "../hooks/use-list-page";
 import { useRecordRows } from "../hooks/use-record-rows";
-import type { AdminEventDirectoryRow } from "../lib/admin-event-table";
+import type { AdminEventTableRow } from "../lib/admin-event-table";
 import { toggleSetValue } from "../lib/directory";
 import { ChipFilterSection } from "./ChipFilterSection";
 import { EVENT_STATUS_LABELS, EventStatusBadge } from "./EventStatusBadge";
@@ -60,29 +60,17 @@ const EVENT_NOUN = { one: "event", other: "events" };
 const LIST_HREF = "/admin/events";
 const COLUMNS = 5;
 
-const eventHref = (row: AdminEventDirectoryRow) => {
-  if ("draftId" in row) {
-    return row.eventId
-      ? `${LIST_HREF}/${row.eventId}/edit`
-      : `${LIST_HREF}/drafts/${row.draftId}`;
-  }
-  return `${LIST_HREF}/${row.event.id}`;
-};
-
-/** A working draft still belongs to its source event when its drawer is open. */
-const eventRecordHref = (row: AdminEventDirectoryRow) => {
-  const eventId = "draftId" in row ? row.eventId : row.event.id;
-  return eventId ? `${LIST_HREF}/${eventId}` : eventHref(row);
-};
+const eventHref = (row: AdminEventTableRow) => `${LIST_HREF}/${row.event.id}`;
+const eventRecordHref = eventHref;
 
 /** A draft takes no registrations, so it has no registration status. */
-function getRegistrationStatus(row: AdminEventDirectoryRow): RegistrationStatus {
+function getRegistrationStatus(row: AdminEventTableRow): RegistrationStatus {
   if (row.event.status === "draft") return "not-applicable";
   return row.registrationOpen ? "open" : "closed";
 }
 
 /** Sorts in place by start date. Undated events come last either way. */
-function sortEvents(rows: AdminEventDirectoryRow[], sort: EventSort) {
+function sortEvents(rows: AdminEventTableRow[], sort: EventSort) {
   return rows.sort((a, b) => {
     const aDate = a.event.starts_at;
     const bDate = b.event.starts_at;
@@ -96,7 +84,7 @@ function sortEvents(rows: AdminEventDirectoryRow[], sort: EventSort) {
  * Manage events: search, sort, filter and page the events. Each row links to
  * the event's overview drawer, or resumes a working draft in its editor.
  */
-export function AdminEventsTable({ rows }: { rows: AdminEventDirectoryRow[] }) {
+export function AdminEventsTable({ rows }: { rows: AdminEventTableRow[] }) {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<EventSort>(DEFAULT_SORT);
   const [statusFilter, setStatusFilter] = useState<Set<EventStatus>>(new Set());
@@ -207,22 +195,21 @@ export function AdminEventsTable({ rows }: { rows: AdminEventDirectoryRow[] }) {
               <TableEmpty colSpan={COLUMNS}>No events match your search and filters.</TableEmpty>
             ) : (
               paging.pageRows.map((row) => {
-                const workingDraft = "draftId" in row;
                 const href = eventHref(row);
-                const reviewEventId = workingDraft ? row.eventId : row.event.id;
+                const reviewEventId = row.event.id;
                 const registration = getRegistrationStatus(row);
                 const recordHref = eventRecordHref(row);
                 const linkProps = records.linkProps(recordHref);
                 return (
-                  <TableRow key={workingDraft ? `draft:${row.draftId}` : row.event.id} {...records.rowProps(recordHref)}>
+                  <TableRow key={row.event.id} {...records.rowProps(recordHref)}>
                     <TableCell className="max-w-72 truncate">
-                      <TableRowLink {...linkProps} href={href} replace={workingDraft ? false : linkProps.replace} aria-current={workingDraft ? undefined : linkProps["aria-current"]}>{row.event.name}</TableRowLink>
+                      <TableRowLink {...linkProps} href={href} replace={linkProps.replace} aria-current={linkProps["aria-current"]}>{row.event.name}</TableRowLink>
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-muted-foreground">
                       {formatEventDate(row.event.starts_at, { month: "short" }) ?? <TableNone />}
                     </TableCell>
                     <TableCell>
-                      <EventStatusBadge status={row.event.status} publishAt={workingDraft ? null : row.event.publish_at} />
+                      <EventStatusBadge status={row.event.status} publishAt={row.event.publish_at} />
                     </TableCell>
                     <TableCell>
                       <Badge variant={registration === "open" ? "success" : "neutral"}>
@@ -233,7 +220,7 @@ export function AdminEventsTable({ rows }: { rows: AdminEventDirectoryRow[] }) {
                       ) : null}
                     </TableCell>
                     <TableCell className="whitespace-nowrap tabular-nums">
-                      {workingDraft && !row.eventId ? <TableNone /> : (
+                      {(
                         <>
                           {row.registrationCount}{" "}
                           <span className="text-muted-foreground">/ {row.event.max_capacity ?? <TableNone />}</span>

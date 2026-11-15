@@ -147,7 +147,6 @@ export function getInitialFormState(): EventFormState {
   return {
     ...defaultFormState,
     date_location: { automatic: true, audience: "everyone", location: emptyLocation(), dates: [emptyEventDate()] },
-    starts_at: timestamptzToDatetimeLocal(new Date().toISOString()),
   };
 }
 

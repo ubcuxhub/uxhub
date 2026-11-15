@@ -259,7 +259,7 @@ export function CheckInManager({
                           Max Capacity
                         </p>
                         <p className="text-body">
-                          {event.max_capacity} attendees
+                          {event.max_capacity == null ? "Not set" : `${event.max_capacity} attendees`}
                         </p>
                       </div>
                       <div>
@@ -267,10 +267,10 @@ export function CheckInManager({
                           Price
                         </p>
                         <p className="text-body">
-                          ${Number(event.regular_price ?? 0).toFixed(2)}
+                          {event.regular_price == null ? "Not set" : `$${event.regular_price.toFixed(2)}`}
                           {event.member_price !== event.regular_price && (
                             <span className="text-muted-foreground ml-1">
-                              / ${Number(event.member_price ?? 0).toFixed(2)}{" "}
+                              / {event.member_price == null ? "Not set" : `$${event.member_price.toFixed(2)}`}{" "}
                               member
                             </span>
                           )}

@@ -110,7 +110,8 @@ const MEMBER_BADGES: Record<string, EventBadge> = {
 };
 
 const EVENT: EventRow = {
-  configured_marketing_mode: null,
+  working_document: null, working_revision: 0, legacy_draft_ids: [],
+    configured_marketing_mode: null,
   configured_marketing_url: null,
   configured_price: null,
   configured_pricing_mode: null,

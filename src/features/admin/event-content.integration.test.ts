@@ -80,15 +80,15 @@ describe("atomic people and resource editor", () => {
   it("rejects empty sections and unsafe URLs even via direct database saves; allows incomplete links only in working drafts", () => withFixtures(async fixtures => {
     const event = await fixtures.createEvent(); const doc = document(); doc.sections[0].items = [];
     expect((await save(event.id, doc)).error?.hint).toBe("EVENT_CONTENT_INVALID");
-    expect((await db.rpc("validate_event_content", { p_document: doc as unknown as Json, p_draft: true })).error?.hint).toBe("EVENT_CONTENT_INVALID");
+    expect((await db.rpc("validate_event_content", { p_document: doc as unknown as Json, p_draft: true })).error).toBeNull();
     const unsafe = document(); unsafe.links[0].url = "javascript:alert(1)";
     expect((await save(event.id, unsafe)).error?.hint).toBe("EVENT_CONTENT_INVALID");
     unsafe.links[0].url = "";
     expect((await db.rpc("validate_event_content", { p_document: unsafe as unknown as Json, p_draft: true })).error).toBeNull();
     expect((await save(event.id, unsafe)).error?.hint).toBe("EVENT_CONTENT_INVALID");
   }));
-  it("restores incomplete working content, protects image references and rejects empty sections through direct draft writes", () => withFixtures(async fixtures => {
-    const id = fixtures.track("admin_event_drafts", crypto.randomUUID());
+  it("restores incomplete working content, protects image references and preserves unfinished empty sections", () => withFixtures(async fixtures => {
+    const id = fixtures.track("events", crypto.randomUUID());
     const content = document();
     content.sections[0].items[0].name = "";
     content.sections[0].items[0].image_url = "https://example.test/entry.png";
@@ -98,9 +98,9 @@ describe("atomic people and resource editor", () => {
     expect((await fetchEventDraft(db, id))?.document.formState.content).toEqual(content);
     expect(await eventImageIsReferenced(db, "https://example.test/entry.png")).toBe(true);
     content.sections[0].items = [];
-    const refused = await db.rpc("save_admin_event_draft", { p_id: id, p_event_id: null!, p_revision: 1, p_document: draft as unknown as Json });
-    expect(refused.error?.hint).toBe("EVENT_CONTENT_INVALID");
-    expect((await fetchEventDraft(db, id))?.revision).toBe(1);
+    const saved = await db.rpc("save_admin_event_draft", { p_id: id, p_event_id: null!, p_revision: 1, p_document: draft as unknown as Json });
+    expect(saved.error).toBeNull();
+    expect((await fetchEventDraft(db, id))?.document.formState.content?.sections[0].items).toEqual([]);
   }));
   it("keeps editor state staff-only, denies browser writes and preserves Going/staff resource access after the event", () => withFixtures(async fixtures => {
     const event = await fixtures.createEvent({ status: "active", starts_at: "2020-01-01T00:00:00Z", ends_at: "2020-01-02T00:00:00Z" });

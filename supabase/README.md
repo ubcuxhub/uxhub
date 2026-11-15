@@ -437,6 +437,51 @@ The section-aware attendee renderer remains deferred.
 
 ## Event builder mutation safety
 
+`events` owns the permanent event identity from the first Save draft. Unscheduled
+drafts allow null descriptions, prices, capacity and dates; exact unfinished form
+values and nested sections live in `working_document`, with `working_revision`.
+An explicit Free selection still means zero; an unfinished paid/legacy amount
+stays null. Row RLS makes drafts staff-only. A CHECK prohibits working documents
+on scheduled/published rows, so public event reads never include private payloads.
+All staff readers use the working-document adapter. Draft Save, full builder Save,
+quick schedule editing and publication share the event/advisory lock, revisions,
+URL claims and operation receipts. Both incomplete and complete saves allocate
+automatic URL collisions under the transaction lock and receipt the actual
+canonical URL. Full saves refuse omitted saved nested sections. Publication
+writes related tables and clears
+the working document in the same transaction. Missing prices never enable checkout.
+
+The expand migration backfills standalone drafts to their original draft UUID;
+attached/materialized drafts retain the existing event UUID. `legacy_draft_ids`
+records route aliases. Manual URL conflicts abort backfill with the draft ID;
+automatic names receive numbered URLs. A rename updates `slug` and
+`configured_slug` together and releases the old claim. First-publication locks
+remain permanent. Old draft routes redirect to the canonical ID editor.
+
+`admin_event_drafts` and the old RPC signatures remain **compatibility mirrors**
+during deployment overlap. They are not application read sources. Compatible
+wrappers write the unified row, and mirror saves/full-save materialization for the
+old deployment. A legacy publication receipt derives from its draft ID/revision;
+new callers send an operation UUID. Do not remove legacy storage/functions in this
+release. After backfill verification and confirmation that all old deployments
+(and pending retries) have retired, a separate contract migration may remove the
+mirrors and superseded wrappers. Never drop `admin_event_mutations` receipts or
+legacy route aliases as part of that cleanup.
+
+Migration verification (local, rolls back all fixtures and writes):
+
+```sh
+psql postgresql://postgres:postgres@127.0.0.1:15432/postgres -v ON_ERROR_STOP=1 -f supabase/tests/unified-draft-migration.sql
+```
+
+The test replays the actual expand backfill for standalone, attached and
+materialized fixtures and confirms that a manual collision blocks cutover without
+losing its document. Run it with RLS and integration checks before deployment.
+Follow the [staged rollout](../docs/rollouts/unified-events.md): deploy the
+legacy-route redirect (#270) first, then this migration and the unified app.
+The build switches application reads/writes after migrations succeed. If cutover reports a collision, resolve that saved manual URL with its
+owner and rerun the deployment; do not delete or overwrite the saved document.
+
 `events.revision` increments for every event-row update, including overview and
 scheduled publication. Builder server actions send the loaded revision and a
 stable operation UUID. `admin_event_mutations` stores committed responses in the

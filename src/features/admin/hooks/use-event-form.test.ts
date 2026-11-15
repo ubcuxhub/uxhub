@@ -51,6 +51,37 @@ it("retries a failed draft save with the latest edited values and preserves leav
   expect(toast.dismiss).toHaveBeenCalledWith(options.id);
 });
 
+it("keeps a rejected duplicate URL editable and displays the server's readable refusal", async () => {
+  const { result } = renderHook(() => useEventForm({}));
+  act(() => result.current.handleFieldChange("page_slug", "taken-url"));
+  vi.mocked(saveAdminEventDraftAction).mockResolvedValueOnce({ error: "This page URL is already in use." });
+  await act(async () => { expect(await result.current.handleSaveDraft(false)).toBe(false); });
+  expect(result.current.formState.page_slug).toBe("taken-url");
+  expect(result.current.hasUnsavedChanges).toBe(true);
+  expect(result.current.error).toBeNull();
+  expect(result.current.serverIssues).toEqual([{ section: "basics", target: "event-page-slug", message: "This page URL is already in use.", required: false }]);
+  expect(result.current.validationAttempt).toBe(1);
+  expect(toast.error).not.toHaveBeenCalled();
+  act(() => result.current.handleFieldChange("page_slug", "available-url"));
+  expect(result.current.serverIssues).toEqual([]);
+  await act(async () => { expect(await result.current.handleSaveDraft(false)).toBe(true); });
+  expect(saveAdminEventDraftAction).toHaveBeenLastCalledWith(expect.objectContaining({ document: expect.objectContaining({ formState: expect.objectContaining({ page_slug: "available-url" }) }) }));
+});
+
+it("attaches publication URL conflicts to the field without a save-error toast", async () => {
+  const { result } = renderHook(() => useEventForm({ eventId: event.id, initialEvent: event }));
+  act(() => result.current.handleFieldChange("page_slug", "taken-url"));
+  vi.mocked(saveAdminEventAction).mockResolvedValueOnce({ error: "This page URL is already in use." });
+  await act(async () => { expect(await result.current.handlePublication("publish")).toBe(false); });
+  expect(saveAdminEventAction).toHaveBeenCalled();
+  expect(result.current.error).toBeNull();
+  expect(result.current.serverIssues).toEqual([expect.objectContaining({ target: "event-page-slug", message: "This page URL is already in use." })]);
+  expect(toast.error).not.toHaveBeenCalled();
+  act(() => result.current.handleFieldChange("page_slug", "available-url"));
+  expect(result.current.serverIssues).toEqual([]);
+  await act(async () => { expect(await result.current.handlePublication("publish")).toBe(true); });
+});
+
 describe("legacy browser draft recovery", () => {
   const key = "event_create_form_draft";
   it("restores incomplete work as dirty and keeps the browser copy until a durable save succeeds", async () => {
@@ -473,6 +504,18 @@ describe("drafts with saved event children", () => {
     await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as FormEvent<HTMLFormElement>);
   });
 
+  it("uses the canonical URL and event revision returned by Save draft for subsequent publication", async () => {
+    const { result } = renderHook(() => useEventForm({ ...options, initialEvent: { ...storedEvent, configured_slug_edited: false } }));
+    act(() => result.current.handleFieldChange("name", "Workshop"));
+    vi.mocked(saveAdminEventDraftAction).mockResolvedValueOnce({ id: "draft-1", revision: 2, eventRevision: 7, pageSlug: "workshop-1" });
+    await act(async () => { expect(await result.current.handleSaveDraft(false)).toBe(true); });
+    expect(result.current.formState.page_slug).toBe("workshop-1");
+    expect(result.current.hasUnsavedChanges).toBe(false);
+    await submit(result);
+    expect(result.current.error).toBeNull();
+    expect(saveAdminEventAction).toHaveBeenLastCalledWith(expect.objectContaining({ expectedRevision: 7, draftRevision: 2, event: expect.objectContaining({ configured_slug: "workshop-1" }) }));
+  });
+
   it("loads branding and formatting and round-trips saved IDs through a working document", async () => {
     const { result, unmount } = renderHook(() => useEventForm(options));
     expect(result.current.formState).toMatchObject({ description_rich: storedEvent.description_rich, header_image_url: storedEvent.header_image_url, header_colour: "", event_colour: storedEvent.event_colour });
@@ -585,6 +628,75 @@ it.each([true, false])("round-trips schedule visibility %s through working draft
 });
 
 describe("builder publication commands", () => {
+  it.each([false, true])("saves repeatedly after reverting an event with retained draft revision (publish in this session: %s)", async publishFirst => {
+    const existing = { ...event, status: publishFirst ? "draft" as const : "active" as const, publish_at: null, revision: 6, working_revision: 3, configured_slug: event.slug, configured_slug_edited: false };
+    const initialDraft = publishFirst ? { id: existing.id, revision: 3, document: { version: 1 as const, formState: formStateFromEvent(existing), checkInEvents: [], mentors: [], sponsors: [], applicationTemplate: [] } } : null;
+    const { result } = renderHook(() => useEventForm({ eventId: existing.id, initialEvent: existing, initialDraft }));
+    let workingRevision = 3;
+    vi.mocked(saveAdminEventDraftAction).mockImplementation(async input => {
+      if (input.revision !== workingRevision) return { error: "This draft changed in another tab. Reload it before saving again." };
+      return { id: input.id, eventId: existing.id, revision: ++workingRevision };
+    });
+    if (publishFirst) await act(async () => { expect(await result.current.handlePublication("publish")).toBe(true); });
+    await act(async () => { expect(await result.current.handlePublication("revert")).toBe(true); });
+    expect(result.current.urlLocked).toBe(true);
+    for (const name of ["First draft edit", "Second draft edit"]) {
+      act(() => result.current.handleFieldChange("name", name));
+      expect(result.current.formState.page_slug).toBe(existing.slug);
+      await act(async () => { expect(await result.current.handleSaveDraft(false)).toBe(true); });
+      expect(saveAdminEventDraftAction).toHaveBeenLastCalledWith(expect.objectContaining({ id: existing.id, eventId: existing.id }));
+      expect(result.current.error).toBeNull();
+      expect(result.current.hasUnsavedChanges).toBe(false);
+    }
+    expect(workingRevision).toBe(5);
+  });
+
+  it("reverts a published event with current edits using the loaded revision and updates draft controls", async () => {
+    const live = { ...event, status: "active" as const, publish_at: null, revision: 4 };
+    const { result } = renderHook(() => useEventForm({ eventId: live.id, initialEvent: live }));
+    act(() => result.current.handleFieldChange("name", "Revised event"));
+    vi.mocked(saveAdminEventAction).mockResolvedValueOnce({ id: live.id, revision: 5, checkInSessionIds: [], questionIds: [] });
+    await act(async () => { expect(await result.current.handlePublication("revert")).toBe(true); });
+    expect(saveAdminEventAction).toHaveBeenCalledWith(expect.objectContaining({
+      eventId: live.id,
+      expectedRevision: 4,
+      expectedPublication: { status: "active", publish_at: null },
+      event: expect.objectContaining({ name: "Revised event", status: "draft", publish_at: null }),
+    }));
+    expect(saveAdminEventDraftAction).not.toHaveBeenCalled();
+    expect(result.current.publication).toEqual({ status: "draft", publish_at: null });
+    expect(result.current.formState.status).toBe("draft");
+    expect(result.current.showDraftSaved).toBe(true);
+    expect(result.current.publicationSuccess).toBeNull();
+    expect(result.current.hasUnsavedChanges).toBe(false);
+    await act(async () => { expect(await result.current.handlePublication("publish")).toBe(true); });
+    expect(saveAdminEventAction).toHaveBeenLastCalledWith(expect.objectContaining({ expectedRevision: 5, expectedPublication: { status: "draft", publish_at: null }, event: expect.objectContaining({ status: "active" }) }));
+  });
+
+  it("keeps a failed revert published with edits intact and retries the revert", async () => {
+    const live = { ...event, status: "active" as const, publish_at: null };
+    const { result } = renderHook(() => useEventForm({ eventId: live.id, initialEvent: live }));
+    act(() => result.current.handleFieldChange("name", "Keep my edits"));
+    vi.mocked(saveAdminEventAction).mockResolvedValueOnce({ error: "Connection lost" });
+    await act(async () => { expect(await result.current.handlePublication("revert")).toBe(false); });
+    expect(result.current.publication.status).toBe("active");
+    expect(result.current.showDraftSaved).toBe(false);
+    expect(result.current.formState.name).toBe("Keep my edits");
+    expect(result.current.hasUnsavedChanges).toBe(true);
+    const options = vi.mocked(toast.error).mock.calls.at(-1)![1]!;
+    await act(async () => { options.action!.onClick(); });
+    expect(result.current.publication.status).toBe("draft");
+    expect(result.current.showDraftSaved).toBe(true);
+  });
+
+  it("refuses to revert a past event", async () => {
+    const live = { ...event, status: "active" as const, publish_at: null, ends_at: "2020-01-01T19:00:00Z" };
+    const { result } = renderHook(() => useEventForm({ eventId: live.id, initialEvent: live }));
+    await act(async () => { expect(await result.current.handlePublication("revert")).toBe(false); });
+    expect(saveAdminEventAction).not.toHaveBeenCalled();
+    expect(result.current.publication.status).toBe("active");
+  });
+
   it("reveals required issues only after attempting Publish and keeps incomplete drafts savable", async () => {
     const { result } = renderHook(() => useEventForm({}));
     expect(result.current.publishAttempted).toBe(false);
@@ -679,4 +791,14 @@ it("becomes Past only at the saved final end while retaining its published statu
     expect(result.current.past).toBe(true);
     expect(result.current.publication.status).toBe("active");
   } finally { vi.useRealTimers(); }
+});
+
+
+it.each(["setPendingImageFile", "setPendingHeaderFile"] as const)("includes pending images in dirty state through %s", setter => {
+  const { result } = renderHook(() => useEventForm({}));
+  expect(result.current.hasUnsavedChanges).toBe(false);
+  act(() => result.current[setter](new File(["image"], "event.png", { type: "image/png" })));
+  expect(result.current.hasUnsavedChanges).toBe(true);
+  act(() => result.current[setter](null));
+  expect(result.current.hasUnsavedChanges).toBe(false);
 });

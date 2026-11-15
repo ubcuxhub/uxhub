@@ -58,6 +58,10 @@ function HubboDemo() {
         </div>
       </Composition>
 
+      <Composition title="Event save confirmations" description="200px full-body artwork: Excited for publication and scheduling; Proud for updates and saved drafts.">
+        <div className="flex flex-wrap items-end gap-4"><Hubbo emotion="excited" size="hero" className="h-50" /><Hubbo emotion="proud" size="hero" className="h-50" /></div>
+      </Composition>
+
       <Composition
         title="Hubbo in an empty state"
         description="Card size above the copy, passed to EmptyState’s media slot. One per screen, never on payments or rejections."

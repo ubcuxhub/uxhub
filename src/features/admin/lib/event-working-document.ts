@@ -14,6 +14,15 @@ export interface EventWorkingDocument {
   applicationTemplate: ApplicationQuestionTemplate[];
 }
 
+export function workingDocumentImageUrls(document: EventWorkingDocument): string[] {
+  return [...new Set([
+    document.formState.image_url, document.formState.header_image_url,
+    ...document.mentors.map(item => item.profile_image_path),
+    ...document.sponsors.map(item => item.brand_logo_path),
+    ...(document.formState.content?.sections.flatMap(section => section.items.map(item => item.image_url)) ?? []),
+  ].filter(Boolean))];
+}
+
 /** Working documents permit incomplete values, but never executable URLs or files. */
 export function parseWorkingDocument(input: unknown): EventWorkingDocument {
   if (!input || typeof input !== "object") throw new Error("Invalid draft document.");

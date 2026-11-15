@@ -65,7 +65,7 @@ export default async function ReviewApplicationsPage({
       eventId={eventId}
       eventName={event.name}
       subtitle={subtitle}
-      capacity={event.max_capacity}
+      capacity={event.max_capacity ?? undefined}
       applications={summaries.map((summary) => ({
         ...withReviewState(summary),
         noteCount: noteCounts[summary.applicationId] ?? 0,

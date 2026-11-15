@@ -1,7 +1,7 @@
 /**
  * Automatic page URLs against the local database: a second event with the
- * same name is numbered past the URLs other events claim (identity slugs and
- * configured page URLs alike), re-saving keeps an event's own URL, and a URL
+ * same name is numbered past the canonical URLs other events claim,
+ * re-saving keeps an event's own URL, and a URL
  * the admin typed still gets the "already in use" refusal.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -74,9 +74,10 @@ describe("automatic event page URLs", () => {
     expect(firstResaved.event.configured_slug).toBe(base);
   }));
 
-  it("numbers both URLs past a URL another event claims only as its configured page", () => withFixtures(async fixtures => {
+  it("numbers an automatic URL past a custom URL another event owns", () => withFixtures(async fixtures => {
     const base = `meetup-${fixtures.tag}`;
-    await fixtures.createEvent({ slug: `elsewhere-${fixtures.tag}`, configured_slug: base });
+    const custom = await fixtures.createEvent({ slug: `elsewhere-${fixtures.tag}`, configured_slug: base });
+    expect(custom).toMatchObject({ slug: base, configured_slug: base });
 
     const created = await save(fixtures, input(`Meetup ${fixtures.tag}`, { edited: false, slug: base }));
     expect(created.event).toMatchObject({ slug: `${base}-1`, configured_slug: `${base}-1` });

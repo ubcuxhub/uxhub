@@ -81,7 +81,7 @@ export function eventContentProblem(content: EventContent, draft = false): strin
   const titles = new Set<string>();
   const groups = new Set<string>();
   for (const section of content.sections) {
-    if (!section.items.length) return `${section.title || "Custom section"}: Add at least one item or remove this section.`;
+    if (!draft && !section.items.length) return `${section.title || "Custom section"}: Add at least one item or remove this section.`;
     const title = section.title.trim().toLowerCase();
     if (!title || titles.has(title)) return "Section names must be nonblank and unique.";
     titles.add(title);

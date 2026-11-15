@@ -21,6 +21,9 @@ import { eventBadgeFor } from "@/features/events/lib/event-badge";
 import { loadEventStates } from "@/features/events/lib/event-states";
 import { RegistrationPanel } from "@/features/events/components/RegistrationPanel";
 import { TeamCard, TeamInviteNotice } from "@/features/events/components/teams/TeamCard";
+import { EventDraftSections } from "@/features/events/components/EventDraftSections";
+import { eventWorkingDocument } from "@/features/admin/lib/event-presentation";
+import { Button } from "@/components/ui/button";
 import { loadTeamCard, type TeamCardData } from "@/features/events/lib/team-card-data";
 import { getHeadersOrigin } from "@/lib/http/request-origin";
 
@@ -34,8 +37,6 @@ export default async function PortalEventPage({
   params,
   searchParams,
 }: PortalEventPageProps) {
-  if (!FLAGS.studentEvents) notFound();
-
   const [{ event: slug }, { join }] = await Promise.all([params, searchParams]);
   const user = await requireAuth();
   const supabase = await createClient();
@@ -46,6 +47,7 @@ export default async function PortalEventPage({
   if (!event) {
     notFound();
   }
+  if (!FLAGS.studentEvents && event.status !== "draft") notFound();
   
   const joinCode = typeof join === "string" ? join : null;
   const origin = getHeadersOrigin(await headers()) ?? "";
@@ -69,7 +71,7 @@ export default async function PortalEventPage({
   return (
     <PageContainer backHref="/portal/events" backLabel="Back to Events" className="space-y-4">
       {event.status !== "active" && (
-        <Alert>Draft: only admins can see this.</Alert>
+        <Alert>Draft: only admins and managers can see this.</Alert>
       )}
       
       <div className="border-border-subtle rounded-md border">
@@ -138,7 +140,8 @@ export default async function PortalEventPage({
       </div>
 
       {/* Registration and applications: one card whose layout follows the student's state. */}
-      <RegistrationPanel event={{ ...event, slug }} user={user} state={states[event.id]} />
+      {event.status === "draft" ? <Button disabled>Registration unavailable in draft preview</Button> : <RegistrationPanel event={{ ...event, slug }} user={user} state={states[event.id]} />}
+      {event.status === "draft" && <EventDraftSections event={event} />}
 
       {/* Ticket holders only. Stacked under the registration panel for now;
           placing it beside the panel is a follow-up. */}
@@ -150,8 +153,8 @@ export default async function PortalEventPage({
 
       <EventAgendaTable eventName={event.name} agenda={agenda} />
 
-      <EventPeopleCard type="mentors" people={mentors} />
-      <EventPeopleCard type="sponsors" people={sponsors} />
+      {!eventWorkingDocument(event) && <EventPeopleCard type="mentors" people={mentors} />}
+      {!eventWorkingDocument(event) && <EventPeopleCard type="sponsors" people={sponsors} />}
     </PageContainer>
   );
 }
