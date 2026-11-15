@@ -792,3 +792,13 @@ it("becomes Past only at the saved final end while retaining its published statu
     expect(result.current.publication.status).toBe("active");
   } finally { vi.useRealTimers(); }
 });
+
+
+it.each(["setPendingImageFile", "setPendingHeaderFile"] as const)("includes pending images in dirty state through %s", setter => {
+  const { result } = renderHook(() => useEventForm({}));
+  expect(result.current.hasUnsavedChanges).toBe(false);
+  act(() => result.current[setter](new File(["image"], "event.png", { type: "image/png" })));
+  expect(result.current.hasUnsavedChanges).toBe(true);
+  act(() => result.current[setter](null));
+  expect(result.current.hasUnsavedChanges).toBe(false);
+});

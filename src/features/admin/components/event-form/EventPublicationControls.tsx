@@ -29,7 +29,7 @@ export function scheduleTimeProblem(value: string, closes: string, now = Date.no
 type Form = ReturnType<typeof useEventForm>;
 
 /** The two builder entry points share the same actions and persisted lifecycle. */
-export function EventPublishMenu({ form, size = "default" }: { form: Form; size?: "sm" | "default" }) {
+export function EventPublishMenu({ form, size = "default", disabled = false }: { form: Form; size?: "sm" | "default"; disabled?: boolean }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [time, setTime] = useState("");
@@ -41,10 +41,11 @@ export function EventPublishMenu({ form, size = "default" }: { form: Form; size?
   const trigger = useRef<HTMLButtonElement>(null);
   const actionOwnsFocus = useRef(false);
   const scheduled = !!form.publication.publish_at;
+  const triggerDisabled = disabled || form.isSubmitting || form.isDeleting;
   const error = inputError ?? (attempted ? scheduleTimeProblem(time, form.formState.registration_closes_at, clock) : null);
   return <Popover open={pickerOpen} onOpenChange={open => { if (!form.isSubmitting) setPickerOpen(open); }}>
     <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-      <PopoverAnchor asChild><DropdownMenuTrigger asChild><Button ref={trigger} type="button" size={size} disabled={form.isSubmitting}>Publish<ChevronDown aria-hidden className="size-4" /></Button></DropdownMenuTrigger></PopoverAnchor>
+      <PopoverAnchor asChild><DropdownMenuTrigger asChild disabled={triggerDisabled}><Button ref={trigger} type="button" size={size} disabled={triggerDisabled}>Publish<ChevronDown aria-hidden className="size-4" /></Button></DropdownMenuTrigger></PopoverAnchor>
       {/* Remove the menu during the handoff: its exit animation otherwise leaves
           hoverable items that can steal focus from and dismiss the picker. */}
       {!pickerOpen && <DropdownMenuContent align="end" collisionPadding={20} className="z-40 w-[calc(100vw-40px)] max-w-[calc(100vw-40px)] sm:w-[340px] space-y-0.5 p-2" onCloseAutoFocus={event => { if (pickerOpen || actionOwnsFocus.current) event.preventDefault(); actionOwnsFocus.current = false; }}>

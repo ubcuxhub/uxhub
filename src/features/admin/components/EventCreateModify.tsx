@@ -128,6 +128,7 @@ export const EventCreateModify = ({
   const draft = !published && !scheduled;
   const issueSections = ["basics", "description", "dates", "registration", "teams", "schedule", "people", "resources", "summary", "settings"];
   const issues = [...new Map([...form.validation.issues, ...form.serverIssues, ...inputIssues].map(issue => [`${issue.section}:${issue.target}`, issue])).values()].filter(issue => !form.past || issue.section === "resources").sort((a, b) => issueSections.indexOf(a.section) - issueSections.indexOf(b.section));
+  const publicationReady = issues.length === 0;
   const visibleIssues = issues.filter(issue => form.publishAttempted || !issue.required);
   const focusIssue = (issue: EventFormIssue) => {
     if (issue.section === "people") window.dispatchEvent(new Event("event-content-invalid"));
@@ -215,10 +216,10 @@ export const EventCreateModify = ({
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <span role="status" className="text-small text-muted-foreground">{saveStatus}{form.past ? ` · Ended ${publicationTimeLabel(form.savedEnd!)}` : scheduled ? ` · Goes live ${publicationTimeLabel(form.publication.publish_at!)}` : published ? " · Published" : ""}</span>
-            {draft && <Button type="button" size="sm" variant="outline" loading={form.isSubmitting} onClick={() => void form.handleSaveDraft()}>Save draft</Button>}
+            {draft && <Button type="button" size="sm" variant="outline" disabled={!form.hasUnsavedChanges || form.isDeleting} loading={form.isSubmitting} onClick={() => void form.handleSaveDraft()}>Save draft</Button>}
             {(scheduled || published) && form.hasUnsavedChanges && <Button type="button" size="sm" variant="outline" disabled={form.isSubmitting || form.unresolvedSave} onClick={() => { form.handleDiscardChanges(); setInputIssues([]); }}>Discard changes</Button>}
             {(scheduled || published) && <Button disabled={!form.hasUnsavedChanges || form.isDeleting} type="button" size="sm" loading={form.isSubmitting} onClick={() => void form.handlePublication("save")}>{scheduled ? "Save changes" : "Update"}</Button>}
-            {!published && <EventPublishMenu form={form} size="sm" />}
+            {!published && <EventPublishMenu form={form} size="sm" disabled={!publicationReady} />}
           </div>
         </div>
       </div>
@@ -233,7 +234,7 @@ export const EventCreateModify = ({
           {section("builder-people", "People and sponsors", <EventPeopleEditor content={form.formState.content ?? emptyContent()} onChange={content => form.handleFieldChange("content", content)} people={mentorOptions} sponsors={sponsorOptions} showErrors={form.showConfigurationErrors} />)}
           {section("builder-resources", "Links and resources", <EventResourcesEditor content={form.formState.content ?? emptyContent()} onChange={content => form.handleFieldChange("content", content)} showErrors={form.showConfigurationErrors} />)}
           {section("builder-summary", "Summary", <div className="space-y-4 rounded-xl border border-border bg-card p-5">
-            <div className="flex flex-wrap items-center justify-between gap-4"><h3 className="text-subheading">{form.past ? "Event ended" : published ? "Published" : scheduled ? "Scheduled" : issues.length ? form.publishAttempted ? "A few things to fix" : "Almost ready" : "Ready to publish"}</h3>{!published && <EventPublishMenu form={form} />}</div>
+            <div className="flex flex-wrap items-center justify-between gap-4"><h3 className="text-subheading">{form.past ? "Event ended" : published ? "Published" : scheduled ? "Scheduled" : issues.length ? form.publishAttempted ? "A few things to fix" : "Almost ready" : "Ready to publish"}</h3>{!published && <EventPublishMenu form={form} disabled={!publicationReady} />}</div>
             <p className="text-muted-foreground">{form.past ? `${historyInfo?.registered ?? 0} registered, ${historyInfo?.checkedIn ?? 0} checked in. Add an event recap link in Links and resources.` : published ? "Members can find this event in the portal. Registration follows its own dates." : scheduled ? `It goes live ${publicationTimeLabel(form.publication.publish_at!)}. You can keep editing until then.` : issues.length ? "Complete the required details before the event goes live." : "Everything required is filled in. Choose Publish to go live now or schedule it."}</p>
             {!!issues.length && <ul className="space-y-2">{sections.filter(item => issues.some(issue => `builder-${issue.section}` === item.id)).map(item => <li key={item.id}><Button type="button" variant="link" className="h-auto whitespace-normal p-0 text-left" onClick={() => focusIssue(issues.find(issue => `builder-${issue.section}` === item.id)!)}>{item.title}{form.publishAttempted ? ` · ${issues.filter(issue => `builder-${issue.section}` === item.id).length} to fix` : ""}</Button></li>)}</ul>}
             {form.publishAttempted && !!issues.length && <ul className="space-y-1 text-small text-destructive">{issues.map((issue, index) => <li key={`${issue.target}-${index}`}><Button type="button" variant="link" className="h-auto whitespace-normal p-0 text-left text-destructive" onClick={() => focusIssue(issue)}>{issue.message}</Button></li>)}</ul>}
@@ -241,7 +242,7 @@ export const EventCreateModify = ({
           {section("builder-settings", "Other settings", <div className="space-y-4 rounded-xl border border-border bg-card p-5">
             {draft && <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="min-w-0 space-y-0.5"><h3 className="text-small font-semibold">Save draft</h3><p className="text-small text-muted-foreground">{saveStatus}. Drafts are only visible to staff.</p></div>
-              <Button type="button" variant="outline" loading={form.isSubmitting} onClick={() => void form.handleSaveDraft()}>Save draft</Button>
+              <Button type="button" variant="outline" disabled={!form.hasUnsavedChanges || form.isDeleting} loading={form.isSubmitting} onClick={() => void form.handleSaveDraft()}>Save draft</Button>
             </div>}
             {published && !form.past && <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="min-w-0 space-y-0.5"><h3 className="text-small font-semibold">Revert to draft</h3><p className="text-small text-muted-foreground">Save your changes and hide this event from members. Only staff can see it until you publish again.</p></div>
