@@ -741,7 +741,8 @@ scrolls there and closes. Enter/Space opens, arrows move, Esc returns focus.
   drawer.
 - Export follows the view: selected rows, or all current results if none.
 - Wide tables scroll sideways inside the card with a fade; first column stays
-  put; long values ellipsize.
+  put from 768px up (narrower, every column scrolls, so none hides under a
+  pinned one); long values ellipsize.
 - SortFilterPanel: popover; filters apply as picked; button shows the count
   ("Sort and filter · 2"); footer "Clear all · 12 users".
 
