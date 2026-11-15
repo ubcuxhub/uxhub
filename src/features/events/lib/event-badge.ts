@@ -1,7 +1,27 @@
 import type { EventBadge } from "@/features/events/types";
 import { formatEventDate } from "@/lib/date";
+import type { EventRow } from "@/lib/supabase/models";
 
 import type { EventState } from "./event-states";
+import { isDraftEvent } from "./event-visibility";
+
+/**
+ * The badge on an unpublished event, which only admins and managers see. It
+ * says "Draft event" rather than "Draft", which already names a student's
+ * unsubmitted application.
+ */
+export const DRAFT_EVENT_BADGE: EventBadge = { status: "draft", label: "Draft event" };
+
+/**
+ * The badge on an event's timeline card: "Draft event" for an unpublished
+ * event, so staff never mistake it for a live one, else the viewer's state.
+ */
+export function timelineBadgeFor(
+  event: Pick<EventRow, "status">,
+  state: EventState
+): EventBadge {
+  return isDraftEvent(event) ? DRAFT_EVENT_BADGE : eventBadgeFor(state);
+}
 
 /** "Oct 20", in Pacific time. */
 const shortDate = (value: string | null) =>

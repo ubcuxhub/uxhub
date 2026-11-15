@@ -14,6 +14,8 @@ interface FetchEventsOptions {
   orderBy?: EventOrderBy;
   ascending?: boolean;
   status?: EventStatus;
+  /** Keeps only events in one of these statuses; combine with RLS, never instead of it. */
+  statuses?: readonly EventStatus[];
 }
 
 interface FetchEventOptions {
@@ -25,7 +27,7 @@ export async function fetchEvents(
   supabase: DbClient,
   options: FetchEventsOptions = {}
 ): Promise<EventRow[]> {
-  const { orderBy = "starts_at", ascending = true, status } = options;
+  const { orderBy = "starts_at", ascending = true, status, statuses } = options;
 
   let query = supabase
     .from(TABLES.events)
@@ -34,6 +36,9 @@ export async function fetchEvents(
 
   if (status) {
     query = query.eq("status", status);
+  }
+  if (statuses) {
+    query = query.in("status", [...statuses]);
   }
 
   const { data, error } = await query;
