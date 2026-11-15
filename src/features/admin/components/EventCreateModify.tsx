@@ -1,6 +1,7 @@
 "use client";
 
-import { Info, Lock } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, Info, Lock } from "lucide-react";
 import { Hubbo } from "@/components/shared/Hubbo";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import type { EventHistoryInfo } from "@/lib/supabase-helpers/event-mutations";
@@ -276,8 +277,10 @@ export const EventCreateModify = ({
             <DialogTitle className="pt-2 text-h2">Draft saved</DialogTitle>
             <DialogDescription className="text-body">{form.formState.name || "Untitled event"} is saved as a draft. Only staff can see it until you publish.</DialogDescription>
           </DialogHeader>
-          <DialogFooter className="flex-wrap items-center gap-3 pt-2 sm:justify-center">
-            <BackButton link="/admin/events" label="Back to Manage Events" className="h-8 px-4 text-small" />
+          <DialogFooter className="flex-wrap gap-3 pt-2 sm:justify-center">
+            <Button variant="outline" asChild>
+              <Link href="/admin/events"><ArrowLeft aria-hidden />Back to Manage Events</Link>
+            </Button>
             <Button type="button" onClick={() => form.setShowDraftSaved(false)}>Keep editing</Button>
           </DialogFooter>
         </DialogContent>
