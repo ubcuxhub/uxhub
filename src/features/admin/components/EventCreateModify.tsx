@@ -126,7 +126,7 @@ export const EventCreateModify = ({
   const scheduled = !!form.publication.publish_at;
   const draft = !published && !scheduled;
   const issueSections = ["basics", "description", "dates", "registration", "teams", "schedule", "people", "resources", "summary", "settings"];
-  const issues = [...new Map([...form.validation.issues, ...inputIssues].map(issue => [`${issue.section}:${issue.target}`, issue])).values()].filter(issue => !form.past || issue.section === "resources").sort((a, b) => issueSections.indexOf(a.section) - issueSections.indexOf(b.section));
+  const issues = [...new Map([...form.validation.issues, ...form.serverIssues, ...inputIssues].map(issue => [`${issue.section}:${issue.target}`, issue])).values()].filter(issue => !form.past || issue.section === "resources").sort((a, b) => issueSections.indexOf(a.section) - issueSections.indexOf(b.section));
   const visibleIssues = issues.filter(issue => form.publishAttempted || !issue.required);
   const focusIssue = (issue: EventFormIssue) => {
     if (issue.section === "people") window.dispatchEvent(new Event("event-content-invalid"));
@@ -242,7 +242,11 @@ export const EventCreateModify = ({
               <div className="min-w-0 space-y-0.5"><h3 className="text-small font-semibold">Save draft</h3><p className="text-small text-muted-foreground">{saveStatus}. Drafts are only visible to staff.</p></div>
               <Button type="button" variant="outline" loading={form.isSubmitting} onClick={() => void form.handleSaveDraft()}>Save draft</Button>
             </div>}
-            {form.eventId && <div className={`flex flex-wrap items-center justify-between gap-4${draft ? " border-t border-border-subtle pt-4" : ""}`}>
+            {published && !form.past && <div className="flex flex-wrap items-center justify-between gap-4">
+              <div className="min-w-0 space-y-0.5"><h3 className="text-small font-semibold">Revert to draft</h3><p className="text-small text-muted-foreground">Save your changes and hide this event from members. Only staff can see it until you publish again.</p></div>
+              <Button type="button" variant="outline" loading={form.isSubmitting} disabled={form.isDeleting} onClick={() => void form.handlePublication("revert")}>Revert to draft</Button>
+            </div>}
+            {form.eventId && <div className={`flex flex-wrap items-center justify-between gap-4${draft || (published && !form.past) ? " border-t border-border-subtle pt-4" : ""}`}>
               <div className="min-w-0 space-y-0.5"><h3 className="text-small font-semibold">Delete event</h3><p className="text-small text-muted-foreground">Payment protections apply. Deletion can’t be undone.</p></div>
               <Button type="button" variant="outline" disabled={form.isSubmitting || form.isDeleting} onClick={() => form.setShowDeleteModal(true)}>Delete event</Button>
             </div>}

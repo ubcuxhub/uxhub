@@ -58,8 +58,28 @@ it("keeps a rejected duplicate URL editable and displays the server's readable r
   await act(async () => { expect(await result.current.handleSaveDraft(false)).toBe(false); });
   expect(result.current.formState.page_slug).toBe("taken-url");
   expect(result.current.hasUnsavedChanges).toBe(true);
-  expect(result.current.error).toBe("This page URL is already in use.");
-  expect(vi.mocked(toast.error).mock.calls.at(-1)![1]!.description).toContain("This page URL is already in use.");
+  expect(result.current.error).toBeNull();
+  expect(result.current.serverIssues).toEqual([{ section: "basics", target: "event-page-slug", message: "This page URL is already in use.", required: false }]);
+  expect(result.current.validationAttempt).toBe(1);
+  expect(toast.error).not.toHaveBeenCalled();
+  act(() => result.current.handleFieldChange("page_slug", "available-url"));
+  expect(result.current.serverIssues).toEqual([]);
+  await act(async () => { expect(await result.current.handleSaveDraft(false)).toBe(true); });
+  expect(saveAdminEventDraftAction).toHaveBeenLastCalledWith(expect.objectContaining({ document: expect.objectContaining({ formState: expect.objectContaining({ page_slug: "available-url" }) }) }));
+});
+
+it("attaches publication URL conflicts to the field without a save-error toast", async () => {
+  const { result } = renderHook(() => useEventForm({ eventId: event.id, initialEvent: event }));
+  act(() => result.current.handleFieldChange("page_slug", "taken-url"));
+  vi.mocked(saveAdminEventAction).mockResolvedValueOnce({ error: "This page URL is already in use." });
+  await act(async () => { expect(await result.current.handlePublication("publish")).toBe(false); });
+  expect(saveAdminEventAction).toHaveBeenCalled();
+  expect(result.current.error).toBeNull();
+  expect(result.current.serverIssues).toEqual([expect.objectContaining({ target: "event-page-slug", message: "This page URL is already in use." })]);
+  expect(toast.error).not.toHaveBeenCalled();
+  act(() => result.current.handleFieldChange("page_slug", "available-url"));
+  expect(result.current.serverIssues).toEqual([]);
+  await act(async () => { expect(await result.current.handlePublication("publish")).toBe(true); });
 });
 
 describe("legacy browser draft recovery", () => {

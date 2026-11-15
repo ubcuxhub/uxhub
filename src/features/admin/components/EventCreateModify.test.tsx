@@ -2,6 +2,9 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { EventCreateModify } from "./EventCreateModify";
+import { toast } from "@/components/ui/toast";
+
+vi.mock("@/components/ui/toast", () => ({ toast: { error: vi.fn(), success: vi.fn(), dismiss: vi.fn() } }));
 
 vi.mock("@/components/shared/Hubbo", () => ({ Hubbo: ({ emotion, className }: { emotion: string; className: string }) => <span data-testid="hubbo" data-emotion={emotion} className={className}>Hubbo</span> }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }) }));
@@ -80,4 +83,27 @@ it("uses Proud Hubbo at 200px after the first draft save and enables saved-draft
   fireEvent.click(within(dialog).getByRole("button", { name: "Keep editing" }));
   await waitFor(() => expect(screen.queryByRole("dialog", { name: "Draft saved" })).toBeNull());
   expect(screen.getByRole("button", { name: "Delete event" })).toBeTruthy();
+});
+
+it("shows a taken Page URL inline, focuses it and clears the error when corrected", async () => {
+  const { saveAdminEventDraftAction } = await import("../actions");
+  vi.mocked(saveAdminEventDraftAction).mockResolvedValueOnce({ error: "This page URL is already in use." });
+  render(<EventCreateModify />);
+  fireEvent.change(screen.getByLabelText("Event name"), { target: { value: "Design Sprint" } });
+  const slug = screen.getByLabelText("Page URL");
+  fireEvent.change(slug, { target: { value: "taken-url" } });
+  fireEvent.click(screen.getAllByRole("button", { name: "Save draft" })[0]);
+  await waitFor(() => expect(slug.getAttribute("aria-invalid")).toBe("true"));
+  await waitFor(() => expect(document.activeElement).toBe(slug));
+  const field = slug.closest('[data-slot="field"]')! as HTMLElement;
+  const message = within(field).getByRole("alert");
+  expect(message.textContent).toBe("This page URL is already in use.");
+  expect(slug.getAttribute("aria-describedby")?.split(" ")).toContain(message.id);
+  expect(slug.className).toContain("aria-invalid:border-destructive");
+  expect(toast.error).not.toHaveBeenCalled();
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(slug).toHaveProperty("value", "taken-url");
+  fireEvent.change(slug, { target: { value: "available-url" } });
+  await waitFor(() => expect(slug.hasAttribute("aria-invalid")).toBe(false));
+  expect(within(field).queryByRole("alert")).toBeNull();
 });

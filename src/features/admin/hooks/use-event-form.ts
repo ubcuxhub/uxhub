@@ -49,6 +49,7 @@ import {
   withSavedCheckInSessionIds,
   withSavedQuestionIds,
   type EventFormState,
+  type EventFormIssue,
   type MentorDraft,
   type SponsorDraft,
 } from "../components/event-form/event-form-schema";
@@ -183,6 +184,7 @@ export function useEventForm({
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showConfigurationErrors, setShowConfigurationErrors] = useState(false);
+  const [rejectedPageSlug, setRejectedPageSlug] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(
     eventId && !initialEvent ? "Event not found." : null
   );
@@ -291,6 +293,7 @@ export function useEventForm({
     }
     resetSuccessMessage();
     questions.setQuestionErrors({});
+    if (field === "page_slug" || (field === "name" && !formState.slug_edited)) setRejectedPageSlug(null);
     setFormState((current) => ({
       ...current,
       [field]: value,
@@ -317,6 +320,7 @@ export function useEventForm({
     setPendingHeaderFile(null);
     setError(null);
     setPublishAttempted(false);
+    setRejectedPageSlug(null);
     setShowConfigurationErrors(false);
     setCleanSnapshot(createFormSnapshot(saved.state, saved.checkIns, saved.mentors, saved.sponsors, saved.template));
     setResetKey(value => value + 1);
@@ -356,6 +360,13 @@ export function useEventForm({
   const draftErrorToastId = useId();
   const retryDraftSave = useRef<(showSuccess: boolean) => void>(() => {});
   useEffect(() => () => toast.dismiss(draftErrorToastId), [draftErrorToastId]);
+
+  const showPageSlugConflict = (message: string, slug: string) => {
+    if (message !== "This page URL is already in use." || formState.marketing_mode !== "hosted") return false;
+    setRejectedPageSlug(slug);
+    setValidationAttempt(value => value + 1);
+    return true;
+  };
 
   const handleSaveDraft = async (showSuccess = true): Promise<boolean> => {
     if (submitLock.current) return false;
@@ -409,12 +420,14 @@ export function useEventForm({
       setFormState(attempt.state); setPendingImageFile(null); setPendingHeaderFile(null);
       setCleanSnapshot(createFormSnapshot(attempt.state, attempt.document.checkInEvents, attempt.document.mentors, attempt.document.sponsors, attempt.document.applicationTemplate));
       setSuccessMessage("Draft saved");
+      setRejectedPageSlug(null);
       if (showSuccess) setShowDraftSaved(true);
       if (!eventId) window.history.replaceState(window.history.state, "", `/admin/events/${permanentId}/edit`);
       return true;
     } catch (error) {
       if (!pendingDraft.current) await Promise.allSettled(uploads.map(url => discardUnusedEventImageAction(url)));
       const message = error instanceof Error ? error.message : "Failed to save draft.";
+      if (showPageSlugConflict(message, formState.page_slug)) return false;
       setError(message);
       toast.error("Couldn’t save your draft", {
         id: draftErrorToastId,
@@ -430,8 +443,8 @@ export function useEventForm({
 
   const publicationToastId = useId();
   useEffect(() => () => toast.dismiss(publicationToastId), [publicationToastId]);
-  const retryPublication = useRef<(intent: "publish" | "schedule" | "cancel" | "save") => void>(() => {});
-  const saveEvent = async (state: EventFormState, intent: "publish" | "schedule" | "cancel" | "save", uploadedWithDraft = false): Promise<boolean> => {
+  const retryPublication = useRef<(intent: "publish" | "schedule" | "cancel" | "save" | "revert") => void>(() => {});
+  const saveEvent = async (state: EventFormState, intent: "publish" | "schedule" | "cancel" | "save" | "revert", uploadedWithDraft = false): Promise<boolean> => {
     if (submitLock.current) return false;
     toast.dismiss(publicationToastId);
     setShowConfigurationErrors(true);
@@ -605,7 +618,9 @@ export function useEventForm({
         setFormState(current => ({ ...current, date_location: current.date_location ? { ...current.date_location, dates: current.date_location.dates.map(row => ({ ...row, session_id: actualState.date_location?.dates.find(saved => saved.key === row.key)?.session_id ?? row.session_id })) } : null, date_location_revision: actualState.date_location_revision, content: current.content ? { ...current.content, revision: actualState.content?.revision ?? current.content.revision } : current.content }));
       } else setFormState(actualState);
       setCleanSnapshot(createFormSnapshot(actualState, savedCheckIns, attempt.mentors, attempt.sponsors, savedTemplate));
-      setSuccessMessage(intent === "cancel" ? "Schedule cancelled. Draft saved." : "Changes saved");
+      setSuccessMessage(intent === "revert" ? "Event reverted to draft." : intent === "cancel" ? "Schedule cancelled. Draft saved." : "Changes saved");
+      if (intent === "revert" && savedPublication.status === "draft" && !savedPublication.publish_at) setShowDraftSaved(true);
+      setRejectedPageSlug(null);
       if (!eventId) window.history.replaceState(window.history.state, "", `/admin/events/${result.id}/edit`);
       if (intent === "publish" || intent === "schedule" || (intent === "save" && savedPublication.status === "active")) setPublicationSuccess({ ...savedPublication, updated: intent === "save", completed_at: Date.now() });
       if (onSuccess) onSuccess(result.id);
@@ -622,6 +637,7 @@ export function useEventForm({
         }
       }
       const message = saveError instanceof Error ? saveError.message : "Failed to save event.";
+      if (showPageSlugConflict(message, state.page_slug)) return false;
       setError(message);
       if (intent) toast.error(past ? "Couldn’t update resources" : publication.status === "active" ? "Couldn’t update event" : "Couldn’t save publication changes", { id: publicationToastId, duration: Infinity, description: `${message} Your edits are still here. If the response was lost, reload to check the saved state or retry.`, action: { label: "Try again", onClick: () => retryPublication.current(intent) } });
       return false;
@@ -632,9 +648,13 @@ export function useEventForm({
   };
 
   const validation = validateEventForm(formState, checkInEvents, questions.applicationTemplate, mentors, sponsors);
-  const handlePublication = async (intent: "publish" | "schedule" | "cancel" | "save", publishAt = formState.publish_at) => {
+  const serverIssues: EventFormIssue[] = rejectedPageSlug !== null && rejectedPageSlug === formState.page_slug && formState.marketing_mode === "hosted"
+    ? [{ section: "basics", target: "event-page-slug", message: "This page URL is already in use.", required: false }]
+    : [];
+  const handlePublication = async (intent: "publish" | "schedule" | "cancel" | "save" | "revert", publishAt = formState.publish_at) => {
+    if (intent === "revert" && (past || publication.status !== "active")) return false;
     setPublishAttempted(true);
-    const state = { ...formState, status: intent === "publish" ? "active" as const : publication.status, publish_at: intent === "publish" || intent === "cancel" ? "" : intent === "schedule" ? publishAt : formState.publish_at };
+    const state = { ...formState, status: intent === "revert" ? "draft" as const : intent === "publish" ? "active" as const : publication.status, publish_at: intent === "publish" || intent === "cancel" || intent === "revert" ? "" : intent === "schedule" ? publishAt : formState.publish_at };
     const controlsValid = validateControls?.(false) ?? true;
     const nextValidation = validateEventForm(state, checkInEvents, questions.applicationTemplate, mentors, sponsors);
     if ((nextValidation.error || !controlsValid) && !past && !pendingSave.current) {
@@ -700,6 +720,7 @@ export function useEventForm({
     publishAttempted,
     validationAttempt,
     validation,
+    serverIssues,
     handlePublication,
     showConfigurationErrors,
     legacyDraftRecovered,
