@@ -39,7 +39,12 @@ function TableCard({ className, ...props }: React.ComponentProps<"div">) {
 interface TableProps extends React.ComponentProps<"table"> {
   /** Rounded, individually spaced rows for editable item lists. */
   variant?: "default" | "separated";
-  /** Pins the first column while scrolling; with a checkbox column, the first two. */
+  /**
+   * Pins the first column while scrolling; with a checkbox column, the first
+   * two. From `md` (768px) up only: on a phone the pinned column would take
+   * most of the card, leaving the scrolled columns a sliver to show through,
+   * so below `md` every column scrolls together and both edges fade instead.
+   */
   stickyFirstColumn?: boolean;
   /** Sets `aria-busy` while loading. */
   busy?: boolean;
@@ -88,10 +93,13 @@ function Table({
         data-scroll-end="true"
         className={cn(
           "group/scroller w-full overflow-x-auto overflow-y-hidden",
-          // A 24px fade on the side with more to scroll to (§3.16). The pinned
-          // column already marks the start edge, so only the end fades there.
+          // A 24px fade on the side with more to scroll to (§3.16). A pinned
+          // column already marks the start edge, so only the end fades there;
+          // below `md` nothing is pinned, so the start fades as well.
           "[--fade-end:0px] [--fade-start:0px] data-[scroll-end=false]:[--fade-end:24px]",
-          !stickyFirstColumn && "data-[scroll-start=false]:[--fade-start:24px]",
+          stickyFirstColumn
+            ? "max-md:data-[scroll-start=false]:[--fade-start:24px]"
+            : "data-[scroll-start=false]:[--fade-start:24px]",
           "[mask-image:linear-gradient(to_right,transparent,#000_var(--fade-start),#000_calc(100%-var(--fade-end)),transparent)]",
           scrollerClassName,
         )}
@@ -103,13 +111,14 @@ function Table({
           className={cn(
             "w-full caption-bottom border-collapse text-table",
             variant === "separated" && "border-separate border-spacing-x-0 border-spacing-y-3 [&_tbody>tr]:border-0 [&_tbody>tr>td]:h-auto [&_tbody>tr>td]:px-4 [&_tbody>tr>td]:py-3 [&_tbody>tr>td:first-child]:rounded-l-lg [&_tbody>tr>td:last-child]:rounded-r-lg",
-            // Pinned cells take their row's fill (`bg-inherit`), so selected and
-            // hovered rows stay one colour under a scrolling cell.
-            "data-sticky:[&_tr>:first-child]:sticky data-sticky:[&_tr>:first-child]:left-0 data-sticky:[&_tr>:first-child]:z-[1]",
-            "data-sticky:[&_tr:has(>[data-slot=table-checkbox-cell]:first-child)>:nth-child(2)]:sticky data-sticky:[&_tr:has(>[data-slot=table-checkbox-cell]:first-child)>:nth-child(2)]:left-13 data-sticky:[&_tr:has(>[data-slot=table-checkbox-cell]:first-child)>:nth-child(2)]:z-[1]",
+            // Pinned (from `md` up, see `stickyFirstColumn`). Pinned cells take
+            // their row's fill (`bg-inherit`), so selected and hovered rows stay
+            // one colour under a scrolling cell.
+            "md:data-sticky:[&_tr>:first-child]:sticky md:data-sticky:[&_tr>:first-child]:left-0 md:data-sticky:[&_tr>:first-child]:z-[1]",
+            "md:data-sticky:[&_tr:has(>[data-slot=table-checkbox-cell]:first-child)>:nth-child(2)]:sticky md:data-sticky:[&_tr:has(>[data-slot=table-checkbox-cell]:first-child)>:nth-child(2)]:left-13 md:data-sticky:[&_tr:has(>[data-slot=table-checkbox-cell]:first-child)>:nth-child(2)]:z-[1]",
             // A hairline marks the pinned edge once something scrolls under it.
-            "group-data-[scroll-start=false]/scroller:data-sticky:[&_tr:not(:has(>[data-slot=table-checkbox-cell]:first-child))>:first-child]:shadow-[1px_0_0_var(--border-subtle)]",
-            "group-data-[scroll-start=false]/scroller:data-sticky:[&_tr:has(>[data-slot=table-checkbox-cell]:first-child)>:nth-child(2)]:shadow-[1px_0_0_var(--border-subtle)]",
+            "md:group-data-[scroll-start=false]/scroller:data-sticky:[&_tr:not(:has(>[data-slot=table-checkbox-cell]:first-child))>:first-child]:shadow-[1px_0_0_var(--border-subtle)]",
+            "md:group-data-[scroll-start=false]/scroller:data-sticky:[&_tr:has(>[data-slot=table-checkbox-cell]:first-child)>:nth-child(2)]:shadow-[1px_0_0_var(--border-subtle)]",
             className,
           )}
           {...props}
@@ -154,7 +163,8 @@ const OPENER = "[data-table-row-opener]";
  * else to the row's button or link, modifier keys included (so Cmd-click on a
  * link row still opens a new tab); keyboard and assistive tech still use the
  * control itself. `onClick` runs once per user click, never for the forwarded
- * one.
+ * one. Below `md`, where nothing is pinned, the opener covers the whole row
+ * again, as in an unpinned table.
  *
  * The row whose opener has `aria-current` (the record that is open) is filled
  * like a selected row.

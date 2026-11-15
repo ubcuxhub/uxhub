@@ -309,8 +309,9 @@ function TableDemo() {
         title="Event drafts in the events table"
         description="Manage Events includes saved working drafts in the same table, search, Draft filter and date sort as events. Working-draft links open /admin/events/drafts/<draft> or /admin/events/<event>/edit; saved-event links retain their overview drawer. A working draft replaces its source event's row, and missing dates or registration counts show a dash."
       >
+        {/* Pinned name and a badge with a second line, as in AdminEventsTable: below md the name scrolls with the rest. */}
         <TableCard>
-          <Table>
+          <Table stickyFirstColumn className="min-w-[48rem]">
             <TableHeader>
               <TableRow>
                 <TableHead>Name</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead><TableHead>Registration</TableHead><TableHead>Registered</TableHead>
@@ -318,7 +319,20 @@ function TableDemo() {
             </TableHeader>
             <TableBody>
               <TableRow>
-                <TableCell>Untitled event</TableCell><TableCell><TableNone /></TableCell><TableCell><Badge variant="neutral">Draft</Badge></TableCell><TableCell><Badge variant="neutral">N/A</Badge></TableCell><TableCell><TableNone /></TableCell>
+                <TableCell className="max-w-72 truncate">Untitled event</TableCell><TableCell><TableNone /></TableCell><TableCell><Badge variant="neutral">Draft</Badge></TableCell><TableCell><Badge variant="neutral">N/A</Badge></TableCell><TableCell><TableNone /></TableCell>
+              </TableRow>
+              <TableRow>
+                <TableCell className="max-w-72 truncate">UXathon 2026: Designing for Accessible Campus Services</TableCell>
+                <TableCell className="whitespace-nowrap text-muted-foreground">Jan 24, 2027</TableCell>
+                <TableCell><Badge variant="success">Active</Badge></TableCell>
+                <TableCell>
+                  <Badge variant="success">Open</Badge>
+                  <div className="mt-1 whitespace-nowrap text-small text-muted-foreground">By application</div>
+                </TableCell>
+                <TableCell className="whitespace-nowrap tabular-nums">
+                  42 <span className="text-muted-foreground">/ 120</span>
+                  <div className="mt-1"><Badge variant="warning">3 to review</Badge></div>
+                </TableCell>
               </TableRow>
             </TableBody>
           </Table>
@@ -334,7 +348,7 @@ function TableDemo() {
 
       <Composition
         title="Wide table, sticky columns"
-        description="Scrolls sideways inside the card with a fade on the cut-off edge. The checkbox and name columns stay put; long values ellipsize."
+        description="Scrolls sideways inside the card with a fade on the cut-off edge. From 768px up the checkbox and name columns stay put; narrower, every column scrolls so none is hidden under a pinned one. Long values ellipsize."
       >
         <div className="max-w-2xl">
           <ManageUsers stickyFirstColumn minWidth="min-w-[64rem]" />

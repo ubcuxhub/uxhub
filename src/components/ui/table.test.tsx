@@ -70,6 +70,43 @@ describe("Table", () => {
     );
     expect(screen.getByRole("cell", { name: "No users match “x”." }).getAttribute("colspan")).toBe("4");
   });
+
+  // jsdom has no layout, so this pins down the classes: on a phone a pinned
+  // column took most of the card and hid the scrolled columns beneath it.
+  it("pins the first column from md up only, and fades the start edge below md", () => {
+    render(
+      <Table stickyFirstColumn>
+        <TableBody>
+          <TableRow>
+            <TableCell>Alex</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>,
+    );
+    const table = screen.getByRole("table");
+    const pinRules = table.className.split(/\s+/).filter((name) => /:(sticky|left-0|left-13|z-\[1\]|shadow-\[)/.test(name));
+    expect(pinRules.length).toBeGreaterThan(0);
+    for (const rule of pinRules) expect(rule.startsWith("md:")).toBe(true);
+
+    const scroller = table.parentElement!;
+    expect(scroller.dataset.slot).toBe("table-scroller");
+    expect(scroller.className).toContain("max-md:data-[scroll-start=false]:[--fade-start:24px]");
+    expect(scroller.className).not.toMatch(/(^|\s)data-\[scroll-start=false\]:\[--fade-start/);
+  });
+
+  it("fades the start edge at every width when nothing is pinned", () => {
+    render(
+      <Table>
+        <TableBody>
+          <TableRow>
+            <TableCell>Alex</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>,
+    );
+    const scroller = screen.getByRole("table").parentElement!;
+    expect(scroller.className).toMatch(/(^|\s)data-\[scroll-start=false\]:\[--fade-start:24px\]/);
+  });
 });
 
 describe("TableNone", () => {
