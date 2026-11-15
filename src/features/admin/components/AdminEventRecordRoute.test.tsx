@@ -97,22 +97,22 @@ describe("AdminEventRecordRoute", () => {
     });
   });
 
-  it("passes when the builder last saved a working draft it will resume", async () => {
+  it("passes when the builder last saved draft edits it will resume", async () => {
     const updatedAt = "2026-11-14T19:30:00.000Z";
     mocks.fetchEventById.mockResolvedValue(event({ status: "draft", publish_at: null }));
     mocks.fetchEventDraftForEvent.mockResolvedValue({ id: "working", updated_at: updatedAt });
 
-    expect((await route(EVENT_ID)).props.workingDraftUpdatedAt).toBe(updatedAt);
+    expect((await route(EVENT_ID)).props.draftEditsSavedAt).toBe(updatedAt);
     expect(mocks.fetchEventDraftForEvent).toHaveBeenCalledWith({}, EVENT_ID);
   });
 
   it("ignores a leftover working draft the builder won't resume", async () => {
     mocks.fetchEventDraftForEvent.mockResolvedValue({ id: "old", updated_at: "2026-11-14T19:30:00.000Z" });
     mocks.fetchEventById.mockResolvedValue(event({ status: "active", publish_at: null }));
-    expect((await route(EVENT_ID)).props.workingDraftUpdatedAt).toBeNull();
+    expect((await route(EVENT_ID)).props.draftEditsSavedAt).toBeNull();
 
     mocks.fetchEventById.mockResolvedValue(event({ status: "draft", publish_at: "2026-12-01T17:00:00.000Z" }));
-    expect((await route(EVENT_ID)).props.workingDraftUpdatedAt).toBeNull();
+    expect((await route(EVENT_ID)).props.draftEditsSavedAt).toBeNull();
   });
 
   it("stops at the guard for someone who isn't an admin", async () => {

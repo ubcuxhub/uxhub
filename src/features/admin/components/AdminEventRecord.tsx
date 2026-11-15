@@ -63,10 +63,11 @@ export interface AdminEventRecordProps {
   seats: { tickets: number; seatsLeft: number };
   applications: EventApplicationStatusCounts;
   /**
-   * When the builder last saved unsaved changes to this event (its working
-   * document), or null when it has none to resume. Optional, as none.
+   * When the builder last saved draft edits to this event (its working
+   * document), or null when it has none. "Save draft" writes only that
+   * document; the edits reach the event when it's published or scheduled.
    */
-  workingDraftUpdatedAt?: string | null;
+  draftEditsSavedAt?: string | null;
   /** When the server rendered this, so the registration window reads the same on both sides. */
   now: string;
   /** Whether the public event pages are live (the student events flag). */
@@ -273,7 +274,7 @@ export function AdminEventRecord({
   event: loaded,
   seats,
   applications,
-  workingDraftUpdatedAt = null,
+  draftEditsSavedAt = null,
   now,
   publicPages,
 }: AdminEventRecordProps) {
@@ -418,12 +419,12 @@ export function AdminEventRecord({
       saveLabel="Save schedule"
       details={
         <>
-          {workingDraftUpdatedAt ? (
+          {draftEditsSavedAt ? (
             <Alert variant="info" icon={<Info aria-hidden />}>
-              <AlertTitle>Unsaved changes in the builder</AlertTitle>
+              <AlertTitle>Newer draft edits in the builder</AlertTitle>
               <AlertDescription>
-                Last edited {formatTimestamp(workingDraftUpdatedAt)}. This overview shows the saved
-                event; Edit event picks up where you left off.
+                Saved {formatTimestamp(draftEditsSavedAt)}. This overview doesn’t include them yet;
+                they’re applied when you publish or schedule. Edit event to continue.
               </AlertDescription>
             </Alert>
           ) : null}

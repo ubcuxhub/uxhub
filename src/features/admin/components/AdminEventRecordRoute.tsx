@@ -45,7 +45,7 @@ export async function AdminEventRecordRoute({ eventParam }: { eventParam: string
         seatsLeft: seats?.seatsLeft ?? event.max_capacity,
       }}
       applications={applications}
-      workingDraftUpdatedAt={
+      draftEditsSavedAt={
         workingDraft && resumesWorkingDraft(event) ? workingDraft.updated_at : null
       }
       now={new Date().toISOString()}

@@ -65,9 +65,9 @@ const isNewDraft = (row: AdminEventDirectoryRow) => "draftId" in row && !row.eve
 
 /**
  * Where a row's name links. A saved event opens its overview drawer, even when
- * its row shows a working draft (unsaved builder changes): the drawer's "Edit
- * event" resumes that draft. A new draft has no event to show, so it opens in
- * its builder.
+ * its row shows a working draft (draft edits not yet applied to the event):
+ * the drawer's "Edit event" resumes that draft. A new draft has no event to
+ * show, so it opens in its builder.
  */
 const eventHref = (row: AdminEventDirectoryRow) => {
   if (!("draftId" in row)) return `${LIST_HREF}/${row.event.id}`;
