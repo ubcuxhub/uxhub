@@ -534,3 +534,16 @@ infer/backfill legacy session mappings. Rebuild/reseed the local database with
 `pnpm supabase:local`; do not deploy it against legacy live agendas without a
 separate data decision. Timing reuses the application's pinned Vancouver calendar
 (including historical gap/overlap rejection), independent of local tzdata.
+
+### Participant agenda projection
+
+`event_participant_content(event_id)` reads canonical agenda rows and projects only
+participant descriptions, check-in flags and active effective day/item locations.
+It authorizes with the requesting viewer, never a supplied user ID. Restricted
+locations return only public summaries unless the viewer is staff or owns an
+event ticket, including after the event. Accepted applications alone grant no
+location access. Staff editor documents, inactive location fields and other
+resources never enter the result. Call with the viewer client and keep HTML/RSC
+responses private/dynamic. `agenda_enabled` hides participant RPC and direct
+agenda reads while preserving staff reads and saved content. Event summary
+location remains available independently of that display switch.

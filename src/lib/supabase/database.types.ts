@@ -1550,6 +1550,7 @@ export type Database = {
         }
         Returns: boolean
       }
+      event_participant_content: { Args: { p_event_id: string }; Returns: Json }
       event_seat_counts: {
         Args: { p_event_ids: string[] }
         Returns: {
@@ -1597,6 +1598,10 @@ export type Database = {
       leave_team: {
         Args: { p_event_id: string; p_user_id: string }
         Returns: string
+      }
+      participant_agenda_location: {
+        Args: { p_location: Json; p_restricted: boolean }
+        Returns: Json
       }
       publish_due_events: { Args: Record<PropertyKey, never>; Returns: number }
       release_event_ticket: {

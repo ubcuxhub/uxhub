@@ -217,7 +217,7 @@ export const MANIFEST = [
   {
     id: "agenda",
     column: 6,
-    uses: ["card", "tabs", "separator"],
+    uses: ["card", "tabs", "table"],
   },
   {
     id: "sponsors",

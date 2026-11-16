@@ -1052,3 +1052,22 @@ fields for in-person, online and hybrid locations. `LocationDraft` lives in
 `onChange` and `restricted` (adds the public summary). Changing type preserves
 inactive fields. Audience enforcement, whole-location inheritance, required-field
 validation and persistence belong to the caller. See `/dev/components/location-editor`.
+
+### Participant location display
+
+`shared/EventLocation` renders an already-authorized `ParticipantLocation`:
+physical building/room/address and map, online join link and labelled CopyCode
+meeting ID/passcode, or both for hybrid. `restricted` renders only the public
+summary. Privacy belongs at the database projection boundary; never pass editor
+settings to participant components. Only HTTP(S) links render. Optional
+`showRoom={false}` supports a separate room column; `details={false}` keeps
+credentials and address/map in the day header for inherited table locations. See `/dev/components/event-location`.
+
+`Table scrollerLabel="…"` gives the horizontal scroll wrapper a region name and
+keyboard focus, allowing arrow-key scrolling without making rows interactive.
+Existing tables retain their default behavior. The separated People example at
+`/dev/components/table` demonstrates a named scroll region.
+
+CopyCode keeps its 12rem preferred minimum where space permits and shrinks to
+its container in narrow location cells. Long values retain the full tooltip and
+clipboard value. See the narrow long-passcode example at `/dev/components/copy-code`.

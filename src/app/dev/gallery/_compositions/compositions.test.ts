@@ -18,6 +18,9 @@ const NOT_IN_GALLERY: readonly string[] = [
   // Lives on the auth screens, which are outside the portal the gallery
   // composes; no portal screen asks for a password.
   "password-input",
+  // Full location details have their own /dev/components/event-location demo.
+  // The accepted participant agenda displays building/room text only.
+  "event-location",
 ];
 
 const SLUGS = new Set(ENTRIES.map((entry) => entry.slug));

@@ -79,7 +79,8 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { EventAgendaTable } from "@/features/events/components/EventAgendaTable";
+import type { EventAgendaDay } from "@/lib/supabase-helpers/event-agenda";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { EventActionsMenu } from "@/app/dev/components/_demos/_fixtures/event-actions-menu";
 
@@ -167,54 +168,18 @@ function Sponsors() {
   );
 }
 
-const AGENDA = {
-  sat: [
-    ["9:00 AM", "Check-in and breakfast", "Atrium"],
-    ["10:00 AM", "Kickoff and brief", "Great Hall"],
-    ["11:30 AM", "Team formation", "Rooms 200–204"],
-    ["6:00 PM", "Studio time", "Rooms 200–204"],
-  ],
-  sun: [
-    ["9:00 AM", "Final build", "Rooms 200–204"],
-    ["2:00 PM", "Judging", "Great Hall"],
-    ["5:00 PM", "Awards and closing", "Great Hall"],
-  ],
-} as const;
-
+const agendaLocation = { type: "in_person" as const, restricted: false, building: "Innovation Center", room: "Studio A", address: "2366 Main Mall", map_url: "https://example.com/map" };
+const AGENDA: EventAgendaDay[] = [
+  { id: "day-1", date: "2027-01-09", title: "Opening studio", location: agendaLocation, items: [
+    { id: "welcome", title: "Check-in and welcome", starts_at: "2027-01-09T16:00:00Z", ends_at: "2027-01-09T17:00:00Z", check_in: true, description: "Bring a laptop and meet your team.", location: agendaLocation, location_overridden: false },
+    { id: "overnight", title: "Late-night remote studio", starts_at: "2027-01-10T06:00:00Z", ends_at: "2027-01-10T08:00:00Z", check_in: false, description: null, location_overridden: true, location: { type: "online", restricted: false, meeting_url: "https://example.com/join", meeting_id: "123 456", meeting_passcode: "studio" } },
+  ] },
+  { id: "day-2", date: "2027-01-23", title: "Final presentations", location: agendaLocation, items: [
+    { id: "presentations", title: "Presentations and closing", starts_at: "2027-01-23T21:00:00Z", ends_at: "2027-01-23T23:00:00Z", check_in: false, description: null, location: agendaLocation, location_overridden: false },
+  ] },
+];
 function Agenda() {
-  return (
-    <Panel>
-      <CardHeader>
-        <CardTitle>Agenda</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <Tabs defaultValue="sat" className="gap-4">
-          <TabsList aria-label="Agenda days">
-            <TabsTrigger value="sat">Sat, Jan 9</TabsTrigger>
-            <TabsTrigger value="sun">Sun, Jan 10</TabsTrigger>
-          </TabsList>
-          {(Object.keys(AGENDA) as (keyof typeof AGENDA)[]).map((day) => (
-            <TabsContent key={day} value={day}>
-              <ol className="flex flex-col">
-                {AGENDA[day].map(([time, session, where], index) => (
-                  <li key={session} className="flex flex-col">
-                    {index > 0 ? <Separator className="my-3 bg-border-subtle" /> : null}
-                    <div className="grid grid-cols-[4.5rem_1fr] gap-3">
-                      <span className="text-small tabular-nums text-muted-foreground">{time}</span>
-                      <span className="flex flex-col">
-                        <span className="text-small font-medium">{session}</span>
-                        <span className="text-label font-normal text-muted-foreground">{where}</span>
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ol>
-            </TabsContent>
-          ))}
-        </Tabs>
-      </CardContent>
-    </Panel>
-  );
+  return <EventAgendaTable eventName="UXathon 2027" agenda={AGENDA} />;
 }
 
 function Profile() {

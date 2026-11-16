@@ -2498,6 +2498,7 @@ $$;
 \ir event-publication.sql
 \ir event-drafts.sql
 \ir event-date-locations.sql
+\ir participant-agenda.sql
 \ir event-application-settings.sql
 \ir event-team-settings.sql
 \ir event-content.sql

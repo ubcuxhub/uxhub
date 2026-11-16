@@ -28,6 +28,14 @@ globalThis.ResizeObserver ??= class {
 };
 
 describe("Table", () => {
+  it("provides an optional named keyboard scroll region without changing the default", () => {
+    const { rerender } = render(<Table scrollerLabel="Schedule locations"><TableBody /></Table>);
+    expect(screen.getByRole("region", { name: "Schedule locations" }).tabIndex).toBe(0);
+    rerender(<Table><TableBody /></Table>);
+    expect(screen.queryByRole("region")).toBeNull();
+    expect(screen.getByRole("table").parentElement?.getAttribute("tabindex")).toBeNull();
+  });
+
   it.each(["default", "separated"] as const)("%s rows preserve native table semantics", (variant) => {
     render(
       <Table variant={variant}>

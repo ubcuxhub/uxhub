@@ -5,13 +5,14 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { EventLocation } from "@/components/shared/EventLocation";
 import { EventAgendaTable } from "@/features/events/components/EventAgendaTable";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { requireAuth } from "@/lib/auth/guards";
 import { FLAGS } from "@/lib/flags";
 import { createClient } from "@/lib/supabase/server";
 import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
-import { fetchEventAgenda } from "@/lib/supabase-helpers/event-agenda";
+import { fetchEventParticipantContent } from "@/lib/supabase-helpers/event-agenda";
 import { Calendar, Link2, MapPin } from "lucide-react";
 import { formatEventDate, formatEventTime, pacificDate } from "@/lib/date";
 import { resolveImagePreviewSrc } from "@/lib/event-image";
@@ -51,8 +52,8 @@ export default async function PortalEventPage({
   
   const joinCode = typeof join === "string" ? join : null;
   const origin = getHeadersOrigin(await headers()) ?? "";
-  const [agenda, mentors, sponsors, states, teams] = await Promise.all([
-    event.agenda_enabled ? fetchEventAgenda(supabase, event.id) : [],
+  const [participant, mentors, sponsors, states, teams] = await Promise.all([
+    fetchEventParticipantContent(supabase, event.id),
     // Admins switch these sections off per event, as the public event page does.
     event.mentors_enabled ? fetchEventMentors(supabase, event.id) : [],
     event.sponsors_enabled ? fetchEventSponsors(supabase, event.id) : [],
@@ -118,8 +119,7 @@ export default async function PortalEventPage({
               <div className="flex items-start gap-3 text-small">
                 <span className="flex size-12 shrink-0 items-center justify-center rounded-md border-[0.8px] text-muted-foreground"><MapPin className="size-5" aria-hidden /></span>
                 <div className="flex flex-col gap-1">
-                  <p className="font-medium">{event.location_building || "TBD"}</p>
-                  <p className="text-muted-foreground">{event.location_room || ""}</p>
+                  {participant.location ? <EventLocation location={participant.location} /> : <p>{event.location_building || "TBD"}</p>}
                 </div>
               </div>
 
@@ -151,7 +151,7 @@ export default async function PortalEventPage({
       ) : null}
 
 
-      <EventAgendaTable eventName={event.name} agenda={agenda} />
+      <EventAgendaTable eventName={event.name} agenda={participant.agenda} />
 
       {!eventWorkingDocument(event) && <EventPeopleCard type="mentors" people={mentors} />}
       {!eventWorkingDocument(event) && <EventPeopleCard type="sponsors" people={sponsors} />}

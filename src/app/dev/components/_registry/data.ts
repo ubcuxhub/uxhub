@@ -332,4 +332,10 @@ export const dataEntries: readonly RegistryEntry[] = [
     spec: "§4.3",
     layout: "page",
   },
+  {
+    slug: "event-location", title: "Event location", category: "Data display", tier: "composite",
+    description: "Already-authorized physical, online, hybrid and public-summary locations with safe links and copyable meeting details.",
+    importPath: "@/components/shared/EventLocation", importNames: ["EventLocation"],
+    source: "src/components/shared/EventLocation.tsx", spec: "Participant locations", layout: "page",
+  },
 ];

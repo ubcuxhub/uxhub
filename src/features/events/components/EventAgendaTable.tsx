@@ -1,128 +1,61 @@
 "use client";
 
-import { Separator } from "@/components/ui/separator";
-import { isAgendaDayToday, isAgendaItemHappening } from "@/features/events/lib/event-agenda";
-import { usePacificNow } from "@/hooks/use-pacific-now";
-import { formatEventDate, formatEventTime } from "@/lib/date";
+import { Clock } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { agendaDayLabel, agendaTimeRange, agendaWeeks } from "@/features/events/lib/event-agenda";
+import { formatEventTime } from "@/lib/date";
 import type { EventAgendaDay } from "@/lib/supabase-helpers/event-agenda";
-import { cn } from "@/lib/utils";
 
-interface EventAgendaTableProps {
-  eventName: string;
-  agenda: EventAgendaDay[];
-}
-
-/**
- * The agenda card on the portal event page: one table per day. Today's day dot
- * turns blue and the running item gets a green dot, both in Vancouver time.
- * Renders nothing for an event without an agenda.
- */
-export function EventAgendaTable({ eventName, agenda }: EventAgendaTableProps) {
-  const now = usePacificNow();
-
-  if (agenda.length === 0) return null;
-
-  return (
-    <section className="flex flex-col gap-6 rounded-md border border-border-subtle p-6">
-      <h3 className="text-h3">{eventName} Agenda</h3>
-      <Separator />
-
-      {agenda.map((day) => {
-        const date = formatEventDate(day.date, { weekday: "short", month: "short", year: undefined });
-        const isToday = isAgendaDayToday(day.date, now);
-
-        return (
-          <div key={day.id} className="overflow-x-auto rounded-lg border">
-            <table className="w-full min-w-max">
-              <thead>
-                <tr className="border-b bg-muted/50">
-                  <th colSpan={4} className="px-4 py-3 text-left font-normal">
-                    <div className="flex items-center gap-4">
-                      <span
-                        className={cn("size-2 shrink-0 rounded-full", isToday ? "bg-primary" : "bg-border")}
-                        aria-hidden
-                      />
-                      <span>
-                        {date && <span className="font-medium">{date}: </span>}
-                        {day.title}
-                        {isToday && <span className="sr-only"> (today)</span>}
-                      </span>
-                    </div>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {day.items.map((item) => {
-                  const isHappening = isAgendaItemHappening(day.date, item, now);
-
-                  return (
-                    <tr key={item.id} className="border-b last:border-b-0">
-                      <td className="w-px p-4">
-                        <div className="flex items-center gap-4 whitespace-nowrap">
-                          {/* `invisible` keeps the dot's space, so rows stay aligned when it appears. */}
-                          <span
-                            className={cn(
-                              "size-2 shrink-0 rounded-full bg-success-solid",
-                              !isHappening && "invisible"
-                            )}
-                            aria-hidden
-                          />
-                          <div className="flex w-52 items-center gap-2">
-                            <AgendaClock time={item.start_time} />
-                            {formatEventTime(item.start_time)} - {formatEventTime(item.end_time)}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-4 pr-4">
-                        {item.title}
-                        {isHappening && <span className="sr-only"> (happening now)</span>}
-                      </td>
-                      <td className="w-px py-4 pr-4 whitespace-nowrap text-right text-small">
-                        {item.building}
-                      </td>
-                      <td className="w-32 py-4 pr-4 whitespace-nowrap text-right text-small">
-                        {item.room}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        );
-      })}
-    </section>
-  );
-}
-
-/** A clock icon whose hands show `time`, a Postgres `time` string like "09:30:00". */
-function AgendaClock({ time }: { time: string }) {
-  const [hours, minutes] = time.split(":").map(Number);
-  const minuteAngle = minutes * 6;
-  const hourAngle = ((hours % 12) + minutes / 60) * 30;
-
-  // Hand tip for an angle measured clockwise from 12 o'clock, in Lucide's 24x24 grid.
-  const handEnd = (angle: number, length: number) => {
-    const radians = (angle * Math.PI) / 180;
-    return {
-      x2: Number((12 + length * Math.sin(radians)).toFixed(2)),
-      y2: Number((12 - length * Math.cos(radians)).toFixed(2)),
-    };
-  };
-
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      className="size-5 shrink-0 text-muted-foreground"
-      aria-hidden
-    >
-      <circle cx="12" cy="12" r="10" />
-      <line x1="12" y1="12" {...handEnd(hourAngle, 4)} />
-      <line x1="12" y1="12" {...handEnd(minuteAngle, 6)} />
-    </svg>
-  );
+export function EventAgendaTable({ eventName, agenda }: { eventName: string; agenda: EventAgendaDay[] }) {
+  const weeks = agendaWeeks(agenda);
+  if (!weeks.length) return null;
+  const days = (entries: EventAgendaDay[]) => <div className="space-y-4">{entries.map(day => <div key={day.id} className="overflow-hidden rounded-lg border border-border-subtle">
+    <div className="bg-secondary px-4 py-3">
+      <h3 className="text-small font-medium">{agendaDayLabel(day.date)}<span className="font-normal text-muted-foreground"> · {day.title}</span></h3>
+    </div>
+    <Table aria-label={`${day.title ?? "Agenda"} on ${day.date}`} className="min-w-80 table-fixed" scrollerLabel={`${day.title ?? "Agenda"} schedule, scroll for locations`} scrollerClassName="focus-visible:focus-ring" >
+      <colgroup>
+        <col className="w-48 @min-[48rem]/agenda:w-56" />
+        <col />
+        <col className="hidden w-40 @min-[48rem]/agenda:table-column" />
+        <col className="hidden w-24 @min-[48rem]/agenda:table-column" />
+      </colgroup>
+      <TableHeader className="sr-only"><TableRow><TableHead>Time</TableHead><TableHead>Item</TableHead><TableHead className="hidden @min-[48rem]/agenda:table-cell">Building or online location</TableHead><TableHead className="hidden @min-[48rem]/agenda:table-cell">Room</TableHead></TableRow></TableHeader>
+      <TableBody>{[...day.items].sort((a, b) => (a.starts_at ?? "").localeCompare(b.starts_at ?? "")).map(item => {
+        const building = item.location?.restricted
+          ? item.location.public_summary
+          : item.location?.building || (item.location?.type === "online" ? "Online" : null);
+        const room = item.location?.restricted ? null : item.location?.room;
+        const location = [building, room].filter(Boolean).join(", ");
+        return <TableRow key={item.id}>
+          <TableCell className="px-4 py-3.5 align-top">
+            <div className="flex items-start gap-2 text-small">
+              <Clock className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+              {item.starts_at && item.ends_at ? <span className="flex flex-col gap-x-1 @min-[48rem]/agenda:flex-row @min-[48rem]/agenda:flex-wrap">
+                <span className="whitespace-nowrap">{formatEventTime(item.starts_at)} –</span>{" "}
+                <span className="whitespace-nowrap">{formatEventTime(item.ends_at)}</span>
+              </span> : <span>{agendaTimeRange(item)}</span>}
+            </div>
+          </TableCell>
+          <TableCell className="px-4 py-3.5 align-top text-small wrap-anywhere">
+            <p className="font-medium">{item.title}</p>
+            {location && <p className="mt-1 font-normal text-muted-foreground @min-[48rem]/agenda:hidden">{location}</p>}
+          </TableCell>
+          <TableCell className="hidden px-4 py-3.5 align-top text-small text-muted-foreground wrap-anywhere @min-[48rem]/agenda:table-cell">{building}</TableCell>
+          <TableCell className="hidden px-4 py-3.5 align-top text-small text-muted-foreground wrap-anywhere @min-[48rem]/agenda:table-cell">{room}</TableCell>
+        </TableRow>;
+      })}</TableBody>
+    </Table>
+  </div>)}</div>;
+  return <section aria-label={`${eventName} agenda`} className="min-w-0">
+    <Card className="@container/agenda gap-0 py-0">
+      <CardHeader className="gap-0.5 border-b px-5 pt-5 [.border-b]:pb-4"><CardTitle><h2>Agenda</h2></CardTitle><CardDescription>All times are Pacific Time</CardDescription></CardHeader>
+      <CardContent className="min-w-0 p-5">{weeks.length === 1 ? days(weeks[0].days) : <Tabs defaultValue={String(weeks[0].number)}>
+        <TabsList aria-label="Agenda weeks">{weeks.map(week => <TabsTrigger className="border border-border-subtle data-[state=active]:border-transparent" key={week.number} value={String(week.number)}>Week {week.number}</TabsTrigger>)}</TabsList>
+        {weeks.map(week => <TabsContent key={week.number} value={String(week.number)} className="mt-4">{days(week.days)}</TabsContent>)}
+      </Tabs>}</CardContent>
+    </Card>
+  </section>;
 }
