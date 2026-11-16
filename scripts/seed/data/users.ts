@@ -1,10 +1,12 @@
 import type { TablesInsert } from "../../../src/lib/supabase/database.types.ts";
 import { addDays, startOfUtcDay, timestamp } from "../lib/relative-dates.ts";
 import { encodeCheckboxResponse } from "../../../src/lib/application-response.ts";
-import type {
-  AllergyId,
-  DietId,
-  SetupStep,
+import {
+  INTEREST_OPTIONS,
+  type AllergyId,
+  type AvatarPreset,
+  type DietId,
+  type SetupStep,
 } from "../../../src/features/setup/lib/options.ts";
 import { seedEvents, type SeedEvent } from "./events.ts";
 
@@ -99,6 +101,13 @@ export interface SeedUser {
    * the manager's row, which a fresh database has not created yet.
    */
   studentVerification?: { verifiedByEmail: string; verifiedAt: string };
+  /**
+   * A file in `scripts/seed/data/profile-photos`, uploaded to the
+   * `profile-photos` bucket at the path the app's upload uses
+   * (`profiles/<profile id>/<hex>.png`) once the profile exists. An uploaded
+   * photo wins over `avatarPreset`, as in the app. Login fixtures only.
+   */
+  profilePhoto?: string;
 }
 
 /** Every fixture account signs in with this. Local only — see `lib/targets.ts`. */
@@ -184,6 +193,22 @@ export interface CommonProfileInput {
    */
   userTypeConfirmed?: boolean;
   newsletter?: boolean;
+  /** One of the brand shapes Settings → Profile offers instead of a photo. */
+  avatarPreset?: AvatarPreset;
+}
+
+/**
+ * Stores an interest the way the app does. A label from the member taxonomy
+ * becomes its id (`"UX research"` -> `"ux-research"`), which Settings →
+ * Profile shows as a chosen chip; anything else is kept as written, the shape
+ * of a manager's free tag, which members never see and the admin directory
+ * shows as is.
+ */
+export function storedInterest(label: string): string {
+  return (
+    INTEREST_OPTIONS.find((option) => option.label.toLowerCase() === label.toLowerCase())?.id ??
+    label
+  );
 }
 
 /**
@@ -196,7 +221,7 @@ function baseProfile(input: CommonProfileInput) {
   return {
     first_name: input.firstName,
     birth_date: input.birthDate ?? null,
-    interests: input.interests ?? [],
+    interests: (input.interests ?? []).map(storedInterest),
     // Only managers set these, through the admin dialog. Writing them on every
     // run is what undoes a verification or photo added through the UI; the
     // fixtures that should start verified get it in a later pass.
@@ -216,7 +241,7 @@ function baseProfile(input: CommonProfileInput) {
     allergies: input.allergies ?? [],
     other_allergies: input.otherAllergies ?? [],
     dietary_restrictions: input.otherAllergies?.length ? input.otherAllergies.join(", ") : null,
-    avatar_preset: null,
+    avatar_preset: input.avatarPreset ?? null,
     newsletter: input.newsletter ?? false,
     square_customer_id: null,
   };
@@ -631,6 +656,9 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
     password: SEED_PASSWORD,
     membershipSlug: "innovator",
     fullEventHistory: true,
+    // The one uploaded photo; the presets are on two grid accounts and
+    // everyone else shows initials.
+    profilePhoto: "avatar-1.png",
     profile: studentProfile({
       firstName: "Daniel",
       birthDate: "2002-11-08",
@@ -755,6 +783,8 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
       lastName: "Martinez",
       phone: "6045550104",
       pronouns: "she/her",
+      // A preset shape rather than a photo, for Settings → Profile.
+      avatarPreset: "splash",
       studentNumber: 10000004,
       faculty: "Faculty of Arts",
       major: "Psychology",
@@ -822,6 +852,7 @@ export function buildSeedUsers(events: SeedEvent[], now: Date): SeedUser[] {
       lastName: "Shah",
       phone: "6045550107",
       pronouns: "she/her",
+      avatarPreset: "pointer",
       admin: true,
       newsletter: true,
       studentNumber: 10000005,
