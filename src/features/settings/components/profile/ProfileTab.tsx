@@ -167,8 +167,6 @@ export function ProfileTab({
             </div>
           </div>
         ) : null}
-
-        <p className="text-small text-muted-foreground">Changes save as you go.</p>
       </div>
 
       <ProfileSection
