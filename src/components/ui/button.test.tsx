@@ -59,3 +59,18 @@ describe("Button asChild disabled", () => {
     expect(onClick).not.toHaveBeenCalled();
   });
 });
+
+describe("Button dotted", () => {
+  it("preserves secondary feedback, disabled behavior and loading semantics", () => {
+    const { rerender } = render(<Button variant="dotted">Link schedule</Button>);
+    let button = screen.getByRole("button", { name: "Link schedule" });
+    for (const token of ["border-dotted", "border-border", "bg-background", "text-foreground", "hover:bg-muted", "active:bg-border-subtle", "focus-visible:focus-ring"]) expect(button.className).toContain(token);
+    rerender(<Button variant="dotted" disabled>Link schedule</Button>);
+    button = screen.getByRole("button", { name: "Link schedule" });
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+    rerender(<Button variant="dotted" loading>Link schedule</Button>);
+    button = screen.getByRole("button", { name: "Link schedule" });
+    expect(button.getAttribute("aria-busy")).toBe("true");
+    expect((button as HTMLButtonElement).disabled).toBe(true);
+  });
+});

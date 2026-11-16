@@ -53,6 +53,12 @@ describe("resolveAdminEventId", () => {
     );
   });
 
+  it("keeps the agenda suffix on a slug redirect", async () => {
+    mocks.fetchEventBySlug.mockResolvedValue({ id: EVENT_ID });
+    await expect(resolveAdminEventId(supabase, "uxathon-2026", "/agenda"))
+      .rejects.toThrow(`NEXT_REDIRECT /admin/events/${EVENT_ID}/agenda`);
+  });
+
   it("redirects to the bare event path when there is no suffix", async () => {
     mocks.fetchEventBySlug.mockResolvedValue({ id: EVENT_ID });
 

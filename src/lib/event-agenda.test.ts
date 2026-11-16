@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { agendaDayLabel, agendaTimeRange, agendaWeeks } from "./event-agenda";
+import { agendaDayLabel, agendaTimeRange, agendaWeeks } from "@/lib/event-agenda";
 import type { EventAgendaDay } from "@/lib/supabase-helpers/event-agenda";
 
 const item = { starts_at: "2026-11-21T06:00:00Z", ends_at: "2026-11-21T09:00:00Z" };

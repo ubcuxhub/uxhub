@@ -330,6 +330,33 @@ export type Database = {
           },
         ]
       }
+      event_agenda_notes: {
+        Row: {
+          body: string
+          item_id: string
+          revision: number
+        }
+        ComputedFields: never
+        Insert: {
+          body?: string
+          item_id: string
+          revision?: number
+        }
+        Update: {
+          body?: string
+          item_id?: string
+          revision?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_agenda_notes_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: true
+            referencedRelation: "event_agenda_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_application_questions: {
         Row: {
           allowed_file_types: string[] | null
@@ -1524,6 +1551,10 @@ export type Database = {
         Args: { p_name: string }
         Returns: boolean
       }
+      create_staff_volunteer_schedule: {
+        Args: { p_event_id: string; p_operation_id: string; p_url: string }
+        Returns: Json
+      }
       create_team: {
         Args: { p_event_id: string; p_name?: string; p_user_id: string }
         Returns: {
@@ -1818,6 +1849,15 @@ export type Database = {
           p_event_id: string
           p_id: string
           p_revision: number
+        }
+        Returns: Json
+      }
+      save_agenda_note: {
+        Args: {
+          p_body: string
+          p_event_id: string
+          p_expected_revision: number
+          p_item_id: string
         }
         Returns: Json
       }

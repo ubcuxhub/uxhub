@@ -31,9 +31,11 @@ export const TABLES = {
   squareWebhookEvents: "square_webhook_events",
   eventAgendaDays: "event_agenda_days",
   eventAgendaItems: "event_agenda_items",
+  eventAgendaNotes: "event_agenda_notes",
   teams: "teams",
   teamMembers: "team_members",
   eventContentSettings: "event_content_settings",
+  // Initial-link creation uses the service-only create_staff_volunteer_schedule RPC.
   eventStaffVolunteerSchedules: "event_staff_volunteer_schedules",
   eventLinks: "event_links",
   eventPrivateDetails: "event_private_details",

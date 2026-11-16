@@ -171,6 +171,7 @@ helper file, and fix it in one place.
 | `event_application_responses` | `src/lib/supabase-helpers/event-applications.ts`  |
 | `event_agenda_days`           | `src/lib/supabase-helpers/event-agenda.ts`        |
 | `event_agenda_items`          | `src/lib/supabase-helpers/event-agenda.ts`        |
+| `event_agenda_notes`          | `src/lib/supabase-helpers/event-agenda-notes.ts` (staff only; `save_agenda_note` enforces revisions and event membership) |
 | `check_in_sessions`           | `src/lib/supabase-helpers/check-ins.ts`           |
 | `check_ins`                   | `src/lib/supabase-helpers/check-ins.ts`           |
 | `mentors` / `event_mentors`   | `src/lib/supabase-helpers/event-people.ts`        |
@@ -195,6 +196,22 @@ Supporting files:
   authorization itself: today `admin-server.ts`, the admin server actions, and
   the payment customer and fulfillment modules.
   `grep -rln 'supabase/admin"' src` lists every importer.
+
+## Shared staff agenda notes
+
+`event_agenda_notes` stores one unbounded text note per stable agenda item,
+separately from participant descriptions, public projections and builder revisions.
+Only admin/manager viewers can read it. Anonymous access and direct browser
+insert/update/delete are denied. The viewer-client `save_agenda_note` RPC checks
+staff authorization, item/event membership and the expected note revision in one
+transaction. A missing note starts at revision 0; each successful save increments
+it. A stale save returns the latest note without overwriting it. Empty text clears
+the note. Deleting an eligible agenda item cascades its note.
+
+`event-agenda-notes.ts` reads the normalized agenda regardless of the participant
+display switch and joins staff-only locations/notes. Call it only after the
+server staff guard, with the requesting viewer's client. The participant reader
+continues to omit all staff notes and Volunteer Schedule URLs.
 
 ## Storage
 
@@ -569,3 +586,12 @@ removal. Older documents without this version preserve a schedule they never kne
 Historical resource RPC calls accept an optional `p_resources_version` argument
 with the same semantics, covered by revision/retry checks. Existing RPC arguments
 and generic everyone/going/after_event resource semantics remain compatible.
+
+
+The staff agenda's `create_staff_volunteer_schedule` operation creates only the
+initial link. It is service-role only, called after the server staff guard, and
+shares builder locks and private retry receipts. Concurrent creation is rejected;
+existing resources/people remain intact. Content and working-document revisions,
+and unmaterialized compatibility mirrors, update atomically to reject stale saves.
+It works for incomplete drafts, active events and historical events. Subsequent
+edits use the event editor's Links and resources section.

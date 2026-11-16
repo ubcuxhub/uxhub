@@ -440,6 +440,7 @@ export function AdminEventRecord({
               ) : null}
             </div>
             <div className="flex flex-wrap gap-2">
+              <Button asChild variant="secondary" size="sm"><Link href={`${base}/agenda`}><ClipboardList aria-hidden />Agenda</Link></Button>
               <Button asChild variant="secondary" size="sm">
                 <Link href={`${base}/check-in`}>
                   <QrCode aria-hidden />

@@ -52,3 +52,15 @@ function withStaffSchedule(content: EventContent, schedule: (ResourceLink & { so
   }
   return { ...content, resources_version: 2, links };
 }
+
+/** Guarded server actions only: this create-only RPC is service-role restricted. */
+export async function createStaffVolunteerSchedule(supabase: DbClient, input: {
+  eventId: string; url: string; operationId: string;
+}): Promise<{ url: string }> {
+  const { data, error } = await supabase.rpc("create_staff_volunteer_schedule", {
+    p_event_id: input.eventId, p_url: input.url, p_operation_id: input.operationId,
+  });
+  if (error) throw error;
+  if (!data || typeof data !== "object" || Array.isArray(data) || typeof data.url !== "string") throw new Error("No saved schedule returned.");
+  return { url: data.url };
+}

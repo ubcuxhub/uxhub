@@ -49,6 +49,7 @@ const buttonVariants = cva(
         /** @deprecated Use `primary`. */
         default: primary,
         secondary,
+        dotted: `${secondary} border-dotted`,
         /** @deprecated Use `secondary`. */
         outline: secondary,
         destructive:

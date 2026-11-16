@@ -1,0 +1,73 @@
+// @vitest-environment jsdom
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import { VolunteerScheduleButton } from "./VolunteerScheduleButton";
+import { createVolunteerScheduleAction } from "../volunteer-schedule-actions";
+vi.mock("../volunteer-schedule-actions", () => ({ createVolunteerScheduleAction: vi.fn() }));
+afterEach(cleanup);
+beforeEach(() => vi.resetAllMocks());
+function setup() {
+  render(<VolunteerScheduleButton eventId="event" initialUrl={null} />);
+  const add = screen.getByRole("button", { name: "Add Exec Volunteer Schedule" });
+  fireEvent.click(add);
+  return { add, input: screen.getByRole("textbox", { name: "Volunteer schedule URL" }) as HTMLInputElement };
+}
+it("shows approved popup copy, editor deep link and submission-only validation; Cancel returns focus", async () => {
+  const { add, input } = setup();
+  expect(add.className).toContain("border-dotted");
+  expect(add.className).toContain("sm:h-(--size-control)");
+  expect(screen.getByRole("dialog", { name: "Link volunteer schedule for the event" })).toBeTruthy();
+  expect(screen.getByText("Keep track of who's doing what")).toBeTruthy();
+  expect(input.placeholder).toBe("Eg. Notion volunteer sign up page");
+  expect(screen.getByText(/To change this link later/).textContent).toBe("To change this link later, use the event editor.");
+  expect(screen.getByRole("link", { name: "event editor" }).getAttribute("href")).toBe("/admin/events/event/edit#builder-resources");
+  fireEvent.change(input, { target: { value: "http://invalid.test" } });
+  expect(screen.queryByRole("alert")).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  expect(await screen.findByRole("alert")).toBeTruthy();
+  expect(input.getAttribute("aria-invalid")).toBe("true");
+  expect(document.activeElement).toBe(input);
+  expect(createVolunteerScheduleAction).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  await waitFor(() => expect(document.activeElement).toBe(add));
+  fireEvent.click(add);
+  expect((screen.getByRole("textbox") as HTMLInputElement).value).toBe("");
+});
+it("retains failed input, reuses receipts on retry, blocks dismissal/duplicates while saving and focuses View on success", async () => {
+  const { input } = setup();
+  const url = "https://example.test/schedule";
+  fireEvent.change(input, { target: { value: url } });
+  let reject!: (reason: Error) => void;
+  vi.mocked(createVolunteerScheduleAction).mockImplementationOnce(() => new Promise((_, fail) => { reject = fail; }));
+  const form = input.closest("form")!;
+  fireEvent.submit(form);
+  fireEvent.submit(form);
+  expect(createVolunteerScheduleAction).toHaveBeenCalledTimes(1);
+  expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.getByRole("button", { name: "Save" }).getAttribute("aria-busy")).toBe("true");
+  fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+  fireEvent.pointerDown(document.body);
+  expect(screen.getByRole("dialog")).toBeTruthy();
+  expect((screen.getByRole("button", { name: "Close" }) as HTMLButtonElement).disabled).toBe(true);
+  await act(async () => reject(new Error("Offline")));
+  expect(await screen.findByRole("alert")).toBeTruthy();
+  expect(input.value).toBe(url);
+  const first = vi.mocked(createVolunteerScheduleAction).mock.calls[0][0];
+  vi.mocked(createVolunteerScheduleAction).mockResolvedValueOnce({ ok: false, error: "Try again" });
+  fireEvent.submit(form);
+  expect(await screen.findByText("Try again")).toBeTruthy();
+  expect(createVolunteerScheduleAction).toHaveBeenLastCalledWith(first);
+  vi.mocked(createVolunteerScheduleAction).mockResolvedValueOnce({ ok: true, url });
+  fireEvent.submit(form);
+  const view = await screen.findByRole("link", { name: "View Volunteer Schedule" });
+  expect(view.getAttribute("href")).toBe(url);
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Add Exec Volunteer Schedule" })).toBeNull();
+  await waitFor(() => expect(document.activeElement).toBe(view));
+});
+it("returns focus after Escape dismissal", async () => {
+  const { add } = setup();
+  fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+  await waitFor(() => expect(document.activeElement).toBe(add));
+});

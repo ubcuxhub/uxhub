@@ -338,4 +338,10 @@ export const dataEntries: readonly RegistryEntry[] = [
     importPath: "@/components/shared/EventLocation", importNames: ["EventLocation"],
     source: "src/components/shared/EventLocation.tsx", spec: "Participant locations", layout: "page",
   },
+  {
+    slug: "agenda-day-table", title: "Agenda day table", category: "Data display", tier: "composite",
+    description: "Shared agenda with container-responsive locations, proportional staff columns (24/24/20/12/20%) and row action popovers.",
+    importPath: "@/components/shared/AgendaDayTable", importNames: ["AgendaDayTable"],
+    source: "src/components/shared/AgendaDayTable.tsx", spec: "Agenda presentation", layout: "page",
+  },
 ];

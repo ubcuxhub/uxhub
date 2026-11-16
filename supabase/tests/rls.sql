@@ -2503,6 +2503,7 @@ $$;
 \ir event-team-settings.sql
 \ir event-content.sql
 \ir staff-volunteer-schedule.sql
+\ir agenda-notes.sql
 \ir event-checkout.sql
 
 rollback;

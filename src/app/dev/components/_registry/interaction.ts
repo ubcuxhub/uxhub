@@ -13,7 +13,7 @@ export const interactionEntries: readonly RegistryEntry[] = [
     category: "Actions",
     tier: "primitive",
     description:
-      "Use a Button for an action on the page. Primary for the one step you want taken, secondary for the rest, destructive for what can’t be undone.",
+      "Use a Button for an action on the page. Primary for the one step you want taken, secondary for the rest, dotted for an optional add/link action, destructive for what can’t be undone.",
     importPath: "@/components/ui/button",
     importNames: ["Button"],
     source: "src/components/ui/button.tsx",

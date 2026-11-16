@@ -21,6 +21,8 @@ const NOT_IN_GALLERY: readonly string[] = [
   // Full location details have their own /dev/components/event-location demo.
   // The accepted participant agenda displays building/room text only.
   "event-location",
+  // Responsive staff actions have dedicated wide and narrow interactive examples.
+  "agenda-day-table",
 ];
 
 const SLUGS = new Set(ENTRIES.map((entry) => entry.slug));
