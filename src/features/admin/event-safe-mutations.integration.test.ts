@@ -88,7 +88,7 @@ describe("safe event mutations", () => {
   }));
 });
 
-it("counts distinct attendees across sessions, retains history on resource saves, and cascades eligible deletion", () => withFixtures(async f => {
+it("counts distinct attendees, retains history, and requires attendance undo before parent deletion", () => withFixtures(async f => {
   const e = await f.createEvent({ status: "active", starts_at: "2020-11-02T18:00:00Z", ends_at: "2020-11-03T19:00:00Z" });
   const users = [await f.createUser(), await f.createUser()];
   const tickets = await f.supabase.from("event_tickets").insert(users.map(user => ({ event_id: e.id, user_id: user.id }))).select();
@@ -103,7 +103,9 @@ it("counts distinct attendees across sessions, retains history on resource saves
   expect((await f.supabase.from("event_tickets").select("id").eq("event_id",e.id)).data?.map(row => row.id).sort()).toEqual(tickets.data!.map(row => row.id).sort());
   expect((await fetchEventHistoryInfo(f.supabase,e.id)).checkedIn).toBe(1);
   const deletion = await f.supabase.rpc("delete_admin_event_safely",{ p_event_id:e.id,p_operation_id:f.track("admin_event_mutations",randomUUID()) });
-  expect(deletion.error).toBeNull();
-  expect((await f.supabase.from("check_ins").select("id").in("ticket_id",tickets.data!.map(row => row.id))).data).toHaveLength(0);
+  expect(deletion.error?.hint).toBe("CHECK_IN_SESSIONS_CONFLICT");
+  expect((await f.supabase.from("check_ins").select("id").in("ticket_id",tickets.data!.map(row => row.id))).data).toHaveLength(2);
+  await f.supabase.from("check_ins").delete().in("ticket_id",tickets.data!.map(row => row.id)).throwOnError();
+  expect((await f.supabase.rpc("delete_admin_event_safely",{ p_event_id:e.id,p_operation_id:f.track("admin_event_mutations",randomUUID()) })).error).toBeNull();
   expect((await f.supabase.from("user_info").select("id").in("id",users.map(user => user.id))).data).toHaveLength(2);
 }));

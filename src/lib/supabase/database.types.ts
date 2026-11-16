@@ -153,6 +153,7 @@ export type Database = {
       }
       check_in_sessions: {
         Row: {
+          agenda_item_id: string | null
           created_at: string | null
           end_time: string | null
           event_id: string
@@ -163,6 +164,7 @@ export type Database = {
         }
         ComputedFields: never
         Insert: {
+          agenda_item_id?: string | null
           created_at?: string | null
           end_time?: string | null
           event_id: string
@@ -172,6 +174,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          agenda_item_id?: string | null
           created_at?: string | null
           end_time?: string | null
           event_id?: string
@@ -181,6 +184,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "check_in_sessions_agenda_item_id_fkey"
+            columns: ["agenda_item_id"]
+            isOneToOne: true
+            referencedRelation: "event_agenda_items"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "check_in_sessions_event_id_fkey"
             columns: ["event_id"]
@@ -236,21 +246,27 @@ export type Database = {
       event_agenda_days: {
         Row: {
           date: string
+          ends_at: string | null
           event_id: string
           id: string
+          starts_at: string | null
           title: string | null
         }
         ComputedFields: never
         Insert: {
           date: string
+          ends_at?: string | null
           event_id: string
           id?: string
+          starts_at?: string | null
           title?: string | null
         }
         Update: {
           date?: string
+          ends_at?: string | null
           event_id?: string
           id?: string
+          starts_at?: string | null
           title?: string | null
         }
         Relationships: [
@@ -266,30 +282,42 @@ export type Database = {
       event_agenda_items: {
         Row: {
           building: string | null
+          check_in: boolean
+          description: string
           end_time: string
+          ends_at: string | null
           event_agenda_day_id: string
           id: string
           room: string | null
           start_time: string
+          starts_at: string | null
           title: string
         }
         ComputedFields: never
         Insert: {
           building?: string | null
+          check_in?: boolean
+          description?: string
           end_time: string
+          ends_at?: string | null
           event_agenda_day_id: string
           id?: string
           room?: string | null
           start_time: string
+          starts_at?: string | null
           title: string
         }
         Update: {
           building?: string | null
+          check_in?: boolean
+          description?: string
           end_time?: string
+          ends_at?: string | null
           event_agenda_day_id?: string
           id?: string
           room?: string | null
           start_time?: string
+          starts_at?: string | null
           title?: string
         }
         Relationships: [
@@ -1442,6 +1470,14 @@ export type Database = {
         Returns: boolean
       }
       admin_event_team_settings: { Args: { p_event_id: string }; Returns: Json }
+      agenda_draft_instant: {
+        Args: { p_date: string; p_time: string }
+        Returns: string
+      }
+      agenda_pacific_instant: {
+        Args: { p_date: string; p_time: string }
+        Returns: string
+      }
       can_edit_application_response: {
         Args: { p_application_id: string; p_question_id: string }
         Returns: boolean
@@ -1596,6 +1632,19 @@ export type Database = {
         }
         Returns: Json
       }
+      save_admin_event_before_agenda: {
+        Args: {
+          p_application_questions: Json
+          p_check_in_sessions: Json
+          p_event: Json
+          p_event_id: string
+          p_expected_image_url: string
+          p_mentors: Json
+          p_slug: string
+          p_sponsors: Json
+        }
+        Returns: Json
+      }
       save_admin_event_before_application_settings: {
         Args: {
           p_application_questions: Json
@@ -1636,6 +1685,22 @@ export type Database = {
         Returns: Json
       }
       save_admin_event_builder: {
+        Args: {
+          p_application_questions: Json
+          p_check_in_sessions: Json
+          p_draft_id: string
+          p_draft_revision: number
+          p_event: Json
+          p_event_id: string
+          p_expected_header_image_url: string
+          p_expected_image_url: string
+          p_mentors: Json
+          p_slug: string
+          p_sponsors: Json
+        }
+        Returns: Json
+      }
+      save_admin_event_builder_before_agenda_timing: {
         Args: {
           p_application_questions: Json
           p_check_in_sessions: Json

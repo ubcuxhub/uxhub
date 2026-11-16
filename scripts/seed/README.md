@@ -314,3 +314,12 @@ resource identities, and only advance revision when content changes. Application
 timing settings are saved without resetting the durable submitted-question lock;
 release/expiry enforcement remains deferred. The seed does not expose protected
 location or meeting data through the public event row.
+
+### Unified agenda fixtures
+
+Every event now receives a version-2 builder agenda document. Agenda items and
+check-in sessions share durable mappings; a session without an exact labelled
+item becomes a distinct check-in item. Event timing derives from all agenda
+items. Day/item physical projections honour the saved location audience.
+`pnpm supabase:local` rebuilds and reseeds the empty-event cutover; subsequent
+`pnpm seed` runs reconcile the same item/session identities.

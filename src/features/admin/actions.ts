@@ -7,7 +7,7 @@ import { fetchEventMutationResult, eventMutationResult, fetchEventHistoryInfo } 
 import { eventContentProblem, type EventContent } from "./lib/event-content";
 import { searchMentors, searchSponsors } from "@/lib/supabase-helpers/event-people";
 
-import { parseDateLocationDraft, dateLocationProblem, dateSessions, type EventDateLocationDraft } from "./lib/event-date-location";
+import { agendaEnvelope, parseDateLocationDraft, dateLocationProblem, dateSessions, type EventDateLocationDraft } from "./lib/event-date-location";
 
 import { saveEventDraft, fetchEventDraft, eventImageIsReferenced, recoverEventDraftReceipt } from "@/lib/supabase-helpers/event-drafts";
 import { workingDocumentImageUrls, type EventWorkingDocument } from "./lib/event-working-document";
@@ -365,8 +365,12 @@ export async function saveAdminEventAction(
     const config = parseDateLocationDraft(input.dateLocation);
     const problem = dateLocationProblem(config);
     if (problem) return { error: problem };
+    if (config.version === 2) {
+      const envelope = agendaEnvelope(config);
+      input = { ...input, event: { ...input.event, starts_at: datetimeLocalToTimestamptz(envelope.starts_at), ends_at: datetimeLocalToTimestamptz(envelope.ends_at) } };
+    }
     const sessions = dateSessions(config);
-    datePayload = { _date_revision: input.dateLocationRevision ?? 0, _date_location: { ...config, dates: config.dates.map((row, index) => ({ ...row, start_time: sessions[index].start_time, end_time: sessions[index].end_time })) } };
+    datePayload = { _date_revision: input.dateLocationRevision ?? 0, _date_location: { ...config, dates: config.version === 2 ? config.dates : config.dates.map((row, index) => ({ ...row, start_time: sessions[index].start_time, end_time: sessions[index].end_time })) } };
   }
 
   if ((input.event.short_description?.length ?? 0) > 50 || (input.event.description?.length ?? 0) > 3000) throw new Error("Overview exceeds its character limit.");

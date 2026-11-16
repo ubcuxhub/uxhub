@@ -510,3 +510,27 @@ purchase, ticket and fulfilled status together. A rejected reservation leaves no
 purchase or seat. Retries return the same receipt. No Square customer or payment
 is used for zero amounts; ordinary confirmation, history and check-in read the
 same purchase/ticket records as paid registration.
+
+## Unified builder agenda (EAG-001)
+
+Version 2 of the staff-only `event_date_location_settings.document` contains
+dated days with whole locations and stable item UUIDs, descriptions, start time,
+explicit end date/time, optional whole-location override and optional check-in.
+Day/event envelopes are derived server-side; working-document projections use
+the same items and retain incomplete text. `agenda_enabled` controls display only.
+Public agenda rows contain safe physical projections, never the private editor
+document or meeting credentials. Existing public time columns remain projections
+for participant consumers pending EAG-002.
+
+`check_in_sessions.agenda_item_id` maps enabled items to the current scanner.
+Attendance keeps its original session/ticket/timestamp. Database guards serialize
+item/session/event deletion with attendance inserts and reject disabling attended
+items, including through a draft working document. Undo of attendance is separate.
+Full saves keep the existing revision and operation receipt transaction. Overview
+quick edits cannot change the item-derived event dates.
+
+The 20261116012130 migration uses the approved empty-event baseline; it does not
+infer/backfill legacy session mappings. Rebuild/reseed the local database with
+`pnpm supabase:local`; do not deploy it against legacy live agendas without a
+separate data decision. Timing reuses the application's pinned Vancouver calendar
+(including historical gap/overlap rejection), independent of local tzdata.

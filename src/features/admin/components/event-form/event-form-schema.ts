@@ -1,5 +1,5 @@
 import { eventContentProblem, type EventContent } from "../../lib/event-content";
-import { dateLocationIssues, emptyEventDate, emptyLocation, type EventDateLocationDraft } from "../../lib/event-date-location";
+import { dateLocationIssues, emptyAgendaDay, emptyLocation, type EventDateLocationDraft } from "../../lib/event-date-location";
 import { parseEventDescription, type EventDescription } from "@/lib/event-description";
 import { eventSlugError, priceError, suggestedEventSlug, websiteUrlError } from "../../lib/event-configuration";
 import {
@@ -146,7 +146,7 @@ export const defaultFormState: EventFormState = {
 export function getInitialFormState(): EventFormState {
   return {
     ...defaultFormState,
-    date_location: { automatic: true, audience: "everyone", location: emptyLocation(), dates: [emptyEventDate()] },
+    date_location: { version: 2, automatic: true, audience: "everyone", location: emptyLocation(), dates: [emptyAgendaDay()] },
   };
 }
 
@@ -274,7 +274,7 @@ export function createFormSnapshot(
   });
 }
 
-export type BuilderSection = "basics" | "description" | "dates" | "registration" | "teams" | "schedule" | "people" | "resources" | "summary" | "settings";
+export type BuilderSection = "basics" | "description" | "agenda" | "registration" | "teams" | "people" | "resources" | "summary" | "settings";
 export interface EventFormIssue {
   section: BuilderSection;
   target: string;
@@ -318,10 +318,10 @@ export function validateEventForm(
     else if (formState.registration_closes_at && strictPacificTimestamp(formState.registration_closes_at) && strictPacificTimestamp(formState.publish_at)! >= strictPacificTimestamp(formState.registration_closes_at)!) add("summary", "publish-date", "Publish time must be before registration closes.");
   }
   if (formState.date_location) {
-    issues.push(...dateLocationIssues(formState.date_location).map(issue => ({ ...issue, section: "dates" as const })));
+    issues.push(...dateLocationIssues(formState.date_location).map(issue => ({ ...issue, section: "agenda" as const })));
   } else {
-    if (!isCompleteDateTime(formState.starts_at) || !isCompleteDateTime(formState.ends_at)) add("dates", "builder-dates", "Event start and end dates and times are required.", true);
-    else if (isEventScheduleRangeInvalid(formState)) add("dates", "builder-dates", "Event end time must be after the start time.");
+    if (!isCompleteDateTime(formState.starts_at) || !isCompleteDateTime(formState.ends_at)) add("agenda", "builder-agenda", "Event start and end dates and times are required.", true);
+    else if (isEventScheduleRangeInvalid(formState)) add("agenda", "builder-agenda", "Event end time must be after the start time.");
     if (!checkInEvents.every(item => item.name && item.start_time && item.end_time)) add("registration", "builder-registration", "All check-in sessions require name, start time, and end time.", true);
     else if (checkInEvents.some(item => isDateTimeRangeInvalid(item.start_time, item.end_time))) add("registration", "builder-registration", "Check-in end time must be after the start time.");
   }

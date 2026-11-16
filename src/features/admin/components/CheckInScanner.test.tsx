@@ -47,6 +47,7 @@ const sessions: CheckInSession[] = [
   {
     id: "doors",
     event_id: "event-1",
+    agenda_item_id: null,
     name: "Doors",
     start_time: at(-3 * hour),
     end_time: at(-2 * hour),
@@ -56,6 +57,7 @@ const sessions: CheckInSession[] = [
   {
     id: "talks",
     event_id: "event-1",
+    agenda_item_id: null,
     name: "Talks",
     start_time: at(-hour),
     end_time: at(hour),

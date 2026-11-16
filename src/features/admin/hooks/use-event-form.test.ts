@@ -174,7 +174,7 @@ describe("event form publishing schedule", () => {
       initialEvent: event,
       initialCheckInSessions: [{
         id: "check-in-1",
-        created_at: null,
+        agenda_item_id: null, created_at: null,
         updated_at: null,
         event_id: event.id,
         name: "Doors",
@@ -201,7 +201,7 @@ describe("event form publishing schedule", () => {
       initialEvent: event,
       initialCheckInSessions: [{
         id: "check-in-1",
-        created_at: null,
+        agenda_item_id: null, created_at: null,
         updated_at: null,
         event_id: event.id,
         name: "Doors",
@@ -217,7 +217,7 @@ describe("event form publishing schedule", () => {
     });
     act(() => {
       const dates = result.current.formState.date_location!;
-      result.current.handleFieldChange("date_location", { ...dates, dates: [{ ...dates.dates[0], end: "12:30" }] });
+      result.current.handleFieldChange("date_location", { ...dates, dates: [{ ...dates.dates[0], items: dates.dates[0].items!.map(item => ({ ...item, end: "12:30" })) }] });
       result.current.handleFieldChange("registration_closes_at", "2024-06-30T23:59");
       result.current.handleFieldChange("publish_at", "2024-06-29T10:00");
       result.current.handleFieldChange("requires_application", true);
@@ -285,7 +285,7 @@ it("reopens a saved unfinished card as clean while retaining all its values", ()
 
 it("preserves saved question identity during a branding save", async () => {
   const question = { id: "question-1", event_id: event.id, created_at: null, updated_at: null, question: "Why?", description: null, response_type: "short_text" as const, is_required: false, sort_order: 0, max_char_limit: null, response_options: [], restrict_file_types: false, allowed_file_types: [], max_file_size_bytes: null };
-  const { result } = renderHook(() => useEventForm({ eventId: event.id, initialEvent: event, initialApplicationQuestions: [question], initialCheckInSessions: [{ id: "session-1", event_id: event.id, created_at: null, updated_at: null, name: "Doors", start_time: event.starts_at, end_time: event.ends_at }] }));
+  const { result } = renderHook(() => useEventForm({ eventId: event.id, initialEvent: event, initialApplicationQuestions: [question], initialCheckInSessions: [{ id: "session-1", event_id: event.id, agenda_item_id: null, created_at: null, updated_at: null, name: "Doors", start_time: event.starts_at, end_time: event.ends_at }] }));
   act(() => result.current.handleFieldChange("event_colour", "#C983C7"));
   await act(async () => { await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as FormEvent<HTMLFormElement>); });
   expect(result.current.error).toBeNull();
@@ -324,7 +324,7 @@ describe("event configuration editing", () => {
 describe("event form application questions", () => {
   const checkIn = {
     id: "check-in-1",
-    created_at: null,
+    agenda_item_id: null, created_at: null,
     updated_at: null,
     event_id: event.id,
     name: "Doors",
@@ -401,7 +401,7 @@ describe("event form application questions", () => {
 describe("event form check-in sessions", () => {
   const doors = {
     id: "check-in-1",
-    created_at: null,
+    agenda_item_id: null, created_at: null,
     updated_at: null,
     event_id: event.id,
     name: "Doors",
@@ -428,7 +428,7 @@ describe("event form check-in sessions", () => {
       initialCheckInSessions: [doors],
     }));
     act(() => { const config = result.current.formState.date_location!;
-      result.current.handleFieldChange("date_location", { ...config, dates: [{ ...config.dates[0], end: "12:00" }, { ...config.dates[0], key: "second", session_id: null, start: "12:00", end: "13:00", label: "Lunch" }] });
+      result.current.handleFieldChange("date_location", { ...config, dates: [{ ...config.dates[0], items: [{ ...config.dates[0].items![0], end: "12:00" }, { ...config.dates[0].items![0], key: crypto.randomUUID(), session_id: null, start: "12:00", end: "13:00", label: "Lunch" }] }] });
     });
 
     await submit(result);
@@ -475,7 +475,7 @@ describe("event form check-in sessions", () => {
 it("loads staff-only timing and sends Pacific moments separately from event and offer fields", async () => {
   vi.mocked(saveAdminEventAction).mockResolvedValue({ id: event.id, checkInSessionIds: ["session-1"], questionIds: [] });
   const settings = { event_id: event.id, decisions_release_at: "2026-11-16T18:00:00Z", confirmation_deadline: "2026-11-17T18:00:00Z", questions_locked_at: null };
-  const { result } = renderHook(() => useEventForm({ eventId: event.id, initialEvent: event, initialApplicationSettings: settings, initialCheckInSessions: [{ id: "session-1", event_id: event.id, created_at: null, updated_at: null, name: "Doors", start_time: event.starts_at, end_time: event.ends_at }] }));
+  const { result } = renderHook(() => useEventForm({ eventId: event.id, initialEvent: event, initialApplicationSettings: settings, initialCheckInSessions: [{ id: "session-1", event_id: event.id, agenda_item_id: null, created_at: null, updated_at: null, name: "Doors", start_time: event.starts_at, end_time: event.ends_at }] }));
   expect(result.current.formState.decisions_release_at).toBe("2026-11-16T11:00");
   act(() => result.current.handleFieldChange("confirmation_deadline", "2026-11-18T11:00"));
   await act(async () => { await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as FormEvent<HTMLFormElement>); });
@@ -497,7 +497,7 @@ it("saves an incomplete application and incomplete timing as a working draft", a
 
 describe("drafts with saved event children", () => {
   const storedEvent = { ...event, publish_at: null, description_rich: [{ type: "paragraph", spans: [{ text: event.description! }] }], header_image_url: "https://example.test/header.png", header_colour: null, event_colour: "#C983C7" };
-  const session = { id: "session-1", event_id: event.id, created_at: null, updated_at: null, name: "Doors", start_time: event.starts_at, end_time: event.ends_at };
+  const session = { id: "session-1", event_id: event.id, agenda_item_id: null, created_at: null, updated_at: null, name: "Doors", start_time: event.starts_at, end_time: event.ends_at };
   const question = { id: "question-1", event_id: event.id, created_at: null, updated_at: null, question: "Why?", description: null, response_type: "short_text" as const, is_required: false, sort_order: 0, max_char_limit: 500, response_options: null, restrict_file_types: false, allowed_file_types: null, max_file_size_bytes: null };
   const options = { eventId: event.id, initialEvent: storedEvent, initialCheckInSessions: [session], initialApplicationQuestions: [question] };
   const submit = (result: { current: ReturnType<typeof useEventForm> }) => act(async () => {

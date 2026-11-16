@@ -168,9 +168,9 @@ describe("relative event seed timeline", () => {
             now.getTime() <= Date.parse(session.end_time!)
         )
       ).toBe(true);
-      // One day: six hours, long enough to work through after a seed.
+      // The agenda includes the six-hour event plus its half-hour door item.
       expect(Date.parse(today.event.ends_at!) - Date.parse(today.event.starts_at!)).toBe(
-        6 * 60 * 60 * 1000
+        6.5 * 60 * 60 * 1000
       );
     }
   });

@@ -369,9 +369,6 @@ export function AdminEventRecord({
   const momentError = (field: MomentKey) => {
     if (!draft) return null;
     if (fieldErrors[field]) return fieldErrors[field];
-    if (field === "ends_at" && endsTooEarly(draft.starts_at, draft.ends_at)) {
-      return "Event end time must be after the start time.";
-    }
     if (
       field === "registration_closes_at" &&
       endsTooEarly(draft.registration_opens_at, draft.registration_closes_at)
@@ -467,7 +464,7 @@ export function AdminEventRecord({
           </RecordSection>
 
           <RecordSection
-            title="Status and schedule"
+            title="Status and registration schedule"
             kind={editing ? "content" : "fields"}
             action={
               editing ? null : (
@@ -476,7 +473,7 @@ export function AdminEventRecord({
                   variant="secondary"
                   size="sm"
                   onClick={startEditing}
-                  aria-label="Change status and schedule"
+                  aria-label="Change status and registration schedule"
                 >
                   <Pencil aria-hidden />
                   Change
@@ -526,27 +523,7 @@ export function AdminEventRecord({
                     clearLabel="Clear publish date"
                   />
                 ) : null}
-                <MomentField
-                  id={`${ids}-starts`}
-                  label="Starts"
-                  dateLabel="Start date"
-                  timeLabel="Start time"
-                  value={draft.starts_at}
-                  onChange={(value) => update("starts_at", value)}
-                  onValidityChange={reportField("starts_at")}
-                  error={momentError("starts_at")}
-                />
-                <MomentField
-                  id={`${ids}-ends`}
-                  label="Ends"
-                  dateLabel="End date"
-                  timeLabel="End time"
-                  value={draft.ends_at}
-                  onChange={(value) => update("ends_at", value)}
-                  onValidityChange={reportField("ends_at")}
-                  start={draft.starts_at}
-                  error={momentError("ends_at")}
-                />
+                <FieldDescription>Event timing comes from agenda items. <Link href={`/admin/events/${event.id}/edit#builder-agenda`}>Edit the agenda</Link> to change dates and times.</FieldDescription>
                 <MomentField
                   id={`${ids}-opens`}
                   label="Registration opens"

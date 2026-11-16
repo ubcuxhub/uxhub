@@ -1043,3 +1043,12 @@ insets) that stays anchored when the sidebar expands or collapses.
 The section navigation menu is non-modal: opening it preserves page scrolling
 and scrollbar space, keeping the fixed trigger stationary. Escape and selection
 retain the existing focus behavior.
+
+### Location editor
+
+`shared/LocationEditor` composes the standard segmented toggle and labelled
+fields for in-person, online and hybrid locations. `LocationDraft` lives in
+`src/lib/location.ts`. Callers pass a unique `prefix`, controlled `value`,
+`onChange` and `restricted` (adds the public summary). Changing type preserves
+inactive fields. Audience enforcement, whole-location inheritance, required-field
+validation and persistence belong to the caller. See `/dev/components/location-editor`.
