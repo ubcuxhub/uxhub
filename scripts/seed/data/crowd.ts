@@ -395,6 +395,11 @@ const DESIGN_JAM_CHECKED_IN = 9;
 /** Last year's welcome night, free, with door check-ins. */
 const GET_TO_KNOW_TICKETS = [0, 1, 3, 4, 6, 7, 9, 10, 12, 14, 16, 19, 20, 23, 24, 27, 28, 29, 32, 35];
 const GET_TO_KNOW_ABSENT = new Set([12, 27, 35]);
+/**
+ * Bought while the content design workshop was live, before it went back to
+ * draft. Their tickets are what lock its pricing in the builder.
+ */
+const CONTENT_WORKSHOP_TICKETS = [5, 14, 25, 30, 34, 39];
 
 /** Lapsed explorer who has already started renewing: payment still pending. */
 const RENEWAL_PENDING = 29;
@@ -412,6 +417,7 @@ export function buildSeedCrowd(events: SeedEvent[], now: Date): SeedUser[] {
   const uxathonUpcoming = requireEvent(events, "uxathon-upcoming");
   const uxathonPast = requireEvent(events, "uxathon-past");
   const designSprintUpcoming = requireEvent(events, "design-sprint-upcoming");
+  const contentWorkshop = requireEvent(events, "content-design-workshop");
 
   const users: SeedUser[] = PEOPLE.map((person, index) => {
     const handle = handleOf(person);
@@ -499,6 +505,7 @@ export function buildSeedCrowd(events: SeedEvent[], now: Date): SeedUser[] {
 
   ticketsFor(thinkbox, THINKBOX_TICKETS);
   ticketsFor(figmaWorkshop, FIGMA_WORKSHOP_TICKETS);
+  ticketsFor(contentWorkshop, CONTENT_WORKSHOP_TICKETS);
 
   const designJamDoor = designJam.checkInSessions[0];
   ticketsFor(designJam, DESIGN_JAM_TICKETS, (position) =>

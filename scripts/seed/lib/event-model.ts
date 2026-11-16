@@ -7,10 +7,14 @@ import type { ReconcileOptions } from "./reconcile.ts";
 /** Validate fixtures before storage, database or Auth writes, including --only runs. */
 export function validateSeedEvents(events: SeedEvent[]): void {
   const slugs = new Set<string>();
-  for (const { event, privateDetails, checkInSessions, links } of events) {
+  for (const { event, privateDetails, checkInSessions, links, bannerKey } of events) {
     const fail = (message: string): never => { throw new Error(`Event "${event.slug}": ${message}`); };
     if (slugs.has(event.slug)) fail("duplicate slug");
     slugs.add(event.slug);
+    // events_header_image_or_colour and events_header_colour_hex.
+    if (bannerKey && event.header_colour) fail("a banner is an image or a colour, never both");
+    if (event.header_colour && !/^#[0-9A-Fa-f]{6}$/.test(event.header_colour)) fail("header colour must be #RRGGBB");
+    if (bannerKey && !/^banner-[a-z0-9-]+\.png$/.test(bannerKey)) fail("banner must be a data/images/banner-*.png file");
     if (!event.short_description?.trim() || event.short_description.length > 50) fail("short overview must be 1–50 characters");
     if (!event.description?.trim() || event.description.length > 3000) fail("long overview must be 1–3000 characters");
     const price = Number(event.configured_price);

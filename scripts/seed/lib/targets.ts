@@ -41,11 +41,17 @@ export interface TargetPolicy {
    * which is exactly the audience prod demo data is for.
    */
   forceDraft: boolean;
+  /**
+   * Write `data/drafts.ts`, the unfinished builder drafts, through the
+   * builder's save RPC. Local only: prod's demo events are finished rows, and
+   * the seed keeps out of the builder's document and mirror tables there.
+   */
+  workingDrafts: boolean;
 }
 
 export const TARGET_POLICIES: Record<SeedTarget, TargetPolicy> = {
-  local: { prune: true, users: true, memberships: true, forceDraft: false },
-  prod: { prune: false, users: false, memberships: false, forceDraft: true },
+  local: { prune: true, users: true, memberships: true, forceDraft: false, workingDrafts: true },
+  prod: { prune: false, users: false, memberships: false, forceDraft: true, workingDrafts: false },
 };
 
 /** Env var names each target reads its connection from. */
