@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, type ReactNode } from "react";
+import { useId, useRef, type ReactNode } from "react";
 
 import { AutosaveStatus } from "@/features/applications/components/AutosaveStatus";
 import type { AutosaveState } from "@/features/applications/lib/autosave";
@@ -35,7 +35,16 @@ export function ProfileSection({
   className,
 }: ProfileSectionProps) {
   const headingId = useId();
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const showStatus = saveState && saveState.kind !== "idle";
+
+  const retry = () => {
+    // Retry turns into "Saving…" and leaves the page; keep focus in this
+    // section rather than dropping it to the dialog. The status's live
+    // region then says whether it saved.
+    headingRef.current?.focus();
+    onRetry?.();
+  };
 
   return (
     <section
@@ -47,7 +56,7 @@ export function ProfileSection({
     >
       <div className="flex min-w-0 flex-col gap-1">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 id={headingId} className="text-subheading">
+          <h3 id={headingId} ref={headingRef} tabIndex={-1} className="text-subheading outline-none">
             {title}
           </h3>
           {meta}
@@ -60,9 +69,7 @@ export function ProfileSection({
             reserved line keeps the wide layout from jumping when it appears;
             stacked, it takes no room until there is something to say. */}
         <div className={cn("min-h-5 pt-1", !showStatus && "@max-2xl/profile:hidden")}>
-          {showStatus ? (
-            <AutosaveStatus state={saveState} onRetry={onRetry ?? (() => {})} />
-          ) : null}
+          {showStatus ? <AutosaveStatus state={saveState} onRetry={retry} /> : null}
         </div>
       </div>
       <div className="min-w-0">{children}</div>

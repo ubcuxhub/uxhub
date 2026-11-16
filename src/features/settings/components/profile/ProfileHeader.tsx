@@ -1,5 +1,6 @@
 "use client";
 
+import type { Ref } from "react";
 import { Camera } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
@@ -23,7 +24,16 @@ interface ProfileHeaderProps {
   onPhotoToggle: () => void;
   /** The id of the photo chooser, for `aria-controls`. */
   photoPanelId: string;
+  /** The photo button, so closing the chooser can return focus to it. */
+  photoButtonRef?: Ref<HTMLButtonElement>;
 }
+
+const BADGE_VARIANT = {
+  active: "success",
+  pending: "warning",
+  ended: "neutral",
+  none: "neutral",
+} as const;
 
 /**
  * Who this profile is, before any field: the avatar as others see it, the
@@ -41,8 +51,15 @@ export function ProfileHeader({
   photoOpen,
   onPhotoToggle,
   photoPanelId,
+  photoButtonRef,
 }: ProfileHeaderProps) {
   const hasPicture = Boolean(photoUrl || preset);
+  const date =
+    membership.kind === "active" && membership.expiresOn
+      ? `Until ${membership.expiresOn}`
+      : membership.kind === "ended" && membership.endedOn
+        ? `Ended ${membership.endedOn}`
+        : null;
 
   return (
     <header className="flex flex-col gap-4 @md/profile:flex-row @md/profile:items-center @md/profile:gap-5">
@@ -59,37 +76,24 @@ export function ProfileHeader({
           <p className="text-h3 break-words">{name}</p>
           <p className="text-small break-all text-muted-foreground">{email}</p>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 pt-1">
-            <Badge
-              variant={
-                membership.kind === "active"
-                  ? "success"
-                  : membership.kind === "pending"
-                    ? "warning"
-                    : "neutral"
-              }
-            >
-              {membershipLabel(membership)}
-            </Badge>
+            <Badge variant={BADGE_VARIANT[membership.kind]}>{membershipLabel(membership)}</Badge>
             {role ? <Badge variant="tag">{role}</Badge> : null}
-            {membership.kind === "active" && membership.expiresOn ? (
-              <span className="text-label font-normal text-muted-foreground">
-                Until {membership.expiresOn}
-              </span>
-            ) : null}
+            {date ? <span className="text-label font-normal text-muted-foreground">{date}</span> : null}
           </div>
         </div>
       </div>
 
       <Button
+        ref={photoButtonRef}
         type="button"
         variant="secondary"
         size="sm"
         aria-expanded={photoOpen}
-        aria-controls={photoPanelId}
+        aria-controls={photoOpen ? photoPanelId : undefined}
         onClick={onPhotoToggle}
         className="self-start @md/profile:self-center"
       >
-        <Camera />
+        <Camera aria-hidden />
         {hasPicture ? "Change photo" : "Add photo"}
       </Button>
     </header>
