@@ -90,3 +90,36 @@ it("reorders people entries through their handles without movement buttons", () 
   expect(JSON.parse(screen.getByTestId("document").textContent!).sections[0].items.map((item: { name: string }) => item.name)).toEqual(["Sam", "Alex"]);
   expect(document.activeElement).toBe(handle);
 });
+
+it("adds Volunteer Schedule as a normal link row with fixed staff access, HTTPS validation and singleton controls", () => {
+  render(<Editor />);
+  fireEvent.click(screen.getByRole("button", { name: "Volunteer Schedule" }));
+  const audience = screen.getByRole("combobox", { name: "Who can see it" }) as HTMLButtonElement;
+  expect(audience.disabled).toBe(true);
+  expect(audience.textContent).toContain("Only staff");
+  expect((screen.getByRole("button", { name: "Volunteer Schedule" }) as HTMLButtonElement).disabled).toBe(true);
+  fireEvent.change(screen.getByLabelText("Link"), { target: { value: "http://example.test/shifts" } });
+  expect(screen.getByText("Use an absolute HTTPS URL without a username or password.")).toBeTruthy();
+  fireEvent.change(screen.getByLabelText("Link"), { target: { value: "https://example.test/shifts" } });
+  expect(screen.queryByText("Use an absolute HTTPS URL without a username or password.")).toBeNull();
+  fireEvent.change(screen.getByLabelText("Button label (optional)"), { target: { value: "Staff shifts" } });
+  fireEvent.click(screen.getByRole("button", { name: "Slack workspace" }));
+  const saved = JSON.parse(screen.getByTestId("document").textContent!);
+  expect(saved.links[0]).toMatchObject({ type: "volunteer_schedule", visibility: "staff", label: "Staff shifts", url: "https://example.test/shifts" });
+  fireEvent.click(screen.getByRole("button", { name: "Remove link 1" }));
+  expect(JSON.parse(screen.getByTestId("document").textContent!).links.map((link: { type: string }) => link.type)).toEqual(["slack_workspace"]);
+  expect((screen.getByRole("button", { name: "Volunteer Schedule" }) as HTMLButtonElement).disabled).toBe(false);
+});
+
+it("offers Volunteer Schedule in the existing type selector and restores ordinary audience controls when switched back", () => {
+  render(<Editor />);
+  fireEvent.click(screen.getByRole("button", { name: "Other link" }));
+  fireEvent.keyDown(screen.getByRole("combobox", { name: "Type" }), { key: "ArrowDown" });
+  fireEvent.click(screen.getByRole("option", { name: "Volunteer Schedule" }));
+  expect((screen.getByRole("combobox", { name: "Who can see it" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(JSON.parse(screen.getByTestId("document").textContent!).links[0].visibility).toBe("staff");
+  fireEvent.keyDown(screen.getByRole("combobox", { name: "Type" }), { key: "ArrowDown" });
+  fireEvent.click(screen.getByRole("option", { name: "Participant package" }));
+  expect((screen.getByRole("combobox", { name: "Who can see it" }) as HTMLButtonElement).disabled).toBe(false);
+  expect(JSON.parse(screen.getByTestId("document").textContent!).links[0].visibility).toBe("going");
+});

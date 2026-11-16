@@ -547,3 +547,25 @@ resources never enter the result. Call with the viewer client and keep HTML/RSC
 responses private/dynamic. `agenda_enabled` hides participant RPC and direct
 agenda reads while preserving staff reads and saved content. Event summary
 location remains available independently of that display switch.
+
+## Staff Volunteer Schedule
+
+`event_staff_volunteer_schedules` stores one safe HTTPS resource per event (event
+PK, stable ID, label, URL, sort order, event-delete cascade). Admin/manager viewer
+clients can read it; anonymous clients lack SELECT and basic users get no rows.
+Browser mutations are revoked. Server mutations require `requireAdmin()` before
+using the service role. No participant resource audience enum is extended.
+
+The staff editor includes `volunteer_schedule` as another link type, always with
+`visibility: staff`. Its type, label, URL and remove controls share the existing
+resource editor. Atomic saves filter it out of `event_links`, synchronize private
+storage, and retain it in staff-only content/working documents. Incomplete drafts
+keep unfinished rows without erasing a configured URL. `fetchEventContent` merges
+the private row back into its saved position; `fetchStaffVolunteerSchedule` is the
+viewer-scoped reader for the admin agenda. Generic resource readers never query it.
+
+New editor documents use `resources_version: 2`: an omitted schedule row then means
+removal. Older documents without this version preserve a schedule they never knew.
+Historical resource RPC calls accept an optional `p_resources_version` argument
+with the same semantics, covered by revision/retry checks. Existing RPC arguments
+and generic everyone/going/after_event resource semantics remain compatible.

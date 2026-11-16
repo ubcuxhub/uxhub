@@ -323,3 +323,8 @@ item becomes a distinct check-in item. Event timing derives from all agenda
 items. Day/item physical projections honour the saved location audience.
 `pnpm supabase:local` rebuilds and reseeds the empty-event cutover; subsequent
 `pnpm seed` runs reconcile the same item/session identities.
+
+The upcoming UXathon includes an HTTPS Staff Volunteer Schedule example. Builder
+reconciliation stores it in `event_staff_volunteer_schedules`; no generic resource
+link or participant response includes it. Events without this fixture clear it
+on reconciliation.

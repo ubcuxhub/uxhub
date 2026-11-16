@@ -75,6 +75,7 @@ import {
   discardUnusedEventImageAction,
   fetchAdminCheckInSnapshotAction,
   saveAdminEventAction,
+  savePastEventResourcesAction,
   saveAdminEventDraftAction,
   setMembershipTermEndsAtAction,
   toggleCheckInAction,
@@ -1350,4 +1351,21 @@ it("refuses to drop saved unfinished sections by omitting them from a complete s
   eventDrafts.fetchEventDraft.mockResolvedValueOnce({ document: { formState: { ...defaultFormState, content: {revision:0,sections:[],links:[]} } } });
   expect(await saveAdminEventAction({...saveInput,eventId:"event-1"})).toEqual({error:"Reload saved people and resources before publishing."});
   expect(adminRpc).not.toHaveBeenCalled();
+});
+
+describe("protected staff schedule server actions", () => {
+  const input = { eventId: "event-1", revision: 1, operationId: "operation-1", content: { revision: 1, resources_version: 2 as const, sections: [], links: [{ id: crypto.randomUUID(), type: "volunteer_schedule" as const, visibility: "staff" as const, label: "Volunteers", url: "https://example.test/private-schedule" }] } };
+  it("checks authorization before historical resource validation or service-role mutation", async () => {
+    const denied = new Error("denied"); guards.requireAdmin.mockRejectedValueOnce(denied);
+    await expect(savePastEventResourcesAction(input)).rejects.toBe(denied);
+    expect(adminRpc).not.toHaveBeenCalled();
+  });
+  it("rejects unsafe HTTPS values before invoking the historical RPC", async () => {
+    expect(await savePastEventResourcesAction({ ...input, content: { ...input.content, links: [{ ...input.content.links[0], url: "http://example.test" }] } })).toEqual({ error: expect.stringContaining("HTTPS") });
+    expect(adminRpc).not.toHaveBeenCalled();
+  });
+  it("includes the protected resource in authorized historical saves", async () => {
+    await savePastEventResourcesAction(input);
+    expect(adminRpc).toHaveBeenCalledWith("save_past_event_resources", { p_event_id: input.eventId, p_revision: input.revision, p_operation_id: input.operationId, p_links: input.content.links, p_resources_version: 2 });
+  });
 });

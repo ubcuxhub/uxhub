@@ -8,6 +8,7 @@ import type {
 export type AppSettingsRow = Tables<"app_settings">;
 export type AppSettingsUpdate = TablesUpdate<"app_settings">;
 
+export type EventStaffVolunteerScheduleRow = Tables<"event_staff_volunteer_schedules">;
 export type EventContentSettingsRow = Tables<"event_content_settings">;
 
 // PostgREST computed fields are returned only when explicitly selected.

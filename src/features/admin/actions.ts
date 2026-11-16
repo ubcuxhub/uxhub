@@ -790,6 +790,7 @@ export async function savePastEventResourcesAction(input: { eventId: string; rev
   const { data, error } = await supabaseAdmin.rpc("save_past_event_resources", {
     p_event_id: input.eventId, p_revision: input.revision, p_operation_id: input.operationId,
     p_links: input.content.links as unknown as Json,
+    p_resources_version: input.content.resources_version,
   });
   if (error) {
     if (["EVENT_REVISION_CONFLICT", "EVENT_HISTORY_LOCKED", "EVENT_CONTENT_INVALID"].includes(error.hint ?? "")) return { error: error.message };

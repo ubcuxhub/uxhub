@@ -1,6 +1,6 @@
 "use client";
 
-import { emptyContent, legacyEventContent, type EventContent } from "../lib/event-content";
+import { emptyContent, legacyEventContent, restoreResourceContent, type EventContent } from "../lib/event-content";
 
 import type { ApplicationQuestionTemplate } from "@/features/events/types";
 import type { EventApplicationSettingsRow } from "@/lib/supabase/models";
@@ -140,7 +140,8 @@ export function useEventForm({
         return { ...source, content: initialContent ?? emptyContent(), date_location_revision: initialDateLocation?.revision ?? 0, date_location: asAgenda(recoverDateLocation(source)) };
       }
       const teamSource = state.teams_configuration_initialized === false && initialEvent ? formStateFromEvent(initialEvent) : { ...defaultFormState, ...state };
-      const restored = { ...defaultFormState, ...state, content: state.content ?? legacyEventContent(initialDraft?.document.mentors ?? [], initialDraft?.document.sponsors ?? [], initialContent), schedule_configuration_initialized: true, agenda_enabled: state.schedule_configuration_initialized === false && initialEvent ? initialEvent.agenda_enabled ?? true : state.agenda_enabled ?? defaultFormState.agenda_enabled, teams_configuration_initialized: true, teams_enabled: teamSource.teams_enabled, min_team_size: teamSource.min_team_size, max_team_size: teamSource.max_team_size, team_deadline: teamSource.team_deadline, date_location: state.date_location ? restoreAgenda(state.date_location) : asAgenda(recoverDateLocation(state)), date_location_revision: state.date_location ? state.date_location_revision : initialDateLocation?.revision ?? state.date_location_revision };
+      const content = restoreResourceContent(state.content ?? legacyEventContent(initialDraft?.document.mentors ?? [], initialDraft?.document.sponsors ?? [], initialContent), initialContent);
+      const restored = { ...defaultFormState, ...state, content, schedule_configuration_initialized: true, agenda_enabled: state.schedule_configuration_initialized === false && initialEvent ? initialEvent.agenda_enabled ?? true : state.agenda_enabled ?? defaultFormState.agenda_enabled, teams_configuration_initialized: true, teams_enabled: teamSource.teams_enabled, min_team_size: teamSource.min_team_size, max_team_size: teamSource.max_team_size, team_deadline: teamSource.team_deadline, date_location: state.date_location ? restoreAgenda(state.date_location) : asAgenda(recoverDateLocation(state)), date_location_revision: state.date_location ? state.date_location_revision : initialDateLocation?.revision ?? state.date_location_revision };
       // Old working documents never captured these settings. Recover them
       // from the source event instead of resetting a saved featured choice,
       // external destination or URL during an unrelated edit.

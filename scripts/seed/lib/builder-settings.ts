@@ -132,7 +132,7 @@ export async function reconcileBuilderSettings(client: SupabaseClient, eventId: 
   for (const result of [sections, people, sponsors, links]) if (result.error) throw result.error;
   // This script uses an untyped Supabase client; normalize nested relationships
   // explicitly instead of importing the server-only helper tree into Node.
-  const content: EventContent = { revision: 0, sections: [], links: [] };
+  const content: EventContent = { revision: 0, sections: [], links: [], resources_version: 2 };
   for (const section of sections.data ?? []) {
     content.sections.push({ key: section.id, kind: (["Judges", "Mentors", "Speakers", "Panelists"].includes(section.title) ? section.title : "custom") as PeopleGroup, title: section.title,
       items: (people.data ?? []).filter(row => row.section_id === section.id).map(row => {
@@ -145,6 +145,7 @@ export async function reconcileBuilderSettings(client: SupabaseClient, eventId: 
     return { key: seedId(`${eventId}:${sponsor.id}`), directory_id: sponsor.id, name: sponsor.name, position: "", description: sponsor.description ?? "", url: sponsor.website_url ?? "", image_url: sponsor.brand_logo_path ?? "" };
   }) });
   content.links = (links.data ?? []).map(row => ({ id: row.id, type: row.type, label: row.label ?? "", url: row.url, visibility: row.visibility, label_edited: true, audience_edited: true }));
+  if (seed.staffVolunteerSchedule) content.links.push({ id: seedId(`${eventId}:volunteer-schedule`), type: "volunteer_schedule", label: "Volunteer Schedule", url: seed.staffVolunteerSchedule, visibility: "staff" });
   await writeDocument(client, "event_content_settings", eventId, content);
   if (seed.applicationQuestions.length) {
     const start = Date.parse(seed.event.registration_closes_at!);

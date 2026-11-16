@@ -761,6 +761,39 @@ export type Database = {
           },
         ]
       }
+      event_staff_volunteer_schedules: {
+        Row: {
+          event_id: string
+          id: string
+          label: string
+          sort_order: number
+          url: string
+        }
+        ComputedFields: never
+        Insert: {
+          event_id: string
+          id?: string
+          label?: string
+          sort_order?: number
+          url: string
+        }
+        Update: {
+          event_id?: string
+          id?: string
+          label?: string
+          sort_order?: number
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_staff_volunteer_schedules_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       event_tickets: {
         Row: {
           created_at: string
@@ -1624,6 +1657,7 @@ export type Database = {
         }[]
       }
       safe_event_content_url: { Args: { p_url: string }; Returns: boolean }
+      safe_staff_schedule_url: { Args: { p_url: string }; Returns: boolean }
       save_admin_event_atomically: {
         Args: {
           p_application_questions: Json
@@ -1811,6 +1845,7 @@ export type Database = {
           p_event_id: string
           p_links: Json
           p_operation_id: string
+          p_resources_version?: number
           p_revision: number
         }
         Returns: Json
@@ -1828,6 +1863,10 @@ export type Database = {
           missing_question_ids: string[]
           status: string
         }[]
+      }
+      sync_staff_schedule: {
+        Args: { p_document: Json; p_draft: boolean; p_event_id: string }
+        Returns: undefined
       }
       team_change_blocked: {
         Args: { p_event_id: string; p_user_id: string }
@@ -1902,6 +1941,10 @@ export type Database = {
       valid_other_allergies: { Args: { entries: string[] }; Returns: boolean }
       valid_user_interests: { Args: { tags: string[] }; Returns: boolean }
       validate_event_content: {
+        Args: { p_document: Json; p_draft?: boolean }
+        Returns: undefined
+      }
+      validate_staff_schedule_content: {
         Args: { p_document: Json; p_draft?: boolean }
         Returns: undefined
       }
