@@ -54,6 +54,8 @@ export interface EventBadge {
     | "not_selected"
     | "applications_closed";
   date?: string;
+  /** Replaces the status's label, as for a draft event (`DRAFT_EVENT_BADGE`). */
+  label?: string;
 }
 
 export interface EventGroup {

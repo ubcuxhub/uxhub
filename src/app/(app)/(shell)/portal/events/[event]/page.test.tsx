@@ -53,6 +53,7 @@ beforeEach(() => {
   fixtures.termEndsAt = null;
   fixtures.user.membership_expires_at = "2099-01-01T00:00:00Z";
   fixtures.event.pricing_policy = "figma";
+  fixtures.event.status = "active";
 });
 
 it("shows a scannable ticket on the event page after registration, alongside Going", async () => {
@@ -114,4 +115,20 @@ it.each([
   fixtures.event.pricing_policy = policy;
   await renderPage();
   expect(Boolean(screen.queryByText("CA$20.00 for non-members"))).toBe(pays);
+});
+
+// RLS returns a draft to admins and managers only, so the banner is theirs alone.
+it.each([
+  ["draft", true],
+  ["active", false],
+] as const)("shows the staff-only draft banner on a %s event: %s", async (status, shown) => {
+  fixtures.event.status = status;
+  await renderPage();
+  expect(
+    Boolean(screen.queryByText(/This is a draft event\. Draft events are only visible to admins and managers\./))
+  ).toBe(shown);
+  // A draft is a preview: registration stays disabled for staff too.
+  const disabled = screen.queryByRole("button", { name: "Registration unavailable in draft preview" });
+  expect(Boolean(disabled)).toBe(shown);
+  if (disabled) expect((disabled as HTMLButtonElement).disabled).toBe(true);
 });

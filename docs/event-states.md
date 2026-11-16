@@ -71,19 +71,27 @@ five-minute cache revalidation.
 
 ### Drafts for admins
 
-A draft is visible only to admins and managers, and they can use it the way a
-member would. This is how we test an event, such as a QR check-in trial, without
-a separate "test" state.
+A draft is visible only to admins and managers, who can preview it before it is
+published.
 
 - **Who sees it:** RLS already returns drafts only to `is_admin()`, which covers
   admins and managers. Everyone else gets a 404, as if the event didn't exist.
-- **Portal event page and checkout:** admins and managers can open a draft's
-  `/portal/events/[slug]` page, register through its checkout, and get a ticket.
-  The page shows a "Draft: only admins can see this" banner.
-- **Not listed anywhere:** the portal timeline and the public `/events` pages
-  stay active-only. Share a draft by its direct portal link. The public
-  `/events/[slug]` page is cached and uses the anon client, so it never shows
-  a draft.
+- **Portal event page:** admins and managers can open a draft's
+  `/portal/events/[slug]` page, even while `FLAGS.studentEvents` is off. It
+  shows a "This is a draft event" banner and the saved unfinished sections, and
+  replaces the registration panel with a disabled "Registration unavailable in
+  draft preview" button (see "Unified saved drafts and staff previews").
+- **Portal timeline:** `/portal/events` lists drafts to admins and managers
+  only (`portalEventStatuses`), each with a "Draft event" badge in place of the
+  state badge, under a note that only admins and managers see drafts. Search
+  and the past-events switch treat a draft like any other event. A draft
+  without a start date isn't listed, since the timeline groups by date; open it
+  from the admin drawer. Members' list stays active-only, by the query's filter
+  and by RLS. Unlike the event page, the timeline stays behind
+  `FLAGS.studentEvents`.
+- **Not on the public site:** the public `/events` pages stay active-only. The
+  public `/events/[slug]` page is cached and uses the anon client, so it never
+  shows a draft; staff preview one at `/events/<slug>?preview=draft`.
 - **Enforced on the server:** fulfillment reads events with the service-role
   client, which bypasses RLS. It has to check the buyer's role itself before it
   sells a draft ticket. `reserve_event_ticket` does this: it looks up the
