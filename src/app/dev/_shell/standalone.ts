@@ -25,7 +25,7 @@ export const STANDALONE = {
     path: "/dev/templates",
     title: "Templates",
     description:
-      "Whole pages assembled from the components on fixture data: the events list, event detail, event builder, the proposed application review pages, member setup, and the proposed Settings Profile tab.",
+      "Whole pages assembled from the components on fixture data: the events list, event detail, event builder, the proposed application review pages, member setup, and the Settings Profile tab.",
     spec: "§4.4",
     layout: "page",
     // `<id>-frame` (the mobile iframe) is understood too, but not listed.
@@ -44,6 +44,7 @@ export const STANDALONE = {
       "profile-new",
       "profile-saving",
       "profile-error",
+      "profile-pending",
     ],
   },
 } as const satisfies Record<string, DocMeta & { path: string }>;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState, type ReactNode } from "react";
+import { useId, useRef, useState, type ReactNode } from "react";
 
 import { DetailList, DetailRow } from "@/components/shared/DetailRow";
 import { Badge } from "@/components/ui/badge";
@@ -16,11 +16,7 @@ import {
 } from "@/components/ui/select";
 import { AutosaveStatus } from "@/features/applications/components/AutosaveStatus";
 import { AvatarPicker, type AvatarChoice } from "@/features/setup/components/AvatarPicker";
-import {
-  DietaryFields,
-  isDietaryEmpty,
-  type DietaryValue,
-} from "@/features/setup/components/DietaryFields";
+import { DietaryFields, type DietaryValue } from "@/features/setup/components/DietaryFields";
 import { InterestFields } from "@/features/setup/components/InterestFields";
 import type { InterestId } from "@/features/setup/lib/options";
 import { FACULTIES, STUDENT_STATUSES, YEAR_LEVELS } from "@/lib/constants";
@@ -29,20 +25,21 @@ import type { StudentStatus, UniversityYear, UserInfoRow } from "@/lib/supabase/
 import { formatUserName } from "@/lib/user-name";
 import { cn } from "@/lib/utils";
 
-import type { ProfileFormData } from "../ProfileFields";
 import {
-  membershipLabel,
+  isDietaryUnanswered,
+  lockedEligibilityNote,
+  membershipDetail,
   roleLabel,
   STUDIES_TITLES,
   USER_TYPE_LABELS,
+  type CheckedField,
   type MembershipSummary,
+  type ProfileFormData,
   type ProfileSaveStates,
   type ProfileSectionId,
 } from "./model";
 import { ProfileHeader } from "./ProfileHeader";
 import { ProfileSection } from "./ProfileSection";
-
-type CheckedField = "first_name" | "last_name" | "student_number";
 
 export interface ProfileTabProps {
   /** The saved row: the header, locked fields and account facts read it. */
@@ -75,9 +72,10 @@ export interface ProfileTabProps {
 }
 
 /**
- * Proposed Profile tab for the Settings dialog (docs/design/profile-settings.md).
+ * The Settings dialog's Profile tab (docs/design/profile-settings.md).
  * Presentational: the caller owns the values and the saving, and reports each
- * section's autosave in `saveStates`. Not wired into `SettingsDialog` yet.
+ * section's autosave in `saveStates`. `ProfileSettings` wires it to the
+ * signed-in member; the dev templates run it on fixtures.
  */
 export function ProfileTab({
   user,
@@ -100,10 +98,18 @@ export function ProfileTab({
   defaultPhotoOpen = false,
 }: ProfileTabProps) {
   const photoPanelId = useId();
+  const photoButtonRef = useRef<HTMLButtonElement>(null);
+  const photoPanelRef = useRef<HTMLDivElement>(null);
   const [photoOpen, setPhotoOpen] = useState(defaultPhotoOpen);
   // The header shows the name as typed, but never goes blank mid-edit.
   const name = formatUserName(form) || formatUserName(user) || user.email;
-  const dietaryUnanswered = !dietary.none && isDietaryEmpty(dietary);
+  const dietaryUnanswered = isDietaryUnanswered(dietary);
+
+  const closePhoto = () => {
+    setPhotoOpen(false);
+    // The panel, and whatever in it had focus, is gone: go back to its button.
+    photoButtonRef.current?.focus();
+  };
 
   return (
     <div className="@container/profile flex flex-col">
@@ -118,14 +124,17 @@ export function ProfileTab({
           photoOpen={photoOpen}
           onPhotoToggle={() => setPhotoOpen((open) => !open)}
           photoPanelId={photoPanelId}
+          photoButtonRef={photoButtonRef}
         />
 
         {photoOpen ? (
           <div
             id={photoPanelId}
+            ref={photoPanelRef}
             role="region"
             aria-label="Profile photo"
-            className="flex flex-col gap-5 rounded-xl border border-border-subtle bg-section p-4 @md/profile:p-6"
+            tabIndex={-1}
+            className="flex flex-col gap-5 rounded-xl border border-border-subtle bg-section p-4 outline-none @md/profile:p-6"
           >
             <AvatarPicker
               preview={false}
@@ -138,14 +147,21 @@ export function ProfileTab({
             <div className="flex items-center justify-between gap-3 border-t border-border-subtle pt-4">
               <div className="min-w-0">
                 {saveStates.photo && saveStates.photo.kind !== "idle" ? (
-                  <AutosaveStatus state={saveStates.photo} onRetry={() => onRetry("photo")} />
+                  <AutosaveStatus
+                    state={saveStates.photo}
+                    onRetry={() => {
+                      // Retry leaves the page as it turns into "Saving…".
+                      photoPanelRef.current?.focus();
+                      onRetry("photo");
+                    }}
+                  />
                 ) : (
                   <p className="text-small text-muted-foreground">
                     {photoUrl ? "Choosing an icon replaces your uploaded photo." : "Shown on your profile."}
                   </p>
                 )}
               </div>
-              <Button type="button" variant="secondary" size="sm" onClick={() => setPhotoOpen(false)}>
+              <Button type="button" variant="secondary" size="sm" onClick={closePhoto}>
                 Done
               </Button>
             </div>
@@ -168,6 +184,7 @@ export function ProfileTab({
             onChange={(first_name) => onFormChange({ first_name })}
             onBlur={() => onFieldBlur?.("first_name")}
             error={errors.first_name}
+            required
             autoComplete="given-name"
           />
           <TextField
@@ -176,6 +193,7 @@ export function ProfileTab({
             onChange={(last_name) => onFormChange({ last_name })}
             onBlur={() => onFieldBlur?.("last_name")}
             error={errors.last_name}
+            required
             autoComplete="family-name"
           />
           <TextField
@@ -229,13 +247,22 @@ export function ProfileTab({
                   maxLength={8}
                 />
               ) : (
-                <LockedField label="Student number" value={user.student_number?.toString()} />
+                <LockedField
+                  label="Student number"
+                  value={user.student_number?.toString()}
+                  note={lockedEligibilityNote(membership)}
+                />
               )}
             </>
           ) : user.user_type === "faculty" ? (
             <>
               <FacultyField value={form.faculty} onChange={(faculty) => onFormChange({ faculty })} wide />
-              <LockedField label="Faculty email" value={user.faculty_email} wide />
+              <LockedField
+                label="Faculty email"
+                value={user.faculty_email}
+                note="Your UBC sign-in email. Ask an exec if it needs to change."
+                wide
+              />
             </>
           ) : (
             <>
@@ -288,11 +315,7 @@ export function ProfileTab({
         <DetailList className="[&>div:first-child]:pt-0 [&>div:last-child]:border-b-0 [&>div:last-child]:pb-0">
           <DetailRow label="Email">{user.email}</DetailRow>
           <DetailRow label="Account type">{USER_TYPE_LABELS[user.user_type]}</DetailRow>
-          <DetailRow label="Membership">
-            {membership.kind === "active" && membership.expiresOn
-              ? `${membershipLabel(membership)}, until ${membership.expiresOn}`
-              : membershipLabel(membership)}
-          </DetailRow>
+          <DetailRow label="Membership">{membershipDetail(membership)}</DetailRow>
           <DetailRow label="Joined">{formatEventDate(user.created_at, { month: "short" })}</DetailRow>
         </DetailList>
       </ProfileSection>
@@ -319,6 +342,7 @@ function TextField({
   onChange,
   onBlur,
   optional,
+  required,
   wide,
   error,
   type = "text",
@@ -332,6 +356,7 @@ function TextField({
   onChange: (value: string) => void;
   onBlur?: () => void;
   optional?: boolean;
+  required?: boolean;
   wide?: boolean;
   error?: string | null;
   type?: string;
@@ -347,6 +372,7 @@ function TextField({
         {label}
         {optional ? <Optional /> : null}
       </FieldLabel>
+      {/* `Input` links itself to the error below (aria-describedby, aria-invalid). */}
       <Input
         id={id}
         type={type}
@@ -355,6 +381,7 @@ function TextField({
         inputMode={inputMode}
         maxLength={maxLength}
         autoComplete={autoComplete}
+        aria-required={required || undefined}
         onChange={(event) => onChange(event.target.value)}
         onBlur={onBlur}
       />
@@ -365,15 +392,25 @@ function TextField({
 
 /**
  * A value the member can't change here. A disabled input keeps it where they
- * would look for it, and the note says who can change it.
+ * would look for it, and the note says why and who can change it.
  */
-function LockedField({ label, value, wide }: { label: string; value?: string | null; wide?: boolean }) {
+function LockedField({
+  label,
+  value,
+  note,
+  wide,
+}: {
+  label: string;
+  value?: string | null;
+  note: string;
+  wide?: boolean;
+}) {
   const id = useId();
   return (
     <Field className={cn(wide && "@md/fields:col-span-2")}>
       <FieldLabel htmlFor={id}>{label}</FieldLabel>
       <Input id={id} value={value?.trim() ? value : "Not set"} disabled readOnly />
-      <FieldDescription>Locked while your membership is active. Ask an exec to change it.</FieldDescription>
+      <FieldDescription>{note}</FieldDescription>
     </Field>
   );
 }
