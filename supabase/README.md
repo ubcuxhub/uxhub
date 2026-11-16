@@ -121,6 +121,16 @@ Do these steps in order:
    production (see the compatibility path under "Migration guidelines").
    `db push` is forward-only; correct a bad migration with a new one.
 
+   The one exception is a migration that fails in production. Each migration
+   runs in one transaction, so production never applied it, and a later
+   migration cannot help because the failing one runs first. Fix that file in
+   place, say so in the pull request, and rebuild local databases that applied
+   the old version with `pnpm supabase:local`. A backfill that depends on
+   production data is worth a read-only preflight query first (see
+   [`docs/rollouts/unified-events.md`](../docs/rollouts/unified-events.md)).
+   `db push` prints neither `NOTICE` nor `WARNING` messages; a `WARNING` still
+   reaches the Postgres logs in the Supabase dashboard.
+
    CI fails a pull request whose new migration sorts before the newest one on
    `main`, since `db push` would refuse it. That check can go stale while a PR
    waits, so rerun it, or update the branch, after another migration merges.
