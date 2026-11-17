@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import type { EventState, EventStateKind } from "./event-states";
-import { getPanelSpec, type PanelContext } from "./registration-panel";
+import {
+  CANCELED_TITLE,
+  getPanelSpec,
+  REFUND_DONE,
+  REFUND_PENDING,
+  type PanelContext,
+} from "./registration-panel";
 
 // Wed, Aug 26, 2026 at noon Pacific.
 const DATE = "2026-08-26T19:00:00Z";
@@ -16,6 +22,7 @@ const context: PanelContext = {
 };
 
 const STATES: Record<EventStateKind, EventState> = {
+  canceled: { kind: "canceled", note: "Moved to January.", ticketId: "t" },
   "reg-upcoming": { kind: "reg-upcoming", opensAt: DATE },
   "reg-open": { kind: "reg-open", closesAt: DATE },
   "reg-full": { kind: "reg-full" },
@@ -41,6 +48,7 @@ const spec = (kind: EventStateKind, overrides: Partial<PanelContext> = {}) =>
 
 describe("getPanelSpec", () => {
   it.each([
+    ["canceled", "alert", "Registration"],
     ["reg-upcoming", "alert", "Registration"],
     ["reg-open", "action", "Registration"],
     ["reg-full", "alert", "Registration"],
@@ -164,5 +172,37 @@ describe("getPanelSpec", () => {
     expect(spec("reg-closed").props).toMatchObject({ variant: "neutral" });
     expect((spec("reg-closed").props as { icon?: unknown }).icon).toBeUndefined();
     expect((spec("app-rejected").props as { icon?: unknown }).icon).toBeTruthy();
+  });
+});
+
+describe("getPanelSpec for a canceled event", () => {
+  const canceled = (state: Partial<Extract<EventState, { kind: "canceled" }>>, overrides: Partial<PanelContext> = {}) =>
+    getPanelSpec({ kind: "canceled", note: null, ticketId: null, ...state }, { ...context, ...overrides });
+
+  it("shows an alert, never the ticket or its code", () => {
+    const spec = canceled({ ticketId: "t" });
+    expect(spec).toMatchObject({
+      title: "Registration",
+      layout: "alert",
+      props: { variant: "destructive", title: CANCELED_TITLE },
+    });
+    expect((spec.props as { icon?: unknown }).icon).toBeTruthy();
+  });
+
+  it("gives the note, then where the refund stands", () => {
+    expect(canceled({ note: "Moved to January.", ticketId: "t" }, { refund: "not-refunded" }).props).toMatchObject({
+      description: `Moved to January. ${REFUND_PENDING}`,
+    });
+    expect(canceled({ ticketId: "t" }, { refund: "refunded" }).props).toMatchObject({ description: REFUND_DONE });
+  });
+
+  it("says nothing about refunds without a payment", () => {
+    expect(canceled({ note: "Moved to January.", ticketId: "t" }).props).toMatchObject({
+      description: "Moved to January.",
+    });
+    expect(canceled({ ticketId: "t" }, { refund: null }).props).toMatchObject({
+      description: "You don’t need to do anything.",
+    });
+    expect((canceled({}).props as { description: string }).description).toMatch(/^Keep an eye out/);
   });
 });

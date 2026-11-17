@@ -12,6 +12,7 @@ vi.mock("@/components/ui/toast", () => ({ toast: { error: vi.fn(), success: vi.f
 
 vi.mock("@/components/shared/Hubbo", () => ({ Hubbo: ({ emotion, className }: { emotion: string; className: string }) => <span data-testid="hubbo" data-emotion={emotion} className={className}>Hubbo</span> }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }) }));
+vi.mock("@/features/admin/event-overview-actions", () => ({ loadEventLifecycleCountsAction: vi.fn(async () => ({ registered: 0, memberApplications: 2, paidTickets: 0 })) }));
 vi.mock("@/features/admin/actions", () => ({ recoverAdminEventDraftAction: vi.fn(async () => null), recoverAdminEventMutationAction: vi.fn(async () => null), savePastEventResourcesAction: vi.fn(), loadAdminEventDeletionInfoAction: vi.fn(async () => null), saveAdminEventDraftAction: vi.fn(), saveAdminEventAction: vi.fn(), deleteAdminEventAction: vi.fn(), discardUnusedEventImageAction: vi.fn(), searchAdminEventPeopleAction: vi.fn(async () => []) }));
 
 beforeEach(() => {
@@ -182,6 +183,23 @@ it.each([
     expect(settings.getByText(/Save your changes and hide this event from members/)).toBeTruthy();
     expect(settings.getByRole("button", { name: "Delete event" }).parentElement?.className).toContain("border-t");
   }
+});
+
+it("confirms Revert to draft before saving, naming the applications that lose access", async () => {
+  const { saveAdminEventAction } = await import("../actions");
+  vi.mocked(saveAdminEventAction).mockClear();
+  const event = { id: "event-1", name: "Published event", slug: "published-event", status: "active", publish_at: null, ends_at: "2099-08-01T19:00:00Z", starts_at: "2099-08-01T18:00:00Z", short_description: "Overview", description: "Description", regular_price: 0, member_price: 0, max_capacity: 10, canceled_at: null } as import("@/lib/supabase/models").EventRow;
+  const { container } = render(<EventCreateModify eventId={event.id} initialEvent={event} />);
+  fireEvent.click(within(container.querySelector("#builder-settings")! as HTMLElement).getByRole("button", { name: "Revert to draft" }));
+  expect(await screen.findByText(/2 member applications \(submitted, waitlisted or draft\) will lose access/)).toBeTruthy();
+  expect(saveAdminEventAction).not.toHaveBeenCalled();
+});
+
+it("locks a canceled event like an ended one, without Revert", () => {
+  const event = { id: "event-1", name: "Canceled event", slug: "canceled-event", status: "active", publish_at: null, ends_at: "2099-08-01T19:00:00Z", starts_at: "2099-08-01T18:00:00Z", short_description: "Overview", description: "Description", regular_price: 0, member_price: 0, max_capacity: 10, canceled_at: "2099-07-01T18:00:00Z" } as import("@/lib/supabase/models").EventRow;
+  const { container } = render(<EventCreateModify eventId={event.id} initialEvent={event} />);
+  expect(screen.getByText("This event is canceled")).toBeTruthy();
+  expect(within(container.querySelector("#builder-settings")! as HTMLElement).queryByRole("button", { name: "Revert to draft" })).toBeNull();
 });
 
 it("keeps failed draft saves retryable from either button", async () => {
