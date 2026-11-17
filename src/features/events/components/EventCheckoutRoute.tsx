@@ -20,7 +20,7 @@ import type { EventApplicationRow } from "@/lib/supabase/models";
 function getCheckoutBlock(
   requiresApplication: boolean,
   hasTicket: boolean,
-  application: EventApplicationRow | null,
+  application: Pick<EventApplicationRow, "status" | "offer_expires_at"> | null,
   now = Date.now(),
 ) {
   if (hasTicket) return formatReservationFailure("ALREADY_REGISTERED");

@@ -1454,6 +1454,10 @@ export type Database = {
         Returns: boolean
       }
       admin_event_team_settings: { Args: { p_event_id: string }; Returns: Json }
+      application_decisions_released: {
+        Args: { p_event_id: string }
+        Returns: boolean
+      }
       apply_event_purchase_refund: {
         Args: { p_purchase_id: string; p_refunded_cents: number }
         Returns: {
@@ -1495,6 +1499,28 @@ export type Database = {
       current_user_team_ids: {
         Args: Record<PropertyKey, never>
         Returns: string[]
+      }
+      decide_event_application: {
+        Args: {
+          p_allow_over_capacity?: boolean
+          p_application_id: string
+          p_decision: string
+          p_offer_expires_at?: string
+        }
+        Returns: {
+          application_id: string
+          decisions_release_at: string
+          event_id: string
+          failure_reason: string
+          held_offers: number
+          max_capacity: number
+          offer_expires_at: string
+          over_capacity: boolean
+          previous_status: Database["public"]["Enums"]["event_application_status"]
+          status: Database["public"]["Enums"]["event_application_status"]
+          tickets: number
+          user_id: string
+        }[]
       }
       delete_account: { Args: { p_auth_user_id: string }; Returns: undefined }
       delete_admin_event_safely: {
@@ -1590,6 +1616,20 @@ export type Database = {
         Args: { p_amount_cents?: number; p_event_id: string; p_user_id: string }
         Returns: string
       }
+      get_my_event_applications: {
+        Args: { p_event_ids: string[] }
+        Returns: {
+          created_at: string
+          decisions_release_at: string
+          event_id: string
+          id: string
+          offer_expires_at: string
+          status: Database["public"]["Enums"]["event_application_status"]
+          submitted_at: string
+          updated_at: string
+          user_id: string
+        }[]
+      }
       get_user_info_id: { Args: Record<PropertyKey, never>; Returns: string }
       initialize_event_checkout: {
         Args: {
@@ -1619,6 +1659,10 @@ export type Database = {
       leave_team: {
         Args: { p_event_id: string; p_user_id: string }
         Returns: string
+      }
+      owns_event_application: {
+        Args: { p_application_id: string }
+        Returns: boolean
       }
       publish_due_events: { Args: Record<PropertyKey, never>; Returns: number }
       purchase_is_live: { Args: { p_purchase_id: string }; Returns: boolean }

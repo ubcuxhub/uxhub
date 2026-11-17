@@ -6,7 +6,6 @@ import type {
   EventApplicationQuestionRow,
   EventApplicationResponseInsert,
   EventApplicationRow,
-  EventApplicationUpdate,
   SubmittedApplicationRow,
   SubmittedApplicationStatus,
 } from "@/lib/supabase/models";
@@ -102,41 +101,65 @@ export async function fetchEventApplicationById(
   return data;
 }
 
+/**
+ * An applicant's own application, as `get_my_event_applications` shows it to
+ * them. Before the event's decisions are released (docs/event-states.md,
+ * "Decision release") a decided application reads as `submitted`, with no
+ * `offer_expires_at` and no `updated_at`. `decisions_release_at` is the
+ * event's "Release decisions on", null when none is set.
+ */
+export type ApplicantApplicationRow = Pick<
+  EventApplicationRow,
+  "id" | "event_id" | "user_id" | "status" | "offer_expires_at" | "submitted_at" | "created_at"
+> & {
+  updated_at: string | null;
+  decisions_release_at: string | null;
+};
+
+/**
+ * The caller's applications to these events, through
+ * `get_my_event_applications`, which only ever returns the caller's own
+ * (`userId` must be theirs: a service-role client sees none). Keyed by event id.
+ */
+async function fetchOwnApplications(
+  supabase: DbClient,
+  userId: string,
+  eventIds: string[]
+): Promise<Map<string, ApplicantApplicationRow>> {
+  if (eventIds.length === 0) return new Map();
+
+  const { data, error } = await supabase.rpc("get_my_event_applications", {
+    p_event_ids: eventIds,
+  });
+
+  if (error) throw error;
+  return new Map(
+    (data ?? [])
+      .filter((application) => application.user_id === userId)
+      .map((application) => [application.event_id, application])
+  );
+}
+
+/** The caller's application to an event, as they may see it, or null. */
 export async function fetchUserEventApplication(
   supabase: DbClient,
   eventId: string,
   userId: string
-): Promise<EventApplicationRow | null> {
-  const { data, error } = await supabase
-    .from(TABLES.eventApplications)
-    .select("*")
-    .eq("event_id", eventId)
-    .eq("user_id", userId)
-    .maybeSingle();
-
-  if (error) throw error;
-  return data;
+): Promise<ApplicantApplicationRow | null> {
+  const applications = await fetchOwnApplications(supabase, userId, [eventId]);
+  return applications.get(eventId) ?? null;
 }
 
 /**
- * A user's applications to many events in one round trip, keyed by event id.
- * An event the user hasn't applied to is absent.
+ * The caller's applications to many events in one round trip, keyed by event
+ * id, as they may see them. An event they haven't applied to is absent.
  */
 export async function fetchUserEventApplications(
   supabase: DbClient,
   userId: string,
   eventIds: string[]
-): Promise<Map<string, EventApplicationRow>> {
-  if (eventIds.length === 0) return new Map();
-
-  const { data, error } = await supabase
-    .from(TABLES.eventApplications)
-    .select("*")
-    .eq("user_id", userId)
-    .in("event_id", eventIds);
-
-  if (error) throw error;
-  return new Map((data ?? []).map((application) => [application.event_id, application]));
+): Promise<Map<string, ApplicantApplicationRow>> {
+  return fetchOwnApplications(supabase, userId, eventIds);
 }
 
 /**
@@ -203,25 +226,28 @@ export async function fetchEventApplicationSummaries(
 /**
  * Starts the caller's application to an event as a draft. RLS allows it only
  * for themself, on an event that requires one, while its registration is
- * open. If they already have one (a double submit, say), that one is returned.
+ * open. If they already have one (a double submit, say), that one is returned
+ * as they may see it: a decision not yet released reads as submitted.
  */
 export async function createDraftApplication(
   supabase: DbClient,
   eventId: string,
   userInfoId: string
-): Promise<EventApplicationRow> {
+): Promise<ApplicantApplicationRow> {
   const { data, error } = await supabase
     .from(TABLES.eventApplications)
     .insert({ event_id: eventId, user_id: userInfoId, status: "draft" })
-    .select()
+    .select("id, event_id, user_id, status, offer_expires_at, submitted_at, created_at, updated_at")
     .single();
 
+  // A unique violation: they already have one, which their own select may
+  // not show before release, so read it the way they may see it.
   if (error?.code === "23505") {
     const existing = await fetchUserEventApplication(supabase, eventId, userInfoId);
     if (existing) return existing;
   }
   if (error) throw error;
-  return data;
+  return { ...data, decisions_release_at: null };
 }
 
 /**
@@ -290,21 +316,84 @@ export async function submitEventApplication(
   };
 }
 
-/** Records an admin's decision. The database enforces the allowed moves. */
-export async function updateEventApplication(
-  supabase: DbClient,
-  applicationId: string,
-  payload: Pick<EventApplicationUpdate, "status" | "offer_expires_at">
-): Promise<EventApplicationRow> {
-  const { data, error } = await supabase
-    .from(TABLES.eventApplications)
-    .update(payload)
-    .eq("id", applicationId)
-    .select()
-    .single();
+/** Why `decide_event_application` refused a decision. */
+export type ApplicationDecisionFailure =
+  | "NOT_FOUND"
+  | "NOT_SUBMITTED"
+  | "INVALID_DECISION"
+  | "DEADLINE_REQUIRED"
+  | "DEADLINE_TOO_EARLY"
+  | "HAS_TICKET"
+  | "NOT_ALLOWED"
+  | "OVER_CAPACITY";
+
+/** Seats as they stood when the decision was made. */
+export interface DecisionSeats {
+  tickets: number;
+  heldOffers: number;
+  /** `null` when the event has no capacity. */
+  capacity: number | null;
+}
+
+export type ApplicationDecisionResult = {
+  applicationId: string;
+  eventId: string | null;
+  userId: string | null;
+  previousStatus: EventApplicationRow["status"] | null;
+  /** The status now: the new one, or the unchanged one on a refusal. */
+  status: EventApplicationRow["status"] | null;
+  offerExpiresAt: string | null;
+  /** The event's "Release decisions on", null when none is set. */
+  decisionsReleaseAt: string | null;
+  seats: DecisionSeats;
+  /** An override accepted past capacity. */
+  overCapacity: boolean;
+} & ({ ok: true } | { ok: false; reason: ApplicationDecisionFailure });
+
+/**
+ * Records an admin's decision through `decide_event_application`, which takes
+ * the event lock reservation takes, checks capacity on an accept that would
+ * take a seat (unless `allowOverCapacity`), requires a deadline after now and
+ * after the release, and enforces the allowed moves. Service role only.
+ */
+export async function decideEventApplication(
+  serviceClient: DbClient,
+  input: {
+    applicationId: string;
+    decision: "accept" | "waitlist" | "reject";
+    offerExpiresAt: string | null;
+    allowOverCapacity?: boolean;
+  }
+): Promise<ApplicationDecisionResult> {
+  const { data, error } = await serviceClient.rpc("decide_event_application", {
+    p_application_id: input.applicationId,
+    p_decision: input.decision,
+    p_offer_expires_at: input.offerExpiresAt ?? undefined,
+    p_allow_over_capacity: input.allowOverCapacity ?? false,
+  });
 
   if (error) throw error;
-  return data;
+  const row = data?.[0];
+  if (!row) throw new Error("decide_event_application returned no result.");
+
+  const common = {
+    applicationId: row.application_id ?? input.applicationId,
+    eventId: row.event_id,
+    userId: row.user_id,
+    previousStatus: row.previous_status,
+    status: row.status,
+    offerExpiresAt: row.offer_expires_at,
+    decisionsReleaseAt: row.decisions_release_at,
+    seats: {
+      tickets: row.tickets ?? 0,
+      heldOffers: row.held_offers ?? 0,
+      capacity: row.max_capacity,
+    },
+    overCapacity: row.over_capacity ?? false,
+  };
+  return row.failure_reason
+    ? { ...common, ok: false, reason: row.failure_reason as ApplicationDecisionFailure }
+    : { ...common, ok: true };
 }
 
 /**

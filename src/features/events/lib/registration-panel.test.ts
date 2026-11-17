@@ -158,6 +158,19 @@ describe("getPanelSpec", () => {
     expect(spec("app-in-review").subheading).toBeUndefined();
   });
 
+  it("says when decisions are released while they're held back", () => {
+    const held = getPanelSpec({ kind: "app-in-review", decisionsReleaseAt: DATE }, context);
+    expect(held).toMatchObject({
+      title: "Application",
+      layout: "alert",
+      props: {
+        variant: "warning",
+        title: "Your application is in review",
+        description: "Decisions are released Wed, Aug 26, 2026 at 12:00 PM.",
+      },
+    });
+  });
+
   it("promises no email to applicants", () => {
     expect(spec("app-in-review").props).toMatchObject({ description: "Check back here for a decision." });
     expect(spec("app-waitlisted").props).toMatchObject({ description: "If a spot opens up, it’ll show here." });
