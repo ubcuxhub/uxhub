@@ -166,15 +166,17 @@ describe("getPanelSpec", () => {
       props: {
         variant: "warning",
         title: "Your application is in review",
-        description: "Decisions are released Wed, Aug 26, 2026 at 12:00 PM.",
+        description: "Decisions are released Wed, Aug 26, 2026 at 12:00 PM. We’ll also email you then.",
       },
     });
   });
 
-  it("promises no email to applicants", () => {
-    expect(spec("app-in-review").props).toMatchObject({ description: "Check back here for a decision." });
-    expect(spec("app-waitlisted").props).toMatchObject({ description: "If a spot opens up, it’ll show here." });
-    for (const kind of ["app-in-review", "app-waitlisted"] as const) {
+  // The application-emails job sends each released decision, including a
+  // later offer to someone on the waitlist; nothing else is promised.
+  it("says decisions and waitlist offers are emailed", () => {
+    expect(spec("app-in-review").props).toMatchObject({ description: "We’ll email you when there’s a decision, and it’ll show here too." });
+    expect(spec("app-waitlisted").props).toMatchObject({ description: "If a spot opens up, we’ll email you and it’ll show here." });
+    for (const kind of ["app-accepted", "app-rejected", "app-offer-expired"] as const) {
       expect(JSON.stringify(spec(kind).props)).not.toMatch(/e-?mail/i);
     }
   });

@@ -1485,6 +1485,27 @@ export type Database = {
         Args: { p_event_id: string; p_note: string; p_operation_id: string }
         Returns: Json
       }
+      claim_application_emails: {
+        Args: { p_event_ids?: string[]; p_limit?: number }
+        Returns: {
+          application_id: string
+          attempts: number
+          delivery_id: string
+          email: string
+          ends_at: string
+          event_id: string
+          event_name: string
+          event_slug: string
+          first_name: string
+          kind: string
+          offer_expires_at: string
+          starts_at: string
+        }[]
+      }
+      complete_application_email: {
+        Args: { p_delivery_id: string; p_error_code?: string; p_sent: boolean }
+        Returns: number
+      }
       create_team: {
         Args: { p_event_id: string; p_name?: string; p_user_id: string }
         Returns: {
@@ -1669,6 +1690,10 @@ export type Database = {
       regenerate_event_ticket_token: {
         Args: { p_ticket_id: string }
         Returns: boolean
+      }
+      release_application_emails: {
+        Args: { p_delivery_ids: string[]; p_reason?: string }
+        Returns: number
       }
       release_event_ticket: {
         Args: { p_purchase_id: string }
