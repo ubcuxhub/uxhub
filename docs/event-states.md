@@ -187,6 +187,31 @@ refuse it with `EVENT_CANCELED`. Nothing sets it yet.
 that event as account deletion does: a team they owned passes to the teammate
 who joined first, or is deleted if nobody else is on it.
 
+### Refunds
+
+Refunds are issued in Square, never in the app. The webhook takes
+`refund.created` and `refund.updated` (and a `payment.updated` that lists
+refunds), fetches the payment and each of its refunds, and passes the total of
+the `COMPLETED` ones, capped at Square's `refundedMoney`, to
+`apply_event_purchase_refund`. It runs under the event lock, records
+`refunded_cents`/`refunded_at`, and never lowers the amount, so duplicate and
+out-of-order deliveries change nothing. `purchases.status` stays `completed`.
+
+- **Full refund, no check-in:** the ticket goes (`remove_event_ticket`), which
+  frees the seat and the team spot. The purchase is dead.
+- **Full refund after check-in:** the ticket and its check-ins stay, and the
+  app logs `payment.refund_after_check_in` at `warn` for someone to review.
+- **Partial refund:** only the amount is recorded; the ticket stays and the
+  purchase is still live.
+- **Pending refund:** nothing is recorded until it completes.
+- **Membership:** the amount is recorded and the app warns
+  (`payment.membership_refunded`); the membership is not revoked.
+- **Refund before fulfillment** (the capture was confirmed late): fulfillment
+  skips a fully refunded purchase, and `guard_refunded_purchase_ticket`
+  refuses its ticket, so no ticket is ever issued for it.
+
+Purchase history shows "Refunded" or "Partially refunded" from the amount.
+
 ## Admin: application
 
 Only for events with `requires_application`.

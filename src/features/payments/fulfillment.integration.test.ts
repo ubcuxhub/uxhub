@@ -4,7 +4,7 @@
  * Square is mocked; everything the database decides is real.
  */
 import { randomUUID } from "node:crypto";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { SquareError } from "square";
 
 import type { UserInfoRow } from "@/lib/supabase/models";
@@ -14,6 +14,7 @@ import { fetchUserEventTicket } from "@/lib/supabase-helpers/event-tickets";
 import { fetchPurchasesForUser } from "@/lib/supabase-helpers/purchases";
 import { fetchCheckInSessions, fetchCheckInStatuses, checkInTicket } from "@/lib/supabase-helpers/check-ins";
 import type { CheckoutRequestInput } from "./types";
+import type { SquareRefundEvent } from "@/lib/square/webhook";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/server", () => ({ after: vi.fn() }));
@@ -30,14 +31,15 @@ const square = vi.hoisted(() => ({
   complete: vi.fn(),
   cancel: vi.fn(),
   get: vi.fn(),
+  getRefund: vi.fn(),
 }));
 vi.mock("@/lib/square/client", () => ({
-  squareClient: { payments: square },
+  squareClient: { payments: square, refunds: { get: square.getRefund } },
   getSquareLocationId: () => "location-1",
   SQUARE_CURRENCY: "CAD",
 }));
 
-const { executeCheckoutForUser, processSquarePaymentEvent } = await import(
+const { executeCheckoutForUser, processSquarePaymentEvent, processSquareRefundEvent } = await import(
   "./fulfillment"
 );
 
@@ -383,5 +385,200 @@ describe("release_event_ticket", () => {
       expect((await ticketsFor(event.id)).map((ticket) => ticket.id).sort()).toEqual(
         [completed.ticketId, checkedIn.ticketId].sort()
       );
+    }));
+});
+
+describe("Square refunds", () => {
+  const cad = (amount: number) => ({ amount: BigInt(amount), currency: "CAD" });
+
+  /**
+   * Square as it stands after the refunds: `payments.get` lists them and
+   * `refunds.get` returns each with its status.
+   */
+  function squareRefunds(paymentId: string, amountCents: number, refunds: { status: string; cents: number }[]) {
+    const completed = refunds.filter((refund) => refund.status === "COMPLETED");
+    square.get.mockResolvedValue({
+      payment: {
+        id: paymentId,
+        status: "COMPLETED",
+        amountMoney: cad(amountCents),
+        refundedMoney: cad(completed.reduce((sum, refund) => sum + refund.cents, 0)),
+        refundIds: refunds.map((_, index) => `refund-${index}`),
+      },
+    });
+    square.getRefund.mockImplementation(async ({ refundId }: { refundId: string }) => {
+      const refund = refunds[Number(refundId.split("-")[1])];
+      return { refund: { id: refundId, paymentId, status: refund.status, amountMoney: cad(refund.cents) } };
+    });
+  }
+
+  function refundEvent(paymentId: string, eventId = `it-${randomUUID()}`): SquareRefundEvent {
+    return {
+      eventId,
+      type: "refund.updated",
+      data: { object: { refund: { id: "refund-0", paymentId } } },
+    } as never;
+  }
+
+  async function paidTicket(fixtures: Fixtures) {
+    const event = await fixtures.createEvent({ status: "active" });
+    const user = await buyer(fixtures);
+    const result = await executeCheckoutForUser(user, checkoutInput(event.slug));
+    if (!result.ok) throw new Error("Checkout failed");
+    const { data: purchase, error } = await db
+      .from("purchases")
+      .select("id, amount_cents, square_payment_id")
+      .eq("id", result.purchaseId)
+      .single();
+    if (error) throw error;
+    return { event, user, purchase: { ...purchase, square_payment_id: purchase.square_payment_id! } };
+  }
+
+  async function refundState(purchaseId: string) {
+    const { data, error } = await db
+      .from("purchases")
+      .select("status, refunded_cents, refunded_at, fulfilled_at")
+      .eq("id", purchaseId)
+      .single();
+    if (error) throw error;
+    return data;
+  }
+
+  async function checkIn(fixtures: Fixtures, eventId: string, ticketId: string) {
+    const session = await db.from("check_in_sessions").insert({ event_id: eventId, name: "Door" }).select().single();
+    if (session.error) throw session.error;
+    fixtures.track("check_in_sessions", session.data.id);
+    await checkInTicket(db, ticketId, session.data.id);
+  }
+
+  afterEach(async () => {
+    await db.from("square_webhook_events").delete().like("event_id", "it-%");
+  });
+
+  it("takes back the ticket and frees the seat on a full refund before check-in", () =>
+    withFixtures(async (fixtures) => {
+      const { event, purchase } = await paidTicket(fixtures);
+      expect(await ticketsFor(event.id)).toHaveLength(1);
+
+      squareRefunds(purchase.square_payment_id, purchase.amount_cents, [{ status: "COMPLETED", cents: purchase.amount_cents }]);
+      await processSquareRefundEvent(refundEvent(purchase.square_payment_id));
+
+      expect(await ticketsFor(event.id)).toEqual([]);
+      expect(await refundState(purchase.id)).toMatchObject({ status: "completed", refunded_cents: purchase.amount_cents });
+      expect((await refundState(purchase.id)).refunded_at).not.toBeNull();
+      const { data: seats } = await db.rpc("event_seat_counts_unfiltered", { p_event_ids: [event.id] });
+      expect(seats![0]).toMatchObject({ tickets: 0 });
+    }));
+
+  it("records nothing that removes access while the refund is pending", () =>
+    withFixtures(async (fixtures) => {
+      const { event, purchase } = await paidTicket(fixtures);
+
+      squareRefunds(purchase.square_payment_id, purchase.amount_cents, [{ status: "PENDING", cents: purchase.amount_cents }]);
+      await processSquareRefundEvent(refundEvent(purchase.square_payment_id));
+
+      expect(await ticketsFor(event.id)).toHaveLength(1);
+      expect(await refundState(purchase.id)).toMatchObject({ refunded_cents: 0, refunded_at: null });
+    }));
+
+  it("keeps a checked-in ticket and its check-ins on a full refund", () =>
+    withFixtures(async (fixtures) => {
+      const { event, purchase } = await paidTicket(fixtures);
+      const [ticket] = await ticketsFor(event.id);
+      await checkIn(fixtures, event.id, ticket.id);
+
+      squareRefunds(purchase.square_payment_id, purchase.amount_cents, [{ status: "COMPLETED", cents: purchase.amount_cents }]);
+      await processSquareRefundEvent(refundEvent(purchase.square_payment_id));
+
+      expect(await ticketsFor(event.id)).toEqual([expect.objectContaining({ id: ticket.id })]);
+      expect(await fetchCheckInStatuses(db, event.id)).toHaveProperty("size", 1);
+      expect(await refundState(purchase.id)).toMatchObject({ refunded_cents: purchase.amount_cents });
+    }));
+
+  it("only records a partial refund", () =>
+    withFixtures(async (fixtures) => {
+      const { event, purchase } = await paidTicket(fixtures);
+
+      squareRefunds(purchase.square_payment_id, purchase.amount_cents, [{ status: "COMPLETED", cents: 100 }]);
+      await processSquareRefundEvent(refundEvent(purchase.square_payment_id));
+
+      expect(await ticketsFor(event.id)).toHaveLength(1);
+      expect(await refundState(purchase.id)).toMatchObject({ status: "completed", refunded_cents: 100 });
+      const history = await fetchPurchasesForUser(db, (await ticketsFor(event.id))[0].user_id);
+      expect(history.find((row) => row.id === purchase.id)).toMatchObject({ refunded_cents: 100 });
+    }));
+
+  it("changes nothing on a duplicate or stale delivery", () =>
+    withFixtures(async (fixtures) => {
+      const { event, purchase } = await paidTicket(fixtures);
+      squareRefunds(purchase.square_payment_id, purchase.amount_cents, [{ status: "COMPLETED", cents: 300 }]);
+      const delivery = refundEvent(purchase.square_payment_id);
+
+      await processSquareRefundEvent(delivery);
+      const first = await refundState(purchase.id);
+      await processSquareRefundEvent(delivery);
+      expect(await refundState(purchase.id)).toEqual(first);
+
+      // A later event reporting less (a stale fetch) never lowers the amount.
+      const { data, error } = await db.rpc("apply_event_purchase_refund", { p_purchase_id: purchase.id, p_refunded_cents: 100 });
+      if (error) throw error;
+      expect(data![0]).toMatchObject({ refunded_total_cents: 300, amount_increased: false, ticket_removed: false });
+      expect(await refundState(purchase.id)).toEqual(first);
+      expect(await ticketsFor(event.id)).toHaveLength(1);
+    }));
+
+  it("never issues a ticket when the refund lands before fulfillment", () =>
+    withFixtures(async (fixtures) => {
+      const event = await fixtures.createEvent({ status: "active" });
+      const user = await buyer(fixtures);
+      // Capture times out: the purchase stays authorized, its ticket reserved.
+      square.complete.mockRejectedValue(
+        new SquareError({ message: "timeout", body: { errors: [{ category: "API_ERROR", code: "GATEWAY_TIMEOUT" }] } })
+      );
+      const result = await executeCheckoutForUser(user, checkoutInput(event.slug));
+      if (!result.ok) throw new Error("Checkout failed");
+      const { data: purchase } = await db.from("purchases").select("square_payment_id, amount_cents").eq("id", result.purchaseId).single();
+      const paymentId = purchase!.square_payment_id!;
+
+      // Square captured and then refunded it in full before any payment.updated.
+      squareRefunds(paymentId, purchase!.amount_cents, [{ status: "COMPLETED", cents: purchase!.amount_cents }]);
+      await processSquareRefundEvent(refundEvent(paymentId));
+      expect(await ticketsFor(event.id)).toEqual([]);
+
+      await processSquarePaymentEvent({
+        eventId: `it-${randomUUID()}`,
+        type: "payment.updated",
+        data: { object: { payment: { id: paymentId, status: "COMPLETED" } } },
+      } as never);
+
+      expect(await ticketsFor(event.id)).toEqual([]);
+      expect(await refundState(result.purchaseId)).toMatchObject({ status: "completed", fulfilled_at: null, refunded_cents: purchase!.amount_cents });
+
+      // The database refuses one too, for the race the app's check can't see.
+      const { error } = await db.rpc("reserve_event_ticket", { p_event_id: event.id, p_user_id: user.id, p_purchase_id: result.purchaseId });
+      expect(error).toMatchObject({ hint: "PURCHASE_REFUNDED" });
+    }));
+
+  it("records a membership refund and keeps the membership", () =>
+    withFixtures(async (fixtures) => {
+      const tier = await fixtures.createMembershipType();
+      const user = await fixtures.createUser({ membership_type_id: tier.id });
+      const { data: purchase, error } = await db
+        .from("purchases")
+        .insert({
+          user_id: user.id, kind: "membership", membership_type_id: tier.id, status: "completed",
+          amount_cents: 1000, currency: "CAD", idempotency_key: `${fixtures.tag}-${randomUUID()}`,
+        })
+        .select()
+        .single();
+      if (error) throw error;
+
+      const applied = await db.rpc("apply_event_purchase_refund", { p_purchase_id: purchase.id, p_refunded_cents: 1000 });
+      if (applied.error) throw applied.error;
+
+      expect(applied.data![0]).toMatchObject({ fully_refunded: true, amount_increased: true, ticket_removed: false });
+      expect(await refundState(purchase.id)).toMatchObject({ status: "completed", refunded_cents: 1000 });
+      const { data: member } = await db.from("user_info").select("membership_type_id").eq("id", user.id).single();
+      expect(member).toEqual({ membership_type_id: tier.id });
     }));
 });

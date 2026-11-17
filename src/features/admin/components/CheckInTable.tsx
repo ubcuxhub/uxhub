@@ -14,6 +14,7 @@ interface CheckInTableProps {
   filteredAttendees: CheckInAttendee[];
   checkInStatuses: Map<string, string | null>;
   onToggle: (ticketId: string, sessionId: string, currentlyChecked: boolean) => void;
+  onTicketVoided: (ticketId: string) => void;
   updatingCells: Set<string>;
   searchQuery: string;
   onSearchChange: (query: string) => void;
@@ -25,6 +26,7 @@ export function CheckInTable({
   filteredAttendees,
   checkInStatuses,
   onToggle,
+  onTicketVoided,
   updatingCells,
   searchQuery,
   onSearchChange,
@@ -58,6 +60,7 @@ export function CheckInTable({
                   sessions={sessions}
                   checkInStatuses={checkInStatuses}
                   onToggle={onToggle}
+                  onTicketVoided={onTicketVoided}
                   updatingCells={updatingCells}
                 />
               ))}

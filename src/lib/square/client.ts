@@ -51,4 +51,5 @@ function getClient() {
 export const squareClient = {
   get payments() { return getClient().payments; },
   get customers() { return getClient().customers; },
+  get refunds() { return getClient().refunds; },
 };

@@ -6,6 +6,7 @@ import type { Payment, PaymentUpdatedEvent } from "square";
 import type { PurchaseRow, UserInfoRow } from "@/lib/supabase/models";
 import type { CheckoutActionResult, CheckoutRequestInput } from "./types";
 import type { Database, Json } from "@/lib/supabase/database.types";
+import type { SquareRefundEvent } from "@/lib/square/webhook";
 import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
 import { errorFields, log } from "@/lib/log";
 import {
@@ -23,6 +24,7 @@ import {
   fetchPurchaseByIdempotencyKey,
   fetchPurchaseBySquarePaymentId,
   forgetSquareWebhookEvent,
+  applyPurchaseRefund,
   recordSquareWebhookEvent,
   updatePurchase,
 } from "@/lib/supabase-helpers/purchases";
@@ -35,6 +37,7 @@ import {
   SQUARE_CURRENCY,
 } from "@/lib/square/client";
 import {
+  completedRefundCents,
   formatReservationFailure,
   getSquareErrorDiagnostic,
   getSquareErrorMessage,
@@ -50,6 +53,7 @@ import { ensureSquareCustomerId } from "./customer";
 import { sendPurchaseConfirmationEmail } from "./confirmation-email";
 import { revalidatePurchasePaths } from "./revalidation";
 import { getExistingCheckoutResult } from "./checkout-results";
+import { isFullyRefunded } from "./purchase-status";
 
 const adminDb = supabaseAdmin as unknown as SupabaseClient<Database>;
 
@@ -117,6 +121,14 @@ async function fulfillEventTicketPurchase(purchaseId: string) {
     throw new Error("Event ticket purchase is missing an event ID.");
   }
 
+  // A refund recorded before the capture was confirmed means no ticket. The
+  // database refuses one too (guard_refunded_purchase_ticket) for the race
+  // where the refund lands after this read.
+  if (isFullyRefunded(purchase)) {
+    log.warn("payment.refunded_before_fulfillment", { purchaseId: purchase.id });
+    return purchase;
+  }
+
   // Checkout reserves the ticket before capturing, so it is normally there
   // already. A capture confirmed only by a later webhook may find it released
   // in between, and then reserves it again.
@@ -154,6 +166,11 @@ async function fulfillCompletedPurchase(purchaseId: string) {
     : purchase.kind === "membership"
       ? await fulfillMembershipPurchase(purchase.id)
       : await fulfillEventTicketPurchase(purchase.id);
+
+  // No receipt for a ticket refunded in full: it is gone or never existed.
+  if (fulfilled.kind === "event_ticket" && isFullyRefunded(fulfilled)) {
+    return fulfilled;
+  }
 
   /**
    * Sent on every pass that sees a completed payment rather than only the one
@@ -601,6 +618,51 @@ export async function processSquarePaymentEvent(
     return;
   }
 
+  await processOnce(eventId, eventType, rawPayload, () =>
+    applySquarePayment(payment.id!, payment)
+  );
+}
+
+/**
+ * Handles a `refund.created` or `refund.updated` delivery. The payload's
+ * refund only names the payment: the payment and each of its refunds are
+ * fetched from Square, so a delivery that arrives late or out of order still
+ * records the current total of completed refunds.
+ */
+export async function processSquareRefundEvent(
+  event: SquareRefundEvent,
+  rawPayload: NonNullable<Json> = event as NonNullable<Json>
+) {
+  const eventId = event.eventId;
+  const eventType = event.type;
+  const paymentId = event.data?.object?.refund?.paymentId;
+
+  if (!eventId || !eventType || !paymentId) {
+    return;
+  }
+
+  await processOnce(eventId, eventType, rawPayload, async () => {
+    const { payment } = await squareClient.payments.get({ paymentId });
+    if (!payment?.id) {
+      throw new Error("Square did not return the refunded payment.");
+    }
+    const purchase = await findPurchaseForPayment(payment.id, payment);
+    if (purchase) await syncPurchaseRefunds(purchase, payment);
+  });
+}
+
+/**
+ * Runs `handle` for a webhook event unless another delivery of it already
+ * ran. The event is recorded before processing so concurrent deliveries are
+ * handled once, and forgotten again on failure, or Square's retry would be
+ * dropped as a duplicate and the purchase would never settle.
+ */
+async function processOnce(
+  eventId: string,
+  eventType: string,
+  rawPayload: NonNullable<Json>,
+  handle: () => Promise<void>
+) {
   const wasRecorded = await recordSquareWebhookEvent(adminDb, {
     event_id: eventId,
     event_type: eventType,
@@ -612,11 +674,8 @@ export async function processSquarePaymentEvent(
   }
 
   try {
-    await applySquarePayment(payment.id, payment);
+    await handle();
   } catch (error) {
-    // The event was recorded before processing so concurrent deliveries are
-    // handled once. Forget it again on failure, or Square's retry would be
-    // dropped as a duplicate and the purchase would never settle.
     await forgetSquareWebhookEvent(adminDb, eventId).catch((forgetError) => {
       log.error("webhook.square_event_forget_failed", {
         eventId,
@@ -627,7 +686,48 @@ export async function processSquarePaymentEvent(
   }
 }
 
-async function applySquarePayment(paymentId: string, payment: Payment) {
+/**
+ * Records the payment's completed refunds on its purchase. A full refund of
+ * an event ticket takes the ticket back, unless it was checked in
+ * (docs/event-states.md, "Refunds").
+ */
+async function syncPurchaseRefunds(purchase: PurchaseRow, payment: Payment) {
+  const refunds = await Promise.all(
+    (payment.refundIds ?? []).map(
+      async (refundId) => (await squareClient.refunds.get({ refundId })).refund
+    )
+  );
+  const refundedCents = completedRefundCents(payment, refunds);
+  if (refundedCents <= purchase.refunded_cents && !isFullyRefunded(purchase)) return;
+
+  const result = await applyPurchaseRefund(adminDb, purchase.id, refundedCents);
+  if (!result) return;
+
+  const fields = {
+    purchaseId: purchase.id,
+    refundedCents: result.refundedCents,
+    fullyRefunded: result.fullyRefunded,
+  };
+  if (result.keptCheckedInTicket && result.amountIncreased) {
+    // The money went back after the door: someone should decide whether that
+    // was right, so it is a warning, not just a record.
+    log.warn("payment.refund_after_check_in", fields);
+  } else if (purchase.kind === "membership" && result.amountIncreased) {
+    // Refunding a membership does not end it; an admin does that by hand.
+    log.warn("payment.membership_refunded", fields);
+  } else if (result.amountIncreased || result.ticketRemoved) {
+    log.info("payment.refund_recorded", { ...fields, ticketRemoved: result.ticketRemoved });
+  }
+
+  if (result.amountIncreased || result.ticketRemoved) {
+    await revalidatePurchasePaths(adminDb, purchase.id);
+  }
+}
+
+async function findPurchaseForPayment(
+  paymentId: string,
+  payment: Payment
+): Promise<PurchaseRow | null> {
   let purchase = await fetchPurchaseBySquarePaymentId(adminDb, paymentId);
 
   // A create-payment response can be lost after Square accepts the charge but
@@ -640,7 +740,18 @@ async function applySquarePayment(paymentId: string, payment: Payment) {
     }
   }
 
+  return purchase;
+}
+
+async function applySquarePayment(paymentId: string, payment: Payment) {
+  const purchase = await findPurchaseForPayment(paymentId, payment);
   if (!purchase) return;
 
-  await applyPaymentStateToPurchase(purchase.id, payment);
+  const updated = await applyPaymentStateToPurchase(purchase.id, payment);
+
+  // Square also sends payment.updated when a refund completes, so a missed or
+  // reordered refund event still lands here.
+  if (payment.refundIds?.length) {
+    await syncPurchaseRefunds(updated, payment);
+  }
 }
