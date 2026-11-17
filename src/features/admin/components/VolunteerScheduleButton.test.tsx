@@ -14,7 +14,8 @@ function setup() {
 }
 it("shows approved popup copy, editor deep link and submission-only validation; Cancel returns focus", async () => {
   const { add, input } = setup();
-  expect(add.className).toContain("border-dotted");
+  expect(add.className).toContain("border-border");
+  expect(add.className).not.toContain("border-dotted");
   expect(add.className).toContain("sm:h-(--size-control)");
   expect(screen.getByRole("dialog", { name: "Link volunteer schedule for the event" })).toBeTruthy();
   expect(screen.getByText("Keep track of who's doing what")).toBeTruthy();

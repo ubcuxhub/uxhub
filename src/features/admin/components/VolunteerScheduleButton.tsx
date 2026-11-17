@@ -50,7 +50,7 @@ export function VolunteerScheduleButton({ eventId, initialUrl }: { eventId: stri
 
   return <div ref={control} className="min-w-0">
     {url ? <Button asChild variant="secondary" className="w-full sm:h-(--size-control) sm:w-auto"><a href={url} target="_blank" rel="noopener noreferrer"><Calendar aria-hidden />View Volunteer Schedule</a></Button>
-      : <Button variant="dotted" className="w-full sm:h-(--size-control) sm:w-auto" onClick={() => { setValue(""); setError(null); setOpen(true); }}><LinkIcon aria-hidden />Add Exec Volunteer Schedule</Button>}
+      : <Button variant="secondary" className="w-full sm:h-(--size-control) sm:w-auto" onClick={() => { setValue(""); setError(null); setOpen(true); }}><LinkIcon aria-hidden />Add Exec Volunteer Schedule</Button>}
     <Dialog open={open} onOpenChange={next => { if (!saving.current) setOpen(next); }}>
       <DialogContent closeDisabled={pending} onCloseAutoFocus={event => { event.preventDefault(); control.current?.querySelector<HTMLElement>("button, a")?.focus(); }}>
         <DialogHeader><DialogTitle>Link volunteer schedule for the event</DialogTitle><DialogDescription>Keep track of who&apos;s doing what</DialogDescription></DialogHeader>
