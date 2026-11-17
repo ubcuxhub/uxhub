@@ -102,7 +102,7 @@ export const MANIFEST = [
   {
     id: "check-in",
     column: 3,
-    uses: ["card", "alert", "search-field", "avatar", "status-badge", "button"],
+    uses: ["card", "alert", "search-field", "avatar", "status-badge", "button", "scanner-frame"],
   },
   {
     id: "mentors",

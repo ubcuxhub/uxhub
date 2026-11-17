@@ -23,3 +23,10 @@ it("handles missing events using the existing not-found convention", async () =>
   mocks.event.mockResolvedValueOnce(null);
   await expect(AgendaPage({ params: Promise.resolve({ event: "missing" }) })).rejects.toThrow("Not found");
 });
+
+it("restores the requested day after returning from check-in", async () => {
+  mocks.agenda.mockResolvedValue([{ id: "one", date: "2026-11-16" }, { id: "two", date: "2026-11-17" }]);
+  const result = await AgendaPage({ params: Promise.resolve({ event: "slug" }), searchParams: Promise.resolve({ day: "two" }) });
+  expect(result.props.initialDayId).toBe("two");
+  expect(mocks.resolve).toHaveBeenCalledWith({}, "slug", "/agenda?day=two");
+});

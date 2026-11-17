@@ -1,159 +1,179 @@
-/**
- * Checking in at the door against the local database: a ticket's QR code
- * checks its holder in once per session, the first time is kept even when
- * scans race, and only a real ticket for this event gets in.
- */
-import { beforeEach, describe, expect, it, vi } from "vitest";
-
-import type { CheckInResult } from "@/features/admin/types";
-import { createIntegrationClient, withFixtures, type Fixtures } from "@/test/integration";
-
+import { randomUUID } from "node:crypto";
+import { describe, expect, it, vi } from "vitest";
+import { clientAs, withFixtures, type Fixtures } from "@/test/integration";
+import { mutateItemCheckIn, fetchItemCheckInSnapshot } from "@/lib/supabase-helpers/item-check-in";
 vi.mock("server-only", () => ({}));
+const context = vi.hoisted(() => ({ requireAdmin: vi.fn(), createClient: vi.fn() }));
+vi.mock("@/lib/auth/guards", () => ({ requireAdmin: context.requireAdmin, requireManager: vi.fn() }));
+vi.mock("@/lib/supabase/server", () => ({ createClient: context.createClient }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-const guards = vi.hoisted(() => ({ requireAdmin: vi.fn(), requireManager: vi.fn() }));
-vi.mock("@/lib/auth/guards", () => guards);
+import { checkInScannedTicketAction, checkInTicketAction, toggleCheckInAction } from "@/features/admin/actions";
 
-import {
-  checkInScannedTicketAction,
-  checkInTicketAction,
-  toggleCheckInAction,
-} from "@/features/admin/actions";
-import { checkInTicket } from "@/lib/supabase-helpers/check-ins";
+async function setup(f: Fixtures, times = { start: "2026-01-01T18:00:00Z", end: "2026-01-01T19:00:00Z" }) {
+  const db = f.supabase;
 
-const db = createIntegrationClient();
+  const event = await f.createEvent({ agenda_enabled: false });
+  const admin = await f.createUser({ role_access: "admin" });
 
-beforeEach(() => {
-  guards.requireAdmin.mockResolvedValue({ id: "admin" });
+  const manager = await f.createUser({ role_access: "manager" });
+
+  const user = await f.createUser({ first_name: "Ada", last_name: "Lovelace" });
+  const day = await db.from("event_agenda_days").insert({ event_id: event.id, date: times.start.slice(0, 10), title: "Day" }).select().single();
+
+  if (day.error)
+    throw day.error;
+  const item = await db.from("event_agenda_items").insert({ event_agenda_day_id: day.data.id, title: "Doors", start_time: "10:00", end_time: "11:00", starts_at: times.start, ends_at: times.end, check_in: true }).select().single();
+
+  if (item.error)
+    throw item.error;
+  const session = await db.from("check_in_sessions").insert({ event_id: event.id, agenda_item_id: item.data.id, name: "Doors", start_time: times.start, end_time: times.end }).select().single();
+
+  if (session.error)
+    throw session.error;
+  const ticket = await db.from("event_tickets").insert({ event_id: event.id, user_id: user.id }).select().single();
+
+  if (ticket.error)
+    throw ticket.error;
+  return { db, event, admin, manager, user, item: item.data, session: session.data, ticket: ticket.data, input: { eventId: event.id, itemId: item.data.id, ticketId: ticket.data.id } };
+}
+
+describe("atomic item check-in", () => {
+  it.each([{ start: "2020-11-01T07:00:00Z", end: "2020-11-01T11:00:00Z" }, { start: "2035-11-01T07:00:00Z", end: "2035-11-01T11:00:00Z" }])("has no past/future time or hidden-schedule gate", times => withFixtures(async f => {
+    const x = await setup(f, times);
+
+    const client = clientAs(x.admin);
+    const result = await mutateItemCheckIn(client, x.input);
+
+    expect(result.status).toBe("checked_in");
+    const snap = await fetchItemCheckInSnapshot(client, x.event.id, x.item.id);
+
+    expect(snap.attendance).toHaveLength(1);
+
+    expect(snap.attendance[0]).toMatchObject({ method: "manual", operator: "Integration Test" });
+    expect((await mutateItemCheckIn(client, { ...x.input, undoVersion: snap.attendance[0].attendanceVersion })).status).toBe("undone");
+  }));
+  it("serializes mixed concurrent scans/manual calls, preserving one time/operator/method and activity", () => withFixtures(async f => {
+    const x = await setup(f);
+
+    const admin = clientAs(x.admin), manager = clientAs(x.manager);
+    const results = await Promise.all(Array.from({ length: 6 }, (_, i) => mutateItemCheckIn(i % 2 ? admin : manager, i % 2 ? x.input : { eventId: x.event.id, itemId: x.item.id, code: x.ticket.qr_token })));
+    expect(results.filter(r => r.status === "checked_in")).toHaveLength(1);
+
+    expect(results.filter(r => r.status === "already_checked_in")).toHaveLength(5);
+    const versions = results.map(r => "attendanceVersion" in r ? r.attendanceVersion : null);
+
+    expect(new Set(versions).size).toBe(1);
+    const activity = await x.db.from("check_in_activity").select().eq("item_id", x.item.id);
+
+    expect(activity.data).toHaveLength(1);
+
+    expect([x.admin.id, x.manager.id]).toContain(activity.data![0].operator_id);
+    expect((await x.db.from("check_ins").select().eq("ticket_id", x.ticket.id)).data).toHaveLength(1);
+  }));
+  it("binds undo to the displayed version, preserving a later rescan and its activity", () => withFixtures(async f => {
+    const x = await setup(f);
+
+    const client = clientAs(x.admin);
+    const first = await mutateItemCheckIn(client, x.input);
+
+    if (!("attendanceVersion" in first))
+      throw new Error("Missing attendance");
+    await mutateItemCheckIn(client, { ...x.input, undoVersion: first.attendanceVersion });
+    const second = await mutateItemCheckIn(client, x.input);
+
+    expect(second.status).toBe("checked_in");
+    expect((await mutateItemCheckIn(client, { ...x.input, undoVersion: first.attendanceVersion })).status).toBe("stale_undo");
+    expect((await fetchItemCheckInSnapshot(client, x.event.id, x.item.id)).attendance[0].attendanceVersion).not.toBe(first.attendanceVersion);
+    const activity = await x.db.from("check_in_activity").select().eq("item_id", x.item.id);
+
+    expect(activity.data).toHaveLength(2);
+
+    expect(activity.data!.filter(a => a.undone_at)).toHaveLength(1);
+  }));
+  it("rejects foreign tickets/items, disabled targets and unknown codes without writes", () => withFixtures(async f => {
+    const x = await setup(f);
+
+    const other = await f.createEvent({ slug: `other-${f.tag}` });
+
+    const client = clientAs(x.admin);
+    const foreign = await x.db.from("event_tickets").insert({ event_id: other.id, user_id: x.user.id }).select().single();
+
+    if (foreign.error)
+      throw foreign.error;
+    expect((await mutateItemCheckIn(client, { ...x.input, ticketId: foreign.data.id })).status).toBe("rejected");
+    expect((await mutateItemCheckIn(client, { eventId: x.event.id, itemId: x.item.id, code: "x" })).status).toBe("rejected");
+    await expect(mutateItemCheckIn(client, { ...x.input, eventId: other.id })).rejects.toBeTruthy();
+    await expect(mutateItemCheckIn(client, { ...x.input, itemId: randomUUID() })).rejects.toBeTruthy();
+    await x.db.from("event_agenda_items").update({ check_in: false }).eq("id", x.item.id).throwOnError();
+    await expect(mutateItemCheckIn(client, x.input)).rejects.toBeTruthy();
+    expect((await x.db.from("check_in_activity").select().eq("event_id", x.event.id)).data).toEqual([]);
+    expect((await x.db.from("check_ins").insert({ ticket_id: foreign.data.id, check_in_session_id: x.session.id })).error).toBeTruthy();
+  }));
+  it("protects attribution/attendance from direct requests and staff data from attendees/anonymous users", () => withFixtures(async f => {
+    const x = await setup(f);
+
+    const staff = clientAs(x.admin), student = clientAs(x.user), anon = clientAs(null);
+    await mutateItemCheckIn(staff, x.input);
+    for (const client of [student, anon]) {
+      await expect(mutateItemCheckIn(client, x.input)).rejects.toBeTruthy();
+      const read = await client.from("check_in_activity").select().eq("event_id", x.event.id);
+
+      expect(read.data ?? []).toHaveLength(0);
+    }
+    expect((await staff.from("check_ins").insert({ ticket_id: x.ticket.id, check_in_session_id: x.session.id })).error).toBeTruthy();
+    expect((await staff.from("check_in_activity").update({ operator_id: x.user.id }).eq("item_id", x.item.id)).error).toBeTruthy();
+    const spoof = await staff.rpc("mutate_item_check_in", { p_event_id: x.event.id, p_item_id: x.item.id, p_ticket_id: x.ticket.id, p_operator_id: x.user.id } as never);
+
+    expect(spoof.error).toBeTruthy();
+  }));
+  it("scopes attendance per item and retains unknown provenance for old rows", () => withFixtures(async f => {
+    const x = await setup(f);
+
+    const client = clientAs(x.admin);
+    await x.db.from("check_ins").insert({ ticket_id: x.ticket.id, check_in_session_id: x.session.id, checked_in_at: "2020-01-01T00:00:00Z" }).throwOnError();
+    const snap = await fetchItemCheckInSnapshot(client, x.event.id, x.item.id);
+
+    expect(snap.attendance[0]).toMatchObject({ operator: null, method: null, checkedInAt: "2020-01-01T00:00:00+00:00" });
+    const unknown = await fetchItemCheckInSnapshot(client, x.event.id, randomUUID());
+
+    expect(unknown.attendance).toEqual([]);
+  }));
 });
 
-/** An event with one check-in session and one ticket holder. */
-async function ticketHolder(fixtures: Fixtures, slug = `check-in-${fixtures.tag}`) {
-  const event = await fixtures.createEvent({ slug });
-  const user = await fixtures.createUser({ first_name: "Ada", last_name: "Lovelace" });
+it("legacy actions enforce the same item/role/version guards without a time lock", () => withFixtures(async f => {
+  const x = await setup(f);
 
-  const session = await db
-    .from("check_in_sessions")
-    .insert({ event_id: event.id, name: "Doors" })
-    .select("id")
-    .single();
-  if (session.error) throw session.error;
+  context.requireAdmin.mockResolvedValue(x.admin);
 
-  const ticket = await db
-    .from("event_tickets")
-    .insert({ event_id: event.id, user_id: user.id })
-    .select("id, qr_token")
-    .single();
-  if (ticket.error) throw ticket.error;
+  context.createClient.mockResolvedValue(clientAs(x.admin));
+  const first = await checkInScannedTicketAction(x.session.id, x.ticket.qr_token);
+  expect(first.status).toBe("checked_in");
+  expect((await checkInTicketAction(x.session.id, x.ticket.id)).status).toBe("already_checked_in");
+  await expect(toggleCheckInAction(x.ticket.id, x.session.id, false)).rejects.toThrow("Refresh check-in");
+  const row = (await fetchItemCheckInSnapshot(clientAs(x.admin), x.event.id, x.item.id)).attendance[0];
+  await toggleCheckInAction(x.ticket.id, x.session.id, false, row.attendanceVersion);
+  expect((await checkInTicketAction(x.session.id, x.ticket.id)).status).toBe("checked_in");
+  await expect(toggleCheckInAction(x.ticket.id, x.session.id, false, row.attendanceVersion)).rejects.toThrow("Check-in changed");
+  context.requireAdmin.mockRejectedValue(new Error("Access denied"));
+  await expect(checkInTicketAction(x.session.id, x.ticket.id)).rejects.toThrow("Access denied");
+}));
 
-  return {
-    sessionId: session.data.id,
-    ticketId: ticket.data.id,
-    qrToken: ticket.data.qr_token,
-  };
-}
+it("keeps two items independent and serializes undo against a simultaneous scan", () => withFixtures(async f => {
+  const x = await setup(f);
 
-async function checkInRows(ticketId: string) {
-  const { data, error } = await db
-    .from("check_ins")
-    .select("checked_in_at")
-    .eq("ticket_id", ticketId);
-  if (error) throw error;
-  return data;
-}
+  const client = clientAs(x.admin);
+  const second = await x.db.from("event_agenda_items").insert({ event_agenda_day_id: x.item.event_agenda_day_id, title: "Closing", start_time: "17:00", end_time: "18:00", starts_at: "2026-01-01T01:00:00Z", ends_at: "2026-01-01T02:00:00Z", check_in: true }).select().single();
 
-function checkedInAt(result: CheckInResult): number {
-  if (result.status === "rejected") throw new Error(`Rejected: ${result.reason}`);
-  return new Date(result.checkedInAt).getTime();
-}
-
-describe("checking in at the door", () => {
-  it("checks someone in once and reports the first time on a second scan", () =>
-    withFixtures(async (fixtures) => {
-      const { sessionId, ticketId, qrToken } = await ticketHolder(fixtures);
-
-      const first = await checkInScannedTicketAction(sessionId, qrToken);
-      const second = await checkInScannedTicketAction(sessionId, qrToken);
-
-      expect(first).toMatchObject({ status: "checked_in", name: "Ada Lovelace" });
-      expect(second).toMatchObject({ status: "already_checked_in", name: "Ada Lovelace" });
-      expect(checkedInAt(second)).toBe(checkedInAt(first));
-      expect(await checkInRows(ticketId)).toHaveLength(1);
-    }));
-
-  it("lets only one of several simultaneous scans check someone in", () =>
-    withFixtures(async (fixtures) => {
-      const { sessionId, ticketId } = await ticketHolder(fixtures);
-
-      const results = await Promise.all(
-        Array.from({ length: 5 }, () => checkInTicket(db, ticketId, sessionId)),
-      );
-
-      expect(results.filter((result) => !result.alreadyCheckedIn)).toHaveLength(1);
-      expect(new Set(results.map((result) => new Date(result.checkedInAt).getTime())).size).toBe(1);
-      expect(await checkInRows(ticketId)).toHaveLength(1);
-    }));
-
-  it("gives a manual check-in and a scan the same answer", () =>
-    withFixtures(async (fixtures) => {
-      const { sessionId, ticketId, qrToken } = await ticketHolder(fixtures);
-
-      const picked = await checkInTicketAction(sessionId, ticketId);
-      const scanned = await checkInScannedTicketAction(sessionId, qrToken);
-
-      expect(picked).toMatchObject({ status: "checked_in", name: "Ada Lovelace" });
-      expect(scanned).toMatchObject({ status: "already_checked_in" });
-      expect(checkedInAt(scanned)).toBe(checkedInAt(picked));
-    }));
-
-  it("checks someone in again after an admin un-checks them", () =>
-    withFixtures(async (fixtures) => {
-      const { sessionId, ticketId, qrToken } = await ticketHolder(fixtures);
-
-      await checkInScannedTicketAction(sessionId, qrToken);
-      await toggleCheckInAction(ticketId, sessionId, false);
-
-      expect(await checkInRows(ticketId)).toEqual([]);
-      expect(await checkInScannedTicketAction(sessionId, qrToken)).toMatchObject({
-        status: "checked_in",
-      });
-      expect(await checkInRows(ticketId)).toHaveLength(1);
-    }));
-
-  it("checks in a ticket whose row an older un-check left with no time", () =>
-    withFixtures(async (fixtures) => {
-      const { sessionId, ticketId, qrToken } = await ticketHolder(fixtures);
-      const { error } = await db
-        .from("check_ins")
-        .insert({ ticket_id: ticketId, check_in_session_id: sessionId, checked_in_at: null });
-      if (error) throw error;
-
-      expect(await checkInScannedTicketAction(sessionId, qrToken)).toMatchObject({
-        status: "checked_in",
-      });
-      const rows = await checkInRows(ticketId);
-      expect(rows).toHaveLength(1);
-      expect(rows[0].checked_in_at).not.toBeNull();
-    }));
-
-  it("rejects an edited code and another event's ticket", () =>
-    withFixtures(async (fixtures) => {
-      const { sessionId, ticketId, qrToken } = await ticketHolder(fixtures);
-      const other = await ticketHolder(fixtures, `check-in-other-${fixtures.tag}`);
-      const edited = qrToken.slice(0, -1) + (qrToken.endsWith("a") ? "b" : "a");
-
-      expect(await checkInScannedTicketAction(sessionId, edited)).toEqual({
-        status: "rejected",
-        reason: "invalid_code",
-      });
-      expect(await checkInScannedTicketAction(other.sessionId, qrToken)).toEqual({
-        status: "rejected",
-        reason: "wrong_event",
-      });
-      expect(await checkInTicketAction(other.sessionId, ticketId)).toEqual({
-        status: "rejected",
-        reason: "wrong_event",
-      });
-
-      expect(await checkInRows(ticketId)).toEqual([]);
-    }));
-});
+  if (second.error)
+    throw second.error;
+  await x.db.from("check_in_sessions").insert({ event_id: x.event.id, agenda_item_id: second.data.id, name: "Closing" }).throwOnError();
+  await mutateItemCheckIn(client, x.input);
+  expect((await fetchItemCheckInSnapshot(client, x.event.id, second.data.id)).attendance).toEqual([]);
+  await mutateItemCheckIn(client, { ...x.input, itemId: second.data.id });
+  const original = (await fetchItemCheckInSnapshot(client, x.event.id, x.item.id)).attendance[0];
+  await Promise.all([mutateItemCheckIn(client, { ...x.input, undoVersion: original.attendanceVersion }), mutateItemCheckIn(client, x.input)]);
+  const remaining = await fetchItemCheckInSnapshot(client, x.event.id, x.item.id);
+  if (remaining.attendance.length)
+    expect(remaining.attendance[0].attendanceVersion).not.toBe(original.attendanceVersion);
+  expect((await fetchItemCheckInSnapshot(client, x.event.id, second.data.id)).attendance).toHaveLength(1);
+}));

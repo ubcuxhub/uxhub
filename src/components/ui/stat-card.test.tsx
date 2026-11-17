@@ -73,3 +73,8 @@ describe("StatCard", () => {
     expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(2);
   });
 });
+
+it.each([[12,48,"of 48 going · 25%"],[0,0,"of 0 going · 0%"]] as const)("keeps count primary with a safe denominator/rate caption",(count,total,caption)=>{
+  render(<StatCard label="Checked in" kind="count" count={count} total={total} noun="going" showRate/>);
+  expect(screen.getByText(String(count))).toBeTruthy();expect(screen.getByText(caption)).toBeTruthy();
+});

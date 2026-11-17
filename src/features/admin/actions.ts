@@ -33,18 +33,13 @@ import {
   type MembershipTypeInput,
 } from "@/features/admin/lib/membership-type";
 import {
-  checkInTicket,
-  deleteCheckIn,
   fetchCheckInAttendees,
-  fetchCheckInSessionEventId,
   fetchCheckInSessions,
   fetchCheckInStatuses,
-  fetchCheckInTicketById,
-  fetchCheckInTicketByToken,
-  type CheckInTicket,
 } from "@/lib/supabase-helpers/check-ins";
+import { mutateItemCheckIn, fetchLegacyCheckInTarget } from "@/lib/supabase-helpers/item-check-in";
 import { isUuid } from "@/lib/uuid";
-import type { CheckInRejection, CheckInResult } from "./types";
+import type { CheckInResult } from "./types";
 import { removeApplicationFiles } from "@/lib/supabase-helpers/application-files";
 import { updateEventApplication } from "@/lib/supabase-helpers/event-applications";
 import {
@@ -563,129 +558,42 @@ export async function updateApplicationDecisionAction(
   return { ...updated, status: updated.status };
 }
 
-/** Checks a ticket in to a session, or removes a mistaken check-in. */
-export async function toggleCheckInAction(
-  ticketId: string,
-  sessionId: string,
-  checked: boolean
-): Promise<string | null> {
+/** Compatibility entry points resolve sessions to enabled items and use the same
+ * authenticated transaction as the item routes. Unversioned undo is refused. */
+async function legacyCheckInTarget(sessionId: string) {
   await requireAdmin();
-
-  if (!checked) {
-    await deleteCheckIn(supabaseAdmin, ticketId, sessionId);
-    return null;
-  }
-
-  const { checkedInAt } = await checkInTicket(supabaseAdmin, ticketId, sessionId);
-  return checkedInAt;
+  if (!isUuid(sessionId)) throw new Error("Check-in item unavailable.");
+  const client = await createClient();
+  return { client, ...await fetchLegacyCheckInTarget(client, sessionId) };
 }
-
-// `event_tickets.qr_token` is 16 random bytes as hex.
-const QR_TOKEN_PATTERN = /^[0-9a-f]{32}$/;
-
-type CheckInMethod = "scan" | "lookup";
-
-/** Checks in the ticket whose QR code was scanned at the door. */
-export async function checkInScannedTicketAction(
-  sessionId: string,
-  code: string
-): Promise<CheckInResult> {
-  await requireAdmin();
-
-  const qrToken = typeof code === "string" ? code.trim() : "";
-  if (!QR_TOKEN_PATTERN.test(qrToken)) {
-    return rejectCheckIn("invalid_code", "scan", sessionId);
-  }
-
-  const [eventId, ticket] = await Promise.all([
-    fetchSessionEventId(sessionId),
-    fetchCheckInTicketByToken(supabaseAdmin, qrToken),
-  ]);
-  if (!ticket) return rejectCheckIn("invalid_code", "scan", sessionId);
-
-  return recordCheckIn(ticket, eventId, sessionId, "scan");
+export async function toggleCheckInAction(ticketId: string, sessionId: string, checked: boolean, attendanceVersion?: string): Promise<string | null> {
+  const { client, ...target } = await legacyCheckInTarget(sessionId);
+  if (!checked && !attendanceVersion) throw new Error("Refresh check-in before undoing attendance.");
+  const result = await mutateItemCheckIn(client, { ...target, ticketId, undoVersion: checked ? undefined : attendanceVersion });
+  if (result.status === "checked_in" || result.status === "already_checked_in") return result.checkedInAt;
+  if (result.status === "undone") return null;
+  throw new Error("Check-in changed or the ticket is unavailable. Refresh and try again.");
 }
-
-/** Checks in a ticket an admin picked by name when its code won't scan. */
-export async function checkInTicketAction(
-  sessionId: string,
-  ticketId: string
-): Promise<CheckInResult> {
-  await requireAdmin();
-
-  const [eventId, ticket] = await Promise.all([
-    fetchSessionEventId(sessionId),
-    typeof ticketId === "string" && isUuid(ticketId)
-      ? fetchCheckInTicketById(supabaseAdmin, ticketId)
-      : null,
-  ]);
-  if (!ticket) return rejectCheckIn("not_found", "lookup", sessionId);
-
-  return recordCheckIn(ticket, eventId, sessionId, "lookup");
+export async function checkInScannedTicketAction(sessionId: string, code: string): Promise<CheckInResult> {
+  const { client, ...target } = await legacyCheckInTarget(sessionId);
+  const result = await mutateItemCheckIn(client, { ...target, code });
+  if (result.status === "undone" || result.status === "stale_undo") throw new Error("Unexpected check-in result.");
+  return result;
 }
-
-async function fetchSessionEventId(sessionId: string): Promise<string> {
-  const eventId =
-    typeof sessionId === "string" && isUuid(sessionId)
-      ? await fetchCheckInSessionEventId(supabaseAdmin, sessionId)
-      : null;
-  if (!eventId) throw new Error("Check-in session not found.");
-  return eventId;
+export async function checkInTicketAction(sessionId: string, ticketId: string): Promise<CheckInResult> {
+  const { client, ...target } = await legacyCheckInTarget(sessionId);
+  const result = await mutateItemCheckIn(client, { ...target, ticketId });
+  if (result.status === "undone" || result.status === "stale_undo") throw new Error("Unexpected check-in result.");
+  return result;
 }
-
-async function recordCheckIn(
-  ticket: CheckInTicket,
-  eventId: string,
-  sessionId: string,
-  method: CheckInMethod
-): Promise<CheckInResult> {
-  if (ticket.event_id !== eventId) {
-    return rejectCheckIn("wrong_event", method, sessionId, ticket.id);
-  }
-
-  const { checkedInAt, alreadyCheckedIn } = await checkInTicket(
-    supabaseAdmin,
-    ticket.id,
-    sessionId
-  );
-  log.info("check_in.recorded", {
-    method,
-    sessionId,
-    ticketId: ticket.id,
-    alreadyCheckedIn,
-  });
-
-  return {
-    status: alreadyCheckedIn ? "already_checked_in" : "checked_in",
-    name: ticket.user_name,
-    checkedInAt,
-  };
-}
-
-function rejectCheckIn(
-  reason: CheckInRejection,
-  method: CheckInMethod,
-  sessionId: string,
-  ticketId: string | null = null
-): CheckInResult {
-  log.warn("check_in.rejected", { reason, method, sessionId, ticketId });
-  return { status: "rejected", reason };
-}
-
 export async function fetchAdminCheckInSnapshotAction(eventId: string) {
   await requireAdmin();
-
   const [sessions, attendees, statuses] = await Promise.all([
     fetchCheckInSessions(supabaseAdmin, eventId),
     fetchCheckInAttendees(supabaseAdmin, eventId),
     fetchCheckInStatuses(supabaseAdmin, eventId),
   ]);
-
-  return {
-    sessions,
-    attendees,
-    statuses: Array.from(statuses.entries()),
-  };
+  return { sessions, attendees, statuses: Array.from(statuses.entries()) };
 }
 
 /**

@@ -12,7 +12,7 @@ import { clientAs, createIntegrationClient, withFixtures, type Fixtures } from "
 import { fetchEventById } from "@/lib/supabase-helpers/events";
 import { fetchUserEventTicket } from "@/lib/supabase-helpers/event-tickets";
 import { fetchPurchasesForUser } from "@/lib/supabase-helpers/purchases";
-import { fetchCheckInSessions, fetchCheckInStatuses, checkInTicket } from "@/lib/supabase-helpers/check-ins";
+import { fetchCheckInSessions, fetchCheckInStatuses } from "@/lib/supabase-helpers/check-ins";
 import type { CheckoutRequestInput } from "./types";
 
 vi.mock("server-only", () => ({}));
@@ -136,7 +136,7 @@ describe("event ticket checkout", () => {
       expect(history).toContainEqual(expect.objectContaining({ id: result.purchaseId, status: "completed", amount_cents: request.expectedAmountCents }));
       const sessions = await fetchCheckInSessions(db, eventId);
       expect(sessions).toHaveLength(1);
-      await checkInTicket(db, ticket!.id, sessions[0].id);
+      await db.from("check_ins").insert({ticket_id:ticket!.id,check_in_session_id:sessions[0].id,checked_in_at:new Date().toISOString()}).throwOnError();
       expect((await fetchCheckInStatuses(db, eventId)).get(`${ticket!.id}_${sessions[0].id}`)).toBeTruthy();
       expect(await fetchUserEventTicket(clientAs(user), eventId, user.id)).toMatchObject({ id: ticket!.id });
       if (mode === "free") expect(square.create).not.toHaveBeenCalled();

@@ -442,7 +442,7 @@ export function AdminEventRecord({
             <div className="flex flex-wrap gap-2">
               <Button asChild variant="secondary" size="sm"><Link href={`${base}/agenda`}><ClipboardList aria-hidden />Agenda</Link></Button>
               <Button asChild variant="secondary" size="sm">
-                <Link href={`${base}/check-in`}>
+                <Link href={`${base}/check-in?returnTo=${encodeURIComponent(base)}`}>
                   <QrCode aria-hidden />
                   Check-in
                 </Link>

@@ -146,7 +146,7 @@ describe("AdminEventRecord overview", () => {
       `/admin/events/${EVENT_ID}/edit`
     );
     expect(screen.getByRole("link", { name: "Check-in" }).getAttribute("href")).toBe(
-      `/admin/events/${EVENT_ID}/check-in`
+      `/admin/events/${EVENT_ID}/check-in?returnTo=${encodeURIComponent(`/admin/events/${EVENT_ID}`)}`
     );
     const publicPage = screen.getByRole("link", { name: /^View marketing page/ });
     expect(publicPage.textContent).toBe("View marketing page (opens in a new tab)");

@@ -605,3 +605,21 @@ existing resources/people remain intact. Content and working-document revisions,
 and unmaterialized compatibility mirrors, update atomically to reject stale saves.
 It works for incomplete drafts, active events and historical events. Subsequent
 edits use the event editor's Links and resources section.
+
+## Item check-in
+
+Staff use the viewer-client `mutate_item_check_in` RPC with event and stable item
+identity. It checks staff authorization, an enabled item in that event, and a
+valid ticket on every mutation, independent of event time or participant schedule
+visibility. Compatibility sessions remain stored and retain their item mapping.
+Authenticated direct attendance writes are revoked; legacy server actions resolve
+their session to an item and call this same RPC. Unversioned legacy undo is refused.
+
+`check_ins.attendance_version` identifies the displayed attendance. Duplicates
+preserve it and the first timestamp. Undo compares it atomically; a later rescan
+cannot be removed with an old version. Event/session/item locks serialize builder
+changes and staff mutations. `check_in_activity` records each successful version,
+its authenticated profile ID and scan/manual method; undo marks that version's
+activity undone. Activity reads are staff-only and direct client writes are denied.
+Old attendance lacking activity displays unknown provenance without invented data.
+The new helper is `src/lib/supabase-helpers/item-check-in.ts`.

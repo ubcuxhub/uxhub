@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { agendaCheckInHref, defaultAgendaDayId } from "./staff-agenda";
+import { agendaCheckInHref, defaultAgendaDayId, selectedAgendaDayId } from "./staff-agenda";
 
 const days = [
   { id: "last", date: "2027-12-20" },
@@ -20,6 +20,12 @@ describe("staff agenda", () => {
     expect(defaultAgendaDayId(days, new Date("2027-12-11T07:00:00Z"))).toBe("last");
   });
   it("carries the exact stable identity into the check-in URL", () => {
-    expect(agendaCheckInHref("event-id", "item-id")).toBe("/admin/events/event-id/check-in?item=item-id");
+    expect(agendaCheckInHref("event-id", "item-id")).toBe("/admin/events/event-id/check-in?item=item-id&returnTo=%2Fadmin%2Fevents%2Fevent-id%2Fagenda");
   });
+});
+
+it("restores a valid day and retains defaults for invalid or missing day links", () => {
+  expect(selectedAgendaDayId(days, "first", new Date("2027-12-10T20:00:00Z"))).toBe("first");
+  expect(selectedAgendaDayId(days, "foreign", new Date("2027-12-10T20:00:00Z"))).toBe("middle");
+  expect(selectedAgendaDayId(days, undefined, new Date("2027-12-10T20:00:00Z"))).toBe("middle");
 });

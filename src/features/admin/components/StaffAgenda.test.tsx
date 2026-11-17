@@ -17,7 +17,7 @@ function setup() { render(<StaffAgenda eventId="event" eventName="UXathon" days=
 function edit() { fireEvent.click(screen.getAllByRole("button", { name: "View Notes" })[0]); return screen.getByRole("textbox", { name: "Staff note" }) as HTMLTextAreaElement; }
 it("inherits locations, keeps conditional exact check-in links, and cancels without saving", () => {
   setup();
-  expect(screen.getByRole("link", { name: "Check In" }).getAttribute("href")).toBe("/admin/events/event/check-in?item=first");
+  expect(screen.getByRole("link", { name: "Check In" }).getAttribute("href")).toBe("/admin/events/event/check-in?item=first&returnTo=%2Fadmin%2Fevents%2Fevent%2Fagenda%3Fday%3Dday");
   expect(screen.queryByRole("link", { name: "View Volunteer Schedule" })).toBeNull();
   expect(screen.getAllByText("Day building, Day room")).toHaveLength(2);
   expect(edit().value).toBe("Saved note");

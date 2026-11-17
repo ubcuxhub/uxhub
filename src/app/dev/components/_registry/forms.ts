@@ -85,7 +85,7 @@ export const formsEntries: readonly RegistryEntry[] = [
     category: "Forms",
     tier: "primitive",
     description:
-      "Choose one option from a short list in a menu, such as a year of study.",
+      "Choose one option from a short list. Optional multiline trigger uses card-radius corners and item descriptions show wrapping two-line values; default controls retain a single line.",
     importPath: "@/components/ui/select",
     importNames: [
       "Select",

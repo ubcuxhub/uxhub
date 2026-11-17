@@ -1,324 +1,151 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { ScanLine } from "lucide-react";
-import { CheckInTable } from "@/features/admin/components/CheckInTable";
-import { searchCheckInAttendees } from "@/features/admin/lib/check-in-search";
-import {
-  type CheckInAttendee,
-  type CheckInSession,
-} from "@/features/admin/types";
-import type { EventRow } from "@/lib/supabase/models";
-import { createClient } from "@/lib/supabase/client";
-import { TABLES } from "@/lib/supabase-helpers/tables";
-import {
-  fetchAdminCheckInSnapshotAction,
-  toggleCheckInAction,
-} from "@/features/admin/actions";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { MoreHorizontal, ScanLine } from "lucide-react";
+import type { ReactNode } from "react";
 import { PageContainer } from "@/components/shared/PageContainer";
+import { ListRow } from "@/components/shared/ListRow";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
+import { StatCard } from "@/components/ui/stat-card";
+import { FilterChip, FilterChipGroup } from "@/components/ui/filter-chip";
+import { SearchField } from "@/components/ui/search-field";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { EmptyState } from "@/components/ui/empty-state";
+import { toast } from "@/components/ui/toast";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
+import { CheckInTarget } from "./CheckInTarget";
+import { CheckInFeedback } from "./CheckInFeedback";
+import { useItemCheckIn } from "@/features/admin/hooks/use-item-check-in";
+import { checkInBackLabel, checkInReturnTo, checkInPath, type ItemCheckInSnapshot, type ItemAttendance } from "@/features/admin/lib/item-check-in";
+import { searchCheckInAttendees } from "@/features/admin/lib/check-in-search";
+import type { EventRow } from "@/lib/supabase/models";
 import { formatEventDate, formatEventTime } from "@/lib/date";
 
-// Stat card component
-function StatCard({
-  title,
-  value,
-  subtitle,
-  valueClassName,
-}: {
-  title: string;
-  value: number;
-  subtitle?: string;
-  valueClassName?: string;
-}) {
-  return (
-    <Card>
-      <CardHeader className="pb-3">
-        <CardTitle className="text-label text-muted-foreground">
-          {title}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className={`text-h2 ${valueClassName || ""}`}>
-          {value}
-        </div>
-        {subtitle && (
-          <p className="mt-1 text-label text-muted-foreground">{subtitle}</p>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-interface CheckInManagerProps {
-  eventId: string;
-  event: EventRow;
-  initialCheckInSessions: CheckInSession[];
-  initialAttendees: CheckInAttendee[];
-  initialCheckInStatuses: [string, string | null][];
-}
-
-export function CheckInManager({
-  eventId,
-  event,
-  initialCheckInSessions,
-  initialAttendees,
-  initialCheckInStatuses,
-}: CheckInManagerProps) {
-  const supabase = useMemo(() => createClient(), []);
-
-  const [checkInSessions, setCheckInSessions] = useState<CheckInSession[]>(
-    initialCheckInSessions
-  );
-  const [attendees, setAttendees] =
-    useState<CheckInAttendee[]>(initialAttendees);
-  const [checkInStatuses, setCheckInStatuses] = useState<
-    Map<string, string | null>
-  >(new Map(initialCheckInStatuses));
-  const [searchQuery, setSearchQuery] = useState("");
-  const [updatingCells, setUpdatingCells] = useState<Set<string>>(new Set());
-
-  // Fetch all data
-  useEffect(() => {
-    // Set up realtime subscriptions
-    const channel = supabase
-      .channel(`check-in-${eventId}`)
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: TABLES.checkIns,
-        },
-        async () => {
-          try {
-            const snapshot = await fetchAdminCheckInSnapshotAction(eventId);
-            setCheckInStatuses(new Map(snapshot.statuses));
-          } catch (err) {
-            console.error("Error refetching check-in statuses:", err);
-          }
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: TABLES.eventTickets,
-          filter: `event_id=eq.${eventId}`,
-        },
-        async () => {
-          try {
-            const snapshot = await fetchAdminCheckInSnapshotAction(eventId);
-            setAttendees(snapshot.attendees);
-          } catch (err) {
-            console.error("Error refetching tickets:", err);
-          }
-        }
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
-          table: TABLES.checkInSessions,
-          filter: `event_id=eq.${eventId}`,
-        },
-        async () => {
-          try {
-            const snapshot = await fetchAdminCheckInSnapshotAction(eventId);
-            setCheckInSessions(snapshot.sessions);
-          } catch (err) {
-            console.error("Error refetching check-in sessions:", err);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [eventId, supabase]);
-
-  const filteredAttendees = searchCheckInAttendees(attendees, searchQuery);
-
-  const handleCheckInToggle = async (
-    ticketId: string,
-    sessionId: string,
-    currentlyChecked: boolean
-  ) => {
-    const key = `${ticketId}_${sessionId}`;
-    if (updatingCells.has(key)) return;
-
-    setUpdatingCells((prev) => new Set(prev).add(key));
-
+export function CheckInManager({ eventId, event, initialItemId, initialSnapshot, phoneLinks, returnTo }: { eventId: string; event: EventRow; initialItemId: string | null; initialSnapshot: ItemCheckInSnapshot; phoneLinks: Record<string, ReactNode>; returnTo?: string }) {
+  const state = useItemCheckIn(eventId, initialItemId, initialSnapshot, false, returnTo);
+  const { snapshot, itemId } = state;
+  const [filter, setFilter] = useState<"not" | "checked" | "all">("not");
+  const [search, setSearch] = useState("");
+  const [viewAll, setViewAll] = useState(false);
+  const [undoRow, setUndoRow] = useState<ItemAttendance | null>(null);
+  const [undoError, setUndoError] = useState<string | null>(null);
+  const attendance = new Map(snapshot.attendance.map(a => [a.ticketId, a]));
+  const total = snapshot.attendees.length;
+  const count = attendance.size;
+  const target = snapshot.items.find(i => i.id === itemId);
+  const matches = searchCheckInAttendees(snapshot.attendees, search).filter(a => filter === "all" || (filter === "checked" ? attendance.has(a.id) : !attendance.has(a.id)));
+  const name = (ticketId: string) => snapshot.attendees.find(a => a.id === ticketId)?.user_name ?? "Unknown User";
+  const undo = async (row: ItemAttendance, selected = itemId) => {
     try {
-      const checkedInAt = await toggleCheckInAction(
-        ticketId,
-        sessionId,
-        !currentlyChecked
-      );
-
-      setCheckInStatuses((prev) => {
-        const newMap = new Map(prev);
-        newMap.set(key, checkedInAt);
-        return newMap;
-      });
-    } catch (err) {
-      console.error("Error updating check-in status:", err);
-      alert("Failed to update check-in status. Please try again.");
-    } finally {
-      setUpdatingCells((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(key);
-        return newSet;
-      });
+      await state.undo(row, selected);
+      toast.success("Check-in undone");
+    }
+    catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't undo check-in. Try again.");
     }
   };
-
-  // Calculate statistics
-  const stats = useMemo(() => {
-    const total = attendees.length;
-
-    // Tickets with at least one check-in
-    const checkedInTicketIds = new Set<string>();
-    checkInStatuses.forEach((checkedInAt, key) => {
-      if (checkedInAt !== null) {
-        const [ticketId] = key.split("_");
-        checkedInTicketIds.add(ticketId);
+  const manual = async (ticketId: string) => {
+    try {
+      const result = await state.mutate({ ticketId });
+      if (!result)
+        return;
+      if (result.status === "checked_in" || result.status === "already_checked_in") {
+        const row: ItemAttendance = { ticketId: result.ticketId, attendanceVersion: result.attendanceVersion, checkedInAt: result.checkedInAt, method: "manual", operator: null };
+        // Count comes from the committed transaction, never an optimistic increment.
+        toast.success(result.status === "checked_in" ? `${result.name} checked in` : `${result.name} is already checked in`, {
+          description: `${target?.label} · ${result.checkedCount} of ${result.total} checked in`,
+          action: result.status === "checked_in" ? { label: "Undo check-in", onClick: () => void undo(row, itemId) } : undefined,
+        });
+      } else
+        toast.error("Ticket not recognized. Refresh the attendee list and try again.");
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Couldn't check in. Try again.");
+    }
+  };
+  const rowAction = (row: ItemAttendance) => <IconButton label={`Undo check-in for ${name(row.ticketId)}`} variant="secondary" disabled={!state.enabled} onClick={() => {
+    setUndoError(null);
+    setUndoRow(row);
+  }}>
+    <MoreHorizontal />
+  </IconButton>;
+  return <PageContainer backHref={checkInReturnTo(returnTo)} backLabel={checkInBackLabel(checkInReturnTo(returnTo))} className="@container/checkin flex flex-col gap-6">
+    <div>
+      <h1 className="text-h2">{event.name}</h1>
+      <p className="mt-1 text-small text-muted-foreground">{event.starts_at ? formatEventDate(event.starts_at, { month: "short" }) : "Date not set"}{event.location_building ? ` · ${event.location_building}` : ""}</p>
+    </div>
+    <h2 className="text-h3">Check-in</h2>
+    {snapshot.items.length ? <CheckInTarget items={snapshot.items} itemId={itemId} onChange={id => {
+      setUndoRow(null);
+      state.selectItem(id);
+    }} /> : null}
+    <CheckInFeedback state={state} eventId={eventId} />
+    {target ? <>
+      <div className="grid grid-cols-2 gap-3">
+        <StatCard label="Checked in" {...(state.loading ? { kind: "loading" as const } : { kind: "count" as const, count, total, noun: "going", showRate: true })} />
+        <StatCard label="Not checked in" {...(state.loading ? { kind: "loading" as const } : { kind: "count" as const, count: total - count, total, noun: "going" })} />
+      </div>
+      <div className="flex items-center gap-3">
+      <Button className="min-w-0 flex-1" asChild={state.enabled} disabled={!state.enabled}>{state.enabled ? <Link href={checkInPath(eventId, itemId, true, returnTo)}>
+        <ScanLine aria-hidden />Scan tickets</Link> : <>
+        <ScanLine aria-hidden />Scan tickets</>}</Button>
+      {itemId && phoneLinks[itemId] ? <Dialog>
+        <DialogTrigger asChild>
+          <Button variant="secondary" className="hidden w-fit shrink-0 sm:inline-flex">Open scanner on phone</Button>
+        </DialogTrigger>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Open scanner on phone</DialogTitle>
+            <DialogDescription>Scan this link to check tickets into {target.label}.</DialogDescription>
+          </DialogHeader>{phoneLinks[itemId]}<Button asChild>
+            <Link href={checkInPath(eventId, itemId, true, returnTo)}>Open scanner</Link>
+          </Button>
+        </DialogContent>
+      </Dialog> : null}
+      </div>
+      <div className="grid min-w-0 gap-8 @[56rem]/checkin:grid-cols-2">
+        <section className="flex min-w-0 flex-col gap-4" aria-label="Recent check-ins">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-subheading">Recent check-ins</h3>{count > 3 ? <Button variant="ghost" size="sm" onClick={() => setViewAll(!viewAll)}>{viewAll ? "Show less" : `View all ${count}`}</Button> : null}</div>
+          {count ? <ul className="overflow-hidden rounded-xl border border-border">{snapshot.attendance.slice(0, viewAll ? undefined : 3).map(row => <ListRow key={row.attendanceVersion} variant="compact" name={name(row.ticketId)} leading={formatEventTime(row.checkedInAt)} description={row.method ? `${row.method === "scan" ? "Scanned" : "Checked in manually"} · ${row.operator ?? "Unknown operator"}` : "Operator and method unknown"} action={rowAction(row)} />)}</ul> : <EmptyState size="inline" title="No check-ins yet" description="Check in an attendee to see activity here." />}
+        </section>
+        <section className="flex min-w-0 flex-col gap-4" aria-label="Attendees">
+          <div className="flex items-center justify-between">
+            <h3 className="text-subheading">Attendees</h3>
+            <span className="text-label text-muted-foreground">{total} going</span>
+          </div>
+          <FilterChipGroup aria-label="Attendance">
+            <FilterChip pressed={filter === "not"} onPressedChange={() => setFilter("not")} count={total - count}>Not checked in ·</FilterChip>
+            <FilterChip pressed={filter === "checked"} onPressedChange={() => setFilter("checked")} count={count}>Checked in ·</FilterChip>
+            <FilterChip pressed={filter === "all"} onPressedChange={() => setFilter("all")} count={total}>All ·</FilterChip>
+          </FilterChipGroup>
+          <SearchField label="Search attendees" placeholder="Search attendees" value={search} onValueChange={setSearch} resultCount={matches.length} />
+          {matches.length ? <ul className="overflow-hidden rounded-xl border border-border">{matches.map(a => {
+            const row = attendance.get(a.id);
+            return <ListRow key={a.id} variant="compact" name={a.user_name} supporting={row ? <StatusBadge status="checked_in" label={`Checked in at ${formatEventTime(row.checkedInAt)}`} /> : null} action={row ? rowAction(row) : <Button variant="secondary" disabled={!state.enabled} onClick={() => void manual(a.id)}>Check in</Button>} />;
+          })}</ul> : <EmptyState size="inline" title={total ? "No attendees match" : "No attendees yet"} description={total ? "Try another search or filter." : "Valid ticket holders will appear here."} actions={total ? <Button variant="secondary" onClick={() => {
+            setSearch("");
+            setFilter("all");
+          }}>{search ? "Clear search" : "Show all"}</Button> : undefined} />}
+        </section>
+      </div>
+    </> : null}
+    <ConfirmDialog open={!!undoRow} onOpenChange={open => {
+      if (!open)
+        setUndoRow(null);
+    }} title="Undo check-in" description={undoRow ? `${name(undoRow.ticketId)} will go back to Going for ${target?.label}. The checked-in count changes from ${count} to ${Math.max(0, count - 1)}. You can check them in again at any time.` : ""} confirmLabel="Undo check-in" confirmVariant="default" pending={state.busy} error={undoError} onConfirm={() => {
+      if (!undoRow)
+        return;
+      if (!state.enabled) {
+        setUndoError("Reconnect and refresh before undoing attendance.");
+        return;
       }
-    });
-    const checkedIn = checkedInTicketIds.size;
-
-    return { total, checkedIn };
-  }, [attendees, checkInStatuses]);
-
-  return (
-    <PageContainer
-      backHref="/admin/events"
-      backLabel="Back to Events"
-      className="flex flex-col gap-6"
-    >
-            {/* Header */}
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <h1 className="text-h2">Check-In Management</h1>
-                <p className="text-small text-muted-foreground">
-                  Manage attendee check-ins for this event
-                </p>
-              </div>
-              <Button asChild>
-                <Link href={`/admin/events/${eventId}/check-in/scan`}>
-                  <ScanLine aria-hidden />
-                  Scan tickets
-                </Link>
-              </Button>
-            </div>
-
-              <>
-                {/* Event Info Card */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>{event.name}</CardTitle>
-                    <CardDescription>{event.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid gap-4 md:grid-cols-4">
-                      <div>
-                        <p className="text-label text-muted-foreground">
-                          Date & Time
-                        </p>
-                        <p className="text-body">
-                          {event.starts_at
-                            ? `${formatEventDate(event.starts_at, {
-                                month: "short",
-                              })} at ${formatEventTime(event.starts_at)}`
-                            : "TBD"}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-label text-muted-foreground">
-                          Location
-                        </p>
-                        <p className="text-body">
-                          {event.location_building && event.location_room
-                            ? `${event.location_building} ${event.location_room}`
-                            : "TBD"}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-label text-muted-foreground">
-                          Max Capacity
-                        </p>
-                        <p className="text-body">
-                          {event.max_capacity == null ? "Not set" : `${event.max_capacity} attendees`}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-label text-muted-foreground">
-                          Price
-                        </p>
-                        <p className="text-body">
-                          {event.regular_price == null ? "Not set" : `$${event.regular_price.toFixed(2)}`}
-                          {event.member_price !== event.regular_price && (
-                            <span className="text-muted-foreground ml-1">
-                              / {event.member_price == null ? "Not set" : `$${event.member_price.toFixed(2)}`}{" "}
-                              member
-                            </span>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Statistics */}
-                <div className="grid gap-4 md:grid-cols-2">
-                  <StatCard title="Registered" value={stats.total} />
-                  <StatCard
-                    title="Checked In"
-                    value={stats.checkedIn}
-                    subtitle={
-                      stats.total > 0
-                        ? `${Math.round(
-                            (stats.checkedIn / stats.total) * 100
-                          )}%`
-                        : "0%"
-                    }
-                    valueClassName="text-success-foreground"
-                  />
-                </div>
-
-                {/* Registrations Table */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Registrations</CardTitle>
-                    <CardDescription>
-                      Search and manage attendee check-ins
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <CheckInTable
-                      sessions={checkInSessions}
-                      attendees={attendees}
-                      filteredAttendees={filteredAttendees}
-                      checkInStatuses={checkInStatuses}
-                      onToggle={handleCheckInToggle}
-                      updatingCells={updatingCells}
-                      searchQuery={searchQuery}
-                      onSearchChange={setSearchQuery}
-                    />
-                  </CardContent>
-                </Card>
-              </>
-    </PageContainer>
-  );
+      void state.undo(undoRow).then(() => {
+        setUndoRow(null);
+        toast.success("Check-in undone");
+      }).catch(e => setUndoError(e instanceof Error ? e.message : "Couldn't undo. Try again."));
+    }} />
+  </PageContainer>;
 }

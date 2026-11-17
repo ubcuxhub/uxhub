@@ -1088,3 +1088,31 @@ Escape/outside dismissal returns focus; action handlers own editor transitions
 and subsequent focus restoration using the trigger passed to `onSelect`. Only pass authorized presentation data; staff
 notes and resource URLs remain in staff features. See `/dev/components/agenda-day-table`
 for participant, staff and narrow desktop examples.
+
+### Check-in presentation
+
+StatCard `kind="count"` makes `count` the primary number and renders `of total noun`
+as its context; `showRate` appends the rounded percentage. Zero total renders 0%
+without changing the existing rate variant's insufficient-data behavior. See
+`/dev/components/stat-card` for count, zero, loading and existing variants.
+
+ListRow `variant="compact"` omits artwork and accepts optional `leading`,
+`supporting` and `action` slots for time, a status badge and trailing controls.
+Names/descriptions wrap and rows grow; the caller provides a labelled list and
+library buttons. Default people/organization rows retain their existing layout.
+See `/dev/components/list-row`.
+
+ScannerFrame is a full-viewport dark surface with a wrapping header and centred
+480px content. ScannerViewfinder supplies a 264px square within the available
+width. Callers own capture, lifecycle, selection, permissions and recovery.
+See `/dev/components/scanner-frame` for the camera-free preview at all widths.
+
+SelectTrigger `multiline` allows the value to wrap and the outlined trigger to
+grow with its content. It uses `rounded-xl`, matching StatCard corners; standard
+single-line triggers retain their pill shape. SelectItem `description` adds a muted second line to both the
+menu and selected value; use them together. Supply `textValue` when typeahead
+should search only the primary label. Default single-line consumers retain their
+height and truncation. Keep an associated label or `aria-label` on the trigger.
+Enabled Select triggers show a pointer cursor; disabled triggers retain
+`cursor-not-allowed`. See `/dev/components/select` for long labels and overnight
+date context.

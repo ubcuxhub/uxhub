@@ -151,6 +151,69 @@ export type Database = {
           },
         ]
       }
+      check_in_activity: {
+        Row: {
+          attendance_version: string
+          checked_in_at: string
+          event_id: string
+          item_id: string
+          method: string
+          operator_id: string | null
+          ticket_id: string
+          undone_at: string | null
+        }
+        ComputedFields: never
+        Insert: {
+          attendance_version: string
+          checked_in_at: string
+          event_id: string
+          item_id: string
+          method: string
+          operator_id?: string | null
+          ticket_id: string
+          undone_at?: string | null
+        }
+        Update: {
+          attendance_version?: string
+          checked_in_at?: string
+          event_id?: string
+          item_id?: string
+          method?: string
+          operator_id?: string | null
+          ticket_id?: string
+          undone_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "check_in_activity_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "check_in_activity_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "event_agenda_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "check_in_activity_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "user_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "check_in_activity_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "event_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       check_in_sessions: {
         Row: {
           agenda_item_id: string | null
@@ -202,6 +265,7 @@ export type Database = {
       }
       check_ins: {
         Row: {
+          attendance_version: string
           check_in_session_id: string
           checked_in_at: string | null
           created_at: string | null
@@ -211,6 +275,7 @@ export type Database = {
         }
         ComputedFields: never
         Insert: {
+          attendance_version?: string
           check_in_session_id: string
           checked_in_at?: string | null
           created_at?: string | null
@@ -219,6 +284,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          attendance_version?: string
           check_in_session_id?: string
           checked_in_at?: string | null
           created_at?: string | null
@@ -1662,6 +1728,17 @@ export type Database = {
       leave_team: {
         Args: { p_event_id: string; p_user_id: string }
         Returns: string
+      }
+      mutate_item_check_in: {
+        Args: {
+          p_event_id: string
+          p_item_id: string
+          p_method?: string
+          p_qr_token?: string
+          p_ticket_id?: string
+          p_undo_version?: string
+        }
+        Returns: Json
       }
       participant_agenda_location: {
         Args: { p_location: Json; p_restricted: boolean }

@@ -120,12 +120,18 @@ export const dataEntries: readonly RegistryEntry[] = [
     aliases: [{ id: "data-table" }],
   },
   {
+    slug: "scanner-frame", title: "Scanner frame", category: "Data display", tier: "composite",
+    description: "A full-viewport dark camera surface with a wrapping header, centred controls and a 264px viewfinder. Capture and permission handling belong to callers.",
+    importPath: "@/components/shared/ScannerFrame", importNames: ["ScannerFrame", "ScannerViewfinder"],
+    source: "src/components/shared/ScannerFrame.tsx", spec: "Check-in presentation", layout: "page",
+  },
+  {
     slug: "stat-card",
     title: "Stat card",
     category: "Data display",
     tier: "primitive",
     description:
-      "A dashboard number with its neutral context, and honest empty and loading states.",
+      "A value, rate, or primary count with denominator and optional percentage. A dashboard number with its neutral context, and honest empty and loading states.",
     importPath: "@/components/ui/stat-card",
     importNames: ["StatCard"],
     source: "src/components/ui/stat-card.tsx",
@@ -166,7 +172,7 @@ export const dataEntries: readonly RegistryEntry[] = [
     category: "Data display",
     tier: "composite",
     description:
-      "A row for a person or an organization (judges, mentors, sponsors) with an optional link, grouped in a ListCard.",
+      "Compact attendance/activity rows with optional time, badge and actions; or a row for a person or an organization (judges, mentors, sponsors) with an optional link, grouped in a ListCard.",
     importPath: "@/components/shared/ListRow",
     importNames: ["ListCard", "ListRow"],
     source: "src/components/shared/ListRow.tsx",

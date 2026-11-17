@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { saveAgendaNoteAction } from "@/features/admin/agenda-note-actions";
 import { VolunteerScheduleButton } from "./VolunteerScheduleButton";
-import { agendaCheckInHref } from "@/features/admin/lib/staff-agenda";
+import { agendaCheckInHref, agendaPath } from "@/features/admin/lib/staff-agenda";
 import { agendaDayLabel } from "@/lib/event-agenda";
 import type { AgendaNote, StaffAgendaDay, StaffAgendaItem } from "@/lib/supabase-helpers/event-agenda-notes";
 
@@ -45,13 +45,13 @@ export function StaffAgenda({ eventId, eventName, days, initialDayId, volunteerU
   return <PageContainer backHref={`/admin/events/${eventId}`} backLabel="Back to Event overview" className="space-y-6">
     <h1 className="text-h1">{eventName} agenda</h1>
     <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-      {days.length > 1 && <div className="w-full min-w-0 sm:max-w-sm sm:flex-1"><Select value={dayId ?? undefined} onValueChange={setDayId}><SelectTrigger aria-label="Day"><SelectValue /></SelectTrigger><SelectContent>{days.map(entry => <SelectItem key={entry.id} value={entry.id}>{agendaDayLabel(entry.date)} · {entry.title}</SelectItem>)}</SelectContent></Select></div>}
+      {days.length > 1 && <div className="w-full min-w-0 sm:max-w-sm sm:flex-1"><Select value={dayId ?? undefined} onValueChange={id => { setDayId(id); window.history.replaceState(null, "", agendaPath(eventId, id)); }}><SelectTrigger aria-label="Day"><SelectValue /></SelectTrigger><SelectContent>{days.map(entry => <SelectItem key={entry.id} value={entry.id}>{agendaDayLabel(entry.date)} · {entry.title}</SelectItem>)}</SelectContent></Select></div>}
       <VolunteerScheduleButton eventId={eventId} initialUrl={volunteerUrl} />
     </div>
     <div data-agenda-container className="@container/agenda min-w-0">
       {day ? <><AgendaDayTable day={{ ...day, items: day.items.map(item => ({ ...item, location: item.location ?? day.location })) }} actions={item => [
         { label: "View Notes", icon: <FileText aria-hidden />, onSelect: (trigger: HTMLElement) => openNote(item, trigger) },
-        ...(item.check_in ? [{ label: "Check In", icon: <QrCode aria-hidden />, href: agendaCheckInHref(eventId, item.id) }] : []),
+        ...(item.check_in ? [{ label: "Check In", icon: <QrCode aria-hidden />, href: agendaCheckInHref(eventId, item.id, day.id) }] : []),
       ]} />{!day.items.length && <p className="mt-4 text-muted-foreground">No agenda items for this day yet.</p>}</> : <p className="text-muted-foreground">No agenda days yet. Add days and items in the event builder.</p>}
     </div>
     <Dialog open={!!editor} onOpenChange={open => { if (!open && !saving.current) setEditor(null); }}><DialogContent closeDisabled={pending} onCloseAutoFocus={event => { event.preventDefault(); returnFocus.current?.focus(); }}>

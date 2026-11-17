@@ -10,6 +10,7 @@ type StatCardProps = { label: string; className?: string } & (
       value: number;
       change?: { delta: number; period: string };
     }
+  | { kind: "count"; count: number; total: number; noun: string; showRate?: boolean }
   | { kind: "rate"; count: number; total: number; noun: string }
   | { kind: "insufficient"; reason: string }
   | { kind: "loading" }
@@ -79,6 +80,14 @@ function StatCard({ label, className, ...stat }: StatCardProps) {
             {stat.kind === "insufficient"
               ? stat.reason
               : `No ${stat.noun} to calculate a rate.`}
+          </p>
+        </>
+      ) : stat.kind === "count" ? (
+        <>
+          <p className="text-h1 text-foreground tabular-nums">{numberFormatter.format(stat.count)}</p>
+          <p className="text-label font-normal text-muted-foreground">
+            of {numberFormatter.format(stat.total)} {stat.noun}
+            {stat.showRate ? ` · ${stat.total > 0 ? Math.round(stat.count / stat.total * 100) : 0}%` : ""}
           </p>
         </>
       ) : stat.kind === "rate" ? (

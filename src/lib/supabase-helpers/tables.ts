@@ -20,6 +20,7 @@ export const TABLES = {
   eventApplicationResponses: "event_application_responses",
   applicationReviewNotes: "application_review_notes",
   checkInSessions: "check_in_sessions",
+  checkInActivity: "check_in_activity",
   checkIns: "check_ins",
   mentors: "mentors",
   sponsors: "sponsors",

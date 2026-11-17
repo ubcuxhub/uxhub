@@ -17,7 +17,12 @@ type ListRowLead =
 interface ListRowProps {
   name: string;
   description?: string | null;
-  lead: ListRowLead;
+  lead?: ListRowLead;
+  /** Compact attendance/activity rows omit the artwork and allow actions. */
+  variant?: "default" | "compact";
+  leading?: React.ReactNode;
+  supporting?: React.ReactNode;
+  action?: React.ReactNode;
   link?: {
     href: string;
     label: string;
@@ -96,7 +101,18 @@ function ListCard({
 }
 
 /** A compact person or organization row for use inside ListCard. */
-function ListRow({ name, description, lead, link }: ListRowProps) {
+function ListRow({ name, description, lead = { kind: "person" }, link, variant = "default", leading, supporting, action }: ListRowProps) {
+  if (variant === "compact") return (
+    <li data-slot="list-row" data-variant="compact" className="flex min-w-0 items-center gap-4 border-b border-border-subtle px-4 py-4 last:border-b-0">
+      {leading ? <span className="shrink-0 text-label tabular-nums">{leading}</span> : null}
+      <div className="flex min-w-0 flex-1 flex-col items-start gap-1 [overflow-wrap:anywhere]">
+        <span className="text-body-medium">{name}</span>
+        {description ? <span className="text-small text-muted-foreground">{description}</span> : null}
+        {supporting}
+      </div>
+      {action ? <span className="shrink-0">{action}</span> : null}
+    </li>
+  );
   return (
     <li
       data-slot="list-row"
