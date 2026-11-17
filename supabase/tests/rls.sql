@@ -1745,6 +1745,15 @@ select set_config('request.jwt.claims', '{}', true);
 \o
 update public.user_info set role_access = :'user_a_drafts_saved_role' where id = :'user_a_id';
 
+-- From here on the fixture event moves between Active and Draft to test
+-- visibility and scheduling, though members hold tickets and offers on it.
+-- The unpublish guard would refuse that; event-cancellation.sql re-enables it
+-- and tests it. The whole script rolls back.
+-- ALTER TABLE needs the deferred publication check run first.
+set constraints all immediate;
+alter table public.events disable trigger guard_event_unpublish;
+set constraints all deferred;
+
 -- Scheduled drafts stay hidden until the job actually changes their status.
 update public.events set status = 'draft', publish_at = now() + interval '1 day'
 where id = :'event_id';
@@ -2510,5 +2519,6 @@ $$;
 \ir event-team-settings.sql
 \ir event-content.sql
 \ir event-checkout.sql
+\ir event-cancellation.sql
 
 rollback;
