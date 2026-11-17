@@ -312,6 +312,9 @@ export function CheckInManager({
                       filteredAttendees={filteredAttendees}
                       checkInStatuses={checkInStatuses}
                       onToggle={handleCheckInToggle}
+                      onTicketVoided={(ticketId) =>
+                        setAttendees((prev) => prev.filter((attendee) => attendee.id !== ticketId))
+                      }
                       updatingCells={updatingCells}
                       searchQuery={searchQuery}
                       onSearchChange={setSearchQuery}

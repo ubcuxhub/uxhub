@@ -5,12 +5,14 @@ import type {
   CheckInSession,
 } from "../types";
 import { CheckInTableCell } from "./CheckInTableCell";
+import { CheckInTicketMenu } from "./CheckInTicketMenu";
 
 interface CheckInTableRowProps {
   attendee: CheckInAttendee;
   sessions: CheckInSession[];
   checkInStatuses: Map<string, string | null>;
   onToggle: (ticketId: string, sessionId: string, currentlyChecked: boolean) => void;
+  onTicketVoided: (ticketId: string) => void;
   updatingCells: Set<string>;
 }
 
@@ -19,6 +21,7 @@ export function CheckInTableRow({
   sessions,
   checkInStatuses,
   onToggle,
+  onTicketVoided,
   updatingCells,
 }: CheckInTableRowProps) {
   return (
@@ -41,6 +44,9 @@ export function CheckInTableRow({
           />
         );
       })}
+      <td className="px-2 py-3 text-right">
+        <CheckInTicketMenu attendee={attendee} onVoided={onTicketVoided} />
+      </td>
     </tr>
   );
 }

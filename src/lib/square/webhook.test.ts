@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  isSquareRefundEventType,
   parseSquarePaymentUpdatedEvent,
+  parseSquareRefundEvent,
   parseSquareWebhookEndpoints,
 } from "./webhook";
 
@@ -50,6 +52,61 @@ describe("parseSquarePaymentUpdatedEvent", () => {
         data: { object: { payment: { id: "payment-1" } } },
       })
     ).toThrow(/missing event ID or payment ID/);
+  });
+});
+
+describe("parseSquareRefundEvent", () => {
+  const wire = (type: string, refund: Record<string, unknown>) => ({
+    merchant_id: "merchant-1",
+    type,
+    event_id: "event-1",
+    created_at: "2026-11-16T20:43:07Z",
+    data: { type: "refund", id: "refund-1", object: { refund } },
+  });
+
+  it.each(["refund.created", "refund.updated"])("normalizes a %s wire payload", (type) => {
+    const event = parseSquareRefundEvent(
+      wire(type, {
+        id: "refund-1",
+        payment_id: "payment-1",
+        status: "PENDING",
+        amount_money: { amount: 500, currency: "CAD" },
+      })
+    );
+
+    expect(event).toMatchObject({
+      type,
+      eventId: "event-1",
+      data: {
+        object: {
+          refund: {
+            id: "refund-1",
+            paymentId: "payment-1",
+            status: "PENDING",
+            amountMoney: { amount: BigInt(500), currency: "CAD" },
+          },
+        },
+      },
+    });
+  });
+
+  it("rejects a refund without a payment ID", () => {
+    expect(() =>
+      parseSquareRefundEvent(
+        wire("refund.updated", { id: "refund-1", amount_money: { amount: 500, currency: "CAD" } })
+      )
+    ).toThrow(/missing event ID, refund ID or payment ID/);
+  });
+
+  it("rejects an event that isn't a refund", () => {
+    expect(() => parseSquareRefundEvent({ type: "payment.updated" })).toThrow(/not a refund event/);
+  });
+
+  it("names exactly the refund event types", () => {
+    expect(isSquareRefundEventType("refund.created")).toBe(true);
+    expect(isSquareRefundEventType("refund.updated")).toBe(true);
+    expect(isSquareRefundEventType("payment.updated")).toBe(false);
+    expect(isSquareRefundEventType(undefined)).toBe(false);
   });
 });
 

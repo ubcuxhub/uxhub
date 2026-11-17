@@ -5,7 +5,7 @@ import { describeUserPurchase, toUserPurchaseSummary } from "./user-purchases";
 
 function purchase(overrides: Partial<PurchaseWithDetails>): PurchaseWithDetails {
   return {
-    id: "p1", kind: "membership", amount_cents: 1500, currency: "CAD", status: "completed",
+    id: "p1", kind: "membership", amount_cents: 1500, refunded_cents: 0, currency: "CAD", status: "completed",
     created_at: "2026-10-01", events: null, membership_types: null,
     ...overrides,
   } as PurchaseWithDetails;
@@ -18,7 +18,7 @@ describe("toUserPurchaseSummary", () => {
       square_payment_id: "private-payment-id",
       failure_reason: "private-error",
     } as PurchaseWithDetails);
-    expect(summary).toEqual({ id: "p1", title: "Non UBC", kind: "membership", amount_cents: 1500, currency: "CAD", status: "completed", created_at: "2026-10-01" });
+    expect(summary).toEqual({ id: "p1", title: "Non UBC", kind: "membership", amount_cents: 1500, refunded_cents: 0, currency: "CAD", status: "completed", created_at: "2026-10-01" });
   });
 
   it.each([
@@ -32,7 +32,13 @@ describe("toUserPurchaseSummary", () => {
 
 describe("describeUserPurchase", () => {
   it("names the kind, and the status when it isn't completed", () => {
-    expect(describeUserPurchase({ kind: "membership", status: "completed" })).toBe("Annual membership");
-    expect(describeUserPurchase({ kind: "event_ticket", status: "failed" })).toBe("Event ticket · Failed");
+    const paid = { amount_cents: 1500, refunded_cents: 0 };
+    expect(describeUserPurchase({ kind: "membership", status: "completed", ...paid })).toBe("Annual membership");
+    expect(describeUserPurchase({ kind: "event_ticket", status: "failed", ...paid })).toBe("Event ticket · Failed");
+  });
+
+  it("says when Square refunded it, in full or in part", () => {
+    expect(describeUserPurchase({ kind: "event_ticket", status: "completed", amount_cents: 1500, refunded_cents: 1500 })).toBe("Event ticket · Refunded");
+    expect(describeUserPurchase({ kind: "membership", status: "completed", amount_cents: 1500, refunded_cents: 500 })).toBe("Annual membership · Partially refunded");
   });
 });

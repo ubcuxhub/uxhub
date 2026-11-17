@@ -1028,6 +1028,38 @@ begin
 end;
 $$;
 
+-- Refunds and admin ticket actions run on the server only: a member must not
+-- record a refund, void a ticket or mint a new QR code.
+do $$
+declare
+  role_name text;
+  fn text;
+begin
+  foreach role_name in array array['anon', 'authenticated'] loop
+    foreach fn in array array[
+      'public.apply_event_purchase_refund(uuid, integer)',
+      'public.regenerate_event_ticket_token(uuid)',
+      'public.void_event_ticket(uuid)',
+      'public.guard_refunded_purchase_ticket()'
+    ] loop
+      if has_function_privilege(role_name, fn, 'execute') then
+        raise exception '% can execute %', role_name, fn;
+      end if;
+    end loop;
+  end loop;
+  -- Members can't set their own refund either: purchases has no UPDATE policy.
+  if exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'purchases'
+             and cmd in ('UPDATE', 'ALL')) then
+    raise exception 'purchases gained a client UPDATE policy; refunded_cents must stay server-written';
+  end if;
+  if not has_function_privilege('service_role', 'public.apply_event_purchase_refund(uuid, integer)', 'execute')
+     or not has_function_privilege('service_role', 'public.void_event_ticket(uuid)', 'execute')
+     or not has_function_privilege('service_role', 'public.regenerate_event_ticket_token(uuid)', 'execute') then
+    raise exception 'service_role lost execute on the refund or ticket actions';
+  end if;
+end;
+$$;
+
 -- Applications, responses and check-ins by application and ticket, without a
 -- registration (docs/registration-rollout.md step 2).
 \o /dev/null

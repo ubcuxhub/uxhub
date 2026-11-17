@@ -1458,6 +1458,16 @@ export type Database = {
         Args: { p_event_id: string }
         Returns: boolean
       }
+      apply_event_purchase_refund: {
+        Args: { p_purchase_id: string; p_refunded_cents: number }
+        Returns: {
+          amount_increased: boolean
+          fully_refunded: boolean
+          kept_checked_in_ticket: boolean
+          refunded_total_cents: number
+          ticket_removed: boolean
+        }[]
+      }
       can_edit_application_response: {
         Args: { p_application_id: string; p_question_id: string }
         Returns: boolean
@@ -1644,6 +1654,10 @@ export type Database = {
       }
       publish_due_events: { Args: Record<PropertyKey, never>; Returns: number }
       purchase_is_live: { Args: { p_purchase_id: string }; Returns: boolean }
+      regenerate_event_ticket_token: {
+        Args: { p_ticket_id: string }
+        Returns: boolean
+      }
       release_event_ticket: {
         Args: { p_purchase_id: string }
         Returns: undefined
@@ -1919,6 +1933,7 @@ export type Database = {
         Args: { p_document: Json; p_draft?: boolean }
         Returns: undefined
       }
+      void_event_ticket: { Args: { p_ticket_id: string }; Returns: string }
     }
     Enums: {
       event_application_status:
