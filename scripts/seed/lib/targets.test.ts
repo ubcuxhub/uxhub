@@ -125,6 +125,7 @@ describe("target policies", () => {
       users: true,
       memberships: true,
       forceDraft: false,
+      workingDrafts: true,
     });
   });
 
@@ -136,6 +137,7 @@ describe("target policies", () => {
       users: false,
       memberships: false,
       forceDraft: true,
+      workingDrafts: false,
     });
   });
 });

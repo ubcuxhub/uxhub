@@ -20,6 +20,7 @@ import { fetchEventMentors, fetchEventSponsors } from "@/lib/supabase-helpers/ev
 import { EventPeopleCard } from "@/features/events/components/EventPeopleCard";
 import { eventBadgeFor } from "@/features/events/lib/event-badge";
 import { loadEventStates } from "@/features/events/lib/event-states";
+import { DRAFT_EVENTS_NOTE, isDraftEvent } from "@/features/events/lib/event-visibility";
 import { RegistrationPanel } from "@/features/events/components/RegistrationPanel";
 import { TeamCard, TeamInviteNotice } from "@/features/events/components/teams/TeamCard";
 import { EventDraftSections } from "@/features/events/components/EventDraftSections";
@@ -71,8 +72,9 @@ export default async function PortalEventPage({
 
   return (
     <PageContainer backHref="/portal/events" backLabel="Back to Events" className="space-y-4">
-      {event.status !== "active" && (
-        <Alert>Draft: only admins and managers can see this.</Alert>
+      {/* RLS returns a draft to admins and managers only, so only they see this. */}
+      {isDraftEvent(event) && (
+        <Alert>This is a draft event. {DRAFT_EVENTS_NOTE}</Alert>
       )}
       
       <div className="border-border-subtle rounded-md border">

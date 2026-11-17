@@ -725,8 +725,14 @@ end $$;
 
 -- Atomic: a manual URL collision stops the deployment with the draft ID, and
 -- no pending payload is discarded. Materialized aliases keep their event ID.
+-- An attached document can predate a lock its event has since gained (staff
+-- could register for drafts before this release). The save's own guards
+-- decide: when one rejects a locked setting, only that setting is reset to the
+-- event's current value and the save is retried, so every other pending edit
+-- is kept and the runtime locks are unchanged. Each reset is logged by ID. Any
+-- other failure, or a lock a reset cannot satisfy, still stops the deployment.
 -- supabase/tests/unified-draft-migration.sql re-runs this loop.
-do $$ declare d public.admin_event_drafts; e public.events; r jsonb; begin
+do $$ declare d public.admin_event_drafts; e public.events; r jsonb; doc jsonb; s jsonb; err text; setting text; reset text[]; begin
   for d in select * from public.admin_event_drafts order by updated_at,id loop
     if d.materialized then
       update public.events set legacy_draft_ids=array_append(legacy_draft_ids,d.id)
@@ -736,9 +742,48 @@ do $$ declare d public.admin_event_drafts; e public.events; r jsonb; begin
       if e.id is not null and (e.status<>'draft' or e.publish_at is not null) then
         raise exception 'Resolve pending legacy draft % attached to published/scheduled event % before cutover.',d.id,e.id;
       end if;
-      begin
-        r:=public.save_event_working_document(d.id,d.event_id,d.document,0);
-      exception when others then raise exception 'Draft migration blocked for %: %',d.id,sqlerrm; end;
+      doc:=d.document; reset:='{}';
+      loop
+        begin
+          r:=public.save_event_working_document(d.id,d.event_id,doc,0);
+          exit;
+        exception when others then
+          err:=sqlerrm;
+          setting:=case when e.id is null then null
+            when err='Pricing is locked because registrations or payments exist.' then 'pricing'
+            when err='Registration mode is locked because registrations or payments exist.' then 'registration mode'
+            when err like 'Capacity cannot be below % committed seats%' then 'capacity'
+            when err='Teams cannot be turned off because teams already exist.' then 'teams'
+            when err like 'Maximum team size cannot be below %' then 'maximum team size'
+            -- A published URL is fixed, so no other saved URL can be kept.
+            when err='The page URL is locked after first publication.' or (e.first_published_at is not null
+              and err='Use a valid, non-reserved page URL of at most 100 characters.') then 'page URL' end;
+          if setting is null or setting=any(reset) then
+            raise exception 'Draft migration blocked for %: %',d.id,err;
+          end if;
+          s:=doc->'formState';
+          s:=s||case setting
+            -- Projects back to the event's exact pricing columns, written as
+            -- the builder writes amounts. A document without pricing_mode
+            -- takes the event's configuration in the save.
+            when 'pricing' then jsonb_build_object('regular_price',coalesce(trim_scale(e.regular_price)::text,''),
+                'member_price',coalesce(trim_scale(e.member_price)::text,''))
+              ||case when s ? 'pricing_mode' then jsonb_build_object('pricing_mode',coalesce(e.configured_pricing_mode,'legacy'),
+                'pricing_amount',coalesce(trim_scale(coalesce(e.configured_price,e.regular_price))::text,'')) else '{}'::jsonb end
+            when 'registration mode' then jsonb_build_object('requires_application',e.requires_application)
+            when 'capacity' then jsonb_build_object('max_capacity',coalesce(e.max_capacity::text,''))
+            when 'teams' then jsonb_build_object('teams_enabled',e.teams_enabled)
+            when 'maximum team size' then jsonb_build_object('max_team_size',coalesce(e.max_team_size::text,''))
+            when 'page URL' then jsonb_build_object('page_slug',e.slug) end;
+          doc:=jsonb_set(doc,'{formState}',s);
+          reset:=reset||setting;
+        end;
+      end loop;
+      if cardinality(reset)>0 then
+        -- A warning, not a notice: db push prints neither, but the server
+        -- log keeps warnings.
+        raise warning 'Draft % kept the locked % of event %; its other edits are unchanged.',d.id,array_to_string(reset,', '),e.id;
+      end if;
       update public.events set working_revision=d.revision where id=(r->>'event_id')::uuid;
       update public.admin_event_drafts set event_id=(r->>'event_id')::uuid where id=d.id;
     end if;

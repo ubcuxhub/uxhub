@@ -1,3 +1,5 @@
+import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import type { SupabaseClient, User } from "@supabase/supabase-js";
 
 import type { SeedRegistration, SeedUser } from "../data/users.ts";
@@ -10,6 +12,21 @@ import { answeredQuestions, getUserFixtureTotals } from "./user-fixtures.ts";
 
 /** Mirrors BUCKETS.applicationFiles in src/lib/supabase-helpers/buckets.ts. */
 const APPLICATION_FILES_BUCKET = "application-files";
+/** Mirrors BUCKETS.profilePhotos in src/lib/supabase-helpers/buckets.ts. */
+const PROFILE_PHOTOS_BUCKET = "profile-photos";
+const PROFILE_PHOTO_DIR = new URL("../data/profile-photos/", import.meta.url);
+
+/**
+ * Where a fixture's photo lives: the shape `user_info_profile_photo_path_owned`
+ * requires (`profiles/<profile id>/<hex>.png`). The name is derived rather
+ * than random, so a re-run overwrites the same object instead of piling up
+ * copies.
+ */
+export function seedProfilePhotoPath(profileId: string, file: string): string {
+  const hex = createHash("sha256").update(`seed:${profileId}:${file}`).digest("hex");
+  const name = [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20, 32)].join("-");
+  return `profiles/${profileId}/${name}.png`;
+}
 
 /**
  * How many values one `.in()` filter carries. The filter travels in the URL,
@@ -499,6 +516,38 @@ async function reconcileIdentities(
   );
 
   return { authUsers, profiles, profileIds };
+}
+
+/**
+ * Uploads `profilePhoto` and points the profile at it, once every profile
+ * exists. The identity pass has already cleared every fixture's photo, so a
+ * photo uploaded through the app is undone (its object stays in storage,
+ * unreferenced).
+ */
+async function reconcileProfilePhotos(
+  supabase: SupabaseClient,
+  fixtures: SeedUser[],
+  profileIds: Map<string, string>
+): Promise<void> {
+  for (const fixture of fixtures) {
+    if (!fixture.profilePhoto) continue;
+    const profileId = profileIds.get(fixture.email);
+    if (!profileId) throw new Error(`No profile ID found for "${fixture.email}"`);
+    const path = seedProfilePhotoPath(profileId, fixture.profilePhoto);
+    const body = await readFile(new URL(fixture.profilePhoto, PROFILE_PHOTO_DIR));
+    const { error: uploadError } = await supabase.storage
+      .from(PROFILE_PHOTOS_BUCKET)
+      .upload(path, body, { contentType: "image/png", cacheControl: "60", upsert: true });
+    if (uploadError) {
+      throw new Error(`Uploading the photo for "${fixture.email}" failed: ${uploadError.message}`);
+    }
+    // An upload replaces any preset, as it does in the app.
+    const { error } = await supabase
+      .from(TABLE.userInfo)
+      .update({ profile_photo_path: path, avatar_preset: null })
+      .eq("id", profileId);
+    if (error) throw new Error(`Setting the photo for "${fixture.email}" failed: ${error.message}`);
+  }
 }
 
 /**
@@ -1145,6 +1194,7 @@ export async function reconcileUserFixtures(
     identityState
   );
   await reconcileStudentVerification(supabase, fixtures, identity.profileIds);
+  await reconcileProfilePhotos(supabase, fixtures, identity.profileIds);
   const purchases = await reconcilePurchases(
     supabase,
     fixtures,

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { eventBadgeFor } from "./event-badge";
+import { DRAFT_EVENT_BADGE, eventBadgeFor, timelineBadgeFor } from "./event-badge";
 import type { EventState } from "./event-states";
 
 describe("eventBadgeFor", () => {
@@ -34,5 +34,26 @@ describe("eventBadgeFor", () => {
     [{ kind: "app-offer-expired", offerExpiredAt: "2026-10-12T19:00:00Z", windowOpen: false }, { status: "applications_closed" }],
   ])("names %o", (state, badge) => {
     expect(eventBadgeFor(state)).toEqual(badge);
+  });
+});
+
+describe("timelineBadgeFor", () => {
+  it("marks a draft event as a draft, whatever the viewer's state", () => {
+    expect(timelineBadgeFor({ status: "draft" }, { kind: "reg-open", closesAt: null })).toEqual({
+      status: "draft",
+      label: "Draft event",
+    });
+    expect(timelineBadgeFor({ status: "draft" }, { kind: "reg-going", ticketId: "t" })).toBe(
+      DRAFT_EVENT_BADGE
+    );
+  });
+
+  it("shows the viewer's state on a published event", () => {
+    expect(timelineBadgeFor({ status: "active" }, { kind: "reg-open", closesAt: null })).toEqual({
+      status: "registration_open",
+    });
+    expect(timelineBadgeFor({ status: "active" }, { kind: "app-draft", closesAt: null })).toEqual({
+      status: "draft",
+    });
   });
 });
