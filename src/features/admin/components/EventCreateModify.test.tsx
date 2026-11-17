@@ -45,26 +45,26 @@ it("disables unavailable actions on an untouched form and keeps Summary links av
   render(<EventCreateModify />);
   const name = screen.getByLabelText("Event name");
   expect(name.hasAttribute("aria-invalid")).toBe(false);
-  expectActionsDisabled("Save draft", true);
+  expectActionsDisabled("Save", true);
   expectActionsDisabled("Publish", true);
   fireEvent.keyDown(screen.getAllByRole("button", { name: "Publish" })[0], { key: "Enter" });
   expect(screen.queryByRole("menu")).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Description" }));
   expect(document.activeElement).toBe(screen.getByLabelText("Short overview"));
   fireEvent.change(name, { target: { value: "Design Sprint" } });
-  expectActionsDisabled("Save draft", false);
+  expectActionsDisabled("Save", false);
   expectActionsDisabled("Publish", true);
 });
 
 it("enables publishing a complete unchanged draft and tracks edits restored to their original value", () => {
   render(<EventCreateModify initialDraft={completeDraft} />);
-  expectActionsDisabled("Save draft", true);
+  expectActionsDisabled("Save", true);
   expectActionsDisabled("Publish", false);
   fireEvent.change(screen.getByLabelText("Short overview"), { target: { value: "" } });
-  expectActionsDisabled("Save draft", false);
+  expectActionsDisabled("Save", false);
   expectActionsDisabled("Publish", true);
   fireEvent.change(screen.getByLabelText("Short overview"), { target: { value: "A day of design" } });
-  expectActionsDisabled("Save draft", true);
+  expectActionsDisabled("Save", true);
   expectActionsDisabled("Publish", false);
 });
 
@@ -112,29 +112,43 @@ it("shows optional section badges and replaces them when the section is complete
 });
 
 
-it("uses Proud Hubbo at 200px after the first draft save and enables saved-draft deletion", async () => {
-  const { saveAdminEventDraftAction } = await import("../actions");
-  vi.mocked(saveAdminEventDraftAction).mockResolvedValueOnce({ id: "saved-id", eventId: "saved-id", revision: 1, eventRevision: 1, pageSlug: "saved-draft" });
+it("refuses to save an incomplete new event and points at what is missing", async () => {
+  const { saveAdminEventAction, saveAdminEventDraftAction } = await import("../actions");
   render(<EventCreateModify />);
-  fireEvent.change(screen.getByLabelText("Event name"), { target: { value: "Saved draft" } });
-  fireEvent.click(screen.getAllByRole("button", { name: "Save draft" })[0]);
+  fireEvent.change(screen.getByLabelText("Event name"), { target: { value: "Half finished" } });
+  fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
+  await waitFor(() => expect(screen.getAllByText(/to fix/).length).toBeGreaterThan(0));
+  expect(saveAdminEventDraftAction).not.toHaveBeenCalled();
+  expect(saveAdminEventAction).not.toHaveBeenCalled();
+  expect(screen.queryByRole("dialog", { name: "Draft saved" })).toBeNull();
+  expect(screen.getByLabelText("Event name")).toHaveProperty("value", "Half finished");
+});
+
+it("uses Proud Hubbo at 200px after a draft save applies the edits and enables saved-draft deletion", async () => {
+  const { saveAdminEventAction, saveAdminEventDraftAction } = await import("../actions");
+  vi.mocked(saveAdminEventAction).mockResolvedValueOnce({ id: "saved-id", revision: 1, pageSlug: "design-sprint", checkInSessionIds: ["session-1"], questionIds: [] });
+  render(<EventCreateModify initialDraft={completeDraft} />);
+  fireEvent.change(screen.getByLabelText("Short overview"), { target: { value: "Changed overview" } });
+  fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
   const dialog = await screen.findByRole("dialog", { name: "Draft saved" });
   expect(within(dialog).getByTestId("hubbo").getAttribute("data-emotion")).toBe("proud");
   expect(within(dialog).getByTestId("hubbo").className).toContain("h-50");
   fireEvent.click(within(dialog).getByRole("button", { name: "Keep editing" }));
   await waitFor(() => expect(screen.queryByRole("dialog", { name: "Draft saved" })).toBeNull());
   expect(screen.getByRole("button", { name: "Delete event" })).toBeTruthy();
-  expectActionsDisabled("Save draft", true);
+  expectActionsDisabled("Save", true);
+  expect(saveAdminEventDraftAction).not.toHaveBeenCalled();
+  expect(saveAdminEventAction).toHaveBeenCalledWith(expect.objectContaining({ event: expect.objectContaining({ short_description: "Changed overview", status: "draft", publish_at: null }) }));
 });
 
 it("shows a taken Page URL inline, focuses it and clears the error when corrected", async () => {
-  const { saveAdminEventDraftAction } = await import("../actions");
-  vi.mocked(saveAdminEventDraftAction).mockResolvedValueOnce({ error: "This page URL is already in use." });
+  const { saveAdminEventAction } = await import("../actions");
+  vi.mocked(saveAdminEventAction).mockResolvedValueOnce({ error: "This page URL is already in use." });
   render(<EventCreateModify initialDraft={completeDraft} />);
   expectActionsDisabled("Publish", false);
   const slug = screen.getByLabelText("Page URL");
   fireEvent.change(slug, { target: { value: "taken-url" } });
-  fireEvent.click(screen.getAllByRole("button", { name: "Save draft" })[0]);
+  fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
   await waitFor(() => expect(slug.getAttribute("aria-invalid")).toBe("true"));
   await waitFor(() => expect(document.activeElement).toBe(slug));
   const field = slug.closest('[data-slot="field"]')! as HTMLElement;
@@ -145,7 +159,7 @@ it("shows a taken Page URL inline, focuses it and clears the error when correcte
   expect(toast.error).not.toHaveBeenCalled();
   expect(screen.queryByRole("dialog")).toBeNull();
   expect(slug).toHaveProperty("value", "taken-url");
-  expectActionsDisabled("Save draft", false);
+  expectActionsDisabled("Save", false);
   expectActionsDisabled("Publish", true);
   fireEvent.change(slug, { target: { value: "available-url" } });
   await waitFor(() => expect(slug.hasAttribute("aria-invalid")).toBe(false));
@@ -171,14 +185,14 @@ it.each([
 });
 
 it("keeps failed draft saves retryable from either button", async () => {
-  const { saveAdminEventDraftAction } = await import("../actions");
-  vi.mocked(saveAdminEventDraftAction).mockResolvedValue({ error: "Could not save draft" });
+  const { saveAdminEventAction } = await import("../actions");
+  vi.mocked(saveAdminEventAction).mockResolvedValue({ error: "Could not save draft" });
   render(<EventCreateModify initialDraft={completeDraft} />);
   fireEvent.change(screen.getByLabelText("Short overview"), { target: { value: "Changed overview" } });
   for (const index of [0, 1]) {
-    fireEvent.click(screen.getAllByRole("button", { name: "Save draft" })[index]);
-    await waitFor(() => expectActionsDisabled("Save draft", false));
+    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[index]);
+    await waitFor(() => expectActionsDisabled("Save", false));
   }
-  expect(saveAdminEventDraftAction).toHaveBeenCalledTimes(2);
+  expect(saveAdminEventAction).toHaveBeenCalledTimes(2);
   expect(screen.getByLabelText("Short overview")).toHaveProperty("value", "Changed overview");
 });

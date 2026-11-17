@@ -1,5 +1,5 @@
 import type { ReactElement } from "react";
-import { beforeEach, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks=vi.hoisted(()=>({current:vi.fn(),fetch:vi.fn(),noStore:vi.fn(),participant:vi.fn(),flags:{studentEvents:false}}));
 vi.mock("next/cache",()=>({unstable_noStore:mocks.noStore}));
 vi.mock("next/navigation",()=>({notFound:()=>{throw new Error("404")},redirect:(url:string)=>{throw new Error(`redirect:${url}`)}}));
@@ -12,7 +12,7 @@ vi.mock("@/features/marketing/homepage-sections/Footer",()=>({default:()=>null})
 vi.mock("@/lib/supabase-helpers/events",()=>({fetchEventBySlug:mocks.fetch,fetchEvents:vi.fn()}));
 vi.mock("@/lib/supabase-helpers/event-tickets",()=>({fetchEventSeatCounts:async()=>new Map()}));
 vi.mock("@/lib/supabase-helpers/event-people",()=>({fetchEventMentors:async()=>[],fetchEventSponsors:async()=>[]}));
-import Page from "./page";
+import Page, { dynamic } from "./page";
 import { EventRegistrationAction } from "@/features/events/components/EventRegistrationAction";
 const props={params:Promise.resolve({slug:"saved-draft"}),searchParams:Promise.resolve({preview:"draft"})};
 const row={id:"event-1",slug:"saved-draft",name:"Saved draft",status:"draft",publish_at:null,configured_marketing_mode:"hosted",working_document:null,description:"Saved description",max_capacity:null,regular_price:null};
@@ -41,6 +41,23 @@ it.each(["disabled","external"])("returns 404 for an unavailable %s hosted previ
  mocks.current.mockResolvedValue({status:"authenticated",user:{role_access:"admin"}});mocks.fetch.mockResolvedValue({...row,configured_marketing_mode:mode});
  await expect(Page(props)).rejects.toThrow("404");
 });
+describe("public marketing destination", () => {
+ const publicProps={...props,searchParams:Promise.resolve({})};
+ beforeEach(()=>{mocks.flags.studentEvents=true});
+ it("returns 404 for a published event whose marketing page is off",async()=>{
+  mocks.fetch.mockResolvedValue({...row,status:"active",configured_marketing_mode:"disabled"});
+  await expect(Page(publicProps)).rejects.toThrow("404");
+ });
+ it("redirects a published external event to its saved URL",async()=>{
+  mocks.fetch.mockResolvedValue({...row,status:"active",configured_marketing_mode:"external",configured_marketing_url:"https://example.com/e"});
+  await expect(Page(publicProps)).rejects.toThrow("redirect:https://example.com/e");
+ });
+ it("redirects a legacy row that only has marketing_url",async()=>{
+  mocks.fetch.mockResolvedValue({...row,status:"active",configured_marketing_mode:null,marketing_url:"https://example.com/old"});
+  await expect(Page(publicProps)).rejects.toThrow("redirect:https://example.com/old");
+ });
+
+});
 it("previews a scheduled draft with registration disabled",async()=>{
  mocks.current.mockResolvedValue({status:"authenticated",user:{role_access:"manager"}});mocks.fetch.mockResolvedValue({...row,publish_at:"2099-08-01T18:00:00Z"});
  expect(components(await Page(props))).not.toContain(EventRegistrationAction);expect(mocks.noStore).toHaveBeenCalled();
@@ -61,4 +78,8 @@ it("renders the normalized participant agenda through the viewer client instead 
  expect(JSON.stringify(tree)).toContain("Saturday, November 21, 2026");
  expect(JSON.stringify(tree)).not.toContain("LEGACY-");
  expect(mocks.noStore).toHaveBeenCalled();
+});
+
+it("keeps viewer-specific participant content out of the shared page cache", () => {
+ expect(dynamic).toBe("force-dynamic");
 });

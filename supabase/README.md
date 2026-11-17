@@ -382,6 +382,31 @@ left join lateral unnest(w.request_ids) request(id) on true
 left join net._http_response r on r.id = request.id;
 ```
 
+The endpoint reads `public.event_publication_health(before)` (service role
+only), which returns the drafts still unpublished at `before`, the blocked
+drafts, and the blocked event ids. It logs `event.publication_overdue` at error
+level, which Sentry alerts on, with `count` (overdue), `blocked`, `eventIds`
+(the blocked ids, comma-separated) and `before`, whenever either count is above
+zero.
+
+A draft the publisher cannot activate for a lasting reason (anything but a
+lock timeout, serialization failure or deadlock, cancelled statement, or
+resource limit) is recorded in the private `event_publication.blocked` table at
+its current `publish_at`. The publisher no longer sets the minute job for it,
+and the hourly `recover-event-publication` run retries it, counting each
+failure. `reason` is the error's hint (such as `EVENT_PUBLICATION_INVALID`) or
+its SQLSTATE, never the message, which can quote row data; the run's WARNING
+carries the event id, SQLSTATE and hint. Changing the draft's publish date,
+publishing it by hand, or deleting it clears the block. Inspect blocks from a
+privileged SQL connection:
+
+```sql
+select b.event_id, b.publish_at, b.reason, b.failures,
+       b.first_failed_at, b.last_failed_at
+from event_publication.blocked b
+order by b.first_failed_at;
+```
+
 Three attempts with `next_check_at is null` means monitoring is exhausted.
 `last_delivery_status` captures configuration/enqueue outcomes and
 `last_response_status` captures responses observed by later checks; the final
@@ -464,9 +489,13 @@ The section-aware attendee renderer remains deferred.
 
 ## Event builder mutation safety
 
-`events` owns the permanent event identity from the first Save draft. Unscheduled
-drafts allow null descriptions, prices, capacity and dates; exact unfinished form
-values and nested sections live in `working_document`, with `working_revision`.
+`events` owns the permanent event identity from the first builder Save. On a
+draft, Save is a full builder save (validated, applied, keeping the
+draft status); it writes a working document only as the identity step of a new
+event's first save, which the same save then clears. Unscheduled drafts saved
+before that change allow null descriptions, prices, capacity and dates; exact
+unfinished form values and nested sections live in `working_document`, with
+`working_revision`.
 An explicit Free selection still means zero; an unfinished paid/legacy amount
 stays null. Row RLS makes drafts staff-only. A CHECK prohibits working documents
 on scheduled/published rows, so public event reads never include private payloads.

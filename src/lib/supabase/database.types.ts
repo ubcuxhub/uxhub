@@ -1681,6 +1681,14 @@ export type Database = {
         Returns: boolean
       }
       event_participant_content: { Args: { p_event_id: string }; Returns: Json }
+      event_publication_health: {
+        Args: { p_before: string }
+        Returns: {
+          blocked_count: number
+          blocked_event_ids: string[]
+          overdue_count: number
+        }[]
+      }
       event_seat_counts: {
         Args: { p_event_ids: string[] }
         Returns: {

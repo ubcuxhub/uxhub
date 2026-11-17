@@ -18,6 +18,7 @@ import { fetchEventParticipantContent } from "@/lib/supabase-helpers/event-agend
 import { EventAgendaTable } from "@/features/events/components/EventAgendaTable";
 import { EventLocation } from "@/components/shared/EventLocation";
 import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
+import { publicMarketingDestination } from "@/lib/event-marketing";
 import { fetchEventSeatCounts } from "@/lib/supabase-helpers/event-tickets";
 import {
   fetchEventMentors,
@@ -72,6 +73,11 @@ export default async function EventDetailPage({
   const supabase = await createClient();
   const event = await fetchEventBySlug(supabase, slug, { status: preview ? "draft" : "active" });
   if (!event) notFound();
+  if (!preview) {
+    const destination = publicMarketingDestination(event);
+    if (destination.kind === "none") notFound();
+    if (destination.kind === "external") redirect(destination.url);
+  }
   if (preview && (event.configured_marketing_mode === "disabled" || event.configured_marketing_mode === "external")) notFound();
   const unfinished = preview && !!eventWorkingDocument(event);
   const [seatCounts, mentors, sponsors, participant] = await Promise.all([

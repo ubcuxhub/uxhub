@@ -29,15 +29,37 @@ schedule.
 Saving, changing, clearing, deleting, or manually publishing a scheduled draft
 recalculates one shared database job for the earliest pending `publish_at`.
 It runs at that minute (rounded up for timestamps containing seconds), activates
-all due drafts, clears their dates, and schedules the next run. It runs even
-when nobody has the app open. Concurrent edits and publication are serialized
-before acquiring event row locks.
+the due drafts one at a time (earliest date first), clears their dates, and
+schedules the next run. It runs even when nobody has the app open. Concurrent
+edits and publication are serialized before acquiring event row locks.
+
+Each draft publishes or fails on its own, so one unready draft cannot hold the
+others back. That includes the application-questions check, which otherwise
+waits until commit: the publisher runs it at each draft's own update. A draft
+that fails stays a draft with its date, and the reason decides when it is
+tried again:
+
+- A transient failure (a lock timeout, a serialization failure or deadlock,
+  a cancelled statement, or a resource limit) is retried the next minute.
+- Any other failure, such as an application event with no valid question,
+  marks the draft **blocked** at that date. A blocked draft no longer sets the
+  next minute run; the hourly recovery run tries it again until it publishes.
+  Fixing the event isn't enough to publish it sooner: change its publish date
+  (which clears the block) or publish it by hand.
+
+Removing the last valid application question from a scheduled or active event
+that requires an application is refused when the change commits, so a save that
+replaces every question still works. The draft would otherwise pass its checks
+when scheduled and fail only at publication.
+
+Blocked drafts are reported to Sentry by the watchdog below. If the run as a
+whole fails (outside any one draft), nothing changes and a retry every minute
+is scheduled until a run succeeds.
 
 When no schedules remain, both the publication job and recovery job are removed.
 While schedules exist, an hourly recovery check at minute 17 catches missed
-runs after database downtime. Failed updates leave the events unchanged and
-schedule a retry every minute until a successful run restores the normal
-schedule. Run history for these jobs is pruned to seven days during scheduling;
+runs after database downtime and retries blocked drafts. Run history for these
+jobs is pruned to seven days during scheduling;
 there is no separate cleanup timer. Cron has no year field, so the timestamp
 predicate prevents an event scheduled more than a year away from publishing
 early if its calendar schedule fires in an earlier year.
@@ -51,9 +73,11 @@ not reset the budget. Exhaustion removes its pending checks but does not stop
 publication retries or recovery. No five-minute polling job runs while idle.
 
 The watchdog uses `pg_net` to POST a timestamp and HMAC signature to
-`/api/internal/event-publication`. This endpoint independently counts drafts
-overdue by at least five minutes and reports `event.publication_overdue` through
-the existing server logger to Sentry. Queued requests contain no shared secret
+`/api/internal/event-publication`. This endpoint reads
+`event_publication_health()`: the drafts overdue by at least five minutes and
+the blocked drafts. When either exists it reports `event.publication_overdue`
+(`count`, `blocked`, the blocked `eventIds`, and `before`) through the existing
+server logger to Sentry. Queued requests contain no shared secret
 or event data. HTTP delivery is asynchronous; later checks inspect previous
 responses. The final request remains inspectable through its recorded request
 ID and `net._http_response` (subject to pg_net response retention).
@@ -290,19 +314,23 @@ staff draft previews use the marketing layout. Existing operational consumers re
 updates omit effective prices. `is_featured` saves the staff choice without
 claiming portal Home selection/display is delivered.
 
-An existing unpublished event has one active URL: Save draft synchronizes
-`slug` and `configured_slug` in the same transaction as the working document.
+On a draft, Save applies the builder's edits to the event through the same
+validated transaction as Update and publication, and the event stays a draft.
+The builder never stores edits apart from the event: an incomplete form can't
+be saved (Save reveals what's missing, like Publish), and leaving
+discards unsaved edits. An existing unpublished event has one active URL: a
+save synchronizes `slug` and `configured_slug` in the same transaction.
 The new URL works immediately for staff; the old URL stops resolving and its
-claim is released. Other incomplete editor values remain in the same event row’s nullable
-working document. URL lookup retains its existing status/RLS visibility.
+claim is released. URL lookup retains its existing status/RLS visibility.
 Automatic URLs are numbered past other events' claims for duplicate names under
 the save transaction lock, including complete/publication saves;
 deliberately edited conflicting URLs are rejected without committing either
 the document or rename. The returned canonical URL and saved `event_revision`
 keep the editor and subsequent publication revision checks in sync. A retry
 returns the original saved revision, rather than adopting later event writes.
-The first Save draft creates its permanent event/portal identity, even when
-other event fields remain incomplete.
+The first Save creates its permanent event/portal identity: the builder
+writes a working document to get a durable ID that a lost response can retry
+against, then applies the same edits, which clears that document.
 The editor disables the URL field with the library's grey disabled style after
 first publication, including when that event is later returned to Draft.
 
@@ -379,8 +407,11 @@ Completed checkout invalidates the event detail route as well as checkout.
 
 ### Unified saved drafts and staff previews
 
-The first Save draft creates the permanent `events.id`. Unscheduled drafts may
-have missing capacity, prices, description and dates. `working_document` retains
+The first Save creates the permanent `events.id`. Save applies
+validated edits, so the builder no longer leaves a working document behind; one
+exists only on drafts saved before that change, until their next save. Such
+unscheduled drafts may have missing capacity, prices, description and dates.
+`working_document` retains
 unfinished nested sections and exact saved form strings; `working_revision` and
 `events.revision` protect competing edits. Related operational tables are written
 on a validated full save/publication. Publication/scheduling clear the working

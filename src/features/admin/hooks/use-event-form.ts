@@ -365,7 +365,7 @@ export function useEventForm({
 
   const pendingDraft = useRef<{ id: string; revision: number; operationId: string; state: EventFormState; document: EventWorkingDocument } | null>(null);
   const draftErrorToastId = useId();
-  const retryDraftSave = useRef<(showSuccess: boolean) => void>(() => {});
+  const retryDraftSave = useRef<() => void>(() => {});
   useEffect(() => () => toast.dismiss(draftErrorToastId), [draftErrorToastId]);
 
   const showPageSlugConflict = (message: string, slug: string) => {
@@ -375,7 +375,12 @@ export function useEventForm({
     return true;
   };
 
-  const handleSaveDraft = async (showSuccess = true): Promise<boolean> => {
+  /** Writes the builder's working document. The UI never offers this as a
+   * save: it only gives a new event its durable identity right before the
+   * builder applies the same edits (see handlePublication), so a lost response
+   * can be retried without creating a second event.
+   */
+  const saveWorkingDocument = async (): Promise<boolean> => {
     if (submitLock.current) return false;
     if (validateControls && !validateControls(true)) {
       setError("Finish or clear invalid field text before saving a draft.");
@@ -428,7 +433,6 @@ export function useEventForm({
       setCleanSnapshot(createFormSnapshot(attempt.state, attempt.document.checkInEvents, attempt.document.mentors, attempt.document.sponsors, attempt.document.applicationTemplate));
       setSuccessMessage("Draft saved");
       setRejectedPageSlug(null);
-      if (showSuccess) setShowDraftSaved(true);
       if (!eventId) window.history.replaceState(window.history.state, "", `/admin/events/${permanentId}/edit`);
       return true;
     } catch (error) {
@@ -440,18 +444,18 @@ export function useEventForm({
         id: draftErrorToastId,
         duration: Infinity,
         description: `${message} Your changes are still here.`,
-        action: { label: "Try again", onClick: () => retryDraftSave.current(showSuccess) },
+        action: { label: "Try again", onClick: () => retryDraftSave.current() },
       });
       return false;
     } finally { submitLock.current = false; setIsSubmitting(false); }
   };
   // Retry the latest values, including edits made after the failed request.
-  useEffect(() => { retryDraftSave.current = showSuccess => { void handleSaveDraft(showSuccess); }; });
+  useEffect(() => { retryDraftSave.current = () => { void saveWorkingDocument(); }; });
 
   const publicationToastId = useId();
   useEffect(() => () => toast.dismiss(publicationToastId), [publicationToastId]);
   const retryPublication = useRef<(intent: "publish" | "schedule" | "cancel" | "save" | "revert") => void>(() => {});
-  const saveEvent = async (state: EventFormState, intent: "publish" | "schedule" | "cancel" | "save" | "revert", uploadedWithDraft = false): Promise<boolean> => {
+  const saveEvent = async (state: EventFormState, intent: "publish" | "schedule" | "cancel" | "save" | "revert", uploadedWithDraft = false, announceDraft = false): Promise<boolean> => {
     if (submitLock.current) return false;
     toast.dismiss(publicationToastId);
     setShowConfigurationErrors(true);
@@ -627,8 +631,9 @@ export function useEventForm({
         setFormState(current => ({ ...current, date_location: current.date_location ? { ...current.date_location, dates: current.date_location.dates.map(row => ({ ...row, session_id: actualState.date_location?.dates.find(saved => saved.key === row.key)?.session_id ?? row.session_id, items: row.items?.map(item => ({ ...item, session_id: actualState.date_location?.dates.flatMap(day => day.items ?? []).find(saved => saved.key === item.key)?.session_id ?? item.session_id })) })) } : null, date_location_revision: actualState.date_location_revision, content: current.content ? { ...current.content, revision: actualState.content?.revision ?? current.content.revision } : current.content }));
       } else setFormState(actualState);
       setCleanSnapshot(createFormSnapshot(actualState, savedCheckIns, attempt.mentors, attempt.sponsors, savedTemplate));
-      setSuccessMessage(intent === "revert" ? "Event reverted to draft." : intent === "cancel" ? "Schedule cancelled. Draft saved." : "Changes saved");
-      if (intent === "revert" && savedPublication.status === "draft" && !savedPublication.publish_at) setShowDraftSaved(true);
+      const savedAsDraft = savedPublication.status === "draft" && !savedPublication.publish_at;
+      setSuccessMessage(intent === "revert" ? "Event reverted to draft." : intent === "cancel" ? "Schedule cancelled. Draft saved." : intent === "save" && savedAsDraft ? "Draft saved" : "Changes saved");
+      if (savedAsDraft && (intent === "revert" || (intent === "save" && announceDraft))) setShowDraftSaved(true);
       setRejectedPageSlug(null);
       if (!eventId) window.history.replaceState(window.history.state, "", `/admin/events/${result.id}/edit`);
       if (intent === "publish" || intent === "schedule" || (intent === "save" && savedPublication.status === "active")) setPublicationSuccess({ ...savedPublication, updated: intent === "save", completed_at: Date.now() });
@@ -648,7 +653,7 @@ export function useEventForm({
       const message = saveError instanceof Error ? saveError.message : "Failed to save event.";
       if (showPageSlugConflict(message, state.page_slug)) return false;
       setError(message);
-      if (intent) toast.error(past ? "Couldn’t update resources" : publication.status === "active" ? "Couldn’t update event" : "Couldn’t save publication changes", { id: publicationToastId, duration: Infinity, description: `${message} Your edits are still here. If the response was lost, reload to check the saved state or retry.`, action: { label: "Try again", onClick: () => retryPublication.current(intent) } });
+      if (intent) toast.error(past ? "Couldn’t update resources" : publication.status === "active" ? "Couldn’t update event" : intent === "save" && !publication.publish_at ? "Couldn’t save your draft" : "Couldn’t save publication changes", { id: publicationToastId, duration: Infinity, description: `${message} Your edits are still here. If the response was lost, reload to check the saved state or retry.`, action: { label: "Try again", onClick: () => retryPublication.current(intent) } });
       return false;
     } finally {
       submitLock.current = false;
@@ -660,7 +665,7 @@ export function useEventForm({
   const serverIssues: EventFormIssue[] = rejectedPageSlug !== null && rejectedPageSlug === formState.page_slug && formState.marketing_mode === "hosted"
     ? [{ section: "basics", target: "event-page-slug", message: "This page URL is already in use.", required: false }]
     : [];
-  const handlePublication = async (intent: "publish" | "schedule" | "cancel" | "save" | "revert", publishAt = formState.publish_at) => {
+  const handlePublication = async (intent: "publish" | "schedule" | "cancel" | "save" | "revert", publishAt = formState.publish_at, announceDraft = false) => {
     if (intent === "revert" && (past || publication.status !== "active")) return false;
     setPublishAttempted(true);
     const state = { ...formState, status: intent === "revert" ? "draft" as const : intent === "publish" ? "active" as const : publication.status, publish_at: intent === "publish" || intent === "cancel" || intent === "revert" ? "" : intent === "schedule" ? publishAt : formState.publish_at };
@@ -669,15 +674,19 @@ export function useEventForm({
     if ((nextValidation.error || !controlsValid) && !past && !pendingSave.current) {
       setShowConfigurationErrors(true);
       setValidationAttempt(value => value + 1);
-      setError(nextValidation.error ?? "Fix the invalid fields before publishing.");
+      setError(nextValidation.error ?? (intent === "save" && state.status === "draft" && !state.publish_at ? "Fix the invalid fields before saving." : "Fix the invalid fields before publishing."));
       return false;
     }
     setFormState(state);
-    // A durable working-document identity makes a new event's publication
-    // retry reuse the same materialization after response loss.
+    // A durable working-document identity makes a new event's first save
+    // retry reuse the same materialization after response loss. The apply
+    // below clears that document.
     let uploadedWithDraft = false;
+    // The identity step marks the form clean; if the apply then fails, the
+    // edits are still unsaved, so Save stays available and leaving still asks.
+    const unsavedSnapshot = cleanSnapshot;
     if (!eventId && !hasSavedDraft.current) {
-      if (!await handleSaveDraft(false)) return false;
+      if (!await saveWorkingDocument()) return false;
       uploadedWithDraft = true;
       if (lastSavedDraftState.current) {
         state.image_url = lastSavedDraftState.current.image_url;
@@ -685,8 +694,15 @@ export function useEventForm({
       }
       setFormState(state);
     }
-    return saveEvent(state, intent, uploadedWithDraft);
+    const saved = await saveEvent(state, intent, uploadedWithDraft, announceDraft);
+    if (!saved && uploadedWithDraft) { setCleanSnapshot(unsavedSnapshot); setSuccessMessage(null); }
+    return saved;
   };
+  /** Saves a draft by applying its edits to the event, through the same
+   * validated transaction as Update. Unfinished edits are never stored apart
+   * from the event: they are applied or discarded.
+   */
+  const handleSaveDraft = (announce = true) => handlePublication("save", formState.publish_at, announce);
   useEffect(() => { retryPublication.current = intent => { void handlePublication(intent); }; });
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
