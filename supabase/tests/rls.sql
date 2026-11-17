@@ -989,7 +989,15 @@ begin
     foreach fn in array array[
       'public.reserve_event_ticket(uuid, uuid, uuid)',
       'public.release_event_ticket(uuid)',
-      'public.event_seat_counts_unfiltered(uuid[])'
+      'public.event_seat_counts_unfiltered(uuid[])',
+      -- Ticket-safety helpers are internal: service role and database
+      -- functions only.
+      'public.purchase_is_live(uuid)',
+      'public.event_has_live_purchases(uuid)',
+      'public.event_member_commitments(uuid)',
+      'public.remove_event_ticket(uuid)',
+      'public.event_ticket_eligibility(uuid, uuid, bigint)',
+      'public.delete_event_before_safe_mutations(uuid)'
     ] loop
       if has_function_privilege(role_name, fn, 'execute') then
         raise exception '% can execute %', role_name, fn;

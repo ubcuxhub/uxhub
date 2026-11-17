@@ -21,11 +21,11 @@ import { eventBadgeFor } from "@/features/events/lib/event-badge";
 import { loadEventStates } from "@/features/events/lib/event-states";
 import { DRAFT_EVENTS_NOTE, isDraftEvent } from "@/features/events/lib/event-visibility";
 import { RegistrationPanel } from "@/features/events/components/RegistrationPanel";
+import { DraftTestRegistration } from "@/features/events/components/DraftTestRegistration";
 import { TeamCard, TeamInviteNotice } from "@/features/events/components/teams/TeamCard";
 import { EventDraftSections } from "@/features/events/components/EventDraftSections";
 import { publicMarketingDestination } from "@/lib/event-marketing";
 import { eventWorkingDocument } from "@/features/admin/lib/event-presentation";
-import { Button } from "@/components/ui/button";
 import { loadTeamCard, type TeamCardData } from "@/features/events/lib/team-card-data";
 import { getHeadersOrigin } from "@/lib/http/request-origin";
 
@@ -151,7 +151,7 @@ export default async function PortalEventPage({
       </div>
 
       {/* Registration and applications: one card whose layout follows the student's state. */}
-      {event.status === "draft" ? <Button disabled>Registration unavailable in draft preview</Button> : <RegistrationPanel event={{ ...event, slug }} user={user} state={states[event.id]} />}
+      {event.status === "draft" ? <DraftTestRegistration event={{ ...event, slug }} user={user} state={states[event.id]} checkoutAvailable={FLAGS.studentEvents} /> : <RegistrationPanel event={{ ...event, slug }} user={user} state={states[event.id]} />}
       {event.status === "draft" && <EventDraftSections event={event} />}
 
       {/* Ticket holders only. Stacked under the registration panel for now;

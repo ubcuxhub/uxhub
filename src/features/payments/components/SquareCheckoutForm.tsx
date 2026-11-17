@@ -48,6 +48,8 @@ interface SquareCheckoutFormProps {
   amountCents: number;
   amountLabel: string;
   buttonLabel: string;
+  /** The submit label for a free event ticket, which takes no card. */
+  freeButtonLabel?: string;
   collectBuyerDetails?: boolean;
   kind: PurchaseKind;
   slug: string;
@@ -140,6 +142,7 @@ export function SquareCheckoutForm({
   amountCents,
   amountLabel,
   buttonLabel,
+  freeButtonLabel = "Confirm spot",
   collectBuyerDetails = true,
   kind,
   slug,
@@ -569,7 +572,7 @@ export function SquareCheckoutForm({
         }
         type="submit"
       >
-        {busy ? "Processing..." : freeEvent ? "Confirm spot" : buttonLabel}
+        {busy ? "Processing..." : freeEvent ? freeButtonLabel : buttonLabel}
       </Button>
     </form>
   );

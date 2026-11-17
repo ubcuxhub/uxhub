@@ -2,7 +2,7 @@
 
 import type { Json } from "@/lib/supabase/database.types";
 
-import { fetchEventMutationResult, eventMutationResult, fetchEventHistoryInfo } from "@/lib/supabase-helpers/event-mutations";
+import { fetchEventMutationResult, eventMutationResult, fetchEventHistoryInfo, fetchEventDeletionBlockers, eventDeletionBlocked } from "@/lib/supabase-helpers/event-mutations";
 
 import { eventContentProblem, type EventContent } from "./lib/event-content";
 import { searchMentors, searchSponsors } from "@/lib/supabase-helpers/event-people";
@@ -510,11 +510,20 @@ export async function saveAdminEventAction(
   };
 }
 
-export async function deleteAdminEventAction(eventId: string, operationId?: string) {
+/** The database's refusal to delete an event that would affect members or
+ * live purchases (`delete_event_before_safe_mutations`). */
+const EVENT_DELETE_PROTECTED = "EVENT_DELETE_PROTECTED";
+const EVENT_DELETE_PROTECTED_MESSAGE = "This event can’t be deleted because members are registered, hold offers, or have payments that aren’t failed, canceled or refunded. Nothing has been deleted.";
+
+export async function deleteAdminEventAction(eventId: string, operationId?: string): Promise<{ error: string } | undefined> {
   await requireAdmin();
 
   if (operationId) {
     const { data, error } = await supabaseAdmin.rpc("delete_admin_event_safely", { p_event_id: eventId, p_operation_id: operationId });
+    if (error?.hint === EVENT_DELETE_PROTECTED) {
+      log.warn("admin.event_delete_refused", { eventId });
+      return { error: EVENT_DELETE_PROTECTED_MESSAGE };
+    }
     if (error) throw error;
     const assets = data as { images?: string[]; files?: string[] } | null;
     await Promise.all((assets?.images ?? []).map(discardEventImage));
@@ -523,6 +532,10 @@ export async function deleteAdminEventAction(eventId: string, operationId?: stri
     // Compatibility for existing server callers; the builder uses a receipt.
     const existing = await fetchEventById(supabaseAdmin, eventId);
     const { error } = await supabaseAdmin.rpc("delete_event_atomically", { target_event_id: eventId });
+    if (error?.hint === EVENT_DELETE_PROTECTED) {
+      log.warn("admin.event_delete_refused", { eventId });
+      return { error: EVENT_DELETE_PROTECTED_MESSAGE };
+    }
     if (error) throw error;
     await discardEventImage(existing?.image_url);
     await discardEventImage(existing?.header_image_url);
@@ -801,7 +814,8 @@ export async function loadAdminEventDeletionInfoAction(eventId: string) {
   await requireAdmin();
   const event = await fetchEventById(supabaseAdmin, eventId);
   if (!event) return null;
-  return { name: event.name, ...await fetchEventHistoryInfo(supabaseAdmin, eventId) };
+  const [history, blockers] = await Promise.all([fetchEventHistoryInfo(supabaseAdmin, eventId), fetchEventDeletionBlockers(supabaseAdmin, eventId)]);
+  return { name: event.name, ...history, blockers, blocked: eventDeletionBlocked(blockers) };
 }
 
 export async function recoverAdminEventDraftAction(id: string, operationId?: string) {

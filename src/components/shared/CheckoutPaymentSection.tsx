@@ -17,6 +17,8 @@ interface CheckoutPaymentSectionProps {
   collectBuyerDetails?: boolean;
   description?: string;
   buttonLabel?: string;
+  /** The submit label for a free event ticket, which takes no card. */
+  freeButtonLabel?: string;
   disabled?: boolean;
   disabledMessage?: string | null;
   framed?: boolean;
@@ -40,6 +42,7 @@ export function CheckoutPaymentSection({
   collectBuyerDetails = true,
   description,
   buttonLabel = "Secure Checkout",
+  freeButtonLabel,
   disabled = false,
   disabledMessage = null,
   framed = true,
@@ -65,6 +68,7 @@ export function CheckoutPaymentSection({
       amountCents={amountCents}
       amountLabel={amount}
       buttonLabel={buttonLabel}
+      freeButtonLabel={freeButtonLabel}
       collectBuyerDetails={collectBuyerDetails}
       disabled={disabled}
       disabledMessage={disabledMessage}

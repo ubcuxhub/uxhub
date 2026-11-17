@@ -26,6 +26,8 @@ interface CheckoutLayoutProps {
   payment: {
     disabled?: boolean;
     disabledMessage?: string | null;
+    /** The submit label for a free event ticket. */
+    freeButtonLabel?: string;
     kind: PurchaseKind;
     slug: string;
     successHref: (purchaseId: string) => string;
@@ -98,6 +100,7 @@ export function CheckoutLayout({
             buttonLabel="Pay now"
             disabled={payment.disabled}
             disabledMessage={payment.disabledMessage}
+            freeButtonLabel={payment.freeButtonLabel}
             framed={false}
             initialEmail={user.email}
             initialFirstName={user.first_name}

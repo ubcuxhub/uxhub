@@ -54,6 +54,7 @@ beforeEach(() => {
   fixtures.user.membership_expires_at = "2099-01-01T00:00:00Z";
   fixtures.event.pricing_policy = "figma";
   fixtures.event.status = "active";
+  fixtures.event.regular_price = 20;
 });
 
 it("shows a scannable ticket on the event page after registration, alongside Going", async () => {
@@ -123,12 +124,32 @@ it.each([
   ["active", false],
 ] as const)("shows the staff-only draft banner on a %s event: %s", async (status, shown) => {
   fixtures.event.status = status;
+  fixtures.state = { kind: "reg-open", closesAt: null };
   await renderPage();
   expect(
     Boolean(screen.queryByText(/This is a draft event\. Draft events are only visible to admins and managers\./))
   ).toBe(shown);
-  // A draft is a preview: registration stays disabled for staff too.
-  const disabled = screen.queryByRole("button", { name: "Registration unavailable in draft preview" });
-  expect(Boolean(disabled)).toBe(shown);
+});
+
+// Staff test registration on a draft is free events only (docs/event-states.md).
+it.each([
+  ["free", 0, true],
+  ["paid", 20, false],
+] as const)("offers staff test registration on a %s draft: %s", async (_label, price, offered) => {
+  fixtures.event.status = "draft";
+  fixtures.event.regular_price = price;
+  fixtures.state = { kind: "reg-open", closesAt: null };
+  await renderPage();
+  expect(Boolean(screen.queryByText("Test registration (staff only)"))).toBe(offered);
+  expect(Boolean(screen.queryByText(/This creates a real registration/))).toBe(offered);
+  const disabled = screen.queryByRole("button", { name: "Paid drafts can’t be test-registered" });
+  expect(Boolean(disabled)).toBe(!offered);
   if (disabled) expect((disabled as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.queryByText("Registration")).toBeNull();
+});
+
+it("offers no test registration on a published event", async () => {
+  fixtures.state = { kind: "reg-open", closesAt: null };
+  await renderPage();
+  expect(screen.queryByText("Test registration (staff only)")).toBeNull();
 });

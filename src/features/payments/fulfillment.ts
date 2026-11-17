@@ -408,6 +408,8 @@ async function checkoutEventTicket(
     expectedAmountCents: input.expectedAmountCents,
   });
   if (initialized.failure_reason || !initialized.purchase_id) {
+    // Refused before any purchase or Square call, so no card was held.
+    log.warn("payment.ticket_checkout_refused", { eventId: event.id, reason: initialized.failure_reason ?? null });
     return { error: formatReservationFailure(initialized.failure_reason), terminal: true } as const;
   }
   const purchase = await fetchPurchaseById(adminDb, initialized.purchase_id);

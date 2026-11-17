@@ -197,17 +197,20 @@ describe("event ticket checkout", () => {
       expect(await ticketsFor(event.id)).toHaveLength(1);
     }));
 
-  it("voids the hold and leaves no ticket when the event is sold out", () =>
+  it("places no hold and leaves no purchase or ticket when the event is sold out", () =>
     withFixtures(async (fixtures) => {
       const event = await fixtures.createEvent({ status: "active", max_capacity: 1 });
       const first = await buyer(fixtures);
       const second = await buyer(fixtures);
 
       await executeCheckoutForUser(first, checkoutInput(event.slug));
+      square.create.mockClear();
       const result = await executeCheckoutForUser(second, checkoutInput(event.slug));
 
       expect(result).toEqual({ ok: false, error: "This event is sold out.", terminal: true });
-      expect(square.cancel).toHaveBeenCalledTimes(1);
+      expect(square.create).not.toHaveBeenCalled();
+      expect(square.cancel).not.toHaveBeenCalled();
+      expect((await fetchPurchasesForUser(db, second.id)).filter((row) => row.event_id === event.id)).toEqual([]);
       expect(await ticketsFor(event.id)).toEqual([
         expect.objectContaining({ user_id: first.id }),
       ]);
@@ -251,25 +254,35 @@ describe("event ticket checkout", () => {
       await db.from("square_webhook_events").delete().like("event_id", "it-%");
     }));
 
-  it("sells drafts to admins and managers only", () =>
+  it("lets admins and managers test-register on free drafts only, and never holds a card for a paid one", () =>
     withFixtures(async (fixtures) => {
-      const event = await fixtures.createEvent({ status: "draft" });
+      const freeDraft = await fixtures.createEvent({ status: "draft", configured_pricing_mode: "free", configured_price: 0, slug: `free-draft-${fixtures.tag}` });
+      const paidDraft = await fixtures.createEvent({ status: "draft", slug: `paid-draft-${fixtures.tag}` });
       const member = await buyer(fixtures);
       const admin = await buyer(fixtures, "admin");
       const manager = await buyer(fixtures, "manager");
 
-      await expect(
-        executeCheckoutForUser(member, checkoutInput(event.slug))
-      ).resolves.toEqual({ ok: false, error: "Event not found.", terminal: true });
+      for (const event of [freeDraft, paidDraft]) {
+        await expect(
+          executeCheckoutForUser(member, checkoutInput(event.slug))
+        ).resolves.toEqual({ ok: false, error: "Event not found.", terminal: true });
+      }
 
       for (const staff of [admin, manager]) {
         await expect(
-          executeCheckoutForUser(staff, checkoutInput(event.slug))
+          executeCheckoutForUser(staff, checkoutInput(freeDraft.slug))
         ).resolves.toMatchObject({ ok: true, resolution: "completed" });
+        await expect(
+          executeCheckoutForUser(staff, checkoutInput(paidDraft.slug))
+        ).resolves.toEqual({ ok: false, error: "This event is no longer open for registration.", terminal: true });
       }
-      expect((await ticketsFor(event.id)).map((ticket) => ticket.user_id).sort()).toEqual(
+      expect(square.create).not.toHaveBeenCalled();
+      expect((await ticketsFor(freeDraft.id)).map((ticket) => ticket.user_id).sort()).toEqual(
         [admin.id, manager.id].sort()
       );
+      expect(await ticketsFor(paidDraft.id)).toEqual([]);
+      const { data: paidPurchases } = await db.from("purchases").select("id").eq("event_id", paidDraft.id);
+      expect(paidPurchases).toEqual([]);
     }));
 
   it("sells an application event only on an accepted, unexpired offer", () =>
@@ -310,7 +323,9 @@ describe("event ticket checkout", () => {
         executeCheckoutForUser(user, checkoutInput(event.slug))
       ).resolves.toMatchObject({ ok: true, resolution: "completed" });
       expect(await ticketsFor(event.id)).toHaveLength(1);
-      expect(square.cancel).toHaveBeenCalledTimes(2);
+      // The refused attempts never reached Square, so there was no hold to void.
+      expect(square.create).toHaveBeenCalledTimes(1);
+      expect(square.cancel).not.toHaveBeenCalled();
     }));
 });
 
