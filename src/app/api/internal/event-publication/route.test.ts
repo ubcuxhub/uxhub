@@ -3,7 +3,7 @@ import { POST } from "./route";
 import { createHmac } from "node:crypto";
 
 const mocks = vi.hoisted(() => ({ find: vi.fn(), error: vi.fn(), flush: vi.fn() }));
-vi.mock("@/lib/supabase-helpers/admin-server", () => ({ adminFindOverduePublications: mocks.find }));
+vi.mock("@/lib/supabase-helpers/admin-server", () => ({ adminGetPublicationHealth: mocks.find }));
 vi.mock("@/lib/log", () => ({ log: { error: mocks.error }, errorFields: () => ({ code: "08006" }) }));
 vi.mock("@sentry/nextjs", () => ({ flush: mocks.flush }));
 
@@ -21,7 +21,7 @@ beforeEach(() => {
   vi.stubEnv("EVENT_PUBLICATION_HEALTH_SECRET", "test-secret");
   vi.useFakeTimers();
   vi.setSystemTime(new Date("2026-10-28T20:00:00Z"));
-  mocks.find.mockResolvedValue(0);
+  mocks.find.mockResolvedValue({ overdue: 0, blocked: 0, blockedEventIds: [] });
 });
 afterEach(() => { vi.unstubAllEnvs(); vi.useRealTimers(); });
 
@@ -42,15 +42,23 @@ describe("publication health notifications", () => {
     expect((await POST(request("Bearer "))).status).toBe(401);
   });
   it("does not alert when publication has recovered", async () => {
-    expect(await (await POST(request())).json()).toEqual({ overdue: 0 });
+    expect(await (await POST(request())).json()).toEqual({ overdue: 0, blocked: 0 });
     expect(mocks.find).toHaveBeenCalledWith("2026-10-28T19:55:00.000Z");
     expect(mocks.error).not.toHaveBeenCalled();
   });
   it("reports overdue publications and flushes Sentry before responding", async () => {
-    mocks.find.mockResolvedValue(2);
-    expect(await (await POST(request())).json()).toEqual({ overdue: 2 });
+    mocks.find.mockResolvedValue({ overdue: 2, blocked: 0, blockedEventIds: [] });
+    expect(await (await POST(request())).json()).toEqual({ overdue: 2, blocked: 0 });
     expect(mocks.error).toHaveBeenCalledWith("event.publication_overdue", {
-      count: 2, before: "2026-10-28T19:55:00.000Z",
+      count: 2, blocked: 0, eventIds: "", before: "2026-10-28T19:55:00.000Z",
+    });
+    expect(mocks.flush).toHaveBeenCalledWith(2000);
+  });
+  it("reports blocked drafts by id, even before they are overdue", async () => {
+    mocks.find.mockResolvedValue({ overdue: 0, blocked: 2, blockedEventIds: ["event-a", "event-b"] });
+    expect(await (await POST(request())).json()).toEqual({ overdue: 0, blocked: 2 });
+    expect(mocks.error).toHaveBeenCalledWith("event.publication_overdue", {
+      count: 0, blocked: 2, eventIds: "event-a,event-b", before: "2026-10-28T19:55:00.000Z",
     });
     expect(mocks.flush).toHaveBeenCalledWith(2000);
   });
