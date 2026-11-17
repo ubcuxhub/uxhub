@@ -267,7 +267,7 @@ export function getPanelSpec(state: EventState, context: PanelContext): PanelSpe
           variant: "warning",
           icon: Hourglass,
           title: "Your application is in review",
-          description: "We’ll email you once a decision is made.",
+          description: "Check back here for a decision.",
         },
       };
     case "app-waitlisted":
@@ -279,7 +279,7 @@ export function getPanelSpec(state: EventState, context: PanelContext): PanelSpe
           icon: Hourglass,
           title: "You’re on the waitlist",
           description:
-            "You’ll be notified here on the portal and by email if you’re offered a spot. You don’t need to do anything until then.",
+            "If a spot opens up, it’ll show here.",
         },
       };
     case "app-accepted":
