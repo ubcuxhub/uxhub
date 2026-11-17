@@ -1,5 +1,8 @@
 -- Included by rls.sql inside its rollback-only fixture transaction.
 -- Check scheduler lifecycle, retry behavior, and restricted management access.
+-- A draft blocked at its current publish date waits for the hourly recovery
+-- run, so it never sets the minute job; the recovery job stays while any
+-- schedule exists.
 create function pg_temp.assert_publication_jobs()
 returns void language plpgsql as $$
 declare
@@ -7,11 +10,23 @@ declare
   next_local timestamp;
   expected_schedule text;
 begin
-  select min(publish_at) into next_at from public.events
-    where status = 'draft' and publish_at is not null;
-  if next_at is null then
+  if not exists (select 1 from public.events where status = 'draft' and publish_at is not null) then
     if exists (select 1 from cron.job where jobname in ('publish-due-events', 'recover-event-publication')) then
       raise exception 'publication jobs remain without scheduled drafts';
+    end if;
+    return;
+  end if;
+  if not exists (select 1 from cron.job where jobname = 'recover-event-publication'
+    and active and schedule = '17 * * * *') then
+    raise exception 'pending schedules lack a recovery job';
+  end if;
+  select min(e.publish_at) into next_at from public.events e
+    where e.status = 'draft' and e.publish_at is not null
+      and not exists (select 1 from event_publication.blocked b
+        where b.event_id = e.id and b.publish_at = e.publish_at);
+  if next_at is null then
+    if exists (select 1 from cron.job where jobname = 'publish-due-events') then
+      raise exception 'blocked drafts alone keep a minute publication job';
     end if;
     return;
   end if;
@@ -26,10 +41,6 @@ begin
   if not exists (select 1 from cron.job where jobname = 'publish-due-events'
     and active and schedule = expected_schedule and command = 'select public.publish_due_events()') then
     raise exception 'publication job does not match the earliest pending date';
-  end if;
-  if not exists (select 1 from cron.job where jobname = 'recover-event-publication'
-    and active and schedule = '17 * * * *') then
-    raise exception 'pending schedules lack a recovery job';
   end if;
 end;
 $$;
@@ -86,12 +97,16 @@ begin
 end;
 $$;
 
--- A failed publication must keep the draft/date and commit a minute retry.
+-- One draft's lasting failure must not hold back another due draft. The
+-- failure keeps its draft and date, is recorded as blocked, and gets no minute
+-- retry: the hourly recovery run tries it again.
+-- rls.publication_failure picks the SQLSTATE the forced failure raises.
 create function pg_temp.fail_test_event_publication()
 returns trigger language plpgsql as $$
 begin
   if old.slug = 'rls-event' and new.status = 'active' then
-    raise exception 'Intentional publication test failure';
+    raise exception 'Intentional publication test failure'
+      using errcode = coalesce(nullif(current_setting('rls.publication_failure', true), ''), 'P0001');
   end if;
   return new;
 end;
@@ -100,21 +115,269 @@ create trigger fail_test_event_publication before update on public.events
 for each row execute function pg_temp.fail_test_event_publication();
 update public.events set status = 'draft', publish_at = now() - interval '1 second'
 where id = :'event_id';
+insert into public.events (short_description, starts_at, ends_at, name, description, regular_price, member_price, max_capacity, slug, status, publish_at)
+values ('Publication fixture', now()+interval '5 days', now()+interval '6 days', 'RLS publication sibling', 'Rollback fixture', 0, 0, 10, 'rls-publication-sibling', 'draft',
+  now() - interval '2 seconds');
 do $$
+declare
+  b event_publication.blocked;
 begin
-  if public.publish_due_events() <> -1 then
-    raise exception 'publication failure did not report a retry';
+  if public.publish_due_events() < 1 then
+    raise exception 'a failing draft held back the publication run';
+  end if;
+  if not exists (select 1 from public.events where slug = 'rls-publication-sibling' and status = 'active' and publish_at is null) then
+    raise exception 'a failing draft held back a due sibling';
   end if;
   if not exists (select 1 from public.events where slug = 'rls-event' and status = 'draft' and publish_at is not null) then
     raise exception 'failed publication changed the event';
   end if;
-  if not exists (select 1 from cron.job where jobname = 'publish-due-events' and schedule = '* * * * *') then
-    raise exception 'failed publication has no minute retry';
+  select b0.* into b from event_publication.blocked b0 join public.events e
+    on e.id = b0.event_id and e.publish_at = b0.publish_at where e.slug = 'rls-event';
+  if b.reason is distinct from 'P0001' or b.failures <> 1 or b.first_failed_at <> b.last_failed_at then
+    raise exception 'failed draft was not recorded as blocked by its SQLSTATE';
+  end if;
+  if exists (select 1 from cron.job where jobname = 'publish-due-events' and schedule = '* * * * *') then
+    raise exception 'a blocked draft kept a minute retry';
+  end if;
+  -- A later run (the hourly recovery) retries it and counts the failure.
+  perform public.publish_due_events();
+  if not exists (select 1 from event_publication.blocked b0 join public.events e on e.id = b0.event_id
+    where e.slug = 'rls-event' and b0.failures = 2 and b0.first_failed_at = b.first_failed_at
+      and b0.last_failed_at > b.last_failed_at) then
+    raise exception 'a repeated failure was not counted against the same block';
   end if;
 end;
 $$;
+-- No minute job is set for the blocked draft; the recovery job remains.
+select pg_temp.assert_publication_jobs();
+
+-- The watchdog endpoint reads blocked drafts; application roles cannot.
+do $$
+declare
+  health record;
+begin
+  select * into strict health from public.event_publication_health(clock_timestamp());
+  if health.blocked_count < 1 or health.overdue_count < health.blocked_count
+    or not (select e.id from public.events e where e.slug = 'rls-event') = any(health.blocked_event_ids) then
+    raise exception 'publication health omits a blocked draft';
+  end if;
+  if not has_function_privilege('service_role', 'public.event_publication_health(timestamptz)', 'execute')
+    or has_function_privilege('anon', 'public.event_publication_health(timestamptz)', 'execute')
+    or has_function_privilege('authenticated', 'public.event_publication_health(timestamptz)', 'execute') then
+    raise exception 'publication health is not limited to the service role';
+  end if;
+  if has_table_privilege('anon', 'event_publication.blocked', 'select,insert,update,delete')
+    or has_table_privilege('authenticated', 'event_publication.blocked', 'select,insert,update,delete')
+    or has_table_privilege('service_role', 'event_publication.blocked', 'select,insert,update,delete') then
+    raise exception 'blocked publication state is accessible to application roles';
+  end if;
+end;
+$$;
+
+-- Changing the publish date clears the block. A transient failure (here a
+-- lock timeout) does not block: the draft keeps the minute retry.
+update public.events set publish_at = now() - interval '3 seconds' where id = :'event_id';
+select set_config('rls.publication_failure', '55P03', true);
+do $$
+begin
+  if exists (select 1 from event_publication.blocked b join public.events e on e.id = b.event_id
+    where e.slug = 'rls-event') then
+    raise exception 'a new publish date kept the old block';
+  end if;
+  if public.publish_due_events() < 0 then
+    raise exception 'a transient draft failure failed the whole run';
+  end if;
+  if not exists (select 1 from public.events where slug = 'rls-event' and status = 'draft' and publish_at is not null) then
+    raise exception 'transient failure changed the event';
+  end if;
+  if exists (select 1 from event_publication.blocked b join public.events e on e.id = b.event_id
+    where e.slug = 'rls-event') then
+    raise exception 'a transient failure blocked the draft';
+  end if;
+end;
+$$;
+-- The due, unblocked draft sets the publication job to the next minute.
+select pg_temp.assert_publication_jobs();
+-- A statement timeout (query_canceled, which OTHERS does not catch) on one
+-- draft is transient too.
+select set_config('rls.publication_failure', '57014', true);
+do $$
+begin
+  if public.publish_due_events() < 0 or exists (select 1 from event_publication.blocked b
+    join public.events e on e.id = b.event_id where e.slug = 'rls-event')
+    or not exists (select 1 from public.events where slug = 'rls-event' and status = 'draft') then
+    raise exception 'a statement timeout was not treated as transient';
+  end if;
+end;
+$$;
+select pg_temp.assert_publication_jobs();
+select set_config('rls.publication_failure', '', true);
 drop trigger fail_test_event_publication on public.events;
 select public.publish_due_events();
+select pg_temp.assert_publication_jobs();
+
+-- An application draft with no valid question fails the questions guard,
+-- which is deferred to commit. The publisher checks it at the draft's own
+-- update, so the failure is caught and recorded there, its sibling still
+-- publishes, and nothing is left pending for commit. A trusted service-role
+-- insert, which that guard exempts, stands in for questions removed before
+-- the removal guard below existed.
+select coalesce(current_setting('request.jwt.claims', true), '') as publication_saved_claims \gset
+select set_config('request.jwt.claims', '{"role":"service_role"}', true);
+insert into public.events (short_description, starts_at, ends_at, name, description, regular_price, member_price, max_capacity, slug, status, publish_at, requires_application)
+values ('Publication fixture', now()+interval '5 days', now()+interval '6 days', 'RLS publication no questions', 'Rollback fixture', 0, 0, 10, 'rls-publication-no-questions', 'draft',
+  now() - interval '1 second', true);
+-- The deferred guard reads the role when it fires, so run it before the
+-- claims change back, as a service-role request's commit would.
+set constraints public.event_publication_questions immediate;
+set constraints public.event_publication_questions deferred;
+select set_config('request.jwt.claims', :'publication_saved_claims', true);
+insert into public.events (short_description, starts_at, ends_at, name, description, regular_price, member_price, max_capacity, slug, status, publish_at)
+values ('Publication fixture', now()+interval '5 days', now()+interval '6 days', 'RLS publication sibling 2', 'Rollback fixture', 0, 0, 10, 'rls-publication-sibling-2', 'draft',
+  now() - interval '1 second');
+do $$
+begin
+  if public.publish_due_events() < 1 then
+    raise exception 'an unready application draft held back the publication run';
+  end if;
+  if not exists (select 1 from public.events where slug = 'rls-publication-sibling-2' and status = 'active') then
+    raise exception 'an unready application draft held back a due sibling';
+  end if;
+  if not exists (select 1 from event_publication.blocked b join public.events e
+    on e.id = b.event_id and e.publish_at = b.publish_at
+    where e.slug = 'rls-publication-no-questions' and e.status = 'draft'
+      and b.reason = 'EVENT_PUBLICATION_INVALID') then
+    raise exception 'the deferred questions failure was not caught and recorded by its hint';
+  end if;
+end;
+$$;
+set constraints all immediate;
+set constraints public.event_publication_questions, public.event_application_questions_publication deferred;
+select pg_temp.assert_publication_jobs();
+
+-- A SET CONSTRAINTS change made inside a subtransaction that rolls back is
+-- undone with it, and one made before a subtransaction survives that
+-- subtransaction's rollback. publish_due_events relies on both: a draft's
+-- failed update leaves the guard immediate for the next draft, and a failed
+-- run leaves it deferred.
+do $$
+declare
+  raised boolean := false;
+  hint text;
+begin
+  begin
+    set constraints public.event_publication_questions immediate;
+    raise exception using errcode = 'UXT01';
+  exception when sqlstate 'UXT01' then null;
+  end;
+  begin
+    -- Changing the date re-runs the guard, which this draft fails.
+    update public.events set publish_at = publish_at + interval '1 second'
+      where slug = 'rls-publication-no-questions';
+    raise exception using errcode = 'UXT01';
+  exception
+    when sqlstate 'UXT01' then null;
+    when others then
+      raise exception 'a rolled-back SET CONSTRAINTS change outlived its subtransaction';
+  end;
+
+  set constraints public.event_publication_questions immediate;
+  begin
+    raise exception using errcode = 'UXT01';
+  exception when sqlstate 'UXT01' then null;
+  end;
+  begin
+    update public.events set publish_at = publish_at + interval '1 second'
+      where slug = 'rls-publication-no-questions';
+  exception when others then
+    get stacked diagnostics hint = pg_exception_hint;
+    raised := hint = 'EVENT_PUBLICATION_INVALID';
+  end;
+  set constraints public.event_publication_questions deferred;
+  if not raised then
+    raise exception 'an inner rollback undid the outer SET CONSTRAINTS change';
+  end if;
+end;
+$$;
+
+-- A failure outside any one draft reports -1, changes nothing and commits a
+-- minute retry. Here the caller's own pending questions check fails as soon
+-- as the publisher makes the guard immediate.
+do $$
+declare
+  result integer;
+begin
+  begin
+    update public.events set publish_at = publish_at + interval '1 second'
+      where slug = 'rls-publication-no-questions';
+    result := public.publish_due_events();
+    if result <> -1 or not exists (select 1 from cron.job
+      where jobname = 'publish-due-events' and schedule = '* * * * *') then
+      raise exception 'a failed run did not report -1 with a minute retry';
+    end if;
+    raise exception using errcode = 'UXT01';
+  exception when sqlstate 'UXT01' then null;
+  end;
+end;
+$$;
+select pg_temp.assert_publication_jobs();
+
+-- Deleting or blanking the last question of a scheduled or active application
+-- event is refused at commit. Replacing it, unscheduling the event first, or
+-- deleting the event is allowed. Each change runs in a subtransaction that
+-- rolls back.
+insert into public.events (short_description, starts_at, ends_at, name, description, regular_price, member_price, max_capacity, slug, status, publish_at, requires_application)
+values ('Publication fixture', now()+interval '5 days', now()+interval '6 days', 'RLS publication guarded', 'Rollback fixture', 0, 0, 10, 'rls-publication-guarded', 'draft',
+  now() + interval '2 days', true)
+returning id as publication_guarded_id \gset
+insert into public.event_application_questions (event_id, question, response_type)
+values (:'publication_guarded_id', 'Why?', 'long_text');
+set constraints public.event_publication_questions immediate;
+set constraints public.event_publication_questions deferred;
+create function pg_temp.assert_question_change(statements text[], refused boolean)
+returns void language plpgsql as $$
+declare
+  statement text;
+  hint text;
+begin
+  begin
+    foreach statement in array statements loop
+      execute statement;
+    end loop;
+    set constraints public.event_application_questions_publication immediate;
+    if refused then
+      raise exception 'question change was allowed: %', statements;
+    end if;
+    raise exception using errcode = 'UXT01';
+  exception
+    when sqlstate 'UXT01' then null;
+    when others then
+      get stacked diagnostics hint = pg_exception_hint;
+      if not refused or hint is distinct from 'EVENT_PUBLICATION_INVALID' then
+        raise;
+      end if;
+  end;
+end;
+$$;
+select pg_temp.assert_question_change(array[format(
+  'delete from public.event_application_questions where event_id = %L', :'publication_guarded_id')], true);
+select pg_temp.assert_question_change(array[format(
+  'update public.event_application_questions set question = %L where event_id = %L', ' ', :'publication_guarded_id')], true);
+select pg_temp.assert_question_change(array[
+  format('insert into public.event_application_questions (event_id, question, response_type) values (%L, %L, %L)',
+    :'publication_guarded_id', 'Why now?', 'long_text'),
+  format('delete from public.event_application_questions where event_id = %L and question = %L',
+    :'publication_guarded_id', 'Why?')], false);
+select pg_temp.assert_question_change(array[
+  format('update public.events set publish_at = null where id = %L', :'publication_guarded_id'),
+  format('delete from public.event_application_questions where event_id = %L', :'publication_guarded_id')], false);
+select pg_temp.assert_question_change(array[
+  format('delete from public.events where id = %L', :'publication_guarded_id')], false);
+
+delete from public.events where slug in ('rls-publication-sibling', 'rls-publication-sibling-2',
+  'rls-publication-no-questions', 'rls-publication-guarded');
+set constraints all immediate;
+set constraints public.event_publication_questions, public.event_application_questions_publication deferred;
 select pg_temp.assert_publication_jobs();
 
 do $$
@@ -264,7 +527,9 @@ where event_id = :'event_id';
 select event_publication.check_publication();
 do $$
 begin
-  if public.publish_due_events() <> -1 then
+  perform public.publish_due_events();
+  if not exists (select 1 from event_publication.blocked b join public.events e on e.id = b.event_id
+    where e.slug = 'rls-event' and e.status = 'draft') then
     raise exception 'expected intentional publication failure';
   end if;
   if not exists (select 1 from event_publication.watchdog w join public.events e on e.id = w.event_id
@@ -280,6 +545,10 @@ begin
   if exists (select 1 from event_publication.watchdog w join public.events e on e.id = w.event_id
     where e.slug = 'rls-event') then
     raise exception 'successful publication retains a watchdog';
+  end if;
+  if exists (select 1 from event_publication.blocked b join public.events e on e.id = b.event_id
+    where e.slug = 'rls-event') then
+    raise exception 'successful publication retains its block';
   end if;
   if not exists (select 1 from event_publication.watchdog where next_check_at is not null)
     and exists (select 1 from cron.job where jobname = 'check-event-publication') then
