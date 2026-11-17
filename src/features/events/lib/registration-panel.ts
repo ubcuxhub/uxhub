@@ -284,7 +284,7 @@ export function getPanelSpec(state: EventState, context: PanelContext): PanelSpe
             variant: "warning",
             icon: Hourglass,
             title: "Your application is in review",
-            description: `Decisions are released ${releaseMoment(state.decisionsReleaseAt)}.`,
+            description: `Decisions are released ${releaseMoment(state.decisionsReleaseAt)}. We’ll also email you then.`,
           },
         };
       }
@@ -295,7 +295,7 @@ export function getPanelSpec(state: EventState, context: PanelContext): PanelSpe
           variant: "warning",
           icon: Hourglass,
           title: "Your application is in review",
-          description: "Check back here for a decision.",
+          description: "We’ll email you when there’s a decision, and it’ll show here too.",
         },
       };
     case "app-waitlisted":
@@ -306,8 +306,7 @@ export function getPanelSpec(state: EventState, context: PanelContext): PanelSpe
           variant: "warning",
           icon: Hourglass,
           title: "You’re on the waitlist",
-          description:
-            "If a spot opens up, it’ll show here.",
+          description: "If a spot opens up, we’ll email you and it’ll show here.",
         },
       };
     case "app-accepted":

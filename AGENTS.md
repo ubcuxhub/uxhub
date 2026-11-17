@@ -226,13 +226,17 @@ Local values belong in the git-ignored `.env.local`.
 - Migrations: secret `SUPABASE_MIGRATIONS_DB_URL`, set in Vercel's Production
   environment only, is the session-mode pooler connection string the
   production build pushes migrations through. Never put it in `.env.local`
+- Application emails: secret `APPLICATION_EMAILS_SECRET`, set in Vercel's
+  Production environment only, matching the `application_emails_secret` Vault
+  secret the pg_cron job signs with (`supabase/README.md`, "Application
+  emails")
 
 `SQUARE_ENV` is optional and defaults to the sandbox; set it to `production`
 only for production credentials.
 
 Never expose the Supabase secret keys, migrations database URL, Square access
-token, webhook signature key, Resend API key, or Sentry auth token to client
-components.
+token, webhook signature key, Resend API key, Sentry auth token, or
+application-emails secret to client components.
 
 ## Quality
 

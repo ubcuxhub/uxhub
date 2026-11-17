@@ -352,6 +352,33 @@ pushes it to an open page. Once applicants can see decisions (the release has
 passed, or none was set and some application is decided), the release can't
 move into the future (`EVENT_SETTINGS_CONFLICT`).
 
+### Application emails
+
+Applicants get plain, fixed-copy emails through Resend
+(`src/lib/email/application-templates.ts`). A production-only job sends
+them within about five minutes of becoming due (setup and limits:
+supabase/README.md, "Application emails"):
+
+| Email | Sent when |
+| --- | --- |
+| Accepted ("You're in", confirm by the deadline, button to the portal event page) | The decision is `accepted` and released, and the offer hasn't expired |
+| Waitlisted (a spot that opens up shows in the portal) | The decision is `waitlisted` and released |
+| Not selected | The decision is `rejected` and released |
+| Offer reminder (confirm by the deadline, button) | An accepted, released offer expires within 24 hours, and its acceptance email went out before those 24 hours began |
+
+- Each email goes once per application and decision, so a decision that
+  changes after release (waitlisted to accepted, accepted to rejected) sends
+  the new one. A new deadline on the same offer sends no new acceptance, but
+  gets its own reminder.
+- Nothing is sent for a canceled event, a draft (unpublished) event, an event
+  that has ended, an event that no longer requires applications, a deleted
+  account, or an applicant who already has a ticket. Before release nothing is
+  sent, so decisions changed before then send only the final one.
+- No email when an offer expires, and none when an application is submitted.
+- Decisions released before the job shipped were marked sent when it
+  deployed, so nobody got an email for them.
+- Nothing is sent while student events are off (`FLAGS.studentEvents`).
+
 Drafts belong to the applicant alone:
 
 - Members create applications only as drafts, inside the registration window.

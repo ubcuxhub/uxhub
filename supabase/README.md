@@ -185,6 +185,7 @@ helper file, and fix it in one place.
 | `check_ins`                   | `src/lib/supabase-helpers/check-ins.ts`           |
 | `mentors` / `event_mentors`   | `src/lib/supabase-helpers/event-people.ts`        |
 | `sponsors` / `event_sponsors` | `src/lib/supabase-helpers/event-people.ts`        |
+| `application_emails.deliveries` (private, RPCs only) | `src/lib/supabase-helpers/application-emails.ts` |
 | `user_info`                   | `src/lib/supabase-helpers/users.ts`               |
 | `membership_types`            | `src/lib/supabase-helpers/memberships.ts`         |
 | `purchases`                   | `src/lib/supabase-helpers/purchases.ts`           |
@@ -400,6 +401,76 @@ configuration and deliberately change the event's publication date to rearm it.
 Use a non-sensitive test draft to verify an overdue alert reaches Sentry after
 deployment; local tests cover scheduling and authentication without sending
 external HTTP requests.
+
+### Application emails
+
+Applicants are emailed their released decision and a reminder 24 hours before
+an accepted offer expires (`docs/event-states.md`, "Application emails"). The
+migration `*_application_emails.sql` adds:
+
+- the private `application_emails` schema, whose `deliveries` table records
+  one row per email per application, unique on `(application_id, kind, key)`
+  (`key` is the status for a decision, the deadline for a reminder). No
+  application role, the service role included, can reach it directly;
+- `claim_application_emails(p_limit, p_event_ids)`,
+  `complete_application_email(p_delivery_id, p_sent, p_error_code)` and
+  `release_application_emails(p_delivery_ids, p_reason)`, service role only.
+  A failed send hands its claim back for the next run, up to five attempts; a
+  release (Resend's rate limit or quota, or no API key) doesn't count one. A
+  claim the route never completed is retried after 15 minutes;
+- a backfill that marked every email already due as sent (`last_error_code =
+  'BACKFILL'`), so deploying emailed nobody;
+- the `send-application-emails` pg_cron job, every five minutes. When an email
+  is due and both Vault secrets below exist, it POSTs to the stored URL, signed
+  like the publication watchdog: a SHA-256 HMAC over
+  `application-emails:<unix-seconds>` in `x-application-emails-signature`,
+  the timestamp in `x-application-emails-timestamp`. Without either secret it
+  does nothing.
+
+Preview deploys share the production database, so the job calls only the URL in
+Vault, and only production has it. `/api/internal/application-emails` checks
+the signature within five minutes of server time, returns `{"skipped":"flag"}`
+while `FLAGS.studentEvents` is off, and otherwise sends up to 25 emails, 600 ms
+apart, through `sendEmail`. On Resend's `rate_limit_exceeded`,
+`daily_quota_exceeded` or `monthly_quota_exceeded` it hands back the rest and
+stops until the next run. The free tier allows about 100 emails a day, so a
+large release can take more than a day to drain.
+
+To turn it on, before the student-events flag goes on in production:
+
+1. Make a random secret (`openssl rand -hex 32`) and set it as
+   `APPLICATION_EMAILS_SECRET` in Vercel's **Production** environment only.
+   `RESEND_API_KEY` and `EMAIL_FROM` must already be set there, with the
+   sending domain verified in Resend.
+2. In the hosted SQL editor, store the same value in Vault as
+   `application_emails_secret`, and the endpoint as `application_emails_url`:
+   `https://www.ubcuxhub.ca/api/internal/application-emails`. Use the `www`
+   host: the apex domain answers with a 307 redirect. Use Vault's UI or
+   parameterized SQL, and never commit either value.
+3. Redeploy production so the function reads the new variable.
+
+Never store these secrets in a preview or local database's Vault. Logs carry
+ids and codes only: `application.email_sent` (info), `application.email_failed`
+and `application.email_paused` (warn), and `application.email_abandoned` (error,
+after the fifth failure), `application.email_claim_failed` and
+`application.email_record_failed` (error). Inspect deliveries and the job's
+calls from a privileged SQL connection:
+
+```sql
+select d.kind, d.key, d.claimed_at, d.sent_at, d.attempts, d.last_error_code,
+       d.application_id
+from application_emails.deliveries d
+order by d.created_at desc
+limit 50;
+
+select r.id, r.status_code, r.timed_out, r.created
+from net._http_response r
+order by r.created desc
+limit 10;
+```
+
+To send an abandoned email again, reset its row (`attempts = 0,
+last_error_code = null`); it goes out on the next run.
 
 ### General rules
 

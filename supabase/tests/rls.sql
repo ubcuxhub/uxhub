@@ -2553,5 +2553,6 @@ $$;
 \ir event-checkout.sql
 \ir application-decisions.sql
 \ir event-cancellation.sql
+\ir application-emails.sql
 
 rollback;
