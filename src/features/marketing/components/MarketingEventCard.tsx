@@ -8,6 +8,8 @@ import {
   CardDescription,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { isCanceledEvent } from "@/features/events/lib/event-cancellation";
 import { formatEventDate } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import type { EventRow } from "@/lib/supabase/models";
@@ -50,6 +52,8 @@ export function MarketingEventCard({ event, href, onClick, className }: Marketin
       )}
 
       <CardHeader className="gap-1">
+        {/* Listed with the badge until it ends, then as any past event. */}
+        {isCanceledEvent(event) && <StatusBadge status="canceled" className="mb-1" />}
         <CardTitle className="line-clamp-1 text-subheading">
           {event.name}
         </CardTitle>

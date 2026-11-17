@@ -1467,6 +1467,10 @@ export type Database = {
         Args: { p_name: string }
         Returns: boolean
       }
+      cancel_admin_event: {
+        Args: { p_event_id: string; p_note: string; p_operation_id: string }
+        Returns: Json
+      }
       create_team: {
         Args: { p_event_id: string; p_name?: string; p_user_id: string }
         Returns: {
@@ -1529,6 +1533,14 @@ export type Database = {
           p_status: Database["public"]["Enums"]["event_status"]
         }
         Returns: boolean
+      }
+      event_lifecycle_counts: {
+        Args: { p_event_id: string }
+        Returns: {
+          member_applications: number
+          paid_tickets: number
+          registered: number
+        }[]
       }
       event_member_commitments: {
         Args: { p_event_id: string }
@@ -1666,6 +1678,22 @@ export type Database = {
         Returns: Json
       }
       save_admin_event_builder: {
+        Args: {
+          p_application_questions: Json
+          p_check_in_sessions: Json
+          p_draft_id: string
+          p_draft_revision: number
+          p_event: Json
+          p_event_id: string
+          p_expected_header_image_url: string
+          p_expected_image_url: string
+          p_mentors: Json
+          p_slug: string
+          p_sponsors: Json
+        }
+        Returns: Json
+      }
+      save_admin_event_builder_before_cancellation: {
         Args: {
           p_application_questions: Json
           p_check_in_sessions: Json

@@ -43,6 +43,7 @@ describe("StatusBadge", () => {
       [{ status: "draft" }, "Draft", "bg-muted"],
       [{ status: "under_review" }, "Under review", "bg-warning"],
       [{ status: "offer_expired" }, "Offer expired", "bg-muted"],
+      [{ status: "canceled" }, "Canceled", "bg-error"],
     ] as const;
     for (const [props, text, tone] of cases) {
       render(<StatusBadge {...props} />);
@@ -51,7 +52,7 @@ describe("StatusBadge", () => {
       expect(badge().querySelector("svg"), text).toBeTruthy();
       cleanup();
     }
-    expect(STUDENT_EVENT_STATUSES).toHaveLength(8);
+    expect(STUDENT_EVENT_STATUSES).toHaveLength(9);
   });
 
   it("still reads sensibly when a dated status has no date", () => {

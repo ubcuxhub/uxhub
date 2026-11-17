@@ -33,6 +33,8 @@ const shortDate = (value: string | null) =>
  */
 export function eventBadgeFor(state: EventState): EventBadge {
   switch (state.kind) {
+    case "canceled":
+      return { status: "canceled" };
     case "reg-upcoming":
     case "app-upcoming":
       return { status: "opens", date: shortDate(state.opensAt) };

@@ -20,6 +20,10 @@ const REJECTIONS: Record<CheckInRejection, CheckInResultCopy> = {
     title: "Ticket is for a different event",
     detail: "Ask for their ticket to this event.",
   },
+  event_canceled: {
+    title: "This event is canceled",
+    detail: "Canceled events don’t take check-ins.",
+  },
 };
 
 /** The words on the result card after a scan or a manual check-in. */

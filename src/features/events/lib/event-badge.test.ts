@@ -32,6 +32,8 @@ describe("eventBadgeFor", () => {
     [{ kind: "app-draft-expired", closedAt: "2026-10-12T19:00:00Z" }, { status: "applications_closed" }],
     [{ kind: "app-offer-expired", offerExpiredAt: "2026-10-12T19:00:00Z", windowOpen: true }, { status: "applications_open" }],
     [{ kind: "app-offer-expired", offerExpiredAt: "2026-10-12T19:00:00Z", windowOpen: false }, { status: "applications_closed" }],
+    [{ kind: "canceled", note: null, ticketId: null }, { status: "canceled" }],
+    [{ kind: "canceled", note: "Moved.", ticketId: "t" }, { status: "canceled" }],
   ])("names %o", (state, badge) => {
     expect(eventBadgeFor(state)).toEqual(badge);
   });
@@ -54,6 +56,9 @@ describe("timelineBadgeFor", () => {
     });
     expect(timelineBadgeFor({ status: "active" }, { kind: "app-draft", closesAt: null })).toEqual({
       status: "draft",
+    });
+    expect(timelineBadgeFor({ status: "active" }, { kind: "canceled", note: null, ticketId: "t" })).toEqual({
+      status: "canceled",
     });
   });
 });

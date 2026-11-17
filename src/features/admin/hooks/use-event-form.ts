@@ -218,7 +218,10 @@ export function useEventForm({
     )
   );
   const savedDocument = useRef<{ state: EventFormState; checkIns: CheckInSessionDraft[]; mentors: MentorDraft[]; sponsors: SponsorDraft[]; template: ApplicationQuestionTemplate[] }>({ state: startingFormState, checkIns: startingCheckIns, mentors, sponsors, template: startingQuestions });
-  const past = eventHasEnded(publication.status, savedEnd, null, clock);
+  // A canceled event is read-only like an ended one: only links and resources
+  // change (docs/event-states.md, "Canceled events").
+  const canceled = Boolean(initialEvent?.canceled_at);
+  const past = eventHasEnded(publication.status, savedEnd, null, clock) || canceled;
   useEffect(() => {
     if (!savedEnd || past || publication.status !== "active") return;
     const timer = window.setTimeout(() => setClock(Date.now()), Math.min(2147483647, Math.max(1, Date.parse(savedEnd) - Date.now() + 1)));
@@ -736,6 +739,7 @@ export function useEventForm({
     formState,
     eventId,
     past,
+    canceled,
     savedEnd,
     resetKey,
     unresolvedSave,
