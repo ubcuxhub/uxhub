@@ -16,6 +16,9 @@ export function CheckInTableHeader({ sessions }: CheckInTableHeaderProps) {
             {session.name}
           </th>
         ))}
+        <th className="w-12 px-2 py-3">
+          <span className="sr-only">Ticket actions</span>
+        </th>
       </tr>
     </thead>
   );

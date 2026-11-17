@@ -28,9 +28,17 @@ won't scan. Target: Nov 12, 2026.
 IDs show up in admin URLs, so a QR code holding a bare ID would let anyone make
 a working ticket. The code has to hold something only the server could issue.
 
-The token never expires or changes, so a screenshot scans as well as the live
-page. Reuse is stopped at the door: the second scan finds the existing
-`check_ins` row and shows "Already checked in at 10:02".
+The token never expires, and changes only when an admin regenerates it, so a
+screenshot scans as well as the live page. Reuse is stopped at the door: the
+second scan finds the existing `check_ins` row and shows "Already checked in at
+10:02".
+
+**Revoking a code.** The row menu on the admin check-in page has "Regenerate
+QR code" (`regenerate_event_ticket_token`): same ticket, holder, check-ins and
+team, new `qr_token`. The old code, screenshots included, then scans as not a
+UX Hub ticket, and the holder's event page shows the new one. Use it when a
+code leaked (a screenshot was shared). "Void ticket" takes the ticket away
+altogether (see below).
 
 **Decided (2026-10-23): use `qr_token`.** `event_tickets` (see
 [registration-rollout.md](registration-rollout.md)) gives every ticket a unique
@@ -51,8 +59,26 @@ needed migrating.
 ## Who gets a ticket
 
 Anyone with an `event_tickets` row, the same set the check-in table lists. Paid
-fulfillment issues it through `reserve_event_ticket`. The states doc says a
-registered person stays registered, so the ticket has no cancelled state.
+fulfillment issues it through `reserve_event_ticket`. A ticket has no
+cancelled state: it exists or it doesn't. Two things delete it, both through
+`remove_event_ticket`, which also frees the seat and the holder's team spot:
+
+- **A Square refund of the whole amount** (`apply_event_purchase_refund`, from
+  the `refund.created`/`refund.updated` webhook), once the refund is
+  `COMPLETED`. A pending refund removes nothing. After check-in the ticket and
+  its check-ins stay and the app logs `payment.refund_after_check_in`. A
+  partial refund keeps the ticket. See
+  [event-states.md](event-states.md#refunds).
+- **"Void ticket"** in the check-in row menu (`void_event_ticket`). Refused
+  while the ticket has a check-in (undo it first), and while its purchase is
+  paid and not refunded in full, so the club never keeps money for no ticket:
+  refund it in Square instead, and the refund removes the ticket. Voiding a
+  free ticket marks its $0 purchase `canceled`. The person can register again
+  if seats are left.
+
+No ticket is ever issued for a fully refunded purchase: fulfillment checks
+`refunded_cents`, and the `guard_refunded_purchase_ticket` trigger refuses the
+insert (`PURCHASE_REFUNDED`) for the race in between.
 
 ## Build steps
 
