@@ -24,6 +24,7 @@ import { RegistrationPanel } from "@/features/events/components/RegistrationPane
 import { DraftTestRegistration } from "@/features/events/components/DraftTestRegistration";
 import { TeamCard, TeamInviteNotice } from "@/features/events/components/teams/TeamCard";
 import { EventDraftSections } from "@/features/events/components/EventDraftSections";
+import { publicMarketingDestination } from "@/lib/event-marketing";
 import { eventWorkingDocument } from "@/features/admin/lib/event-presentation";
 import { loadTeamCard, type TeamCardData } from "@/features/events/lib/team-card-data";
 import { getHeadersOrigin } from "@/lib/http/request-origin";
@@ -64,6 +65,7 @@ export default async function PortalEventPage({
   ]);
   const badge = eventBadgeFor(states[event.id]);
   const canceled = states[event.id].kind === "canceled";
+  const website = publicMarketingDestination(event);
 
   const startTime = formatEventTime(event.starts_at);
   const endTime = formatEventTime(event.ends_at);
@@ -126,16 +128,23 @@ export default async function PortalEventPage({
                 </div>
               </div>
 
-              <div className="flex items-center gap-3 text-small">
-                <span className="flex size-12 shrink-0 items-center justify-center rounded-md border-[0.8px] text-muted-foreground"><Link2 className="size-5" aria-hidden /></span>
-                <div className="flex flex-col gap-1">
-                  <p className="font-medium">Event details</p>
-                  {/* TODO: make this the actual event website - does this need a migration? */}
-                  <Link href={`/events/${event.slug}`} className="text-muted-foreground">
-                    {event.name} website
-                  </Link>
+              {website.kind !== "none" && (
+                <div className="flex items-center gap-3 text-small">
+                  <span className="flex size-12 shrink-0 items-center justify-center rounded-md border-[0.8px] text-muted-foreground"><Link2 className="size-5" aria-hidden /></span>
+                  <div className="flex flex-col gap-1">
+                    <p className="font-medium">Event details</p>
+                    {website.kind === "external" ? (
+                      <a href={website.url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground">
+                        {event.name} website
+                      </a>
+                    ) : (
+                      <Link href={`/events/${event.slug}`} className="text-muted-foreground">
+                        {event.name} website
+                      </Link>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
           <EventDescription rich={event.description_rich} text={event.description} />

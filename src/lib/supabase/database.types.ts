@@ -1550,6 +1550,14 @@ export type Database = {
           tickets: number
         }[]
       }
+      event_publication_health: {
+        Args: { p_before: string }
+        Returns: {
+          blocked_count: number
+          blocked_event_ids: string[]
+          overdue_count: number
+        }[]
+      }
       event_seat_counts: {
         Args: { p_event_ids: string[] }
         Returns: {

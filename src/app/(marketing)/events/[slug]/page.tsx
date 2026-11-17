@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
+import { publicMarketingDestination } from "@/lib/event-marketing";
 import { createPublicClient } from "@/lib/supabase/public";
 import {
   fetchEventBySlug,
@@ -78,7 +79,7 @@ export async function generateStaticParams() {
 
   const events = await fetchEvents(createPublicClient());
   return events
-    .filter((event) => event.slug)
+    .filter((event) => event.slug && publicMarketingDestination(event).kind === "hosted")
     .map((event) => ({ slug: event.slug! }));
 }
 
@@ -102,6 +103,11 @@ export default async function EventDetailPage({
   const supabase = preview ? await createClient() : createPublicClient();
   const event = await fetchEventBySlug(supabase, slug, { status: preview ? "draft" : "active" });
   if (!event) notFound();
+  if (!preview) {
+    const destination = publicMarketingDestination(event);
+    if (destination.kind === "none") notFound();
+    if (destination.kind === "external") redirect(destination.url);
+  }
   if (preview && (event.configured_marketing_mode === "disabled" || event.configured_marketing_mode === "external")) notFound();
   const unfinished = preview && !!eventWorkingDocument(event);
   const [seatCounts, mentors, sponsors] = await Promise.all([
