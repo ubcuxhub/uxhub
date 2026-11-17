@@ -10,6 +10,7 @@ import type { EventRow } from "@/lib/supabase/models";
 import { fetchEventById } from "@/lib/supabase-helpers/events";
 import { fetchReviewerNoteCounts } from "@/lib/supabase-helpers/application-review-notes";
 import { fetchEventApplicationSummaries } from "@/lib/supabase-helpers/event-applications";
+import { fetchEventSeatCounts } from "@/lib/supabase-helpers/event-tickets";
 
 interface ReviewApplicationsPageProps {
   params: Promise<{ event: string }>;
@@ -47,10 +48,12 @@ export default async function ReviewApplicationsPage({
     eventParam,
     "/review-applications"
   );
-  const [event, summaries] = await Promise.all([
+  const [event, summaries, seatCounts] = await Promise.all([
     fetchEventById(supabase, eventId),
     fetchEventApplicationSummaries(supabase, eventId),
+    fetchEventSeatCounts(supabase, [eventId]),
   ]);
+  const seats = seatCounts.get(eventId);
 
   if (!event) notFound();
   const noteCounts = await fetchReviewerNoteCounts(
@@ -66,6 +69,7 @@ export default async function ReviewApplicationsPage({
       eventName={event.name}
       subtitle={subtitle}
       capacity={event.max_capacity ?? undefined}
+      seats={seats ? { tickets: seats.tickets, heldOffers: seats.heldOffers } : undefined}
       applications={summaries.map((summary) => ({
         ...withReviewState(summary),
         noteCount: noteCounts[summary.applicationId] ?? 0,

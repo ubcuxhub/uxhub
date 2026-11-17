@@ -137,6 +137,24 @@ describe("ReviewApplicationsClient", () => {
     expect(screen.getByRole("columnheader", { name: "Notes" })).toBeTruthy();
   });
 
+  it("counts held seats: tickets and offers out", () => {
+    const { unmount } = renderList();
+    // Without seat counts, the list's own Going and Accepted stand in.
+    expect(screen.getByText("2 of 60 seats · 1 going, 1 offer out")).toBeTruthy();
+    unmount();
+    render(
+      <ReviewApplicationsClient
+        eventId="e1"
+        eventName="UXathon"
+        capacity={60}
+        seats={{ tickets: 40, heldOffers: 12 }}
+        applications={items}
+      />,
+    );
+    const card = screen.getByRole("group", { name: "Seats held" });
+    expect(within(card).getByText("52 of 60 seats · 40 going, 12 offers out")).toBeTruthy();
+  });
+
   it("says so when nobody has applied", () => {
     renderList([]);
     expect(screen.getByText("No applications yet")).toBeTruthy();

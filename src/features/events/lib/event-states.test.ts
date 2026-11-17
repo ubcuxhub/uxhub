@@ -168,6 +168,18 @@ describe("eventStateFor", () => {
       });
     });
 
+    it("carries the release time while decisions are held back", () => {
+      const releaseAt = ms(2 * day);
+      const submitted = { ...application("submitted"), decisions_release_at: releaseAt };
+      expect(stateOf({}, { application: submitted }, appEvent)).toEqual({
+        kind: "app-in-review",
+        decisionsReleaseAt: releaseAt,
+      });
+      // Once it has passed, the page needs a refresh to show the decision.
+      const released = { ...submitted, decisions_release_at: ms(-hour) };
+      expect(stateOf({}, { application: released }, appEvent)).toEqual({ kind: "app-in-review" });
+    });
+
     it("keeps a draft upcoming, since it can't be submitted yet", () => {
       const later = { registration_opens_at: ms(day) };
       const draft = { application: application("draft") };

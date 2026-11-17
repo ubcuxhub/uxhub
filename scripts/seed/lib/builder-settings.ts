@@ -112,7 +112,11 @@ export async function reconcileBuilderSettings(client: SupabaseClient, eventId: 
   await writeDocument(client, "event_content_settings", eventId, content);
   if (seed.applicationQuestions.length) {
     const start = Date.parse(seed.event.registration_closes_at!);
-    const result = await client.from("event_application_settings").upsert({ event_id: eventId, decisions_release_at: new Date(start + 3600000).toISOString(), confirmation_deadline: new Date(start + 86400000).toISOString() });
+    // Release an hour after applications close, but only once that has
+    // passed: a later release would hide the fixtures' decisions, and the
+    // database refuses to move a passed release into the future on a re-run.
+    const release = start + 3600000 <= Date.now() ? new Date(start + 3600000).toISOString() : null;
+    const result = await client.from("event_application_settings").upsert({ event_id: eventId, decisions_release_at: release, confirmation_deadline: new Date(start + 86400000).toISOString() });
     if (result.error) throw result.error;
   }
 }

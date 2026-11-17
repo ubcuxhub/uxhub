@@ -1,5 +1,9 @@
+import type { DateTimeValue } from "@/components/ui/date-time-field";
+import { pacificDate, timestamptzToDatetimeLocal } from "@/lib/date";
+import type { IsoDate, WallTime } from "@/lib/date-input";
 import type {
   EventApplicationRow,
+  EventApplicationSettingsRow,
   SubmittedApplicationStatus,
 } from "@/lib/supabase/models";
 
@@ -51,10 +55,28 @@ export type ApplicationDecision = "accept" | "waitlist" | "reject";
  * The decisions the database allows from each state. Accepting an accepted or
  * expired offer sets a new deadline; rejecting one takes it back, which the
  * database refuses once the person has a ticket.
+ *
+ * Before decisions are released (`released` false) nobody has seen them, so
+ * any decision can change to any other until the applicant registers.
  */
 export function getApplicationDecisions(
-  state: ApplicationReviewState
+  state: ApplicationReviewState,
+  released = true
 ): ApplicationDecision[] {
+  if (!released) {
+    switch (state) {
+      case "submitted":
+      case "accepted":
+      case "offer_expired":
+        return ["accept", "waitlist", "reject"];
+      case "waitlisted":
+        return ["accept", "reject"];
+      case "rejected":
+        return ["accept", "waitlist"];
+      case "registered":
+        return [];
+    }
+  }
   switch (state) {
     case "submitted":
       return ["accept", "waitlist", "reject"];
@@ -66,6 +88,48 @@ export function getApplicationDecisions(
     case "rejected":
       return [];
   }
+}
+
+/** Whether decisions are visible to applicants at `now`: no release, or it has passed. */
+export function decisionsReleased(
+  decisionsReleaseAt: string | null | undefined,
+  now: Date = new Date()
+): boolean {
+  return !decisionsReleaseAt || Date.parse(decisionsReleaseAt) <= now.getTime();
+}
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * The offer deadline the decision card starts from (docs/event-states.md,
+ * "Decision release"). An offer can't end before decisions are released, so
+ * the earliest moment is the later of now and the release. The event's
+ * "Confirm by" is used when it's after that moment; otherwise a week after
+ * it, at 11:45 PM Pacific. Changing "Confirm by" never moves offers already
+ * made.
+ */
+export function defaultOfferDeadline(
+  settings: Pick<
+    EventApplicationSettingsRow,
+    "decisions_release_at" | "confirmation_deadline"
+  > | null,
+  now: Date = new Date()
+): DateTimeValue {
+  const release = settings?.decisions_release_at
+    ? Date.parse(settings.decisions_release_at)
+    : Number.NaN;
+  const earliest = Math.max(now.getTime(), Number.isFinite(release) ? release : 0);
+  const confirmBy = settings?.confirmation_deadline ?? null;
+
+  if (confirmBy && Date.parse(confirmBy) > earliest) {
+    const [date, time] = timestamptzToDatetimeLocal(confirmBy).split("T");
+    if (date && time) return { date: date as IsoDate, time: time as WallTime };
+  }
+
+  return {
+    date: pacificDate(new Date(earliest + 7 * DAY_MS).toISOString()) as IsoDate,
+    time: "23:45" as WallTime,
+  };
 }
 
 const DECISION_STATUS: Record<ApplicationDecision, SubmittedApplicationStatus> = {

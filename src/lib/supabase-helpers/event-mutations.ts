@@ -32,15 +32,25 @@ export async function hasEventScheduleReceipt(client: DbClient, id: string, even
   return true;
 }
 
-export interface EventHistoryInfo { registered: number; checkedIn: number; teams: number; protectedPurchases: number }
+/**
+ * What an event holds, for the builder's banners and the delete dialog.
+ * `applications` counts submitted ones (any status but draft). `drafts` only
+ * counts in full under the service role, since drafts are their applicant's
+ * alone; an admin's own client sees at most their own. `reviewerNotes` are the notes on its
+ * applications.
+ */
+export interface EventHistoryInfo { registered: number; checkedIn: number; teams: number; protectedPurchases: number; applications: number; drafts: number; reviewerNotes: number }
 export async function fetchEventHistoryInfo(client: DbClient, eventId: string): Promise<EventHistoryInfo> {
-  const [tickets, teams, purchases] = await Promise.all([
+  const [tickets, teams, purchases, applications, drafts, notes] = await Promise.all([
     client.from(TABLES.eventTickets).select("id,check_ins(id)").eq("event_id", eventId),
     client.from(TABLES.teams).select("id", { count: "exact", head: true }).eq("event_id", eventId),
     client.from(TABLES.purchases).select("id", { count: "exact", head: true }).eq("event_id", eventId).neq("status", "failed"),
+    client.from(TABLES.eventApplications).select("id", { count: "exact", head: true }).eq("event_id", eventId).neq("status", "draft"),
+    client.from(TABLES.eventApplications).select("id", { count: "exact", head: true }).eq("event_id", eventId).eq("status", "draft"),
+    client.from(TABLES.applicationReviewNotes).select("id, event_applications!inner(event_id)", { count: "exact", head: true }).eq("event_applications.event_id", eventId),
   ]);
-  for (const result of [tickets,teams,purchases]) if (result.error) throw result.error;
-  return { registered: tickets.data?.length ?? 0, checkedIn: tickets.data?.filter(row => row.check_ins.length > 0).length ?? 0, teams: teams.count ?? 0, protectedPurchases: purchases.count ?? 0 };
+  for (const result of [tickets,teams,purchases,applications,drafts,notes]) if (result.error) throw result.error;
+  return { registered: tickets.data?.length ?? 0, checkedIn: tickets.data?.filter(row => row.check_ins.length > 0).length ?? 0, teams: teams.count ?? 0, protectedPurchases: purchases.count ?? 0, applications: applications.count ?? 0, drafts: drafts.count ?? 0, reviewerNotes: notes.count ?? 0 };
 }
 
 /**

@@ -1,6 +1,6 @@
 import { CircleMinus, Hourglass, Lock, type LucideIcon } from "lucide-react";
 
-import { formatEventDate } from "@/lib/date";
+import { formatEventDate, formatEventTime } from "@/lib/date";
 
 import type { EventState } from "./event-states";
 
@@ -78,6 +78,12 @@ export interface PanelContext {
 /** "Wed, Aug 26, 2026", in Pacific time. */
 const longDate = (value: string | null) =>
   formatEventDate(value, { weekday: "short", month: "short" });
+
+/** "Wed, Aug 26, 2026 at 9:00 AM", in Pacific time. */
+const releaseMoment = (value: string) => {
+  const time = formatEventTime(value);
+  return time ? `${longDate(value)} at ${time}` : longDate(value);
+};
 
 const currency = new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" });
 
@@ -242,6 +248,18 @@ export function getPanelSpec(state: EventState, context: PanelContext): PanelSpe
       };
     }
     case "app-in-review":
+      if (state.decisionsReleaseAt) {
+        return {
+          title: "Application",
+          layout: "alert",
+          props: {
+            variant: "warning",
+            icon: Hourglass,
+            title: "Your application is in review",
+            description: `Decisions are released ${releaseMoment(state.decisionsReleaseAt)}.`,
+          },
+        };
+      }
       return {
         title: "Application",
         layout: "alert",

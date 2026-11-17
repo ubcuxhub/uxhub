@@ -3,7 +3,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { datetimeLocalToTimestamptz } from "@/lib/date";
+import { datetimeLocalToTimestamptz, formatTimestamp } from "@/lib/date";
 
 import { ApplicationDecisionCard } from "./ApplicationDecisionCard";
 
@@ -87,5 +87,77 @@ describe("ApplicationDecisionCard", () => {
     fireEvent.click(screen.getByRole("button", { name: "Accept" }));
     expect((await screen.findByRole("alert")).textContent).toContain("Couldn’t save the decision");
     expect(screen.getByRole("button", { name: "Accept" })).toBeTruthy();
+  });
+
+  it("shows the server's refusal in place", async () => {
+    const onDecide = vi.fn().mockResolvedValue("This applicant already registered, so the offer can’t be changed.");
+    renderCard("submitted", onDecide);
+    fireEvent.click(screen.getByRole("button", { name: "Waitlist" }));
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "This applicant already registered, so the offer can’t be changed.",
+    );
+  });
+
+  describe("before decisions are released", () => {
+    const releaseAt = "2031-01-04T17:00:00Z";
+
+    function renderUnreleased(
+      state: Parameters<typeof ApplicationDecisionCard>[0]["state"],
+      onDecide = vi.fn().mockResolvedValue(undefined),
+      offerExpiresAt: string | null = null,
+    ) {
+      render(
+        <ApplicationDecisionCard
+          state={state}
+          firstName="Priya"
+          offerExpiresAt={offerExpiresAt}
+          defaultDeadline={defaultDeadline}
+          releaseAt={releaseAt}
+          onDecide={onDecide}
+        />,
+      );
+      return onDecide;
+    }
+
+    it("says the decision is hidden, and lets a rejection change", () => {
+      renderUnreleased("rejected");
+      expect(screen.getByText(`Hidden from Priya until ${formatTimestamp(releaseAt)}.`)).toBeTruthy();
+      expect(
+        screen.getByText("Priya is marked as rejected. You can change this until decisions are released."),
+      ).toBeTruthy();
+      expect(labels()).toEqual(expect.arrayContaining(["Accept", "Waitlist"]));
+    });
+
+    it("lets an accepted applicant be waitlisted", () => {
+      renderUnreleased("accepted", undefined, "2031-01-11T07:45:00Z");
+      expect(labels()).toEqual(expect.arrayContaining(["Move deadline", "Waitlist", "Take back offer"]));
+    });
+
+    it("refuses a deadline before the release", async () => {
+      const onDecide = vi.fn().mockResolvedValue(undefined);
+      render(
+        <ApplicationDecisionCard
+          state="submitted"
+          firstName="Priya"
+          offerExpiresAt={null}
+          defaultDeadline={{ date: "2031-01-03", time: "23:45" }}
+          releaseAt={releaseAt}
+          onDecide={onDecide}
+        />,
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Accept" }));
+      expect((await screen.findByText("Pick a time after decisions are released."))).toBeTruthy();
+      expect(onDecide).not.toHaveBeenCalled();
+    });
+
+    it("says a rejection can still change", async () => {
+      renderUnreleased("submitted");
+      fireEvent.click(screen.getByRole("button", { name: "Reject" }));
+      expect(
+        await screen.findByText(
+          "Priya will see “Not selected” on the event page once decisions are released. You can change this until then.",
+        ),
+      ).toBeTruthy();
+    });
   });
 });

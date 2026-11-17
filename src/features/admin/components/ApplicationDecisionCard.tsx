@@ -41,21 +41,37 @@ interface ApplicationDecisionCardProps {
   /** The deadline offered when there is no current one (an accept from scratch). */
   defaultDeadline: DateTimeValue;
   /**
-   * Makes the decision. Resolves when it is saved, throws when it is not; the
-   * card shows a failure in place and keeps the form as it was.
+   * When decisions are released, while that is still ahead; `null` once
+   * applicants can see them. Until then any decision can change, and an
+   * offer's deadline must fall after it.
+   */
+  releaseAt?: string | null;
+  /**
+   * Makes the decision. Resolves when it is saved, or with a message when the
+   * server refused it; throws when it could not be saved. The card shows
+   * either in place and keeps the form as it was.
    */
   onDecide: (
     decision: ApplicationDecision,
     offerExpiresAt: string | null
-  ) => Promise<void>;
+  ) => Promise<string | void>;
 }
 
 function describe(
   state: ApplicationReviewState,
   name: string,
-  offerExpiresAt: string | null
+  offerExpiresAt: string | null,
+  unreleased: boolean
 ): string {
   const deadline = formatTimestamp(offerExpiresAt);
+  if (unreleased) {
+    if (state === "accepted") {
+      return `${name} is accepted, with until ${deadline} to register. You can change this until decisions are released.`;
+    }
+    if (state === "rejected") {
+      return `${name} is marked as rejected. You can change this until decisions are released.`;
+    }
+  }
   switch (state) {
     case "submitted":
       return `Accept ${name} with a deadline to register, waitlist, or reject.`;
@@ -99,10 +115,12 @@ export function ApplicationDecisionCard({
   firstName,
   offerExpiresAt,
   defaultDeadline,
+  releaseAt = null,
   onDecide,
 }: ApplicationDecisionCardProps) {
   const id = useId();
-  const decisions = getApplicationDecisions(state);
+  const unreleased = Boolean(releaseAt);
+  const decisions = getApplicationDecisions(state, !unreleased);
   const [deadline, setDeadline] = useState<DateTimeValue>(() => {
     const local =
       state === "accepted" ? timestamptzToDatetimeLocal(offerExpiresAt) : "";
@@ -130,11 +148,16 @@ export function ApplicationDecisionCard({
       setPastError("Pick a time in the future.");
       return;
     }
+    if (decision === "accept" && chosen && releaseAt && Date.parse(chosen) <= Date.parse(releaseAt)) {
+      setPastError("Pick a time after decisions are released.");
+      return;
+    }
     setPending(decision);
     setFailure(null);
     try {
-      await onDecide(decision, decision === "accept" ? chosen : null);
-      setConfirmingReject(false);
+      const refusal = await onDecide(decision, decision === "accept" ? chosen : null);
+      if (refusal) setFailure(refusal);
+      else setConfirmingReject(false);
     } catch {
       setFailure(FAILED);
     } finally {
@@ -151,8 +174,13 @@ export function ApplicationDecisionCard({
           Decision
         </CardTitle>
         <CardDescription>
-          {describe(state, firstName, offerExpiresAt)}
+          {describe(state, firstName, offerExpiresAt, unreleased)}
         </CardDescription>
+        {releaseAt ? (
+          <CardDescription>
+            {`Hidden from ${firstName} until ${formatTimestamp(releaseAt)}.`}
+          </CardDescription>
+        ) : null}
       </CardHeader>
       {decisions.length > 0 ? (
         <CardContent className="flex flex-col gap-5">
@@ -223,7 +251,11 @@ export function ApplicationDecisionCard({
             ? `Take back ${firstName}’s offer?`
             : `Reject ${firstName}’s application?`
         }
-        description={`${firstName} will see “Not selected” on the event page. You can’t undo this.`}
+        description={
+          unreleased
+            ? `${firstName} will see “Not selected” on the event page once decisions are released. You can change this until then.`
+            : `${firstName} will see “Not selected” on the event page. You can’t undo this.`
+        }
         cancelLabel="Keep reviewing"
         confirmLabel={takingBack ? "Take back offer" : "Reject"}
         pendingLabel={takingBack ? "Taking back…" : "Rejecting…"}
