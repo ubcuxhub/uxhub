@@ -4,13 +4,13 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { DateField, DateTimeFieldPair, TimeField } from "@/components/ui/date-time-field";
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import type { IsoDate, WallTime } from "@/lib/date-input";
 import { applicationTimingProblem, type EventFormState } from "./event-form-schema";
 
 const moments = [
-  ["decisions_release_at", "Release decisions on"],
-  ["confirmation_deadline", "Confirm by"],
+  ["decisions_release_at", "Release decisions on", "Applicants don’t see a decision until this time."],
+  ["confirmation_deadline", "Confirm by", "New offers default to this deadline for accepting."],
 ] as const;
 
 export function ApplicationTiming({ state, showErrors, onChange }: {
@@ -24,7 +24,7 @@ export function ApplicationTiming({ state, showErrors, onChange }: {
     <CardHeader className="px-5"><CardTitle>Application timing</CardTitle><CardDescription>Save the decision release and common confirmation deadline. Times are in Pacific Time (Vancouver).</CardDescription></CardHeader>
     <CardContent className="space-y-4 px-5">
       <FieldGroup className="grid gap-4 @min-[36rem]/field-group:grid-cols-2">
-        {moments.map(([key, label]) => {
+        {moments.map(([key, label, hint]) => {
           const [date = "", time = ""] = state[key].split("T");
           const dateError = errors[key];
           const timeError = errors[`${key}-time`];
@@ -33,6 +33,7 @@ export function ApplicationTiming({ state, showErrors, onChange }: {
           return <Field key={key} data-invalid={!!(dateError || timeError || problem)}>
             <FieldLabel htmlFor={`${key}-date`}>{label} (optional)</FieldLabel>
             <DateTimeFieldPair timeWidth="wide" date={<DateField id={`${key}-date`} value={(date || null) as IsoDate | null} aria-describedby={errorId} onValueChange={next => update(next ?? "", time)} onValidityChange={error => setErrors(current => ({ ...current, [key]: error }))} />} time={<TimeField id={`${key}-time`} aria-label={`${label} time`} aria-describedby={errorId} ambiguousStart="daytime" value={(time || null) as WallTime | null} onValueChange={next => update(date, next ?? "")} onValidityChange={error => setErrors(current => ({ ...current, [`${key}-time`]: error }))} />} />
+            <FieldDescription>{hint}</FieldDescription>
             <FieldError id={errorId}>{dateError ?? timeError ?? problem}</FieldError>
             {state[key] && <Button type="button" variant="ghost" className="min-h-11 w-fit sm:min-h-10" onClick={() => onChange(key, "")}>Clear {label.toLowerCase()}</Button>}
           </Field>;

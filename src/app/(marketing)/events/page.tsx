@@ -6,6 +6,7 @@ import Navbar from "@/features/marketing/homepage-sections/Navbar";
 import Footer from "@/features/marketing/homepage-sections/Footer";
 import { MarketingEventCard } from "@/features/marketing/components/MarketingEventCard";
 import { createPublicClient } from "@/lib/supabase/public";
+import { publicMarketingDestination } from "@/lib/event-marketing";
 import { fetchEvents } from "@/lib/supabase-helpers/events";
 
 export const revalidate = 300;
@@ -19,6 +20,11 @@ export default async function EventsPage() {
   const events = await fetchEvents(supabase, {
     orderBy: "starts_at",
     status: "active",
+  });
+
+  const listed = events.flatMap((event) => {
+    const destination = publicMarketingDestination(event);
+    return destination.kind === "none" ? [] : [{ event, destination }];
   });
 
   return (
@@ -37,17 +43,18 @@ export default async function EventsPage() {
             </p>
           </div>
 
-          {events.length === 0 ? (
+          {listed.length === 0 ? (
             <Card className="border-dashed py-20 text-center">
               <CardTitle>Events coming soon</CardTitle>
             </Card>
           ) : (
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {events.map((event) => (
+              {listed.map(({ event, destination }) => (
                 <MarketingEventCard
                   key={event.id}
                   event={event}
-                  href={`/events/${event.slug || event.id}`}
+                  href={destination.kind === "external" ? destination.url : `/events/${event.slug || event.id}`}
+                  external={destination.kind === "external"}
                 />
               ))}
             </div>

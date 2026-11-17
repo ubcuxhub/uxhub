@@ -2,6 +2,7 @@ import type { EventRow } from "@/lib/supabase/models";
 import { parseWorkingDocument } from "./event-working-document";
 import { datetimeLocalToTimestamptz } from "@/lib/date";
 import { safeContentUrl } from "./event-content";
+import { publicMarketingDestination } from "@/lib/event-marketing";
 import { formStateFromEvent } from "../components/event-form/event-form-schema";
 import { priceError } from "./event-configuration";
 
@@ -49,12 +50,9 @@ export function eventPresentation(event: EventRow): EventRow {
 
 export function eventMarketingHref(event: EventRow, publicPages = true) {
   const saved = eventPresentation(event);
-  const mode = saved.configured_marketing_mode ?? (saved.marketing_url ? "external" : "hosted");
-  if (mode === "external") {
-    const url = saved.configured_marketing_url ?? saved.marketing_url;
-    return url && safeContentUrl(url) ? url : null;
-  }
-  if (mode !== "hosted" || !saved.slug) return null;
+  const destination = publicMarketingDestination(saved);
+  if (destination.kind === "external") return destination.url;
+  if (destination.kind !== "hosted" || !saved.slug) return null;
   if (saved.status === "draft") return `/events/${saved.slug}?preview=draft`;
   return publicPages && saved.status === "active" ? `/events/${saved.slug}` : null;
 }

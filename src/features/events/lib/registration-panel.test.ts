@@ -150,6 +150,14 @@ describe("getPanelSpec", () => {
     expect(spec("app-in-review").subheading).toBeUndefined();
   });
 
+  it("promises no email to applicants", () => {
+    expect(spec("app-in-review").props).toMatchObject({ description: "Check back here for a decision." });
+    expect(spec("app-waitlisted").props).toMatchObject({ description: "If a spot opens up, it’ll show here." });
+    for (const kind of ["app-in-review", "app-waitlisted"] as const) {
+      expect(JSON.stringify(spec(kind).props)).not.toMatch(/e-?mail/i);
+    }
+  });
+
   it("uses the alert variant and icon the copy names", () => {
     expect(spec("reg-full").props).toMatchObject({ variant: "destructive" });
     expect(spec("app-in-review").props).toMatchObject({ variant: "warning" });

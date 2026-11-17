@@ -17,7 +17,41 @@ import { TABLES } from "./tables";
 
 type UserInfoWritePayload = Record<string, unknown>;
 
-/** Publication watchdog: aggregate only, never send event copy to logs. */
+export interface PublicationHealth {
+  /** Drafts still unpublished at `before`, blocked or not. */
+  overdue: number;
+  /** Drafts whose publication failed for a lasting reason at their current date. */
+  blocked: number;
+  blockedEventIds: string[];
+}
+
+/**
+ * Publication watchdog: counts and event ids only, never event copy, so the
+ * result is safe to log.
+ */
+export async function adminGetPublicationHealth(before: string): Promise<PublicationHealth> {
+  const { data, error } = await supabaseAdmin
+    .rpc("event_publication_health", { p_before: before })
+    .single();
+  if (error) throw error;
+  const row = data as {
+    overdue_count: number;
+    blocked_count: number;
+    blocked_event_ids: string[] | null;
+  };
+  return {
+    overdue: row.overdue_count,
+    blocked: row.blocked_count,
+    blockedEventIds: row.blocked_event_ids ?? [],
+  };
+}
+
+/**
+ * The overdue count alone, as the watchdog endpoint read it before
+ * `event_publication_health` existed. The migration leaves what it reads
+ * unchanged, so the deployment serving that endpoint (or a rollback to it)
+ * keeps working.
+ */
 export async function adminFindOverduePublications(before: string) {
   const { count, error } = await supabaseAdmin
     .from(TABLES.events)
