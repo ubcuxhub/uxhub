@@ -15,11 +15,13 @@ import type { EventRow } from "@/lib/supabase/models";
 export interface MarketingEventCardProps {
   event: EventRow;
   href?: string;
+  /** The link leaves the site, so it opens in a new tab. */
+  external?: boolean;
   onClick?: () => void;
   className?: string;
 }
 
-export function MarketingEventCard({ event, href, onClick, className }: MarketingEventCardProps) {
+export function MarketingEventCard({ event, href, external, onClick, className }: MarketingEventCardProps) {
   const formattedDate = formatEventDate(event.starts_at, { month: "short" });
 
   const locationDisplay = [event.location_building, event.location_room]
@@ -70,7 +72,11 @@ export function MarketingEventCard({ event, href, onClick, className }: Marketin
       <CardFooter className="mt-auto">
         {href ? (
           <Button asChild className="w-full">
-            <Link href={href}>View event</Link>
+            {external ? (
+              <a href={href} target="_blank" rel="noopener noreferrer">View event</a>
+            ) : (
+              <Link href={href}>View event</Link>
+            )}
           </Button>
         ) : (
           <div className="text-small font-medium text-foreground">
