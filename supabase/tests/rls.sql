@@ -2510,5 +2510,6 @@ $$;
 \ir event-team-settings.sql
 \ir event-content.sql
 \ir event-checkout.sql
+\ir application-decisions.sql
 
 rollback;

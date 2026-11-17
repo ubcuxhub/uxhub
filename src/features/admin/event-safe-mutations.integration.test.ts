@@ -100,7 +100,7 @@ it("counts distinct attendees across sessions, retains history on resource saves
   expect(sessions.error).toBeNull();
   const checkIns = await f.supabase.from("check_ins").insert(sessions.data!.map(session => ({ check_in_session_id:session.id,ticket_id:tickets.data![0].id })));
   expect(checkIns.error).toBeNull();
-  expect(await fetchEventHistoryInfo(f.supabase,e.id)).toEqual({ registered:2, checkedIn:1, teams:0, protectedPurchases:0 });
+  expect(await fetchEventHistoryInfo(f.supabase,e.id)).toEqual({ registered:2, checkedIn:1, teams:0, protectedPurchases:0, applications:0, drafts:0, reviewerNotes:0 });
   const resourceOp = f.track("admin_event_mutations",randomUUID());
   expect((await f.supabase.rpc("save_past_event_resources",{ p_event_id:e.id,p_revision:e.revision,p_operation_id:resourceOp,p_links:[] })).error).toBeNull();
   expect((await f.supabase.from("event_tickets").select("id").eq("event_id",e.id)).data?.map(row => row.id).sort()).toEqual(tickets.data!.map(row => row.id).sort());

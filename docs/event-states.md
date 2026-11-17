@@ -171,6 +171,10 @@ or authorized purchase, and all three must be zero, with no live purchase. The
 delete then removes the event's dead purchases (`purchases.event_id` is
 `on delete restrict`) and the event; tickets, check-ins, teams and
 applications cascade. A refusal carries the hint `EVENT_DELETE_PROTECTED`.
+The delete dialog names what goes with the event (`fetchEventHistoryInfo`,
+read with the service role so drafts count): the applications and drafts with
+their answers and uploaded files, the reviewer notes, the registrations and
+the teams. Applicants aren't notified.
 
 **Checkout checks before it holds a card.** `initialize_event_checkout` runs
 `event_ticket_eligibility` (status, cancellation, window, offer and seats) and
@@ -192,9 +196,12 @@ who joined first, or is deleted if nobody else is on it.
 Only for events with `requires_application`.
 
 `event_applications.status` (enum `event_application_status`) has exactly five
-values. The database enforces the moves below:
+values. Once decisions are released ([below](#decision-release)) the database
+enforces the moves below; before release any decision can change to any other
+among `submitted`, `waitlisted`, `accepted` and `rejected`. An offer someone
+has registered on never changes.
 
-| `status` | Meaning | Next |
+| `status` | Meaning | Next, after release |
 | --- | --- | --- |
 | `draft` | The applicant is still filling it in | `submitted`, only through `submit_event_application` |
 | `submitted` | Waiting for review | `accepted`, `waitlisted`, `rejected` |
@@ -217,6 +224,49 @@ not `status` values; they're worked out from the deadline and the ticket:
 - Re-offering an expired spot keeps `status = accepted` and sets a new
   `offer_expires_at`.
 - Taking back an offer before the person registers changes it to Rejected.
+
+Admins decide through `decide_event_application` (service role, from
+`updateApplicationDecisionAction`), which locks the event row as reservation
+does and returns why it refused instead of failing:
+
+- **Capacity.** An accept that would take a seat (the applicant has no ticket
+  and no unexpired offer) counts seats as [Seats](#seats) does. When none is
+  left it returns `OVER_CAPACITY` with the tickets, held offers and capacity;
+  the review page then asks "Accept anyway", which passes
+  `p_allow_over_capacity` and is logged as `application.accepted_over_capacity`.
+  Two accepts for the last seat serialize on the lock, so only one takes it.
+- **Deadline.** `offer_expires_at` must be after now and after the release
+  (`DEADLINE_TOO_EARLY`). The review page starts from `defaultOfferDeadline`:
+  the event's Confirm by when that's after the later of now and the release,
+  otherwise a week after that moment at 11:45 PM Pacific. Changing Confirm by
+  never moves offers already made.
+- Other refusals: `NOT_FOUND`, `NOT_SUBMITTED` (a draft), `HAS_TICKET` (the
+  offer is registered), `NOT_ALLOWED` (a move the table forbids after release).
+
+The review list's "Seats held X of N" card counts tickets and offers out
+(`event_seat_counts`).
+
+### Decision release
+
+"Release decisions on" (`event_application_settings.decisions_release_at`)
+holds every decision back from applicants until it passes;
+`application_decisions_released(event)` is true once it has, or when none is
+set. Before then:
+
+- "applications: read own" shows an applicant only their draft or submitted
+  rows, and `get_my_event_applications` (what the portal reads) reports a
+  decided application as `submitted`, with no `offer_expires_at` and no
+  `updated_at`. It always returns `decisions_release_at`, and the panel says
+  when decisions come out. Applicants still read their own answers.
+- Checkout and reservation refuse an offer with `APPLICATION_REQUIRED`
+  (`event_ticket_eligibility`).
+- Admins see and change decisions as usual; the decision card says "Hidden
+  from {first name} until {release}".
+
+The portal shows the decision on the first load after the release; nothing
+pushes it to an open page. Once applicants can see decisions (the release has
+passed, or none was set and some application is decided), the release can't
+move into the future (`EVENT_SETTINGS_CONFLICT`).
 
 Drafts belong to the applicant alone:
 
@@ -257,7 +307,7 @@ register.
 | `app-upcoming` | Opens Oct 12 | Before `registration_opens_at`, for an application event |
 | `app-open` | Applications open | Applications are open and they haven't started one |
 | `app-draft` | Draft | Their application is a `draft`, and applications are open |
-| `app-in-review` | Pending | Their application is `submitted` |
+| `app-in-review` | Pending | Their application is `submitted`, or decided but not yet released; before release the panel says when decisions come out |
 | `app-waitlisted` | Waitlisted | Their application is `waitlisted` |
 | `app-accepted` | Register by Oct 20 | Accepted, before the offer deadline, no ticket yet |
 | `app-rejected` | Not selected | Their application is `rejected` |
@@ -430,10 +480,11 @@ The admin builder saves application timing in staff-only
 `event_application_settings`, separately from public event rows and existing
 per-offer `offer_expires_at`. Release decisions on and Confirm by are optional
 Pacific moments; entered values need a complete, unambiguous date and time, and
-confirmation follows release when both are set. Elapsed values remain editable.
-These form settings do not yet embargo decisions, change outstanding offers,
-reopen expired offers or send emails. Those attendee behaviours remain deferred.
-The intended common deadline/release policy is provisional pending product review.
+confirmation follows release when both are set. Release decisions on holds
+decisions back from applicants ([Decision release](#decision-release)) and
+can't move into the future once applicants can see decisions. Confirm by is
+the default deadline for new offers; changing it doesn't move outstanding
+offers, reopen expired ones or send emails.
 
 First submission records a durable `questions_locked_at`. Application drafts
 alone do not lock questions. After submission the builder shows ordered summaries,
