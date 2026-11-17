@@ -76,13 +76,15 @@ describe("safe event mutations", () => {
     const op = f.track("admin_event_mutations",randomUUID());
     const args = { p_event_id:e.id,p_operation_id:op };
     const first = await f.supabase.rpc("delete_admin_event_safely",args);
-    if (status === "failed") {
+    // A failed or canceled attempt is dead (docs/event-states.md, "Live purchases").
+    if (status === "failed" || status === "canceled") {
       expect(first.error).toBeNull();
       expect((await f.supabase.rpc("delete_admin_event_safely",args)).data).toEqual(first.data);
       expect((await f.supabase.from("events").select("id").eq("id",e.id)).data).toHaveLength(0);
     } else {
       expect(first.error).not.toBeNull();
       expect((await f.supabase.from("purchases").select("id").eq("id",purchase.data!.id)).data).toHaveLength(1);
+      expect(first.error?.hint).toBe("EVENT_DELETE_PROTECTED");
       expect((await fetchEventHistoryInfo(f.supabase,e.id)).protectedPurchases).toBe(1);
     }
   }));
@@ -90,7 +92,8 @@ describe("safe event mutations", () => {
 
 it("counts distinct attendees, retains history, and requires attendance undo before parent deletion", () => withFixtures(async f => {
   const e = await f.createEvent({ status: "active", starts_at: "2020-11-02T18:00:00Z", ends_at: "2020-11-03T19:00:00Z" });
-  const users = [await f.createUser(), await f.createUser()];
+  // Staff tickets without purchases: no member is affected, so it deletes.
+  const users = [await f.createUser({ role_access: "admin" }), await f.createUser({ role_access: "manager" })];
   const tickets = await f.supabase.from("event_tickets").insert(users.map(user => ({ event_id: e.id, user_id: user.id }))).select();
   expect(tickets.error).toBeNull();
   const sessions = await f.supabase.from("check_in_sessions").insert(["One", "Two"].map(name => ({ event_id:e.id, name, start_time:e.starts_at, end_time:e.ends_at }))).select();

@@ -8,6 +8,9 @@ const actions = vi.hoisted(() => ({ fetchItemCheckInAction: vi.fn(), mutateItemC
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock("@/components/ui/toast", () => ({ toast }));
 vi.mock("@/features/admin/check-in-actions", () => actions);
+vi.mock("./CheckInTicketMenu", () => ({
+  CheckInTicketMenu: ({ onVoided }: { onVoided: (id: string) => void }) => <button onClick={() => onVoided("ticket")}>Void attendee ticket</button>,
+}));
 vi.mock("@/lib/supabase/client", () => ({
   createClient: () => ({
     channel: () => {
@@ -164,4 +167,14 @@ it("uses Manage Events for direct links and unsafe destinations", async () => {
   render(<CheckInManager eventId="event" event={event} initialItemId="a" initialSnapshot={snapshot} phoneLinks={{}} returnTo="//evil.test" />);
   await act(async () => {});
   expect(screen.getByRole("link", { name: "Back to Manage Events" }).getAttribute("href")).toBe("/admin/events");
+});
+
+it("refreshes the item attendee list and counts after a ticket is voided", async () => {
+  mount();
+  await act(async () => {});
+  actions.fetchItemCheckInAction.mockResolvedValue({ ...snapshot, attendees: [] });
+  fireEvent.click(screen.getByRole("button", { name: "Void attendee ticket" }));
+  await waitFor(() => expect(screen.getByText("No attendees yet")).toBeTruthy());
+  expect(screen.queryByText("Ada Lovelace")).toBeNull();
+  expect(screen.getByText("0 going")).toBeTruthy();
 });

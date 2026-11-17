@@ -103,8 +103,14 @@ published.
 - **Portal event page:** admins and managers can open a draft's
   `/portal/events/[slug]` page, even while `FLAGS.studentEvents` is off. It
   shows a "This is a draft event" banner and the saved unfinished sections, and
-  replaces the registration panel with a disabled "Registration unavailable in
-  draft preview" button (see "Unified saved drafts and staff previews").
+  replaces the registration panel with staff test registration
+  (`DraftTestRegistration`): on a free draft, a warning that it creates a real
+  registration and a **Test registration (staff only)** button that opens
+  checkout; on a paid draft, a disabled "Paid drafts can’t be test-registered"
+  button and no way to pay. Once they hold a ticket, the ordinary panel shows
+  it. Checkout is behind `FLAGS.studentEvents`, so while the flag is off the
+  page keeps the disabled "Registration unavailable in draft preview" button
+  (see "Unified saved drafts and staff previews").
 - **Portal timeline:** `/portal/events` lists drafts to admins and managers
   only (`portalEventStatuses`), each with a "Draft event" badge in place of the
   state badge, under a note that only admins and managers see drafts. Search
@@ -116,21 +122,95 @@ published.
 - **Not on the public site:** the public `/events` pages stay active-only. The
   public `/events/[slug]` page is cached and uses the anon client, so it never
   shows a draft; staff preview one at `/events/<slug>?preview=draft`.
+- **Free drafts only:** staff test registration is for free events. On a
+  draft or scheduled event, `event_ticket_eligibility` lets only admins and
+  managers register, and only when the event is free (regular and member
+  price 0) and the amount is $0. Anything else is `EVENT_NOT_ACTIVE`, so a
+  paid draft never gets a purchase or a card hold. The checkout dialog shows
+  the same warning and labels its button **Test registration (staff only)**.
 - **Enforced on the server:** fulfillment reads events with the service-role
   client, which bypasses RLS. It has to check the buyer's role itself before it
-  sells a draft ticket. `reserve_event_ticket` does this: it looks up the
-  buyer's role and lets only admins and managers register for a draft or
-  scheduled event.
+  sells a draft ticket. `initialize_event_checkout` and `reserve_event_ticket`
+  both do, through `event_ticket_eligibility`.
 
 Preview deploys share the production database (the free plan has no branching),
 so registrations and check-ins made on a test draft are real production rows.
-Keep the event in Draft afterwards, or delete it along with its registrations.
+Keep the event in Draft afterwards, or delete it: a staff member's $0 test
+purchase on a draft is not a live purchase, so a draft with only staff test
+registrations deletes, taking its tickets and dead purchases with it.
 
 The portal event page and checkout read the event under the viewer's RLS, so
 staff reach drafts and members get a 404. Fulfillment
 (`checkoutEventTicket`) uses the service role, so it drops the
-`status = active` filter only for admins and managers, and
-`reserve_event_ticket` checks the role again.
+`status = active` filter only for admins and managers, and the database checks
+the role again.
+
+### Live purchases
+
+One rule decides whether a purchase still matters (`purchase_is_live`,
+`event_has_live_purchases`). A purchase is **live** when it is:
+
+- `pending` or `authorized`: Square may still capture it;
+- `completed` with `refunded_cents < amount_cents`: money is still held;
+- `completed` for $0: a free registration, except a staff member's (admin or
+  manager) test registration on an event that is still a draft.
+
+Everything else is **dead**: `failed` and `canceled` attempts, fully refunded
+purchases, and staff $0 tests on a draft. Square owns `purchases.status`, so a
+refund is recorded in `refunded_cents`/`refunded_at`, never as a status.
+
+Live purchases lock pricing (`admin_event_pricing_locked`) and the
+registration mode (`guard_event_registration_settings`), alongside tickets and
+held offers; a canceled checkout attempt locks nothing. They also protect an
+event from deletion.
+
+**Deleting an event** (`delete_event_atomically`) works when no member is
+affected: `event_member_commitments` counts non-staff, non-deleted accounts
+with a ticket, a held offer (accepted, unexpired, no ticket yet) or a pending
+or authorized purchase, and all three must be zero, with no live purchase. The
+delete then removes the event's dead purchases (`purchases.event_id` is
+`on delete restrict`) and the event; tickets, check-ins, teams and
+applications cascade. A refusal carries the hint `EVENT_DELETE_PROTECTED`.
+
+**Checkout checks before it holds a card.** `initialize_event_checkout` runs
+`event_ticket_eligibility` (status, cancellation, window, offer and seats) and
+the one-ticket check before it inserts a purchase, so a sold-out, closed,
+expired-offer or canceled attempt leaves no purchase and never reaches Square.
+Two buyers racing for the last seat can still both be authorized; the loser's
+hold is voided at reservation, as before.
+
+`events.canceled_at` (with `cancellation_note`) marks a canceled event. Cancel
+is a flag on an active event, not a status value; checkout and reservation
+refuse it with `EVENT_CANCELED`. Nothing sets it yet.
+
+`remove_event_ticket` deletes one ticket and frees its holder's team spot on
+that event as account deletion does: a team they owned passes to the teammate
+who joined first, or is deleted if nobody else is on it.
+
+### Refunds
+
+Refunds are issued in Square, never in the app. The webhook takes
+`refund.created` and `refund.updated` (and a `payment.updated` that lists
+refunds), fetches the payment and each of its refunds, and passes the total of
+the `COMPLETED` ones, capped at Square's `refundedMoney`, to
+`apply_event_purchase_refund`. It runs under the event lock, records
+`refunded_cents`/`refunded_at`, and never lowers the amount, so duplicate and
+out-of-order deliveries change nothing. `purchases.status` stays `completed`.
+
+- **Full refund, no check-in:** the ticket goes (`remove_event_ticket`), which
+  frees the seat and the team spot. The purchase is dead.
+- **Full refund after check-in:** the ticket and its check-ins stay, and the
+  app logs `payment.refund_after_check_in` at `warn` for someone to review.
+- **Partial refund:** only the amount is recorded; the ticket stays and the
+  purchase is still live.
+- **Pending refund:** nothing is recorded until it completes.
+- **Membership:** the amount is recorded and the app warns
+  (`payment.membership_refunded`); the membership is not revoked.
+- **Refund before fulfillment** (the capture was confirmed late): fulfillment
+  skips a fully refunded purchase, and `guard_refunded_purchase_ticket`
+  refuses its ticket, so no ticket is ever issued for it.
+
+Purchase history shows "Refunded" or "Partially refunded" from the amount.
 
 ## Admin: application
 
@@ -340,14 +420,16 @@ Active membership requires both personal expiry and club-term checks. Existing
 legacy events retain their policy/amounts on unrelated saves; explicitly changing
 pricing configuration converts an eligible event. The temporary pricing
 publication/scheduling/registration blockers have been removed. Staff may still
-test drafts; ordinary required-field, authorization and pricing locks remain.
+test-register on free drafts (see "Drafts for admins"); ordinary required-field,
+authorization and pricing locks remain.
 
 `initialize_event_checkout` snapshots paid prices under the event lock. A zero
 amount reserves its ticket and completes the zero-dollar purchase in one
 transaction, without Square customer creation, card collection or a charge.
 The purchase supplies existing history, confirmation and receipt paths; its ticket
 supplies Going/private access, QR and check-in. Equal attempt keys return the
-same receipt; rejected free reservations leave no purchase. A changed quote
+same receipt; a refused attempt, free or paid, leaves no purchase, since
+eligibility runs before the insert (see "Live purchases"). A changed quote
 requires refresh rather than charging an unreviewed amount.
 
 `first_published_at` records first activation and survives a return to Draft.
@@ -358,8 +440,8 @@ saved under concurrent requests. Marketing mode/external URL configuration
 remains independently editable; existing public destinations are preserved.
 
 Pricing configuration and effective prices lock when an event has a ticket,
-an unexpired accepted offer, or a nonfailed purchase (including an in-flight
-payment). Purchase/ticket/offer writes take the event lock used by reservation;
+an unexpired accepted offer, or a live purchase (including an in-flight
+payment; see "Live purchases"). Purchase/ticket/offer writes take the event lock used by reservation;
 form checks run after that lock and see committed registrations. Historical
 purchase amounts and ticket records are never rewritten by configuration saves.
 `admin_event_pricing_locked` exposes only the staff aggregate; URL claims have

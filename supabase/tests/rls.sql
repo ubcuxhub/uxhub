@@ -989,7 +989,15 @@ begin
     foreach fn in array array[
       'public.reserve_event_ticket(uuid, uuid, uuid)',
       'public.release_event_ticket(uuid)',
-      'public.event_seat_counts_unfiltered(uuid[])'
+      'public.event_seat_counts_unfiltered(uuid[])',
+      -- Ticket-safety helpers are internal: service role and database
+      -- functions only.
+      'public.purchase_is_live(uuid)',
+      'public.event_has_live_purchases(uuid)',
+      'public.event_member_commitments(uuid)',
+      'public.remove_event_ticket(uuid)',
+      'public.event_ticket_eligibility(uuid, uuid, bigint)',
+      'public.delete_event_before_safe_mutations(uuid)'
     ] loop
       if has_function_privilege(role_name, fn, 'execute') then
         raise exception '% can execute %', role_name, fn;
@@ -1016,6 +1024,38 @@ begin
   end if;
   if not has_function_privilege('anon', 'public.event_seat_counts(uuid[])', 'execute') then
     raise exception 'anon lost execute on event_seat_counts';
+  end if;
+end;
+$$;
+
+-- Refunds and admin ticket actions run on the server only: a member must not
+-- record a refund, void a ticket or mint a new QR code.
+do $$
+declare
+  role_name text;
+  fn text;
+begin
+  foreach role_name in array array['anon', 'authenticated'] loop
+    foreach fn in array array[
+      'public.apply_event_purchase_refund(uuid, integer)',
+      'public.regenerate_event_ticket_token(uuid)',
+      'public.void_event_ticket(uuid)',
+      'public.guard_refunded_purchase_ticket()'
+    ] loop
+      if has_function_privilege(role_name, fn, 'execute') then
+        raise exception '% can execute %', role_name, fn;
+      end if;
+    end loop;
+  end loop;
+  -- Members can't set their own refund either: purchases has no UPDATE policy.
+  if exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'purchases'
+             and cmd in ('UPDATE', 'ALL')) then
+    raise exception 'purchases gained a client UPDATE policy; refunded_cents must stay server-written';
+  end if;
+  if not has_function_privilege('service_role', 'public.apply_event_purchase_refund(uuid, integer)', 'execute')
+     or not has_function_privilege('service_role', 'public.void_event_ticket(uuid)', 'execute')
+     or not has_function_privilege('service_role', 'public.regenerate_event_ticket_token(uuid)', 'execute') then
+    raise exception 'service_role lost execute on the refund or ticket actions';
   end if;
 end;
 $$;

@@ -17,6 +17,22 @@ interface DeleteEventModalProps {
   error?: string | null;
 }
 
+const count = (value: number, one: string, many: string) => `${value} ${value === 1 ? one : many}`;
+
+/** Why the database will refuse the delete (delete_event_before_safe_mutations). */
+export function deletionRefusal(blockers: DeletionInfo["blockers"]) {
+  const members = [
+    blockers.memberTickets ? `${count(blockers.memberTickets, "member is", "members are")} registered` : null,
+    blockers.memberOffers ? `${count(blockers.memberOffers, "member holds an offer", "members hold offers")}` : null,
+    blockers.memberPendingPurchases ? `${count(blockers.memberPendingPurchases, "member payment is", "member payments are")} in progress` : null,
+  ].filter(Boolean);
+  const reasons = [
+    members.length ? `${members.join(", ")}.` : null,
+    blockers.livePurchases ? "Some purchases aren’t failed, canceled or refunded." : null,
+  ].filter(Boolean);
+  return `${reasons.join(" ")} Free staff test registrations on a draft don’t count. Nothing has been deleted.`;
+}
+
 export function DeleteEventModal({ eventId, eventName, isOpen, onClose, onConfirm, isDeleting = false, error }: DeleteEventModalProps) {
   const [info, setInfo] = useState<DeletionInfo | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
@@ -31,8 +47,8 @@ export function DeleteEventModal({ eventId, eventName, isOpen, onClose, onConfir
     }).catch(() => { if (active) setFailure("Couldn’t check deletion protections. Try again."); });
     return () => { active = false; setInfo(null); setFailure(null); };
   }, [isOpen, eventId, attempt]);
-  if (!info || info.protectedPurchases > 0 || info.checkedIn > 0) return <Dialog open={isOpen} onOpenChange={open => { if (!open) onClose(); }}>
-    <DialogContent><DialogHeader><DialogTitle>{info && (info.protectedPurchases > 0 || info.checkedIn > 0) ? "This event can’t be deleted" : "Delete event?"}</DialogTitle><DialogDescription role="status">{info ? `${info.registered} people are registered and ${info.teams} teams exist. Attendance has been recorded for ${info.checkedIn} attendee${info.checkedIn === 1 ? "" : "s"}. ${info.protectedPurchases} purchases are not failed. Attendance and payment protections prevent deleting this event. Nothing has been deleted.` : failure ?? "Checking registrations, teams and payment protections…"}</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" onClick={onClose}>Cancel</Button>{failure && <Button onClick={() => setAttempt(value => value + 1)}>Try again</Button>}</DialogFooter></DialogContent>
+  if (!info || info.blocked || info.checkedIn > 0) return <Dialog open={isOpen} onOpenChange={open => { if (!open) onClose(); }}>
+    <DialogContent><DialogHeader><DialogTitle>{info && (info.blocked || info.checkedIn > 0) ? "This event can’t be deleted" : "Delete event?"}</DialogTitle><DialogDescription role="status">{info ? info.checkedIn > 0 ? `Attendance has been recorded for ${count(info.checkedIn, "attendee", "attendees")}. Undo all check-ins before deleting this event. Nothing has been deleted.` : deletionRefusal(info.blockers) : failure ?? "Checking registrations, teams and payment protections…"}</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" onClick={onClose}>Cancel</Button>{failure && <Button onClick={() => setAttempt(value => value + 1)}>Try again</Button>}</DialogFooter></DialogContent>
   </Dialog>;
   return <ConfirmDialog open={isOpen} onOpenChange={open => { if (!open) onClose(); }} title="Delete event?"
     description={`This will permanently remove ${info.name || eventName}, its registrations and its teams. This can’t be undone. ${info.registered} people are registered and ${info.teams} teams exist. No emails or refunds will be sent.`}

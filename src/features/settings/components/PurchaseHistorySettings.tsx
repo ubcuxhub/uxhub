@@ -11,6 +11,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatTimestamp } from "@/lib/date";
 import { cn } from "@/lib/utils";
+import { purchaseStatusLabel } from "@/features/payments/purchase-status";
 
 const supabase = createClient();
 
@@ -84,13 +85,13 @@ function PurchaseRow({ purchase }: { purchase: PurchaseWithDetails }) {
         </p>
         <p
           className={cn(
-            "text-small capitalize",
+            "text-small",
             PROBLEM_STATUSES.has(purchase.status)
               ? "text-destructive"
               : "text-muted-foreground",
           )}
         >
-          {purchase.status}
+          {purchaseStatusLabel(purchase)}
         </p>
       </div>
     </div>

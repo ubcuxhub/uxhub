@@ -32,6 +32,34 @@ export function matchesReferencedPurchase(
   );
 }
 
+interface SquareMoney {
+  amount?: bigint | null;
+  currency?: string | null;
+}
+
+/**
+ * The refunded amount that may take access away: the sum of the payment's
+ * COMPLETED refunds in its own currency. A PENDING refund can still fail, so
+ * it counts for nothing. Capped at the payment's `refundedMoney`, Square's
+ * own running total, so a refund list fetched ahead of the payment never
+ * records more than Square reports.
+ */
+export function completedRefundCents(
+  payment: { amountMoney?: SquareMoney; refundedMoney?: SquareMoney },
+  refunds: ({ status?: string | null; amountMoney?: SquareMoney } | undefined)[],
+): number {
+  const currency = payment.amountMoney?.currency;
+  let total = BigInt(0);
+  for (const refund of refunds) {
+    if (refund?.status !== "COMPLETED") continue;
+    if (currency && refund.amountMoney?.currency && refund.amountMoney.currency !== currency) continue;
+    total += refund.amountMoney?.amount ?? BigInt(0);
+  }
+  const reported = payment.refundedMoney?.amount;
+  if (reported !== undefined && reported !== null && reported < total) total = reported;
+  return Number(total);
+}
+
 export function normalizeSquareStatus(status: string | undefined) {
   switch (status) {
     case "APPROVED":
@@ -240,6 +268,8 @@ export function formatReservationFailure(reason: string | null | undefined) {
       return "This event could not be found.";
     case "EVENT_NOT_ACTIVE":
       return "This event is no longer open for registration.";
+    case "EVENT_CANCELED":
+      return "This event has been canceled.";
     default:
       return "We could not reserve a ticket for this event.";
   }

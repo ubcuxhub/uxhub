@@ -17,6 +17,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "@/components/ui/toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
 import { CheckInTarget } from "./CheckInTarget";
+import { CheckInTicketMenu } from "./CheckInTicketMenu";
 import { CheckInFeedback } from "./CheckInFeedback";
 import { useItemCheckIn } from "@/features/admin/hooks/use-item-check-in";
 import { checkInBackLabel, checkInReturnTo, checkInPath, type ItemCheckInSnapshot, type ItemAttendance } from "@/features/admin/lib/item-check-in";
@@ -124,7 +125,7 @@ export function CheckInManager({ eventId, event, initialItemId, initialSnapshot,
           <SearchField label="Search attendees" placeholder="Search attendees" value={search} onValueChange={setSearch} resultCount={matches.length} />
           {matches.length ? <ul className="overflow-hidden rounded-xl border border-border">{matches.map(a => {
             const row = attendance.get(a.id);
-            return <ListRow key={a.id} variant="compact" name={a.user_name} supporting={row ? <StatusBadge status="checked_in" label={`Checked in at ${formatEventTime(row.checkedInAt)}`} /> : null} action={row ? rowAction(row) : <Button variant="secondary" disabled={!state.enabled} onClick={() => void manual(a.id)}>Check in</Button>} />;
+            return <ListRow key={a.id} variant="compact" name={a.user_name} supporting={row ? <StatusBadge status="checked_in" label={`Checked in at ${formatEventTime(row.checkedInAt)}`} /> : null} action={<div className="flex items-center gap-1">{row ? rowAction(row) : <Button variant="secondary" disabled={!state.enabled} onClick={() => void manual(a.id)}>Check in</Button>}<CheckInTicketMenu attendee={a} onVoided={() => { void state.refresh(); }} /></div>} />;
           })}</ul> : <EmptyState size="inline" title={total ? "No attendees match" : "No attendees yet"} description={total ? "Try another search or filter." : "Valid ticket holders will appear here."} actions={total ? <Button variant="secondary" onClick={() => {
             setSearch("");
             setFilter("all");

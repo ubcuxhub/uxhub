@@ -1,13 +1,13 @@
 import { randomUUID } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
-import { clientAs, withFixtures, type Fixtures } from "@/test/integration";
+import { clientAs, createIntegrationClient, withFixtures, type Fixtures } from "@/test/integration";
 import { mutateItemCheckIn, fetchItemCheckInSnapshot } from "@/lib/supabase-helpers/item-check-in";
 vi.mock("server-only", () => ({}));
 const context = vi.hoisted(() => ({ requireAdmin: vi.fn(), createClient: vi.fn() }));
 vi.mock("@/lib/auth/guards", () => ({ requireAdmin: context.requireAdmin, requireManager: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: context.createClient }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-import { checkInScannedTicketAction, checkInTicketAction, toggleCheckInAction } from "@/features/admin/actions";
+import { checkInScannedTicketAction, checkInTicketAction, toggleCheckInAction, regenerateTicketQrAction, voidTicketAction } from "@/features/admin/actions";
 
 async function setup(f: Fixtures, times = { start: "2026-01-01T18:00:00Z", end: "2026-01-01T19:00:00Z" }) {
   const db = f.supabase;
@@ -177,3 +177,136 @@ it("keeps two items independent and serializes undo against a simultaneous scan"
     expect(remaining.attendance[0].attendanceVersion).not.toBe(original.attendanceVersion);
   expect((await fetchItemCheckInSnapshot(client, x.event.id, second.data.id)).attendance).toHaveLength(1);
 }));
+
+// Exercise the incoming ticket controls against item-bound sessions.
+const db = createIntegrationClient();
+async function ticketHolder(fixtures: Fixtures) {
+  const x = await setup(fixtures);
+  context.requireAdmin.mockResolvedValue(x.admin);
+  context.createClient.mockResolvedValue(clientAs(x.admin));
+  return { sessionId: x.session.id, ticketId: x.ticket.id, qrToken: x.ticket.qr_token };
+}
+async function checkInRows(ticketId: string) {
+  const { data, error } = await db.from("check_ins").select("checked_in_at").eq("ticket_id", ticketId);
+  if (error) throw error;
+  return data;
+}
+
+describe("admin ticket actions", () => {
+  async function ticketExists(ticketId: string) {
+    const { data, error } = await db.from("event_tickets").select("id").eq("id", ticketId);
+    if (error) throw error;
+    return data.length === 1;
+  }
+
+  /** Attaches a purchase to the holder's ticket, as checkout would. */
+  async function attachPurchase(
+    fixtures: Fixtures,
+    ticketId: string,
+    purchase: { amount_cents: number; status?: "completed" | "authorized"; refunded_cents?: number }
+  ) {
+    const { data: ticket, error: ticketError } = await db
+      .from("event_tickets")
+      .select("event_id, user_id")
+      .eq("id", ticketId)
+      .single();
+    if (ticketError) throw ticketError;
+    const { data, error } = await db
+      .from("purchases")
+      .insert({
+        event_id: ticket.event_id,
+        user_id: ticket.user_id,
+        kind: "event_ticket",
+        status: purchase.status ?? "completed",
+        amount_cents: purchase.amount_cents,
+        refunded_cents: purchase.refunded_cents ?? 0,
+        currency: "CAD",
+        idempotency_key: `${fixtures.tag}-${ticketId}`,
+      })
+      .select("id")
+      .single();
+    if (error) throw error;
+    const linked = await db.from("event_tickets").update({ purchase_id: data.id }).eq("id", ticketId);
+    if (linked.error) throw linked.error;
+    return data.id;
+  }
+
+  it("regenerates a QR code so the old one, screenshots included, stops scanning", () =>
+    withFixtures(async (fixtures) => {
+      const { sessionId, ticketId, qrToken } = await ticketHolder(fixtures);
+
+      expect(await regenerateTicketQrAction(ticketId)).toEqual({ ok: true });
+
+      const { data } = await db.from("event_tickets").select("qr_token").eq("id", ticketId).single();
+      expect(data!.qr_token).toMatch(/^[0-9a-f]{32}$/);
+      expect(data!.qr_token).not.toBe(qrToken);
+      expect(await checkInScannedTicketAction(sessionId, qrToken)).toEqual({
+        status: "rejected",
+        reason: "not_found",
+      });
+      expect(await checkInScannedTicketAction(sessionId, data!.qr_token)).toMatchObject({
+        status: "checked_in",
+        name: "Ada Lovelace",
+      });
+      expect(await regenerateTicketQrAction("00000000-0000-4000-8000-000000000000")).toMatchObject({ ok: false });
+    }));
+
+  it("voids a free ticket and cancels its $0 registration", () =>
+    withFixtures(async (fixtures) => {
+      const { sessionId, ticketId, qrToken } = await ticketHolder(fixtures);
+      const purchaseId = await attachPurchase(fixtures, ticketId, { amount_cents: 0 });
+
+      expect(await voidTicketAction(ticketId)).toEqual({ ok: true });
+
+      expect(await ticketExists(ticketId)).toBe(false);
+      expect(await checkInScannedTicketAction(sessionId, qrToken)).toMatchObject({ status: "rejected" });
+      const { data } = await db.from("purchases").select("status").eq("id", purchaseId).single();
+      expect(data).toEqual({ status: "canceled" });
+    }));
+
+  it("refuses to void a checked-in ticket", () =>
+    withFixtures(async (fixtures) => {
+      const { sessionId, ticketId, qrToken } = await ticketHolder(fixtures);
+      await checkInScannedTicketAction(sessionId, qrToken);
+
+      expect(await voidTicketAction(ticketId)).toEqual({
+        ok: false,
+        error: expect.stringMatching(/checked in/),
+      });
+      expect(await ticketExists(ticketId)).toBe(true);
+      expect(await checkInRows(ticketId)).toHaveLength(1);
+    }));
+
+  it("refuses to void a paid ticket until it is refunded in full", () =>
+    withFixtures(async (fixtures) => {
+      const { ticketId } = await ticketHolder(fixtures);
+      const purchaseId = await attachPurchase(fixtures, ticketId, { amount_cents: 1500 });
+
+      expect(await voidTicketAction(ticketId)).toEqual({
+        ok: false,
+        error: expect.stringMatching(/Refund it in Square/),
+      });
+
+      // Partially refunded: the club still holds money for this ticket.
+      await db.from("purchases").update({ refunded_cents: 500 }).eq("id", purchaseId);
+      expect(await voidTicketAction(ticketId)).toMatchObject({ ok: false });
+      expect(await ticketExists(ticketId)).toBe(true);
+
+      // Fully refunded (as a refund after check-in leaves it, once the
+      // check-in is undone): nothing is held, so the ticket can go.
+      await db.from("purchases").update({ refunded_cents: 1500 }).eq("id", purchaseId);
+      expect(await voidTicketAction(ticketId)).toEqual({ ok: true });
+      expect(await ticketExists(ticketId)).toBe(false);
+      const { data } = await db.from("purchases").select("status, refunded_cents").eq("id", purchaseId).single();
+      expect(data).toEqual({ status: "completed", refunded_cents: 1500 });
+    }));
+
+  it("refuses to void a ticket whose payment is still authorized", () =>
+    withFixtures(async (fixtures) => {
+      const { ticketId } = await ticketHolder(fixtures);
+      await attachPurchase(fixtures, ticketId, { amount_cents: 1500, status: "authorized" });
+
+      expect(await voidTicketAction(ticketId)).toMatchObject({ ok: false });
+      expect(await ticketExists(ticketId)).toBe(true);
+    }));
+});

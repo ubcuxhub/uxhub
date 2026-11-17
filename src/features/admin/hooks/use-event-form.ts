@@ -715,7 +715,13 @@ export function useEventForm({
     setIsDeleting(true);
     setError(null);
     try {
-      await deleteAdminEventAction(eventId, deleteOperation.current);
+      const refusal = await deleteAdminEventAction(eventId, deleteOperation.current);
+      if (refusal) {
+        // A definite refusal: nothing was deleted, and the modal shows why.
+        setError(refusal.error);
+        setIsDeleting(false);
+        return;
+      }
       setShowDeleteModal(false);
       bypassUnsavedChangesWarning.current = true;
       toast.success("Event deleted");

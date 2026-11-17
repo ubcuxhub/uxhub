@@ -49,7 +49,9 @@ export async function EventCheckoutRoute({
   );
   const supabase = await createClient();
   // No status filter: RLS shows drafts to admins and managers only, who may
-  // register for one to test it (docs/event-states.md, "Drafts for admins").
+  // test-register on a free one; EventCheckout shows no button on a paid
+  // draft, and the database refuses it (docs/event-states.md, "Drafts for
+  // admins").
   const event = await fetchEventBySlug(supabase, slug);
 
   if (!event) notFound();

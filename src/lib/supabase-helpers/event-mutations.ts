@@ -42,3 +42,26 @@ export async function fetchEventHistoryInfo(client: DbClient, eventId: string): 
   for (const result of [tickets,teams,purchases]) if (result.error) throw result.error;
   return { registered: tickets.data?.length ?? 0, checkedIn: tickets.data?.filter(row => row.check_ins.length > 0).length ?? 0, teams: teams.count ?? 0, protectedPurchases: purchases.count ?? 0 };
 }
+
+/**
+ * What stops an event from being deleted, by the database's own rule
+ * (`delete_event_before_safe_mutations`): members (not staff, not deleted)
+ * with a ticket, a held offer or a payment in flight, and any live purchase
+ * (docs/event-states.md, "Live purchases"). Staff test registrations on a
+ * draft block nothing. Service role only.
+ */
+export interface EventDeletionBlockers { memberTickets: number; memberOffers: number; memberPendingPurchases: number; livePurchases: boolean }
+export async function fetchEventDeletionBlockers(serviceClient: DbClient, eventId: string): Promise<EventDeletionBlockers> {
+  const [commitments, live] = await Promise.all([
+    serviceClient.rpc("event_member_commitments", { p_event_id: eventId }),
+    serviceClient.rpc("event_has_live_purchases", { p_event_id: eventId }),
+  ]);
+  if (commitments.error) throw commitments.error;
+  if (live.error) throw live.error;
+  const row = commitments.data?.[0];
+  return { memberTickets: row?.tickets ?? 0, memberOffers: row?.offers ?? 0, memberPendingPurchases: row?.pending_purchases ?? 0, livePurchases: Boolean(live.data) };
+}
+
+export function eventDeletionBlocked(blockers: EventDeletionBlockers) {
+  return blockers.livePurchases || blockers.memberTickets > 0 || blockers.memberOffers > 0 || blockers.memberPendingPurchases > 0;
+}

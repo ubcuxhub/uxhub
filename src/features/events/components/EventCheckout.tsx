@@ -1,6 +1,12 @@
 "use client";
 
-import { Alert } from "@/components/ui/alert";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import {
+  STAFF_TEST_REGISTRATION_LABEL,
+  STAFF_TEST_REGISTRATION_WARNING,
+  allowsStaffTestRegistration,
+  isDraftEvent,
+} from "@/features/events/lib/event-visibility";
 import { CheckoutLayout } from "@/components/shared/CheckoutLayout";
 import { useFlowDialog } from "@/components/shared/FlowDialog";
 import { Button } from "@/components/ui/button";
@@ -34,6 +40,12 @@ export function EventCheckout({
   const price = isMember ? event.member_price : event.regular_price;
 
   if (price === null) return <Alert>Registration is unavailable until event pricing is configured.</Alert>;
+  // Only staff can see a draft (RLS). They may test-register on a free one;
+  // a paid draft shows no button, since the database refuses it.
+  const staffTest = isDraftEvent(event);
+  if (staffTest && !allowsStaffTestRegistration(event)) {
+    return <Alert>Paid drafts can’t be test-registered. Make the event free to test registration, or publish it.</Alert>;
+  }
 
   const confirmationHref = (purchaseId: string) =>
     withReturnTo(
@@ -57,6 +69,12 @@ export function EventCheckout({
         </Button>
       }
       description={`Review your ticket for ${event.name}.`}
+      notice={staffTest ? (
+        <Alert>
+          <AlertTitle>{STAFF_TEST_REGISTRATION_LABEL}</AlertTitle>
+          <AlertDescription>{STAFF_TEST_REGISTRATION_WARNING}</AlertDescription>
+        </Alert>
+      ) : undefined}
       item={{
         name: event.name,
         details: eventDetails.join(" · "),
@@ -65,6 +83,7 @@ export function EventCheckout({
       payment={{
         disabled: disabledMessage !== null,
         disabledMessage,
+        freeButtonLabel: staffTest ? STAFF_TEST_REGISTRATION_LABEL : undefined,
         kind: "event_ticket",
         slug,
         successHref: confirmationHref,

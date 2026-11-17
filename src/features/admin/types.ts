@@ -67,6 +67,8 @@ export interface UserPurchaseSummary {
   title: string;
   kind: string;
   amount_cents: number;
+  /** Completed Square refunds; `status` still reads completed after one. */
+  refunded_cents: number;
   currency: string;
   status: string;
   created_at: string | null;

@@ -968,6 +968,8 @@ export type Database = {
         Row: {
           agenda: Json | null
           agenda_enabled: boolean
+          canceled_at: string | null
+          cancellation_note: string | null
           configured_marketing_mode: string | null
           configured_marketing_url: string | null
           configured_price: number | null
@@ -1023,6 +1025,8 @@ export type Database = {
         Insert: {
           agenda?: Json | null
           agenda_enabled?: boolean
+          canceled_at?: string | null
+          cancellation_note?: string | null
           configured_marketing_mode?: string | null
           configured_marketing_url?: string | null
           configured_price?: number | null
@@ -1076,6 +1080,8 @@ export type Database = {
         Update: {
           agenda?: Json | null
           agenda_enabled?: boolean
+          canceled_at?: string | null
+          cancellation_note?: string | null
           configured_marketing_mode?: string | null
           configured_marketing_url?: string | null
           configured_price?: number | null
@@ -1224,6 +1230,8 @@ export type Database = {
           idempotency_key: string
           kind: string
           membership_type_id: string | null
+          refunded_at: string | null
+          refunded_cents: number
           square_customer_id: string | null
           square_payment_id: string | null
           status: string
@@ -1244,6 +1252,8 @@ export type Database = {
           idempotency_key: string
           kind: string
           membership_type_id?: string | null
+          refunded_at?: string | null
+          refunded_cents?: number
           square_customer_id?: string | null
           square_payment_id?: string | null
           status: string
@@ -1263,6 +1273,8 @@ export type Database = {
           idempotency_key?: string
           kind?: string
           membership_type_id?: string | null
+          refunded_at?: string | null
+          refunded_cents?: number
           square_customer_id?: string | null
           square_payment_id?: string | null
           status?: string
@@ -1604,6 +1616,16 @@ export type Database = {
         Args: { p_date: string; p_time: string }
         Returns: string
       }
+      apply_event_purchase_refund: {
+        Args: { p_purchase_id: string; p_refunded_cents: number }
+        Returns: {
+          amount_increased: boolean
+          fully_refunded: boolean
+          kept_checked_in_ticket: boolean
+          refunded_total_cents: number
+          ticket_removed: boolean
+        }[]
+      }
       can_edit_application_response: {
         Args: { p_application_id: string; p_question_id: string }
         Returns: boolean
@@ -1673,12 +1695,24 @@ export type Database = {
         }
         Returns: boolean
       }
+      event_has_live_purchases: {
+        Args: { p_event_id: string }
+        Returns: boolean
+      }
       event_is_public: {
         Args: {
           p_publish_at: string
           p_status: Database["public"]["Enums"]["event_status"]
         }
         Returns: boolean
+      }
+      event_member_commitments: {
+        Args: { p_event_id: string }
+        Returns: {
+          offers: number
+          pending_purchases: number
+          tickets: number
+        }[]
       }
       event_participant_content: { Args: { p_event_id: string }; Returns: Json }
       event_publication_health: {
@@ -1706,6 +1740,10 @@ export type Database = {
           seats_left: number
           tickets: number
         }[]
+      }
+      event_ticket_eligibility: {
+        Args: { p_amount_cents?: number; p_event_id: string; p_user_id: string }
+        Returns: string
       }
       get_user_info_id: { Args: Record<PropertyKey, never>; Returns: string }
       initialize_event_checkout: {
@@ -1753,10 +1791,16 @@ export type Database = {
         Returns: Json
       }
       publish_due_events: { Args: Record<PropertyKey, never>; Returns: number }
+      purchase_is_live: { Args: { p_purchase_id: string }; Returns: boolean }
+      regenerate_event_ticket_token: {
+        Args: { p_ticket_id: string }
+        Returns: boolean
+      }
       release_event_ticket: {
         Args: { p_purchase_id: string }
         Returns: undefined
       }
+      remove_event_ticket: { Args: { p_ticket_id: string }; Returns: boolean }
       rename_team: {
         Args: { p_name: string; p_team_id: string; p_user_id: string }
         Returns: string
@@ -2002,6 +2046,8 @@ export type Database = {
         Returns: {
           agenda: Json | null
           agenda_enabled: boolean
+          canceled_at: string | null
+          cancellation_note: string | null
           configured_marketing_mode: string | null
           configured_marketing_url: string | null
           configured_price: number | null
@@ -2073,6 +2119,7 @@ export type Database = {
         Args: { p_document: Json; p_draft?: boolean }
         Returns: undefined
       }
+      void_event_ticket: { Args: { p_ticket_id: string }; Returns: string }
     }
     Enums: {
       event_application_status:

@@ -735,6 +735,20 @@ describe("deleteAdminEventAction", () => {
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
+  it("returns the database's refusal when members or live purchases protect the event", async () => {
+    events.fetchEventById.mockResolvedValue({ id: "event-1", image_url: "https://store/cover.png" });
+    adminRpc.mockResolvedValue({ error: { message: "refused", hint: "EVENT_DELETE_PROTECTED" } });
+
+    await expect(deleteAdminEventAction("event-1")).resolves.toEqual({
+      error: expect.stringMatching(/can’t be deleted/),
+    });
+    await expect(deleteAdminEventAction("event-1", "operation-1")).resolves.toEqual({
+      error: expect.stringMatching(/can’t be deleted/),
+    });
+    expect(adminServer.adminDeleteEventImageByUrl).not.toHaveBeenCalled();
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
   it("copes with an event that has no cover image", async () => {
     events.fetchEventById.mockResolvedValue({ id: "event-1", image_url: null });
     adminRpc.mockResolvedValue({ error: null });

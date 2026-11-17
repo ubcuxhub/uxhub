@@ -2,7 +2,7 @@
 
 import type { Json } from "@/lib/supabase/database.types";
 
-import { fetchEventMutationResult, eventMutationResult, fetchEventHistoryInfo } from "@/lib/supabase-helpers/event-mutations";
+import { fetchEventMutationResult, eventMutationResult, fetchEventHistoryInfo, fetchEventDeletionBlockers, eventDeletionBlocked } from "@/lib/supabase-helpers/event-mutations";
 
 import { eventContentProblem, type EventContent } from "./lib/event-content";
 import { searchMentors, searchSponsors } from "@/lib/supabase-helpers/event-people";
@@ -38,6 +38,11 @@ import {
   fetchCheckInStatuses,
 } from "@/lib/supabase-helpers/check-ins";
 import { mutateItemCheckIn, fetchLegacyCheckInTarget } from "@/lib/supabase-helpers/item-check-in";
+import {
+  regenerateEventTicketToken,
+  voidEventTicket,
+  type VoidEventTicketRefusal,
+} from "@/lib/supabase-helpers/event-tickets";
 import { isUuid } from "@/lib/uuid";
 import type { CheckInResult } from "./types";
 import { removeApplicationFiles } from "@/lib/supabase-helpers/application-files";
@@ -509,11 +514,20 @@ export async function saveAdminEventAction(
   };
 }
 
-export async function deleteAdminEventAction(eventId: string, operationId?: string) {
+/** The database's refusal to delete an event that would affect members or
+ * live purchases (`delete_event_before_safe_mutations`). */
+const EVENT_DELETE_PROTECTED = "EVENT_DELETE_PROTECTED";
+const EVENT_DELETE_PROTECTED_MESSAGE = "This event can’t be deleted because members are registered, hold offers, or have payments that aren’t failed, canceled or refunded. Nothing has been deleted.";
+
+export async function deleteAdminEventAction(eventId: string, operationId?: string): Promise<{ error: string } | undefined> {
   await requireAdmin();
 
   if (operationId) {
     const { data, error } = await supabaseAdmin.rpc("delete_admin_event_safely", { p_event_id: eventId, p_operation_id: operationId });
+    if (error?.hint === EVENT_DELETE_PROTECTED) {
+      log.warn("admin.event_delete_refused", { eventId });
+      return { error: EVENT_DELETE_PROTECTED_MESSAGE };
+    }
     if (error) throw error;
     const assets = data as { images?: string[]; files?: string[] } | null;
     await Promise.all((assets?.images ?? []).map(discardEventImage));
@@ -522,6 +536,10 @@ export async function deleteAdminEventAction(eventId: string, operationId?: stri
     // Compatibility for existing server callers; the builder uses a receipt.
     const existing = await fetchEventById(supabaseAdmin, eventId);
     const { error } = await supabaseAdmin.rpc("delete_event_atomically", { target_event_id: eventId });
+    if (error?.hint === EVENT_DELETE_PROTECTED) {
+      log.warn("admin.event_delete_refused", { eventId });
+      return { error: EVENT_DELETE_PROTECTED_MESSAGE };
+    }
     if (error) throw error;
     await discardEventImage(existing?.image_url);
     await discardEventImage(existing?.header_image_url);
@@ -594,6 +612,61 @@ export async function fetchAdminCheckInSnapshotAction(eventId: string) {
     fetchCheckInStatuses(supabaseAdmin, eventId),
   ]);
   return { sessions, attendees, statuses: Array.from(statuses.entries()) };
+}
+
+export type TicketAdminActionResult = { ok: true } | { ok: false; error: string };
+
+const VOID_TICKET_REFUSALS: Record<VoidEventTicketRefusal, string> = {
+  TICKET_NOT_FOUND: "This ticket no longer exists.",
+  TICKET_CHECKED_IN:
+    "This ticket has been checked in. Undo its check-ins first, then void it.",
+  TICKET_PAID:
+    "This ticket was paid for and hasn't been fully refunded. Refund it in Square instead; the ticket is removed once the refund completes.",
+};
+
+/**
+ * Gives a ticket a new QR code. The holder keeps the ticket and sees the new
+ * code on their event page; the old code, screenshots included, scans as not
+ * a UX Hub ticket.
+ */
+export async function regenerateTicketQrAction(
+  ticketId: string
+): Promise<TicketAdminActionResult> {
+  await requireAdmin();
+  if (typeof ticketId !== "string" || !isUuid(ticketId)) {
+    return { ok: false, error: VOID_TICKET_REFUSALS.TICKET_NOT_FOUND };
+  }
+
+  const regenerated = await regenerateEventTicketToken(supabaseAdmin, ticketId);
+  if (!regenerated) {
+    log.warn("ticket.regenerate_refused", { ticketId, reason: "TICKET_NOT_FOUND" });
+    return { ok: false, error: VOID_TICKET_REFUSALS.TICKET_NOT_FOUND };
+  }
+
+  log.info("ticket.qr_regenerated", { ticketId });
+  return { ok: true };
+}
+
+/**
+ * Takes a ticket back, freeing its seat and its holder's team spot. Refused
+ * for a checked-in ticket and for a paid one not yet refunded in full.
+ */
+export async function voidTicketAction(
+  ticketId: string
+): Promise<TicketAdminActionResult> {
+  await requireAdmin();
+  if (typeof ticketId !== "string" || !isUuid(ticketId)) {
+    return { ok: false, error: VOID_TICKET_REFUSALS.TICKET_NOT_FOUND };
+  }
+
+  const refusal = await voidEventTicket(supabaseAdmin, ticketId);
+  if (refusal) {
+    log.warn("ticket.void_refused", { ticketId, reason: refusal });
+    return { ok: false, error: VOID_TICKET_REFUSALS[refusal] };
+  }
+
+  log.info("ticket.voided", { ticketId });
+  return { ok: true };
 }
 
 /**
@@ -714,7 +787,8 @@ export async function loadAdminEventDeletionInfoAction(eventId: string) {
   await requireAdmin();
   const event = await fetchEventById(supabaseAdmin, eventId);
   if (!event) return null;
-  return { name: event.name, ...await fetchEventHistoryInfo(supabaseAdmin, eventId) };
+  const [history, blockers] = await Promise.all([fetchEventHistoryInfo(supabaseAdmin, eventId), fetchEventDeletionBlockers(supabaseAdmin, eventId)]);
+  return { name: event.name, ...history, blockers, blocked: eventDeletionBlocked(blockers) };
 }
 
 export async function recoverAdminEventDraftAction(id: string, operationId?: string) {
