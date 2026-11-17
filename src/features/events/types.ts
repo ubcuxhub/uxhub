@@ -52,7 +52,8 @@ export interface EventBadge {
     | "waitlisted"
     | "register_by"
     | "not_selected"
-    | "applications_closed";
+    | "applications_closed"
+    | "canceled";
   date?: string;
   /** Replaces the status's label, as for a draft event (`DRAFT_EVENT_BADGE`). */
   label?: string;

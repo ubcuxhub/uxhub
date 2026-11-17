@@ -723,11 +723,13 @@ async function recordCheckIn(
     return rejectCheckIn("wrong_event", method, sessionId, ticket.id);
   }
 
-  const { checkedInAt, alreadyCheckedIn } = await checkInTicket(
-    supabaseAdmin,
-    ticket.id,
-    sessionId
-  );
+  // The database refuses a canceled event's check-ins (EVENT_CANCELED).
+  const recorded = await checkInTicket(supabaseAdmin, ticket.id, sessionId).catch((error: unknown) => {
+    if (error && typeof error === "object" && "hint" in error && error.hint === "EVENT_CANCELED") return null;
+    throw error;
+  });
+  if (!recorded) return rejectCheckIn("event_canceled", method, sessionId, ticket.id);
+  const { checkedInAt, alreadyCheckedIn } = recorded;
   log.info("check_in.recorded", {
     method,
     sessionId,

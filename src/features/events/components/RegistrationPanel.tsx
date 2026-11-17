@@ -19,7 +19,7 @@ import { getMembershipTermEndsAt } from "@/features/memberships/lib/term";
 import { hasApplicationAnswer } from "@/lib/application-response";
 import { formatEventDateLabel, pacificDate } from "@/lib/date";
 import { createClient } from "@/lib/supabase/server";
-import type { EventRow, UserInfoRow } from "@/lib/supabase/models";
+import type { EventRow, PurchaseRow, UserInfoRow } from "@/lib/supabase/models";
 import {
   fetchApplicationQuestions,
   fetchApplicationResponses,
@@ -27,6 +27,7 @@ import {
 } from "@/lib/supabase-helpers/event-applications";
 import { fetchEventLinks } from "@/lib/supabase-helpers/event-links";
 import { fetchUserEventTicket } from "@/lib/supabase-helpers/event-tickets";
+import { fetchPurchaseById } from "@/lib/supabase-helpers/purchases";
 import type { DbClient } from "@/lib/supabase-helpers/types";
 import { cn } from "@/lib/utils";
 
@@ -80,8 +81,12 @@ export async function RegistrationPanel({ event, user, state }: RegistrationPane
     holdsTicket ? fetchEventLinks(supabase, event.id) : [],
     state.kind === "app-draft" ? loadDraftProgress(supabase, event.id, user.id) : null,
     event.pricing_policy === "figma" ? getMembershipTermEndsAt() : null,
-    "ticketId" in state ? fetchUserEventTicket(supabase, event.id, user.id) : null,
+    "ticketId" in state && state.ticketId ? fetchUserEventTicket(supabase, event.id, user.id) : null,
   ]);
+  // A canceled event's panel says whether their payment came back.
+  const refund = state.kind === "canceled" && ticketRow?.purchase_id
+    ? refundStatus(await fetchPurchaseById(supabase, ticketRow.purchase_id))
+    : null;
 
   const isMember = event.pricing_policy === "figma"
     ? hasActiveMembership(user, membershipTermEndsAt)
@@ -96,6 +101,7 @@ export async function RegistrationPanel({ event, user, state }: RegistrationPane
     price: { amount, isMember },
     participantPackageUrl: links.find((link) => link.type === "participant_package")?.url ?? null,
     draftProgress,
+    refund,
   };
   const spec = getPanelSpec(state, context);
 
@@ -257,6 +263,14 @@ function PanelButton({
       );
     }
   }
+}
+
+/** Whether a paid purchase came back in full; `null` for a free one or none. */
+function refundStatus(
+  purchase: Pick<PurchaseRow, "amount_cents" | "refunded_cents"> | null
+): PanelContext["refund"] {
+  if (!purchase || purchase.amount_cents <= 0) return null;
+  return purchase.refunded_cents >= purchase.amount_cents ? "refunded" : "not-refunded";
 }
 
 function holderName(user: Pick<UserInfoRow, "first_name" | "last_name" | "email">): string {

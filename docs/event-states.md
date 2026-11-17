@@ -4,7 +4,8 @@ What admins and students see for an event, and where each state comes from.
 Columns refer to [schema-proposed.sql](schema-proposed.sql).
 
 Once someone registers, they stay registered: there is no cancelling or
-releasing a spot.
+releasing a spot. The club can cancel a whole event (below), which keeps
+every registration.
 
 ## Admin: event
 
@@ -13,10 +14,67 @@ releasing a spot.
 | Draft | No | `status = draft` |
 | Scheduled | No | `status = draft`, `publish_at` set |
 | Published | Yes | `status = active` |
+| Canceled | Yes, marked canceled | `status = active`, `canceled_at` set |
 
 Draft events are hidden. Whether an event is upcoming or past comes from
 `starts_at` and `ends_at`, not from its status, so a finished event stays
 Published and members keep their history.
+
+### Unpublishing
+
+Going back from Active to Draft hides the event from members, since RLS
+returns drafts to staff only: a member with a ticket would get a 404 and lose
+their QR code. So the database refuses it while any member is registered,
+through every write path (the drawer's quick edit, the builder's Revert to
+draft, a direct update, the service role): one trigger,
+`guard_event_unpublish`, counts `event_member_commitments` (tickets, held
+offers and payments in flight of non-staff, non-deleted accounts) and raises
+"N people are registered. Cancel the event instead." with the hint
+`EVENT_SETTINGS_CONFLICT`. Staff test tickets don't count. Cancel the event
+instead.
+
+When nobody is registered, the drawer and the builder still confirm first
+(`EventUnpublishDialog`): the dialog counts members' draft, submitted and
+waitlisted applications, which lose access until the event is published
+again (`event_lifecycle_counts`).
+
+### Canceled events
+
+Cancel is for an event that won't happen. It's a one-way flag on a published
+event, not a status: **Cancel event** in the drawer (`cancel_admin_event`,
+staff only, through `cancelEventAction`) works only on an active event that
+hasn't ended and isn't canceled, and sets `canceled_at` and the optional
+`cancellation_note`. It can't be undone. A refusal carries the hint
+`EVENT_CANCEL_REFUSED`.
+
+Nothing is rewritten: tickets, purchases, applications, teams and check-ins
+stay, and nobody is emailed. Refunds are manual: staff refund each paid ticket
+in Square, and the cancel dialog says how many paid tickets (completed,
+not fully refunded) there are.
+
+After a cancel:
+
+- **Registration** stops: checkout and reservation refuse it with
+  `EVENT_CANCELED` (`event_ticket_eligibility`).
+- **Applications** stop: `submit_event_application` returns
+  `NOT_ACCEPTING_APPLICATIONS`.
+- **Teams** lock: `create_team`, `join_team`, `leave_team`, `delete_team` and
+  `rename_team` return `TEAMS_LOCKED` (`team_change_blocked`).
+- **Check-in** is refused: a trigger on `check_ins` raises `EVENT_CANCELED`,
+  and the scanner and lookup show "This event is canceled"
+  (`event_canceled`).
+- **The event is read-only**, like an ended one: the builder and the drawer
+  can't change it (`zz_event_canceled_lock` on events, the child-table lock,
+  and the builder save refuse with `EVENT_HISTORY_LOCKED`), and it can't go
+  back to Draft. Links and resources stay editable
+  (`save_past_event_resources`). The service role is no exception, so
+  `pnpm seed` fails on a seed event you canceled locally; reset with
+  `pnpm supabase:local`.
+- **Members still see it.** It stays Active, so RLS keeps showing it to ticket
+  holders and on the public pages. The portal event page, the portal
+  timeline, `/events` and `/events/[slug]` show a "Canceled" badge and the
+  note until the event ends, then treat it as any past event. The ticket's QR
+  code is hidden, and the team card goes.
 
 ### Scheduling publication
 
@@ -185,7 +243,8 @@ hold is voided at reservation, as before.
 
 `events.canceled_at` (with `cancellation_note`) marks a canceled event. Cancel
 is a flag on an active event, not a status value; checkout and reservation
-refuse it with `EVENT_CANCELED`. Nothing sets it yet.
+refuse it with `EVENT_CANCELED`. `cancel_admin_event` sets it (see
+"Canceled events").
 
 `remove_event_ticket` deletes one ticket and frees its holder's team spot on
 that event as account deletion does: a team they owned passes to the teammate
@@ -321,6 +380,7 @@ register.
 
 | State | Badge | When |
 | --- | --- | --- |
+| `canceled` | Canceled | The event was canceled and hasn't ended, ticket or not |
 | `reg-upcoming` | Opens Oct 12 | Before `registration_opens_at` |
 | `reg-open` | Registration open | Registration is open and seats are left |
 | `reg-full` | Full | No seats left; can reopen if an offer expires |
@@ -369,10 +429,28 @@ student is applying and Registration otherwise, including once they're
 accepted. The ticket is locked until they register, and View ticket opens the
 "Your ticket" dialog with the scannable code.
 
+`canceled` is an alert titled "This event has been canceled", never the
+ticket, so the QR code is hidden. Its text is the club's note, then the
+refund line for a paid ticket: "Your payment has been refunded." once
+`purchases.refunded_cents` covers the amount, otherwise "Refunds are handled
+by the club." A free ticket gets "You don’t need to do anything." when there's
+no note.
+
+Badges for a canceled event:
+
+| Where | Before it ends | After it ends |
+| --- | --- | --- |
+| Portal event page and timeline | Canceled (`eventBadgeFor`) | Past |
+| `/events` card | Canceled (`isCanceledEvent`) | No badge, as any event |
+| `/events/[slug]` | Canceled, the note, and a disabled "Event canceled" button | As any past event |
+| Admin drawer and builder | Canceled, always | Canceled, always |
+
 ### When more than one applies
 
 Use the first rule that matches:
 
+0. The event was canceled and hasn't ended: `canceled`, with their ticket if
+   they have one. Once it ends, the rules below apply as for any event.
 1. The event has ended: `reg-past-attended` if they had a ticket, otherwise
    `reg-past`.
 2. They have a ticket: `reg-checked-in` or `reg-going`, over any application

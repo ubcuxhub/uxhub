@@ -1,4 +1,4 @@
-import { CircleMinus, Hourglass, Lock, type LucideIcon } from "lucide-react";
+import { CalendarX, CircleMinus, Hourglass, Lock, type LucideIcon } from "lucide-react";
 
 import { formatEventDate, formatEventTime } from "@/lib/date";
 
@@ -73,7 +73,18 @@ export interface PanelContext {
   participantPackageUrl: string | null;
   /** How far a draft application has got, for `app-draft`. */
   draftProgress: { answered: number; total: number } | null;
+  /**
+   * For `canceled`, whether the student's paid ticket has been refunded in
+   * full (`purchases.refunded_cents`). Left out, or `null`, when they paid
+   * nothing or hold no ticket.
+   */
+  refund?: "refunded" | "not-refunded" | null;
 }
+
+/** The canceled panel's copy (docs/event-states.md, "Canceled events"). */
+export const CANCELED_TITLE = "This event has been canceled";
+export const REFUND_PENDING = "Refunds are handled by the club.";
+export const REFUND_DONE = "Your payment has been refunded.";
 
 /** "Wed, Aug 26, 2026", in Pacific time. */
 const longDate = (value: string | null) =>
@@ -120,6 +131,23 @@ export function getPanelSpec(state: EventState, context: PanelContext): PanelSpe
   };
 
   switch (state.kind) {
+    case "canceled": {
+      // The ticket stays, but no code: there's nothing to check in to.
+      const refund =
+        context.refund === "refunded" ? REFUND_DONE : context.refund === "not-refunded" ? REFUND_PENDING : null;
+      return {
+        title: "Registration",
+        layout: "alert",
+        props: {
+          variant: "destructive",
+          icon: CalendarX,
+          title: CANCELED_TITLE,
+          description:
+            [state.note, refund].filter(Boolean).join(" ") ||
+            (state.ticketId ? "You don’t need to do anything." : KEEP_AN_EYE_OUT),
+        },
+      };
+    }
     case "reg-upcoming":
       return {
         title: "Registration",

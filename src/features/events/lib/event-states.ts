@@ -6,6 +6,7 @@ import type {
   EventTicketRow,
 } from "@/lib/supabase/models";
 import { applicationWindow } from "@/features/applications/lib/application-form";
+import { isCanceledEvent } from "./event-cancellation";
 import type { DbClient } from "@/lib/supabase-helpers/types";
 import { fetchUserEventApplications } from "@/lib/supabase-helpers/event-applications";
 import {
@@ -25,6 +26,8 @@ export type StateEvent = Pick<
   | "registration_opens_at"
   | "registration_closes_at"
   | "requires_application"
+  | "canceled_at"
+  | "cancellation_note"
 >;
 
 /** One check-in on the student's ticket, with the end of its session. */
@@ -62,6 +65,12 @@ export interface StudentEventState {
  * apply page. `null` means no close.
  */
 export type EventState =
+  // ── A canceled event, until it ends ───────────────────────────────────
+  /**
+   * `note`: the club's cancellation note. `ticketId`: the student's ticket,
+   * which they keep (without a scannable code), or `null` without one.
+   */
+  | { kind: "canceled"; note: string | null; ticketId: string | null }
   // ── Shared: registration, ticket, past ────────────────────────────────
   | { kind: "reg-upcoming"; opensAt: string }
   | { kind: "reg-open"; closesAt: string | null }
@@ -119,6 +128,7 @@ function activeCheckIn(
  * The student's state for one event. The first rule that matches wins
  * (docs/event-states.md, "When more than one applies"):
  *
+ * 0. The event was canceled and hasn't ended: canceled, ticket or not.
  * 1. The event has ended: past, attended if they had a ticket.
  * 2. They have a ticket: checked in while a check-in is active, else going.
  * 3. An application event: a decided or submitted application's state, then
@@ -135,6 +145,10 @@ export function eventStateFor(
   now: Date
 ): EventState {
   const t = now.getTime();
+
+  if (isCanceledEvent(event, now)) {
+    return { kind: "canceled", note: event.cancellation_note, ticketId: ticket?.id ?? null };
+  }
 
   // An event without an end ends when it starts.
   const eventEnd = event.ends_at ?? event.starts_at;
