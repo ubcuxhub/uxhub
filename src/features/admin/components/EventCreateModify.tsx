@@ -216,7 +216,7 @@ export const EventCreateModify = ({
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <span role="status" className="text-small text-muted-foreground">{saveStatus}{form.past ? ` · Ended ${publicationTimeLabel(form.savedEnd!)}` : scheduled ? ` · Goes live ${publicationTimeLabel(form.publication.publish_at!)}` : published ? " · Published" : ""}</span>
-            {draft && <Button type="button" size="sm" variant="outline" disabled={!form.hasUnsavedChanges || form.isDeleting} loading={form.isSubmitting} onClick={() => void form.handleSaveDraft()}>Save draft</Button>}
+            {draft && <Button type="button" size="sm" variant="outline" disabled={!form.hasUnsavedChanges || form.isDeleting} loading={form.isSubmitting} onClick={() => void form.handleSaveDraft()}>Save</Button>}
             {(scheduled || published) && form.hasUnsavedChanges && <Button type="button" size="sm" variant="outline" disabled={form.isSubmitting || form.unresolvedSave} onClick={() => { form.handleDiscardChanges(); setInputIssues([]); }}>Discard changes</Button>}
             {(scheduled || published) && <Button disabled={!form.hasUnsavedChanges || form.isDeleting} type="button" size="sm" loading={form.isSubmitting} onClick={() => void form.handlePublication("save")}>{scheduled ? "Save changes" : "Update"}</Button>}
             {!published && <EventPublishMenu form={form} size="sm" disabled={!publicationReady} />}
@@ -241,8 +241,8 @@ export const EventCreateModify = ({
           </div>)}
           {section("builder-settings", "Other settings", <div className="space-y-4 rounded-xl border border-border bg-card p-5">
             {draft && <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="min-w-0 space-y-0.5"><h3 className="text-small font-semibold">Save draft</h3><p className="text-small text-muted-foreground">{saveStatus}. Drafts are only visible to staff.</p></div>
-              <Button type="button" variant="outline" disabled={!form.hasUnsavedChanges || form.isDeleting} loading={form.isSubmitting} onClick={() => void form.handleSaveDraft()}>Save draft</Button>
+              <div className="min-w-0 space-y-0.5"><h3 className="text-small font-semibold">Save changes</h3><p className="text-small text-muted-foreground">{saveStatus}. Drafts are only visible to staff.</p></div>
+              <Button type="button" variant="outline" disabled={!form.hasUnsavedChanges || form.isDeleting} loading={form.isSubmitting} onClick={() => void form.handleSaveDraft()}>Save</Button>
             </div>}
             {published && !form.past && <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="min-w-0 space-y-0.5"><h3 className="text-small font-semibold">Revert to draft</h3><p className="text-small text-muted-foreground">Save your changes and hide this event from members. Only staff can see it until you publish again.</p></div>

@@ -7,6 +7,8 @@ import type { EventApplicationQuestionRow, EventRow } from "@/lib/supabase/model
 import { useEventForm } from "./use-event-form";
 import { parseWorkingDocument } from "../lib/event-working-document";
 import { toast } from "@/components/ui/toast";
+import { emptyLocation } from "../lib/event-date-location";
+import { plainDescription } from "@/lib/event-description";
 vi.mock("@/components/ui/toast", () => ({ toast: { error: vi.fn(), success: vi.fn(), dismiss: vi.fn() } }));
 
 vi.mock("next/navigation", () => ({
@@ -34,27 +36,29 @@ beforeEach(() => {
 });
 
 it("retries a failed draft save with the latest edited values and preserves leave-dialog mode", async () => {
-  const { result } = renderHook(() => useEventForm({}));
+  const { result } = renderHook(() => useEventForm({ eventId: draftEvent.id, initialEvent: draftEvent }));
   act(() => result.current.handleFieldChange("name", "First title"));
-  vi.mocked(saveAdminEventDraftAction).mockRejectedValueOnce(new Error("Offline"));
-  await act(async () => { await result.current.handleSaveDraft(false); });
+  vi.mocked(saveAdminEventAction).mockResolvedValueOnce({ error: "Offline" });
+  await act(async () => { expect(await result.current.handleSaveDraft(false)).toBe(false); });
   expect(result.current.hasUnsavedChanges).toBe(true);
   expect(result.current.showDraftSaved).toBe(false);
-  const options = vi.mocked(toast.error).mock.calls.at(-1)![1]!;
-  expect(options.duration).toBe(Infinity);
-  expect(options.action?.label).toBe("Try again");
+  const [title, options] = vi.mocked(toast.error).mock.calls.at(-1)!;
+  expect(title).toBe("Couldn’t save your draft");
+  expect(options!.duration).toBe(Infinity);
+  expect(options!.action?.label).toBe("Try again");
   act(() => result.current.handleFieldChange("name", "Edited after failure"));
-  await act(async () => { options.action!.onClick(); });
-  expect(vi.mocked(saveAdminEventDraftAction).mock.calls.at(-1)![0].document.formState.name).toBe("Edited after failure");
+  await act(async () => { options!.action!.onClick(); });
+  expect(vi.mocked(saveAdminEventAction).mock.calls.at(-1)![0].event).toMatchObject({ name: "Edited after failure", status: "draft", publish_at: null });
   expect(result.current.hasUnsavedChanges).toBe(false);
   expect(result.current.showDraftSaved).toBe(false);
-  expect(toast.dismiss).toHaveBeenCalledWith(options.id);
+  expect(saveAdminEventDraftAction).not.toHaveBeenCalled();
+  expect(toast.dismiss).toHaveBeenCalledWith(options!.id);
 });
 
 it("keeps a rejected duplicate URL editable and displays the server's readable refusal", async () => {
-  const { result } = renderHook(() => useEventForm({}));
+  const { result } = renderHook(() => useEventForm({ eventId: draftEvent.id, initialEvent: draftEvent }));
   act(() => result.current.handleFieldChange("page_slug", "taken-url"));
-  vi.mocked(saveAdminEventDraftAction).mockResolvedValueOnce({ error: "This page URL is already in use." });
+  vi.mocked(saveAdminEventAction).mockResolvedValueOnce({ error: "This page URL is already in use." });
   await act(async () => { expect(await result.current.handleSaveDraft(false)).toBe(false); });
   expect(result.current.formState.page_slug).toBe("taken-url");
   expect(result.current.hasUnsavedChanges).toBe(true);
@@ -65,7 +69,7 @@ it("keeps a rejected duplicate URL editable and displays the server's readable r
   act(() => result.current.handleFieldChange("page_slug", "available-url"));
   expect(result.current.serverIssues).toEqual([]);
   await act(async () => { expect(await result.current.handleSaveDraft(false)).toBe(true); });
-  expect(saveAdminEventDraftAction).toHaveBeenLastCalledWith(expect.objectContaining({ document: expect.objectContaining({ formState: expect.objectContaining({ page_slug: "available-url" }) }) }));
+  expect(saveAdminEventAction).toHaveBeenLastCalledWith(expect.objectContaining({ event: expect.objectContaining({ configured_slug: "available-url" }) }));
 });
 
 it("attaches publication URL conflicts to the field without a save-error toast", async () => {
@@ -93,10 +97,23 @@ describe("legacy browser draft recovery", () => {
     expect(result.current.formState.description).toBe("Old overview");
     expect(result.current.formState).toMatchObject({ pricing_mode: "legacy", regular_price: "12.50", member_price: "5", page_slug: "recovered-draft" });
     expect(result.current.hasUnsavedChanges).toBe(true);
-    vi.mocked(saveAdminEventDraftAction).mockRejectedValueOnce(new Error("Offline"));
-    await act(async () => { await result.current.handleSaveDraft(); });
+    // Incomplete recovered work cannot be saved; the browser copy stays.
+    await act(async () => { expect(await result.current.handleSaveDraft()).toBe(false); });
+    expect(saveAdminEventDraftAction).not.toHaveBeenCalled();
+    expect(saveAdminEventAction).not.toHaveBeenCalled();
     expect(localStorage.getItem(key)).toBe(JSON.stringify(legacy));
-    await act(async () => { await result.current.handleSaveDraft(); });
+  });
+
+  it("clears the browser copy only once a complete recovered draft is saved", async () => {
+    const legacy = { formState: { ...completeState, name: "Recovered draft" }, checkInEvents: [], mentors: [], sponsors: [], applicationTemplate: [] };
+    localStorage.setItem(key, JSON.stringify(legacy));
+    const { result } = renderHook(() => useEventForm({}));
+    await act(async () => { await Promise.resolve(); });
+    vi.mocked(saveAdminEventDraftAction).mockRejectedValueOnce(new Error("Offline"));
+    await act(async () => { expect(await result.current.handleSaveDraft()).toBe(false); });
+    expect(localStorage.getItem(key)).toBe(JSON.stringify(legacy));
+    await act(async () => { expect(await result.current.handleSaveDraft()).toBe(true); });
+    expect(saveAdminEventAction).toHaveBeenLastCalledWith(expect.objectContaining({ draftId: vi.mocked(saveAdminEventDraftAction).mock.calls.at(-1)![0].id, event: expect.objectContaining({ name: "Recovered draft", status: "draft" }) }));
     expect(localStorage.getItem(key)).toBeNull();
     expect(result.current.hasUnsavedChanges).toBe(false);
   });
@@ -153,6 +170,19 @@ const event = {
   sponsors_enabled: false,
   requires_application: false,
 } as EventRow;
+const draftEvent = { ...event, publish_at: null } as EventRow;
+const completeState = {
+  ...defaultFormState, name: "Design Sprint", short_description: "A day of design", description: "Overview",
+  description_rich: plainDescription("Overview"), pricing_mode: "legacy" as const, max_capacity: "10",
+  date_location: { automatic: true, audience: "everyone" as const, location: { ...emptyLocation(), building: "Nest", address: "6133 University Blvd" }, dates: [{ key: "one", session_id: null, date: "2099-08-01", start: "09:00", end: "17:00", label: "Opening", location: null }] },
+  starts_at: "2099-08-01T09:00", ends_at: "2099-08-01T17:00",
+};
+/** Completes a new event through the form, leaving its URL automatic. */
+const fillComplete = (form: ReturnType<typeof useEventForm>) => {
+  for (const [field, value] of Object.entries(completeState)) {
+    if (field !== "page_slug" && field !== "slug_edited") form.handleFieldChange(field as keyof typeof completeState, value as never);
+  }
+};
 
 // These dates use historical Pacific offsets so timezone rule updates cannot
 // change the expected values for a future year.
@@ -251,20 +281,61 @@ describe("event form publishing schedule", () => {
 });
 
 
-describe("durable incomplete drafts", () => {
-  it("saves without publish fields and establishes a clean snapshot", async () => {
+describe("saving drafts applies edits", () => {
+  it("refuses an incomplete draft, reveals what is missing and sends nothing", async () => {
     const { result } = renderHook(() => useEventForm({}));
     act(() => result.current.handleFieldChange("name", "Work in progress"));
-    expect(result.current.hasUnsavedChanges).toBe(true);
-    await act(async () => { expect(await result.current.handleSaveDraft()).toBe(true); });
+    await act(async () => { expect(await result.current.handleSaveDraft()).toBe(false); });
+    expect(saveAdminEventDraftAction).not.toHaveBeenCalled();
     expect(saveAdminEventAction).not.toHaveBeenCalled();
-    expect(saveAdminEventDraftAction).toHaveBeenCalledWith(expect.objectContaining({ eventId: null, document: expect.objectContaining({ formState: expect.objectContaining({ name: "Work in progress", ends_at: "" }) }) }));
+    expect(result.current.publishAttempted).toBe(true);
+    expect(result.current.validationAttempt).toBe(1);
+    expect(result.current.error).not.toBeNull();
+    expect(result.current.hasUnsavedChanges).toBe(true);
+    expect(result.current.showDraftSaved).toBe(false);
+  });
+  it("applies an existing draft's edits to the event, keeps it a draft and announces it", async () => {
+    const { result } = renderHook(() => useEventForm({ eventId: draftEvent.id, initialEvent: draftEvent }));
+    act(() => result.current.handleFieldChange("name", "Renamed draft"));
+    await act(async () => { expect(await result.current.handleSaveDraft()).toBe(true); });
+    expect(saveAdminEventDraftAction).not.toHaveBeenCalled();
+    expect(saveAdminEventAction).toHaveBeenCalledWith(expect.objectContaining({ eventId: draftEvent.id, draftId: undefined, event: expect.objectContaining({ name: "Renamed draft", status: "draft", publish_at: null }) }));
+    expect(result.current.publication).toEqual({ status: "draft", publish_at: null });
+    expect(result.current.hasUnsavedChanges).toBe(false);
+    expect(result.current.successMessage).toBe("Draft saved");
+    expect(result.current.showDraftSaved).toBe(true);
+    expect(result.current.publicationSuccess).toBeNull();
+  });
+  it("gives a new event its identity and applies the same edits in one save", async () => {
+    const { result } = renderHook(() => useEventForm({}));
+    act(() => fillComplete(result.current));
+    await act(async () => { expect(await result.current.handleSaveDraft()).toBe(true); });
+    expect(saveAdminEventDraftAction).toHaveBeenCalledTimes(1);
+    expect(saveAdminEventDraftAction).toHaveBeenCalledWith(expect.objectContaining({ eventId: null }));
+    const { id } = vi.mocked(saveAdminEventDraftAction).mock.calls[0][0];
+    expect(saveAdminEventAction).toHaveBeenCalledWith(expect.objectContaining({ draftId: id, eventId: id, event: expect.objectContaining({ name: "Design Sprint", status: "draft" }) }));
+    expect(result.current.eventId).toBe("event-1");
     expect(result.current.hasUnsavedChanges).toBe(false);
     expect(result.current.showDraftSaved).toBe(true);
   });
-  it("keeps entered work and its dirty state after a failed save", async () => {
-    vi.mocked(saveAdminEventDraftAction).mockRejectedValueOnce(new Error("Draft changed elsewhere"));
+  it("keeps a new event's edits unsaved when the apply after its identity step fails, then retries the apply", async () => {
     const { result } = renderHook(() => useEventForm({}));
+    act(() => fillComplete(result.current));
+    vi.mocked(saveAdminEventAction).mockResolvedValueOnce({ error: "Offline" });
+    await act(async () => { expect(await result.current.handleSaveDraft()).toBe(false); });
+    expect(result.current.hasUnsavedChanges).toBe(true);
+    expect(result.current.successMessage).toBeNull();
+    expect(result.current.showDraftSaved).toBe(false);
+    await act(async () => { expect(await result.current.handleSaveDraft()).toBe(true); });
+    const { id } = vi.mocked(saveAdminEventDraftAction).mock.calls[0][0];
+    expect(saveAdminEventDraftAction).toHaveBeenCalledTimes(1);
+    // The retry targets the permanent event the identity step returned.
+    expect(saveAdminEventAction).toHaveBeenLastCalledWith(expect.objectContaining({ draftId: id, eventId: "draft-1" }));
+    expect(result.current.hasUnsavedChanges).toBe(false);
+  });
+  it("keeps entered work and its dirty state after a failed save", async () => {
+    vi.mocked(saveAdminEventAction).mockResolvedValueOnce({ error: "Draft changed elsewhere" });
+    const { result } = renderHook(() => useEventForm({ eventId: draftEvent.id, initialEvent: draftEvent }));
     act(() => result.current.handleFieldChange("name", "Keep me"));
     await act(async () => { expect(await result.current.handleSaveDraft(false)).toBe(false); });
     expect(result.current.formState.name).toBe("Keep me");
@@ -296,9 +367,9 @@ it("preserves saved question identity during a branding save", async () => {
 describe("event configuration editing", () => {
   it("follows the name until the URL is deliberately edited, including after draft save", async () => {
     const { result } = renderHook(() => useEventForm({}));
-    act(() => result.current.handleFieldChange("name", "Design Sprint"));
+    act(() => fillComplete(result.current));
     expect(result.current.formState.page_slug).toBe("design-sprint");
-    await act(async () => { await result.current.handleSaveDraft(false); });
+    await act(async () => { expect(await result.current.handleSaveDraft(false)).toBe(true); });
     act(() => result.current.handleFieldChange("name", "New Name"));
     expect(result.current.formState.page_slug).toBe("new-name");
     act(() => result.current.handleFieldChange("page_slug", "custom-url"));
@@ -483,16 +554,17 @@ it("loads staff-only timing and sends Pacific moments separately from event and 
   expect(saveAdminEventAction).toHaveBeenLastCalledWith(expect.objectContaining({ applicationTiming: { decisions_release_at: "2026-11-16T18:00:00.000Z", confirmation_deadline: "2026-11-18T18:00:00.000Z" } }));
 });
 
-it("saves an incomplete application and incomplete timing as a working draft", async () => {
-  const { result } = renderHook(() => useEventForm({}));
+it("refuses to save an incomplete application or incomplete timing", async () => {
+  const { result } = renderHook(() => useEventForm({ eventId: draftEvent.id, initialEvent: draftEvent }));
   act(() => {
     result.current.handleFieldChange("requires_application", true);
     result.current.addApplicationQuestion("dropdown");
     result.current.handleFieldChange("decisions_release_at", "2099-01-01T");
   });
-  await act(async () => { await result.current.handleSaveDraft(); });
-  expect(result.current.error).toBeNull();
-  expect(saveAdminEventDraftAction).toHaveBeenLastCalledWith(expect.objectContaining({ document: expect.objectContaining({ formState: expect.objectContaining({ decisions_release_at: "2099-01-01T" }), applicationTemplate: [expect.objectContaining({ question: "", response_options: [""] })] }) }));
+  await act(async () => { expect(await result.current.handleSaveDraft()).toBe(false); });
+  expect(result.current.error).not.toBeNull();
+  expect(saveAdminEventAction).not.toHaveBeenCalled();
+  expect(saveAdminEventDraftAction).not.toHaveBeenCalled();
 });
 
 describe("drafts with saved event children", () => {
@@ -507,36 +579,25 @@ describe("drafts with saved event children", () => {
   it("uses the canonical URL and event revision returned by Save draft for subsequent publication", async () => {
     const { result } = renderHook(() => useEventForm({ ...options, initialEvent: { ...storedEvent, configured_slug_edited: false } }));
     act(() => result.current.handleFieldChange("name", "Workshop"));
-    vi.mocked(saveAdminEventDraftAction).mockResolvedValueOnce({ id: "draft-1", revision: 2, eventRevision: 7, pageSlug: "workshop-1" });
+    vi.mocked(saveAdminEventAction).mockResolvedValueOnce({ id: event.id, revision: 7, pageSlug: "workshop-1", checkInSessionIds: [session.id], questionIds: [question.id] });
     await act(async () => { expect(await result.current.handleSaveDraft(false)).toBe(true); });
     expect(result.current.formState.page_slug).toBe("workshop-1");
     expect(result.current.hasUnsavedChanges).toBe(false);
     await submit(result);
     expect(result.current.error).toBeNull();
-    expect(saveAdminEventAction).toHaveBeenLastCalledWith(expect.objectContaining({ expectedRevision: 7, draftRevision: 2, event: expect.objectContaining({ configured_slug: "workshop-1" }) }));
+    expect(saveAdminEventAction).toHaveBeenLastCalledWith(expect.objectContaining({ expectedRevision: 7, draftId: undefined, event: expect.objectContaining({ configured_slug: "workshop-1", status: "active" }) }));
   });
 
-  it("loads branding and formatting and round-trips saved IDs through a working document", async () => {
-    const { result, unmount } = renderHook(() => useEventForm(options));
+  it("loads branding and formatting and saves a draft with its children's IDs", async () => {
+    const { result } = renderHook(() => useEventForm(options));
     expect(result.current.formState).toMatchObject({ description_rich: storedEvent.description_rich, header_image_url: storedEvent.header_image_url, header_colour: "", event_colour: storedEvent.event_colour });
     act(() => result.current.handleFieldChange("name", "Working title"));
-    await act(async () => { expect(await result.current.handleSaveDraft(false)).toBe(true); });
-    const sent = vi.mocked(saveAdminEventDraftAction).mock.calls[0][0];
-    const document = parseWorkingDocument(JSON.parse(JSON.stringify(sent.document)));
-    expect(document.checkInEvents[0].id).toBe(session.id);
-    expect(document.applicationTemplate[0].id).toBe(question.id);
-    unmount();
-    const reopened = renderHook(() => useEventForm({ ...options, initialDraft: { id: sent.id, revision: 1, document } }));
-    expect(reopened.result.current.formState.name).toBe("Working title");
-    expect(reopened.result.current.formState.date_location).toMatchObject({ location: { address: storedEvent.location_address }, dates: [{ session_id: session.id }] });
-    expect(reopened.result.current.hasUnsavedChanges).toBe(false);
     vi.mocked(saveAdminEventAction).mockResolvedValue({ id: event.id, checkInSessionIds: [session.id], questionIds: [question.id] });
-    await submit(reopened.result);
-    expect(reopened.result.current.error).toBeNull();
-    expect(vi.mocked(saveAdminEventAction).mock.calls[0][0]).toMatchObject({ draftId: sent.id, draftRevision: 1, checkInSessions: [{ id: session.id }], applicationQuestions: [{ id: question.id }] });
-    expect(reopened.result.current.hasUnsavedChanges).toBe(false);
-    await submit(reopened.result);
-    expect(vi.mocked(saveAdminEventAction).mock.calls[1][0].draftId).toBeUndefined();
+    await act(async () => { expect(await result.current.handleSaveDraft(false)).toBe(true); });
+    expect(saveAdminEventDraftAction).not.toHaveBeenCalled();
+    expect(vi.mocked(saveAdminEventAction).mock.calls[0][0]).toMatchObject({ draftId: undefined, event: { name: "Working title", status: "draft" }, checkInSessions: [{ id: session.id }], applicationQuestions: [{ id: question.id }] });
+    expect(result.current.formState.date_location).toMatchObject({ location: { address: storedEvent.location_address }, dates: [{ session_id: session.id }] });
+    expect(result.current.hasUnsavedChanges).toBe(false);
   });
 
   it("preserves changed work and draft identity on a refused event save, then adopts IDs on success", async () => {
@@ -570,27 +631,13 @@ it("recovers team settings from an event when an older working document has no t
   expect(result.current.hasUnsavedChanges).toBe(true);
 });
 
-it("retains hidden team settings through draft save/reload and event payloads", async () => {
-  const source = { ...event, teams_enabled: true, min_team_size: 2, max_team_size: 4, team_deadline: "2026-11-16T18:00:00Z" };
-  const { result, unmount } = renderHook(() => useEventForm({ eventId: source.id, initialEvent: source }));
+it("retains hidden team settings when a draft save applies them", async () => {
+  const source = { ...draftEvent, teams_enabled: true, min_team_size: 2, max_team_size: 4, team_deadline: "2026-11-16T18:00:00Z" };
+  const { result } = renderHook(() => useEventForm({ eventId: source.id, initialEvent: source }));
   act(() => result.current.handleFieldChange("teams_enabled", false));
-  await act(async () => { await result.current.handleSaveDraft(); });
-  const sent = vi.mocked(saveAdminEventDraftAction).mock.calls.at(-1)![0];
-  expect(sent.document.formState).toMatchObject({ teams_enabled: false, min_team_size: "2", max_team_size: "4", team_deadline: "2026-11-16T11:00" });
-  unmount();
-  const reopened = renderHook(() => useEventForm({ eventId: source.id, initialEvent: source, initialDraft: { id: sent.id, revision: 1, document: parseWorkingDocument(sent.document) } }));
-  expect(reopened.result.current.hasUnsavedChanges).toBe(false);
-  await act(async () => { await reopened.result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as FormEvent<HTMLFormElement>); });
-  expect(reopened.result.current.error).toBeNull();
-  expect(saveAdminEventAction).toHaveBeenLastCalledWith(expect.objectContaining({ event: expect.objectContaining({ teams_enabled: false, min_team_size: 2, max_team_size: 4, team_deadline: "2026-11-16T18:00:00.000Z" }) }));
-});
-
-it("saves incomplete team settings in a working document", async () => {
-  const { result } = renderHook(() => useEventForm({}));
-  act(() => { result.current.handleFieldChange("teams_enabled", true); result.current.handleFieldChange("min_team_size", "0"); result.current.handleFieldChange("team_deadline", "2099-01-01T"); });
-  await act(async () => { await result.current.handleSaveDraft(); });
-  expect(result.current.error).toBeNull();
-  expect(saveAdminEventDraftAction).toHaveBeenLastCalledWith(expect.objectContaining({ document: expect.objectContaining({ formState: expect.objectContaining({ teams_enabled: true, min_team_size: "0", team_deadline: "2099-01-01T" }) }) }));
+  await act(async () => { expect(await result.current.handleSaveDraft()).toBe(true); });
+  expect(saveAdminEventDraftAction).not.toHaveBeenCalled();
+  expect(saveAdminEventAction).toHaveBeenLastCalledWith(expect.objectContaining({ event: expect.objectContaining({ status: "draft", teams_enabled: false, min_team_size: 2, max_team_size: 4, team_deadline: "2026-11-16T18:00:00.000Z" }) }));
 });
 
 it("starts new schedules off and restores old drafts from the event's saved choice", () => {
@@ -606,36 +653,30 @@ it("starts new schedules off and restores old drafts from the event's saved choi
   }
 });
 
-it.each([true, false])("round-trips schedule visibility %s through working drafts and the event save", async enabled => {
-  const source = { ...event, agenda_enabled: !enabled };
-  const { result, unmount } = renderHook(() => useEventForm({ eventId: source.id, initialEvent: source }));
+it.each([true, false])("saves schedule visibility %s through a draft save, keeping it after a failure", async enabled => {
+  const source = { ...draftEvent, agenda_enabled: !enabled };
+  const { result } = renderHook(() => useEventForm({ eventId: source.id, initialEvent: source }));
   act(() => result.current.handleFieldChange("agenda_enabled", enabled));
   expect(result.current.hasUnsavedChanges).toBe(true);
-  await act(async () => { await result.current.handleSaveDraft(); });
-  const sent = vi.mocked(saveAdminEventDraftAction).mock.calls.at(-1)![0];
-  unmount();
-  const reopened = renderHook(() => useEventForm({ eventId: source.id, initialEvent: source, initialDraft: { id: sent.id, revision: 1, document: parseWorkingDocument(sent.document) } }));
-  expect(reopened.result.current.formState.agenda_enabled).toBe(enabled);
-  expect(reopened.result.current.hasUnsavedChanges).toBe(false);
   vi.mocked(saveAdminEventAction).mockResolvedValueOnce({ error: "Offline" });
-  const submit = () => reopened.result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as FormEvent<HTMLFormElement>);
-  await act(async () => { await submit(); });
-  expect(reopened.result.current.error).toBe("Offline");
-  expect(reopened.result.current.formState.agenda_enabled).toBe(enabled);
-  await act(async () => { await submit(); });
-  expect(reopened.result.current.error).toBeNull();
-  expect(saveAdminEventAction).toHaveBeenLastCalledWith(expect.objectContaining({ event: expect.objectContaining({ agenda_enabled: enabled }) }));
+  await act(async () => { expect(await result.current.handleSaveDraft(false)).toBe(false); });
+  expect(result.current.error).toBe("Offline");
+  expect(result.current.formState.agenda_enabled).toBe(enabled);
+  await act(async () => { expect(await result.current.handleSaveDraft(false)).toBe(true); });
+  expect(result.current.error).toBeNull();
+  expect(result.current.hasUnsavedChanges).toBe(false);
+  expect(saveAdminEventAction).toHaveBeenLastCalledWith(expect.objectContaining({ event: expect.objectContaining({ agenda_enabled: enabled, status: "draft" }) }));
 });
 
 describe("builder publication commands", () => {
-  it.each([false, true])("saves repeatedly after reverting an event with retained draft revision (publish in this session: %s)", async publishFirst => {
+  it.each([false, true])("saves repeatedly after reverting an event, applying each save (publish in this session: %s)", async publishFirst => {
     const existing = { ...event, status: publishFirst ? "draft" as const : "active" as const, publish_at: null, revision: 6, working_revision: 3, configured_slug: event.slug, configured_slug_edited: false };
     const initialDraft = publishFirst ? { id: existing.id, revision: 3, document: { version: 1 as const, formState: formStateFromEvent(existing), checkInEvents: [], mentors: [], sponsors: [], applicationTemplate: [] } } : null;
     const { result } = renderHook(() => useEventForm({ eventId: existing.id, initialEvent: existing, initialDraft }));
-    let workingRevision = 3;
-    vi.mocked(saveAdminEventDraftAction).mockImplementation(async input => {
-      if (input.revision !== workingRevision) return { error: "This draft changed in another tab. Reload it before saving again." };
-      return { id: input.id, eventId: existing.id, revision: ++workingRevision };
+    let revision = 6;
+    vi.mocked(saveAdminEventAction).mockImplementation(async input => {
+      if (input.expectedRevision !== revision) return { error: "This event changed in another tab. Reload before saving." };
+      return { id: existing.id, revision: ++revision, checkInSessionIds: [], questionIds: [] };
     });
     if (publishFirst) await act(async () => { expect(await result.current.handlePublication("publish")).toBe(true); });
     await act(async () => { expect(await result.current.handlePublication("revert")).toBe(true); });
@@ -644,11 +685,12 @@ describe("builder publication commands", () => {
       act(() => result.current.handleFieldChange("name", name));
       expect(result.current.formState.page_slug).toBe(existing.slug);
       await act(async () => { expect(await result.current.handleSaveDraft(false)).toBe(true); });
-      expect(saveAdminEventDraftAction).toHaveBeenLastCalledWith(expect.objectContaining({ id: existing.id, eventId: existing.id }));
+      expect(saveAdminEventAction).toHaveBeenLastCalledWith(expect.objectContaining({ eventId: existing.id, event: expect.objectContaining({ name, status: "draft" }) }));
       expect(result.current.error).toBeNull();
       expect(result.current.hasUnsavedChanges).toBe(false);
     }
-    expect(workingRevision).toBe(5);
+    expect(saveAdminEventDraftAction).not.toHaveBeenCalled();
+    expect(revision).toBe(publishFirst ? 10 : 9);
   });
 
   it("reverts a published event with current edits using the loaded revision and updates draft controls", async () => {
@@ -697,16 +739,17 @@ describe("builder publication commands", () => {
     expect(result.current.publication.status).toBe("active");
   });
 
-  it("reveals required issues only after attempting Publish and keeps incomplete drafts savable", async () => {
+  it("reveals required issues only after attempting to save or publish", async () => {
     const { result } = renderHook(() => useEventForm({}));
     expect(result.current.publishAttempted).toBe(false);
     expect(result.current.validation.issues.some(issue => issue.required)).toBe(true);
-    await act(async () => { await result.current.handleSaveDraft(false); });
-    expect(result.current.publishAttempted).toBe(false);
-    await act(async () => { expect(await result.current.handlePublication("publish")).toBe(false); });
+    await act(async () => { expect(await result.current.handleSaveDraft(false)).toBe(false); });
     expect(result.current.publishAttempted).toBe(true);
     expect(result.current.validationAttempt).toBe(1);
+    await act(async () => { expect(await result.current.handlePublication("publish")).toBe(false); });
+    expect(result.current.validationAttempt).toBe(2);
     expect(saveAdminEventAction).not.toHaveBeenCalled();
+    expect(saveAdminEventDraftAction).not.toHaveBeenCalled();
   });
   it("sends the loaded lifecycle precondition and reports the actual saved outcome", async () => {
     const { result } = renderHook(() => useEventForm({ eventId: event.id, initialEvent: event }));

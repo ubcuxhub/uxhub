@@ -92,7 +92,7 @@ their history, a closed registration window, a not-yet-open one, and:
 | `draftWithRegistrations` | `content-design-workshop` | Published a month ago (`first_published_at`), sold six tickets to the crowd, then taken back to draft: the one way a draft holds registrations now that drafts can't be registered for. The builder shows pricing, registration mode and the capacity floor as locked, and the URL as locked after publication. No login fixture holds a ticket. `first_published_at` only takes on a fresh row (the guard pins it on update) and prod never writes it |
 
 A local run writes `working_document: null` on these rows. They are finished
-events; a document left by a builder Save draft would otherwise survive the run
+events; a document left by an older builder Save draft would otherwise survive the run
 and win over the seeded columns wherever a draft is presented, and on the
 scheduled fixture it made the run fail (only an unscheduled draft may hold one).
 Prod keeps the document, since it may be an admin's unsaved work and prod
@@ -119,8 +119,8 @@ hotlinked 800px Unsplash URL that `design-sprint-upcoming` used to carry.
 
 `data/drafts.ts` — two drafts saved through the event builder and never
 finished, the unified lifecycle's `working_document` state. They are written
-through `save_event_working_document`, the RPC the builder's Save draft calls,
-so each row is what a real save makes: the document, its representable fields
+through `save_event_working_document`, the RPC the builder's Save draft called
+before it applied edits, so each row is what such a save made: the document, its representable fields
 projected into the columns, and the legacy `admin_event_drafts` mirror.
 
 | Draft | State |

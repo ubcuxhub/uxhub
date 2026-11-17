@@ -314,19 +314,23 @@ staff draft previews use the marketing layout. Existing operational consumers re
 updates omit effective prices. `is_featured` saves the staff choice without
 claiming portal Home selection/display is delivered.
 
-An existing unpublished event has one active URL: Save draft synchronizes
-`slug` and `configured_slug` in the same transaction as the working document.
+On a draft, Save applies the builder's edits to the event through the same
+validated transaction as Update and publication, and the event stays a draft.
+The builder never stores edits apart from the event: an incomplete form can't
+be saved (Save reveals what's missing, like Publish), and leaving
+discards unsaved edits. An existing unpublished event has one active URL: a
+save synchronizes `slug` and `configured_slug` in the same transaction.
 The new URL works immediately for staff; the old URL stops resolving and its
-claim is released. Other incomplete editor values remain in the same event row’s nullable
-working document. URL lookup retains its existing status/RLS visibility.
+claim is released. URL lookup retains its existing status/RLS visibility.
 Automatic URLs are numbered past other events' claims for duplicate names under
 the save transaction lock, including complete/publication saves;
 deliberately edited conflicting URLs are rejected without committing either
 the document or rename. The returned canonical URL and saved `event_revision`
 keep the editor and subsequent publication revision checks in sync. A retry
 returns the original saved revision, rather than adopting later event writes.
-The first Save draft creates its permanent event/portal identity, even when
-other event fields remain incomplete.
+The first Save creates its permanent event/portal identity: the builder
+writes a working document to get a durable ID that a lost response can retry
+against, then applies the same edits, which clears that document.
 The editor disables the URL field with the library's grey disabled style after
 first publication, including when that event is later returned to Draft.
 
@@ -403,8 +407,11 @@ Completed checkout invalidates the event detail route as well as checkout.
 
 ### Unified saved drafts and staff previews
 
-The first Save draft creates the permanent `events.id`. Unscheduled drafts may
-have missing capacity, prices, description and dates. `working_document` retains
+The first Save creates the permanent `events.id`. Save applies
+validated edits, so the builder no longer leaves a working document behind; one
+exists only on drafts saved before that change, until their next save. Such
+unscheduled drafts may have missing capacity, prices, description and dates.
+`working_document` retains
 unfinished nested sections and exact saved form strings; `working_revision` and
 `events.revision` protect competing edits. Related operational tables are written
 on a validated full save/publication. Publication/scheduling clear the working

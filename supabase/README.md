@@ -472,9 +472,13 @@ The section-aware attendee renderer remains deferred.
 
 ## Event builder mutation safety
 
-`events` owns the permanent event identity from the first Save draft. Unscheduled
-drafts allow null descriptions, prices, capacity and dates; exact unfinished form
-values and nested sections live in `working_document`, with `working_revision`.
+`events` owns the permanent event identity from the first builder Save. On a
+draft, Save is a full builder save (validated, applied, keeping the
+draft status); it writes a working document only as the identity step of a new
+event's first save, which the same save then clears. Unscheduled drafts saved
+before that change allow null descriptions, prices, capacity and dates; exact
+unfinished form values and nested sections live in `working_document`, with
+`working_revision`.
 An explicit Free selection still means zero; an unfinished paid/legacy amount
 stays null. Row RLS makes drafts staff-only. A CHECK prohibits working documents
 on scheduled/published rows, so public event reads never include private payloads.
