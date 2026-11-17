@@ -46,7 +46,7 @@ function row(id: string, name: string, starts_at: string | null, status: EventSt
       max_capacity: 30,
       regular_price: 15,
       member_price: 5,
-      working_document: null, working_revision: 0, legacy_draft_ids: [],
+      working_document: null, working_revision: 0, legacy_draft_ids: [], canceled_at: null, cancellation_note: null,
     configured_marketing_mode: null,
       configured_marketing_url: null,
       configured_price: null,

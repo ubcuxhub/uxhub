@@ -35,5 +35,23 @@ export function showsDraftEventsNote(
   return hasAdminAccess(role) && events.some(isDraftEvent);
 }
 
+/**
+ * Whether staff may test-register on this draft: free events only, as
+ * `event_ticket_eligibility` enforces (docs/event-states.md, "Drafts for
+ * admins"). A paid draft takes no registrations, so no card is ever held.
+ */
+export function allowsStaffTestRegistration(
+  event: Pick<EventRow, "status" | "regular_price" | "member_price">
+): boolean {
+  return isDraftEvent(event) && event.regular_price === 0 && (event.member_price ?? 0) === 0;
+}
+
+/** The staff test registration button on a draft. */
+export const STAFF_TEST_REGISTRATION_LABEL = "Test registration (staff only)";
+
+/** Shown beside every staff test registration control. */
+export const STAFF_TEST_REGISTRATION_WARNING =
+  "This creates a real registration, ticket and $0 purchase. Delete the event or keep it in Draft afterwards; members never see a draft.";
+
 /** The note shown to staff on the timeline and on a draft's event page. */
 export const DRAFT_EVENTS_NOTE = "Draft events are only visible to admins and managers.";

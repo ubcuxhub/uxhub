@@ -250,6 +250,7 @@ describe("payment fulfillment rules", () => {
     ["SOLD_OUT", "This event is sold out."],
     ["EVENT_NOT_FOUND", "This event could not be found."],
     ["EVENT_NOT_ACTIVE", "This event is no longer open for registration."],
+    ["EVENT_CANCELED", "This event has been canceled."],
     [null, "We could not reserve a ticket for this event."],
   ])("formats reservation failure %s", (reason, expected) => {
     expect(formatReservationFailure(reason)).toBe(expected);

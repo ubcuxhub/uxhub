@@ -13,9 +13,10 @@ The draft **QA Team Test** is already set up: free, teams on (max 3), one check-
 5. Send everyone the event link: [QA Team Test](https://www.ubcuxhub.ca/portal/events/qa-team-test)
 
 ## 2. Register (A, B, C, D)
-1. Open [QA Team Test](https://www.ubcuxhub.ca/portal/events/qa-team-test). ✅ "Draft" banner, header, description.
-2. Click **Register** → **Confirm registration**. ✅ No card form.
+1. Open [QA Team Test](https://www.ubcuxhub.ca/portal/events/qa-team-test). ✅ "Draft" banner, header, description, and a **Staff only** warning that registering creates a real registration.
+2. Click **Test registration (staff only)**. ✅ The checkout shows the same warning, no card form, and a **Test registration (staff only)** button. Click it.
 3. Back on the event page. ✅ Ticket with a QR code, and a **Your team** card.
+4. **Host:** make a second draft that is **paid** and open its portal page. ✅ A disabled "Paid drafts can’t be test-registered" button and no way to pay. Delete it.
 
 ## 3. Teams (A, B, C, D)
 1. **A:** **Create team** → name "Test Team" → **Copy link**. Send it to B, C and D.
@@ -41,5 +42,5 @@ The draft **QA Team Test** is already set up: free, teams on (max 3), one check-
 
 ## 6. Cleanup (Host)
 1. **A** and **C:** **Manage team → Delete team**.
-2. Delete QA Team Test from its [event page](https://www.ubcuxhub.ca/admin/events/ba0548e5-ed36-44b2-967e-04e312961890). If it refuses because tickets exist, ask Claude to remove the test rows.
+2. Delete QA Team Test from its [event page](https://www.ubcuxhub.ca/admin/events/ba0548e5-ed36-44b2-967e-04e312961890). ✅ It deletes: staff test registrations on a free draft don't protect it. If it refuses, the dialog names what does (a member's ticket, offer or payment); ask Claude to look before removing anything.
 3. Keep the flag on, or set it to `false` and redeploy.

@@ -40,7 +40,7 @@ function storedEvent(overrides: Partial<EventRow> = {}): EventRow {
     short_description: "Show your work.",
     description: "A night of portfolio reviews.",
     description_rich: null,
-    working_document: null, working_revision: 0, legacy_draft_ids: [],
+    working_document: null, working_revision: 0, legacy_draft_ids: [], canceled_at: null, cancellation_note: null,
     configured_marketing_mode: null,
     configured_marketing_url: null,
     configured_price: null,
