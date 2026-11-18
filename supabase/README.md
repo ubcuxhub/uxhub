@@ -656,7 +656,7 @@ items, including through a draft working document. Undo of attendance is separat
 Full saves keep the existing revision and operation receipt transaction. Overview
 quick edits cannot change the item-derived event dates.
 
-The 20261116012130 migration uses the approved empty-event baseline; it does not
+The 20261118012141 migration uses the approved empty-event baseline; it does not
 infer/backfill legacy session mappings. Rebuild/reseed the local database with
 `pnpm supabase:local`; do not deploy it against legacy live agendas without a
 separate data decision. Timing reuses the application's pinned Vancouver calendar

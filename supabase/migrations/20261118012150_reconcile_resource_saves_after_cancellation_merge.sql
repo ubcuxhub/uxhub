@@ -1,8 +1,7 @@
--- Cancellation reintroduced the legacy four-argument function alongside the
--- schedule-aware function with a default fifth argument. PostgREST cannot
--- resolve legacy calls with both present. Keep one compatible signature and
--- combine cancellation access with private schedule synchronization/retries.
-drop function public.save_past_event_resources(uuid,integer,jsonb,uuid);
+-- Keep one compatible signature and combine cancellation access with private
+-- schedule synchronization/retries. The schedule migration already removes the
+-- legacy overload when replayed after cancellation; tolerate its absence.
+drop function if exists public.save_past_event_resources(uuid,integer,jsonb,uuid);
 
 create or replace function public.save_past_event_resources(p_event_id uuid,p_revision integer,p_links jsonb,p_operation_id uuid,p_resources_version integer default null)
 returns jsonb language plpgsql set search_path = '' as $$
