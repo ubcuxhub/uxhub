@@ -211,3 +211,13 @@ it("keeps the agenda day through item changes, refresh and scanner close", async
   expect(query.get("item")).toBe("b");
   expect(query.get("returnTo")).toBe(returnTo);
 });
+
+it("explains cancellation when the item check-in is refused", async () => {
+  actions.mutateItemCheckInAction.mockResolvedValue({ status: "rejected", reason: "event_canceled" });
+  mount();
+  await act(async () => { });
+  await act(async () => camera.scan("qr"));
+  expect(screen.getByRole("heading", { name: "This event is canceled" })).toBeTruthy();
+  expect(screen.getByText("Canceled events don’t take check-ins.")).toBeTruthy();
+  expect(screen.queryByText("Ticket not recognized")).toBeNull();
+});

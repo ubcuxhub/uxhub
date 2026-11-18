@@ -11,7 +11,14 @@ type StatCardProps = { label: string; className?: string } & (
       change?: { delta: number; period: string };
     }
   | { kind: "count"; count: number; total: number; noun: string; showRate?: boolean }
-  | { kind: "rate"; count: number; total: number; noun: string }
+  | {
+      kind: "rate";
+      count: number;
+      total: number;
+      noun: string;
+      /** Follows "3 of 40 seats" after a middle dot: what makes up the count. */
+      detail?: string;
+    }
   | { kind: "insufficient"; reason: string }
   | { kind: "loading" }
 );
@@ -101,6 +108,7 @@ function StatCard({ label, className, ...stat }: StatCardProps) {
           <p className="text-label font-normal text-muted-foreground">
             {numberFormatter.format(stat.count)} of{" "}
             {numberFormatter.format(stat.total)} {stat.noun}
+            {stat.detail ? ` · ${stat.detail}` : null}
           </p>
         </>
       ) : (

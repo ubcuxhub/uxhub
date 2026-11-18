@@ -44,6 +44,8 @@ export async function mutateItemCheckIn(client: DbClient, input: { eventId: stri
     p_event_id: input.eventId, p_item_id: input.itemId, p_ticket_id: input.ticketId,
     p_qr_token: input.code?.trim(), p_method: input.code !== undefined ? "scan" : "manual", p_undo_version: input.undoVersion,
   });
+  if (error?.hint === "EVENT_CANCELED")
+    return { status: "rejected", reason: "event_canceled" };
   if (error)
     throw error;
   return data as unknown as ItemCheckInResult | { status: "undone" } | { status: "stale_undo" };

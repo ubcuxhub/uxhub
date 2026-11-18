@@ -3,7 +3,7 @@
 import { useId, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ClipboardList, ExternalLink, Pencil, QrCode } from "lucide-react";
+import { CalendarX, ClipboardList, ExternalLink, Pencil, QrCode } from "lucide-react";
 
 import { CopyCode } from "@/components/shared/CopyCode";
 import {
@@ -56,6 +56,8 @@ import {
 } from "../lib/event-registration-window";
 import { isCompleteDateTime } from "./event-form/event-form-schema";
 import { EventStatusBadge, EVENT_STATUS_LABELS } from "./EventStatusBadge";
+import { EventUnpublishDialog } from "./EventUnpublishDialog";
+import { CancelEventDialog } from "./CancelEventDialog";
 import { eventMarketingHref } from "../lib/event-presentation";
 
 export interface AdminEventRecordProps {
@@ -234,6 +236,12 @@ function formatPrice(value: number | null) {
   return Number(value) === 0 ? "Free" : currency.format(Number(value));
 }
 
+/** As the database's `event_has_ended`: over once its end (or start, without one) has passed. */
+function hasEnded(event: Pick<EventRow, "starts_at" | "ends_at">, now: Date) {
+  const end = event.ends_at ?? event.starts_at;
+  return Boolean(end && Date.parse(end) <= now.getTime());
+}
+
 function RegistrationBadge({
   state,
   opensAt,
@@ -285,8 +293,14 @@ export function AdminEventRecord({
   const editRevision = useRef(event.revision);
   // What each date and time field reports about its own text ("Use a real date").
   const [fieldErrors, setFieldErrors] = useState<Partial<Record<MomentKey, string>>>({});
+  const [unpublishing, setUnpublishing] = useState(false);
+  const [unpublishError, setUnpublishError] = useState<string | null>(null);
+  const [canceling, setCanceling] = useState(false);
   const editing = draft !== null;
   const dirty = draft !== null && !sameDraft(draft, draftFrom(event));
+  // Canceled for good, or over: the drawer shows the record but edits nothing.
+  const canceled = event.canceled_at !== null;
+  const ended = event.status === "active" && hasEnded(event, new Date(now));
 
   const base = `/admin/events/${event.id}`;
   // "Edit event" grows the drawer into the builder, as expand does.
@@ -344,6 +358,16 @@ export function AdminEventRecord({
       setError(problem);
       return;
     }
+    // Active → Draft hides the event from members: confirm it first.
+    if (event.status === "active" && input.status === "draft") {
+      setUnpublishError(null);
+      setUnpublishing(true);
+      return;
+    }
+    await commit(input);
+  };
+
+  const commit = async (input: EventScheduleInput) => {
     setSaving(true);
     setError(null);
     const key = JSON.stringify([event.id, editRevision.current, input]);
@@ -352,20 +376,24 @@ export function AdminEventRecord({
       const result = await updateEventScheduleAction(event.id, { ...input, operationId: pendingOperation.current.id, expectedRevision: editRevision.current });
       if (!result.ok) {
         setError(result.error);
+        if (unpublishing) setUnpublishError(result.error);
         return;
       }
       setSaved({ from: loaded, row: result.event });
       pendingOperation.current = null;
       setDraft(null);
+      setUnpublishing(false);
       router.refresh();
     } catch {
       setError("Couldn’t save the schedule. Try again.");
+      if (unpublishing) setUnpublishError("Couldn’t save the schedule. Try again.");
     } finally {
       setSaving(false);
     }
   };
 
   const publishingNow = draft !== null && event.status === "draft" && draft.status === "active";
+  const unpublishingNow = draft !== null && event.status === "active" && draft.status === "draft";
   const momentError = (field: MomentKey) => {
     if (!draft) return null;
     if (fieldErrors[field]) return fieldErrors[field];
@@ -395,7 +423,11 @@ export function AdminEventRecord({
       status={
         <>
           <EventStatusBadge status={event.status} publishAt={event.publish_at} />
-          <RegistrationBadge state={registration} opensAt={event.registration_opens_at} />
+          {canceled ? (
+            <StatusBadge status="canceled" />
+          ) : (
+            <RegistrationBadge state={registration} opensAt={event.registration_opens_at} />
+          )}
         </>
       }
       fullPageHref={`${base}/edit`}
@@ -468,7 +500,7 @@ export function AdminEventRecord({
             title="Status and registration schedule"
             kind={editing ? "content" : "fields"}
             action={
-              editing ? null : (
+              editing || canceled ? null : (
                 <Button
                   type="button"
                   variant="secondary"
@@ -507,6 +539,10 @@ export function AdminEventRecord({
                   {publishingNow ? (
                     <FieldDescription>
                       Students can see the event as soon as you save.
+                    </FieldDescription>
+                  ) : unpublishingNow ? (
+                    <FieldDescription>
+                      Members lose access until you publish it again. You’ll confirm before it saves.
                     </FieldDescription>
                   ) : null}
                 </Field>
@@ -584,6 +620,59 @@ export function AdminEventRecord({
               </>
             )}
           </RecordSection>
+
+          {canceled ? (
+            <RecordSection title="Canceled">
+              <RecordField label="Canceled" value={formatTimestamp(event.canceled_at)} />
+              <RecordField label="Note to attendees" value={event.cancellation_note ?? "No note"} />
+              <RecordField label="Refunds" value="Issue refunds in Square" />
+            </RecordSection>
+          ) : event.status === "active" && !ended ? (
+            <RecordSection
+              title="Cancel event"
+              kind="content"
+              action={
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={editing}
+                  onClick={() => setCanceling(true)}
+                >
+                  <CalendarX aria-hidden />
+                  Cancel event
+                </Button>
+              }
+            >
+              <p className="text-small text-muted-foreground">
+                For an event that won’t happen. Ticket holders keep it in their portal, marked canceled. It can’t be undone, and refunds are issued in Square.
+              </p>
+            </RecordSection>
+          ) : null}
+
+          <EventUnpublishDialog
+            eventId={event.id}
+            open={unpublishing}
+            onOpenChange={(open) => {
+              if (!open && !saving) setUnpublishing(false);
+            }}
+            pending={saving}
+            error={unpublishError}
+            onConfirm={() => {
+              if (draft) void commit(toInput(draft));
+            }}
+          />
+          <CancelEventDialog
+            eventId={event.id}
+            eventName={event.name}
+            open={canceling}
+            onOpenChange={setCanceling}
+            onCanceled={(row) => {
+              setSaved({ from: loaded, row });
+              setCanceling(false);
+              router.refresh();
+            }}
+          />
 
           <RecordSection title="Venue">
             <RecordField label="Building" value={event.location_building} />

@@ -25,6 +25,11 @@ import { workingDocumentSaveInput } from "./lib/event-working-save";
 import { eventWorkingDocument } from "./lib/event-presentation";
 import { pacificDate } from "@/lib/date";
 import { hasEventScheduleReceipt } from "@/lib/supabase-helpers/event-mutations";
+import {
+  cancelEvent,
+  fetchEventLifecycleCounts,
+  type EventLifecycleCounts,
+} from "@/lib/supabase-helpers/event-lifecycle";
 
 export type UpdateEventScheduleResult =
   | { ok: true; event: EventRow }
@@ -123,5 +128,66 @@ export async function updateEventScheduleAction(
       ...errorFields(error),
     });
     return { ok: false, error: SAVE_FAILED };
+  }
+}
+
+/**
+ * The counts the revert and cancel dialogs show (`event_lifecycle_counts`):
+ * members registered (which block a revert to Draft), members' open
+ * applications (which lose access while it's a draft), and paid tickets to
+ * refund after a cancel. Read-only; `null` when the event is gone.
+ */
+export async function loadEventLifecycleCountsAction(
+  eventId: string
+): Promise<EventLifecycleCounts | null> {
+  await requireAdmin();
+  if (typeof eventId !== "string" || !isUuid(eventId)) return null;
+  const event = await fetchEventById(supabaseAdmin, eventId);
+  if (!event) return null;
+  return fetchEventLifecycleCounts(supabaseAdmin, eventId);
+}
+
+export type CancelEventResult =
+  | { ok: true; event: EventRow }
+  | { ok: false; error: string };
+
+const CANCEL_FAILED = "Couldn’t cancel the event. Try again.";
+const CANCEL_NOTE_LIMIT = 1000;
+
+/**
+ * Cancels a published event that hasn't ended, for good (docs/event-states.md,
+ * "Canceled events"). Tickets, purchases, applications and teams stay; ticket
+ * holders see the event as canceled, with `note`. Nothing is emailed and
+ * nothing is refunded: staff refund paid tickets in Square.
+ *
+ * `operationId` is the caller's key for this attempt, so a retry after a lost
+ * response returns the first result instead of a refusal.
+ */
+export async function cancelEventAction(
+  eventId: string,
+  input: { note: string | null; operationId: string }
+): Promise<CancelEventResult> {
+  await requireAdmin();
+  if (typeof eventId !== "string" || !isUuid(eventId)) return { ok: false, error: NOT_FOUND };
+  if (!input || typeof input.operationId !== "string" || !isUuid(input.operationId)) return { ok: false, error: CANCEL_FAILED };
+  const note = typeof input.note === "string" ? input.note.trim() : "";
+  if (note.length > CANCEL_NOTE_LIMIT) return { ok: false, error: `Keep the note to ${CANCEL_NOTE_LIMIT.toLocaleString("en-CA")} characters.` };
+
+  try {
+    const event = await cancelEvent(supabaseAdmin, eventId, note || null, input.operationId);
+    log.info("admin.event_canceled", { eventId, operationId: input.operationId });
+    // The list and overview, the builder, the portal and the public pages.
+    revalidatePath("/admin/events", "layout");
+    revalidatePath("/portal/events", "layout");
+    revalidatePath("/events", "layout");
+    return { ok: true, event };
+  } catch (error) {
+    const hint = error && typeof error === "object" && "hint" in error ? String(error.hint) : "";
+    if (["EVENT_CANCEL_REFUSED", "EVENT_REVISION_CONFLICT"].includes(hint) && error && typeof error === "object" && "message" in error && typeof error.message === "string") {
+      log.warn("admin.event_cancel_refused", { eventId, hint });
+      return { ok: false, error: error.message };
+    }
+    log.error("admin.event_cancel_failed", { eventId, ...errorFields(error) });
+    return { ok: false, error: CANCEL_FAILED };
   }
 }

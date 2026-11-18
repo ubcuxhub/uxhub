@@ -19,6 +19,8 @@ export function CheckInResultCard({ result, eventName, targetLabel, onNext, onSe
     return () => clearInterval(interval);
   }, [result.status]);
   const rejected = result.status === "rejected";
+  const canceled = rejected && result.reason === "event_canceled";
+  const rejectionTitle = canceled ? "This event is canceled" : "Ticket not recognized";
   return <Sheet open onOpenChange={open => {
     if (!open)
       onNext();
@@ -33,9 +35,9 @@ export function CheckInResultCard({ result, eventName, targetLabel, onNext, onSe
       <SheetHeader className="gap-3 p-5">
         <div>{result.status === "checked_in" ? <StatusBadge status="checked_in" /> : result.status === "already_checked_in" ? <Badge variant="warning">
           <History aria-hidden />Already checked in</Badge> : <Badge variant="error">
-          <CircleAlert aria-hidden />Ticket not recognized</Badge>}</div>
-        <SheetTitle className="text-h2 [overflow-wrap:anywhere]">{rejected ? "Ticket not recognized" : result.name}</SheetTitle>
-        <SheetDescription>{rejected ? `This QR code isn't a ticket for ${eventName}. Ask the attendee to open their ticket in the portal, or find them by name.` : `${eventName} · ${result.status === "already_checked_in" ? "Already checked in" : "Checked in"} at ${formatEventTime(result.checkedInAt)}`}</SheetDescription>
+          <CircleAlert aria-hidden />{rejectionTitle}</Badge>}</div>
+        <SheetTitle className="text-h2 [overflow-wrap:anywhere]">{rejected ? rejectionTitle : result.name}</SheetTitle>
+        <SheetDescription>{rejected ? canceled ? "Canceled events don’t take check-ins." : `This QR code isn't a ticket for ${eventName}. Ask the attendee to open their ticket in the portal, or find them by name.` : `${eventName} · ${result.status === "already_checked_in" ? "Already checked in" : "Checked in"} at ${formatEventTime(result.checkedInAt)}`}</SheetDescription>
         <p className="text-small text-muted-foreground [overflow-wrap:anywhere]">{targetLabel}</p>
       </SheetHeader>
       {!rejected ? <div className="mx-5 flex flex-wrap justify-between gap-3 border-t border-border-subtle pt-5 text-small">

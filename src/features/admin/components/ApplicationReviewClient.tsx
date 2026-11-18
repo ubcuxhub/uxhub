@@ -2,8 +2,10 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { Users } from "lucide-react";
 
 import { BackButton } from "@/components/shared/BackButton";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { Avatar } from "@/components/ui/avatar";
 import {
@@ -20,6 +22,7 @@ import { ApplicantPager, type PagerTarget } from "@/features/admin/components/Ap
 import { ApplicationDecisionCard } from "@/features/admin/components/ApplicationDecisionCard";
 import { ReviewStateBadge } from "@/features/admin/components/ReviewStateBadge";
 import {
+  decisionsReleased,
   getApplicationReviewState,
   type ApplicationDecision,
 } from "@/features/admin/lib/application-review";
@@ -30,6 +33,7 @@ import type {
 } from "@/features/applications/lib/application-form";
 import { formatTimestamp } from "@/lib/date";
 import type { SubmittedApplicationRow } from "@/lib/supabase/models";
+import type { DecisionSeats } from "@/lib/supabase-helpers/event-applications";
 
 export interface AdminApplicant {
   name: string;
@@ -56,6 +60,8 @@ interface ApplicationReviewClientProps {
     next: PagerTarget | null;
   };
   defaultDeadline: DateTimeValue;
+  /** The event's "Release decisions on", null when none is set. */
+  decisionsReleaseAt?: string | null;
   /**
    * The reviewer-notes thread. It sits in the aside under the decision (and
    * after it on one column), where the notes inform the decision and are read
@@ -65,6 +71,15 @@ interface ApplicationReviewClientProps {
 }
 
 const firstName = (name: string) => name.split(" ")[0] || name;
+
+const count = (value: number, one: string, many: string) =>
+  `${value} ${value === 1 ? one : many}`;
+
+/** "38 of 40 seats are held: 30 going, 8 offers out." */
+export function describeHeldSeats(seats: DecisionSeats): string {
+  const held = seats.tickets + seats.heldOffers;
+  return `${held} of ${count(seats.capacity ?? held, "seat is", "seats are")} held: ${seats.tickets} going, ${count(seats.heldOffers, "offer", "offers")} out.`;
+}
 
 /**
  * One application (docs/design/application-review.md, §3): the applicant, the
@@ -83,6 +98,7 @@ export function ApplicationReviewClient({
   backHref,
   pager,
   defaultDeadline,
+  decisionsReleaseAt = null,
   notes,
 }: ApplicationReviewClientProps) {
   const router = useRouter();
@@ -91,6 +107,14 @@ export function ApplicationReviewClient({
     useState<SubmittedApplicationRow>(initialApplication);
   const state = getApplicationReviewState(application, hasTicket);
   const name = firstName(applicant.name);
+  const releaseAt = decisionsReleased(decisionsReleaseAt) ? null : decisionsReleaseAt;
+  // An accept the event has no seat for, waiting on "Accept anyway".
+  const [overCapacity, setOverCapacity] = useState<{
+    offerExpiresAt: string | null;
+    seats: DecisionSeats;
+  } | null>(null);
+  const [overriding, setOverriding] = useState(false);
+  const [overrideError, setOverrideError] = useState<string | null>(null);
 
   // A new applicant is a new page: focus the name, so moving to the next one
   // is announced.
@@ -100,20 +124,32 @@ export function ApplicationReviewClient({
 
   const decide = async (
     decision: ApplicationDecision,
-    offerExpiresAt: string | null
-  ) => {
-    let updated: SubmittedApplicationRow;
+    offerExpiresAt: string | null,
+    allowOverCapacity = false
+  ): Promise<string | void> => {
+    let result: Awaited<ReturnType<typeof updateApplicationDecisionAction>>;
     try {
-      updated = await updateApplicationDecisionAction(
+      result = await updateApplicationDecisionAction(
         application.id,
         decision,
-        offerExpiresAt
+        offerExpiresAt,
+        { allowOverCapacity }
       );
     } catch (error) {
       console.error("Error updating application decision:", error);
       throw error;
     }
+    if (!result.ok) {
+      if (result.reason === "OVER_CAPACITY") {
+        setOverrideError(null);
+        setOverCapacity({ offerExpiresAt, seats: result.seats });
+        return;
+      }
+      return result.error;
+    }
+    const updated = result.application;
     setApplication(updated);
+    setOverCapacity(null);
     const next = pager.next;
     toast.success(
       decision === "accept"
@@ -124,13 +160,27 @@ export function ApplicationReviewClient({
       {
         description:
           decision === "accept"
-            ? `Register by ${formatTimestamp(updated.offer_expires_at)}`
+            ? `${result.overCapacity ? "Over capacity. " : ""}Register by ${formatTimestamp(updated.offer_expires_at)}`
             : undefined,
         action: next
           ? { label: "Next applicant", onClick: () => router.push(next.href) }
           : undefined,
       }
     );
+  };
+
+  const acceptAnyway = async () => {
+    if (!overCapacity) return;
+    setOverriding(true);
+    setOverrideError(null);
+    try {
+      const refusal = await decide("accept", overCapacity.offerExpiresAt, true);
+      if (refusal) setOverrideError(refusal);
+    } catch {
+      setOverrideError("Couldn’t save the decision. Check your connection and try again.");
+    } finally {
+      setOverriding(false);
+    }
   };
 
   return (
@@ -213,11 +263,33 @@ export function ApplicationReviewClient({
             firstName={name}
             offerExpiresAt={application.offer_expires_at}
             defaultDeadline={defaultDeadline}
-            onDecide={decide}
+            releaseAt={releaseAt}
+            onDecide={(decision, offerExpiresAt) => decide(decision, offerExpiresAt)}
           />
           {notes}
         </div>
       </div>
+
+      <ConfirmDialog
+        open={overCapacity !== null}
+        onOpenChange={(open) => {
+          if (!open && !overriding) setOverCapacity(null);
+        }}
+        icon={<Users aria-hidden />}
+        title="This event is full"
+        description={
+          overCapacity
+            ? `${describeHeldSeats(overCapacity.seats)} Accepting ${name} holds one more seat than the event has.`
+            : undefined
+        }
+        cancelLabel="Don’t accept"
+        confirmLabel="Accept anyway"
+        pendingLabel="Accepting…"
+        confirmVariant="default"
+        pending={overriding}
+        error={overrideError}
+        onConfirm={() => void acceptAnyway()}
+      />
     </PageContainer>
   );
 }

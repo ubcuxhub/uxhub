@@ -65,6 +65,7 @@ export default async function PortalEventPage({
       : null as TeamCardData | null,
   ]);
   const badge = eventBadgeFor(states[event.id]);
+  const canceled = states[event.id].kind === "canceled";
   const website = publicMarketingDestination(event);
 
   const startTime = formatEventTime(event.starts_at);
@@ -156,8 +157,9 @@ export default async function PortalEventPage({
 
       {/* Ticket holders only. Stacked under the registration panel for now;
           placing it beside the panel is a follow-up. */}
-      {teams?.show ? <TeamCard {...teams.props} /> : null}
-      {teams && !teams.show && teams.inviteError ? (
+      {/* A canceled event's teams are locked for good, so the card goes. */}
+      {teams?.show && !canceled ? <TeamCard {...teams.props} /> : null}
+      {teams && !teams.show && teams.inviteError && !canceled ? (
         <TeamInviteNotice inviteError={teams.inviteError} />
       ) : null}
 

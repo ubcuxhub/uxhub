@@ -1616,6 +1616,10 @@ export type Database = {
         Args: { p_date: string; p_time: string }
         Returns: string
       }
+      application_decisions_released: {
+        Args: { p_event_id: string }
+        Returns: boolean
+      }
       apply_event_purchase_refund: {
         Args: { p_purchase_id: string; p_refunded_cents: number }
         Returns: {
@@ -1639,6 +1643,31 @@ export type Database = {
         Args: { p_name: string }
         Returns: boolean
       }
+      cancel_admin_event: {
+        Args: { p_event_id: string; p_note: string; p_operation_id: string }
+        Returns: Json
+      }
+      claim_application_emails: {
+        Args: { p_event_ids?: string[]; p_limit?: number }
+        Returns: {
+          application_id: string
+          attempts: number
+          delivery_id: string
+          email: string
+          ends_at: string
+          event_id: string
+          event_name: string
+          event_slug: string
+          first_name: string
+          kind: string
+          offer_expires_at: string
+          starts_at: string
+        }[]
+      }
+      complete_application_email: {
+        Args: { p_delivery_id: string; p_error_code?: string; p_sent: boolean }
+        Returns: number
+      }
       create_staff_volunteer_schedule: {
         Args: { p_event_id: string; p_operation_id: string; p_url: string }
         Returns: Json
@@ -1657,6 +1686,28 @@ export type Database = {
       current_user_team_ids: {
         Args: Record<PropertyKey, never>
         Returns: string[]
+      }
+      decide_event_application: {
+        Args: {
+          p_allow_over_capacity?: boolean
+          p_application_id: string
+          p_decision: string
+          p_offer_expires_at?: string
+        }
+        Returns: {
+          application_id: string
+          decisions_release_at: string
+          event_id: string
+          failure_reason: string
+          held_offers: number
+          max_capacity: number
+          offer_expires_at: string
+          over_capacity: boolean
+          previous_status: Database["public"]["Enums"]["event_application_status"]
+          status: Database["public"]["Enums"]["event_application_status"]
+          tickets: number
+          user_id: string
+        }[]
       }
       delete_account: { Args: { p_auth_user_id: string }; Returns: undefined }
       delete_admin_event_safely: {
@@ -1706,6 +1757,14 @@ export type Database = {
         }
         Returns: boolean
       }
+      event_lifecycle_counts: {
+        Args: { p_event_id: string }
+        Returns: {
+          member_applications: number
+          paid_tickets: number
+          registered: number
+        }[]
+      }
       event_member_commitments: {
         Args: { p_event_id: string }
         Returns: {
@@ -1744,6 +1803,20 @@ export type Database = {
       event_ticket_eligibility: {
         Args: { p_amount_cents?: number; p_event_id: string; p_user_id: string }
         Returns: string
+      }
+      get_my_event_applications: {
+        Args: { p_event_ids: string[] }
+        Returns: {
+          created_at: string
+          decisions_release_at: string
+          event_id: string
+          id: string
+          offer_expires_at: string
+          status: Database["public"]["Enums"]["event_application_status"]
+          submitted_at: string
+          updated_at: string
+          user_id: string
+        }[]
       }
       get_user_info_id: { Args: Record<PropertyKey, never>; Returns: string }
       initialize_event_checkout: {
@@ -1786,6 +1859,10 @@ export type Database = {
         }
         Returns: Json
       }
+      owns_event_application: {
+        Args: { p_application_id: string }
+        Returns: boolean
+      }
       participant_agenda_location: {
         Args: { p_location: Json; p_restricted: boolean }
         Returns: Json
@@ -1795,6 +1872,10 @@ export type Database = {
       regenerate_event_ticket_token: {
         Args: { p_ticket_id: string }
         Returns: boolean
+      }
+      release_application_emails: {
+        Args: { p_delivery_ids: string[]; p_reason?: string }
+        Returns: number
       }
       release_event_ticket: {
         Args: { p_purchase_id: string }
@@ -1900,6 +1981,22 @@ export type Database = {
         Returns: Json
       }
       save_admin_event_builder_before_agenda_timing: {
+        Args: {
+          p_application_questions: Json
+          p_check_in_sessions: Json
+          p_draft_id: string
+          p_draft_revision: number
+          p_event: Json
+          p_event_id: string
+          p_expected_header_image_url: string
+          p_expected_image_url: string
+          p_mentors: Json
+          p_slug: string
+          p_sponsors: Json
+        }
+        Returns: Json
+      }
+      save_admin_event_builder_before_cancellation: {
         Args: {
           p_application_questions: Json
           p_check_in_sessions: Json

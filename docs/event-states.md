@@ -4,7 +4,8 @@ What admins and students see for an event, and where each state comes from.
 Columns refer to [schema-proposed.sql](schema-proposed.sql).
 
 Once someone registers, they stay registered: there is no cancelling or
-releasing a spot.
+releasing a spot. The club can cancel a whole event (below), which keeps
+every registration.
 
 ## Admin: event
 
@@ -13,10 +14,67 @@ releasing a spot.
 | Draft | No | `status = draft` |
 | Scheduled | No | `status = draft`, `publish_at` set |
 | Published | Yes | `status = active` |
+| Canceled | Yes, marked canceled | `status = active`, `canceled_at` set |
 
 Draft events are hidden. Whether an event is upcoming or past comes from
 `starts_at` and `ends_at`, not from its status, so a finished event stays
 Published and members keep their history.
+
+### Unpublishing
+
+Going back from Active to Draft hides the event from members, since RLS
+returns drafts to staff only: a member with a ticket would get a 404 and lose
+their QR code. So the database refuses it while any member is registered,
+through every write path (the drawer's quick edit, the builder's Revert to
+draft, a direct update, the service role): one trigger,
+`guard_event_unpublish`, counts `event_member_commitments` (tickets, held
+offers and payments in flight of non-staff, non-deleted accounts) and raises
+"N people are registered. Cancel the event instead." with the hint
+`EVENT_SETTINGS_CONFLICT`. Staff test tickets don't count. Cancel the event
+instead.
+
+When nobody is registered, the drawer and the builder still confirm first
+(`EventUnpublishDialog`): the dialog counts members' draft, submitted and
+waitlisted applications, which lose access until the event is published
+again (`event_lifecycle_counts`).
+
+### Canceled events
+
+Cancel is for an event that won't happen. It's a one-way flag on a published
+event, not a status: **Cancel event** in the drawer (`cancel_admin_event`,
+staff only, through `cancelEventAction`) works only on an active event that
+hasn't ended and isn't canceled, and sets `canceled_at` and the optional
+`cancellation_note`. It can't be undone. A refusal carries the hint
+`EVENT_CANCEL_REFUSED`.
+
+Nothing is rewritten: tickets, purchases, applications, teams and check-ins
+stay, and nobody is emailed. Refunds are manual: staff refund each paid ticket
+in Square, and the cancel dialog says how many paid tickets (completed,
+not fully refunded) there are.
+
+After a cancel:
+
+- **Registration** stops: checkout and reservation refuse it with
+  `EVENT_CANCELED` (`event_ticket_eligibility`).
+- **Applications** stop: `submit_event_application` returns
+  `NOT_ACCEPTING_APPLICATIONS`.
+- **Teams** lock: `create_team`, `join_team`, `leave_team`, `delete_team` and
+  `rename_team` return `TEAMS_LOCKED` (`team_change_blocked`).
+- **Check-in** is refused: a trigger on `check_ins` raises `EVENT_CANCELED`,
+  and the scanner and lookup show "This event is canceled"
+  (`event_canceled`).
+- **The event is read-only**, like an ended one: the builder and the drawer
+  can't change it (`zz_event_canceled_lock` on events, the child-table lock,
+  and the builder save refuse with `EVENT_HISTORY_LOCKED`), and it can't go
+  back to Draft. Links and resources stay editable
+  (`save_past_event_resources`). The service role is no exception, so
+  `pnpm seed` fails on a seed event you canceled locally; reset with
+  `pnpm supabase:local`.
+- **Members still see it.** It stays Active, so RLS keeps showing it to ticket
+  holders and on the public pages. The portal event page, the portal
+  timeline, `/events` and `/events/[slug]` show a "Canceled" badge and the
+  note until the event ends, then treat it as any past event. The ticket's QR
+  code is hidden, and the team card goes.
 
 ### Scheduling publication
 
@@ -171,6 +229,10 @@ or authorized purchase, and all three must be zero, with no live purchase. The
 delete then removes the event's dead purchases (`purchases.event_id` is
 `on delete restrict`) and the event; tickets, check-ins, teams and
 applications cascade. A refusal carries the hint `EVENT_DELETE_PROTECTED`.
+The delete dialog names what goes with the event (`fetchEventHistoryInfo`,
+read with the service role so drafts count): the applications and drafts with
+their answers and uploaded files, the reviewer notes, the registrations and
+the teams. Applicants aren't notified.
 
 **Checkout checks before it holds a card.** `initialize_event_checkout` runs
 `event_ticket_eligibility` (status, cancellation, window, offer and seats) and
@@ -181,7 +243,8 @@ hold is voided at reservation, as before.
 
 `events.canceled_at` (with `cancellation_note`) marks a canceled event. Cancel
 is a flag on an active event, not a status value; checkout and reservation
-refuse it with `EVENT_CANCELED`. Nothing sets it yet.
+refuse it with `EVENT_CANCELED`. `cancel_admin_event` sets it (see
+"Canceled events").
 
 `remove_event_ticket` deletes one ticket and frees its holder's team spot on
 that event as account deletion does: a team they owned passes to the teammate
@@ -217,9 +280,12 @@ Purchase history shows "Refunded" or "Partially refunded" from the amount.
 Only for events with `requires_application`.
 
 `event_applications.status` (enum `event_application_status`) has exactly five
-values. The database enforces the moves below:
+values. Once decisions are released ([below](#decision-release)) the database
+enforces the moves below; before release any decision can change to any other
+among `submitted`, `waitlisted`, `accepted` and `rejected`. An offer someone
+has registered on never changes.
 
-| `status` | Meaning | Next |
+| `status` | Meaning | Next, after release |
 | --- | --- | --- |
 | `draft` | The applicant is still filling it in | `submitted`, only through `submit_event_application` |
 | `submitted` | Waiting for review | `accepted`, `waitlisted`, `rejected` |
@@ -242,6 +308,76 @@ not `status` values; they're worked out from the deadline and the ticket:
 - Re-offering an expired spot keeps `status = accepted` and sets a new
   `offer_expires_at`.
 - Taking back an offer before the person registers changes it to Rejected.
+
+Admins decide through `decide_event_application` (service role, from
+`updateApplicationDecisionAction`), which locks the event row as reservation
+does and returns why it refused instead of failing:
+
+- **Capacity.** An accept that would take a seat (the applicant has no ticket
+  and no unexpired offer) counts seats as [Seats](#seats) does. When none is
+  left it returns `OVER_CAPACITY` with the tickets, held offers and capacity;
+  the review page then asks "Accept anyway", which passes
+  `p_allow_over_capacity` and is logged as `application.accepted_over_capacity`.
+  Two accepts for the last seat serialize on the lock, so only one takes it.
+- **Deadline.** `offer_expires_at` must be after now and after the release
+  (`DEADLINE_TOO_EARLY`). The review page starts from `defaultOfferDeadline`:
+  the event's Confirm by when that's after the later of now and the release,
+  otherwise a week after that moment at 11:45 PM Pacific. Changing Confirm by
+  never moves offers already made.
+- Other refusals: `NOT_FOUND`, `NOT_SUBMITTED` (a draft), `HAS_TICKET` (the
+  offer is registered), `NOT_ALLOWED` (a move the table forbids after release).
+
+The review list's "Seats held X of N" card counts tickets and offers out
+(`event_seat_counts`).
+
+### Decision release
+
+"Release decisions on" (`event_application_settings.decisions_release_at`)
+holds every decision back from applicants until it passes;
+`application_decisions_released(event)` is true once it has, or when none is
+set. Before then:
+
+- "applications: read own" shows an applicant only their draft or submitted
+  rows, and `get_my_event_applications` (what the portal reads) reports a
+  decided application as `submitted`, with no `offer_expires_at` and no
+  `updated_at`. It always returns `decisions_release_at`, and the panel says
+  when decisions come out. Applicants still read their own answers.
+- Checkout and reservation refuse an offer with `APPLICATION_REQUIRED`
+  (`event_ticket_eligibility`).
+- Admins see and change decisions as usual; the decision card says "Hidden
+  from {first name} until {release}".
+
+The portal shows the decision on the first load after the release; nothing
+pushes it to an open page. Once applicants can see decisions (the release has
+passed, or none was set and some application is decided), the release can't
+move into the future (`EVENT_SETTINGS_CONFLICT`).
+
+### Application emails
+
+Applicants get plain, fixed-copy emails through Resend
+(`src/lib/email/application-templates.ts`). A production-only job sends
+them within about five minutes of becoming due (setup and limits:
+supabase/README.md, "Application emails"):
+
+| Email | Sent when |
+| --- | --- |
+| Accepted ("You're in", confirm by the deadline, button to the portal event page) | The decision is `accepted` and released, and the offer hasn't expired |
+| Waitlisted (a spot that opens up shows in the portal) | The decision is `waitlisted` and released |
+| Not selected | The decision is `rejected` and released |
+| Offer reminder (confirm by the deadline, button) | An accepted, released offer expires within 24 hours, and its acceptance email went out before those 24 hours began |
+
+- Each email goes once per application and decision, so a decision that
+  changes after release (waitlisted to accepted, accepted to rejected) sends
+  the new one. A new deadline on the same offer sends no new acceptance, but
+  gets its own reminder.
+- Nothing is sent for a canceled event, a draft (unpublished) event, an event
+  that has ended, an event that no longer requires applications, a deleted
+  account, or an applicant who already has a ticket. Before release nothing is
+  sent, so decisions changed before then send only the final one.
+- No email when an offer expires, and none when an application is submitted.
+- Decisions released before the job shipped were marked sent when it
+  deployed, so nobody got an email for them.
+- Nothing is sent while student events are off (`FLAGS.studentEvents`).
 
 Drafts belong to the applicant alone:
 
@@ -271,6 +407,7 @@ register.
 
 | State | Badge | When |
 | --- | --- | --- |
+| `canceled` | Canceled | The event was canceled and hasn't ended, ticket or not |
 | `reg-upcoming` | Opens Oct 12 | Before `registration_opens_at` |
 | `reg-open` | Registration open | Registration is open and seats are left |
 | `reg-full` | Full | No seats left; can reopen if an offer expires |
@@ -282,7 +419,7 @@ register.
 | `app-upcoming` | Opens Oct 12 | Before `registration_opens_at`, for an application event |
 | `app-open` | Applications open | Applications are open and they haven't started one |
 | `app-draft` | Draft | Their application is a `draft`, and applications are open |
-| `app-in-review` | Pending | Their application is `submitted` |
+| `app-in-review` | Pending | Their application is `submitted`, or decided but not yet released; before release the panel says when decisions come out |
 | `app-waitlisted` | Waitlisted | Their application is `waitlisted` |
 | `app-accepted` | Register by Oct 20 | Accepted, before the offer deadline, no ticket yet |
 | `app-rejected` | Not selected | Their application is `rejected` |
@@ -319,10 +456,28 @@ student is applying and Registration otherwise, including once they're
 accepted. The ticket is locked until they register, and View ticket opens the
 "Your ticket" dialog with the scannable code.
 
+`canceled` is an alert titled "This event has been canceled", never the
+ticket, so the QR code is hidden. Its text is the club's note, then the
+refund line for a paid ticket: "Your payment has been refunded." once
+`purchases.refunded_cents` covers the amount, otherwise "Refunds are handled
+by the club." A free ticket gets "You don’t need to do anything." when there's
+no note.
+
+Badges for a canceled event:
+
+| Where | Before it ends | After it ends |
+| --- | --- | --- |
+| Portal event page and timeline | Canceled (`eventBadgeFor`) | Past |
+| `/events` card | Canceled (`isCanceledEvent`) | No badge, as any event |
+| `/events/[slug]` | Canceled, the note, and a disabled "Event canceled" button | As any past event |
+| Admin drawer and builder | Canceled, always | Canceled, always |
+
 ### When more than one applies
 
 Use the first rule that matches:
 
+0. The event was canceled and hasn't ended: `canceled`, with their ticket if
+   they have one. Once it ends, the rules below apply as for any event.
 1. The event has ended: `reg-past-attended` if they had a ticket, otherwise
    `reg-past`.
 2. They have a ticket: `reg-checked-in` or `reg-going`, over any application
@@ -455,10 +610,11 @@ The admin builder saves application timing in staff-only
 `event_application_settings`, separately from public event rows and existing
 per-offer `offer_expires_at`. Release decisions on and Confirm by are optional
 Pacific moments; entered values need a complete, unambiguous date and time, and
-confirmation follows release when both are set. Elapsed values remain editable.
-These form settings do not yet embargo decisions, change outstanding offers,
-reopen expired offers or send emails. Those attendee behaviours remain deferred.
-The intended common deadline/release policy is provisional pending product review.
+confirmation follows release when both are set. Release decisions on holds
+decisions back from applicants ([Decision release](#decision-release)) and
+can't move into the future once applicants can see decisions. Confirm by is
+the default deadline for new offers; changing it doesn't move outstanding
+offers, reopen expired ones or send emails.
 
 First submission records a durable `questions_locked_at`. Application drafts
 alone do not lock questions. After submission the builder shows ordered summaries,

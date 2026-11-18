@@ -33,6 +33,9 @@ function StatCardDemo() {
             noun="registrants"
           />
         </Specimen>
+        <Specimen label="Rate with count detail" className="w-56">
+          <StatCard label="Seats held" kind="rate" count={3} total={40} noun="seats" detail="2 tickets, 1 offer" />
+        </Specimen>
         <Specimen label="Not enough data" className="w-56">
           <StatCard
             className="h-full w-full"

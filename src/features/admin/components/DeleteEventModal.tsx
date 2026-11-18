@@ -33,6 +33,15 @@ export function deletionRefusal(blockers: DeletionInfo["blockers"]) {
   return `${reasons.join(" ")} Free staff test registrations on a draft don’t count. Nothing has been deleted.`;
 }
 
+/**
+ * Everything the delete takes with it. Drafts count with applications: their
+ * answers and files go too. Staff test registrations are the only ones left
+ * once deletion is allowed.
+ */
+export function deletionSummary(name: string, info: Pick<DeletionInfo, "applications" | "drafts" | "reviewerNotes" | "registered" | "teams">) {
+  return `This permanently deletes ${name}: ${count(info.applications + info.drafts, "application", "applications")} with their answers and uploaded files, ${count(info.reviewerNotes, "reviewer note", "reviewer notes")}, ${count(info.registered, "registration", "registrations")} and ${count(info.teams, "team", "teams")}. Applicants aren’t notified. This can’t be undone.`;
+}
+
 export function DeleteEventModal({ eventId, eventName, isOpen, onClose, onConfirm, isDeleting = false, error }: DeleteEventModalProps) {
   const [info, setInfo] = useState<DeletionInfo | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
@@ -51,6 +60,6 @@ export function DeleteEventModal({ eventId, eventName, isOpen, onClose, onConfir
     <DialogContent><DialogHeader><DialogTitle>{info && (info.blocked || info.checkedIn > 0) ? "This event can’t be deleted" : "Delete event?"}</DialogTitle><DialogDescription role="status">{info ? info.checkedIn > 0 ? `Attendance has been recorded for ${count(info.checkedIn, "attendee", "attendees")}. Undo all check-ins before deleting this event. Nothing has been deleted.` : deletionRefusal(info.blockers) : failure ?? "Checking registrations, teams and payment protections…"}</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" onClick={onClose}>Cancel</Button>{failure && <Button onClick={() => setAttempt(value => value + 1)}>Try again</Button>}</DialogFooter></DialogContent>
   </Dialog>;
   return <ConfirmDialog open={isOpen} onOpenChange={open => { if (!open) onClose(); }} title="Delete event?"
-    description={`This will permanently remove ${info.name || eventName}, its registrations and its teams. This can’t be undone. ${info.registered} people are registered and ${info.teams} teams exist. No emails or refunds will be sent.`}
+    description={deletionSummary(info.name || eventName, info)}
     confirmLabel="Delete event" cancelLabel="Cancel" pendingLabel="Deleting…" error={error} pending={isDeleting} onConfirm={onConfirm} />;
 }

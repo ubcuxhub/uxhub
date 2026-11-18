@@ -27,6 +27,8 @@ import {
 import type { EventRow } from "@/lib/supabase/models";
 import { formatEventDate, formatEventTime, pacificDate } from "@/lib/date";
 import { EventRegistrationAction } from "@/features/events/components/EventRegistrationAction";
+import { isCanceledEvent } from "@/features/events/lib/event-cancellation";
+import { StatusBadge } from "@/components/ui/status-badge";
 import Navbar from "@/features/marketing/homepage-sections/Navbar";
 import Footer from "@/features/marketing/homepage-sections/Footer";
 import {
@@ -89,6 +91,8 @@ export default async function EventDetailPage({
 
   /* ── Derived data ── */
   const regStatus = getRegistrationStatus(event);
+  // Until it ends; then the page reads as any past event's.
+  const canceled = isCanceledEvent(event);
   // Held offers count as taken (docs/event-states.md, "Seats").
   const spotsLeft = seatCounts.get(event.id)?.seatsLeft ?? event.max_capacity ?? 0;
   const canRegister = regStatus === "open" && spotsLeft > 0;
@@ -155,6 +159,15 @@ export default async function EventDetailPage({
           <div className="flex flex-col gap-5">
             <h1 className="text-h1">{event.name}</h1>
 
+            {canceled && (
+              <div className="flex flex-col items-start gap-2">
+                <StatusBadge status="canceled" size="large" />
+                <p className="text-muted-foreground">
+                  {event.cancellation_note || "This event has been canceled."}
+                </p>
+              </div>
+            )}
+
             <p className="line-clamp-4 text-muted-foreground">
               {event.short_description || event.description}
             </p>
@@ -218,7 +231,7 @@ export default async function EventDetailPage({
             </div>
 
             {/* Register Button */}
-            {preview ? <Button disabled>Registration unavailable in draft preview</Button> : <EventRegistrationAction
+            {preview ? <Button disabled>Registration unavailable in draft preview</Button> : canceled ? <Button disabled className="self-start">Event canceled</Button> : <EventRegistrationAction
               eventId={event.id}
               eventSlug={event.slug ?? slug}
               registrationAvailable={canRegister}

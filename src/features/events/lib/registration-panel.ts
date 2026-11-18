@@ -1,6 +1,6 @@
-import { CircleMinus, Hourglass, Lock, type LucideIcon } from "lucide-react";
+import { CalendarX, CircleMinus, Hourglass, Lock, type LucideIcon } from "lucide-react";
 
-import { formatEventDate } from "@/lib/date";
+import { formatEventDate, formatEventTime } from "@/lib/date";
 
 import type { EventState } from "./event-states";
 
@@ -73,11 +73,28 @@ export interface PanelContext {
   participantPackageUrl: string | null;
   /** How far a draft application has got, for `app-draft`. */
   draftProgress: { answered: number; total: number } | null;
+  /**
+   * For `canceled`, whether the student's paid ticket has been refunded in
+   * full (`purchases.refunded_cents`). Left out, or `null`, when they paid
+   * nothing or hold no ticket.
+   */
+  refund?: "refunded" | "not-refunded" | null;
 }
+
+/** The canceled panel's copy (docs/event-states.md, "Canceled events"). */
+export const CANCELED_TITLE = "This event has been canceled";
+export const REFUND_PENDING = "Refunds are handled by the club.";
+export const REFUND_DONE = "Your payment has been refunded.";
 
 /** "Wed, Aug 26, 2026", in Pacific time. */
 const longDate = (value: string | null) =>
   formatEventDate(value, { weekday: "short", month: "short" });
+
+/** "Wed, Aug 26, 2026 at 9:00 AM", in Pacific time. */
+const releaseMoment = (value: string) => {
+  const time = formatEventTime(value);
+  return time ? `${longDate(value)} at ${time}` : longDate(value);
+};
 
 const currency = new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" });
 
@@ -114,6 +131,23 @@ export function getPanelSpec(state: EventState, context: PanelContext): PanelSpe
   };
 
   switch (state.kind) {
+    case "canceled": {
+      // The ticket stays, but no code: there's nothing to check in to.
+      const refund =
+        context.refund === "refunded" ? REFUND_DONE : context.refund === "not-refunded" ? REFUND_PENDING : null;
+      return {
+        title: "Registration",
+        layout: "alert",
+        props: {
+          variant: "destructive",
+          icon: CalendarX,
+          title: CANCELED_TITLE,
+          description:
+            [state.note, refund].filter(Boolean).join(" ") ||
+            (state.ticketId ? "You don’t need to do anything." : KEEP_AN_EYE_OUT),
+        },
+      };
+    }
     case "reg-upcoming":
       return {
         title: "Registration",
@@ -242,6 +276,18 @@ export function getPanelSpec(state: EventState, context: PanelContext): PanelSpe
       };
     }
     case "app-in-review":
+      if (state.decisionsReleaseAt) {
+        return {
+          title: "Application",
+          layout: "alert",
+          props: {
+            variant: "warning",
+            icon: Hourglass,
+            title: "Your application is in review",
+            description: `Decisions are released ${releaseMoment(state.decisionsReleaseAt)}. We’ll also email you then.`,
+          },
+        };
+      }
       return {
         title: "Application",
         layout: "alert",
@@ -249,7 +295,7 @@ export function getPanelSpec(state: EventState, context: PanelContext): PanelSpe
           variant: "warning",
           icon: Hourglass,
           title: "Your application is in review",
-          description: "Check back here for a decision.",
+          description: "We’ll email you when there’s a decision, and it’ll show here too.",
         },
       };
     case "app-waitlisted":
@@ -260,8 +306,7 @@ export function getPanelSpec(state: EventState, context: PanelContext): PanelSpe
           variant: "warning",
           icon: Hourglass,
           title: "You’re on the waitlist",
-          description:
-            "If a spot opens up, it’ll show here.",
+          description: "If a spot opens up, we’ll email you and it’ll show here.",
         },
       };
     case "app-accepted":

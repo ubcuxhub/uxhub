@@ -28,6 +28,7 @@ function matchRoutes(defaultAppPaths = defaults) {
 
 const handlers = [
   "/api/admin/users/[userId]/photo",
+  "/api/internal/application-emails",
   "/api/internal/event-publication",
   "/api/profile-photo",
   "/api/square/webhook",
@@ -36,7 +37,7 @@ const handlers = [
 ];
 
 describe("strict root parallel-slot coverage", () => {
-  it("reproduces the six handler conflicts without the children fallback", () => {
+  it("reproduces the handler conflicts without the children fallback", () => {
     const result = matchRoutes(defaults.filter((entry) => entry !== "/default"));
     expect(result.incompatibleParallelRouteSlots.map((entry) => entry.route).sort()).toEqual(handlers.toSorted());
   });

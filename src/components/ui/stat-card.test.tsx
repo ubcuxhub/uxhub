@@ -23,6 +23,11 @@ describe("StatCard", () => {
     expect(screen.getByText("412 of 528 registrants")).toBeTruthy();
   });
 
+  it("explains the count behind a rate", () => {
+    render(<StatCard label="Seats held" kind="rate" count={3} total={40} noun="seats" detail="2 tickets, 1 offer" />);
+    expect(screen.getByText("3 of 40 seats · 2 tickets, 1 offer")).toBeTruthy();
+  });
+
   it("uses the insufficient state when a rate has no total", () => {
     render(
       <StatCard

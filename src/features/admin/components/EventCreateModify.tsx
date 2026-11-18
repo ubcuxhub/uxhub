@@ -23,6 +23,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { EventBranding } from "./event-form/EventBranding";
 import { EventDescriptionEditor } from "./event-form/EventDescriptionEditor";
 import { EventLeaveDialog } from "./EventLeaveDialog";
+import { EventUnpublishDialog } from "./EventUnpublishDialog";
 import type { EventWorkingDocument } from "../lib/event-working-document";
 import type {
   CheckInSessionRow,
@@ -120,6 +121,10 @@ export const EventCreateModify = ({
   });
 
   const header = useRef<HTMLDivElement>(null);
+  // Revert asks first: members lose access, and the database refuses while
+  // any are registered (docs/event-states.md, "Unpublishing").
+  const [revertOpen, setRevertOpen] = useState(false);
+  const [revertError, setRevertError] = useState<string | null>(null);
   const [offset, setOffset] = useState(86);
   const [currentId, setCurrentId] = useState("builder-basics");
   const published = form.publication.status === "active";
@@ -209,10 +214,10 @@ export const EventCreateModify = ({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-2.5">
             <h1 className="break-words text-h2">{form.formState.name || "Untitled event"}</h1>
-            <StatusBadge label={form.past ? "Past" : scheduled ? "Scheduled" : published ? "Published" : "Draft"} tone={form.past ? "neutral" : scheduled ? "info" : published ? "success" : "neutral"} />
+            {form.canceled ? <StatusBadge status="canceled" /> : <StatusBadge label={form.past ? "Past" : scheduled ? "Scheduled" : published ? "Published" : "Draft"} tone={form.past ? "neutral" : scheduled ? "info" : published ? "success" : "neutral"} />}
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <span role="status" className="text-small text-muted-foreground">{saveStatus}{form.past ? ` · Ended ${publicationTimeLabel(form.savedEnd!)}` : scheduled ? ` · Goes live ${publicationTimeLabel(form.publication.publish_at!)}` : published ? " · Published" : ""}</span>
+            <span role="status" className="text-small text-muted-foreground">{saveStatus}{form.canceled ? " · Canceled" : form.past ? ` · Ended ${publicationTimeLabel(form.savedEnd!)}` : scheduled ? ` · Goes live ${publicationTimeLabel(form.publication.publish_at!)}` : published ? " · Published" : ""}</span>
             {draft && <Button type="button" size="sm" variant="outline" disabled={!form.hasUnsavedChanges || form.isDeleting} loading={form.isSubmitting} onClick={() => void form.handleSaveDraft()}>Save</Button>}
             {(scheduled || published) && form.hasUnsavedChanges && <Button type="button" size="sm" variant="outline" disabled={form.isSubmitting || form.unresolvedSave} onClick={() => { form.handleDiscardChanges(); setInputIssues([]); }}>Discard changes</Button>}
             {(scheduled || published) && <Button disabled={!form.hasUnsavedChanges || form.isDeleting} type="button" size="sm" loading={form.isSubmitting} onClick={() => void form.handlePublication("save")}>{scheduled ? "Save changes" : "Update"}</Button>}
@@ -220,7 +225,7 @@ export const EventCreateModify = ({
           </div>
         </div>
       </div>
-      {published && <Alert variant={form.past ? "neutral" : "info"} className={form.past ? "border-border" : "border-info-foreground"} icon={<Info aria-hidden />}><AlertTitle>{form.past ? "This event has ended" : "This event is live"}</AlertTitle><AlertDescription>{form.past ? `Details are locked so they match what happened: ${historyInfo?.registered ?? 0} registered, ${historyInfo?.checkedIn ?? 0} checked in. You can still add or change links, like the event recap.` : `Members still see the published version. Your changes go live when you choose Update. ${historyInfo?.registered ?? 0} people are registered.`}</AlertDescription></Alert>}
+      {published && <Alert variant={form.past ? "neutral" : "info"} className={form.past ? "border-border" : "border-info-foreground"} icon={<Info aria-hidden />}><AlertTitle>{form.canceled ? "This event is canceled" : form.past ? "This event has ended" : "This event is live"}</AlertTitle><AlertDescription>{form.canceled ? `Details are locked. ${historyInfo?.registered ?? 0} registered: ticket holders see it as canceled and can’t check in. Issue refunds in Square. You can still add or change links.` : form.past ? `Details are locked so they match what happened: ${historyInfo?.registered ?? 0} registered, ${historyInfo?.checkedIn ?? 0} checked in. You can still add or change links, like the event recap.` : `Members still see the published version. Your changes go live when you choose Update. ${historyInfo?.registered ?? 0} people are registered.`}</AlertDescription></Alert>}
         <form key={form.resetKey} ref={formElement} onClickCapture={captureInputIssues} onChangeCapture={captureInputIssues} onBlurCapture={captureInputIssues} id="event-builder-form" noValidate className="flex min-w-0 flex-col gap-14 [&_[data-slot=card]:has([data-invalid=true])]:border-destructive [&_input:not([type=checkbox]):not([type=radio])]:h-10 [&_button[data-slot=select-trigger]]:h-10" onSubmit={form.handleSubmit}><fieldset disabled={form.isSubmitting || form.isDeleting} className="flex min-w-0 flex-col gap-14">
           {section("builder-basics", "Basics", <><PrimaryDetailsSection showConfigurationErrors={form.publishAttempted} urlLocked={form.urlLocked} formState={form.formState} onFieldChange={form.handleFieldChange} /><EventBranding state={form.formState} disabled={form.isSubmitting} onChange={form.handleFieldChange} onIcon={form.setPendingImageFile} onHeader={form.setPendingHeaderFile} /><EventFeatured state={form.formState} onChange={form.handleFieldChange} /><EventPricing showErrors={form.publishAttempted} state={form.formState} locked={pricingLocked} effectivePrices={initialEvent && initialEvent.regular_price != null && initialEvent.member_price != null ? { regular: initialEvent.regular_price, member: initialEvent.member_price } : undefined} onChange={form.handleFieldChange} /></>)}
           {section("builder-description", "Description", <EventDescriptionEditor validationManaged key={`${form.resetKey}-${form.legacyDraftRecovered ? "legacy-recovered" : "initial"}`} short={form.formState.short_description} value={form.formState.description} rich={form.formState.description_rich} disabled={form.isSubmitting || form.past} onChange={(short, text, rich) => { form.handleFieldChange("short_description", short); form.handleFieldChange("description", text); form.handleFieldChange("description_rich", rich); }} />)}
@@ -230,8 +235,8 @@ export const EventCreateModify = ({
           {section("builder-people", "People and sponsors", <EventPeopleEditor content={form.formState.content ?? emptyContent()} onChange={content => form.handleFieldChange("content", content)} people={mentorOptions} sponsors={sponsorOptions} showErrors={form.showConfigurationErrors} />)}
           {section("builder-resources", "Links and resources", <EventResourcesEditor content={form.formState.content ?? emptyContent()} onChange={content => form.handleFieldChange("content", content)} showErrors={form.showConfigurationErrors} />)}
           {section("builder-summary", "Summary", <div className="space-y-4 rounded-xl border border-border bg-card p-5">
-            <div className="flex flex-wrap items-center justify-between gap-4"><h3 className="text-subheading">{form.past ? "Event ended" : published ? "Published" : scheduled ? "Scheduled" : issues.length ? form.publishAttempted ? "A few things to fix" : "Almost ready" : "Ready to publish"}</h3>{!published && <EventPublishMenu form={form} disabled={!publicationReady} />}</div>
-            <p className="text-muted-foreground">{form.past ? `${historyInfo?.registered ?? 0} registered, ${historyInfo?.checkedIn ?? 0} checked in. Add an event recap link in Links and resources.` : published ? "Members can find this event in the portal. Registration follows its own dates." : scheduled ? `It goes live ${publicationTimeLabel(form.publication.publish_at!)}. You can keep editing until then.` : issues.length ? "Complete the required details before the event goes live." : "Everything required is filled in. Choose Publish to go live now or schedule it."}</p>
+            <div className="flex flex-wrap items-center justify-between gap-4"><h3 className="text-subheading">{form.canceled ? "Event canceled" : form.past ? "Event ended" : published ? "Published" : scheduled ? "Scheduled" : issues.length ? form.publishAttempted ? "A few things to fix" : "Almost ready" : "Ready to publish"}</h3>{!published && <EventPublishMenu form={form} disabled={!publicationReady} />}</div>
+            <p className="text-muted-foreground">{form.canceled ? `${historyInfo?.registered ?? 0} registered. Refunds are issued in Square.` : form.past ? `${historyInfo?.registered ?? 0} registered, ${historyInfo?.checkedIn ?? 0} checked in. Add an event recap link in Links and resources.` : published ? "Members can find this event in the portal. Registration follows its own dates." : scheduled ? `It goes live ${publicationTimeLabel(form.publication.publish_at!)}. You can keep editing until then.` : issues.length ? "Complete the required details before the event goes live." : "Everything required is filled in. Choose Publish to go live now or schedule it."}</p>
             {!!issues.length && <ul className="space-y-2">{sections.filter(item => issues.some(issue => `builder-${issue.section}` === item.id)).map(item => <li key={item.id}><Button type="button" variant="link" className="h-auto whitespace-normal p-0 text-left" onClick={() => focusIssue(issues.find(issue => `builder-${issue.section}` === item.id)!)}>{item.title}{form.publishAttempted ? ` · ${issues.filter(issue => `builder-${issue.section}` === item.id).length} to fix` : ""}</Button></li>)}</ul>}
             {form.publishAttempted && !!issues.length && <ul className="space-y-1 text-small text-destructive">{issues.map((issue, index) => <li key={`${issue.target}-${index}`}><Button type="button" variant="link" className="h-auto whitespace-normal p-0 text-left text-destructive" onClick={() => focusIssue(issue)}>{issue.message}</Button></li>)}</ul>}
           </div>)}
@@ -242,7 +247,7 @@ export const EventCreateModify = ({
             </div>}
             {published && !form.past && <div className="flex flex-wrap items-center justify-between gap-4">
               <div className="min-w-0 space-y-0.5"><h3 className="text-small font-semibold">Revert to draft</h3><p className="text-small text-muted-foreground">Save your changes and hide this event from members. Only staff can see it until you publish again.</p></div>
-              <Button type="button" variant="outline" loading={form.isSubmitting} disabled={form.isDeleting} onClick={() => void form.handlePublication("revert")}>Revert to draft</Button>
+              <Button type="button" variant="outline" loading={form.isSubmitting} disabled={form.isDeleting} onClick={() => { setRevertError(null); setRevertOpen(true); }}>Revert to draft</Button>
             </div>}
             {form.eventId && <div className={`flex flex-wrap items-center justify-between gap-4${draft || (published && !form.past) ? " border-t border-border-subtle pt-4" : ""}`}>
               <div className="min-w-0 space-y-0.5"><h3 className="text-small font-semibold">Delete event</h3><p className="text-small text-muted-foreground">Payment protections apply. Deletion can’t be undone.</p></div>
@@ -266,6 +271,9 @@ export const EventCreateModify = ({
 
       <SectionNavigator title="Event sections" sections={sections} currentId={currentId} numberFormat="plain" placement="bottom-right" className="z-40" />
       <EventPublicationSuccess form={form} />
+      {form.eventId && <EventUnpublishDialog eventId={form.eventId} open={revertOpen} pending={form.isSubmitting} error={revertError}
+        onOpenChange={open => { if (!form.isSubmitting) setRevertOpen(open); }}
+        onConfirm={() => void form.handlePublication("revert").then(saved => { if (saved) setRevertOpen(false); else setRevertError("The event wasn’t reverted. Your edits are still here."); })} />}
       <EventLeaveDialog eventName={form.formState.name || "Untitled event"} navigation={form.navigation} draft={draft} pending={form.isSubmitting} error={form.error} save={() => form.handleSaveDraft(false)} />
       <Dialog open={form.showDraftSaved} onOpenChange={form.setShowDraftSaved}>
         <DialogContent showCloseButton={false} className="max-w-[482px] gap-4 px-7 pt-11 pb-8">

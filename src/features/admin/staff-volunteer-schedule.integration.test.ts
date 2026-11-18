@@ -73,10 +73,14 @@ describe("Volunteer Schedule persistence and privacy", () => {
     expect(await fetchStaffVolunteerSchedule(db, event.id)).toBeNull();
   }));
 
-  it("keeps historical resource saves compatible, atomic and retry-safe", () => withFixtures(async f => {
-    const event = await f.createEvent({ status: "active", starts_at: "2020-01-01T00:00:00Z", ends_at: "2020-01-02T00:00:00Z" });
+  it.each(["ended", "canceled"] as const)("keeps %s resource saves compatible, atomic and retry-safe", state => withFixtures(async f => {
+    const event = await f.createEvent({ status: "active", starts_at: state === "ended" ? "2020-01-01T00:00:00Z" : "2099-01-01T00:00:00Z", ends_at: state === "ended" ? "2020-01-02T00:00:00Z" : "2099-01-02T00:00:00Z" });
     // Materialize people and generic resources before editing only resources.
     const doc = content(); expect((await save(event.id, doc)).error).toBeNull();
+    if (state === "canceled") {
+      const canceled = await db.rpc("cancel_admin_event", { p_event_id: event.id, p_note: "Canceled", p_operation_id: f.track("admin_event_mutations", crypto.randomUUID()) });
+      expect(canceled.error).toBeNull();
+    }
     const current = await db.from("events").select("revision").eq("id", event.id).single();
     const args = { p_event_id: event.id, p_revision: current.data!.revision, p_links: doc.links as unknown as Json, p_operation_id: crypto.randomUUID(), p_resources_version: 2 };
     const saved = await db.rpc("save_past_event_resources", args); expect(saved.error).toBeNull();

@@ -28,7 +28,8 @@ const checkIns = vi.hoisted(() => ({
   fetchCheckInStatuses: vi.fn(),
 }));
 const applications = vi.hoisted(() => ({
-  updateEventApplication: vi.fn(),
+  decideEventApplication: vi.fn(),
+  fetchEventApplicationById: vi.fn(),
 }));
 const applicationFiles = vi.hoisted(() => ({
   removeApplicationFiles: vi.fn(),
@@ -802,46 +803,92 @@ describe("fetchAdminCheckInSnapshotAction", () => {
 
 describe("updateApplicationDecisionAction", () => {
   const tomorrow = () => new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  const seats = { tickets: 9, heldOffers: 1, capacity: 10 };
+  const decided = (overrides: object = {}) => ({
+    ok: true,
+    applicationId: "application-1",
+    eventId: "event-1",
+    userId: "user-1",
+    previousStatus: "submitted",
+    status: "accepted",
+    offerExpiresAt: null,
+    decisionsReleaseAt: null,
+    seats,
+    overCapacity: false,
+    ...overrides,
+  });
 
   beforeEach(() => {
-    applications.updateEventApplication.mockImplementation(
-      async (_client: unknown, id: string, update: object) => ({ id, ...update }),
+    applications.decideEventApplication.mockResolvedValue(decided());
+    applications.fetchEventApplicationById.mockImplementation(
+      async (_client: unknown, id: string) => ({ id, status: "accepted" }),
     );
   });
 
   it("refuses to report a draft as decided", async () => {
-    applications.updateEventApplication.mockResolvedValue({
+    applications.fetchEventApplicationById.mockResolvedValue({
       id: "application-1",
       status: "draft",
     });
 
     await expect(
       updateApplicationDecisionAction("application-1", "reject", null),
-    ).rejects.toThrow("A draft application cannot be decided.");
+    ).rejects.toThrow("The decided application could not be read back.");
   });
 
-  it("accepts with the offer deadline", async () => {
+  it("accepts with the offer deadline, through the decision function", async () => {
     const deadline = tomorrow();
-    await updateApplicationDecisionAction("application-1", "accept", deadline);
+    const result = await updateApplicationDecisionAction("application-1", "accept", deadline);
 
-    expect(applications.updateEventApplication).toHaveBeenCalledWith(
-      expect.anything(),
-      "application-1",
-      { status: "accepted", offer_expires_at: deadline },
-    );
+    expect(applications.decideEventApplication).toHaveBeenCalledWith(expect.anything(), {
+      applicationId: "application-1",
+      decision: "accept",
+      offerExpiresAt: deadline,
+      allowOverCapacity: false,
+    });
+    expect(result).toEqual({
+      ok: true,
+      application: { id: "application-1", status: "accepted" },
+      overCapacity: false,
+    });
   });
 
-  it.each([
-    ["waitlist", "waitlisted"],
-    ["reject", "rejected"],
-  ] as const)("%s clears any deadline", async (decision, status) => {
+  it.each(["waitlist", "reject"] as const)("%s clears any deadline", async (decision) => {
     await updateApplicationDecisionAction("application-1", decision, tomorrow());
 
-    expect(applications.updateEventApplication).toHaveBeenCalledWith(
+    expect(applications.decideEventApplication).toHaveBeenCalledWith(
       expect.anything(),
-      "application-1",
-      { status, offer_expires_at: null },
+      expect.objectContaining({ decision, offerExpiresAt: null }),
     );
+  });
+
+  it("returns OVER_CAPACITY with the seat counts, and accepts anyway on request", async () => {
+    applications.decideEventApplication.mockResolvedValueOnce(
+      decided({ ok: false, reason: "OVER_CAPACITY", status: "submitted" }),
+    );
+    const refused = await updateApplicationDecisionAction("application-1", "accept", tomorrow());
+    expect(refused).toEqual({ ok: false, reason: "OVER_CAPACITY", error: "The event is full.", seats });
+    expect(applications.fetchEventApplicationById).not.toHaveBeenCalled();
+
+    applications.decideEventApplication.mockResolvedValueOnce(decided({ overCapacity: true }));
+    const forced = await updateApplicationDecisionAction("application-1", "accept", tomorrow(), {
+      allowOverCapacity: true,
+    });
+    expect(applications.decideEventApplication).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.objectContaining({ allowOverCapacity: true }),
+    );
+    expect(forced).toMatchObject({ ok: true, overCapacity: true });
+  });
+
+  it("explains a deadline before the release", async () => {
+    const release = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString();
+    applications.decideEventApplication.mockResolvedValueOnce(
+      decided({ ok: false, reason: "DEADLINE_TOO_EARLY", decisionsReleaseAt: release }),
+    );
+    const result = await updateApplicationDecisionAction("application-1", "accept", tomorrow());
+    expect(result).toMatchObject({ ok: false, reason: "DEADLINE_TOO_EARLY" });
+    expect(!result.ok && result.error).toMatch(/^Pick a deadline after decisions are released/);
   });
 
   it("refuses to accept without a future deadline", async () => {
@@ -855,14 +902,14 @@ describe("updateApplicationDecisionAction", () => {
         new Date(Date.now() - 1000).toISOString(),
       ),
     ).rejects.toThrow("The offer deadline must be in the future.");
-    expect(applications.updateEventApplication).not.toHaveBeenCalled();
+    expect(applications.decideEventApplication).not.toHaveBeenCalled();
   });
 
   it("rejects a decision outside the known set", async () => {
     await expect(
       updateApplicationDecisionAction("application-1", "approve" as "accept", null),
     ).rejects.toThrow("Invalid application decision.");
-    expect(applications.updateEventApplication).not.toHaveBeenCalled();
+    expect(applications.decideEventApplication).not.toHaveBeenCalled();
   });
 });
 

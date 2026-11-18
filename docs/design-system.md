@@ -1095,6 +1095,8 @@ StatCard `kind="count"` makes `count` the primary number and renders `of total n
 as its context; `showRate` appends the rounded percentage. Zero total renders 0%
 without changing the existing rate variant's insufficient-data behavior. See
 `/dev/components/stat-card` for count, zero, loading and existing variants.
+The rate variant accepts optional `detail` text after its count caption to explain
+what the count includes (for example, tickets and held offers).
 
 ListRow `variant="compact"` omits artwork and accepts optional `leading`,
 `supporting` and `action` slots for time, a status badge and trailing controls.
