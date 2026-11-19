@@ -143,6 +143,22 @@ describe("Ticket", () => {
     );
   });
 
+  it("greys an expired ticket and fades its code, with no caption", () => {
+    const { container } = render(
+      <Ticket {...base} state="expired" code={<svg data-testid="qr" />} />,
+    );
+
+    expect(
+      screen.getByRole("article", { name: "Ticket for Design Sprint, expired" }),
+    ).toBeTruthy();
+    const shape = container.querySelector("[data-slot='ticket-shape']") as HTMLElement;
+    expect(shape.className).toContain("grayscale");
+    // Unlike pending, the fill isn't faded: only the code is.
+    expect(shape.className).not.toContain("opacity-60");
+    expect(screen.getByTestId("qr").parentElement?.className).toContain("opacity-60");
+    expect(container.querySelector("[data-slot='ticket-caption']")).toBeNull();
+  });
+
   it("shows a lock instead of the code while locked, in full colour", () => {
     const { container } = render(
       <Ticket {...base} state="locked" code={<svg data-testid="qr" />} />,
@@ -166,8 +182,8 @@ describe("Ticket", () => {
     expect(screen.getByRole("button", { name: "View ticket" })).toBeTruthy();
   });
 
-  it("lays the dither under the sheen on a live ticket, and keeps a greyed or checked-in one still", () => {
-    for (const state of ["active", "locked", "pending", "used"] as const) {
+  it("lays the dither under the sheen on a live ticket, and keeps a greyed, expired or checked-in one still", () => {
+    for (const state of ["active", "locked", "pending", "used", "expired"] as const) {
       const { container } = render(<Ticket {...base} state={state} />);
       const shape = container.querySelector("[data-slot='ticket-shape']") as HTMLElement;
       const dither = shape.querySelector("[data-slot='dither-overlay']");
