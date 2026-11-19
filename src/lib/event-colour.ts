@@ -84,3 +84,27 @@ export function featuredCardGradient(hex: string): string {
   const colour = normalizeHex(hex) ?? DEFAULT_EVENT_COLOUR;
   return `linear-gradient(135deg, ${colour}, ${eventColourTint(colour)})`;
 }
+
+/**
+ * The colour mixed with black, one hover step darker. The featured card's
+ * Figma notes put it at ~17%, the same step as blue-500 → blue-600.
+ */
+export function eventColourShade(hex: string, blackMix = 0.17): string {
+  const mix = Math.min(1, Math.max(0, blackMix));
+  const channels = toRgb(hex).map((channel) => Math.round(channel * (1 - mix)));
+  return `#${channels.map((c) => c.toString(16).padStart(2, "0")).join("").toUpperCase()}`;
+}
+
+/** Where the featured card's colour fade starts and ends, top to bottom (Figma). */
+export const FEATURED_FADE_STOPS = { clear: "22%", solid: "98.6%" } as const;
+
+/**
+ * The featured card's fade over its image: clear across the top, the event
+ * colour behind the title at the bottom. `darker` is the hover overlay.
+ */
+export function featuredCardFade(hex: string, { darker = false } = {}): string {
+  const base = normalizeHex(hex) ?? DEFAULT_EVENT_COLOUR;
+  const colour = darker ? eventColourShade(base) : base;
+  const [r, g, b] = toRgb(colour);
+  return `linear-gradient(179deg, rgb(${r} ${g} ${b} / 0) ${FEATURED_FADE_STOPS.clear}, rgb(${r} ${g} ${b}) ${FEATURED_FADE_STOPS.solid})`;
+}

@@ -31,5 +31,5 @@ export function EventMarketing({ state, urlLocked, onChange, showErrors = false 
 }
 
 export function EventFeatured({ state, onChange }: { state: EventFormState; onChange: (field: "is_featured", value: boolean) => void }) {
-  return <div className="rounded-xl border border-border bg-card p-5"><Field orientation="horizontal"><FieldContent><FieldLabel htmlFor="event-featured">Feature on the portal home</FieldLabel><FieldDescription>Save this choice for the portal home integration. It does not add the event to Home yet.</FieldDescription></FieldContent><Switch id="event-featured" checked={state.is_featured} onCheckedChange={value => onChange("is_featured", value)} /></Field></div>;
+  return <div className="rounded-xl border border-border bg-card p-5"><Field orientation="horizontal"><FieldContent><FieldLabel htmlFor="event-featured">Feature on the portal home</FieldLabel><FieldDescription>Members see the soonest featured event on their portal home until it ends.</FieldDescription></FieldContent><Switch id="event-featured" checked={state.is_featured} onCheckedChange={value => onChange("is_featured", value)} /></Field></div>;
 }
