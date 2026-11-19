@@ -165,4 +165,23 @@ describe("Ticket", () => {
     );
     expect(screen.getByRole("button", { name: "View ticket" })).toBeTruthy();
   });
+
+  it("lays the dither under the sheen on a live ticket, and keeps a greyed or checked-in one still", () => {
+    for (const state of ["active", "locked", "pending", "used"] as const) {
+      const { container } = render(<Ticket {...base} state={state} />);
+      const shape = container.querySelector("[data-slot='ticket-shape']") as HTMLElement;
+      const dither = shape.querySelector("[data-slot='dither-overlay']");
+      const sheen = shape.querySelector("[data-slot='ticket-sheen']");
+
+      expect(dither, state).not.toBeNull();
+      if (state === "active" || state === "locked") {
+        expect(sheen, state).not.toBeNull();
+        // Sheen over the dither, both under the code and text.
+        expect(dither!.compareDocumentPosition(sheen!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      } else {
+        expect(sheen, state).toBeNull();
+      }
+      cleanup();
+    }
+  });
 });

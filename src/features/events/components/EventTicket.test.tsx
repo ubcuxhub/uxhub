@@ -76,4 +76,10 @@ describe("EventTicket", () => {
     render(<EventTicket {...base} eventColour="#F2C94C" />);
     expect(logo()).toContain("logo-stacked-black");
   });
+
+  it("puts the dither and the sheen on both faces", () => {
+    const { container } = render(<EventTicket {...base} />);
+    expect(container.querySelectorAll("[data-slot='dither-overlay']")).toHaveLength(2);
+    expect(container.querySelectorAll("[data-slot='ticket-sheen']")).toHaveLength(2);
+  });
 });

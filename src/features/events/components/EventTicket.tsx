@@ -2,7 +2,9 @@ import type { ReactNode } from "react";
 import Image from "next/image";
 import { Image as ImageIcon } from "lucide-react";
 
+import { DitherOverlay } from "@/components/shared/DitherOverlay";
 import { notchMaskStyle, ticketAppearance } from "@/components/shared/Ticket";
+import { TicketSheen } from "@/components/shared/TicketSheen";
 import { resolveImagePreviewSrc } from "@/lib/event-image";
 import { DEFAULT_EVENT_COLOUR } from "@/lib/event-colour";
 import { cn } from "@/lib/utils";
@@ -100,13 +102,13 @@ export function EventTicket({
   );
 }
 
-/** One side of the ticket: the event-colour fill, the notches and the perforation. */
+/** One side of the ticket: the event-colour fill, dither and sheen, the notches and the perforation. */
 function TicketFace({ fill, children }: { fill: string; children: ReactNode }) {
   return (
     <div className="relative flex size-full flex-col items-center">
       <div
         aria-hidden
-        className="absolute inset-0 rounded-2xl"
+        className="absolute inset-0 overflow-hidden rounded-2xl"
         style={{
           background: fill,
           ...notchMaskStyle(
@@ -118,6 +120,9 @@ function TicketFace({ fill, children }: { fill: string; children: ReactNode }) {
           ),
         }}
       >
+        {/* Fill, dither, sheen, then the code and text (design system ticket). */}
+        <DitherOverlay />
+        <TicketSheen />
         <span className="absolute inset-x-5 top-(--notch-y) border-t-2 border-dashed border-current opacity-80" />
       </div>
       {children}

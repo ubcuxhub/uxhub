@@ -8,6 +8,8 @@ import {
   normalizeHex,
   readableTextOn,
 } from "@/lib/event-colour";
+import { DitherOverlay } from "@/components/shared/DitherOverlay";
+import { TicketSheen } from "@/components/shared/TicketSheen";
 import { cn } from "@/lib/utils";
 
 /** Light-mode `text-foreground`; matches the dark label `readableTextOn` assumes. */
@@ -179,6 +181,10 @@ function Ticket({
         )}
         style={{ background: fill, ...NOTCH_MASK_STYLE }}
       >
+        {/* Layered as in the design system: fill, dither, sheen, then the code and text. */}
+        <DitherOverlay />
+        {/* Only a live ticket shines; a greyed or checked-in one stays still. */}
+        {state === "active" || locked ? <TicketSheen /> : null}
         <span className="absolute inset-y-3.5 right-[calc(25%+10px)] w-0 border-l-2 border-dotted border-current opacity-60" />
       </div>
 
