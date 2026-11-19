@@ -5,6 +5,7 @@ import { Ticket } from "@/components/shared/Ticket";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatusBadge } from "@/components/ui/status-badge";
 import type { EventState } from "@/features/events/lib/event-states";
 import {
   getPanelSpec,
@@ -171,10 +172,12 @@ function ActionLayout({ title, description, action }: ActionLayoutProps) {
  * (Figma "RegistrationTicket").
  */
 function TicketLayout({
+  badge,
   title,
   description,
   priceLine,
   ticketState,
+  ticketNote,
   primary,
   secondary,
   ticket,
@@ -186,19 +189,22 @@ function TicketLayout({
   return (
     <div className="grid gap-4 @4xl:grid-cols-[minmax(0,480px)_444px] @4xl:items-center @4xl:gap-x-10">
       <div className={cn("flex min-w-0 flex-col gap-1 text-body", hasActions && "@4xl:self-end")}>
+        {badge ? <StatusBadge {...badge} className="mb-2 self-start" /> : null}
         {title ? <p className="text-foreground">{title}</p> : null}
         <p className={title ? "text-muted-foreground" : "text-foreground"}>{description}</p>
         {priceLine ? <p className="mt-2 text-small text-muted-foreground">{priceLine}</p> : null}
       </div>
 
-      <Ticket
-        className="@4xl:col-start-2 @4xl:row-span-2 @4xl:row-start-1"
-        eventName={ticket.eventName}
-        holderName={ticket.holderName}
-        eventColour={ticket.eventColour ?? undefined}
-        state={ticketState}
-        code={ticket.qrToken ? <QrCode token={ticket.qrToken} className="size-full" /> : null}
-      />
+      <div className="flex flex-col gap-2 @4xl:col-start-2 @4xl:row-span-2 @4xl:row-start-1">
+        <Ticket
+          eventName={ticket.eventName}
+          holderName={ticket.holderName}
+          eventColour={ticket.eventColour ?? undefined}
+          state={ticketState}
+          code={ticket.qrToken ? <QrCode token={ticket.qrToken} className="size-full" /> : null}
+        />
+        {ticketNote ? <p className="text-small text-muted-foreground">{ticketNote}</p> : null}
+      </div>
 
       {hasActions ? (
         <div className="flex flex-col gap-3 @4xl:flex-row @4xl:flex-wrap @4xl:self-start">
