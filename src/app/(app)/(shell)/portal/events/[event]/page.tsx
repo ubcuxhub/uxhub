@@ -115,7 +115,7 @@ export default async function PortalEventPage({
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img src="/icons/slack.svg" width={16} height={16} alt="" />
                     Open Slack
-                    <span className="sr-only"> (opens in a new tab)</span>  
+                    <span className="sr-only"> (opens in a new tab)</span>
                   </a>
                 </Button>
               )}

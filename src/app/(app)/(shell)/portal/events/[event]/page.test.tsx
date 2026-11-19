@@ -113,7 +113,7 @@ it.each([
   fixtures.state = state;
   fixtures.fetchLinks.mockResolvedValue([slackLink]);
   await renderPage();
-  const link = screen.getByRole("link", { name: "Open Slack" });
+  const link = screen.getByRole("link", { name: /^Open Slack/ });
   expect(link.getAttribute("href")).toBe("https://example.test/slack");
   expect(link.getAttribute("target")).toBe("_blank");
 });
@@ -123,7 +123,7 @@ it("hides Open Slack when the event has no Slack link", async () => {
     { id: "package", type: "participant_package", label: null, url: "https://example.test/package" },
   ]);
   await renderPage();
-  expect(screen.queryByRole("link", { name: "Open Slack" })).toBeNull();
+  expect(screen.queryByRole("link", { name: /^Open Slack/ })).toBeNull();
 });
 
 it.each([
@@ -135,7 +135,7 @@ it.each([
   fixtures.state = state;
   fixtures.fetchLinks.mockResolvedValue([slackLink]);
   await renderPage();
-  expect(screen.queryByRole("link", { name: "Open Slack" })).toBeNull();
+  expect(screen.queryByRole("link", { name: /^Open Slack/ })).toBeNull();
 });
 
 it.each([
