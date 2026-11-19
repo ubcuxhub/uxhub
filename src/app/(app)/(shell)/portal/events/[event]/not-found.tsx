@@ -1,38 +1,22 @@
-import Link from "next/link";
-
-import { Button } from "@/components/ui/button";
-import { EventPageStatus } from "@/features/events/components/EventPageStatus";
-
-const CONTACT_EMAIL = "ubcuxhub@gmail.com";
+import {
+  BrowseEventsButton,
+  EventPageStatus,
+} from "@/features/events/components/EventPageStatus";
 
 /**
- * The event isn't there for this member (Figma 1.20). `fetchEventBySlug`
- * returns null when the row was deleted, when it went back to draft (RLS
- * shows drafts to staff only) and when the slug never existed, and the page
- * calls notFound() for each. A failed query throws instead and reaches
- * error.tsx. A canceled event is still found: its page shows it as canceled.
+ * No event at this link for this member: a mistyped or old slug, a deleted
+ * event, a draft that was never published, or any event while the
+ * student-events flag is off. Neutral on purpose, because a deleted row can't
+ * be told apart from a slug that never existed. An event that was published
+ * and then unpublished gets `EventRemovedStatus` from the page instead. A
+ * failed query throws and reaches error.tsx.
  */
 export default function EventNotFound() {
   return (
     <EventPageStatus
-      title="This event is no longer available"
-      description={
-        <>
-          {"The UX Hub team removed it, so its page and tickets are gone. You don’t need to do anything. Questions about a ticket you paid for? Email the UX Hub team at "}
-          <a
-            href={`mailto:${CONTACT_EMAIL}`}
-            className="text-foreground underline-offset-4 hover:underline"
-          >
-            {CONTACT_EMAIL}
-          </a>
-          .
-        </>
-      }
-      action={
-        <Button asChild>
-          <Link href="/portal/events">Browse events</Link>
-        </Button>
-      }
+      title="We can't find this event"
+      description="The link may be wrong, or the event isn't open to members yet. Check the link, or browse upcoming events."
+      action={<BrowseEventsButton />}
     />
   );
 }

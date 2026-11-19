@@ -8,6 +8,7 @@ const fixtures = vi.hoisted(() => ({
   fetchTicket: vi.fn(),
   fetchEvent: vi.fn(),
   fetchLinks: vi.fn(),
+  isUnpublished: vi.fn(),
   termEndsAt: null as string | null,
   user: { id: "user-1", first_name: "Ada", last_name: "Lovelace", email: "ada@example.test", membership_type_id: "tier", membership_expires_at: "2099-01-01T00:00:00Z" },
   event: { id: "event-1", slug: "sprint", name: "Design Sprint", status: "active", starts_at: "2099-01-01T18:00:00Z", ends_at: "2099-01-01T20:00:00Z", agenda_enabled: false, mentors_enabled: false, sponsors_enabled: false, description: "An event.", pricing_policy: "figma", regular_price: 20, member_price: 0 },
@@ -19,6 +20,9 @@ vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 vi.mock("@/lib/auth/guards", () => ({ requireAuth: async () => fixtures.user }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({}) }));
 vi.mock("@/lib/supabase-helpers/events", () => ({ fetchEventBySlug: fixtures.fetchEvent }));
+vi.mock("@/lib/supabase-helpers/admin-server", () => ({ adminIsUnpublishedEvent: fixtures.isUnpublished }));
+// Static image imports don't resolve outside the Next bundler.
+vi.mock("@/components/shared/Hubbo", () => ({ Hubbo: () => null }));
 vi.mock("@/lib/supabase-helpers/event-agenda", () => ({ fetchEventParticipantContent: async () => ({ location: null, agenda: [] }) }));
 vi.mock("@/lib/supabase-helpers/event-people", () => ({ fetchEventMentors: async () => [], fetchEventSponsors: async () => [] }));
 vi.mock("@/lib/supabase-helpers/event-links", () => ({ fetchEventLinks: fixtures.fetchLinks }));
@@ -51,6 +55,7 @@ beforeEach(() => {
   fixtures.state = { kind: "reg-going", ticketId: fixtures.ticket.id };
   fixtures.fetchEvent.mockImplementation(async () => fixtures.event);
   fixtures.fetchLinks.mockResolvedValue([]);
+  fixtures.isUnpublished.mockResolvedValue(false);
   fixtures.fetchTicket.mockResolvedValue(fixtures.ticket);
   fixtures.termEndsAt = null;
   fixtures.user.membership_expires_at = "2099-01-01T00:00:00Z";
@@ -158,9 +163,28 @@ it("offers no test registration on a published event", async () => {
 
 const loadPage = () => PortalEventPage({ params: Promise.resolve({ event: "sprint" }), searchParams: Promise.resolve({}) });
 
-it("sends a deleted, hidden or unknown event to not-found.tsx", async () => {
+it("sends a deleted, never-published or unknown event to the neutral not-found.tsx", async () => {
   fixtures.fetchEvent.mockResolvedValue(null);
   await expect(loadPage()).rejects.toMatchObject({ digest: expect.stringContaining("404") });
+  expect(fixtures.isUnpublished).toHaveBeenCalledWith("sprint");
+});
+
+it("says an event that was published and then moved back to draft was removed", async () => {
+  fixtures.fetchEvent.mockResolvedValue(null);
+  fixtures.isUnpublished.mockResolvedValue(true);
+  render(await loadPage());
+  expect(screen.getByRole("heading", { level: 1, name: "This event is no longer available" })).toBeTruthy();
+});
+
+it("hides a published event behind the neutral not-found.tsx while student events are off", async () => {
+  const { FLAGS } = await import("@/lib/flags");
+  (FLAGS as { studentEvents: boolean }).studentEvents = false;
+  try {
+    await expect(loadPage()).rejects.toMatchObject({ digest: expect.stringContaining("404") });
+    expect(fixtures.isUnpublished).not.toHaveBeenCalled();
+  } finally {
+    (FLAGS as { studentEvents: boolean }).studentEvents = true;
+  }
 });
 
 it("lets a failed event query reach error.tsx instead of showing it as removed", async () => {
