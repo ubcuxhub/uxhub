@@ -29,6 +29,8 @@ import { publicMarketingDestination } from "@/lib/event-marketing";
 import { eventWorkingDocument } from "@/features/admin/lib/event-presentation";
 import { loadTeamCard, type TeamCardData } from "@/features/events/lib/team-card-data";
 import { getHeadersOrigin } from "@/lib/http/request-origin";
+import { adminIsUnpublishedEvent } from "@/lib/supabase-helpers/admin-server";
+import { EventRemovedStatus } from "@/features/events/components/EventPageStatus";
 
 interface PortalEventPageProps {
   params: Promise<{ event: string }>;
@@ -46,8 +48,11 @@ export default async function PortalEventPage({
   // No status filter: RLS returns drafts to admins and managers only, who
   // can open one to test it (docs/event-states.md, "Drafts for admins").
   const event = await fetchEventBySlug(supabase, slug);
-  
+
   if (!event) {
+    // A published event moved back to draft is hidden by RLS, so ask with the
+    // service role (a yes/no only) to say it was removed rather than missing.
+    if (await adminIsUnpublishedEvent(slug)) return <EventRemovedStatus />;
     notFound();
   }
   if (!FLAGS.studentEvents && event.status !== "draft") notFound();
