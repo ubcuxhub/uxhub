@@ -17,11 +17,10 @@ it("announces loading once and hides the placeholder blocks", () => {
   for (const block of blocks) expect(block.getAttribute("aria-hidden")).toBe("true");
 });
 
-it("pulses faintly, and not at all under reduced motion", () => {
+it("stays still: skeletons don't pulse (Portal Motion §2f)", () => {
   const { container } = render(<EventPageSkeleton />);
-  const block = container.querySelector('[data-slot="skeleton"]');
 
-  expect(block?.className).toContain("animate-skeleton-pulse");
-  expect(block?.className).toContain("motion-reduce:animate-none");
-  expect(block?.className).not.toContain("animate-pulse ");
+  for (const block of container.querySelectorAll('[data-slot="skeleton"]')) {
+    expect(block.className).not.toMatch(/\banimate-/);
+  }
 });
