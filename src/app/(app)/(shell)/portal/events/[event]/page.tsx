@@ -4,6 +4,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EventLocation } from "@/components/shared/EventLocation";
 import { EventAgendaTable } from "@/features/events/components/EventAgendaTable";
@@ -13,6 +14,7 @@ import { FLAGS } from "@/lib/flags";
 import { createClient } from "@/lib/supabase/server";
 import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
 import { fetchEventParticipantContent } from "@/lib/supabase-helpers/event-agenda";
+import { fetchEventLinks } from "@/lib/supabase-helpers/event-links";
 import { Calendar, Link2, MapPin } from "lucide-react";
 import { formatEventDate, formatEventTime, pacificDate } from "@/lib/date";
 import { resolveImagePreviewSrc } from "@/lib/event-image";
@@ -69,6 +71,12 @@ export default async function PortalEventPage({
   const canceled = states[event.id].kind === "canceled";
   // Ticket holders only. A canceled event's teams are locked for good, so the card goes.
   const showTeam = Boolean(teams?.show) && !canceled;
+  // Open Slack is for students going (checked in or not), and only when the
+  // event has a Slack workspace link. RLS returns the links this viewer may see.
+  const going = states[event.id].kind === "reg-going" || states[event.id].kind === "reg-checked-in";
+  const slackUrl = going
+    ? (await fetchEventLinks(supabase, event.id)).find((link) => link.type === "slack_workspace")?.url ?? null
+    : null;
   const website = publicMarketingDestination(event);
 
   const startTime = formatEventTime(event.starts_at);
@@ -98,9 +106,22 @@ export default async function PortalEventPage({
         </div>
         <div className="px-6 pb-6">
           <div className="my-10 flex flex-col gap-6">
-            <div className="flex flex-col items-start gap-3">
-              <h1 className="text-h1">{event.name}</h1>
-              {badge && <StatusBadge {...badge} size="large" />}
+            <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-end sm:justify-between">
+              <div className="flex flex-col items-start gap-3">
+                <h1 className="text-h1">{event.name}</h1>
+                {badge && <StatusBadge {...badge} size="large" />}
+              </div>
+              {slackUrl && (
+                <Button asChild variant="secondary" className="px-5">
+                  <a href={slackUrl} target="_blank" rel="noopener noreferrer">
+                    {/* The Slack mark keeps its brand colours, so it's an image, not a Lucide icon. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/icons/slack.svg" width={16} height={16} alt="" />
+                    Open Slack
+                    <span className="sr-only"> (opens in a new tab)</span>
+                  </a>
+                </Button>
+              )}
             </div>
 
             <hr className="w-full border-border-subtle" />
