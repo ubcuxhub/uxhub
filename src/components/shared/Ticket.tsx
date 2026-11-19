@@ -8,6 +8,8 @@ import {
   normalizeHex,
   readableTextOn,
 } from "@/lib/event-colour";
+import { DitherOverlay } from "@/components/shared/DitherOverlay";
+import { TicketSheen } from "@/components/shared/TicketSheen";
 import { cn } from "@/lib/utils";
 
 /** Light-mode `text-foreground`; matches the dark label `readableTextOn` assumes. */
@@ -76,12 +78,21 @@ function notchMaskStyle(
 }
 
 const NOTCH_X = "calc(75% - 10px)";
+/**
+ * Six punches, as in the design system Ticket: one at each corner, and the
+ * two stubs either end of the perforation. The corners are square, so the
+ * punches give the outline its shape. 19.14px across in Figma.
+ */
 const NOTCH_MASK_STYLE = notchMaskStyle(
   [
     [NOTCH_X, "0"],
     [NOTCH_X, "100%"],
+    ["0", "0"],
+    ["100%", "0"],
+    ["0", "100%"],
+    ["100%", "100%"],
   ],
-  "9px",
+  "9.57px",
 );
 
 export interface TicketProps
@@ -117,7 +128,7 @@ export interface TicketProps
  *
  * The label colour follows the event colour, since it is user data and does not
  * flip with the theme. It meets AA contrast across the whole gradient (see
- * `ticketAppearance`). The notches are cut out, so the ticket works on any
+ * `ticketAppearance`). The punches are cut out, so the ticket works on any
  * surface.
  */
 function Ticket({
@@ -165,12 +176,16 @@ function Ticket({
         aria-hidden
         data-slot="ticket-shape"
         className={cn(
-          "absolute inset-0 overflow-hidden rounded-xl",
+          "absolute inset-0 overflow-hidden",
           pending && "opacity-60 grayscale",
         )}
         style={{ background: fill, ...NOTCH_MASK_STYLE }}
       >
-        <span className="absolute inset-y-0 right-[calc(25%+10px)] w-0 border-l-2 border-dotted border-current opacity-60" />
+        {/* Layered as in the design system: fill, dither, sheen, then the code and text. */}
+        <DitherOverlay />
+        {/* Only a live ticket shines; a greyed or checked-in one stays still. */}
+        {state === "active" || locked ? <TicketSheen /> : null}
+        <span className="absolute inset-y-3.5 right-[calc(25%+10px)] w-0 border-l-2 border-dotted border-current opacity-60" />
       </div>
 
       <div className="relative flex min-w-0 flex-col items-start justify-between gap-3 px-5 py-5 sm:px-7 sm:py-6">
