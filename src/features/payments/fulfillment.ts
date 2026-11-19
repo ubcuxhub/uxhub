@@ -6,9 +6,11 @@ import type { Payment, PaymentUpdatedEvent } from "square";
 import type { PurchaseRow, UserInfoRow } from "@/lib/supabase/models";
 import type { CheckoutActionResult, CheckoutRequestInput } from "./types";
 import type { Database, Json } from "@/lib/supabase/database.types";
+import type { SquareRefundEvent } from "@/lib/square/webhook";
 import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
 import { errorFields, log } from "@/lib/log";
 import {
+  initializeEventCheckout,
   fetchEventTicketByPurchaseId,
   fetchUserEventTicket,
   releaseEventTicket,
@@ -22,6 +24,7 @@ import {
   fetchPurchaseByIdempotencyKey,
   fetchPurchaseBySquarePaymentId,
   forgetSquareWebhookEvent,
+  applyPurchaseRefund,
   recordSquareWebhookEvent,
   updatePurchase,
 } from "@/lib/supabase-helpers/purchases";
@@ -34,6 +37,7 @@ import {
   SQUARE_CURRENCY,
 } from "@/lib/square/client";
 import {
+  completedRefundCents,
   formatReservationFailure,
   getSquareErrorDiagnostic,
   getSquareErrorMessage,
@@ -49,6 +53,7 @@ import { ensureSquareCustomerId } from "./customer";
 import { sendPurchaseConfirmationEmail } from "./confirmation-email";
 import { revalidatePurchasePaths } from "./revalidation";
 import { getExistingCheckoutResult } from "./checkout-results";
+import { isFullyRefunded } from "./purchase-status";
 
 const adminDb = supabaseAdmin as unknown as SupabaseClient<Database>;
 
@@ -116,6 +121,14 @@ async function fulfillEventTicketPurchase(purchaseId: string) {
     throw new Error("Event ticket purchase is missing an event ID.");
   }
 
+  // A refund recorded before the capture was confirmed means no ticket. The
+  // database refuses one too (guard_refunded_purchase_ticket) for the race
+  // where the refund lands after this read.
+  if (isFullyRefunded(purchase)) {
+    log.warn("payment.refunded_before_fulfillment", { purchaseId: purchase.id });
+    return purchase;
+  }
+
   // Checkout reserves the ticket before capturing, so it is normally there
   // already. A capture confirmed only by a later webhook may find it released
   // in between, and then reserves it again.
@@ -153,6 +166,11 @@ async function fulfillCompletedPurchase(purchaseId: string) {
     : purchase.kind === "membership"
       ? await fulfillMembershipPurchase(purchase.id)
       : await fulfillEventTicketPurchase(purchase.id);
+
+  // No receipt for a ticket refunded in full: it is gone or never existed.
+  if (fulfilled.kind === "event_ticket" && isFullyRefunded(fulfilled)) {
+    return fulfilled;
+  }
 
   /**
    * Sent on every pass that sees a completed payment rather than only the one
@@ -219,11 +237,11 @@ async function reconcilePurchaseIfPossible(
 
 async function handleExistingCheckoutAttempt(
   user: UserInfoRow,
-  idempotencyKey: string
+  input: CheckoutRequestInput
 ): Promise<CheckoutActionResult | null> {
   const existingPurchase = await fetchPurchaseByIdempotencyKey(
     adminDb,
-    idempotencyKey
+    input.idempotencyKey
   );
 
   if (!existingPurchase) {
@@ -234,6 +252,15 @@ async function handleExistingCheckoutAttempt(
     return getExistingCheckoutResult(existingPurchase, user.id);
   }
 
+  if (existingPurchase.kind !== input.kind) {
+    return { ok: false, error: formatReservationFailure("ATTEMPT_MISMATCH"), terminal: true };
+  }
+  if (input.kind === "event_ticket") {
+    const event = await fetchEventBySlug(adminDb, input.slug);
+    if (!event || event.id !== existingPurchase.event_id) {
+      return { ok: false, error: formatReservationFailure("ATTEMPT_MISMATCH"), terminal: true };
+    }
+  }
   const reconciledPurchase = await reconcilePurchaseIfPossible(existingPurchase);
 
   if (reconciledPurchase.status === "completed") {
@@ -313,7 +340,7 @@ async function createSquarePaymentForMembership(
       locationId: getSquareLocationId(),
       note: `UX Hub membership purchase: ${membershipType.name}`,
       referenceId: purchase.id,
-      sourceId: input.token,
+      sourceId: input.token!,
       verificationToken: input.verificationToken ?? undefined,
     });
 
@@ -362,7 +389,7 @@ async function createSquarePaymentForMembership(
   }
 }
 
-async function createSquarePaymentForEventTicket(
+async function checkoutEventTicket(
   user: UserInfoRow,
   input: CheckoutRequestInput
 ) {
@@ -382,33 +409,50 @@ async function createSquarePaymentForEventTicket(
   const existingTicket = await fetchUserEventTicket(adminDb, event.id, user.id);
 
   if (existingTicket) {
+    const retry = await handleExistingCheckoutAttempt(user, input);
+    if (retry?.ok) return { purchaseId: retry.purchaseId, resolution: retry.resolution } as const;
     return {
       error: formatReservationFailure("ALREADY_REGISTERED"),
       terminal: true,
     } as const;
   }
 
-  const customerId = await ensureSquareCustomerId(user, input);
-  const amountCents = Math.round(
-    (user.membership_type_id ? event.member_price : event.regular_price) * 100
-  );
-
-  const purchase = await createPurchase(adminDb, {
-    amount_cents: amountCents,
-    currency: SQUARE_CURRENCY,
-    event_id: event.id,
-    idempotency_key: input.idempotencyKey,
-    kind: "event_ticket",
-    square_customer_id: customerId,
-    status: "pending",
-    user_id: user.id,
+  const initialized = await initializeEventCheckout(adminDb, {
+    eventId: event.id,
+    userId: user.id,
+    idempotencyKey: input.idempotencyKey,
+    freeOnly: !input.token,
+    expectedAmountCents: input.expectedAmountCents,
   });
+  if (initialized.failure_reason || !initialized.purchase_id) {
+    // Refused before any purchase or Square call, so no card was held.
+    log.warn("payment.ticket_checkout_refused", { eventId: event.id, reason: initialized.failure_reason ?? null });
+    return { error: formatReservationFailure(initialized.failure_reason), terminal: true } as const;
+  }
+  const purchase = await fetchPurchaseById(adminDb, initialized.purchase_id);
+  if (!purchase) throw new Error("Initialized purchase not found.");
+  if (purchase.status !== "pending") {
+    if (purchase.status === "completed") await fulfillCompletedPurchase(purchase.id);
+    const existing = getExistingCheckoutResult(purchase, user.id);
+    if (!existing.ok) return { error: existing.error, terminal: existing.terminal } as const;
+    await revalidatePurchasePaths(adminDb, purchase.id);
+    return { purchaseId: existing.purchaseId, resolution: existing.resolution } as const;
+  }
+  // Only the transaction that created a paid attempt may start its external
+  // payment. Concurrent requests observe processing, avoiding competing card
+  // tokens/customer failures for the same durable snapshot.
+  if (!initialized.created) return { purchaseId: purchase.id, resolution: "processing" } as const;
+  if (purchase.amount_cents === 0) throw new Error("Free registration was not committed atomically.");
 
-  if (!purchase) {
-    return {
-      error: "Could not initialize the purchase.",
-      terminal: false,
-    } as const;
+  // The database snapshot locks pricing before any external payment request.
+  // Free registration never creates a Square customer or touches a card.
+  let customerId: string;
+  try {
+    customerId = await ensureSquareCustomerId(user, input);
+  } catch (error) {
+    log.error("payment.ticket_customer_failed", { purchaseId: purchase.id, ...errorFields(error) });
+    await updatePurchase(adminDb, purchase.id, { status: "failed", failure_reason: "Payment could not be initialized. Please try again." });
+    return { error: "Payment could not be initialized. Please try again.", terminal: true } as const;
   }
 
   try {
@@ -426,7 +470,7 @@ async function createSquarePaymentForEventTicket(
       locationId: getSquareLocationId(),
       note: `UX Hub event ticket: ${event.name}`,
       referenceId: purchase.id,
-      sourceId: input.token,
+      sourceId: input.token!,
       verificationToken: input.verificationToken ?? undefined,
     });
 
@@ -526,7 +570,7 @@ export async function executeCheckoutForUser(
 ): Promise<CheckoutActionResult> {
   const existingAttempt = await handleExistingCheckoutAttempt(
     user,
-    input.idempotencyKey
+    input
   );
 
   if (existingAttempt) {
@@ -536,7 +580,7 @@ export async function executeCheckoutForUser(
   const result =
     input.kind === "membership"
       ? await createSquarePaymentForMembership(user, input)
-      : await createSquarePaymentForEventTicket(user, input);
+      : await checkoutEventTicket(user, input);
 
   if ("error" in result && result.error) {
     return {
@@ -574,6 +618,51 @@ export async function processSquarePaymentEvent(
     return;
   }
 
+  await processOnce(eventId, eventType, rawPayload, () =>
+    applySquarePayment(payment.id!, payment)
+  );
+}
+
+/**
+ * Handles a `refund.created` or `refund.updated` delivery. The payload's
+ * refund only names the payment: the payment and each of its refunds are
+ * fetched from Square, so a delivery that arrives late or out of order still
+ * records the current total of completed refunds.
+ */
+export async function processSquareRefundEvent(
+  event: SquareRefundEvent,
+  rawPayload: NonNullable<Json> = event as NonNullable<Json>
+) {
+  const eventId = event.eventId;
+  const eventType = event.type;
+  const paymentId = event.data?.object?.refund?.paymentId;
+
+  if (!eventId || !eventType || !paymentId) {
+    return;
+  }
+
+  await processOnce(eventId, eventType, rawPayload, async () => {
+    const { payment } = await squareClient.payments.get({ paymentId });
+    if (!payment?.id) {
+      throw new Error("Square did not return the refunded payment.");
+    }
+    const purchase = await findPurchaseForPayment(payment.id, payment);
+    if (purchase) await syncPurchaseRefunds(purchase, payment);
+  });
+}
+
+/**
+ * Runs `handle` for a webhook event unless another delivery of it already
+ * ran. The event is recorded before processing so concurrent deliveries are
+ * handled once, and forgotten again on failure, or Square's retry would be
+ * dropped as a duplicate and the purchase would never settle.
+ */
+async function processOnce(
+  eventId: string,
+  eventType: string,
+  rawPayload: NonNullable<Json>,
+  handle: () => Promise<void>
+) {
   const wasRecorded = await recordSquareWebhookEvent(adminDb, {
     event_id: eventId,
     event_type: eventType,
@@ -585,11 +674,8 @@ export async function processSquarePaymentEvent(
   }
 
   try {
-    await applySquarePayment(payment.id, payment);
+    await handle();
   } catch (error) {
-    // The event was recorded before processing so concurrent deliveries are
-    // handled once. Forget it again on failure, or Square's retry would be
-    // dropped as a duplicate and the purchase would never settle.
     await forgetSquareWebhookEvent(adminDb, eventId).catch((forgetError) => {
       log.error("webhook.square_event_forget_failed", {
         eventId,
@@ -600,7 +686,48 @@ export async function processSquarePaymentEvent(
   }
 }
 
-async function applySquarePayment(paymentId: string, payment: Payment) {
+/**
+ * Records the payment's completed refunds on its purchase. A full refund of
+ * an event ticket takes the ticket back, unless it was checked in
+ * (docs/event-states.md, "Refunds").
+ */
+async function syncPurchaseRefunds(purchase: PurchaseRow, payment: Payment) {
+  const refunds = await Promise.all(
+    (payment.refundIds ?? []).map(
+      async (refundId) => (await squareClient.refunds.get({ refundId })).refund
+    )
+  );
+  const refundedCents = completedRefundCents(payment, refunds);
+  if (refundedCents <= purchase.refunded_cents && !isFullyRefunded(purchase)) return;
+
+  const result = await applyPurchaseRefund(adminDb, purchase.id, refundedCents);
+  if (!result) return;
+
+  const fields = {
+    purchaseId: purchase.id,
+    refundedCents: result.refundedCents,
+    fullyRefunded: result.fullyRefunded,
+  };
+  if (result.keptCheckedInTicket && result.amountIncreased) {
+    // The money went back after the door: someone should decide whether that
+    // was right, so it is a warning, not just a record.
+    log.warn("payment.refund_after_check_in", fields);
+  } else if (purchase.kind === "membership" && result.amountIncreased) {
+    // Refunding a membership does not end it; an admin does that by hand.
+    log.warn("payment.membership_refunded", fields);
+  } else if (result.amountIncreased || result.ticketRemoved) {
+    log.info("payment.refund_recorded", { ...fields, ticketRemoved: result.ticketRemoved });
+  }
+
+  if (result.amountIncreased || result.ticketRemoved) {
+    await revalidatePurchasePaths(adminDb, purchase.id);
+  }
+}
+
+async function findPurchaseForPayment(
+  paymentId: string,
+  payment: Payment
+): Promise<PurchaseRow | null> {
   let purchase = await fetchPurchaseBySquarePaymentId(adminDb, paymentId);
 
   // A create-payment response can be lost after Square accepts the charge but
@@ -613,7 +740,18 @@ async function applySquarePayment(paymentId: string, payment: Payment) {
     }
   }
 
+  return purchase;
+}
+
+async function applySquarePayment(paymentId: string, payment: Payment) {
+  const purchase = await findPurchaseForPayment(paymentId, payment);
   if (!purchase) return;
 
-  await applyPaymentStateToPurchase(purchase.id, payment);
+  const updated = await applyPaymentStateToPurchase(purchase.id, payment);
+
+  // Square also sends payment.updated when a refund completes, so a missed or
+  // reordered refund event still lands here.
+  if (payment.refundIds?.length) {
+    await syncPurchaseRefunds(updated, payment);
+  }
 }

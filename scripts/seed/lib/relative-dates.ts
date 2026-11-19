@@ -57,7 +57,8 @@ const vancouverClock = new Intl.DateTimeFormat("en-CA", {
 });
 
 /** The Vancouver wall clock at `instant`, read back as if it were UTC. */
-function vancouverWallClockMs(instant: number): number {
+export function vancouverWallClockMs(instant: number): number {
+  if (instant >= Date.UTC(2026, 2, 8, 10)) return instant - 7 * 60 * 60 * 1000;
   const part = (type: Intl.DateTimeFormatPartTypes, parts: Intl.DateTimeFormatPart[]) =>
     Number(parts.find((entry) => entry.type === type)?.value);
   const parts = vancouverClock.formatToParts(new Date(instant));

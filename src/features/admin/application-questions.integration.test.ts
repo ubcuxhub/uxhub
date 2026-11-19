@@ -18,6 +18,7 @@ interface QuestionInput {
   response_type: ResponseType;
   is_required?: boolean;
   sort_order?: number;
+  description?: string | null;
   max_char_limit?: number | null;
   response_options?: string[] | null;
   restrict_file_types?: boolean;
@@ -105,7 +106,7 @@ async function apply(
   const user = await fixtures.createUser();
   const { data: application, error } = await fixtures.supabase
     .from("event_applications")
-    .insert({ event_id: eventId, user_id: user.id, status })
+    .insert({ event_id: eventId, user_id: user.id, status, ...(status === "accepted" ? { offer_expires_at: "2099-01-01T00:00:00Z" } : {}) })
     .select()
     .single();
   if (error) throw error;
@@ -184,7 +185,7 @@ describe("save_admin_event_atomically: application questions", () => {
     withFixtures(async (fixtures) => {
       const created = await save(fixtures, [why, team, year]);
       const [whyId, teamId, yearId] = created.question_ids;
-      const submitted = await apply(fixtures, created.id, "submitted", {
+      const submitted = await apply(fixtures, created.id, "draft", {
         [whyId]: "Because",
         [yearId]: "2",
       });
@@ -237,7 +238,7 @@ describe("save_admin_event_atomically: application questions", () => {
 
       expect(error?.hint).toBe("APPLICATION_QUESTIONS_CONFLICT");
       expect(error?.message).toBe(
-        '"Why?" has answers on submitted applications, so it cannot be removed. Reword it or make it optional instead.'
+        'Application questions are locked after the first submitted application. Reload the event form.'
       );
       const rows = await questionsOf(fixtures, created.id);
       expect(rows.map((row) => [row.id, row.question])).toEqual([
@@ -253,15 +254,15 @@ describe("save_admin_event_atomically: application questions", () => {
       expect(await answersOf(fixtures, submitted)).toEqual({ [whyId]: "Because" });
     }));
 
-  it("removes a question whose submitted answers are blank", () =>
+  it("locks even optional questions whose submitted answers are blank", () =>
     withFixtures(async (fixtures) => {
       const created = await save(fixtures, [why, { ...team, is_required: false }]);
       const [whyId, teamId] = created.question_ids;
       await apply(fixtures, created.id, "submitted", { [whyId]: "Because", [teamId]: "  " });
 
-      const saved = await save(fixtures, [{ ...why, id: whyId }], created.id);
-
-      expect(saved.question_ids).toEqual([whyId]);
+      const { error } = await attemptSave(fixtures, [{ ...why, id: whyId }], created.id);
+      expect(error?.hint).toBe("APPLICATION_QUESTIONS_CONFLICT");
+      expect((await questionsOf(fixtures, created.id)).map(row => row.id)).toEqual([whyId, teamId]);
     }));
 
   it("returns the files answering a removed file question, from drafts", () =>
@@ -378,14 +379,9 @@ describe("save_admin_event_atomically: application questions", () => {
         const unchanged = await save(fixtures, legacy([why, team, year]), created.id);
         expect(unchanged.question_ids).toEqual([whyId, teamId, yearId]);
 
-        const edited = await save(
-          fixtures,
-          legacy([why, { ...team, question: "Teammates?" }, year, resume]),
-          created.id
-        );
-        expect(edited.question_ids[0]).toBe(whyId);
-        expect(edited.question_ids[1]).not.toBe(teamId);
-        expect(edited.question_ids[2]).toBe(yearId);
+        const edited = await attemptSave(fixtures, legacy([why, { ...team, question: "Teammates?" }, year, resume]), created.id);
+        expect(edited.error?.hint).toBe("APPLICATION_QUESTIONS_CONFLICT");
+        expect((await questionsOf(fixtures, created.id)).map(row => row.id)).toEqual([whyId, teamId, yearId]);
         expect(await answersOf(fixtures, submitted)).toEqual({
           [whyId]: "Because",
           [yearId]: "2",
@@ -408,3 +404,56 @@ describe("save_admin_event_atomically: application questions", () => {
       }));
   });
 });
+
+
+describe("submitted question lock", () => {
+  it.each(["submitted", "accepted", "waitlisted", "rejected"] as const)("rejects every edit for %s, even without answers, preserving descriptions and ids", status => withFixtures(async fixtures => {
+    const created = await save(fixtures, [{ ...why, description: "Historical instructions" }, year]);
+    const original = await questionsOf(fixtures, created.id);
+    await apply(fixtures, created.id, status, {});
+    const unchanged = original.map(q => ({ ...q, id: q.id }));
+    expect((await attemptSave(fixtures, unchanged, created.id)).error).toBeNull();
+    const changes = [
+      [{ ...unchanged[0], question: "New text" }, unchanged[1]],
+      [{ ...unchanged[0], description: null }, unchanged[1]],
+      [{ ...unchanged[0], is_required: true }, unchanged[1]],
+      [{ ...unchanged[0], max_char_limit: 600 }, unchanged[1]],
+      [unchanged[0], { ...unchanged[1], response_options: ["New"] }],
+      [{ ...unchanged[1], sort_order: 0 }, { ...unchanged[0], sort_order: 1 }],
+      [unchanged[0]],
+      [...unchanged, team],
+      unchanged.map(q => ({ ...q, id: null })),
+    ];
+    for (const questions of changes) expect((await attemptSave(fixtures, questions, created.id)).error?.hint).toBe("APPLICATION_QUESTIONS_CONFLICT");
+    const direct = await fixtures.supabase.from("event_application_questions").update({ question: "Bypass" }).eq("id", original[0].id);
+    expect(direct.error?.hint).toBe("APPLICATION_QUESTIONS_CONFLICT");
+    const removed = await fixtures.supabase.from("event_application_questions").delete().eq("id", original[0].id);
+    expect(removed.error?.hint).toBe("APPLICATION_QUESTIONS_CONFLICT");
+    const inserted = await fixtures.supabase.from("event_application_questions").insert({ event_id: created.id, question: team.question, response_type: team.response_type });
+    expect(inserted.error?.hint).toBe("APPLICATION_QUESTIONS_CONFLICT");
+    expect(await questionsOf(fixtures, created.id)).toEqual(original);
+  }));
+
+  it("retains the first-submission lock after the application is removed", () => withFixtures(async fixtures => {
+    const created = await save(fixtures, [why]);
+    const application = await apply(fixtures, created.id, "submitted", {});
+    expect((await fixtures.supabase.from("event_applications").delete().eq("id", application)).error).toBeNull();
+    expect((await attemptSave(fixtures, [], created.id)).error?.hint).toBe("APPLICATION_QUESTIONS_CONFLICT");
+  }));
+});
+
+it("round-trips all six supported question families with order, required states and answer settings", () => withFixtures(async fixtures => {
+  const types = ["short_text", "long_text", "checkbox", "multiple_choice", "dropdown", "file_upload"] as const;
+  const questions = types.map((type, index) => ({
+    question: `Question ${index + 1}`, response_type: type, is_required: index % 2 === 0,
+    max_char_limit: type === "short_text" || type === "long_text" ? 250 : null,
+    response_options: type === "checkbox" || type === "multiple_choice" || type === "dropdown" ? ["A", "B"] : null,
+    description: "Retained instructions",
+  }));
+  const created = await save(fixtures, questions);
+  const rows = await questionsOf(fixtures, created.id);
+  expect(rows.map(q => ({ question: q.question, response_type: q.response_type, is_required: q.is_required, max_char_limit: q.max_char_limit, response_options: q.response_options, description: q.description }))).toEqual(questions);
+  const reversed = [...rows].reverse().map((q, index) => ({ ...q, sort_order: index }));
+  expect((await save(fixtures, reversed, created.id)).question_ids).toEqual([...created.question_ids].reverse());
+  expect((await questionsOf(fixtures, created.id)).map(q => q.id)).toEqual([...created.question_ids].reverse());
+}));

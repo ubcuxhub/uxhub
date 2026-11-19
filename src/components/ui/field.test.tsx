@@ -163,3 +163,16 @@ describe("FieldLabel", () => {
     }
   });
 });
+
+it("connects supplied validator feedback and removes stale ARIA errors after correction", async () => {
+  const { FieldValidation } = await import("./field");
+  const body = (errors: { target: string; message: string }[]) => <FieldValidation errors={errors}><Field validationKey="name"><FieldLabel htmlFor="validated-name">Event name</FieldLabel><Input id="validated-name" /><FieldDescription>Public event title</FieldDescription></Field><Field><FieldLabel htmlFor="unrelated">Other</FieldLabel><Input id="unrelated" /></Field></FieldValidation>;
+  const { rerender } = render(body([{ target: "name", message: "Name is required." }]));
+  const control = screen.getByLabelText("Event name");
+  await waitFor(() => expect(ids(control)).toContain(screen.getByRole("alert").id));
+  expect(control.getAttribute("aria-invalid")).toBe("true");
+  expect(screen.getByLabelText("Other").hasAttribute("aria-invalid")).toBe(false);
+  rerender(body([]));
+  await waitFor(() => expect(control.hasAttribute("aria-invalid")).toBe(false));
+  expect(ids(control)).toEqual([screen.getByText("Public event title").id]);
+});

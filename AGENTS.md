@@ -72,8 +72,9 @@ in admin screens. Pruning deletes a crowd account the data no longer lists, so
 never sign up with one of those domains.
 
 `pnpm seed --target=prod` writes demo events for admins while the student-facing
-events feature is unlaunched. It never deletes, never writes user fixtures, and
-forces every event to `draft` so nothing fabricated is reachable through the
+events feature is unlaunched. It never deletes, never writes user fixtures or
+membership tiers (admins edit the live tiers in Club Settings), and forces every
+event to `draft` so nothing fabricated is reachable through the
 public API. It reads `SEED_PROD_SUPABASE_URL` and `SEED_PROD_SUPABASE_SECRET_KEY`
 and expects migrations to be applied already. Each target rejects a URL that does
 not match it, so a stale `.env.local` cannot silently redirect a run.
@@ -106,8 +107,8 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
 
 ## Important Patterns
 
-- `src/proxy.ts` refreshes sessions for `/portal/*`, `/admin/*`, and `/api/*`;
-  it does not authorize users.
+- `src/proxy.ts` refreshes sessions for `/portal/*`, `/admin/*`, `/join/*`
+  (team invite links), and `/api/*`; it does not authorize users.
 - `src/app/(app)/layout.tsx` calls `requireAuth()` and provides the current user.
   `src/app/(app)/(shell)/admin/layout.tsx` adds `requireAdmin()`. Keep access
   control in these server-side guards rather than relying on client UI.
@@ -214,8 +215,6 @@ Local values belong in the git-ignored `.env.local`.
 - Sentry: `NEXT_PUBLIC_SENTRY_DSN` enables error reporting; leave it unset
   locally. Build-time `SENTRY_ORG`, `SENTRY_PROJECT`, and secret
   `SENTRY_AUTH_TOKEN` upload source maps on Vercel builds
-- Check-in: server-only `CHECK_IN_TOKEN_SECRET` signs ticket QR codes
- (`src/lib/check-in-token.ts`); rotating it invalidates every issued ticket
 - Discount codes: server-only `DISCOUNT_CODE_<BUSINESS>`, one per partner in
   `src/features/memberships/lib/discount-codes.ts`, kept out of the public repo.
   A code whose variable is unset is not shown
@@ -227,13 +226,17 @@ Local values belong in the git-ignored `.env.local`.
 - Migrations: secret `SUPABASE_MIGRATIONS_DB_URL`, set in Vercel's Production
   environment only, is the session-mode pooler connection string the
   production build pushes migrations through. Never put it in `.env.local`
+- Application emails: secret `APPLICATION_EMAILS_SECRET`, set in Vercel's
+  Production environment only, matching the `application_emails_secret` Vault
+  secret the pg_cron job signs with (`supabase/README.md`, "Application
+  emails")
 
 `SQUARE_ENV` is optional and defaults to the sandbox; set it to `production`
 only for production credentials.
 
 Never expose the Supabase secret keys, migrations database URL, Square access
-token, webhook signature key, Resend API key, Sentry auth token, or check-in
-token secret to client components.
+token, webhook signature key, Resend API key, Sentry auth token, or
+application-emails secret to client components.
 
 ## Quality
 

@@ -151,6 +151,20 @@ export async function leaveTeam(
   return (data as TeamFailureReason | null) ?? null;
 }
 
+/** Renames the owner's team; a blank name clears it. Service role only. */
+export async function renameTeam(
+  supabase: DbClient,
+  input: { teamId: string; userId: string; name: string | null }
+): Promise<TeamFailureReason | null> {
+  const { data, error } = await supabase.rpc("rename_team", {
+    p_team_id: input.teamId,
+    p_user_id: input.userId,
+    p_name: input.name ?? "",
+  });
+  if (error) throw error;
+  return (data as TeamFailureReason | null) ?? null;
+}
+
 /** Deletes the owner's team and removes everyone on it. Service role only. */
 export async function deleteTeam(
   supabase: DbClient,
@@ -162,4 +176,14 @@ export async function deleteTeam(
   });
   if (error) throw error;
   return (data as TeamFailureReason | null) ?? null;
+}
+
+export interface EventTeamSettingsInfo { teamCount: number; largestTeam: number }
+
+/** Staff-only aggregate for editor locks; never exposes invite codes or membership data. */
+export async function fetchEventTeamSettingsInfo(client: DbClient, eventId: string): Promise<EventTeamSettingsInfo> {
+  const { data, error } = await client.rpc("admin_event_team_settings", { p_event_id: eventId });
+  if (error) throw error;
+  const info = data as { team_count: number; largest_team: number };
+  return { teamCount: info.team_count, largestTeam: info.largest_team };
 }

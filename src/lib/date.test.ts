@@ -343,3 +343,15 @@ describe("formatEventDateTimeRange", () => {
     );
   });
 });
+
+// Builder input must not silently normalize a calendar or clock transition.
+describe("strictPacificTimestamp", () => {
+  it.each(["2026-02-30T09:00", "2025-03-09T02:30", "2025-11-02T01:30", "2026-11-14T25:00"])("rejects %s", async value => {
+    const { strictPacificTimestamp } = await import("./date");
+    expect(strictPacificTimestamp(value)).toBeNull();
+  });
+  it("uses the pinned Vancouver permanent daylight offset", async () => {
+    const { strictPacificTimestamp } = await import("./date");
+    expect(strictPacificTimestamp("2026-11-14T09:00")).toBe("2026-11-14T16:00:00.000Z");
+  });
+});

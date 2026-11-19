@@ -42,6 +42,7 @@ export const config = {
   matcher: [
     "/admin/:path*",
     "/portal/:path*",
+    "/join/:path*",
     "/api/:path*",
   ],
 };

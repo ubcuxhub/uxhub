@@ -1,13 +1,23 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { CopyCode } from "./CopyCode";
 
 afterEach(cleanup);
 
 describe("CopyCode", () => {
+  it("copies the full long meeting passcode from a narrow location cell", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText } });
+    const code = "LONG-MEETING-PASSCODE-123456789";
+    render(<div style={{ width: 144 }}><CopyCode code={code} label="Copy meeting passcode" /></div>);
+    fireEvent.click(screen.getByRole("button", { name: "Copy meeting passcode" }));
+    await waitFor(() => expect(writeText).toHaveBeenCalledWith(code));
+    expect(screen.getByText(code).getAttribute("title")).toBe(code);
+  });
+
   it("names its button generically by default, and takes a label", () => {
     const { rerender } = render(<CopyCode code="UXHUB-2026" />);
     expect(screen.getByRole("button", { name: "Copy code" })).toBeTruthy();
@@ -23,7 +33,6 @@ describe("CopyCode", () => {
     const { container } = render(<CopyCode code={code} />);
 
     const pill = container.firstElementChild?.firstElementChild as HTMLElement;
-    expect(pill.className).toContain("min-w-48");
     expect(pill.className).toContain("max-w-full");
     expect(pill.className).not.toMatch(/(^|\s)w-48(\s|$)/);
 

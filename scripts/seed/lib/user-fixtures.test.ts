@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { membershipTypes } from "../data/membership-types.ts";
 import { buildSeedEvents } from "../data/events.ts";
-import { buildSeedUsers, SEED_PASSWORD } from "../data/users.ts";
+import { buildSeedUsers, SEED_PASSWORD, storedInterest } from "../data/users.ts";
+import { AVATAR_PRESETS, INTEREST_OPTIONS } from "../../../src/features/setup/lib/options.ts";
 import { buildSeedCrowd, isCrowdEmail } from "../data/crowd.ts";
 import {
   classifySeedEvent,
@@ -239,14 +240,49 @@ describe("user seed fixtures", () => {
       ).map((user) => user.email)
     ).toEqual(["admin-no-membership@example.com", "new-member@example.com"]);
     // Written on every run so changes made through the admin dialog are undone.
+    // The photo is set by a later pass, from `profilePhoto`.
     for (const user of seedUsers) {
       expect(user.profile).toMatchObject({
         profile_photo_path: null,
-        avatar_preset: null,
+        avatar_preset: AVATAR_PRESETS.some((preset) => preset.id === user.profile.avatar_preset)
+          ? user.profile.avatar_preset
+          : null,
         student_verified_at: null,
         student_verified_by: null,
       });
     }
+  });
+
+  it("covers every avatar Settings → Profile can show", () => {
+    const photo = seedUsers.filter((user) => user.profilePhoto);
+    const preset = seedUsers.filter((user) => user.profile.avatar_preset);
+    expect(photo.map((user) => user.email)).toEqual(["student-innovator@example.com"]);
+    expect(preset.map((user) => user.email)).toEqual([
+      "student-explorer@example.com",
+      "admin-innovator@example.com",
+    ]);
+    // An upload replaces a preset in the app, so nobody holds both.
+    expect(photo.some((user) => user.profile.avatar_preset)).toBe(false);
+    // Initials for the rest.
+    expect(seedUsers.length - photo.length - preset.length).toBeGreaterThan(5);
+    // Crowd accounts have no Auth user, so nobody could have uploaded one.
+    expect(crowd.some((user) => user.profilePhoto || user.profile.avatar_preset)).toBe(false);
+  });
+
+  it("stores interests as taxonomy ids, with manager free tags beside them", () => {
+    const taxonomy = new Set<string>(INTEREST_OPTIONS.map((option) => option.id));
+    expect(storedInterest("UX research")).toBe("ux-research");
+    expect(storedInterest("design systems")).toBe("design-systems");
+    expect(storedInterest("Creative coding")).toBe("Creative coding");
+    // Some members see chosen chips, some have only manager tags, and the
+    // admin directory sees both.
+    const interests = everyone.map((user) => user.profile.interests ?? []);
+    expect(interests.some((tags) => tags.some((tag) => taxonomy.has(tag)))).toBe(true);
+    expect(interests.some((tags) => tags.length > 0 && tags.every((tag) => !taxonomy.has(tag)))).toBe(true);
+    expect(interests.some((tags) => tags.some((tag) => taxonomy.has(tag)) && tags.some((tag) => !taxonomy.has(tag)))).toBe(true);
+    // No label stored where its id belongs.
+    const labels = new Set(INTEREST_OPTIONS.map((option) => option.label.toLowerCase()));
+    expect(interests.flat().filter((tag) => labels.has(tag.toLowerCase()) && !taxonomy.has(tag))).toEqual([]);
   });
 
   it("rejects a verification no manager could have made", () => {

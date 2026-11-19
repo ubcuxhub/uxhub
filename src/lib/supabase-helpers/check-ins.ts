@@ -1,4 +1,5 @@
 import type { DbClient } from "./types";
+import { fetchCheckInPages } from "./check-in-pages";
 import { TABLES } from "./tables";
 import type {
   CheckInSessionInsert,
@@ -17,6 +18,20 @@ type CheckInAttendeeQueryRow = Pick<EventTicketRow, "id" | "user_id"> & {
     email: string | null;
   } | null;
 };
+
+type AttendeeNameFields = {
+  first_name: string | null;
+  last_name: string | null;
+} | null;
+
+function attendeeName(userInfo: AttendeeNameFields): string {
+  return userInfo?.first_name && userInfo.last_name
+    ? formatUserName({
+        first_name: userInfo.first_name,
+        last_name: userInfo.last_name,
+      })
+    : "Unknown User";
+}
 
 export async function fetchCheckInSessions(
   supabase: DbClient,
@@ -37,36 +52,19 @@ export async function fetchCheckInAttendees(
   supabase: DbClient,
   eventId: string
 ): Promise<CheckInAttendee[]> {
-  const { data, error } = await supabase
+  const data = await fetchCheckInPages<CheckInAttendeeQueryRow>((from, to) => supabase
     .from(TABLES.eventTickets)
-    .select(
-      `
-      id,
-      user_id,
-      user_info!user_id(first_name, last_name, email)
-    `
-    )
+    .select("id,user_id,user_info!user_id(first_name,last_name,email)")
     .eq("event_id", eventId)
-    .order("created_at", { ascending: false });
+    .order("created_at", { ascending: false }).order("id")
+    .range(from, to));
 
-  if (error) throw error;
-  if (!data || data.length === 0) return [];
-
-  return data.map((ticket: CheckInAttendeeQueryRow) => {
-    const userInfo = ticket.user_info;
-    return {
-      id: ticket.id,
-      user_id: ticket.user_id,
-      user_name:
-        userInfo?.first_name && userInfo.last_name
-          ? formatUserName({
-              first_name: userInfo.first_name,
-              last_name: userInfo.last_name,
-            })
-          : "Unknown User",
-      user_email: userInfo?.email || "",
-    };
-  });
+  return data.map((ticket: CheckInAttendeeQueryRow) => ({
+    id: ticket.id,
+    user_id: ticket.user_id,
+    user_name: attendeeName(ticket.user_info),
+    user_email: ticket.user_info?.email || "",
+  }));
 }
 
 /**
@@ -96,47 +94,6 @@ export async function fetchCheckInStatuses(
   }
 
   return statusMap;
-}
-
-/**
- * Checks a ticket in to a session now and returns the stored time. Checking
- * in again restamps it.
- */
-export async function upsertCheckIn(
-  supabase: DbClient,
-  ticketId: string,
-  sessionId: string
-): Promise<string> {
-  const { data, error } = await supabase
-    .from(TABLES.checkIns)
-    .upsert(
-      {
-        ticket_id: ticketId,
-        check_in_session_id: sessionId,
-        checked_in_at: new Date().toISOString(),
-      },
-      { onConflict: "ticket_id,check_in_session_id" }
-    )
-    .select("checked_in_at")
-    .single();
-
-  if (error) throw error;
-  return data.checked_in_at ?? new Date().toISOString();
-}
-
-/** Removes a mistaken check-in so the ticket can be checked in again. */
-export async function deleteCheckIn(
-  supabase: DbClient,
-  ticketId: string,
-  sessionId: string
-): Promise<void> {
-  const { error } = await supabase
-    .from(TABLES.checkIns)
-    .delete()
-    .eq("ticket_id", ticketId)
-    .eq("check_in_session_id", sessionId);
-
-  if (error) throw error;
 }
 
 export async function insertCheckInSessions(

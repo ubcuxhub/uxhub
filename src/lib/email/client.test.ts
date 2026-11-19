@@ -29,6 +29,17 @@ describe("sendEmail", () => {
     );
   });
 
+  it("throws Resend's error name as the code", async () => {
+    vi.stubEnv("RESEND_API_KEY", "test-key");
+    send.mockResolvedValueOnce({
+      error: { name: "rate_limit_exceeded", message: "Too many requests", statusCode: 429 },
+    });
+
+    await expect(
+      sendEmail({ html: "<p>hi</p>", subject: "Subject", to: "a@b.com" })
+    ).rejects.toMatchObject({ name: "EmailSendError", code: "rate_limit_exceeded" });
+  });
+
   it("falls back when EMAIL_FROM is unset", async () => {
     vi.stubEnv("RESEND_API_KEY", "test-key");
     vi.stubEnv("EMAIL_FROM", "");

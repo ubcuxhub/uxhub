@@ -22,20 +22,15 @@ import {
   TableRowLink,
 } from "@/components/ui/table";
 import { formatEventDate } from "@/lib/date";
-import type { EventRow, EventStatus } from "@/lib/supabase/models";
+import type { EventStatus } from "@/lib/supabase/models";
 import { useListPage } from "../hooks/use-list-page";
 import { useRecordRows } from "../hooks/use-record-rows";
+import type { AdminEventTableRow } from "../lib/admin-event-table";
 import { toggleSetValue } from "../lib/directory";
 import { ChipFilterSection } from "./ChipFilterSection";
 import { EVENT_STATUS_LABELS, EventStatusBadge } from "./EventStatusBadge";
 
-export interface AdminEventTableRow {
-  event: EventRow;
-  registrationCount: number;
-  registrationOpen: boolean;
-  /** Submitted applications awaiting a decision; only for events that take applications. */
-  applicationsToReview?: number;
-}
+export type { AdminEventTableRow } from "../lib/admin-event-table";
 
 type RegistrationStatus = "open" | "closed" | "not-applicable";
 type EventSort = "newest" | "oldest";
@@ -66,6 +61,7 @@ const LIST_HREF = "/admin/events";
 const COLUMNS = 5;
 
 const eventHref = (row: AdminEventTableRow) => `${LIST_HREF}/${row.event.id}`;
+const eventRecordHref = eventHref;
 
 /** A draft takes no registrations, so it has no registration status. */
 function getRegistrationStatus(row: AdminEventTableRow): RegistrationStatus {
@@ -86,7 +82,7 @@ function sortEvents(rows: AdminEventTableRow[], sort: EventSort) {
 
 /**
  * Manage events: search, sort, filter and page the events. Each row links to
- * the event's overview, which opens in a drawer over the list.
+ * the event's overview drawer, or resumes a working draft in its editor.
  */
 export function AdminEventsTable({ rows }: { rows: AdminEventTableRow[] }) {
   const [query, setQuery] = useState("");
@@ -116,7 +112,7 @@ export function AdminEventsTable({ rows }: { rows: AdminEventTableRow[] }) {
 
   const view = JSON.stringify([search, sort, [...statusFilter].sort(), [...registrationFilter].sort()]);
   const paging = useListPage(results, view, {
-    startIndex: results.findIndex((row) => eventHref(row) === records.activePath),
+    startIndex: results.findIndex((row) => eventRecordHref(row) === records.activePath),
   });
 
   const count = { shown: results.length, total: rows.length, noun: EVENT_NOUN, filtered: filtering };
@@ -200,11 +196,14 @@ export function AdminEventsTable({ rows }: { rows: AdminEventTableRow[] }) {
             ) : (
               paging.pageRows.map((row) => {
                 const href = eventHref(row);
+                const reviewEventId = row.event.id;
                 const registration = getRegistrationStatus(row);
+                const recordHref = eventRecordHref(row);
+                const linkProps = records.linkProps(recordHref);
                 return (
-                  <TableRow key={row.event.id} {...records.rowProps(href)}>
+                  <TableRow key={row.event.id} {...records.rowProps(recordHref)}>
                     <TableCell className="max-w-72 truncate">
-                      <TableRowLink {...records.linkProps(href)}>{row.event.name}</TableRowLink>
+                      <TableRowLink {...linkProps} href={href} replace={linkProps.replace} aria-current={linkProps["aria-current"]}>{row.event.name}</TableRowLink>
                     </TableCell>
                     <TableCell className="whitespace-nowrap text-muted-foreground">
                       {formatEventDate(row.event.starts_at, { month: "short" }) ?? <TableNone />}
@@ -221,12 +220,16 @@ export function AdminEventsTable({ rows }: { rows: AdminEventTableRow[] }) {
                       ) : null}
                     </TableCell>
                     <TableCell className="whitespace-nowrap tabular-nums">
-                      {row.registrationCount}{" "}
-                      <span className="text-muted-foreground">/ {row.event.max_capacity}</span>
-                      {row.event.requires_application && (row.applicationsToReview ?? 0) > 0 ? (
+                      {(
+                        <>
+                          {row.registrationCount}{" "}
+                          <span className="text-muted-foreground">/ {row.event.max_capacity ?? <TableNone />}</span>
+                        </>
+                      )}
+                      {reviewEventId && row.event.requires_application && (row.applicationsToReview ?? 0) > 0 ? (
                         <div className="mt-1">
                           <Link
-                            href={`${LIST_HREF}/${row.event.id}/review-applications?status=submitted`}
+                            href={`${LIST_HREF}/${reviewEventId}/review-applications?status=submitted`}
                             aria-label={`${row.applicationsToReview} ${
                               row.applicationsToReview === 1 ? "application" : "applications"
                             } to review for ${row.event.name}`}

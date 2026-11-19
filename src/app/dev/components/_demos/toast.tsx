@@ -145,6 +145,29 @@ function ToastDemo({ open }: SectionProps) {
             variant="secondary"
             size="sm"
             onClick={() =>
+              toast.info("Invite declined", {
+                description:
+                  "You didn’t join Pixel Pushers. You can still create your own team or use another invite link.",
+              })
+            }
+          >
+            Info
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() =>
+              toast.warning("Teams lock tomorrow", {
+                description: "Find a team before Nov 13 at 11:59 PM.",
+              })
+            }
+          >
+            Warning
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() =>
               toast.error("Couldn’t save changes", {
                 description: "Check your connection and try again.",
                 action: {

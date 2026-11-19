@@ -1,10 +1,17 @@
 import { NextResponse } from "next/server";
 import { WebhooksHelper } from "square";
-import { processSquarePaymentEvent } from "@/features/payments/fulfillment";
+import {
+  processSquarePaymentEvent,
+  processSquareRefundEvent,
+} from "@/features/payments/fulfillment";
 import { errorFields, log } from "@/lib/log";
 import { getSquareWebhookEndpoints } from "@/lib/square/client";
 import type { Json } from "@/lib/supabase/database.types";
-import { parseSquarePaymentUpdatedEvent } from "@/lib/square/webhook";
+import {
+  isSquareRefundEventType,
+  parseSquarePaymentUpdatedEvent,
+  parseSquareRefundEvent,
+} from "@/lib/square/webhook";
 
 export async function POST(request: Request) {
   const rawBody = await request.text();
@@ -47,22 +54,29 @@ export async function POST(request: Request) {
   }
 
   const eventType = (rawPayload as Record<string, unknown>).type;
+  const isRefund = isSquareRefundEventType(eventType);
 
-  if (eventType !== "payment.updated") {
+  if (eventType !== "payment.updated" && !isRefund) {
     return NextResponse.json({ ok: true });
   }
 
-  let event;
+  let handle: () => Promise<void>;
 
   try {
-    event = parseSquarePaymentUpdatedEvent(rawPayload);
+    if (isRefund) {
+      const event = parseSquareRefundEvent(rawPayload);
+      handle = () => processSquareRefundEvent(event, rawPayload as NonNullable<Json>);
+    } else {
+      const event = parseSquarePaymentUpdatedEvent(rawPayload);
+      handle = () => processSquarePaymentEvent(event, rawPayload as NonNullable<Json>);
+    }
   } catch (error) {
     log.error("webhook.square_payload_invalid", errorFields(error));
     return NextResponse.json({ error: "Invalid webhook payload" }, { status: 400 });
   }
 
   try {
-    await processSquarePaymentEvent(event, rawPayload as NonNullable<Json>);
+    await handle();
 
     return NextResponse.json({ ok: true });
   } catch (error) {

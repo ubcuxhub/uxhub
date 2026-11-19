@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, X } from "lucide-react";
+import { Check, Info, TriangleAlert, X } from "lucide-react";
 import { Toaster as Sonner, toast as sonner } from "sonner";
 
 import { IconButton } from "@/components/ui/icon-button";
@@ -8,8 +8,9 @@ import { cn } from "@/lib/utils";
 
 /**
  * Toasts (§3.8): bottom right, stacked 8px apart, 380px wide, dismissed after
- * five seconds. Tones are Success, Neutral and Error. Mount `<Toaster />` once
- * in the root layout, then call `toast.success("Event published")` from any
+ * five seconds. Tones are Success, Neutral, Info, Warning and Error. Mount
+ * `<Toaster />` once in the root layout, then call `toast.success("Event
+ * published")` (or `toast.info`, `toast.warning`, `toast.error`) from any
  * client code, including right after a server action. Call sites never import
  * `sonner`.
  *
@@ -19,7 +20,7 @@ import { cn } from "@/lib/utils";
  * moves focus into the stack, and hovering or focusing it pauses the timer.
  */
 
-type ToastTone = "success" | "neutral" | "error";
+type ToastTone = "success" | "neutral" | "info" | "warning" | "error";
 
 export interface ToastOptions {
   description?: string;
@@ -31,9 +32,27 @@ export interface ToastOptions {
   duration?: number;
 }
 
-const MARK: Record<Exclude<ToastTone, "neutral">, string> = {
-  success: "bg-success text-success-foreground",
-  error: "bg-error text-destructive",
+/** The 20px disc before the text: its fill, and the 12px icon inside. */
+const MARK: Record<
+  Exclude<ToastTone, "neutral">,
+  { className: string; icon: React.ReactNode }
+> = {
+  success: {
+    className: "bg-success text-success-foreground",
+    icon: <Check className="size-3" />,
+  },
+  info: {
+    className: "bg-info text-info-foreground",
+    icon: <Info className="size-3" />,
+  },
+  warning: {
+    className: "bg-warning text-warning-foreground",
+    icon: <TriangleAlert className="size-3" />,
+  },
+  error: {
+    className: "bg-error text-destructive",
+    icon: <X className="size-3" />,
+  },
 };
 
 interface ToastViewProps extends ToastOptions {
@@ -62,14 +81,10 @@ function ToastView({
           aria-hidden
           className={cn(
             "flex size-5 shrink-0 items-center justify-center rounded-full",
-            MARK[tone],
+            MARK[tone].className,
           )}
         >
-          {tone === "success" ? (
-            <Check className="size-3" />
-          ) : (
-            <X className="size-3" />
-          )}
+          {MARK[tone].icon}
         </span>
       )}
       <div className="flex min-w-0 flex-1 flex-col gap-0.5 break-words">
@@ -135,11 +150,15 @@ const toast = Object.assign<
   ToastFn,
   {
     success: ToastFn;
+    info: ToastFn;
+    warning: ToastFn;
     error: ToastFn;
     dismiss: (id?: string | number) => void;
   }
 >((message, options) => show("neutral", message, options), {
   success: (message, options) => show("success", message, options),
+  info: (message, options) => show("info", message, options),
+  warning: (message, options) => show("warning", message, options),
   error: (message, options) => show("error", message, options),
   dismiss: (id) => {
     sonner.dismiss(id);

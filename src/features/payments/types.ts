@@ -10,7 +10,8 @@ export type PurchaseStatus =
 export interface CheckoutRequestInput {
   kind: PurchaseKind;
   slug: string;
-  token: string;
+  token?: string | null;
+  expectedAmountCents?: number;
   idempotencyKey: string;
   buyerFirstName: string;
   buyerLastName: string;

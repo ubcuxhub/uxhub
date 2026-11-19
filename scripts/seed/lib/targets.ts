@@ -14,7 +14,7 @@
  *   seed data no longer describes.
  * - `prod` holds real data, so the seed only ever adds and updates. It writes
  *   demo events for admins to work with while the student-facing events feature
- *   is unlaunched, and it never writes user fixtures.
+ *   is unlaunched, and it never writes user fixtures or membership tiers.
  */
 
 export type SeedTarget = "local" | "prod";
@@ -27,6 +27,11 @@ export interface TargetPolicy {
   /** Write auth users, profiles, purchases, and registrations. */
   users: boolean;
   /**
+   * Write membership tiers. Production's are live (students buy them) and
+   * admins edit them in Club Settings, so a prod run would revert those edits.
+   */
+  memberships: boolean;
+  /**
    * Force every seeded event to `draft`.
    *
    * The public RLS policy on `events` is `using (status = 'active')`, so an
@@ -36,11 +41,17 @@ export interface TargetPolicy {
    * which is exactly the audience prod demo data is for.
    */
   forceDraft: boolean;
+  /**
+   * Write `data/drafts.ts`, the unfinished builder drafts, through the
+   * builder's save RPC. Local only: prod's demo events are finished rows, and
+   * the seed keeps out of the builder's document and mirror tables there.
+   */
+  workingDrafts: boolean;
 }
 
 export const TARGET_POLICIES: Record<SeedTarget, TargetPolicy> = {
-  local: { prune: true, users: true, forceDraft: false },
-  prod: { prune: false, users: false, forceDraft: true },
+  local: { prune: true, users: true, memberships: true, forceDraft: false, workingDrafts: true },
+  prod: { prune: false, users: false, memberships: false, forceDraft: true, workingDrafts: false },
 };
 
 /** Env var names each target reads its connection from. */

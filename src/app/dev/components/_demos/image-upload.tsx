@@ -143,6 +143,11 @@ function LiveUpload() {
 function ImageUploadDemo() {
   return (
     <div className="flex flex-col gap-8">
+      <SpecimenGroup title="Builder presentations" description="The icon picker is a 220px tile capped to its container. The header picker is shallow with a named upload action. Both retain validation, drag/drop, replacement, progress and keyboard operation; inspect in both themes and densities.">
+        <Specimen label="Icon tile"><ImageUpload presentation="icon" label="Icon" requirements={THUMBNAIL} onChange={noop} /></Specimen>
+        <Specimen label="Header picker" className="w-full"><ImageUpload presentation="header" label="Header image" requirements={HEADER} onChange={noop} /></Specimen>
+        <Specimen label="Uploaded header" className="w-full"><ImageUpload presentation="header" label="Header image" requirements={HEADER} value={HEADER_IMAGE} onChange={noop} /></Specimen>
+      </SpecimenGroup>
       <SpecimenGroup
         title="ImageUpload · thumbnail"
         spec="§3.12"

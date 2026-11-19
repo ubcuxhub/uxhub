@@ -9,6 +9,7 @@ import {
   useMemo,
   useState,
 } from "react"
+import { CircleAlert } from "lucide-react"
 import { cva, type VariantProps } from "class-variance-authority"
 
 import { cn } from "@/lib/utils"
@@ -133,11 +134,20 @@ const fieldVariants = cva(
   }
 )
 
+/** Domain validators supply visible errors; the caller owns when to reveal them. */
+const ValidationContext = createContext<readonly { target: string; message: string }[]>([])
+function FieldValidation({ errors, children }: { errors: readonly { target: string; message: string }[]; children: React.ReactNode }) {
+  return <ValidationContext.Provider value={errors}>{children}</ValidationContext.Provider>
+}
+
 function Field({
   className,
   orientation = "vertical",
+  validationKey,
+  children,
   ...props
-}: React.ComponentProps<"div"> & VariantProps<typeof fieldVariants>) {
+}: React.ComponentProps<"div"> & VariantProps<typeof fieldVariants> & { validationKey?: string }) {
+  const messages = useContext(ValidationContext).filter(error => error.target === validationKey)
   const baseId = useId()
   const [registered, setRegistered] = useState<FieldContextValue["registered"]>(
     {}
@@ -151,6 +161,7 @@ function Field({
 
   const dataInvalid = (props as Record<string, unknown>)["data-invalid"]
   const invalid =
+    messages.length > 0 ||
     Boolean(registered.error) ||
     dataInvalid === true ||
     dataInvalid === "true"
@@ -174,7 +185,11 @@ function Field({
         data-orientation={orientation}
         className={cn(fieldVariants({ orientation }), className)}
         {...props}
-      />
+        data-invalid={invalid || undefined}
+      >
+        {children}
+        {messages.length > 0 && <FieldError><span className="flex items-start gap-1.5"><CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" /><span>{[...new Set(messages.map(error => error.message))].join(" ")}</span></span></FieldError>}
+      </div>
     </FieldContext.Provider>
   )
 }
@@ -372,6 +387,7 @@ function FieldError({
 }
 
 export {
+  FieldValidation,
   Field,
   FieldLabel,
   FieldLabelRow,

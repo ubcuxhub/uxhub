@@ -153,6 +153,8 @@ export class Fixtures {
       .insert({
         name: `Integration event ${this.tag}`,
         description: "Created by an integration test.",
+        short_description: "Integration event",
+        starts_at: "2027-12-01T18:00:00Z", ends_at: "2027-12-01T20:00:00Z",
         slug: `integration-event-${this.tag}`,
         regular_price: 10,
         member_price: 5,

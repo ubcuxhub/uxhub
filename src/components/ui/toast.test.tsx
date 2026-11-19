@@ -53,6 +53,8 @@ describe("toast", () => {
   it.each([
     ["neutral", () => toast("Message"), false],
     ["success", () => toast.success("Message"), true],
+    ["info", () => toast.info("Message"), true],
+    ["warning", () => toast.warning("Message"), true],
     ["error", () => toast.error("Message"), true],
   ] as const)("renders the %s tone", (tone, fire, hasMark) => {
     fire();

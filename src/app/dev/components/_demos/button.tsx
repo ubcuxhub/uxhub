@@ -14,8 +14,8 @@ import { Button } from "@/components/ui/button";
 
 import { Specimen, SpecimenGroup } from "@/app/dev/_shell/Specimen";
 
-const VARIANTS = ["primary", "secondary", "destructive", "ghost", "link"] as const;
-const ICON_VARIANTS = ["primary", "secondary", "destructive", "ghost"] as const;
+const VARIANTS = ["primary", "secondary", "dotted", "destructive", "ghost", "link"] as const;
+const ICON_VARIANTS = ["primary", "secondary", "dotted", "destructive", "ghost"] as const;
 const SIZES = ["md", "sm"] as const;
 const ICON_SIZES = ["icon", "icon-sm"] as const;
 

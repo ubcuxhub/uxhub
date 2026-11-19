@@ -95,7 +95,7 @@ export function EventTimeline({
             size="inline"
             titleAs="h2"
             className="my-8"
-            title={showPastEvents ? "No past events" : "No events scheduled yet"}
+            title={showPastEvents ? "No past events" : "Events coming soon"}
           />
         )
       ) : (

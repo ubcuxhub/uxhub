@@ -33,9 +33,9 @@ export default async function AdminEventsLayout({ children }: { children: React.
   await requireAdmin();
   const supabase = await createClient();
   const events = await fetchEvents(supabase, {
-    orderBy: "created_at",
-    ascending: false,
-  });
+      orderBy: "created_at",
+      ascending: false,
+    });
   // One aggregate call rather than a head-count per event: the per-event form
   // meant a thirty-event dashboard opened thirty concurrent PostgREST requests.
   const seatCounts = await fetchEventSeatCounts(

@@ -13,7 +13,9 @@
  *   are generated as absolute UTC timestamps.
  * - `imageKey` names a file in `scripts/seed/data/images`. The seed uploads it
  *   and fills in `image_url`, so fixtures never hardcode a storage URL — see
- *   `scripts/seed/lib/images.ts`.
+ *   `scripts/seed/lib/images.ts`. `bannerKey` does the same for the header
+ *   banner (`header_image_url`); the README lists which events have an image,
+ *   a colour, or neither.
  *
  * The timeline is shaped around what a local run needs to exercise, and the
  * biggest group is deliberately "active, registration open, nobody has bought
@@ -21,6 +23,8 @@
  * the index; `scripts/seed/lib/event-timeline.test.ts` holds it to that shape.
  */
 
+import { seedDateLocation, seedEventProjection } from "../lib/builder-settings.ts";
+import type { EventDateLocationDraft } from "../../../src/features/admin/lib/event-date-location.ts";
 import type { TablesInsert } from "../../../src/lib/supabase/database.types.ts";
 import {
   addDays,
@@ -83,19 +87,25 @@ type SeedAgendaDay = {
 };
 
 export interface SeedEvent {
-  event: Omit<TablesInsert<"events">, "image_url"> & { slug: string };
+  dateLocation?: EventDateLocationDraft;
+  event: Omit<TablesInsert<"events">, "image_url" | "header_image_url"> & { slug: string };
   /** File name in `scripts/seed/data/images`, uploaded and used as the cover. */
   imageKey: string;
   /**
-   * In page order. The portal event page shows every section, but the
-   * builder still loads every person on the event as a mentor and saves them
-   * back as `p_mentors`: saving an event with other sections in the builder
-   * turns their people into mentors, and fails when one person is in two
-   * sections. Only the uxathons have other sections, to test the page.
+   * File name in `scripts/seed/data/images` (a 1600x400 `banner-*.png`),
+   * uploaded and used as the page header banner, `header_image_url`. The
+   * banner is an image or a colour, never both: set this or
+   * `event.header_colour`, or neither for the muted fallback.
+   */
+  bannerKey?: string;
+  /**
+   * In page order. The builder and the portal event page both show every
+   * section: Judges, Mentors, Speakers, Panelists, or a custom title.
    */
   peopleSections?: PeopleSection[];
   sponsors?: SeedSponsor[];
   links?: Omit<TablesInsert<"event_links">, "event_id">[];
+  staffVolunteerSchedule?: string;
   /** Online meeting details, readable only by ticket holders and admins. */
   privateDetails?: Omit<TablesInsert<"event_private_details">, "event_id">;
   agendaDays?: SeedAgendaDay[];
@@ -158,6 +168,14 @@ export const EVENT_PHASES = {
    * run puts it back to draft with a fresh date.
    */
   scheduled: ["accessibility-audit-clinic"],
+  /**
+   * Published, sold tickets to the crowd, then taken back to draft: the one
+   * way a draft holds registrations now that drafts can't be registered for.
+   * Exercises the builder's locks (pricing, registration mode, capacity floor)
+   * and the once-published URL lock. Local only gets `first_published_at`;
+   * prod has no tickets and writes none.
+   */
+  draftWithRegistrations: ["content-design-workshop"],
 } as const;
 
 /**
@@ -165,6 +183,28 @@ export const EVENT_PHASES = {
  * offers, so login fixtures can buy, re-seed, and buy again.
  */
 export const PURCHASABLE_MIN_SEATS_LEFT = 3;
+
+const shortOverviews: Record<string, string> = {
+  "get-to-know-ux-hub": "Meet the people behind UX Hub.",
+  "design-sprint-past": "Six sessions from brief to prototype.",
+  "design-sprint-upcoming": "Six sessions from brief to prototype.",
+  "uxathon-past": "A weekend of teamwork and design.",
+  "uxathon-upcoming": "A weekend of teamwork and design.",
+  "industry-talk-ai-and-ux": "Explore how AI changes UX practice.",
+  "open-studio": "Make space for your next design project.",
+  "coffee-chat-series": "Connect with designers over coffee.",
+  "mentorship-program": "Build your design skills with a mentor.",
+  "design-jam-today": "Turn a fresh brief into a prototype.",
+  "figma-basics-workshop": "Build your first clickable Figma flow.",
+  "thinkbox-office-tour": "Step inside a working design studio.",
+  "portfolio-review-night": "Get feedback on your portfolio.",
+  "student-panel": "Hear how students started their UX careers.",
+  "industry-talk-design-systems": "Learn how teams build design systems.",
+  "spring-showcase": "Share your work and meet other designers.",
+  "ux-research-workshop": "Practice interviewing and UX research.",
+  "accessibility-audit-clinic": "Find and fix accessibility barriers.",
+  "content-design-workshop": "Write interface copy people understand.",
+};
 
 /** Every slug the seed owns, in declaration order. */
 export const SEED_EVENT_SLUGS = Object.values(EVENT_PHASES).flat();
@@ -238,10 +278,9 @@ const designSprintAgenda: AgendaItem[] = [
 
 /**
  * Every kind of people section the event page shows: the four standard
- * titles and a custom one. Each person sits in one section only, since the
- * builder still saves every person on an event back as a mentor and refuses
- * one listed twice. Speakers has one person, to show the singular count line;
- * the people added for these sections have no photo, to show the initials.
+ * titles and a custom one. Speakers has one person, to show the singular
+ * count line; the people added for these sections have no photo, to show the
+ * initials. `design-sprint-upcoming` covers one person in two sections.
  */
 const uxathonMentors: Mentor[] = [
   {
@@ -712,6 +751,8 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
     /* Draft, scheduled to publish in three days. */
     accessibilityClinic: addDays(today, 35),
     accessibilityClinicPublish: addDays(today, 3),
+    /* Draft again after it sold tickets. */
+    contentWorkshop: addDays(today, 28),
   } as const;
   const designJamEnd = addHours(schedule.designJamStart, 6);
 
@@ -780,9 +821,9 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       slug: "design-sprint-past",
       status: "active",
       description:
-        "One day, one brief, one clickable prototype. Teams of four run a compressed design sprint from problem framing through guerrilla research to a final critique in front of working designers. Our biggest first-term event and the fastest way to get something real into your portfolio.",
+        "Six sessions, one brief, one clickable prototype. Teams of four run a compressed design sprint from problem framing through guerrilla research to a final critique in front of working designers. Our biggest first-term event and the fastest way to get something real into your portfolio.",
       regular_price: 15.0,
-      member_price: 5.0,
+      member_price: 0,
       location_building: "Neville Scarfe Building",
       location_room: "Room 100",
       location_address_url: "https://maps.app.goo.gl/vNq7CkS3Wm2hZr4A9",
@@ -835,7 +876,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       description:
         "Our flagship event: 32 hours, one open-ended brief, and a room full of teams turning it into something defensible. Mentors from across the Vancouver design scene rotate through all weekend, and the final round is judged on how well you argue for your decisions — not just how good the screens look. Food, snacks, and swag included.",
       regular_price: 25.0,
-      member_price: 15.0,
+      member_price: 0,
       location_building: "ICICS/CS X-wing",
       location_room: "Room 100",
       location_address_url: "https://maps.app.goo.gl/6dK2sYqR8fV1nB7t5",
@@ -985,7 +1026,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       description:
         "A long-running mentorship program pairing students with peer and industry mentors. Members join monthly critiques, portfolio working sessions, and career conversations throughout the program.",
       regular_price: 20,
-      member_price: 10,
+      member_price: 0,
       location_building: "Life Sciences Centre",
       location_room: "Atrium",
       location_address_url: "https://maps.app.goo.gl/T4wR8bLp1Vz6Yn3H8",
@@ -1044,6 +1085,9 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       // Walk-ins welcome until the doors close.
       registration_opens_at: timestamp(addMonths(today, -1)),
       registration_closes_at: designJamEnd.toISOString(),
+      // Not one of the builder's three presets, so it lands in the colour
+      // picker's custom swatches.
+      header_colour: "#2F7D6D",
     },
     imageKey: "1.png",
     checkInSessions: [
@@ -1065,13 +1109,14 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       description:
         "Two hours from a blank canvas to a clickable prototype: frames, auto-layout, components, and just enough prototyping to share a flow. Laptops required. Twenty seats so every table gets a facilitator — it fills up fast.",
       regular_price: 6,
-      member_price: 3,
+      member_price: 0,
       location_building: "Irving K. Barber Learning Centre",
       location_room: "Room 182",
       location_address_url: "https://maps.app.goo.gl/Hq2nT7vYw4Lr9Kc81",
       starts_at: pacificTimestamp(schedule.figmaWorkshop, "17:30"),
       ends_at: pacificTimestamp(schedule.figmaWorkshop, "19:30"),
       max_capacity: 20,
+      header_colour: "#325DC4",
       ...openRegistration(schedule.figmaWorkshop),
     },
     imageKey: "6.png",
@@ -1093,10 +1138,9 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       status: "active",
       description:
         "A small-group visit to Thinkbox's Vancouver studio. Walk the space, see how their design team actually works day to day, and stay for an informal Q&A with two of their product designers. Capacity is tight because they are hosting us in one room — sign up early.",
-      // Flat cost, no member discount: the checkout path where a member pays
-      // the same as everyone else.
+      // Paid for non-members and lapsed members; active members enter free.
       regular_price: 10.0,
-      member_price: 10.0,
+      member_price: 0,
       location_building: "Thinkbox Studio",
       location_room: "Main Lobby",
       location_address_url: "https://maps.app.goo.gl/PLACEHOLDER-thinkbox",
@@ -1106,6 +1150,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       ...openRegistration(schedule.thinkboxTour),
     },
     imageKey: "4.png",
+    bannerKey: "banner-2.png",
     agendaDays: [
       {
         date: schedule.thinkboxTour,
@@ -1139,7 +1184,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       description:
         "Our flagship event: 32 hours, one open-ended brief, and a room full of teams turning it into something defensible. Mentors from across the Vancouver design scene rotate through all weekend, and the final round is judged on how well you argue for your decisions — not just how good the screens look. Food, snacks, and swag included.",
       regular_price: 25.0,
-      member_price: 15.0,
+      member_price: 0,
       location_building: "ICICS/CS X-wing",
       location_room: "Room 100",
       location_address_url: "https://maps.app.goo.gl/6dK2sYqR8fV1nB7t5",
@@ -1147,7 +1192,6 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       ends_at: pacificTimestamp(addDays(schedule.uxathonUpcoming, 1), "17:00"),
       max_capacity: 80,
       location_address: "2366 Main Mall, Vancouver, BC",
-      header_colour: "#C983C7",
       event_colour: "#C983C7",
       is_featured: true,
       marketing_url: "https://uxathon.example.com",
@@ -1159,7 +1203,9 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       agenda: [...uxathonAgendaDayOne, ...uxathonAgendaDayTwo],
       description_images: uxathonDescriptionImages,
     },
+    staffVolunteerSchedule: "https://example.com/uxathon-volunteers",
     imageKey: "5.png",
+    bannerKey: "banner-3.png",
     peopleSections: uxathonPeopleSections,
     sponsors: seedSponsors,
     links: [
@@ -1212,6 +1258,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       ends_at: pacificTimestamp(schedule.portfolioReview, "20:30"),
       max_capacity: 45,
       location_address: "6133 University Blvd, Vancouver, BC",
+      header_colour: "#4A5E8A",
       ...openRegistration(schedule.portfolioReview),
       agenda: portfolioReviewAgenda,
     },
@@ -1241,9 +1288,9 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       slug: "design-sprint-upcoming",
       status: "active",
       description:
-        "One day, one brief, one clickable prototype. Teams of four run a compressed design sprint from problem framing through guerrilla research to a final critique in front of working designers. Our biggest first-term event and the fastest way to get something real into your portfolio.",
+        "Six sessions, one brief, one clickable prototype. Teams of four run a compressed design sprint from problem framing through guerrilla research to a final critique in front of working designers. Our biggest first-term event and the fastest way to get something real into your portfolio.",
       regular_price: 15.0,
-      member_price: 5.0,
+      member_price: 0,
       location_building: "Neville Scarfe Building",
       location_room: "Room 100",
       location_address_url: "https://maps.app.goo.gl/vNq7CkS3Wm2hZr4A9",
@@ -1251,7 +1298,6 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       ends_at: pacificTimestamp(addDays(schedule.designSprintUpcoming, 11), "17:00"),
       max_capacity: 60,
       location_address: "2125 Main Mall, Vancouver, BC",
-      header_image_url: designSprintDescriptionImages[0],
       event_colour: "#325DC4",
       teams_enabled: true,
       min_team_size: 3,
@@ -1262,6 +1308,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       description_images: designSprintDescriptionImages,
     },
     imageKey: "2.png",
+    bannerKey: "banner-1.png",
     peopleSections: [{ title: "Mentors", people: designSprintMentors }],
     sponsors: seedSponsors.slice(0, 2),
     links: [
@@ -1339,7 +1386,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       description:
         "Two staff designers on what a design system looks like once it has more than a hundred consumers — governance, deprecation, the components nobody uses, and the arguments you have to keep having. Registration for this one has already closed.",
       regular_price: 5.0,
-      member_price: 3.0,
+      member_price: 0,
       location_building: "Henry Angus Building",
       location_room: "Room 098",
       location_address_url: "https://maps.app.goo.gl/Xk4mP2rT8wQ6nB3v1",
@@ -1386,6 +1433,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       ...notYetOpenRegistration(schedule.springShowcase),
     },
     imageKey: "4.png",
+    bannerKey: "banner-1.png",
     checkInSessions: [
       {
         name: "Door Check-in",
@@ -1405,7 +1453,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       description:
         "A hands-on afternoon on research methods that fit a student timeline: writing a screener, running a usable interview, and turning six messy conversations into something a team can act on. Still being planned — details will change.",
       regular_price: 12.0,
-      member_price: 6.0,
+      member_price: 0,
       location_building: "Neville Scarfe Building",
       location_room: "Room 204",
       location_address_url: "https://maps.app.goo.gl/vNq7CkS3Wm2hZr4A9",
@@ -1450,11 +1498,44 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       registration_closes_at: timestamp(addDays(schedule.accessibilityClinic, -2), 23, 59),
     },
     imageKey: "2.png",
+    bannerKey: "banner-2.png",
     checkInSessions: [
       {
         name: "Door Check-in",
         start_time: timestamp(schedule.accessibilityClinic, 12, 45),
         end_time: timestamp(schedule.accessibilityClinic, 13, 30),
+      },
+    ],
+    applicationQuestions: [],
+  },
+
+  /* ── Draft with registrations — published, sold, unpublished ────────── */
+  {
+    event: {
+      name: `Content Design Workshop ${eventYear(schedule.contentWorkshop)}`,
+      slug: "content-design-workshop",
+      status: "draft",
+      // It went live when registration opened. The guard pins this column
+      // after insert, so it only takes on a fresh database; prod drops it.
+      first_published_at: timestamp(addMonths(today, -1)),
+      description:
+        "Microcopy, error messages and empty states: a practical session on writing interface text that helps people finish what they came to do. Back in draft while the speaker line-up changes — existing tickets still stand.",
+      regular_price: 8,
+      member_price: 0,
+      location_building: "Buchanan Building",
+      location_room: "Room D218",
+      location_address_url: "https://maps.app.goo.gl/Bq7Rz3Nw9Lt2Kd5m8",
+      starts_at: pacificTimestamp(schedule.contentWorkshop, "18:00"),
+      ends_at: pacificTimestamp(schedule.contentWorkshop, "20:00"),
+      max_capacity: 24,
+      ...openRegistration(schedule.contentWorkshop),
+    },
+    imageKey: "1.png",
+    checkInSessions: [
+      {
+        name: "Door Check-in",
+        start_time: timestamp(schedule.contentWorkshop, 17, 45),
+        end_time: timestamp(schedule.contentWorkshop, 18, 30),
       },
     ],
     applicationQuestions: [],
@@ -1465,10 +1546,48 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
   // events only exposes 'active' rows, so draft fixtures are invisible on the
   // marketing site and in the portal. Spread first so a fixture can still opt
   // into its own status.
-  return seeded.map((seed) => ({
-    ...seed,
-    event: { status: "active" as const, ...seed.event },
-  }));
+  return seeded.map((seed) => {
+    const result: SeedEvent = {
+      ...seed,
+      peopleSections: seed.event.slug === "design-sprint-upcoming" ? [
+        ...(seed.peopleSections ?? []),
+        { title: "Judges", people: [designSprintMentors[0]] },
+        { title: "Workshop hosts", people: [designSprintMentors[1]] },
+      ] : seed.peopleSections,
+      event: {
+        status: "active" as const,
+        ...seed.event,
+        short_description: shortOverviews[seed.event.slug],
+        description_rich: null,
+        configured_slug: seed.event.slug,
+        configured_marketing_mode: seed.event.slug === "ux-research-workshop" ? "disabled" :
+          seed.event.slug === "uxathon-upcoming" ? "external" : "hosted",
+        configured_marketing_url: seed.event.slug === "uxathon-upcoming" ? "https://example.com/uxathon" : null,
+        configured_pricing_mode: Number(seed.event.regular_price) === 0 ? "free" : "paid",
+        configured_price: Number(seed.event.regular_price),
+        pricing_policy: "figma",
+        member_price: 0,
+      },
+    };
+    if (seed.event.slug === "design-sprint-upcoming") {
+      result.checkInSessions = seed.agendaDays!.map((day, index) => ({
+        name: day.title ?? `Day ${index + 1}`,
+        start_time: pacificTimestamp(day.date, day.items[0].start),
+        end_time: pacificTimestamp(day.date, day.items.at(-1)!.end),
+      }));
+    } else if (["student-panel", "ux-research-workshop", "thinkbox-office-tour"].includes(seed.event.slug)) {
+      const start = Date.parse(seed.event.starts_at!);
+      const end = Date.parse(seed.event.ends_at!);
+      result.checkInSessions = seed.checkInSessions.map((session, index, sessions) => ({
+        ...session,
+        start_time: new Date(start + (end - start) * index / sessions.length).toISOString(),
+        end_time: new Date(start + (end - start) * (index + 1) / sessions.length).toISOString(),
+      }));
+    }
+    result.dateLocation = seedDateLocation(result) ?? undefined;
+    Object.assign(result.event, seedEventProjection(result));
+    return result;
+  });
 }
 
 export const seedEvents = buildSeedEvents(new Date());

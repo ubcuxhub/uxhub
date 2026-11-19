@@ -192,6 +192,47 @@ export async function fetchPurchaseForUser(
   return (data as PurchaseWithDetails | null) ?? null;
 }
 
+/** What `apply_event_purchase_refund` recorded and did. */
+export interface PurchaseRefundResult {
+  /** The refunded total now on the purchase. It never goes down. */
+  refundedCents: number;
+  fullyRefunded: boolean;
+  /** False for a duplicate or stale delivery that changed nothing. */
+  amountIncreased: boolean;
+  ticketRemoved: boolean;
+  /** A full refund left the ticket alone because it has a check-in. */
+  keptCheckedInTicket: boolean;
+}
+
+/**
+ * Records the total of a purchase's completed Square refunds through
+ * `apply_event_purchase_refund`, which takes back the ticket of an event
+ * purchase refunded in full unless it was checked in. Pass only completed
+ * refunds: a pending one must not remove access. Null for an unknown
+ * purchase. Service role only.
+ */
+export async function applyPurchaseRefund(
+  supabase: DbClient,
+  purchaseId: string,
+  refundedCents: number
+): Promise<PurchaseRefundResult | null> {
+  const { data, error } = await supabase.rpc("apply_event_purchase_refund", {
+    p_purchase_id: purchaseId,
+    p_refunded_cents: refundedCents,
+  });
+
+  if (error) throw error;
+  const row = data?.[0];
+  if (!row) return null;
+  return {
+    refundedCents: row.refunded_total_cents,
+    fullyRefunded: row.fully_refunded,
+    amountIncreased: row.amount_increased,
+    ticketRemoved: row.ticket_removed,
+    keptCheckedInTicket: row.kept_checked_in_ticket,
+  };
+}
+
 export async function recordSquareWebhookEvent(
   supabase: DbClient,
   payload: SquareWebhookEventInsert

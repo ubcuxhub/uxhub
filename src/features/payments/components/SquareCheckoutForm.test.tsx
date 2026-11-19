@@ -67,6 +67,32 @@ describe("SquareCheckoutForm deadlines", () => {
     vi.useRealTimers();
   });
 
+  it("confirms a free event without Square configuration, retaining the key on ambiguous failure", async () => {
+    vi.stubEnv("NEXT_PUBLIC_SQUARE_APP_ID", "");
+    vi.stubEnv("NEXT_PUBLIC_SQUARE_LOCATION_ID", "");
+    actionMocks.submitCheckoutAction.mockResolvedValue({ ok: false, terminal: false, error: "Try again with the same registration." });
+    render(<SquareCheckoutForm amountCents={0} amountLabel="$0.00" buttonLabel="Pay now" initialEmail="student@example.com" initialFirstName="Student" initialLastName="Member" kind="event_ticket" slug="free" userId="user-1" />);
+    expect(screen.queryByLabelText("First name")).toBeNull();
+    const confirm = screen.getByRole("button", { name: "Confirm spot" });
+    fireEvent.click(confirm);
+    expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Try again with the same registration.");
+    const first = actionMocks.submitCheckoutAction.mock.calls[0][0];
+    expect(first).toMatchObject({ token: null, verificationToken: null, expectedAmountCents: 0 });
+    fireEvent.click(confirm);
+    await act(async () => { await Promise.resolve(); });
+    expect(actionMocks.submitCheckoutAction.mock.calls[1][0].idempotencyKey).toBe(first.idempotencyKey);
+    expect(squareMocks.payments).not.toHaveBeenCalled();
+    expect(squareMocks.tokenize).not.toHaveBeenCalled();
+    expect(squareMocks.verifyBuyer).not.toHaveBeenCalled();
+  });
+
+  it("keeps a disabled free registration unavailable", () => {
+    render(<SquareCheckoutForm amountCents={0} amountLabel="$0.00" buttonLabel="Pay now" disabled disabledMessage="Registration has closed." initialEmail="student@example.com" initialFirstName="Student" initialLastName="Member" kind="event_ticket" slug="free" userId="user-1" />);
+    expect(screen.getByRole("button", { name: "Confirm spot" })).toHaveProperty("disabled", true);
+    expect(screen.getByRole("alert").textContent).toBe("Registration has closed.");
+    expect(squareMocks.payments).not.toHaveBeenCalled();
+  });
+
   it("surfaces an initialization timeout instead of loading forever", async () => {
     vi.useFakeTimers();
     squareMocks.payments.mockReturnValue(new Promise(() => undefined));

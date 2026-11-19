@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   buildApplicationDecisionUpdate,
   countReviewStates,
+  decisionsReleased,
+  defaultOfferDeadline,
   filterReviewItems,
   getApplicationDecisions,
   getApplicationReviewState,
@@ -41,6 +43,75 @@ describe("getApplicationDecisions", () => {
     expect(getApplicationDecisions("offer_expired")).toEqual(["accept", "reject"]);
     expect(getApplicationDecisions("registered")).toEqual([]);
     expect(getApplicationDecisions("rejected")).toEqual([]);
+  });
+
+  it("lets any decision change before release, until the applicant registers", () => {
+    expect(getApplicationDecisions("accepted", false)).toEqual(["accept", "waitlist", "reject"]);
+    expect(getApplicationDecisions("rejected", false)).toEqual(["accept", "waitlist"]);
+    expect(getApplicationDecisions("waitlisted", false)).toEqual(["accept", "reject"]);
+    expect(getApplicationDecisions("registered", false)).toEqual([]);
+  });
+});
+
+describe("decisionsReleased", () => {
+  it("is true with no release or once it has passed", () => {
+    expect(decisionsReleased(null, now)).toBe(true);
+    expect(decisionsReleased("2026-10-20T12:00:00.000Z", now)).toBe(true);
+    expect(decisionsReleased("2026-10-20T12:00:01.000Z", now)).toBe(false);
+  });
+});
+
+describe("defaultOfferDeadline", () => {
+  // 2026-10-20T12:00Z is 5:00 AM Pacific (PDT).
+  it("is a week out at 11:45 PM Pacific without settings", () => {
+    expect(defaultOfferDeadline(null, now)).toEqual({ date: "2026-10-27", time: "23:45" });
+    expect(
+      defaultOfferDeadline({ decisions_release_at: null, confirmation_deadline: null }, now)
+    ).toEqual({ date: "2026-10-27", time: "23:45" });
+  });
+
+  it("uses Confirm by when it is after now and the release", () => {
+    expect(
+      defaultOfferDeadline(
+        {
+          decisions_release_at: "2026-10-22T16:00:00.000Z",
+          confirmation_deadline: "2026-10-25T06:59:00.000Z",
+        },
+        now
+      )
+    ).toEqual({ date: "2026-10-24", time: "23:59" });
+  });
+
+  it("counts the week from the release when Confirm by has passed or comes first", () => {
+    // Release Oct 22, 9:00 AM Pacific; Confirm by already passed.
+    expect(
+      defaultOfferDeadline(
+        {
+          decisions_release_at: "2026-10-22T16:00:00.000Z",
+          confirmation_deadline: "2026-10-19T00:00:00.000Z",
+        },
+        now
+      )
+    ).toEqual({ date: "2026-10-29", time: "23:45" });
+    // Confirm by equal to the release isn't after it.
+    expect(
+      defaultOfferDeadline(
+        {
+          decisions_release_at: "2026-10-22T16:00:00.000Z",
+          confirmation_deadline: "2026-10-22T16:00:00.000Z",
+        },
+        now
+      )
+    ).toEqual({ date: "2026-10-29", time: "23:45" });
+  });
+
+  it("counts from now once the release has passed", () => {
+    expect(
+      defaultOfferDeadline(
+        { decisions_release_at: "2026-10-01T16:00:00.000Z", confirmation_deadline: null },
+        now
+      )
+    ).toEqual({ date: "2026-10-27", time: "23:45" });
   });
 });
 

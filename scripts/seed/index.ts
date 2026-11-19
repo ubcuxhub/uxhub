@@ -49,6 +49,8 @@ import {
 } from "./lib/images.ts";
 import { membershipTypes } from "./data/membership-types.ts";
 import { buildSeedEvents, type SeedEvent } from "./data/events.ts";
+import { buildSeedWorkingDrafts, type SeedWorkingDraft } from "./data/drafts.ts";
+import { reconcileWorkingDrafts } from "./lib/working-drafts.ts";
 import { seedTeams } from "./data/teams.ts";
 import { dateString } from "./lib/relative-dates.ts";
 import {
@@ -63,6 +65,8 @@ import {
   reconcileUserFixtures,
   removeRetiredFixtures,
 } from "./lib/reconcile-users.ts";
+import { seedDateLocation, prepareBuilderDateSettings, reconcileBuilderSettings } from "./lib/builder-settings.ts";
+import { prepareLegacySeedPricing, validateSeedEvents } from "./lib/event-model.ts";
 import { validateUserFixtures } from "./lib/user-fixtures.ts";
 import { seedReviewNotes } from "./data/review-notes.ts";
 import { reconcileReviewNotes, resolveSeedReviewNotes } from "./lib/review-notes.ts";
@@ -219,23 +223,39 @@ async function reconcileBuckets(
   return results.join("; ");
 }
 
+/** Every `data/images` file a fixture names: covers and header banners. */
+function imageKeysOf(
+  seedEvents: SeedEvent[],
+  drafts: SeedWorkingDraft[]
+): { slug: string; key: string }[] {
+  return [
+    ...seedEvents.map((seed) => ({ slug: seed.event.slug, keys: [seed.imageKey, seed.bannerKey] })),
+    ...drafts.map((draft) => ({ slug: draft.slug, keys: [draft.imageKey, draft.bannerKey] })),
+  ].flatMap(({ slug, keys }) =>
+    keys.filter((key): key is string => Boolean(key)).map((key) => ({ slug, key }))
+  );
+}
+
 /**
- * Fails loudly when a fixture names a cover image that is not on disk. Without
- * this the seed would happily write an `image_url` pointing at nothing.
+ * Fails loudly when a fixture names a cover or banner image that is not on
+ * disk. Without this the seed would happily write an `image_url` pointing at
+ * nothing.
  */
-async function assertImageKeysExist(seedEvents: SeedEvent[]): Promise<void> {
+async function assertImageKeysExist(
+  images: { slug: string; key: string }[]
+): Promise<void> {
   const available = new Set(await listSeedImageFiles());
   const missing = [
     ...new Set(
-      seedEvents
-        .filter((seed) => !available.has(seed.imageKey))
-        .map((seed) => `${seed.event.slug} -> ${seed.imageKey}`)
+      images
+        .filter((image) => !available.has(image.key))
+        .map((image) => `${image.slug} -> ${image.key}`)
     ),
   ];
 
   if (missing.length > 0) {
     throw new Error(
-      `Missing cover images in scripts/seed/data/images: ${missing.join(", ")}`
+      `Missing images in scripts/seed/data/images: ${missing.join(", ")}`
     );
   }
 }
@@ -260,6 +280,8 @@ function formatPruned(label: string, pruned: number): string | null {
 async function prunePass(
   supabase: SupabaseClient,
   seedEvents: SeedEvent[],
+  draftSlugs: string[],
+  imageKeys: string[],
   seedUsers: SeedUser[],
   profileIds: Map<string, string>,
   options: Options
@@ -305,7 +327,7 @@ async function prunePass(
     const plan = planPrune(
       (data ?? []) as { id: string; slug: string | null }[],
       (row) => row.slug,
-      seedEvents.map((seed) => seed.event.slug)
+      [...seedEvents.map((seed) => seed.event.slug), ...draftSlugs]
     );
 
     // `purchases.event_id` is `on delete restrict`, so an event somebody bought
@@ -466,7 +488,7 @@ async function prunePass(
     const { pruned } = await pruneSeedImages(
       supabase,
       BUCKET.eventImages.id,
-      seedEvents.map((seed) => seed.imageKey),
+      imageKeys,
       { dryRun: options.dryRun }
     );
 
@@ -692,7 +714,8 @@ async function reconcileAgenda(
   seed: SeedEvent,
   options: Options
 ): Promise<Counts> {
-  const days = seed.agendaDays ?? [];
+  const document = seedDateLocation(seed);
+  const days = document?.dates.map(day => ({ date: new Date(`${day.date}T12:00:00Z`), title: day.label, items: (day.items ?? []).map(item => ({ title: item.label, start: item.start, end: item.end, building: item.location?.building, room: item.location?.room })) })) ?? [];
   const counts = await reconcileChildren(
     supabase,
     TABLE.eventAgendaDays,
@@ -747,7 +770,19 @@ async function reconcileTeams(
 ): Promise<Counts> {
   const counts = emptyCounts();
   if (options.dryRun) {
-    counts.created += seedTeams.length;
+    for (const team of seedTeams) {
+      const ownerId = profileIds.get(team.ownerEmail);
+      const event = await supabase.from(TABLE.events).select("id").eq("slug", team.eventSlug).maybeSingle();
+      if (event.error) throw event.error;
+      if (!ownerId || !event.data) {
+        counts.created += 1;
+        continue;
+      }
+      const existing = await supabase.from(TABLE.teams).select("id").eq("event_id", event.data.id).eq("owner_id", ownerId).maybeSingle();
+      if (existing.error) throw existing.error;
+      if (existing.data) counts.updated += 1;
+      else counts.created += 1;
+    }
     return counts;
   }
 
@@ -898,15 +933,20 @@ async function main(): Promise<void> {
     ...buildSeedUsers(seedEvents, seedNow),
     ...buildSeedCrowd(seedEvents, seedNow),
   ];
+  validateSeedEvents(seedEvents);
   validateUserFixtures(seedUsers, seedEvents, membershipTypes, seedNow);
   const reviewNotes = resolveSeedReviewNotes(seedReviewNotes, seedUsers, seedNow);
-  await assertImageKeysExist(seedEvents);
 
   const { url, secretKey, policy } = resolveTarget(options.target, process.env);
+  const workingDrafts = policy.workingDrafts ? buildSeedWorkingDrafts(seedNow) : [];
+  const images = imageKeysOf(seedEvents, workingDrafts);
+  const imageKeys = [...new Set(images.map((image) => image.key))];
+  await assertImageKeysExist(images);
   const host = new URL(url).hostname;
 
   // The target's policy is not negotiable from the command line: prod never
-  // deletes and never writes login fixtures, whatever the flags say.
+  // deletes and never writes login fixtures or membership tiers, whatever the
+  // flags say.
   if (!policy.prune) options.prune = false;
 
   if (!policy.users && options.only.has("users")) {
@@ -917,7 +957,15 @@ async function main(): Promise<void> {
     );
   }
 
+  if (!policy.memberships && options.only.has("memberships")) {
+    throw new Error(
+      `--only=memberships is not available with --target=${options.target}.\n` +
+        "  Production's tiers are live and edited in Club Settings."
+    );
+  }
+
   const skipUsers = !policy.users;
+  const writeMemberships = policy.memberships && shouldRun(options, "memberships");
   const notices: string[] = [];
 
   if (options.target === "prod") {
@@ -927,6 +975,9 @@ async function main(): Promise<void> {
     }
     if (skipUsers) {
       notices.push("User fixtures, purchases, tickets, and applications are skipped.");
+    }
+    if (!policy.memberships) {
+      notices.push("Membership tiers are skipped.");
     }
   }
 
@@ -943,6 +994,12 @@ async function main(): Promise<void> {
   });
 
   const summary: string[] = [];
+  if (shouldRun(options, "events")) {
+    const converted = await prepareLegacySeedPricing(supabase, seedEvents, seedUsers, {
+      ...options, users: !skipUsers && shouldRun(options, "users"),
+    });
+    if (converted) summary.push(`Legacy event pricing: ${converted} fixture events prepared for conversion`);
+  }
 
   if (shouldRun(options, "storage")) {
     summary.push(await reconcileBuckets(supabase, options));
@@ -952,14 +1009,14 @@ async function main(): Promise<void> {
         await uploadSeedImages(
           supabase,
           BUCKET.eventImages.id,
-          seedEvents.map((seed) => seed.imageKey),
+          imageKeys,
           options
         )
       )
     );
   }
 
-  if (shouldRun(options, "memberships")) {
+  if (writeMemberships) {
     const { counts } = await upsertBySlug(
       supabase,
       TABLE.membershipTypes,
@@ -970,6 +1027,7 @@ async function main(): Promise<void> {
   }
 
   if (shouldRun(options, "events")) {
+    if (!options.dryRun) await prepareBuilderDateSettings(supabase, seedEvents);
     const { idsBySlug, counts: eventCounts } = await upsertBySlug(
       supabase,
       TABLE.events,
@@ -988,12 +1046,24 @@ async function main(): Promise<void> {
         location_type: seed.event.location_type ?? "in_person",
         agenda_enabled: seed.event.agenda_enabled ?? true,
         teams_enabled: seed.event.teams_enabled ?? false,
-        short_description:
-          seed.event.short_description ??
-          seed.event.description.slice(0, 180),
+        short_description: seed.event.short_description,
         // Built from the target's own host rather than uploaded here, so
         // `--only=events` still resolves images a previous run wrote.
         image_url: seedImageUrl(supabase, BUCKET.eventImages.id, seed.imageKey),
+        // The page banner: an uploaded image, a colour, or neither.
+        header_image_url: seed.bannerKey
+          ? seedImageUrl(supabase, BUCKET.eventImages.id, seed.bannerKey)
+          : null,
+        header_colour: seed.event.header_colour ?? null,
+        // A builder save leaves its document here. These rows are finished
+        // events, so a local run discards one, which also lets the scheduled
+        // fixture keep its schedule (only unscheduled drafts may hold one).
+        // Prod keeps an admin's unsaved builder work: it writes no schedule,
+        // so nothing there conflicts with a document.
+        ...(policy.prune ? { working_document: null } : {}),
+        // Only a fresh row takes this (the guard pins it on update). Prod's
+        // forced drafts were never published.
+        first_published_at: policy.forceDraft ? null : (seed.event.first_published_at ?? null),
         mentors_enabled: Boolean(
           seed.peopleSections?.some((section) => section.people.length > 0)
         ),
@@ -1064,6 +1134,16 @@ async function main(): Promise<void> {
         await reconcilePrivateDetails(supabase, eventId, seed, options)
       );
       addCounts(agendaCounts, await reconcileAgenda(supabase, eventId, seed, options));
+      if (!options.dryRun) await reconcileBuilderSettings(supabase, eventId, seed);
+    }
+
+    if (workingDrafts.length > 0) {
+      summary.push(format("Working drafts", await reconcileWorkingDrafts(
+        supabase,
+        workingDrafts,
+        (key) => seedImageUrl(supabase, BUCKET.eventImages.id, key),
+        options
+      )));
     }
 
     summary.push(format("Check-in sessions", sessionCounts));
@@ -1120,6 +1200,8 @@ async function main(): Promise<void> {
     const pruned = await prunePass(
       supabase,
       seedEvents,
+      workingDrafts.map((draft) => draft.slug),
+      imageKeys,
       seedUsers,
       profileIds,
       options
@@ -1138,6 +1220,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  console.error(`\nSeed failed: ${error instanceof Error ? error.message : error}`);
+  console.error(`\nSeed failed: ${error && typeof error === "object" && "message" in error ? String(error.message) : String(error)}`);
   process.exit(1);
 });

@@ -6,6 +6,18 @@ import type { RegistryEntry } from "./types";
  */
 export const dataEntries: readonly RegistryEntry[] = [
   {
+    slug: "checkout",
+    title: "Checkout",
+    category: "Data display",
+    tier: "app",
+    description: "CheckoutLayout and CheckoutPaymentSection share paid checkout and cardless event registration. Zero-price event tickets use Confirm spot without loading Square; membership checkout retains its payment form.",
+    importPath: "@/components/shared/CheckoutLayout",
+    importNames: ["CheckoutLayout", "CheckoutPaymentSection"],
+    source: "src/components/shared/CheckoutLayout.tsx",
+    spec: "§4.4",
+    layout: "page",
+  },
+  {
     slug: "card",
     title: "Card",
     category: "Data display",
@@ -85,7 +97,7 @@ export const dataEntries: readonly RegistryEntry[] = [
     category: "Data display",
     tier: "primitive",
     description:
-      "A table of records with selection, sticky columns and loading and empty states, such as Manage Users. Pair it with TableToolbar and Pagination.",
+      "A table of records with selection, sticky columns, separated rounded item rows and loading and empty states, such as Manage Users. Pair it with TableToolbar and Pagination.",
     importPath: "@/components/ui/table",
     importNames: [
       "Table",
@@ -108,12 +120,18 @@ export const dataEntries: readonly RegistryEntry[] = [
     aliases: [{ id: "data-table" }],
   },
   {
+    slug: "scanner-frame", title: "Scanner frame", category: "Data display", tier: "composite",
+    description: "A full-viewport dark camera surface with a wrapping header, centred controls and a 264px viewfinder. Capture and permission handling belong to callers.",
+    importPath: "@/components/shared/ScannerFrame", importNames: ["ScannerFrame", "ScannerViewfinder"],
+    source: "src/components/shared/ScannerFrame.tsx", spec: "Check-in presentation", layout: "page",
+  },
+  {
     slug: "stat-card",
     title: "Stat card",
     category: "Data display",
     tier: "primitive",
     description:
-      "A dashboard number with its neutral context, and honest empty and loading states.",
+      "A value, rate, or primary count with denominator and optional percentage. A dashboard number with its neutral context, and honest empty and loading states.",
     importPath: "@/components/ui/stat-card",
     importNames: ["StatCard"],
     source: "src/components/ui/stat-card.tsx",
@@ -154,7 +172,7 @@ export const dataEntries: readonly RegistryEntry[] = [
     category: "Data display",
     tier: "composite",
     description:
-      "A row for a person or an organization (judges, mentors, sponsors) with an optional link, grouped in a ListCard.",
+      "Compact attendance/activity rows with optional time, badge and actions; or a row for a person or an organization (judges, mentors, sponsors) with an optional link, grouped in a ListCard.",
     importPath: "@/components/shared/ListRow",
     importNames: ["ListCard", "ListRow"],
     source: "src/components/shared/ListRow.tsx",
@@ -168,7 +186,7 @@ export const dataEntries: readonly RegistryEntry[] = [
     category: "Feedback",
     tier: "primitive",
     description:
-      "An inline notice in the page: a warning, something to know, or an error, with an icon and an optional title.",
+      "An inline notice in the page: neutral status, a warning, something to know, or an error, with an icon and an optional title.",
     importPath: "@/components/ui/alert",
     importNames: ["Alert", "AlertDescription", "AlertTitle"],
     source: "src/components/ui/alert.tsx",
@@ -307,5 +325,29 @@ export const dataEntries: readonly RegistryEntry[] = [
     source: "src/components/shared/Ticket.tsx",
     spec: "§2.1, §4.3",
     layout: "split",
+  },
+  {
+    slug: "registration-ticket",
+    title: "Registration ticket",
+    category: "Data display",
+    tier: "composite",
+    description: "A Registration card with a divided ticket-count header, copy, ticket and actions. Wide containers place the ticket beside the copy; narrow containers stack text, ticket and actions.",
+    importPath: "@/components/shared/RegistrationTicket",
+    importNames: ["RegistrationTicket"],
+    source: "src/components/shared/RegistrationTicket.tsx",
+    spec: "§4.3",
+    layout: "page",
+  },
+  {
+    slug: "event-location", title: "Event location", category: "Data display", tier: "composite",
+    description: "Already-authorized physical, online, hybrid and public-summary locations with safe links and copyable meeting details.",
+    importPath: "@/components/shared/EventLocation", importNames: ["EventLocation"],
+    source: "src/components/shared/EventLocation.tsx", spec: "Participant locations", layout: "page",
+  },
+  {
+    slug: "agenda-day-table", title: "Agenda day table", category: "Data display", tier: "composite",
+    description: "Shared agenda with container-responsive locations, proportional staff columns (24/24/20/12/20%) and row action popovers.",
+    importPath: "@/components/shared/AgendaDayTable", importNames: ["AgendaDayTable"],
+    source: "src/components/shared/AgendaDayTable.tsx", spec: "Agenda presentation", layout: "page",
   },
 ];

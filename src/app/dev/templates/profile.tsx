@@ -15,23 +15,28 @@ import {
   SidebarProvider,
 } from "@/components/ui/sidebar";
 import type { AutosaveState } from "@/features/applications/lib/autosave";
-import { validateStudentNumber } from "@/features/memberships/lib/validation";
-import type { ProfileFormData } from "@/features/settings/components/ProfileFields";
 import {
   membershipSummary,
+  profileErrors,
+  sectionBlocked,
+  sectionOf,
+  toProfileForm,
+  type CheckedField,
+  type ProfileFormData,
   type ProfileSaveStates,
   type ProfileSectionId,
-} from "@/features/settings/components/profile-redesign/model";
-import { ProfileTab } from "@/features/settings/components/profile-redesign/ProfileTab";
+} from "@/features/settings/components/profile/model";
+import { ProfileTab } from "@/features/settings/components/profile/ProfileTab";
 import type { AvatarChoice } from "@/features/setup/components/AvatarPicker";
 import { toDietaryValue, type DietaryValue } from "@/features/setup/components/DietaryFields";
 import type { AvatarPreset, InterestId } from "@/features/setup/lib/options";
 import type { UserInfoRow } from "@/lib/supabase/models";
 
 /**
- * The proposed Profile tab (docs/design/profile-settings.md) on fixture data,
- * in a static copy of the Settings dialog's chrome. Saving is faked: a change
- * waits 800ms (the real debounce), then "saves" for 600ms.
+ * The Settings Profile tab (docs/design/profile-settings.md): the real
+ * `ProfileTab` on fixture data, in a static copy of the Settings dialog's
+ * chrome. Saving is faked: a change waits 800ms (the real debounce), then
+ * "saves" for 600ms. `ProfileSettings` does the real saving.
  */
 
 const TERM_ENDS_AT = "2027-08-31T23:59:00-07:00";
@@ -135,9 +140,24 @@ interface Scenario {
   edits?: Partial<ProfileFormData>;
   saveStates?: ProfileSaveStates;
   /** Fields whose errors show from the start, as if just left. */
-  touched?: Array<"first_name" | "last_name" | "student_number">;
+  touched?: CheckedField[];
   photoOpen?: boolean;
 }
+
+/** Paid for a membership that Square hasn't confirmed yet: pending, and locked. */
+const PRE_ORDER: UserInfoRow = {
+  ...NEW_MEMBER,
+  email: "ana.lima@student.ubc.ca",
+  first_name: "Ana",
+  last_name: "Lima",
+  faculty: "Faculty of Arts",
+  major: "Psychology",
+  year: "2",
+  student_number: 27182818,
+  membership_pre_ordered_type_id: "explorer",
+  setup_step: "done",
+  interests: ["ux-research"],
+};
 
 export const PROFILE_SCENARIOS = {
   "profile-filled": { user: BASE, membershipName: "Innovator" },
@@ -158,31 +178,13 @@ export const PROFILE_SCENARIOS = {
     saveStates: { about: { kind: "failed" } },
     touched: ["student_number"],
   },
+  "profile-pending": { user: PRE_ORDER, membershipName: null },
 } satisfies Record<string, Scenario>;
 
 export type ProfileScenarioId = keyof typeof PROFILE_SCENARIOS;
 
 const DEBOUNCE_MS = 800;
 const SAVE_MS = 600;
-
-function toForm(user: UserInfoRow): ProfileFormData {
-  return {
-    first_name: user.first_name,
-    last_name: user.last_name,
-    preferred_pronouns: user.preferred_pronouns ?? "",
-    phone: user.phone ?? "",
-    student_number: user.student_number?.toString() ?? "",
-    user_type: user.user_type,
-    faculty: user.faculty ?? "",
-    faculty_email: user.faculty_email ?? "",
-    major: user.major ?? "",
-    school_institution: user.school_institution ?? "",
-    student_status: user.student_status ?? "",
-    year: user.year ?? "",
-  };
-}
-
-const ABOUT_FIELDS = new Set<keyof ProfileFormData>(["first_name", "last_name", "preferred_pronouns", "phone"]);
 
 /** The in-memory autosave: one debounce timer per section, like the real tab. */
 function useFakeAutosave(initial: ProfileSaveStates) {
@@ -230,8 +232,8 @@ export function ProfileTemplate({ scenario }: { scenario: ProfileScenarioId }) {
   const config: Scenario = PROFILE_SCENARIOS[scenario];
   const { user } = config;
 
-  const [form, setForm] = useState<ProfileFormData>(() => ({ ...toForm(user), ...config.edits }));
-  const [touched, setTouched] = useState(() => new Set(config.touched ?? []));
+  const [form, setForm] = useState<ProfileFormData>(() => ({ ...toProfileForm(user), ...config.edits }));
+  const [touched, setTouched] = useState(() => new Set<CheckedField>(config.touched ?? []));
   const [photoUrl, setPhotoUrl] = useState<string | null>(user.profile_photo_path);
   const [choice, setChoice] = useState<AvatarChoice>(() =>
     user.profile_photo_path
@@ -254,14 +256,12 @@ export function ProfileTemplate({ scenario }: { scenario: ProfileScenarioId }) {
   const autosave = useFakeAutosave(config.saveStates ?? {});
 
   const canEditEligibility = !user.membership_type_id && !user.membership_pre_ordered_type_id;
-  const errorsFor = (values: ProfileFormData) => ({
-    first_name: values.first_name.trim() ? null : "Enter your first name.",
-    last_name: values.last_name.trim() ? null : "Enter your last name.",
-    student_number:
-      canEditEligibility && values.student_number !== (user.student_number?.toString() ?? "")
-        ? validateStudentNumber(values.student_number)
-        : null,
-  });
+  const errorsFor = (values: ProfileFormData) =>
+    profileErrors(values, {
+      userType: user.user_type,
+      canEditEligibility,
+      savedStudentNumber: user.student_number?.toString() ?? "",
+    });
   const errors = errorsFor(form);
   const shown = {
     first_name: touched.has("first_name") ? errors.first_name : null,
@@ -280,14 +280,8 @@ export function ProfileTemplate({ scenario }: { scenario: ProfileScenarioId }) {
           const next = { ...form, ...patch };
           setForm(next);
           const nextErrors = errorsFor(next);
-          const section = Object.keys(patch).some((key) => ABOUT_FIELDS.has(key as keyof ProfileFormData))
-            ? "about"
-            : "studies";
-          const blocked =
-            section === "about"
-              ? nextErrors.first_name || nextErrors.last_name
-              : nextErrors.student_number;
-          if (blocked) autosave.hold(section);
+          const section = sectionOf(Object.keys(patch)[0] as keyof ProfileFormData);
+          if (sectionBlocked(section, nextErrors)) autosave.hold(section);
           else autosave.schedule(section);
         }}
         onFieldBlur={(field) => setTouched((current) => new Set(current).add(field))}

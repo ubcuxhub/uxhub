@@ -26,6 +26,8 @@ function payload(fixtures: Fixtures, publish_at: string | null) {
   return {
     name: `Scheduled event ${fixtures.tag}`,
     description: "Publishing schedule integration test.",
+    short_description: "Publication test",
+    starts_at: "2099-08-01T18:00:00Z", ends_at: "2099-08-01T20:00:00Z",
     status: "draft" as const,
     event_type: "regular" as const,
     mentors_enabled: false,
@@ -107,6 +109,56 @@ describe("admin event publishing", () => {
       expect(await fetchEventById(clientAs(null), due.id)).not.toBeNull();
       expect((await fetchEventById(fixtures.supabase, unscheduled.id))!.status).toBe("draft");
       expect((await fetchEventById(fixtures.supabase, future.id))!.status).toBe("draft");
+    }));
+
+  // Each RPC commits for real, so this reaches the questions guard that is
+  // deferred to commit: before drafts published one at a time, its failure
+  // rolled back the whole run and the due sibling stayed a draft.
+  it("publishes each due draft on its own and blocks an unready one", () =>
+    withFixtures(async (fixtures) => {
+      const past = new Date(Date.now() - hour).toISOString();
+      // A trusted insert skips the questions check, standing in for an
+      // application event whose questions went missing after scheduling.
+      const unready = await fixtures.createEvent({
+        slug: `unready-${fixtures.tag}`, status: "draft", publish_at: past, requires_application: true,
+      });
+      const ready = await fixtures.createEvent({ slug: `ready-${fixtures.tag}`, status: "draft", publish_at: past });
+
+      const { data, error } = await fixtures.supabase.rpc("publish_due_events");
+      if (error) throw error;
+      expect(data).toBeGreaterThanOrEqual(1);
+      expect((await fetchEventById(fixtures.supabase, ready.id))!.status).toBe("active");
+      const blocked = (await fetchEventById(fixtures.supabase, unready.id))!;
+      expect(blocked.status).toBe("draft");
+      expect(new Date(blocked.publish_at!).toISOString()).toBe(past);
+
+      const health = await fixtures.supabase
+        .rpc("event_publication_health", { p_before: new Date().toISOString() })
+        .single();
+      if (health.error) throw health.error;
+      expect(health.data.blocked_event_ids).toContain(unready.id);
+      expect(health.data.blocked_event_ids).not.toContain(ready.id);
+      expect(health.data.overdue_count).toBeGreaterThanOrEqual(health.data.blocked_count);
+    }));
+
+  it("refuses removing the last question of an active application event", () =>
+    withFixtures(async (fixtures) => {
+      const event = await fixtures.createEvent({ status: "active", requires_application: true });
+      const questions = () => fixtures.supabase.from("event_application_questions");
+      const inserted = await questions()
+        .insert({ event_id: event.id, question: "Why attend?", response_type: "short_text" })
+        .select()
+        .single();
+      if (inserted.error) throw inserted.error;
+
+      const removed = await questions().delete().eq("id", inserted.data.id);
+      expect(removed.error?.hint).toBe("EVENT_PUBLICATION_INVALID");
+      const blanked = await questions().update({ question: " " }).eq("id", inserted.data.id);
+      expect(blanked.error?.hint).toBe("EVENT_PUBLICATION_INVALID");
+
+      const { data, error } = await questions().select("question").eq("event_id", event.id);
+      if (error) throw error;
+      expect(data).toEqual([{ question: "Why attend?" }]);
     }));
 
   it("rejects a schedule on an active event and clears it on a manual status change", () =>

@@ -40,9 +40,6 @@ export interface CheckInSessionDraft {
   end_time: string;
 }
 
-/** The fields of a check-in session the builder edits. */
-export type CheckInSessionField = Exclude<keyof CheckInSessionDraft, "id">;
-
 /** A ticket holder on the check-in page. `id` is the ticket's. */
 export interface CheckInAttendee {
   id: string;
@@ -50,6 +47,15 @@ export interface CheckInAttendee {
   user_name: string;
   user_email: string;
 }
+
+/** Why a scan or a manual check-in was refused. */
+export type CheckInRejection = "invalid_code" | "not_found" | "wrong_event" | "event_canceled";
+
+/** What the door sees after a scan or a manual check-in. */
+export type CheckInResult =
+  | { status: "checked_in"; name: string; checkedInAt: string }
+  | { status: "already_checked_in"; name: string; checkedInAt: string }
+  | { status: "rejected"; reason: CheckInRejection };
 
 export type UserRecord = UserInfoRow & {
   membership_type_name?: string | null;
@@ -61,6 +67,8 @@ export interface UserPurchaseSummary {
   title: string;
   kind: string;
   amount_cents: number;
+  /** Completed Square refunds; `status` still reads completed after one. */
+  refunded_cents: number;
   currency: string;
   status: string;
   created_at: string | null;

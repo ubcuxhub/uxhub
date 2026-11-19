@@ -39,21 +39,23 @@ returning id as auth_user_id, email
 \gset unprofiled_
 
 insert into public.events (
+  short_description, starts_at, ends_at,
   name, description, regular_price, member_price, max_capacity, slug,
   registration_opens_at, registration_closes_at, status, requires_application
 )
 values (
-  'RLS Event', 'RLS test event', 0, 0, 10, 'rls-event',
+  'RLS event', now()+interval '1 day', now()+interval '2 days', 'RLS Event', 'RLS test event', 0, 0, 10, 'rls-event',
   now() - interval '1 hour', now() + interval '1 hour', 'active', true
 )
 returning id \gset event_
 
 insert into public.events (
+  short_description, starts_at, ends_at,
   name, description, regular_price, member_price, max_capacity, slug,
   registration_opens_at, registration_closes_at, status
 )
 values (
-  'RLS Draft Event', 'RLS draft event', 0, 0, 10, 'rls-draft-event',
+  'RLS event', now()+interval '1 day', now()+interval '2 days', 'RLS Draft Event', 'RLS draft event', 0, 0, 10, 'rls-draft-event',
   now() - interval '1 hour', now() + interval '1 hour', 'draft'
 )
 returning id \gset draft_event_
@@ -131,6 +133,8 @@ returning id \gset draft_agenda_item_
 -- Both hold a ticket, so user A can read the event's check-in sessions.
 insert into public.event_tickets (event_id, user_id)
 values (:'event_id', :'user_a_id'), (:'event_id', :'user_b_id');
+
+update public.events set teams_enabled = true where id = :'event_id';
 
 -- User A owns a team with user B on it; another team on the event has neither.
 insert into public.teams (event_id, owner_id)
@@ -985,7 +989,15 @@ begin
     foreach fn in array array[
       'public.reserve_event_ticket(uuid, uuid, uuid)',
       'public.release_event_ticket(uuid)',
-      'public.event_seat_counts_unfiltered(uuid[])'
+      'public.event_seat_counts_unfiltered(uuid[])',
+      -- Ticket-safety helpers are internal: service role and database
+      -- functions only.
+      'public.purchase_is_live(uuid)',
+      'public.event_has_live_purchases(uuid)',
+      'public.event_member_commitments(uuid)',
+      'public.remove_event_ticket(uuid)',
+      'public.event_ticket_eligibility(uuid, uuid, bigint)',
+      'public.delete_event_before_safe_mutations(uuid)'
     ] loop
       if has_function_privilege(role_name, fn, 'execute') then
         raise exception '% can execute %', role_name, fn;
@@ -1016,6 +1028,38 @@ begin
 end;
 $$;
 
+-- Refunds and admin ticket actions run on the server only: a member must not
+-- record a refund, void a ticket or mint a new QR code.
+do $$
+declare
+  role_name text;
+  fn text;
+begin
+  foreach role_name in array array['anon', 'authenticated'] loop
+    foreach fn in array array[
+      'public.apply_event_purchase_refund(uuid, integer)',
+      'public.regenerate_event_ticket_token(uuid)',
+      'public.void_event_ticket(uuid)',
+      'public.guard_refunded_purchase_ticket()'
+    ] loop
+      if has_function_privilege(role_name, fn, 'execute') then
+        raise exception '% can execute %', role_name, fn;
+      end if;
+    end loop;
+  end loop;
+  -- Members can't set their own refund either: purchases has no UPDATE policy.
+  if exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'purchases'
+             and cmd in ('UPDATE', 'ALL')) then
+    raise exception 'purchases gained a client UPDATE policy; refunded_cents must stay server-written';
+  end if;
+  if not has_function_privilege('service_role', 'public.apply_event_purchase_refund(uuid, integer)', 'execute')
+     or not has_function_privilege('service_role', 'public.void_event_ticket(uuid)', 'execute')
+     or not has_function_privilege('service_role', 'public.regenerate_event_ticket_token(uuid)', 'execute') then
+    raise exception 'service_role lost execute on the refund or ticket actions';
+  end if;
+end;
+$$;
+
 -- Applications, responses and check-ins by application and ticket, without a
 -- registration (docs/registration-rollout.md step 2).
 \o /dev/null
@@ -1025,11 +1069,12 @@ select role_access as user_a_saved_role from public.user_info where id = :'user_
 update public.user_info set role_access = 'basic' where id = :'user_a_id';
 
 insert into public.events (
+  short_description, starts_at, ends_at,
   name, description, regular_price, member_price, max_capacity, slug,
   registration_opens_at, registration_closes_at, status, requires_application
 )
 values (
-  'RLS Application Event', 'RLS application event', 0, 0, 10, 'rls-application-event',
+  'RLS event', now()+interval '1 day', now()+interval '2 days', 'RLS Application Event', 'RLS application event', 0, 0, 10, 'rls-application-event',
   now() - interval '1 hour', now() + interval '1 hour', 'active', true
 )
 returning id \gset application_event_
@@ -1190,18 +1235,18 @@ begin
     raise exception 'admin could not accept the application';
   end if;
 
-  insert into public.check_ins (ticket_id, check_in_session_id, checked_in_at)
-  values (
-    current_setting('rls.user_b_ticket_id')::uuid,
-    current_setting('rls.application_session_id')::uuid,
-    now()
-  );
+  begin
+    insert into public.check_ins (ticket_id, check_in_session_id, checked_in_at)
+    values (current_setting('rls.user_b_ticket_id')::uuid,current_setting('rls.application_session_id')::uuid,now());
+    raise exception 'admin bypassed atomic item check-in';
+  exception when insufficient_privilege then null;
+  end;
 
   select count(*) into visible_count
   from public.check_ins
   where ticket_id = current_setting('rls.user_b_ticket_id')::uuid;
-  if visible_count <> 1 then
-    raise exception 'admin should see the check-in by ticket, saw %', visible_count;
+  if visible_count <> 0 then
+    raise exception 'refused direct check-in must not write, saw %', visible_count;
   end if;
 end;
 $$;
@@ -1257,15 +1302,12 @@ begin
     raise exception 'user A can read user B check-in';
   end if;
 
-  update public.check_ins
-  set checked_in_at = now() - interval '1 day'
-  where ticket_id in (
-    select id from public.event_tickets where user_id = public.current_user_info_id()
-  );
-  get diagnostics changed_count = row_count;
-  if changed_count <> 0 then
+  begin
+    update public.check_ins set checked_in_at=now()-interval '1 day'
+    where ticket_id in (select id from public.event_tickets where user_id=public.current_user_info_id());
     raise exception 'user A updated their own check-in';
-  end if;
+  exception when insufficient_privilege then null;
+  end;
 end;
 $$;
 
@@ -1301,31 +1343,37 @@ values (:'user_c_auth_user_id', :'user_c_email', 'RLS', 'User C', 'basic')
 returning id \gset user_c_
 
 insert into public.events (
+  short_description, starts_at, ends_at,
   name, description, regular_price, member_price, max_capacity, slug,
   registration_opens_at, registration_closes_at, status, requires_application
 )
 values
-  ('RLS Drafts Event', 'RLS drafts event', 0, 0, 10, 'rls-drafts-event',
+  ('RLS event', now()+interval '1 day', now()+interval '2 days', 'RLS Drafts Event', 'RLS drafts event', 0, 0, 10, 'rls-drafts-event',
    now() - interval '1 hour', now() + interval '1 hour', 'active', true)
 returning id \gset drafts_event_
 
 insert into public.events (
+  short_description, starts_at, ends_at,
   name, description, regular_price, member_price, max_capacity, slug,
   registration_opens_at, registration_closes_at, status, requires_application
 )
 values
-  ('RLS Second Drafts Event', 'RLS second drafts event', 0, 0, 10, 'rls-drafts-event-2',
+  ('RLS event', now()+interval '1 day', now()+interval '2 days', 'RLS Second Drafts Event', 'RLS second drafts event', 0, 0, 10, 'rls-drafts-event-2',
    now() - interval '1 hour', now() + interval '1 hour', 'active', true)
 returning id \gset drafts_event_2_
 
 insert into public.events (
+  short_description, starts_at, ends_at,
   name, description, regular_price, member_price, max_capacity, slug,
   registration_opens_at, registration_closes_at, status, requires_application
 )
 values
-  ('RLS Closed Drafts Event', 'RLS closed drafts event', 0, 0, 10, 'rls-drafts-closed',
+  ('RLS event', now()+interval '1 day', now()+interval '2 days', 'RLS Closed Drafts Event', 'RLS closed drafts event', 0, 0, 10, 'rls-drafts-closed',
    now() - interval '2 hours', now() - interval '1 hour', 'active', true)
 returning id \gset drafts_closed_event_
+
+insert into public.event_application_questions(event_id,question,response_type)
+values (:'drafts_closed_event_id','Why attend?','short_text');
 
 insert into public.event_application_questions (event_id, question, response_type, sort_order)
 values (:'drafts_event_id', 'Why?', 'long_text', 0)
@@ -1726,6 +1774,15 @@ select set_config('request.jwt.claims', '{}', true);
 \o
 update public.user_info set role_access = :'user_a_drafts_saved_role' where id = :'user_a_id';
 
+-- From here on the fixture event moves between Active and Draft to test
+-- visibility and scheduling, though members hold tickets and offers on it.
+-- The unpublish guard would refuse that; event-cancellation.sql re-enables it
+-- and tests it. The whole script rolls back.
+-- ALTER TABLE needs the deferred publication check run first.
+set constraints all immediate;
+alter table public.events disable trigger guard_event_unpublish;
+set constraints all deferred;
+
 -- Scheduled drafts stay hidden until the job actually changes their status.
 update public.events set status = 'draft', publish_at = now() + interval '1 day'
 where id = :'event_id';
@@ -1821,14 +1878,18 @@ values ('rls-notes-drafter@example.test', 'RLS', 'Notes Drafter', 'basic')
 returning id \gset notes_drafter_
 
 insert into public.events (
+  short_description, starts_at, ends_at,
   name, description, regular_price, member_price, max_capacity, slug,
   registration_opens_at, registration_closes_at, status, requires_application
 )
 values (
-  'RLS Notes Event', 'RLS reviewer notes event', 0, 0, 10, 'rls-notes-event',
+  'RLS event', now()+interval '1 day', now()+interval '2 days', 'RLS Notes Event', 'RLS reviewer notes event', 0, 0, 10, 'rls-notes-event',
   now() - interval '1 hour', now() + interval '1 hour', 'active', true
 )
 returning id \gset notes_event_
+
+insert into public.event_application_questions(event_id,question,response_type)
+values (:'notes_event_id','Why attend?','short_text');
 
 insert into public.event_applications (event_id, user_id)
 values (:'notes_event_id', :'notes_applicant_id')
@@ -2481,5 +2542,25 @@ end;
 $$;
 
 \ir event-publication.sql
+\ir event-drafts.sql
+\ir event-date-locations.sql
+\ir participant-agenda.sql
+\ir event-application-settings.sql
+\ir event-team-settings.sql
+\ir event-content.sql
+\ir staff-volunteer-schedule.sql
+\ir agenda-notes.sql
+\ir event-checkout.sql
+\ir application-decisions.sql
+\ir event-cancellation.sql
+\ir application-emails.sql
 
+do $$ begin
+  if has_table_privilege('authenticated','public.check_in_activity','insert')
+    or has_table_privilege('authenticated','public.check_ins','update')
+    or has_table_privilege('authenticated','public.check_ins','delete')
+    or has_function_privilege('anon','public.mutate_item_check_in(uuid,uuid,uuid,text,text,uuid)','execute') then
+    raise exception 'Item attendance or attribution can bypass the protected mutation';
+  end if;
+end $$;
 rollback;

@@ -1,4 +1,7 @@
+import { readFile } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
+
+import { getPngDimensions } from "../../../src/lib/event-image.ts";
 
 import {
   buildSeedEvents,
@@ -40,7 +43,7 @@ describe("relative event seed timeline", () => {
     const counts = { past: 0, ongoing: 0, upcoming: 0 };
     for (const event of events) counts[classifySeedEvent(event, fixedNow)] += 1;
 
-    expect(counts).toEqual({ past: 4, ongoing: 4, upcoming: 10 });
+    expect(counts).toEqual({ past: 4, ongoing: 4, upcoming: 11 });
   });
 
   it("places each declared phase where it belongs on the timeline", () => {
@@ -65,6 +68,7 @@ describe("relative event seed timeline", () => {
       ...EVENT_PHASES.registrationUpcoming,
       ...EVENT_PHASES.draft,
       ...EVENT_PHASES.scheduled,
+      ...EVENT_PHASES.draftWithRegistrations,
     ]) {
       expect(classifySeedEvent(seedEvent(slug), fixedNow)).toBe("upcoming");
     }
@@ -83,21 +87,15 @@ describe("relative event seed timeline", () => {
     }
   });
 
-  it("covers the free, member-discount, and full-price checkout paths", () => {
-    const prices = EVENT_PHASES.purchasable.map((slug) => {
-      const { regular_price, member_price } = seedEvent(slug).event;
-      return { regular: Number(regular_price), member: Number(member_price) };
-    });
-
-    expect(prices.some((price) => price.regular === 0)).toBe(true);
-    expect(
-      prices.some((price) => price.regular > 0 && price.member === price.regular)
-    ).toBe(true);
-    expect(
-      prices.some(
-        (price) => price.regular > 0 && price.member > 0 && price.member < price.regular
-      )
-    ).toBe(true);
+  it("covers free and paid checkout with active members always free", () => {
+    const prices = EVENT_PHASES.purchasable.map(slug => seedEvent(slug).event);
+    expect(prices.some(event => event.configured_pricing_mode === "free" && event.regular_price === 0)).toBe(true);
+    expect(prices.some(event => event.configured_pricing_mode === "paid" && Number(event.regular_price) > 0)).toBe(true);
+    for (const event of prices) {
+      expect(event.pricing_policy).toBe("figma");
+      expect(event.member_price).toBe(0);
+      expect(event.configured_price).toBe(event.regular_price);
+    }
   });
 
   it("keeps the ongoing events open through a long window", () => {
@@ -134,11 +132,22 @@ describe("relative event seed timeline", () => {
   });
 
   it("keeps drafts out of the public listing", () => {
-    for (const slug of [...EVENT_PHASES.draft, ...EVENT_PHASES.scheduled]) {
+    for (const slug of [
+      ...EVENT_PHASES.draft,
+      ...EVENT_PHASES.scheduled,
+      ...EVENT_PHASES.draftWithRegistrations,
+    ]) {
       expect(seedEvent(slug).event.status).toBe("draft");
     }
-    for (const slug of EVENT_PHASES.draft) {
+    for (const slug of [...EVENT_PHASES.draft, ...EVENT_PHASES.draftWithRegistrations]) {
       expect(seedEvent(slug).event.publish_at ?? null).toBeNull();
+    }
+  });
+
+  it("marks only the draft with registrations as once published", () => {
+    for (const event of events) {
+      const unpublished = EVENT_PHASES.draftWithRegistrations.includes(event.event.slug as never);
+      expect(Boolean(event.event.first_published_at)).toBe(unpublished);
     }
   });
 
@@ -174,9 +183,9 @@ describe("relative event seed timeline", () => {
             now.getTime() <= Date.parse(session.end_time!)
         )
       ).toBe(true);
-      // One day: six hours, long enough to work through after a seed.
+      // The agenda includes the six-hour event plus its half-hour door item.
       expect(Date.parse(today.event.ends_at!) - Date.parse(today.event.starts_at!)).toBe(
-        6 * 60 * 60 * 1000
+        6.5 * 60 * 60 * 1000
       );
     }
   });
@@ -219,6 +228,39 @@ describe("seed event cover images", () => {
 
     for (let index = 1; index < listed.length; index += 1) {
       expect(listed[index].imageKey).not.toBe(listed[index - 1].imageKey);
+    }
+  });
+});
+
+describe("seed event banners", () => {
+  it("mixes uploaded images, plain colours, and the fallback", () => {
+    const images = events.filter((event) => event.bannerKey);
+    const colours = events.filter((event) => event.event.header_colour);
+    const neither = events.filter((event) => !event.bannerKey && !event.event.header_colour);
+    // events_header_image_or_colour: never both.
+    expect(images.filter((event) => event.event.header_colour)).toEqual([]);
+    for (const group of [images, colours, neither]) {
+      expect(group.filter((event) => event.event.status === "active").length).toBeGreaterThanOrEqual(2);
+    }
+    // The featured card and a scheduled draft carry an image.
+    expect(seedEvent("uxathon-upcoming").bannerKey).toBeTruthy();
+    expect(seedEvent(EVENT_PHASES.scheduled[0]).bannerKey).toBeTruthy();
+    // A colour outside the builder's presets lands in its custom swatches.
+    expect(
+      colours.some((event) => !["#325DC4", "#C983C7", "#4A5E8A"].includes(event.event.header_colour!.toUpperCase()))
+    ).toBe(true);
+  });
+
+  it("uses local 1600x400 banners, never hotlinked ones", async () => {
+    const available = new Set(await listSeedImageFiles());
+    for (const event of events) {
+      expect(event.event).not.toHaveProperty("header_image_url");
+      if (!event.bannerKey) continue;
+      expect(available.has(event.bannerKey)).toBe(true);
+      // The builder's minimum for a header (parseEventImageUpload).
+      const file = await readFile(new URL(`../data/images/${event.bannerKey}`, import.meta.url));
+      expect(getPngDimensions(file)).toEqual({ width: 1600, height: 400 });
+      expect(file.byteLength).toBeLessThan(100 * 1024);
     }
   });
 });
@@ -290,6 +332,18 @@ describe("fixture purchases", () => {
     expect(today[0].user.fullEventHistory).toBe(true);
     expect(today[0].registration.ticket).toBe(true);
     expect(today[0].registration.checkIns).toBeUndefined();
+  });
+
+  it("holds crowd tickets, and only crowd tickets, on the draft with registrations", () => {
+    // Tickets are what lock its pricing in the builder. Login fixtures stay
+    // off it so a tester's own registrations never depend on a draft.
+    for (const slug of EVENT_PHASES.draftWithRegistrations) {
+      expect(seatsTaken.get(slug)).toBeGreaterThan(0);
+      expect(seatsTaken.get(slug)).toBeLessThan(seedEvent(slug).event.max_capacity!);
+      expect(
+        users.some((user) => user.registrations.some((registration) => registration.eventSlug === slug))
+      ).toBe(false);
+    }
   });
 
   it("still gives every account a failed purchase to look at somewhere", () => {

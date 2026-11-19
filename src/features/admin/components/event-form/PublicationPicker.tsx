@@ -1,70 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { DatePickerButton } from "../DatePickerButton";
-import { Calendar } from "@/components/ui/calendar";
-import { Input } from "@/components/ui/input";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { CircleAlert } from "lucide-react";
+import { useId } from "react";
+import { DateField, DateTimeFieldPair, TimeField } from "@/components/ui/date-time-field";
+import { Field, FieldLabel, FieldError } from "@/components/ui/field";
+import type { IsoDate, WallTime } from "@/lib/date-input";
 
-interface PublicationPickerProps {
-  value: string;
-  disabled: boolean;
-  onChange: (value: string) => void;
-}
-
-// Calendar dates are wall-clock date parts, never instants converted via UTC.
-export function PublicationPicker({ value, disabled, onChange }: PublicationPickerProps) {
-  const [open, setOpen] = useState(false);
+/** Pacific wall-clock parts, validated as a complete instant by the caller. */
+export function PublicationPicker({ value, disabled, onChange, error }: { value: string; disabled: boolean; error?: string | null; onChange: (value: string) => void }) {
+  const uid = useId();
   const [date = "", time = ""] = value.split("T");
-  const parts = date.split("-").map(Number);
-  const selected = date ? new Date(parts[0], parts[1] - 1, parts[2]) : undefined;
-
-  return (
-    <Field>
-      <FieldLabel htmlFor="publish_date">Publish Date &amp; Time (Pacific)</FieldLabel>
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-        <Popover open={open && !disabled} onOpenChange={setOpen}>
-          <PopoverTrigger asChild>
-            <DatePickerButton
-              id="publish_date"
-              disabled={disabled}
-              aria-describedby="publish_at_description"
-              label={selected ? selected.toLocaleDateString("en-CA", { dateStyle: "medium" }) : undefined}
-            />
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="start">
-            <Calendar
-              mode="single"
-              selected={selected}
-              defaultMonth={selected}
-              onSelect={(day) => {
-                if (!day) return;
-                const next = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(day.getDate()).padStart(2, "0")}`;
-                onChange(`${next}T${time}`);
-                setOpen(false);
-              }}
-            />
-          </PopoverContent>
-        </Popover>
-        <Input
-          type="time"
-          aria-label="Publish time (Pacific)"
-          aria-describedby="publish_at_description"
-          disabled={disabled}
-          value={time}
-          onChange={(event) => onChange(`${date}T${event.target.value}`)}
-        />
-      </div>
-      {value && (
-        <Button type="button" variant="ghost" className="w-fit" disabled={disabled} onClick={() => onChange("")}>
-          Clear publish schedule
-        </Button>
-      )}
-      <FieldDescription id="publish_at_description">
-        Draft events become Active at this time. Leave empty to keep in Draft.
-      </FieldDescription>
-    </Field>
-  );
+  const errorId = error ? `${uid}-error` : undefined;
+  return <><DateTimeFieldPair timeWidth="wide" date={<Field><FieldLabel htmlFor={`${uid}-date`}>Date</FieldLabel><DateField aria-invalid={error ? true : undefined} aria-describedby={errorId} id={`${uid}-date`} disabled={disabled} value={(date || null) as IsoDate | null} onValueChange={next => onChange(`${next ?? ""}T${time}`)} /></Field>} time={<Field><FieldLabel htmlFor={`${uid}-time`}>Time (PT)</FieldLabel><TimeField aria-invalid={error ? true : undefined} aria-describedby={errorId} id={`${uid}-time`} disabled={disabled} ambiguousStart="daytime" value={(time || null) as WallTime | null} onValueChange={next => onChange(`${date}T${next ?? ""}`)} /></Field>} />{error && <FieldError id={errorId}><span className="flex items-start gap-1.5"><CircleAlert aria-hidden className="mt-0.5 size-4 shrink-0" />{error}</span></FieldError>}</>;
 }

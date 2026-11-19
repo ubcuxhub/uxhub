@@ -13,16 +13,40 @@
  */
 export function getRequestOrigin(request: Request) {
   const requestUrl = new URL(request.url);
-  const host =
-    firstHeaderValue(request.headers.get("x-forwarded-host")) ??
-    firstHeaderValue(request.headers.get("host"));
 
-  if (!host) return requestUrl.origin;
+  return (
+    originFromHeaders(request.headers, () => requestUrl.protocol.replace(":", "")) ??
+    requestUrl.origin
+  );
+}
+
+/**
+ * The same, from a server component's `headers()`, which has no request URL
+ * to fall back on. Without forwarded headers, a local host is assumed to be
+ * plain http and anything else https. Null when there's no host at all.
+ */
+export function getHeadersOrigin(headers: Headers) {
+  return originFromHeaders(headers, (host) =>
+    /^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(host) ? "http" : "https"
+  );
+}
+
+/**
+ * `<protocol>://<host>` from the forwarded headers, else the `Host` header;
+ * `fallbackProtocol` decides the protocol when none is forwarded. Null
+ * without a host.
+ */
+function originFromHeaders(
+  headers: Headers,
+  fallbackProtocol: (host: string) => string
+) {
+  const host =
+    firstHeaderValue(headers.get("x-forwarded-host")) ??
+    firstHeaderValue(headers.get("host"));
+  if (!host) return null;
 
   const protocol =
-    firstHeaderValue(request.headers.get("x-forwarded-proto")) ??
-    requestUrl.protocol.replace(":", "");
-
+    firstHeaderValue(headers.get("x-forwarded-proto")) ?? fallbackProtocol(host);
   return `${protocol}://${host}`;
 }
 
