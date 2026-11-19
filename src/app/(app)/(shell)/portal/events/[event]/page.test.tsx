@@ -6,6 +6,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const fixtures = vi.hoisted(() => ({
   state: { kind: "reg-going", ticketId: "ticket-1" } as import("@/features/events/lib/event-states").EventState,
   fetchTicket: vi.fn(),
+  fetchEvent: vi.fn(),
   fetchLinks: vi.fn(),
   termEndsAt: null as string | null,
   user: { id: "user-1", first_name: "Ada", last_name: "Lovelace", email: "ada@example.test", membership_type_id: "tier", membership_expires_at: "2099-01-01T00:00:00Z" },
@@ -17,7 +18,7 @@ vi.mock("@/lib/flags", () => ({ FLAGS: { studentEvents: true } }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 vi.mock("@/lib/auth/guards", () => ({ requireAuth: async () => fixtures.user }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({}) }));
-vi.mock("@/lib/supabase-helpers/events", () => ({ fetchEventBySlug: async () => fixtures.event }));
+vi.mock("@/lib/supabase-helpers/events", () => ({ fetchEventBySlug: fixtures.fetchEvent }));
 vi.mock("@/lib/supabase-helpers/event-agenda", () => ({ fetchEventParticipantContent: async () => ({ location: null, agenda: [] }) }));
 vi.mock("@/lib/supabase-helpers/event-people", () => ({ fetchEventMentors: async () => [], fetchEventSponsors: async () => [] }));
 vi.mock("@/lib/supabase-helpers/event-links", () => ({ fetchEventLinks: fixtures.fetchLinks }));
@@ -48,6 +49,7 @@ afterEach(cleanup);
 beforeEach(() => {
   vi.clearAllMocks();
   fixtures.state = { kind: "reg-going", ticketId: fixtures.ticket.id };
+  fixtures.fetchEvent.mockImplementation(async () => fixtures.event);
   fixtures.fetchLinks.mockResolvedValue([]);
   fixtures.fetchTicket.mockResolvedValue(fixtures.ticket);
   fixtures.termEndsAt = null;
@@ -152,4 +154,17 @@ it("offers no test registration on a published event", async () => {
   fixtures.state = { kind: "reg-open", closesAt: null };
   await renderPage();
   expect(screen.queryByText("Test registration (staff only)")).toBeNull();
+});
+
+const loadPage = () => PortalEventPage({ params: Promise.resolve({ event: "sprint" }), searchParams: Promise.resolve({}) });
+
+it("sends a deleted, hidden or unknown event to not-found.tsx", async () => {
+  fixtures.fetchEvent.mockResolvedValue(null);
+  await expect(loadPage()).rejects.toMatchObject({ digest: expect.stringContaining("404") });
+});
+
+it("lets a failed event query reach error.tsx instead of showing it as removed", async () => {
+  const failure = new Error("fetch failed");
+  fixtures.fetchEvent.mockRejectedValue(failure);
+  await expect(loadPage()).rejects.toBe(failure);
 });
