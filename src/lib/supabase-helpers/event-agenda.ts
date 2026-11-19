@@ -1,34 +1,42 @@
 import type { DbClient } from "./types";
-import { TABLES } from "./tables";
-import type { EventAgendaDayRow, EventAgendaItemRow } from "@/lib/supabase/models";
+import type { ParticipantLocation } from "@/lib/location";
 
-/**
- * Agenda tables are read-only for the browser roles: RLS shows an active
- * event's agenda to everyone and every agenda to admins, and there are no write
- * policies. Writes go through the service-role client.
- */
+export interface EventAgendaItem {
+  id: string;
+  title: string;
+  starts_at: string | null;
+  ends_at: string | null;
+  description: string | null;
+  check_in: boolean;
+  location_overridden: boolean;
+  location: ParticipantLocation | null;
+}
 
-export interface EventAgendaDay extends EventAgendaDayRow {
-  items: EventAgendaItemRow[];
+export interface EventAgendaDay {
+  id: string;
+  date: string;
+  title: string | null;
+  location: ParticipantLocation | null;
+  items: EventAgendaItem[];
+}
+
+export interface EventParticipantContent {
+  location: ParticipantLocation | null;
+  agenda: EventAgendaDay[];
 }
 
 /**
- * Returns an event's agenda days in date order, each with its items in start
- * time order. An event without an agenda returns an empty array.
- *
- * `building` and `room` stay null where an item uses the event's location.
+ * Pass the viewer's own client. The database authorizes the event and projects
+ * active location fields before any HTML/RSC serialization. Never read the
+ * editor settings or cache a ticket holder's projection for another viewer.
  */
-export async function fetchEventAgenda(
+export async function fetchEventParticipantContent(
   supabase: DbClient,
-  eventId: string
-): Promise<EventAgendaDay[]> {
-  const { data, error } = await supabase
-    .from(TABLES.eventAgendaDays)
-    .select("*, items:event_agenda_items(*)")
-    .eq("event_id", eventId)
-    .order("date", { ascending: true })
-    .order("start_time", { referencedTable: "items", ascending: true });
-
+  eventId: string,
+): Promise<EventParticipantContent> {
+  const { data, error } = await supabase.rpc("event_participant_content", { p_event_id: eventId });
   if (error) throw error;
-  return data ?? [];
+  // The RPC constructs this explicit projection, rather than serializing rows
+  // or the private document. Its JSON shape is exercised by integration tests.
+  return data as unknown as EventParticipantContent;
 }

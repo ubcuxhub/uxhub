@@ -7,7 +7,7 @@ import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import type { EventHistoryInfo } from "@/lib/supabase-helpers/event-mutations";
 import type { EventApplicationSettingsRow } from "@/lib/supabase/models";
 import { EventTeams } from "./event-form/EventTeams";
-import { EventSchedule } from "./event-form/EventSchedule";
+import { EventAgenda } from "./event-form/EventAgenda";
 import type { EventFormIssue } from "./event-form/event-form-schema";
 import { EventPublishMenu, EventPublicationSuccess, publicationTimeLabel } from "./event-form/EventPublicationControls";
 import type { EventTeamSettingsInfo } from "@/lib/supabase-helpers/teams";
@@ -42,7 +42,6 @@ import {
 } from "@/components/ui/field";
 import { useEventForm } from "@/features/admin/hooks/use-event-form";
 import { PrimaryDetailsSection } from "./event-form/PrimaryDetailsSection";
-import { EventDateLocation } from "./event-form/EventDateLocation";
 import { EventRegistration } from "./event-form/EventRegistration";
 import { type EventDateLocationDraft } from "../lib/event-date-location";
 import { EventPeopleEditor, EventResourcesEditor } from "./event-form/EventPeopleResources";
@@ -156,26 +155,24 @@ export const EventCreateModify = ({
   const sectionDetails: Record<string, { number: number; description?: string }> = {
     "builder-basics": { number: 1, description: "What the event is called, where its page lives, how it looks and what it costs." },
     "builder-description": { number: 2, description: "How the event is described across the portal and the club website." },
-    "builder-dates": { number: 3, description: "Every day the event runs, where it happens, and who sees the details." },
+    "builder-agenda": { number: 3, description: "Every day, location and timed item, including optional check-in." },
     "builder-registration": { number: 4, description: "How members sign up, how many can and how they check in." },
     "builder-teams": { number: 5, description: "Team events show a Your Team card with an invite link on the event page." },
-    "builder-people": { number: 7 },
-    "builder-schedule": { number: 6, description: "Shown as the agenda on the event page." },
-    "builder-resources": { number: 8, description: "Community links, files and the event recap for this event." },
-    "builder-summary": { number: 9, description: "What’s left before the event can go live. Drafts are only visible to staff." },
-    "builder-settings": { number: 10, description: "Actions that affect the whole event." },
+    "builder-people": { number: 6 },
+    "builder-resources": { number: 7, description: "Community links, files and the event recap for this event." },
+    "builder-summary": { number: 8, description: "What’s left before the event can go live. Drafts are only visible to staff." },
+    "builder-settings": { number: 9, description: "Actions that affect the whole event." },
   };
   const sections: NavigatorSection[] = [
     { id: "builder-basics", number: 1, title: "Basics", state: "complete", required: true },
     { id: "builder-description", number: 2, title: "Description", state: "complete", required: true },
-    { id: "builder-dates", number: 3, title: "Date and location", state: "complete", required: true },
+    { id: "builder-agenda", number: 3, title: "Agenda", state: "complete", required: true },
     { id: "builder-registration", number: 4, title: "Registration", state: "complete", required: true },
     { id: "builder-teams", number: 5, title: "Teams", state: form.formState.teams_enabled ? "complete" : "optional", required: false },
-    { id: "builder-schedule", number: 6, title: "Schedule", state: form.formState.agenda_enabled ? "complete" : "optional", required: false },
-    { id: "builder-people", number: 7, title: "People and sponsors", state: form.formState.content?.sections.length ? "complete" : "optional", required: false },
-    { id: "builder-resources", number: 8, title: "Links and resources", state: form.formState.content?.links.length ? "complete" : "optional", required: false },
-    { id: "builder-summary", number: 9, title: "Summary", state: "optional", required: false },
-    { id: "builder-settings", number: 10, title: "Other settings", state: "optional", required: false },
+    { id: "builder-people", number: 6, title: "People and sponsors", state: form.formState.content?.sections.length ? "complete" : "optional", required: false },
+    { id: "builder-resources", number: 7, title: "Links and resources", state: form.formState.content?.links.length ? "complete" : "optional", required: false },
+    { id: "builder-summary", number: 8, title: "Summary", state: "optional", required: false },
+    { id: "builder-settings", number: 9, title: "Other settings", state: "optional", required: false },
   ].map((section): NavigatorSection => {
     const key = section.id.replace("builder-", "");
     const all = issues.filter(issue => issue.section === key);
@@ -232,10 +229,9 @@ export const EventCreateModify = ({
         <form key={form.resetKey} ref={formElement} onClickCapture={captureInputIssues} onChangeCapture={captureInputIssues} onBlurCapture={captureInputIssues} id="event-builder-form" noValidate className="flex min-w-0 flex-col gap-14 [&_[data-slot=card]:has([data-invalid=true])]:border-destructive [&_input:not([type=checkbox]):not([type=radio])]:h-10 [&_button[data-slot=select-trigger]]:h-10" onSubmit={form.handleSubmit}><fieldset disabled={form.isSubmitting || form.isDeleting} className="flex min-w-0 flex-col gap-14">
           {section("builder-basics", "Basics", <><PrimaryDetailsSection showConfigurationErrors={form.publishAttempted} urlLocked={form.urlLocked} formState={form.formState} onFieldChange={form.handleFieldChange} /><EventBranding state={form.formState} disabled={form.isSubmitting} onChange={form.handleFieldChange} onIcon={form.setPendingImageFile} onHeader={form.setPendingHeaderFile} /><EventFeatured state={form.formState} onChange={form.handleFieldChange} /><EventPricing showErrors={form.publishAttempted} state={form.formState} locked={pricingLocked} effectivePrices={initialEvent && initialEvent.regular_price != null && initialEvent.member_price != null ? { regular: initialEvent.regular_price, member: initialEvent.member_price } : undefined} onChange={form.handleFieldChange} /></>)}
           {section("builder-description", "Description", <EventDescriptionEditor validationManaged key={`${form.resetKey}-${form.legacyDraftRecovered ? "legacy-recovered" : "initial"}`} short={form.formState.short_description} value={form.formState.description} rich={form.formState.description_rich} disabled={form.isSubmitting || form.past} onChange={(short, text, rich) => { form.handleFieldChange("short_description", short); form.handleFieldChange("description", text); form.handleFieldChange("description_rich", rich); }} />)}
-          {section("builder-dates", "Date and location", <EventDateLocation key={form.formState.date_location_revision} value={form.formState.date_location!} disabled={form.isSubmitting} showErrors={form.publishAttempted} onChange={value => form.handleFieldChange("date_location", value)} />)}
+          {section("builder-agenda", "Agenda", <EventAgenda enabled={form.formState.agenda_enabled} onEnabledChange={enabled => form.handleFieldChange("agenda_enabled", enabled)} key={form.formState.date_location_revision} value={form.formState.date_location!} disabled={form.isSubmitting} showErrors={form.publishAttempted} onChange={value => form.handleFieldChange("date_location", value)} />)}
           {section("builder-registration", "Registration", <><EventRegistration state={form.formState} disabled={form.isSubmitting} info={registrationInfo} onChange={form.handleFieldChange} /><ApplicationQuestionsSection locked={!!initialApplicationSettings?.questions_locked_at} onMove={form.moveApplicationQuestion} registrationModeOwned enabled={form.formState.requires_application} applicationTemplate={form.applicationTemplate} questionErrors={form.publishAttempted ? form.validation.questionErrors : form.questionErrors} onEnabledChange={enabled => form.handleFieldChange("requires_application", enabled)} onAdd={form.addApplicationQuestion} onRemove={form.removeApplicationQuestion} onUpdate={form.updateApplicationQuestion} onAddResponseOption={form.addResponseOption} onUpdateResponseOption={form.updateResponseOption} onRemoveResponseOption={form.removeResponseOption} />{form.formState.requires_application && <ApplicationTiming state={form.formState} showErrors={form.publishAttempted || visibleIssues.some(issue => issue.section === "registration")} onChange={form.handleFieldChange} />}</>)}
           {section("builder-teams", "Teams", <EventTeams state={form.formState} info={teamInfo} showErrors={form.publishAttempted || visibleIssues.some(issue => issue.section === "teams")} onChange={form.handleFieldChange} />)}
-          {section("builder-schedule", "Schedule", <EventSchedule enabled={form.formState.agenda_enabled} onChange={enabled => form.handleFieldChange("agenda_enabled", enabled)} />)}
           {section("builder-people", "People and sponsors", <EventPeopleEditor content={form.formState.content ?? emptyContent()} onChange={content => form.handleFieldChange("content", content)} people={mentorOptions} sponsors={sponsorOptions} showErrors={form.showConfigurationErrors} />)}
           {section("builder-resources", "Links and resources", <EventResourcesEditor content={form.formState.content ?? emptyContent()} onChange={content => form.handleFieldChange("content", content)} showErrors={form.showConfigurationErrors} />)}
           {section("builder-summary", "Summary", <div className="space-y-4 rounded-xl border border-border bg-card p-5">

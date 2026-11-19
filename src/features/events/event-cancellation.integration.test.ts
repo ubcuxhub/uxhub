@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import { clientAs, withFixtures, type Fixtures } from "@/test/integration";
 import type { EventRow } from "@/lib/supabase/models";
-import { checkInTicket } from "@/lib/supabase-helpers/check-ins";
+import { mutateItemCheckIn } from "@/lib/supabase-helpers/item-check-in";
 import { createTeam, joinTeam } from "@/lib/supabase-helpers/teams";
 import { cancelEvent, fetchEventLifecycleCounts } from "@/lib/supabase-helpers/event-lifecycle";
 
@@ -133,7 +133,12 @@ describe("canceling", () => {
     const team = await createTeam(f.supabase, { eventId: event.id, userId: owner.id });
     expect(team.failureReason).toBeNull();
     const { data: teamRow } = await f.supabase.from("teams").select("invite_code").eq("id", team.teamId!).single();
-    const session = await f.supabase.from("check_in_sessions").insert({ event_id: event.id, name: "Door", start_time: at(-day), end_time: at(day) }).select().single();
+    const staff = clientAs(await f.createUser({ role_access: "admin" }));
+    const agendaDay = await f.supabase.from("event_agenda_days").insert({ event_id: event.id, date: "2026-11-24", title: "Day" }).select().single();
+    expect(agendaDay.error).toBeNull();
+    const item = await f.supabase.from("event_agenda_items").insert({ event_agenda_day_id: agendaDay.data!.id, title: "Door", check_in: true, start_time: "10:00", end_time: "11:00", starts_at: "2026-11-24T18:00:00Z", ends_at: "2026-11-24T19:00:00Z" }).select().single();
+    expect(item.error).toBeNull();
+    const session = await f.supabase.from("check_in_sessions").insert({ event_id: event.id, agenda_item_id: item.data!.id, name: "Door", start_time: at(-day), end_time: at(day) }).select().single();
     expect(session.error).toBeNull();
 
     const applicationEvent = await f.createEvent({ ...upcoming, requires_application: true, slug: `apply-${f.tag}` });
@@ -149,7 +154,10 @@ describe("canceling", () => {
     expect(submitted.data?.[0]?.status).toBe("NOT_ACCEPTING_APPLICATIONS");
     expect((await joinTeam(f.supabase, { inviteCode: teamRow!.invite_code, userId: joiner.id })).failureReason).toBe("TEAMS_LOCKED");
     expect((await createTeam(f.supabase, { eventId: event.id, userId: joiner.id })).failureReason).toBe("TEAMS_LOCKED");
-    await expect(checkInTicket(f.supabase, ownerTicket.id, session.data!.id)).rejects.toMatchObject({ hint: "EVENT_CANCELED" });
+    for (const input of [{ ticketId: ownerTicket.id }, { code: ownerTicket.qr_token }]) {
+      expect(await mutateItemCheckIn(staff, { eventId: event.id, itemId: item.data!.id, ...input })).toEqual({ status: "rejected", reason: "event_canceled" });
+    }
+    expect((await f.supabase.from("check_ins").select("id").eq("check_in_session_id", session.data!.id)).data).toEqual([]);
   }));
 
   it("locks the builder but keeps links and resources editable", () => withFixtures(async f => {

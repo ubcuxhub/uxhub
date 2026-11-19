@@ -1,275 +1,223 @@
 // @vitest-environment jsdom
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import type { ItemCheckInSnapshot } from "@/features/admin/lib/item-check-in";
+const actions = vi.hoisted(() => ({ fetchItemCheckInAction: vi.fn(), mutateItemCheckInAction: vi.fn() }));
+const camera = vi.hoisted(() => ({ scan: vi.fn<(code: string) => void>() as (code: string) => void, unmount: vi.fn() }));
+vi.mock("@/features/admin/check-in-actions", () => actions);
+vi.mock("@/lib/supabase/client", () => ({
+  createClient: () => ({
+    channel: () => {
+      const ch = { on: () => ch, subscribe: () => ch };
 
-import {
-  act,
-  cleanup,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from "@testing-library/react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import type { CheckInAttendee, CheckInSession } from "@/features/admin/types";
-
-const actions = vi.hoisted(() => ({
-  checkInScannedTicketAction: vi.fn(),
-  checkInTicketAction: vi.fn(),
-  fetchAdminCheckInSnapshotAction: vi.fn(),
+      return ch;
+    }, removeChannel: vi.fn()
+  })
 }));
-const pointer = vi.hoisted(() => ({ useCoarsePointer: vi.fn() }));
-const toast = vi.hoisted(() => ({ error: vi.fn() }));
-/** The last props the stand-in camera got. */
-const camera = vi.hoisted(() => ({
-  onScan: (code: string): void => {
-    throw new Error(`No camera mounted to scan ${code}`);
-  },
-  paused: false,
-}));
+vi.mock("./QrCameraView", async () => {
+  const { useEffect } = await import("react");
 
-vi.mock("@/features/admin/actions", () => actions);
-vi.mock("@/hooks/use-coarse-pointer", () => pointer);
-vi.mock("@/components/ui/toast", () => ({ toast }));
-vi.mock("@/features/admin/components/QrCameraView", () => ({
-  QrCameraView: (props: { paused: boolean; onScan: (code: string) => void }) => {
-    camera.onScan = props.onScan;
-    camera.paused = props.paused;
-    return <div data-testid="camera" />;
-  },
-}));
+  return {
+    QrCameraView: ({ onScan }: { onScan: (code: string) => void }) => {
+      camera.scan = onScan;
 
+      useEffect(() => () => camera.unmount(), []);
+
+      return <div data-testid="camera" />;
+    }
+  };
+});
+vi.mock("./CheckInTarget", () => ({
+  checkInItemContext: () => "Nov 21 · 10:00 AM – 11:00 AM PT", CheckInTarget: ({ itemId, onChange }: { itemId: string; onChange: (id: string) => void }) => <select aria-label="Check-in item" value={itemId ?? ""} onChange={e => onChange(e.target.value)}>
+    <option value="">Choose</option>
+    <option value="a">Opening</option>
+    <option value="b">Closing</option>
+  </select>
+}));
 import { CheckInScanner } from "./CheckInScanner";
-
-const hour = 60 * 60 * 1000;
-const at = (offsetMs: number) => new Date(Date.now() + offsetMs).toISOString();
-
-const sessions: CheckInSession[] = [
-  {
-    id: "doors",
-    event_id: "event-1",
-    name: "Doors",
-    start_time: at(-3 * hour),
-    end_time: at(-2 * hour),
-    created_at: null,
-    updated_at: null,
-  },
-  {
-    id: "talks",
-    event_id: "event-1",
-    name: "Talks",
-    start_time: at(-hour),
-    end_time: at(hour),
-    created_at: null,
-    updated_at: null,
-  },
-];
-const ada: CheckInAttendee = {
-  id: "ticket-ada",
-  user_id: "user-ada",
-  user_name: "Ada Lovelace",
-  user_email: "ada@student.ubc.ca",
-};
-const CHECKED_IN_AT = "2026-07-15T17:02:00Z";
-
-function renderScanner(overrides: { sessions?: CheckInSession[] } = {}) {
-  return render(
-    <CheckInScanner
-      eventId="event-1"
-      eventName="Design Sprint"
-      sessions={overrides.sessions ?? sessions}
-      initialAttendees={[ada]}
-      phoneLink={<svg data-testid="phone-link" />}
-    />
-  );
-}
-
-async function scan(code: string) {
-  await act(async () => camera.onScan(code));
-}
-
+const snapshot: ItemCheckInSnapshot = { items: [{ id: "a", label: "Opening", starts_at: null, ends_at: null }, { id: "b", label: "Closing", starts_at: null, ends_at: null }], attendees: [{ id: "ticket", user_id: "user", user_name: "Ada Lovelace", user_email: "ada@test" }], attendance: [] };
+const result = { status: "checked_in", name: "Ada Lovelace", ticketId: "ticket", attendanceVersion: "v1", checkedInAt: "2026-11-15T19:00:00Z", checkedCount: 1, total: 1 };
 beforeEach(() => {
   vi.clearAllMocks();
-  pointer.useCoarsePointer.mockReturnValue(true);
-  actions.checkInScannedTicketAction.mockResolvedValue({
-    status: "checked_in",
-    name: "Ada Lovelace",
-    checkedInAt: CHECKED_IN_AT,
-  });
-  actions.checkInTicketAction.mockResolvedValue({
-    status: "checked_in",
-    name: "Ada Lovelace",
-    checkedInAt: CHECKED_IN_AT,
-  });
-  actions.fetchAdminCheckInSnapshotAction.mockResolvedValue({
-    sessions,
-    attendees: [ada],
-    statuses: [],
-  });
-});
 
+  Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
+
+  window.history.replaceState(null, "", "/admin/events/event/check-in/scan?item=a");
+
+  actions.fetchItemCheckInAction.mockResolvedValue(snapshot);
+
+  actions.mutateItemCheckInAction.mockResolvedValue(result);
+});
 afterEach(() => {
   cleanup();
-  vi.restoreAllMocks();
+
+  vi.useRealTimers();
+});
+function mount() {
+  return render(<CheckInScanner eventId="event" eventName="Design Sprint" initialItemId="a" initialSnapshot={snapshot} />);
+}
+it("uses the selected item and pauses for four seconds before Scan next", async () => {
+  mount();
+
+  await waitFor(() => expect(actions.fetchItemCheckInAction).toHaveBeenCalled());
+  vi.useFakeTimers();
+
+  await act(async () => camera.scan("qr"));
+  expect(actions.mutateItemCheckInAction).toHaveBeenCalledWith({ eventId: "event", itemId: "a", code: "qr" });
+  expect(screen.getByText("Ada Lovelace")).toBeTruthy();
+
+  expect((screen.getByRole("button", { name: "Scan next" }) as HTMLButtonElement).disabled).toBe(true);
+  await act(async () => {
+    vi.advanceTimersByTime(4000);
+  });
+  expect((screen.getByRole("button", { name: "Scan next" }) as HTMLButtonElement).disabled).toBe(false);
+  fireEvent.click(screen.getByRole("button", { name: "Scan next" }));
+
+  expect(screen.queryByText("Ada Lovelace")).toBeNull();
+
+  expect(screen.getByTestId("camera")).toBeTruthy();
+});
+it("ignores a delayed scan result after changing items and retains the new return link", async () => {
+  let finish!: (value: unknown) => void;
+
+  actions.mutateItemCheckInAction.mockImplementation(() => new Promise(resolve => {
+    finish = resolve;
+  }));
+
+  mount();
+
+  await act(async () => { });
+  act(() => camera.scan("qr"));
+
+  fireEvent.change(screen.getByRole("combobox", { name: "Check-in item" }), { target: { value: "b" } });
+  await act(async () => finish(result));
+
+  expect(screen.queryByText("Ada Lovelace")).toBeNull();
+
+  expect(screen.getByRole("link", { name: "Close scanner" }).getAttribute("href")).toContain("?item=b");
+
+  expect(window.location.search).toBe("?item=b");
+});
+it("stops the camera offline, prevents manual writes, and refetches on reconnect", async () => {
+  mount();
+
+  await act(async () => { });
+  Object.defineProperty(navigator, "onLine", { configurable: true, value: false });
+
+  act(() => window.dispatchEvent(new Event("offline")));
+  expect(screen.queryByTestId("camera")).toBeNull();
+
+  expect(camera.unmount).toHaveBeenCalled();
+
+  await act(async () => camera.scan("qr"));
+
+  expect(actions.mutateItemCheckInAction).not.toHaveBeenCalled();
+  Object.defineProperty(navigator, "onLine", { configurable: true, value: true });
+
+  act(() => window.dispatchEvent(new Event("online")));
+
+  await waitFor(() => expect(screen.getByTestId("camera")).toBeTruthy());
+
+  expect(actions.fetchItemCheckInAction.mock.calls.length).toBeGreaterThan(1);
+});
+it("offers search recovery for unrecognised tickets without losing target", async () => {
+  actions.mutateItemCheckInAction.mockResolvedValue({ status: "rejected", reason: "not_found" });
+
+  mount();
+
+  await act(async () => { });
+
+  await act(async () => camera.scan("bad"));
+  fireEvent.click(screen.getAllByRole("button", { name: "Search attendees" }).at(-1)!);
+
+  expect(screen.getByRole("searchbox", { name: "Search by name or email" })).toBeTruthy();
+
+  expect(window.location.search).toBe("?item=a");
+});
+it("discards an in-flight result when connectivity is lost", async () => {
+  let finish!: (value: unknown) => void;
+
+  actions.mutateItemCheckInAction.mockImplementation(() => new Promise(resolve => {
+    finish = resolve;
+  }));
+
+  mount();
+
+  await act(async () => { });
+
+  act(() => camera.scan("qr"));
+  Object.defineProperty(navigator, "onLine", { configurable: true, value: false });
+
+  act(() => window.dispatchEvent(new Event("offline")));
+
+  await act(async () => finish(result));
+
+  expect(screen.queryByText("Ada Lovelace")).toBeNull();
 });
 
-describe("CheckInScanner", () => {
-  it("asks to be opened on a phone when there is no touch screen", () => {
-    pointer.useCoarsePointer.mockReturnValue(false);
-    renderScanner();
+it("preserves duplicate time/count and does not offer another undo", async () => {
+  actions.mutateItemCheckInAction.mockResolvedValue({ ...result, status: "already_checked_in", checkedInAt: "2026-11-01T18:00:00Z" });
 
-    expect(screen.getByText("Open this on your phone"));
-    expect(screen.getByTestId("phone-link"));
-    expect(screen.queryByTestId("camera")).toBeNull();
-  });
+  mount();
 
-  it("renders no scanner until it knows the device", () => {
-    pointer.useCoarsePointer.mockReturnValue(null);
-    renderScanner();
+  await act(async () => { });
 
-    expect(screen.queryByTestId("camera")).toBeNull();
-    expect(screen.queryByText("Open this on your phone")).toBeNull();
-  });
+  await act(async () => camera.scan("again"));
+  expect(screen.getByText("Already checked in")).toBeTruthy();
 
-  it("explains that a session is needed when the event has none", () => {
-    renderScanner({ sessions: [] });
+  expect(screen.getByText("1 of 1 checked in")).toBeTruthy();
 
-    expect(screen.getByText("No check-in sessions"));
-    expect(screen.queryByTestId("camera")).toBeNull();
-  });
+  expect(screen.queryByRole("button", { name: "Undo check-in" })).toBeNull();
+});
+it("retains target and blocks capture after permission is lost", async () => {
+  actions.fetchItemCheckInAction.mockResolvedValue({ status: "forbidden" });
 
-  it("checks a scanned code in to the session running now and shows who it was", async () => {
-    renderScanner();
+  mount();
 
-    await scan("9f86d081884c7d659a2feaa0c55ad015");
+  await waitFor(() => expect(screen.getByText("You no longer have access to check-in.")).toBeTruthy());
 
-    expect(actions.checkInScannedTicketAction).toHaveBeenCalledWith(
-      "talks",
-      "9f86d081884c7d659a2feaa0c55ad015"
-    );
-    const result = await screen.findByRole("region", { name: "Check-in result" });
-    expect(result.dataset.status).toBe("checked_in");
-    expect(result.textContent).toContain("Ada Lovelace");
-    expect(result.textContent).toContain("Checked in");
-    expect(camera.paused).toBe(true);
-  });
+  expect(screen.queryByTestId("camera")).toBeNull();
 
-  it("submits each code once while its result is showing", async () => {
-    renderScanner();
+  expect(window.location.search).toBe("?item=a");
+});
 
-    await scan("code-1");
-    await screen.findByRole("region", { name: "Check-in result" });
-    await scan("code-1");
-    await scan("code-2");
+it("Scan next returns manual lookup to the camera", async () => {
+  mount(); await act(async () => {});
+  fireEvent.click(screen.getByRole("button", {name:"Search attendees"}));
+  fireEvent.change(screen.getByRole("searchbox", {name:"Search by name or email"}), {target:{value:"Ada"}});
+  vi.useFakeTimers();
+  fireEvent.click(screen.getByRole("button", {name:"Check in Ada Lovelace"}));
+  await act(async () => {});
+  await act(async () => { vi.advanceTimersByTime(4000); });
+  fireEvent.click(screen.getByRole("button", {name:"Scan next"}));
+  expect(screen.getByTestId("camera")).toBeTruthy();
+  expect(screen.queryByRole("searchbox", {name:"Search by name or email"})).toBeNull();
+});
 
-    expect(actions.checkInScannedTicketAction).toHaveBeenCalledTimes(1);
-  });
+it("keeps the agenda day through item changes, refresh and scanner close", async () => {
+  const returnTo = "/admin/events/event/agenda?day=second";
+  const props = { eventId: "event", eventName: "Design Sprint", initialItemId: "a", initialSnapshot: snapshot, returnTo };
+  const view = render(<CheckInScanner {...props} />);
+  await act(async () => {});
+  fireEvent.change(screen.getByRole("combobox", { name: "Check-in item" }), { target: { value: "b" } });
+  await act(async () => {});
+  expect(new URL(window.location.href).searchParams.get("item")).toBe("b");
+  expect(new URL(window.location.href).searchParams.get("returnTo")).toBe(returnTo);
+  view.unmount();
+  render(<CheckInScanner {...props} initialItemId="b" />);
+  await act(async () => {});
+  const href = screen.getByRole("link", { name: "Close scanner" }).getAttribute("href")!;
+  const query = new URL(href, window.location.origin).searchParams;
+  expect(query.get("item")).toBe("b");
+  expect(query.get("returnTo")).toBe(returnTo);
+});
 
-  it("scans the next ticket after Scan next, ignoring the last code for a moment", async () => {
-    const now = vi.spyOn(Date, "now").mockReturnValue(1_000_000);
-    renderScanner();
-
-    await scan("code-1");
-    fireEvent.click(await screen.findByRole("button", { name: "Scan next" }));
-    expect(camera.paused).toBe(false);
-
-    await scan("code-1");
-    expect(actions.checkInScannedTicketAction).toHaveBeenCalledTimes(1);
-
-    await scan("code-2");
-    expect(actions.checkInScannedTicketAction).toHaveBeenLastCalledWith("talks", "code-2");
-    fireEvent.click(await screen.findByRole("button", { name: "Scan next" }));
-
-    now.mockReturnValue(1_000_000 + 5000);
-    await scan("code-2");
-    expect(actions.checkInScannedTicketAction).toHaveBeenCalledTimes(3);
-  });
-
-  it("shows the first time when a ticket was already checked in", async () => {
-    actions.checkInScannedTicketAction.mockResolvedValue({
-      status: "already_checked_in",
-      name: "Ada Lovelace",
-      checkedInAt: CHECKED_IN_AT,
-    });
-    renderScanner();
-
-    await scan("code-1");
-
-    const result = await screen.findByRole("region", { name: "Check-in result" });
-    expect(result.dataset.status).toBe("already_checked_in");
-    expect(result.textContent).toContain("Already checked in at 10:02 AM");
-  });
-
-  it("says why a code was rejected", async () => {
-    actions.checkInScannedTicketAction.mockResolvedValue({
-      status: "rejected",
-      reason: "wrong_event",
-    });
-    renderScanner();
-
-    await scan("code-1");
-
-    const result = await screen.findByRole("region", { name: "Check-in result" });
-    expect(result.dataset.status).toBe("rejected");
-    expect(result.textContent).toContain("Ticket is for a different event");
-  });
-
-  it("goes back to scanning and allows a retry when the check-in fails", async () => {
-    vi.spyOn(console, "error").mockImplementation(() => undefined);
-    actions.checkInScannedTicketAction.mockRejectedValueOnce(new Error("offline"));
-    renderScanner();
-
-    await scan("code-1");
-
-    await waitFor(() => expect(toast.error).toHaveBeenCalled());
-    expect(camera.paused).toBe(false);
-    expect(screen.queryByRole("region", { name: "Check-in result" })).toBeNull();
-
-    await scan("code-1");
-    expect(actions.checkInScannedTicketAction).toHaveBeenCalledTimes(2);
-    await screen.findByRole("region", { name: "Check-in result" });
-  });
-
-  it("checks in someone picked by name when their code won't scan", async () => {
-    renderScanner();
-
-    fireEvent.click(screen.getByRole("button", { name: "Can't scan?" }));
-    expect(screen.queryByTestId("camera")).toBeNull();
-    expect(actions.fetchAdminCheckInSnapshotAction).toHaveBeenCalledWith("event-1");
-
-    fireEvent.change(screen.getByRole("searchbox", { name: "Search by name or email" }), {
-      target: { value: "lovelace" },
-    });
-    fireEvent.click(screen.getByRole("button", { name: /Check in Ada Lovelace/ }));
-
-    await waitFor(() =>
-      expect(actions.checkInTicketAction).toHaveBeenCalledWith("talks", "ticket-ada")
-    );
-    const result = await screen.findByRole("region", { name: "Check-in result" });
-    expect(result.textContent).toContain("Ada Lovelace");
-
-    fireEvent.click(screen.getByRole("button", { name: "Scan next" }));
-    expect(screen.getByTestId("camera"));
-  });
-
-  it("finds tickets bought after the page loaded", async () => {
-    const grace: CheckInAttendee = {
-      id: "ticket-grace",
-      user_id: "user-grace",
-      user_name: "Grace Hopper",
-      user_email: "grace@example.com",
-    };
-    actions.fetchAdminCheckInSnapshotAction.mockResolvedValue({
-      sessions,
-      attendees: [ada, grace],
-      statuses: [],
-    });
-    renderScanner();
-
-    fireEvent.click(screen.getByRole("button", { name: "Can't scan?" }));
-    fireEvent.change(screen.getByRole("searchbox", { name: "Search by name or email" }), {
-      target: { value: "grace" },
-    });
-
-    expect(await screen.findByRole("button", { name: /Check in Grace Hopper/ }));
-  });
+it("explains cancellation when the item check-in is refused", async () => {
+  actions.mutateItemCheckInAction.mockResolvedValue({ status: "rejected", reason: "event_canceled" });
+  mount();
+  await act(async () => { });
+  await act(async () => camera.scan("qr"));
+  expect(screen.getByRole("heading", { name: "This event is canceled" })).toBeTruthy();
+  expect(screen.getByText("Canceled events don’t take check-ins.")).toBeTruthy();
+  expect(screen.queryByText("Ticket not recognized")).toBeNull();
 });

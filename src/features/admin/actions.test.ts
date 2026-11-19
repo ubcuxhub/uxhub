@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { UserInfoRow } from "@/lib/supabase/models";
 import { defaultFormState } from "./components/event-form/event-form-schema";
@@ -23,14 +23,9 @@ const eventImageIsReferenced = vi.hoisted(() => vi.fn());
 const eventDrafts = vi.hoisted(() => ({ saveEventDraft: vi.fn(), fetchEventDraft: vi.fn() }));
 vi.mock("@/lib/supabase-helpers/event-drafts", () => ({ eventImageIsReferenced, ...eventDrafts }));
 const checkIns = vi.hoisted(() => ({
-  checkInTicket: vi.fn(),
-  deleteCheckIn: vi.fn(),
   fetchCheckInAttendees: vi.fn(),
-  fetchCheckInSessionEventId: vi.fn(),
   fetchCheckInSessions: vi.fn(),
   fetchCheckInStatuses: vi.fn(),
-  fetchCheckInTicketById: vi.fn(),
-  fetchCheckInTicketByToken: vi.fn(),
 }));
 const applications = vi.hoisted(() => ({
   decideEventApplication: vi.fn(),
@@ -70,15 +65,13 @@ vi.mock("@/lib/supabase/server", () => ({
 // delegates its rejection decision to them, so mocking them would only prove
 // the mock rejects what it was told to.
 import {
-  checkInScannedTicketAction,
-  checkInTicketAction,
   deleteAdminEventAction,
   discardUnusedEventImageAction,
   fetchAdminCheckInSnapshotAction,
   saveAdminEventAction,
+  savePastEventResourcesAction,
   saveAdminEventDraftAction,
   setMembershipTermEndsAtAction,
-  toggleCheckInAction,
   updateApplicationDecisionAction,
   updateManagerUserAction,
   saveManagerUserDetailsAction,
@@ -787,264 +780,6 @@ describe("deleteAdminEventAction", () => {
 // Check-in
 // ---------------------------------------------------------------------------
 
-describe("toggleCheckInAction", () => {
-  it("checks a ticket in and returns the stored time", async () => {
-    checkIns.checkInTicket.mockResolvedValue({
-      checkedInAt: "2026-10-20T18:00:00.000Z",
-      alreadyCheckedIn: false,
-    });
-
-    await expect(
-      toggleCheckInAction("ticket-1", "session-1", true),
-    ).resolves.toBe("2026-10-20T18:00:00.000Z");
-
-    expect(checkIns.checkInTicket).toHaveBeenCalledWith(
-      expect.anything(),
-      "ticket-1",
-      "session-1",
-    );
-    expect(checkIns.deleteCheckIn).not.toHaveBeenCalled();
-  });
-
-  it("keeps the first time when the ticket was already checked in", async () => {
-    checkIns.checkInTicket.mockResolvedValue({
-      checkedInAt: "2026-10-20T17:02:00.000Z",
-      alreadyCheckedIn: true,
-    });
-
-    await expect(
-      toggleCheckInAction("ticket-1", "session-1", true),
-    ).resolves.toBe("2026-10-20T17:02:00.000Z");
-  });
-
-  it("deletes the check-in when unchecking", async () => {
-    await expect(
-      toggleCheckInAction("ticket-1", "session-1", false),
-    ).resolves.toBeNull();
-
-    expect(checkIns.deleteCheckIn).toHaveBeenCalledWith(
-      expect.anything(),
-      "ticket-1",
-      "session-1",
-    );
-    expect(checkIns.checkInTicket).not.toHaveBeenCalled();
-  });
-
-  it("requires an admin", async () => {
-    const redirect = new Error("NEXT_REDIRECT");
-    guards.requireAdmin.mockRejectedValue(redirect);
-
-    await expect(toggleCheckInAction("ticket-1", "session-1", true)).rejects.toBe(
-      redirect,
-    );
-    expect(checkIns.checkInTicket).not.toHaveBeenCalled();
-  });
-});
-
-describe("checking in at the door", () => {
-  const SESSION_ID = "5b0f7c1e-2a4d-4e8b-9c3f-6d1a8e2b7c40";
-  const TICKET_ID = "3f1c9a52-8d4e-4b7a-9c61-2e5f0d8b7a14";
-  const QR_TOKEN = "9f86d081884c7d659a2feaa0c55ad015";
-  const CHECKED_IN_AT = "2026-10-20T17:02:00.000Z";
-  const ticket = { id: TICKET_ID, event_id: "event-1", user_name: "Ada Lovelace" };
-
-  let consoleLog: ReturnType<typeof vi.spyOn>;
-
-  beforeEach(() => {
-    consoleLog = vi.spyOn(console, "log").mockImplementation(() => undefined);
-    checkIns.fetchCheckInSessionEventId.mockResolvedValue("event-1");
-    checkIns.fetchCheckInTicketByToken.mockResolvedValue(ticket);
-    checkIns.fetchCheckInTicketById.mockResolvedValue(ticket);
-    checkIns.checkInTicket.mockResolvedValue({
-      checkedInAt: CHECKED_IN_AT,
-      alreadyCheckedIn: false,
-    });
-  });
-
-  afterEach(() => {
-    consoleLog.mockRestore();
-  });
-
-  describe("checkInScannedTicketAction", () => {
-    it("checks the ticket in and returns the holder's name", async () => {
-      await expect(
-        checkInScannedTicketAction(SESSION_ID, QR_TOKEN),
-      ).resolves.toEqual({
-        status: "checked_in",
-        name: "Ada Lovelace",
-        checkedInAt: CHECKED_IN_AT,
-      });
-
-      expect(checkIns.fetchCheckInTicketByToken).toHaveBeenCalledWith(
-        expect.anything(),
-        QR_TOKEN,
-      );
-      expect(checkIns.checkInTicket).toHaveBeenCalledWith(
-        expect.anything(),
-        TICKET_ID,
-        SESSION_ID,
-      );
-    });
-
-    it("reports the first time on a second scan", async () => {
-      checkIns.checkInTicket.mockResolvedValue({
-        checkedInAt: CHECKED_IN_AT,
-        alreadyCheckedIn: true,
-      });
-
-      await expect(
-        checkInScannedTicketAction(SESSION_ID, QR_TOKEN),
-      ).resolves.toEqual({
-        status: "already_checked_in",
-        name: "Ada Lovelace",
-        checkedInAt: CHECKED_IN_AT,
-      });
-    });
-
-    it("ignores whitespace a scanner adds around the code", async () => {
-      await checkInScannedTicketAction(SESSION_ID, ` ${QR_TOKEN}\n`);
-
-      expect(checkIns.fetchCheckInTicketByToken).toHaveBeenCalledWith(
-        expect.anything(),
-        QR_TOKEN,
-      );
-    });
-
-    it.each([
-      ["a link", "https://example.com"],
-      ["an empty scan", ""],
-      ["a token with a character changed", `${QR_TOKEN.slice(0, -1)}g`],
-      ["a token cut short", QR_TOKEN.slice(0, -1)],
-      ["an upper-case token", QR_TOKEN.toUpperCase()],
-      ["a value that is not a string", 42 as unknown as string],
-    ])("rejects %s without a lookup", async (_, code) => {
-      await expect(checkInScannedTicketAction(SESSION_ID, code)).resolves.toEqual({
-        status: "rejected",
-        reason: "invalid_code",
-      });
-
-      expect(checkIns.fetchCheckInTicketByToken).not.toHaveBeenCalled();
-      expect(checkIns.checkInTicket).not.toHaveBeenCalled();
-    });
-
-    it("rejects a well-formed code that matches no ticket", async () => {
-      checkIns.fetchCheckInTicketByToken.mockResolvedValue(null);
-
-      await expect(
-        checkInScannedTicketAction(SESSION_ID, QR_TOKEN),
-      ).resolves.toEqual({ status: "rejected", reason: "invalid_code" });
-      expect(checkIns.checkInTicket).not.toHaveBeenCalled();
-    });
-
-    it("rejects a ticket for another event", async () => {
-      checkIns.fetchCheckInSessionEventId.mockResolvedValue("event-2");
-
-      await expect(
-        checkInScannedTicketAction(SESSION_ID, QR_TOKEN),
-      ).resolves.toEqual({ status: "rejected", reason: "wrong_event" });
-      expect(checkIns.checkInTicket).not.toHaveBeenCalled();
-    });
-
-    it("fails when the session is gone", async () => {
-      checkIns.fetchCheckInSessionEventId.mockResolvedValue(null);
-
-      await expect(
-        checkInScannedTicketAction(SESSION_ID, QR_TOKEN),
-      ).rejects.toThrow("Check-in session not found.");
-      expect(checkIns.checkInTicket).not.toHaveBeenCalled();
-    });
-
-    it("fails on a session ID that is not a UUID, without a query", async () => {
-      await expect(
-        checkInScannedTicketAction("session-1", QR_TOKEN),
-      ).rejects.toThrow("Check-in session not found.");
-      expect(checkIns.fetchCheckInSessionEventId).not.toHaveBeenCalled();
-    });
-
-    it("logs IDs, never the holder's name", async () => {
-      await checkInScannedTicketAction(SESSION_ID, QR_TOKEN);
-      checkIns.fetchCheckInSessionEventId.mockResolvedValue("event-2");
-      await checkInScannedTicketAction(SESSION_ID, QR_TOKEN);
-
-      const logged = consoleLog.mock.calls.flat().join("\n");
-      expect(logged).toContain("check_in.recorded");
-      expect(logged).toContain("check_in.rejected");
-      expect(logged).toContain(TICKET_ID);
-      expect(logged).not.toContain("Ada");
-      expect(logged).not.toContain(QR_TOKEN);
-    });
-
-    it("requires an admin", async () => {
-      const redirect = new Error("NEXT_REDIRECT");
-      guards.requireAdmin.mockRejectedValue(redirect);
-
-      await expect(
-        checkInScannedTicketAction(SESSION_ID, QR_TOKEN),
-      ).rejects.toBe(redirect);
-      expect(checkIns.fetchCheckInTicketByToken).not.toHaveBeenCalled();
-      expect(checkIns.checkInTicket).not.toHaveBeenCalled();
-    });
-  });
-
-  describe("checkInTicketAction", () => {
-    it("checks in the ticket an admin picked", async () => {
-      await expect(checkInTicketAction(SESSION_ID, TICKET_ID)).resolves.toEqual({
-        status: "checked_in",
-        name: "Ada Lovelace",
-        checkedInAt: CHECKED_IN_AT,
-      });
-
-      expect(checkIns.fetchCheckInTicketById).toHaveBeenCalledWith(
-        expect.anything(),
-        TICKET_ID,
-      );
-      expect(checkIns.checkInTicket).toHaveBeenCalledWith(
-        expect.anything(),
-        TICKET_ID,
-        SESSION_ID,
-      );
-    });
-
-    it("rejects a ticket that no longer exists", async () => {
-      checkIns.fetchCheckInTicketById.mockResolvedValue(null);
-
-      await expect(checkInTicketAction(SESSION_ID, TICKET_ID)).resolves.toEqual({
-        status: "rejected",
-        reason: "not_found",
-      });
-      expect(checkIns.checkInTicket).not.toHaveBeenCalled();
-    });
-
-    it("rejects a ticket ID that is not a UUID, without a query", async () => {
-      await expect(checkInTicketAction(SESSION_ID, "ticket-1")).resolves.toEqual({
-        status: "rejected",
-        reason: "not_found",
-      });
-      expect(checkIns.fetchCheckInTicketById).not.toHaveBeenCalled();
-    });
-
-    it("rejects a ticket for another event", async () => {
-      checkIns.fetchCheckInSessionEventId.mockResolvedValue("event-2");
-
-      await expect(checkInTicketAction(SESSION_ID, TICKET_ID)).resolves.toEqual({
-        status: "rejected",
-        reason: "wrong_event",
-      });
-      expect(checkIns.checkInTicket).not.toHaveBeenCalled();
-    });
-
-    it("requires an admin", async () => {
-      const redirect = new Error("NEXT_REDIRECT");
-      guards.requireAdmin.mockRejectedValue(redirect);
-
-      await expect(checkInTicketAction(SESSION_ID, TICKET_ID)).rejects.toBe(
-        redirect,
-      );
-      expect(checkIns.checkInTicket).not.toHaveBeenCalled();
-    });
-  });
-});
-
 describe("fetchAdminCheckInSnapshotAction", () => {
   it("returns the three sources as one snapshot with statuses serialized", async () => {
     checkIns.fetchCheckInSessions.mockResolvedValue([{ id: "session-1" }]);
@@ -1411,4 +1146,21 @@ it("refuses to drop saved unfinished sections by omitting them from a complete s
   eventDrafts.fetchEventDraft.mockResolvedValueOnce({ document: { formState: { ...defaultFormState, content: {revision:0,sections:[],links:[]} } } });
   expect(await saveAdminEventAction({...saveInput,eventId:"event-1"})).toEqual({error:"Reload saved people and resources before publishing."});
   expect(adminRpc).not.toHaveBeenCalled();
+});
+
+describe("protected staff schedule server actions", () => {
+  const input = { eventId: "event-1", revision: 1, operationId: "operation-1", content: { revision: 1, resources_version: 2 as const, sections: [], links: [{ id: crypto.randomUUID(), type: "volunteer_schedule" as const, visibility: "staff" as const, label: "Volunteers", url: "https://example.test/private-schedule" }] } };
+  it("checks authorization before historical resource validation or service-role mutation", async () => {
+    const denied = new Error("denied"); guards.requireAdmin.mockRejectedValueOnce(denied);
+    await expect(savePastEventResourcesAction(input)).rejects.toBe(denied);
+    expect(adminRpc).not.toHaveBeenCalled();
+  });
+  it("rejects unsafe HTTPS values before invoking the historical RPC", async () => {
+    expect(await savePastEventResourcesAction({ ...input, content: { ...input.content, links: [{ ...input.content.links[0], url: "http://example.test" }] } })).toEqual({ error: expect.stringContaining("HTTPS") });
+    expect(adminRpc).not.toHaveBeenCalled();
+  });
+  it("includes the protected resource in authorized historical saves", async () => {
+    await savePastEventResourcesAction(input);
+    expect(adminRpc).toHaveBeenCalledWith("save_past_event_resources", { p_event_id: input.eventId, p_revision: input.revision, p_operation_id: input.operationId, p_links: input.content.links, p_resources_version: 2 });
+  });
 });

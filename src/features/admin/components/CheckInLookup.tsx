@@ -2,6 +2,7 @@
 
 import { useId, useState } from "react";
 
+import { ListRow } from "@/components/shared/ListRow";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SearchField } from "@/components/ui/search-field";
@@ -13,12 +14,13 @@ const MAX_RESULTS = 20;
 
 interface CheckInLookupProps {
   attendees: CheckInAttendee[];
+  disabled?: boolean;
   onPick: (attendee: CheckInAttendee) => void;
   onCancel: () => void;
 }
 
 /** Finds a ticket holder by name or email when their code won't scan. */
-export function CheckInLookup({ attendees, onPick, onCancel }: CheckInLookupProps) {
+export function CheckInLookup({ attendees, onPick, onCancel, disabled = false }: CheckInLookupProps) {
   const titleId = useId();
   const [query, setQuery] = useState("");
   const searching = query.trim() !== "";
@@ -60,25 +62,9 @@ export function CheckInLookup({ attendees, onPick, onCancel }: CheckInLookupProp
         <>
           <ul className="flex flex-col divide-y divide-border-subtle overflow-hidden rounded-xl border border-border">
             {matches.slice(0, MAX_RESULTS).map((attendee) => (
-              <li key={attendee.id}>
-                <button
-                  type="button"
-                  onClick={() => onPick(attendee)}
-                  aria-label={[`Check in ${attendee.user_name}`, attendee.user_email]
-                    .filter(Boolean)
-                    .join(", ")}
-                  className="flex min-h-14 w-full flex-col items-start justify-center gap-0.5 px-4 py-3 text-left transition-colors hover:bg-muted active:bg-border-subtle focus-visible:focus-ring"
-                >
-                  <span className="text-body-medium [overflow-wrap:anywhere]">
-                    {attendee.user_name}
-                  </span>
-                  {attendee.user_email ? (
-                    <span className="text-small text-muted-foreground [overflow-wrap:anywhere]">
-                      {attendee.user_email}
-                    </span>
-                  ) : null}
-                </button>
-              </li>
+              <ListRow key={attendee.id} variant="compact" name={attendee.user_name} description={attendee.user_email}
+                action={<Button variant="secondary" disabled={disabled} onClick={()=>onPick(attendee)} aria-label={`Check in ${attendee.user_name}`}>Check in</Button>}/>
+
             ))}
           </ul>
           {matches.length > MAX_RESULTS ? (

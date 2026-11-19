@@ -35,8 +35,8 @@ interface CopyCodeProps {
 
 /**
  * A pill showing `code` with a copy button. After a copy, the code and icon
- * shrink away while "Code Copied!" shrinks in, then the reverse. The pill is at
- * least 12rem wide and grows with the code up to its container; a longer code
+ * shrink away while "Code Copied!" shrinks in, then the reverse. The pill is
+ * 12rem wide where space allows and grows up to its container; a longer code
  * is truncated (the full code is its tooltip and is what gets copied).
  */
 export function CopyCode({ code, label = "Copy code" }: CopyCodeProps) {
@@ -84,7 +84,7 @@ export function CopyCode({ code, label = "Copy code" }: CopyCodeProps) {
     <div className="flex flex-col gap-1">
       {/* Clipped, so a layer waiting at 125% can't widen the page; the 4px
           margin leaves room for the button's focus ring. */}
-      <div className="relative flex h-10 w-fit min-w-48 max-w-full items-center overflow-clip rounded-full bg-muted text-muted-foreground [overflow-clip-margin:4px]">
+      <div className="relative flex h-10 w-fit min-w-[min(12rem,100%)] max-w-full items-center overflow-clip rounded-full bg-muted text-muted-foreground [overflow-clip-margin:4px]">
         <span
           title={code}
           className={cn(

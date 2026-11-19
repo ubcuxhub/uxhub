@@ -9,6 +9,9 @@ function CopyCodeDemo() {
         <Specimen label="default (click to copy)">
           <CopyCode code="UXHUB-2026" />
         </Specimen>
+        <Specimen label="Narrow meeting location cell (long value)">
+          <div className="w-36"><CopyCode code="LONG-MEETING-PASSCODE-123456789" label="Copy meeting passcode" /></div>
+        </Specimen>
       </SpecimenGroup>
     </div>
   );

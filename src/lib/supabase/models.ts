@@ -8,6 +8,7 @@ import type {
 export type AppSettingsRow = Tables<"app_settings">;
 export type AppSettingsUpdate = TablesUpdate<"app_settings">;
 
+export type EventStaffVolunteerScheduleRow = Tables<"event_staff_volunteer_schedules">;
 export type EventContentSettingsRow = Tables<"event_content_settings">;
 
 // PostgREST computed fields are returned only when explicitly selected.
@@ -96,14 +97,6 @@ export type UserType = Enums<"user_type">;
 export type RoleAccess = Enums<"role_access_enum">;
 export type StudentStatus = Enums<"student_status">;
 export type UniversityYear = Enums<"uni_year">;
-
-export type EventAgendaDayRow = Tables<"event_agenda_days">;
-export type EventAgendaDayInsert = TablesInsert<"event_agenda_days">;
-export type EventAgendaDayUpdate = TablesUpdate<"event_agenda_days">;
-
-export type EventAgendaItemRow = Tables<"event_agenda_items">;
-export type EventAgendaItemInsert = TablesInsert<"event_agenda_items">;
-export type EventAgendaItemUpdate = TablesUpdate<"event_agenda_items">;
 
 export const ResponseType = {
   short_text: "short_text",

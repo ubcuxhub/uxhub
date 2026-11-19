@@ -16,7 +16,7 @@ export function workingDocumentSaveInput(event: EventRow, schedule: EventSchedul
   const s = document.formState;
   const start = timestamptzToDatetimeLocal(schedule.starts_at);
   const end = timestamptzToDatetimeLocal(schedule.ends_at);
-  const dateLocation = s.date_location?.dates.length === 1 ? {
+  const dateLocation = s.date_location?.version !== 2 && s.date_location?.dates.length === 1 ? {
     ...s.date_location,
     dates: s.date_location.dates.map(row => ({ ...row, date: start.split("T")[0], start: start.split("T")[1] ?? "", end: end.split("T")[1] ?? "" })),
   } : s.date_location;

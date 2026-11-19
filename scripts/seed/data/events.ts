@@ -102,6 +102,7 @@ export interface SeedEvent {
   peopleSections?: PeopleSection[];
   sponsors?: SeedSponsor[];
   links?: Omit<TablesInsert<"event_links">, "event_id">[];
+  staffVolunteerSchedule?: string;
   /** Online meeting details, readable only by ticket holders and admins. */
   privateDetails?: Omit<TablesInsert<"event_private_details">, "event_id">;
   agendaDays?: SeedAgendaDay[];
@@ -1127,6 +1128,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       agenda: [...uxathonAgendaDayOne, ...uxathonAgendaDayTwo],
       description_images: uxathonDescriptionImages,
     },
+    staffVolunteerSchedule: "https://example.com/uxathon-volunteers",
     imageKey: "5.png",
     bannerKey: "banner-3.png",
     peopleSections: [{ title: "Mentors", people: uxathonMentors }],

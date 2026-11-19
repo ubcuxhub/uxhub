@@ -1,11 +1,11 @@
 "use client";
 
-import { emptyContent, legacyEventContent, type EventContent } from "../lib/event-content";
+import { emptyContent, legacyEventContent, restoreResourceContent, type EventContent } from "../lib/event-content";
 
 import type { ApplicationQuestionTemplate } from "@/features/events/types";
 import type { EventApplicationSettingsRow } from "@/lib/supabase/models";
 
-import { dateSessions, emptyEventDate, emptyLocation, type EventDateLocationDraft } from "../lib/event-date-location";
+import { asAgenda, agendaEnvelope, agendaProjection, withAgendaSessionIds, dateSessions, emptyEventDate, emptyLocation, type EventDateLocationDraft } from "../lib/event-date-location";
 
 import { suggestedEventSlug } from "../lib/event-configuration";
 
@@ -117,8 +117,13 @@ export function useEventForm({
   const startingFormState = useMemo(
     () => {
       const state = initialDraft?.document.formState;
+      const restoreAgenda = (value: EventDateLocationDraft) => {
+        const restored = asAgenda(value);
+        const attended = new Set(initialDateLocation?.document.dates.flatMap(day => day.items ?? []).filter(item => item.attended).map(item => item.session_id));
+        return { ...restored, dates: restored.dates.map(day => ({ ...day, items: day.items?.map(item => ({ ...item, attended: !!item.session_id && attended.has(item.session_id) })) })) };
+      };
       const recoverDateLocation = (source: EventFormState): EventDateLocationDraft => {
-        if (initialDateLocation) return initialDateLocation.document;
+        if (initialDateLocation) return asAgenda(initialDateLocation.document);
         const sessions = initialDraft?.document.checkInEvents.length
           ? initialDraft.document.checkInEvents
           : checkInDraftsFromRows(initialCheckInSessions);
@@ -126,16 +131,17 @@ export function useEventForm({
           automatic: true,
           audience: "everyone",
           location: { ...emptyLocation(), type: initialEvent?.location_type ?? "in_person", building: source.location_building, room: source.location_room, address: initialEvent?.location_address ?? "", map_url: source.location_address_url },
-          dates: sessions.length ? sessions.map(row => ({ ...emptyEventDate(), session_id: row.id ?? null, date: row.start_time.split("T")[0], start: row.start_time.split("T")[1] ?? "", end: row.end_time.split("T")[1] ?? "", label: row.name })) : [{ ...emptyEventDate(), date: source.starts_at.split("T")[0], start: source.starts_at.split("T")[1] ?? "", end: source.ends_at.split("T")[1] ?? "" }],
+          dates: sessions.length ? sessions.map(row => ({ ...emptyEventDate(), session_id: row.id ?? null, date: row.start_time.split("T")[0], start: row.start_time.split("T")[1] ?? "", end: row.end_time.split("T")[1] ?? "", label: row.name })) : [{ ...emptyEventDate(), date: source.starts_at.split("T")[0], start: source.starts_at.split("T")[1] ?? "", end: source.ends_at.split("T")[1] ?? "", label: source.name }],
         };
       };
       if (!state) {
         if (!initialEvent) return { ...getInitialFormState(), content: initialContent ?? emptyContent() };
         const source = { ...formStateFromEvent(initialEvent), decisions_release_at: timestamptzToDatetimeLocal(initialApplicationSettings?.decisions_release_at), confirmation_deadline: timestamptzToDatetimeLocal(initialApplicationSettings?.confirmation_deadline) };
-        return { ...source, content: initialContent ?? emptyContent(), date_location_revision: initialDateLocation?.revision ?? 0, date_location: recoverDateLocation(source) };
+        return { ...source, content: initialContent ?? emptyContent(), date_location_revision: initialDateLocation?.revision ?? 0, date_location: asAgenda(recoverDateLocation(source)) };
       }
       const teamSource = state.teams_configuration_initialized === false && initialEvent ? formStateFromEvent(initialEvent) : { ...defaultFormState, ...state };
-      const restored = { ...defaultFormState, ...state, content: state.content ?? legacyEventContent(initialDraft?.document.mentors ?? [], initialDraft?.document.sponsors ?? [], initialContent), schedule_configuration_initialized: true, agenda_enabled: state.schedule_configuration_initialized === false && initialEvent ? initialEvent.agenda_enabled ?? true : state.agenda_enabled ?? defaultFormState.agenda_enabled, teams_configuration_initialized: true, teams_enabled: teamSource.teams_enabled, min_team_size: teamSource.min_team_size, max_team_size: teamSource.max_team_size, team_deadline: teamSource.team_deadline, date_location: state.date_location ?? recoverDateLocation(state), date_location_revision: state.date_location ? state.date_location_revision : initialDateLocation?.revision ?? state.date_location_revision };
+      const content = restoreResourceContent(state.content ?? legacyEventContent(initialDraft?.document.mentors ?? [], initialDraft?.document.sponsors ?? [], initialContent), initialContent);
+      const restored = { ...defaultFormState, ...state, content, schedule_configuration_initialized: true, agenda_enabled: state.schedule_configuration_initialized === false && initialEvent ? initialEvent.agenda_enabled ?? true : state.agenda_enabled ?? defaultFormState.agenda_enabled, teams_configuration_initialized: true, teams_enabled: teamSource.teams_enabled, min_team_size: teamSource.min_team_size, max_team_size: teamSource.max_team_size, team_deadline: teamSource.team_deadline, date_location: state.date_location ? restoreAgenda(state.date_location) : asAgenda(recoverDateLocation(state)), date_location_revision: state.date_location ? state.date_location_revision : initialDateLocation?.revision ?? state.date_location_revision };
       // Old working documents never captured these settings. Recover them
       // from the source event instead of resetting a saved featured choice,
       // external destination or URL during an unrelated edit.
@@ -302,8 +308,8 @@ export function useEventForm({
       ...current,
       [field]: value,
       ...(field === "date_location" && value && typeof value === "object" && "dates" in value ? {
-        starts_at: value.dates.map(row => `${row.date}T${row.start}`).sort()[0] ?? "",
-        ends_at: value.dates.map(row => `${row.date}T${row.end}`).sort().at(-1) ?? "",
+        ...agendaEnvelope(value),
+        date_location: agendaProjection(value),
       } : {}),
       ...(field === "name" && !current.slug_edited && !urlLocked ? { page_slug: suggestedEventSlug(String(value)) } : {}),
       ...(field === "page_slug" ? { slug_edited: true } : {}),
@@ -611,7 +617,7 @@ export function useEventForm({
       setDraftId(result.id);
       const savedFormState = { ...state, page_slug: result.pageSlug ?? state.page_slug, content: result.content ?? state.content, image_url: imageUrl, header_image_url: headerUrl,
         date_location_revision: result.dateLocationRevision ?? state.date_location_revision,
-        date_location: state.date_location ? { ...state.date_location, dates: state.date_location.dates.map((row, index) => ({ ...row, session_id: (attempt.resources ? row.session_id : result.checkInSessionIds[index]) ?? row.session_id })) } : null };
+        date_location: state.date_location && !attempt.resources ? withAgendaSessionIds(state.date_location, result.checkInSessionIds) : state.date_location };
       persistedHeaderUrl.current = headerUrl || null;
       if (!editedSinceAttempt) setPendingHeaderFile(null);
       persistedImageUrl.current = imageUrl || null;
@@ -625,7 +631,7 @@ export function useEventForm({
       setSavedEnd(datetimeLocalToTimestamptz(actualState.ends_at || actualState.starts_at));
       savedDocument.current = { state: actualState, checkIns: savedCheckIns, mentors: attempt.mentors, sponsors: attempt.sponsors, template: savedTemplate };
       if (editedSinceAttempt) {
-        setFormState(current => ({ ...current, date_location: current.date_location ? { ...current.date_location, dates: current.date_location.dates.map(row => ({ ...row, session_id: actualState.date_location?.dates.find(saved => saved.key === row.key)?.session_id ?? row.session_id })) } : null, date_location_revision: actualState.date_location_revision, content: current.content ? { ...current.content, revision: actualState.content?.revision ?? current.content.revision } : current.content }));
+        setFormState(current => ({ ...current, date_location: current.date_location ? { ...current.date_location, dates: current.date_location.dates.map(row => ({ ...row, session_id: actualState.date_location?.dates.find(saved => saved.key === row.key)?.session_id ?? row.session_id, items: row.items?.map(item => ({ ...item, session_id: actualState.date_location?.dates.flatMap(day => day.items ?? []).find(saved => saved.key === item.key)?.session_id ?? item.session_id })) })) } : null, date_location_revision: actualState.date_location_revision, content: current.content ? { ...current.content, revision: actualState.content?.revision ?? current.content.revision } : current.content }));
       } else setFormState(actualState);
       setCleanSnapshot(createFormSnapshot(actualState, savedCheckIns, attempt.mentors, attempt.sponsors, savedTemplate));
       const savedAsDraft = savedPublication.status === "draft" && !savedPublication.publish_at;

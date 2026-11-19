@@ -88,7 +88,9 @@ export async function updateEventScheduleAction(
     if (problem) return { ok: false, error: problem };
 
     if (isPublishing(current, { status: input.status, publish_at: patch.publish_at ?? null })) {
-      const dates = eventWorkingDocument(current)?.formState.date_location?.dates;
+      const agenda = eventWorkingDocument(current)?.formState.date_location;
+      if (agenda?.version === 2 && (Date.parse(current.starts_at ?? "") !== Date.parse(input.starts_at ?? "") || Date.parse(current.ends_at ?? "") !== Date.parse(input.ends_at ?? ""))) return { ok: false, error: "Edit agenda item timing in the event builder." };
+      const dates = agenda?.version === 2 ? undefined : agenda?.dates;
       if (dates && ((dates.length > 1 && (Date.parse(current.starts_at ?? "") !== Date.parse(input.starts_at ?? "") || Date.parse(current.ends_at ?? "") !== Date.parse(input.ends_at ?? ""))) || (dates.length === 1 && pacificDate(input.starts_at) !== pacificDate(input.ends_at)))) return { ok: false, error: "Edit individual event dates in the event form." };
       const workingInput = workingDocumentSaveInput(current, input);
       if (workingInput) {

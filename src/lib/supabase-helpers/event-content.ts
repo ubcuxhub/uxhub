@@ -1,4 +1,4 @@
-import { emptyContent, parseEventContent, PEOPLE_GROUPS, type ContentEntry, type EventContent, type PeopleGroup } from "@/features/admin/lib/event-content";
+import { emptyContent, parseEventContent, PEOPLE_GROUPS, type ContentEntry, type EventContent, type PeopleGroup, type ResourceLink } from "@/features/admin/lib/event-content";
 import { TABLES } from "./tables";
 import type { DbClient } from "./types";
 import type { MentorRow, SponsorRow } from "@/lib/supabase/models";
@@ -14,7 +14,8 @@ export function sponsorContentEntry(row: SponsorRow): ContentEntry {
 export async function fetchEventContent(supabase: DbClient, eventId: string): Promise<EventContent> {
   const { data, error } = await supabase.from(TABLES.eventContentSettings).select("document").eq("event_id", eventId).maybeSingle();
   if (error) throw error;
-  if (data) return parseEventContent(data.document);
+  const staffSchedule = await fetchStaffVolunteerSchedule(supabase, eventId);
+  if (data) return withStaffSchedule(parseEventContent(data.document), staffSchedule);
   const results = await Promise.all([
     supabase.from(TABLES.eventPeopleSections).select("*").eq("event_id", eventId).order("sort_order").order("id"),
     supabase.from(TABLES.eventMentors).select("*, mentors(*)").eq("event_id", eventId).order("sort_order"),
@@ -32,5 +33,34 @@ export async function fetchEventContent(supabase: DbClient, eventId: string): Pr
     else content.sections.push({ key: crypto.randomUUID(), kind: "Sponsors", title: "Sponsors", items });
   }
   content.links = (await fetchEventLinks(supabase, eventId)).map(row => ({ id: row.id, type: row.type, label: row.label ?? "", url: row.url, visibility: row.visibility, label_edited: true, audience_edited: true }));
-  return content;
+  return withStaffSchedule(content, staffSchedule);
+}
+
+/** Staff-only reader for the admin agenda. Always pass the viewer client so RLS
+ * applies; generic participant link readers never query this storage. */
+export async function fetchStaffVolunteerSchedule(supabase: DbClient, eventId: string): Promise<(ResourceLink & { sort_order: number }) | null> {
+  const { data, error } = await supabase.from(TABLES.eventStaffVolunteerSchedules).select("id,url,label,sort_order").eq("event_id", eventId).maybeSingle();
+  if (error) throw error;
+  return data ? { id: data.id, type: "volunteer_schedule", visibility: "staff", url: data.url, label: data.label, label_edited: true, sort_order: data.sort_order } : null;
+}
+
+function withStaffSchedule(content: EventContent, schedule: (ResourceLink & { sort_order: number }) | null): EventContent {
+  const links = content.links.filter(link => link.type !== "volunteer_schedule");
+  if (schedule) {
+    const { sort_order, ...link } = schedule;
+    links.splice(Math.min(sort_order, links.length), 0, link);
+  }
+  return { ...content, resources_version: 2, links };
+}
+
+/** Guarded server actions only: this create-only RPC is service-role restricted. */
+export async function createStaffVolunteerSchedule(supabase: DbClient, input: {
+  eventId: string; url: string; operationId: string;
+}): Promise<{ url: string }> {
+  const { data, error } = await supabase.rpc("create_staff_volunteer_schedule", {
+    p_event_id: input.eventId, p_url: input.url, p_operation_id: input.operationId,
+  });
+  if (error) throw error;
+  if (!data || typeof data !== "object" || Array.isArray(data) || typeof data.url !== "string") throw new Error("No saved schedule returned.");
+  return { url: data.url };
 }

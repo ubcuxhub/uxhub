@@ -120,12 +120,18 @@ export const dataEntries: readonly RegistryEntry[] = [
     aliases: [{ id: "data-table" }],
   },
   {
+    slug: "scanner-frame", title: "Scanner frame", category: "Data display", tier: "composite",
+    description: "A full-viewport dark camera surface with a wrapping header, centred controls and a 264px viewfinder. Capture and permission handling belong to callers.",
+    importPath: "@/components/shared/ScannerFrame", importNames: ["ScannerFrame", "ScannerViewfinder"],
+    source: "src/components/shared/ScannerFrame.tsx", spec: "Check-in presentation", layout: "page",
+  },
+  {
     slug: "stat-card",
     title: "Stat card",
     category: "Data display",
     tier: "primitive",
     description:
-      "A dashboard number with its neutral context, and honest empty and loading states.",
+      "A value, rate, or primary count with denominator and optional percentage. A dashboard number with its neutral context, and honest empty and loading states.",
     importPath: "@/components/ui/stat-card",
     importNames: ["StatCard"],
     source: "src/components/ui/stat-card.tsx",
@@ -166,7 +172,7 @@ export const dataEntries: readonly RegistryEntry[] = [
     category: "Data display",
     tier: "composite",
     description:
-      "A row for a person or an organization (judges, mentors, sponsors) with an optional link, grouped in a ListCard.",
+      "Compact attendance/activity rows with optional time, badge and actions; or a row for a person or an organization (judges, mentors, sponsors) with an optional link, grouped in a ListCard.",
     importPath: "@/components/shared/ListRow",
     importNames: ["ListCard", "ListRow"],
     source: "src/components/shared/ListRow.tsx",
@@ -331,5 +337,17 @@ export const dataEntries: readonly RegistryEntry[] = [
     source: "src/components/shared/RegistrationTicket.tsx",
     spec: "§4.3",
     layout: "page",
+  },
+  {
+    slug: "event-location", title: "Event location", category: "Data display", tier: "composite",
+    description: "Already-authorized physical, online, hybrid and public-summary locations with safe links and copyable meeting details.",
+    importPath: "@/components/shared/EventLocation", importNames: ["EventLocation"],
+    source: "src/components/shared/EventLocation.tsx", spec: "Participant locations", layout: "page",
+  },
+  {
+    slug: "agenda-day-table", title: "Agenda day table", category: "Data display", tier: "composite",
+    description: "Shared agenda with container-responsive locations, proportional staff columns (24/24/20/12/20%) and row action popovers.",
+    importPath: "@/components/shared/AgendaDayTable", importNames: ["AgendaDayTable"],
+    source: "src/components/shared/AgendaDayTable.tsx", spec: "Agenda presentation", layout: "page",
   },
 ];

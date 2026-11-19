@@ -53,10 +53,13 @@ export const JUDGES: readonly SearchableOption[] = [
 ];
 
 export const BUILDER_SECTIONS: readonly NavigatorSection[] = [
-  { id: "basics", title: "Basics", state: "complete", required: true },
-  { id: "description", title: "Description", state: "complete", required: true },
-  { id: "schedule", title: "Date and location", state: "attention", issues: 1, required: true },
-  { id: "tickets", title: "Tickets and pricing", state: "not-started", required: true },
-  { id: "application", title: "Application form", state: "optional", required: false },
-  { id: "people", title: "Judges and sponsors", state: "optional", required: false },
+  { id: "basics", number: 1, title: "Basics", state: "complete", required: true },
+  { id: "description", number: 2, title: "Description", state: "complete", required: true },
+  { id: "agenda", number: 3, title: "Agenda", state: "attention", issues: 1, required: true },
+  { id: "registration", number: 4, title: "Registration", state: "not-started", required: true },
+  { id: "teams", number: 5, title: "Teams", state: "optional", required: false },
+  { id: "people", number: 6, title: "People and sponsors", state: "optional", required: false },
+  { id: "resources", number: 7, title: "Links and resources", state: "optional", required: false },
+  { id: "summary", number: 8, title: "Summary", state: "optional", required: false },
+  { id: "settings", number: 9, title: "Other settings", state: "optional", required: false },
 ];

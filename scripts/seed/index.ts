@@ -65,7 +65,7 @@ import {
   reconcileUserFixtures,
   removeRetiredFixtures,
 } from "./lib/reconcile-users.ts";
-import { prepareBuilderDateSettings, reconcileBuilderSettings } from "./lib/builder-settings.ts";
+import { seedDateLocation, prepareBuilderDateSettings, reconcileBuilderSettings } from "./lib/builder-settings.ts";
 import { prepareLegacySeedPricing, validateSeedEvents } from "./lib/event-model.ts";
 import { validateUserFixtures } from "./lib/user-fixtures.ts";
 import { seedReviewNotes } from "./data/review-notes.ts";
@@ -714,7 +714,8 @@ async function reconcileAgenda(
   seed: SeedEvent,
   options: Options
 ): Promise<Counts> {
-  const days = seed.agendaDays ?? [];
+  const document = seedDateLocation(seed);
+  const days = document?.dates.map(day => ({ date: new Date(`${day.date}T12:00:00Z`), title: day.label, items: (day.items ?? []).map(item => ({ title: item.label, start: item.start, end: item.end, building: item.location?.building, room: item.location?.room })) })) ?? [];
   const counts = await reconcileChildren(
     supabase,
     TABLE.eventAgendaDays,

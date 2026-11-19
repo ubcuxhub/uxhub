@@ -1,3 +1,4 @@
+import { strictPacificTimestamp } from "../../../src/lib/date";
 import { describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { buildSeedEvents } from "../data/events.ts";
@@ -6,7 +7,7 @@ import { buildSeedCrowd } from "../data/crowd.ts";
 import { membershipTypes } from "../data/membership-types.ts";
 import { validateUserFixtures } from "./user-fixtures.ts";
 import { seedDateLocation } from "./builder-settings.ts";
-import { dateSessions, dateLocationProblem } from "../../../src/features/admin/lib/event-date-location";
+import { agendaEnvelope, dateSessions, dateLocationProblem } from "../../../src/features/admin/lib/event-date-location";
 import { prepareLegacySeedPricing, validateSeedEvents } from "./event-model.ts";
 
 const now = new Date("2026-11-11T20:00:00Z");
@@ -28,9 +29,9 @@ describe("delivered event seed model", () => {
       if (!settings) continue;
       expect(dateLocationProblem(settings)).toBeNull();
       const sessions = dateSessions(settings);
-      expect(Math.min(...sessions.map(session => Date.parse(session.start_time)))).toBe(Date.parse(seed.event.starts_at!));
-      expect(Math.max(...sessions.map(session => Date.parse(session.end_time)))).toBe(Date.parse(seed.event.ends_at!));
-      expect(sessions.map(session => session.name)).toEqual(seed.checkInSessions.map(session => session.name));
+      expect(Date.parse(strictPacificTimestamp(agendaEnvelope(settings).starts_at)!)).toBe(Date.parse(seed.event.starts_at!));
+      expect(Date.parse(strictPacificTimestamp(agendaEnvelope(settings).ends_at)!)).toBe(Date.parse(seed.event.ends_at!));
+      expect(sessions.map(session => session.name).sort()).toEqual(seed.checkInSessions.map(session => session.name).sort());
     }
     expect(saved.some(settings => settings.audience === "going" && settings.dates.some(date => date.location))).toBe(true);
     expect(saved.some(settings => settings.dates.length > 1)).toBe(true);

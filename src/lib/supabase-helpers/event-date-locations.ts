@@ -7,7 +7,15 @@ import { parseDateLocationDraft, type EventDateLocationDraft } from "@/features/
 export async function fetchEventDateLocationSettings(client: DbClient, eventId: string): Promise<(Omit<EventDateLocationSettingsRow, "document"> & { document: EventDateLocationDraft }) | null> {
   const { data, error } = await client.from(TABLES.eventDateLocationSettings).select("*").eq("event_id", eventId).maybeSingle();
   if (error) throw error;
-  return data ? { ...data, document: parseDateLocationDraft(data.document), revision: data.revision } : null;
+  if (!data) return null;
+  const document = parseDateLocationDraft(data.document);
+  if (document.version === 2) {
+    const sessions = await client.from(TABLES.checkInSessions).select("id, check_ins(id)").eq("event_id", eventId);
+    if (sessions.error) throw sessions.error;
+    const attended = new Set(sessions.data.filter(session => session.check_ins.length > 0).map(session => session.id));
+    for (const day of document.dates) for (const item of day.items ?? []) item.attended = !!item.session_id && attended.has(item.session_id);
+  }
+  return { ...data, document, revision: data.revision };
 }
 
 export async function fetchEventRegistrationSettings(client: DbClient, eventId: string) {

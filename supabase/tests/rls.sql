@@ -1235,18 +1235,18 @@ begin
     raise exception 'admin could not accept the application';
   end if;
 
-  insert into public.check_ins (ticket_id, check_in_session_id, checked_in_at)
-  values (
-    current_setting('rls.user_b_ticket_id')::uuid,
-    current_setting('rls.application_session_id')::uuid,
-    now()
-  );
+  begin
+    insert into public.check_ins (ticket_id, check_in_session_id, checked_in_at)
+    values (current_setting('rls.user_b_ticket_id')::uuid,current_setting('rls.application_session_id')::uuid,now());
+    raise exception 'admin bypassed atomic item check-in';
+  exception when insufficient_privilege then null;
+  end;
 
   select count(*) into visible_count
   from public.check_ins
   where ticket_id = current_setting('rls.user_b_ticket_id')::uuid;
-  if visible_count <> 1 then
-    raise exception 'admin should see the check-in by ticket, saw %', visible_count;
+  if visible_count <> 0 then
+    raise exception 'refused direct check-in must not write, saw %', visible_count;
   end if;
 end;
 $$;
@@ -1302,15 +1302,12 @@ begin
     raise exception 'user A can read user B check-in';
   end if;
 
-  update public.check_ins
-  set checked_in_at = now() - interval '1 day'
-  where ticket_id in (
-    select id from public.event_tickets where user_id = public.current_user_info_id()
-  );
-  get diagnostics changed_count = row_count;
-  if changed_count <> 0 then
+  begin
+    update public.check_ins set checked_in_at=now()-interval '1 day'
+    where ticket_id in (select id from public.event_tickets where user_id=public.current_user_info_id());
     raise exception 'user A updated their own check-in';
-  end if;
+  exception when insufficient_privilege then null;
+  end;
 end;
 $$;
 
@@ -2547,12 +2544,23 @@ $$;
 \ir event-publication.sql
 \ir event-drafts.sql
 \ir event-date-locations.sql
+\ir participant-agenda.sql
 \ir event-application-settings.sql
 \ir event-team-settings.sql
 \ir event-content.sql
+\ir staff-volunteer-schedule.sql
+\ir agenda-notes.sql
 \ir event-checkout.sql
 \ir application-decisions.sql
 \ir event-cancellation.sql
 \ir application-emails.sql
 
+do $$ begin
+  if has_table_privilege('authenticated','public.check_in_activity','insert')
+    or has_table_privilege('authenticated','public.check_ins','update')
+    or has_table_privilege('authenticated','public.check_ins','delete')
+    or has_function_privilege('anon','public.mutate_item_check_in(uuid,uuid,uuid,text,text,uuid)','execute') then
+    raise exception 'Item attendance or attribution can bypass the protected mutation';
+  end if;
+end $$;
 rollback;

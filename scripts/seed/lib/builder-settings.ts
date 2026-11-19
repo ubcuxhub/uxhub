@@ -1,3 +1,4 @@
+import { pacificTimestamp, vancouverWallClockMs } from "./relative-dates.ts";
 import { createHash } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { SeedEvent } from "../data/events.ts";
@@ -10,15 +11,13 @@ function seedId(value: string): string {
 }
 function pacificParts(value: string | null | undefined) {
   if (!value) throw new Error("Seed date requires a timestamp");
-  const parts = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Vancouver", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(value));
-  const part = (name: string) => parts.find(item => item.type === name)!.value;
-  return { date: `${part("year")}-${part("month")}-${part("day")}`, time: `${part("hour")}:${part("minute")}` };
+  const wall = new Date(vancouverWallClockMs(Date.parse(value))).toISOString();
+  return { date: wall.slice(0,10), time: wall.slice(11,16) };
 }
 
 /** Selected single/multiple-date fixtures exercise saved editor settings. */
 export function seedDateLocation(seed: SeedEvent): EventDateLocationDraft | null {
-  if (seed.dateLocation) return structuredClone(seed.dateLocation);
-  if (!["design-sprint-upcoming", "student-panel", "ux-research-workshop", "thinkbox-office-tour"].includes(seed.event.slug)) return null;
+  if (seed.dateLocation?.version === 2) return structuredClone(seed.dateLocation);
   const event = seed.event;
   const location = {
     type: event.location_type ?? "in_person", building: event.location_building ?? "", room: event.location_room ?? "",
@@ -26,16 +25,31 @@ export function seedDateLocation(seed: SeedEvent): EventDateLocationDraft | null
     meeting_url: seed.privateDetails?.meeting_url ?? "", meeting_id: seed.privateDetails?.meeting_id ?? "",
     meeting_passcode: seed.privateDetails?.meeting_passcode ?? "", public_summary: "UBC Vancouver — details after registration",
   };
-  return {
-    automatic: true, audience: event.slug === "thinkbox-office-tour" ? "going" : "everyone", location,
-    dates: seed.checkInSessions.map((session, index) => {
-      const start = pacificParts(session.start_time);
-      const end = pacificParts(session.end_time);
-      return { key: seedId(`${event.slug}:date:${index}`), session_id: null, date: start.date, start: start.time, end: end.time, label: session.name,
-        start_time: session.start_time, end_time: session.end_time,
-        location: event.slug === "thinkbox-office-tour" && index === 1 ? { ...location, room: "Demo meeting room B" } : null };
-    }),
-  };
+  const dates: EventDateLocationDraft["dates"] = (seed.agendaDays ?? []).map((day, index) => {
+    const date = day.date.toISOString().slice(0,10);
+    return { key: seedId(`${event.slug}:day:${date}`), session_id: null, date, start: "", end: "", label: day.title || `Day ${index + 1}`, location: { ...location },
+      items: day.items.map((item, position) => ({ key: seedId(`${event.slug}:${date}:item:${position}`), session_id: null, label: item.title, start: item.start, end_date: date, end: item.end, description: "", check_in: false,
+        location: item.building || item.room ? { ...location, building: item.building ?? location.building, room: item.room ?? location.room } : null })) };
+  });
+  for (const [index, session] of seed.checkInSessions.entries()) {
+    const start = pacificParts(session.start_time); const end = pacificParts(session.end_time);
+    let day = dates.find(day => day.date === start.date);
+    if (!day) { day = { key: seedId(`${event.slug}:day:${start.date}`), session_id: null, date: start.date, start: "", end: "", label: `Day ${dates.length + 1}`, location: { ...location }, items: [] }; dates.push(day); }
+    const match = day.items!.find(item => item.label === session.name && item.start === start.time && item.end === end.time && item.end_date === end.date);
+    if (match) match.check_in = true;
+    else day.items!.push({ key: seedId(`${event.slug}:session:${index}`), session_id: null, label: session.name, start: start.time, end_date: end.date, end: end.time, description: "", check_in: true, location: null });
+  }
+  if (!dates.length) {
+    const start = pacificParts(event.starts_at); const end = pacificParts(event.ends_at);
+    dates.push({ key: seedId(`${event.slug}:day:${start.date}`), session_id: null, date: start.date, start: "", end: "", label: "Event day", location: { ...location }, items: [{ key: seedId(`${event.slug}:main`), session_id: null, label: event.name ?? "Event", start: start.time, end_date: end.date, end: end.time, check_in: false, description: "", location: null }] });
+  }
+  dates.sort((a,b) => a.date.localeCompare(b.date));
+  for (const day of dates) {
+    const starts = day.items!.map(item => pacificTimestamp(new Date(`${day.date}T12:00:00Z`), item.start)).sort();
+    const ends = day.items!.map(item => pacificTimestamp(new Date(`${item.end_date}T12:00:00Z`), item.end)).sort();
+    Object.assign(day, { start: pacificParts(starts[0]).time, end: pacificParts(ends.at(-1)).time, start_time: starts[0], end_time: ends.at(-1) });
+  }
+  return { version: 2, automatic: true, audience: event.slug === "thinkbox-office-tour" ? "going" : "everyone", location, dates };
 }
 
 async function writeDocument(client: SupabaseClient, table: string, eventId: string, document: object): Promise<void> {
@@ -57,8 +71,8 @@ export function seedEventProjection(seed: SeedEvent) {
   if (!document) return {};
   const physical = document.audience === "everyone" && document.location.type !== "online";
   return {
-    starts_at: seed.checkInSessions.map(session => session.start_time).sort()[0],
-    ends_at: seed.checkInSessions.map(session => session.end_time).sort().at(-1),
+    starts_at: document.dates.flatMap(day => (day.items ?? []).map(item => pacificTimestamp(new Date(`${day.date}T12:00:00Z`), item.start))).sort()[0],
+    ends_at: document.dates.flatMap(day => (day.items ?? []).map(item => pacificTimestamp(new Date(`${item.end_date}T12:00:00Z`), item.end))).sort().at(-1),
     location_type: document.location.type,
     location_building: document.audience === "going" ? document.location.public_summary : document.location.type === "online" ? "Online" : document.location.building,
     location_room: physical ? document.location.room || null : null,
@@ -72,7 +86,29 @@ async function writeDateSettings(client: SupabaseClient, eventId: string, seed: 
   if (!locations) return;
   const sessions = await client.from("check_in_sessions").select("id,name").eq("event_id", eventId);
   if (sessions.error) throw sessions.error;
-  for (const date of locations.dates) date.session_id = sessions.data.find(session => session.name === date.label)?.id ?? null;
+  const storedDays = await client.from("event_agenda_days").select("id,date,items:event_agenda_items(id,title)").eq("event_id",eventId);
+  if (storedDays.error) throw storedDays.error;
+  for (const day of locations.dates) {
+    const stored = storedDays.data.find(row => row.date === day.date);
+    if (stored) day.key = stored.id;
+    const start_time = (day as unknown as { start_time: string }).start_time;
+    const end_time = (day as unknown as { end_time: string }).end_time;
+    const upsert = await client.from("event_agenda_days").upsert({ id: day.key, event_id: eventId, date: day.date, title: day.label, starts_at: start_time, ends_at: end_time });
+    if (upsert.error) throw upsert.error;
+    for (const item of day.items ?? []) {
+      item.key = stored?.items.find(row => row.title === item.label)?.id ?? item.key;
+      item.session_id = item.check_in ? sessions.data.find(session => session.name === item.label)?.id ?? null : null;
+      const effective = item.location ?? day.location!;
+      const inserted = await client.from("event_agenda_items").upsert({ id: item.key, event_agenda_day_id: day.key, title: item.label, start_time: item.start, end_time: item.end,
+        starts_at: pacificTimestamp(new Date(`${day.date}T12:00:00Z`),item.start), ends_at: pacificTimestamp(new Date(`${item.end_date}T12:00:00Z`),item.end), description: item.description, check_in: item.check_in,
+        building: locations.audience === "going" ? effective.public_summary : effective.type === "online" ? "Online" : effective.building, room: locations.audience === "everyone" && effective.type !== "online" ? effective.room || null : null });
+      if (inserted.error) throw inserted.error;
+      if (item.session_id) {
+        const linked = await client.from("check_in_sessions").update({ agenda_item_id: item.key }).eq("id",item.session_id);
+        if (linked.error) throw linked.error;
+      }
+    }
+  }
   await writeDocument(client, "event_date_location_settings", eventId, locations);
 }
 
@@ -96,7 +132,7 @@ export async function reconcileBuilderSettings(client: SupabaseClient, eventId: 
   for (const result of [sections, people, sponsors, links]) if (result.error) throw result.error;
   // This script uses an untyped Supabase client; normalize nested relationships
   // explicitly instead of importing the server-only helper tree into Node.
-  const content: EventContent = { revision: 0, sections: [], links: [] };
+  const content: EventContent = { revision: 0, sections: [], links: [], resources_version: 2 };
   for (const section of sections.data ?? []) {
     content.sections.push({ key: section.id, kind: (["Judges", "Mentors", "Speakers", "Panelists"].includes(section.title) ? section.title : "custom") as PeopleGroup, title: section.title,
       items: (people.data ?? []).filter(row => row.section_id === section.id).map(row => {
@@ -109,6 +145,7 @@ export async function reconcileBuilderSettings(client: SupabaseClient, eventId: 
     return { key: seedId(`${eventId}:${sponsor.id}`), directory_id: sponsor.id, name: sponsor.name, position: "", description: sponsor.description ?? "", url: sponsor.website_url ?? "", image_url: sponsor.brand_logo_path ?? "" };
   }) });
   content.links = (links.data ?? []).map(row => ({ id: row.id, type: row.type, label: row.label ?? "", url: row.url, visibility: row.visibility, label_edited: true, audience_edited: true }));
+  if (seed.staffVolunteerSchedule) content.links.push({ id: seedId(`${eventId}:volunteer-schedule`), type: "volunteer_schedule", label: "Volunteer Schedule", url: seed.staffVolunteerSchedule, visibility: "staff" });
   await writeDocument(client, "event_content_settings", eventId, content);
   if (seed.applicationQuestions.length) {
     const start = Date.parse(seed.event.registration_closes_at!);

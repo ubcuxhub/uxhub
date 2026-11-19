@@ -1,3 +1,4 @@
+import { agendaEnvelope } from "./event-date-location";
 import type { EventRow } from "@/lib/supabase/models";
 import { parseWorkingDocument } from "./event-working-document";
 import { datetimeLocalToTimestamptz } from "@/lib/date";
@@ -44,7 +45,7 @@ export function eventPresentation(event: EventRow): EventRow {
     location_address: location ? restricted || location.type === "online" ? null : location.address : event.location_address,
     location_address_url: location ? restricted || location.type === "online" ? null : location.map_url : s.location_address_url || null,
     configured_slug: s.page_slug || event.slug, configured_slug_edited: s.slug_edited,
-    starts_at: datetimeLocalToTimestamptz(s.starts_at), ends_at: datetimeLocalToTimestamptz(s.ends_at),
+    starts_at: datetimeLocalToTimestamptz(s.date_location?.version === 2 ? agendaEnvelope(s.date_location).starts_at : s.starts_at), ends_at: datetimeLocalToTimestamptz(s.date_location?.version === 2 ? agendaEnvelope(s.date_location).ends_at : s.ends_at),
   };
 }
 

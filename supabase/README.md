@@ -181,6 +181,7 @@ helper file, and fix it in one place.
 | `event_application_responses` | `src/lib/supabase-helpers/event-applications.ts`  |
 | `event_agenda_days`           | `src/lib/supabase-helpers/event-agenda.ts`        |
 | `event_agenda_items`          | `src/lib/supabase-helpers/event-agenda.ts`        |
+| `event_agenda_notes`          | `src/lib/supabase-helpers/event-agenda-notes.ts` (staff only; `save_agenda_note` enforces revisions and event membership) |
 | `check_in_sessions`           | `src/lib/supabase-helpers/check-ins.ts`           |
 | `check_ins`                   | `src/lib/supabase-helpers/check-ins.ts`           |
 | `mentors` / `event_mentors`   | `src/lib/supabase-helpers/event-people.ts`        |
@@ -206,6 +207,22 @@ Supporting files:
   authorization itself: today `admin-server.ts`, the admin server actions, and
   the payment customer and fulfillment modules.
   `grep -rln 'supabase/admin"' src` lists every importer.
+
+## Shared staff agenda notes
+
+`event_agenda_notes` stores one unbounded text note per stable agenda item,
+separately from participant descriptions, public projections and builder revisions.
+Only admin/manager viewers can read it. Anonymous access and direct browser
+insert/update/delete are denied. The viewer-client `save_agenda_note` RPC checks
+staff authorization, item/event membership and the expected note revision in one
+transaction. A missing note starts at revision 0; each successful save increments
+it. A stale save returns the latest note without overwriting it. Empty text clears
+the note. Deleting an eligible agenda item cascades its note.
+
+`event-agenda-notes.ts` reads the normalized agenda regardless of the participant
+display switch and joins staff-only locations/notes. Call it only after the
+server staff guard, with the requesting viewer's client. The participant reader
+continues to omit all staff notes and Volunteer Schedule URLs.
 
 ## Storage
 
@@ -621,6 +638,91 @@ purchase or seat. Retries return the same receipt. No Square customer or payment
 is used for zero amounts; ordinary confirmation, history and check-in read the
 same purchase/ticket records as paid registration.
 
+## Unified builder agenda (EAG-001)
+
+Version 2 of the staff-only `event_date_location_settings.document` contains
+dated days with whole locations and stable item UUIDs, descriptions, start time,
+explicit end date/time, optional whole-location override and optional check-in.
+Day/event envelopes are derived server-side; working-document projections use
+the same items and retain incomplete text. `agenda_enabled` controls display only.
+Public agenda rows contain safe physical projections, never the private editor
+document or meeting credentials. Existing public time columns remain projections
+for participant consumers pending EAG-002.
+
+`check_in_sessions.agenda_item_id` maps enabled items to the current scanner.
+Attendance keeps its original session/ticket/timestamp. Database guards serialize
+item/session/event deletion with attendance inserts and reject disabling attended
+items, including through a draft working document. Undo of attendance is separate.
+Full saves keep the existing revision and operation receipt transaction. Overview
+quick edits cannot change the item-derived event dates.
+
+The 20261118012141 migration uses the approved empty-event baseline; it does not
+infer/backfill legacy session mappings. Rebuild/reseed the local database with
+`pnpm supabase:local`; do not deploy it against legacy live agendas without a
+separate data decision. Timing reuses the application's pinned Vancouver calendar
+(including historical gap/overlap rejection), independent of local tzdata.
+
+### Participant agenda projection
+
+`event_participant_content(event_id)` reads canonical agenda rows and projects only
+participant descriptions, check-in flags and active effective day/item locations.
+It authorizes with the requesting viewer, never a supplied user ID. Restricted
+locations return only public summaries unless the viewer is staff or owns an
+event ticket, including after the event. Accepted applications alone grant no
+location access. Staff editor documents, inactive location fields and other
+resources never enter the result. Call with the viewer client and keep HTML/RSC
+responses private/dynamic. `agenda_enabled` hides participant RPC and direct
+agenda reads while preserving staff reads and saved content. Event summary
+location remains available independently of that display switch.
+
+## Staff Volunteer Schedule
+
+`event_staff_volunteer_schedules` stores one safe HTTPS resource per event (event
+PK, stable ID, label, URL, sort order, event-delete cascade). Admin/manager viewer
+clients can read it; anonymous clients lack SELECT and basic users get no rows.
+Browser mutations are revoked. Server mutations require `requireAdmin()` before
+using the service role. No participant resource audience enum is extended.
+
+The staff editor includes `volunteer_schedule` as another link type, always with
+`visibility: staff`. Its type, label, URL and remove controls share the existing
+resource editor. Atomic saves filter it out of `event_links`, synchronize private
+storage, and retain it in staff-only content/working documents. Incomplete drafts
+keep unfinished rows without erasing a configured URL. `fetchEventContent` merges
+the private row back into its saved position; `fetchStaffVolunteerSchedule` is the
+viewer-scoped reader for the admin agenda. Generic resource readers never query it.
+
+New editor documents use `resources_version: 2`: an omitted schedule row then means
+removal. Older documents without this version preserve a schedule they never knew.
+Historical resource RPC calls accept an optional `p_resources_version` argument
+with the same semantics, covered by revision/retry checks. Existing RPC arguments
+and generic everyone/going/after_event resource semantics remain compatible.
+
+
+The staff agenda's `create_staff_volunteer_schedule` operation creates only the
+initial link. It is service-role only, called after the server staff guard, and
+shares builder locks and private retry receipts. Concurrent creation is rejected;
+existing resources/people remain intact. Content and working-document revisions,
+and unmaterialized compatibility mirrors, update atomically to reject stale saves.
+It works for incomplete drafts, active events and historical events. Subsequent
+edits use the event editor's Links and resources section.
+
+## Item check-in
+
+Staff use the viewer-client `mutate_item_check_in` RPC with event and stable item
+identity. It checks staff authorization, an enabled item in that event, and a
+valid ticket on every mutation, independent of event time or participant schedule
+visibility. Compatibility sessions remain stored and retain their item mapping.
+Authenticated direct attendance writes are revoked; legacy server actions resolve
+their session to an item and call this same RPC. Unversioned legacy undo is refused.
+
+`check_ins.attendance_version` identifies the displayed attendance. Duplicates
+preserve it and the first timestamp. Undo compares it atomically; a later rescan
+cannot be removed with an old version. Event/session/item locks serialize builder
+changes and staff mutations. `check_in_activity` records each successful version,
+its authenticated profile ID and scan/manual method; undo marks that version's
+activity undone. Activity reads are staff-only and direct client writes are denied.
+Old attendance lacking activity displays unknown provenance without invented data.
+The new helper is `src/lib/supabase-helpers/item-check-in.ts`.
 ### Ticket-safety groundwork
 
 `20261117054623_ticket_safety_groundwork.sql` defines one live-purchase rule
@@ -635,3 +737,9 @@ columns `events.canceled_at`/`cancellation_note` and
 `purchases.refunded_cents`/`refunded_at` are not browser-writable: the events
 column grants leave them out, and `purchases` has no browser update policy. See
 [live purchases](../docs/event-states.md#live-purchases).
+
+Resource-only saves for ended and canceled events share the schedule-aware
+`save_past_event_resources` function. Its optional `p_resources_version` preserves
+older callers and private volunteer schedules; do not add a separate four-argument
+overload, which makes PostgREST calls ambiguous. The reconciliation migration
+combines cancellation access with schedule synchronization and service-role grants.

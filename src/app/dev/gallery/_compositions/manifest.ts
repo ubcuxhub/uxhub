@@ -102,7 +102,7 @@ export const MANIFEST = [
   {
     id: "check-in",
     column: 3,
-    uses: ["card", "alert", "search-field", "avatar", "status-badge", "button"],
+    uses: ["card", "alert", "search-field", "avatar", "status-badge", "button", "scanner-frame"],
   },
   {
     id: "mentors",
@@ -155,7 +155,7 @@ export const MANIFEST = [
     column: 4,
     uses: ["card", "field", "input", "select", "textarea", "checkbox", "button", "status-badge", "toast"],
   },
-  { id: "builder-date-location", column: 5, uses: ["card", "separator", "field", "date-time-field", "segmented-toggle", "radio-group", "select", "input", "button", "icon-button", "confirm-dialog"] },
+  { id: "builder-date-location", column: 5, uses: ["location-editor", "card", "separator", "field", "date-time-field", "segmented-toggle", "radio-group", "select", "input", "button", "icon-button", "confirm-dialog"] },
   { id: "builder-people-ordering", column: 5, uses: ["sortable-section", "button", "field", "input"] },
   // Column 5: Event builder
   {
@@ -217,7 +217,7 @@ export const MANIFEST = [
   {
     id: "agenda",
     column: 6,
-    uses: ["card", "tabs", "separator"],
+    uses: ["card", "tabs", "table"],
   },
   {
     id: "sponsors",

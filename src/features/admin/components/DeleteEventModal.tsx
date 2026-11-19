@@ -56,8 +56,8 @@ export function DeleteEventModal({ eventId, eventName, isOpen, onClose, onConfir
     }).catch(() => { if (active) setFailure("Couldn’t check deletion protections. Try again."); });
     return () => { active = false; setInfo(null); setFailure(null); };
   }, [isOpen, eventId, attempt]);
-  if (!info || info.blocked) return <Dialog open={isOpen} onOpenChange={open => { if (!open) onClose(); }}>
-    <DialogContent><DialogHeader><DialogTitle>{info?.blocked ? "This event can’t be deleted" : "Delete event?"}</DialogTitle><DialogDescription role="status">{info ? deletionRefusal(info.blockers) : failure ?? "Checking registrations, teams and payment protections…"}</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" onClick={onClose}>Cancel</Button>{failure && <Button onClick={() => setAttempt(value => value + 1)}>Try again</Button>}</DialogFooter></DialogContent>
+  if (!info || info.blocked || info.checkedIn > 0) return <Dialog open={isOpen} onOpenChange={open => { if (!open) onClose(); }}>
+    <DialogContent><DialogHeader><DialogTitle>{info && (info.blocked || info.checkedIn > 0) ? "This event can’t be deleted" : "Delete event?"}</DialogTitle><DialogDescription role="status">{info ? info.checkedIn > 0 ? `Attendance has been recorded for ${count(info.checkedIn, "attendee", "attendees")}. Undo all check-ins before deleting this event. Nothing has been deleted.` : deletionRefusal(info.blockers) : failure ?? "Checking registrations, teams and payment protections…"}</DialogDescription></DialogHeader><DialogFooter><Button variant="outline" onClick={onClose}>Cancel</Button>{failure && <Button onClick={() => setAttempt(value => value + 1)}>Try again</Button>}</DialogFooter></DialogContent>
   </Dialog>;
   return <ConfirmDialog open={isOpen} onOpenChange={open => { if (!open) onClose(); }} title="Delete event?"
     description={deletionSummary(info.name || eventName, info)}

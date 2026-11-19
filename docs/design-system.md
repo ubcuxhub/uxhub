@@ -471,7 +471,8 @@ Hubbo and the white logo don't change. Contrast on the dark page: primary
 ### 3.1 Buttons
 
 - Variants: **Primary** (`action-primary` fill, white label; one per view),
-  **Secondary** (white, `border-default`; everything else), **Destructive**
+  **Secondary** (white, `border-default`; everything else), **Dotted**
+  (`variant="dotted"`, secondary styling with a dotted border for optional add/link actions), **Destructive**
   (only inside a confirming Dialog).
 - Sizes: md 40px (forms, pages), sm 32px (cards, tables, toolbars). States:
   Default, Hover, Pressed, Focus, Disabled, Loading (keeps width, progress in
@@ -1043,3 +1044,77 @@ insets) that stays anchored when the sidebar expands or collapses.
 The section navigation menu is non-modal: opening it preserves page scrolling
 and scrollbar space, keeping the fixed trigger stationary. Escape and selection
 retain the existing focus behavior.
+
+### Location editor
+
+`shared/LocationEditor` composes the standard segmented toggle and labelled
+fields for in-person, online and hybrid locations. `LocationDraft` lives in
+`src/lib/location.ts`. Callers pass a unique `prefix`, controlled `value`,
+`onChange` and `restricted` (adds the public summary). Changing type preserves
+inactive fields. Audience enforcement, whole-location inheritance, required-field
+validation and persistence belong to the caller. See `/dev/components/location-editor`.
+
+### Participant location display
+
+`shared/EventLocation` renders an already-authorized `ParticipantLocation`:
+physical building/room/address and map, online join link and labelled CopyCode
+meeting ID/passcode, or both for hybrid. `restricted` renders only the public
+summary. Privacy belongs at the database projection boundary; never pass editor
+settings to participant components. Only HTTP(S) links render. Optional
+`showRoom={false}` supports a separate room column; `details={false}` keeps
+credentials and address/map in the day header for inherited table locations. See `/dev/components/event-location`.
+
+`Table scrollerLabel="…"` gives the horizontal scroll wrapper a region name and
+keyboard focus, allowing arrow-key scrolling without making rows interactive.
+Existing tables retain their default behavior. The separated People example at
+`/dev/components/table` demonstrates a named scroll region.
+
+CopyCode keeps its 12rem preferred minimum where space permits and shrinks to
+its container in narrow location cells. Long values retain the full tooltip and
+clipboard value. See the narrow long-passcode example at `/dev/components/copy-code`.
+
+### Shared agenda table
+
+`shared/AgendaDayTable` renders the participant day heading, Time, Item, Building
+or online location and Room columns. Place it inside `@container/agenda`
+(`data-agenda-container` enables dismissing open actions on resize). At 48rem
+container width it expands to four columns; narrower containers show complete
+two-line times and muted building/room beneath the item. Optional `actions(item)`
+adds secondary small icon buttons in an Actions column. Expanded staff columns
+use Time 24%, Item 24%, Building 20%, Room 12%, Actions 20%; participant
+column widths stay unchanged. Below the same breakpoint
+a native stretched row button opens those actions in a row-anchored Popover.
+Escape/outside dismissal returns focus; action handlers own editor transitions
+and subsequent focus restoration using the trigger passed to `onSelect`. Only pass authorized presentation data; staff
+notes and resource URLs remain in staff features. See `/dev/components/agenda-day-table`
+for participant, staff and narrow desktop examples.
+
+### Check-in presentation
+
+StatCard `kind="count"` makes `count` the primary number and renders `of total noun`
+as its context; `showRate` appends the rounded percentage. Zero total renders 0%
+without changing the existing rate variant's insufficient-data behavior. See
+`/dev/components/stat-card` for count, zero, loading and existing variants.
+The rate variant accepts optional `detail` text after its count caption to explain
+what the count includes (for example, tickets and held offers).
+
+ListRow `variant="compact"` omits artwork and accepts optional `leading`,
+`supporting` and `action` slots for time, a status badge and trailing controls.
+Names/descriptions wrap and rows grow; the caller provides a labelled list and
+library buttons. Default people/organization rows retain their existing layout.
+See `/dev/components/list-row`.
+
+ScannerFrame is a full-viewport dark surface with a wrapping header and centred
+480px content. ScannerViewfinder supplies a 264px square within the available
+width. Callers own capture, lifecycle, selection, permissions and recovery.
+See `/dev/components/scanner-frame` for the camera-free preview at all widths.
+
+SelectTrigger `multiline` allows the value to wrap and the outlined trigger to
+grow with its content. It uses `rounded-xl`, matching StatCard corners; standard
+single-line triggers retain their pill shape. SelectItem `description` adds a muted second line to both the
+menu and selected value; use them together. Supply `textValue` when typeahead
+should search only the primary label. Default single-line consumers retain their
+height and truncation. Keep an associated label or `aria-label` on the trigger.
+Enabled Select triggers show a pointer cursor; disabled triggers retain
+`cursor-not-allowed`. See `/dev/components/select` for long labels and overnight
+date context.

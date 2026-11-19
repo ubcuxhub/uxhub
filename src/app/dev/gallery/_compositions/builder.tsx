@@ -3,10 +3,10 @@
 import SortableSectionDemo from "@/app/dev/components/_demos/sortable-section";
 import { useId, useState } from "react";
 
-import { EventDateLocation } from "@/features/admin/components/event-form/EventDateLocation";
+import { EventAgenda } from "@/features/admin/components/event-form/EventAgenda";
 import { EventRegistration } from "@/features/admin/components/event-form/EventRegistration";
 import { defaultFormState } from "@/features/admin/components/event-form/event-form-schema";
-import { emptyLocation, type EventDateLocationDraft } from "@/features/admin/lib/event-date-location";
+import { asAgenda, emptyLocation, type EventDateLocationDraft } from "@/features/admin/lib/event-date-location";
 
 import { ImageUpload } from "@/components/shared/ImageUpload";
 import { SectionNavigator } from "@/components/shared/SectionNavigator";
@@ -267,7 +267,7 @@ const SECTION_COPY: Record<string, string> = {
 };
 
 function SetupOutline() {
-  const [current, setCurrent] = useState("schedule");
+  const [current, setCurrent] = useState("agenda");
   const index = BUILDER_SECTIONS.findIndex((section) => section.id === current);
   const section = BUILDER_SECTIONS[index];
   return (
@@ -298,13 +298,13 @@ function SetupOutline() {
 }
 
 function DateLocationForm() {
-  const [state, setState] = useState({ ...defaultFormState, max_capacity: "120", date_location: {
+  const [state, setState] = useState({ ...defaultFormState, max_capacity: "120", date_location: asAgenda({
     automatic: true, audience: "going", location: { ...emptyLocation(), building: "AMS Student Nest", room: "Room 2306", address: "6133 University Blvd, Vancouver", public_summary: "UBC Vancouver" }, dates: [
       { key: "saturday", session_id: null, date: "2099-11-14", start: "09:00", end: "17:00", label: "Opening ceremony", location: null },
       { key: "sunday", session_id: null, date: "2099-11-15", start: "10:00", end: "17:00", label: "Workshops", location: null },
     ],
-  } as EventDateLocationDraft });
-  return <div className="space-y-4"><EventDateLocation value={state.date_location} disabled={false} showErrors={true} onChange={date_location => setState(current => ({ ...current, date_location }))} /><EventRegistration state={state} disabled={false} info={{ locked: false, seats: 0 }} onChange={(key, value) => setState(current => ({ ...current, [key]: value }))} /></div>;
+  } as EventDateLocationDraft) });
+  return <div className="space-y-4"><EventAgenda enabled={state.agenda_enabled} onEnabledChange={agenda_enabled => setState(current => ({ ...current, agenda_enabled }))} value={state.date_location} disabled={false} showErrors={true} onChange={date_location => setState(current => ({ ...current, date_location }))} /><EventRegistration state={state} disabled={false} info={{ locked: false, seats: 0 }} onChange={(key, value) => setState(current => ({ ...current, [key]: value }))} /></div>;
 }
 
 export const BUILDER_COMPONENTS = {

@@ -151,8 +151,72 @@ export type Database = {
           },
         ]
       }
+      check_in_activity: {
+        Row: {
+          attendance_version: string
+          checked_in_at: string
+          event_id: string
+          item_id: string
+          method: string
+          operator_id: string | null
+          ticket_id: string
+          undone_at: string | null
+        }
+        ComputedFields: never
+        Insert: {
+          attendance_version: string
+          checked_in_at: string
+          event_id: string
+          item_id: string
+          method: string
+          operator_id?: string | null
+          ticket_id: string
+          undone_at?: string | null
+        }
+        Update: {
+          attendance_version?: string
+          checked_in_at?: string
+          event_id?: string
+          item_id?: string
+          method?: string
+          operator_id?: string | null
+          ticket_id?: string
+          undone_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "check_in_activity_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "check_in_activity_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: false
+            referencedRelation: "event_agenda_items"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "check_in_activity_operator_id_fkey"
+            columns: ["operator_id"]
+            isOneToOne: false
+            referencedRelation: "user_info"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "check_in_activity_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "event_tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       check_in_sessions: {
         Row: {
+          agenda_item_id: string | null
           created_at: string | null
           end_time: string | null
           event_id: string
@@ -163,6 +227,7 @@ export type Database = {
         }
         ComputedFields: never
         Insert: {
+          agenda_item_id?: string | null
           created_at?: string | null
           end_time?: string | null
           event_id: string
@@ -172,6 +237,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          agenda_item_id?: string | null
           created_at?: string | null
           end_time?: string | null
           event_id?: string
@@ -181,6 +247,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "check_in_sessions_agenda_item_id_fkey"
+            columns: ["agenda_item_id"]
+            isOneToOne: true
+            referencedRelation: "event_agenda_items"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "check_in_sessions_event_id_fkey"
             columns: ["event_id"]
@@ -192,6 +265,7 @@ export type Database = {
       }
       check_ins: {
         Row: {
+          attendance_version: string
           check_in_session_id: string
           checked_in_at: string | null
           created_at: string | null
@@ -201,6 +275,7 @@ export type Database = {
         }
         ComputedFields: never
         Insert: {
+          attendance_version?: string
           check_in_session_id: string
           checked_in_at?: string | null
           created_at?: string | null
@@ -209,6 +284,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          attendance_version?: string
           check_in_session_id?: string
           checked_in_at?: string | null
           created_at?: string | null
@@ -236,21 +312,27 @@ export type Database = {
       event_agenda_days: {
         Row: {
           date: string
+          ends_at: string | null
           event_id: string
           id: string
+          starts_at: string | null
           title: string | null
         }
         ComputedFields: never
         Insert: {
           date: string
+          ends_at?: string | null
           event_id: string
           id?: string
+          starts_at?: string | null
           title?: string | null
         }
         Update: {
           date?: string
+          ends_at?: string | null
           event_id?: string
           id?: string
+          starts_at?: string | null
           title?: string | null
         }
         Relationships: [
@@ -266,30 +348,42 @@ export type Database = {
       event_agenda_items: {
         Row: {
           building: string | null
+          check_in: boolean
+          description: string
           end_time: string
+          ends_at: string | null
           event_agenda_day_id: string
           id: string
           room: string | null
           start_time: string
+          starts_at: string | null
           title: string
         }
         ComputedFields: never
         Insert: {
           building?: string | null
+          check_in?: boolean
+          description?: string
           end_time: string
+          ends_at?: string | null
           event_agenda_day_id: string
           id?: string
           room?: string | null
           start_time: string
+          starts_at?: string | null
           title: string
         }
         Update: {
           building?: string | null
+          check_in?: boolean
+          description?: string
           end_time?: string
+          ends_at?: string | null
           event_agenda_day_id?: string
           id?: string
           room?: string | null
           start_time?: string
+          starts_at?: string | null
           title?: string
         }
         Relationships: [
@@ -298,6 +392,33 @@ export type Database = {
             columns: ["event_agenda_day_id"]
             isOneToOne: false
             referencedRelation: "event_agenda_days"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_agenda_notes: {
+        Row: {
+          body: string
+          item_id: string
+          revision: number
+        }
+        ComputedFields: never
+        Insert: {
+          body?: string
+          item_id: string
+          revision?: number
+        }
+        Update: {
+          body?: string
+          item_id?: string
+          revision?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_agenda_notes_item_id_fkey"
+            columns: ["item_id"]
+            isOneToOne: true
+            referencedRelation: "event_agenda_items"
             referencedColumns: ["id"]
           },
         ]
@@ -729,6 +850,39 @@ export type Database = {
             columns: ["sponsor_id"]
             isOneToOne: false
             referencedRelation: "sponsors"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      event_staff_volunteer_schedules: {
+        Row: {
+          event_id: string
+          id: string
+          label: string
+          sort_order: number
+          url: string
+        }
+        ComputedFields: never
+        Insert: {
+          event_id: string
+          id?: string
+          label?: string
+          sort_order?: number
+          url: string
+        }
+        Update: {
+          event_id?: string
+          id?: string
+          label?: string
+          sort_order?: number
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "event_staff_volunteer_schedules_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: true
+            referencedRelation: "events"
             referencedColumns: ["id"]
           },
         ]
@@ -1454,6 +1608,14 @@ export type Database = {
         Returns: boolean
       }
       admin_event_team_settings: { Args: { p_event_id: string }; Returns: Json }
+      agenda_draft_instant: {
+        Args: { p_date: string; p_time: string }
+        Returns: string
+      }
+      agenda_pacific_instant: {
+        Args: { p_date: string; p_time: string }
+        Returns: string
+      }
       application_decisions_released: {
         Args: { p_event_id: string }
         Returns: boolean
@@ -1505,6 +1667,10 @@ export type Database = {
       complete_application_email: {
         Args: { p_delivery_id: string; p_error_code?: string; p_sent: boolean }
         Returns: number
+      }
+      create_staff_volunteer_schedule: {
+        Args: { p_event_id: string; p_operation_id: string; p_url: string }
+        Returns: Json
       }
       create_team: {
         Args: { p_event_id: string; p_name?: string; p_user_id: string }
@@ -1607,6 +1773,7 @@ export type Database = {
           tickets: number
         }[]
       }
+      event_participant_content: { Args: { p_event_id: string }; Returns: Json }
       event_publication_health: {
         Args: { p_before: string }
         Returns: {
@@ -1681,9 +1848,24 @@ export type Database = {
         Args: { p_event_id: string; p_user_id: string }
         Returns: string
       }
+      mutate_item_check_in: {
+        Args: {
+          p_event_id: string
+          p_item_id: string
+          p_method?: string
+          p_qr_token?: string
+          p_ticket_id?: string
+          p_undo_version?: string
+        }
+        Returns: Json
+      }
       owns_event_application: {
         Args: { p_application_id: string }
         Returns: boolean
+      }
+      participant_agenda_location: {
+        Args: { p_location: Json; p_restricted: boolean }
+        Returns: Json
       }
       publish_due_events: { Args: Record<PropertyKey, never>; Returns: number }
       purchase_is_live: { Args: { p_purchase_id: string }; Returns: boolean }
@@ -1716,7 +1898,21 @@ export type Database = {
         }[]
       }
       safe_event_content_url: { Args: { p_url: string }; Returns: boolean }
+      safe_staff_schedule_url: { Args: { p_url: string }; Returns: boolean }
       save_admin_event_atomically: {
+        Args: {
+          p_application_questions: Json
+          p_check_in_sessions: Json
+          p_event: Json
+          p_event_id: string
+          p_expected_image_url: string
+          p_mentors: Json
+          p_slug: string
+          p_sponsors: Json
+        }
+        Returns: Json
+      }
+      save_admin_event_before_agenda: {
         Args: {
           p_application_questions: Json
           p_check_in_sessions: Json
@@ -1769,6 +1965,22 @@ export type Database = {
         Returns: Json
       }
       save_admin_event_builder: {
+        Args: {
+          p_application_questions: Json
+          p_check_in_sessions: Json
+          p_draft_id: string
+          p_draft_revision: number
+          p_event: Json
+          p_event_id: string
+          p_expected_header_image_url: string
+          p_expected_image_url: string
+          p_mentors: Json
+          p_slug: string
+          p_sponsors: Json
+        }
+        Returns: Json
+      }
+      save_admin_event_builder_before_agenda_timing: {
         Args: {
           p_application_questions: Json
           p_check_in_sessions: Json
@@ -1866,6 +2078,15 @@ export type Database = {
         }
         Returns: Json
       }
+      save_agenda_note: {
+        Args: {
+          p_body: string
+          p_event_id: string
+          p_expected_revision: number
+          p_item_id: string
+        }
+        Returns: Json
+      }
       save_event_application_questions: {
         Args: { p_event_id: string; p_questions: Json }
         Returns: Json
@@ -1890,6 +2111,7 @@ export type Database = {
           p_event_id: string
           p_links: Json
           p_operation_id: string
+          p_resources_version?: number
           p_revision: number
         }
         Returns: Json
@@ -1907,6 +2129,10 @@ export type Database = {
           missing_question_ids: string[]
           status: string
         }[]
+      }
+      sync_staff_schedule: {
+        Args: { p_document: Json; p_draft: boolean; p_event_id: string }
+        Returns: undefined
       }
       team_change_blocked: {
         Args: { p_event_id: string; p_user_id: string }
@@ -1983,6 +2209,10 @@ export type Database = {
       valid_other_allergies: { Args: { entries: string[] }; Returns: boolean }
       valid_user_interests: { Args: { tags: string[] }; Returns: boolean }
       validate_event_content: {
+        Args: { p_document: Json; p_draft?: boolean }
+        Returns: undefined
+      }
+      validate_staff_schedule_content: {
         Args: { p_document: Json; p_draft?: boolean }
         Returns: undefined
       }

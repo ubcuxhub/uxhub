@@ -11,6 +11,7 @@ import type { RegistryEntry } from "./types";
  * `ComponentType<SectionProps>`).
  */
 export const formsEntries: readonly RegistryEntry[] = [
+  { slug: "location-editor", title: "Location editor", category: "Forms", tier: "composite", description: "Whole-location fields for in-person, online and hybrid venues. Keeps inactive values and supports a restricted-location public summary. The caller owns audience, inheritance and validation.", importPath: "@/components/shared/LocationEditor", importNames: ["LocationEditor"], source: "src/components/shared/LocationEditor.tsx", spec: "Location editor", layout: "page" },
   {
     slug: "field",
     title: "Field",
@@ -84,7 +85,7 @@ export const formsEntries: readonly RegistryEntry[] = [
     category: "Forms",
     tier: "primitive",
     description:
-      "Choose one option from a short list in a menu, such as a year of study.",
+      "Choose one option from a short list. Optional multiline trigger uses card-radius corners and item descriptions show wrapping two-line values; default controls retain a single line.",
     importPath: "@/components/ui/select",
     importNames: [
       "Select",

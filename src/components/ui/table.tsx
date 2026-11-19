@@ -50,11 +50,14 @@ interface TableProps extends React.ComponentProps<"table"> {
   busy?: boolean;
   /** Classes for the scrolling wrapper. */
   scrollerClassName?: string;
+  /** Makes the horizontal scroll region named and keyboard-focusable. */
+  scrollerLabel?: string;
 }
 
 function Table({
   className,
   scrollerClassName,
+  scrollerLabel,
   stickyFirstColumn = false,
   busy = false,
   variant = "default",
@@ -87,6 +90,9 @@ function Table({
     <StickyContext value={stickyFirstColumn}>
       <div
         ref={scrollerRef}
+        role={scrollerLabel ? "region" : undefined}
+        aria-label={scrollerLabel}
+        tabIndex={scrollerLabel ? 0 : undefined}
         data-slot="table-scroller"
         // Both flags start `true` (nothing to scroll) until the effect measures.
         data-scroll-start="true"
