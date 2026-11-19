@@ -50,6 +50,12 @@ function Section() {
         <Specimen label="Used: checked in, dimmed code" className="w-96">
           <Ticket {...holder} state="used" code={<Qr />} />
         </Specimen>
+        <Specimen label="Expired: the event has ended, greyed, faded code" className="w-96">
+          <Ticket {...holder} state="expired" code={<Qr />} />
+        </Specimen>
+        <Specimen label="Expired, Orchid (dark label)" className="w-96">
+          <Ticket {...holder} eventColour="#C983C7" state="expired" code={<Qr />} />
+        </Specimen>
         <Specimen label="With action" className="w-96">
           <Ticket {...holder} code={<Qr />} action={<ViewTicket />} />
         </Specimen>

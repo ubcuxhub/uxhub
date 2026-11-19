@@ -1,5 +1,6 @@
 import { CalendarX, CircleMinus, Hourglass, Lock, type LucideIcon } from "lucide-react";
 
+import type { StatusBadgeSpec } from "@/components/ui/status-badge";
 import { formatEventDate, formatEventTime } from "@/lib/date";
 
 import type { EventState } from "./event-states";
@@ -39,13 +40,17 @@ export interface ActionLayoutProps {
 }
 
 export interface TicketLayoutProps {
+  /** A status badge above the copy: "Ticket expired" once the event ends. */
+  badge?: StatusBadgeSpec;
   /** Left out when the copy has no title: the description stands alone. */
   title?: string;
   description: string;
   /** What the price will be, before they've paid: "CA$15.00 for non-members". */
   priceLine?: string;
-  /** `locked` until they register; `used` once checked in. */
-  ticketState: "active" | "used" | "locked";
+  /** `locked` until they register; `used` once checked in; `expired` once the event ends. */
+  ticketState: "active" | "used" | "locked" | "expired";
+  /** A line under the ticket: "No longer valid" on an expired one. */
+  ticketNote?: string;
   primary?: PanelAction;
   secondary?: PanelAction;
 }
@@ -230,9 +235,12 @@ export function getPanelSpec(state: EventState, context: PanelContext): PanelSpe
         subheading: "1 ticket",
         layout: "ticket",
         props: {
+          // Everyone with a ticket sees this once the event ends, checked in or not.
+          badge: { status: "past", label: "Ticket expired" },
           title: `Thanks for coming to ${eventName}`,
-          description: "The event has ended",
-          ticketState: "active",
+          description: "This event has ended.",
+          ticketState: "expired",
+          ticketNote: "No longer valid",
         },
       };
     case "app-upcoming":

@@ -105,9 +105,11 @@ export interface TicketProps
    * `active` shows the code. `pending` (accepted, not yet confirmed) is greyed
    * and shows no code, since none exists yet. `used` (checked in) dims the code.
    * `locked` (offered a spot, not yet registered) keeps the event colour and
-   * shows a lock where the code will be.
+   * shows a lock where the code will be. `expired` (the event has ended,
+   * checked in or not) is the design system's Expired ticket: the fill turns
+   * grey, the sheen stops and the code fades to 60%.
    */
-  state?: "active" | "pending" | "used" | "locked";
+  state?: "active" | "pending" | "used" | "locked" | "expired";
   /** The QR slot, drawn inside a 72px white tile. Ignored while `pending` or `locked`. */
   code?: React.ReactNode;
   /**
@@ -146,6 +148,7 @@ function Ticket({
   const pending = state === "pending";
   const used = state === "used";
   const locked = state === "locked";
+  const expired = state === "expired";
   const { label, fill } = ticketAppearance(eventColour);
   const captionContent =
     caption ?? (pending ? "Not confirmed yet" : used ? "Checked in" : null);
@@ -155,7 +158,9 @@ function Ticket({
       ? "checked in"
       : locked
         ? "not registered yet"
-        : null;
+        : expired
+          ? "expired"
+          : null;
 
   return (
     <article
@@ -178,12 +183,13 @@ function Ticket({
         className={cn(
           "absolute inset-0 overflow-hidden",
           pending && "opacity-60 grayscale",
+          expired && "grayscale",
         )}
         style={{ background: fill, ...NOTCH_MASK_STYLE }}
       >
         {/* Layered as in the design system: fill, dither, sheen, then the code and text. */}
         <DitherOverlay />
-        {/* Only a live ticket shines; a greyed or checked-in one stays still. */}
+        {/* Only a live ticket shines; a greyed, expired or checked-in one stays still. */}
         {state === "active" || locked ? <TicketSheen /> : null}
         <span className="absolute inset-y-3.5 right-[calc(25%+10px)] w-0 border-l-2 border-dotted border-current opacity-60" />
       </div>
@@ -227,6 +233,7 @@ function Ticket({
             className={cn(
               "flex aspect-square w-[65%] max-w-18 items-center justify-center overflow-hidden rounded-xl border border-border-subtle bg-white text-black",
               used && "opacity-50",
+              expired && "opacity-60",
             )}
           >
             {locked ? (
