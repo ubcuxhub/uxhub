@@ -117,7 +117,7 @@ describe("Ticket", () => {
     ).toBeTruthy();
   });
 
-  it("cuts the notches out instead of painting them over the surface", () => {
+  it("cuts the six punches out instead of painting them over the surface", () => {
     const { container } = render(<Ticket {...base} />);
     const shape = container.querySelector(
       "[data-slot='ticket-shape']",
@@ -126,7 +126,9 @@ describe("Ticket", () => {
     expect(container.innerHTML).not.toContain("bg-background");
     const mask =
       shape.style.maskImage || shape.style.getPropertyValue("-webkit-mask-image");
-    expect(mask.match(/radial-gradient/g)).toHaveLength(2);
+    // The four corners and the two perforation stubs.
+    expect(mask.match(/radial-gradient/g)).toHaveLength(6);
+    expect(shape.className).not.toMatch(/\brounded-/);
   });
 
   it("says Checked in when used and keeps a dimmed code", () => {
