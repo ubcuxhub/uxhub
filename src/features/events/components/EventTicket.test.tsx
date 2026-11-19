@@ -82,4 +82,16 @@ describe("EventTicket", () => {
     expect(container.querySelectorAll("[data-slot='dither-overlay']")).toHaveLength(2);
     expect(container.querySelectorAll("[data-slot='ticket-sheen']")).toHaveLength(2);
   });
+
+  it("spins in and sways only in the pop-up, fading in under reduced motion", () => {
+    const { container, rerender } = render(<EventTicket {...base} />);
+    const card = () => container.querySelector("[data-slot='event-ticket-card']") as HTMLElement;
+    expect(card().className).not.toContain("animate-ticket-enter");
+
+    rerender(<EventTicket {...base} entrance />);
+    expect(card().className).toContain("motion-safe:animate-ticket-enter");
+    expect(card().className).toContain("motion-reduce:animate-ticket-fade");
+    // One 3D stage for the spin and the flip.
+    expect(container.querySelector("article")!.className).toContain("perspective-[2400px]");
+  });
 });

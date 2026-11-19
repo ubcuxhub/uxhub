@@ -23,7 +23,9 @@ export function TicketFlip({ front, back, className }: TicketFlipProps) {
   const [flipped, setFlipped] = useState(false);
 
   return (
-    <div className={cn("relative perspective-[1200px]", className)}>
+    // No perspective of its own: the ticket around it is the 3D stage, so the
+    // flip and the pop-up's spin share one (2400px, the ticket motion spec).
+    <div className={cn("relative transform-3d", className)}>
       <div
         className={cn(
           "relative size-full transform-3d motion-safe:transition-transform motion-safe:duration-expressive motion-safe:ease-out",
@@ -53,7 +55,7 @@ export function TicketFlip({ front, back, className }: TicketFlipProps) {
         type="button"
         aria-label={flipped ? "Flip ticket to show QR code" : "Flip ticket to show UX Hub logo"}
         onClick={() => setFlipped((value) => !value)}
-        className="absolute inset-0 cursor-pointer rounded-2xl focus-visible:focus-ring"
+        className="absolute inset-0 cursor-pointer rounded-2xl focus-visible:focus-ring focus-visible:outline-offset-4"
       />
     </div>
   );
