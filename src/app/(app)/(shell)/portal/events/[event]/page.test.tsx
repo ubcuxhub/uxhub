@@ -7,6 +7,8 @@ const fixtures = vi.hoisted(() => ({
   state: { kind: "reg-going", ticketId: "ticket-1" } as import("@/features/events/lib/event-states").EventState,
   fetchTicket: vi.fn(),
   fetchLinks: vi.fn(),
+  agenda: [] as import("@/lib/supabase-helpers/event-agenda").EventAgendaDay[],
+  agendaProps: vi.fn(),
   termEndsAt: null as string | null,
   user: { id: "user-1", first_name: "Ada", last_name: "Lovelace", email: "ada@example.test", membership_type_id: "tier", membership_expires_at: "2099-01-01T00:00:00Z" },
   event: { id: "event-1", slug: "sprint", name: "Design Sprint", status: "active", starts_at: "2099-01-01T18:00:00Z", ends_at: "2099-01-01T20:00:00Z", agenda_enabled: false, mentors_enabled: false, sponsors_enabled: false, description: "An event.", pricing_policy: "figma", regular_price: 20, member_price: 0 },
@@ -18,7 +20,7 @@ vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 vi.mock("@/lib/auth/guards", () => ({ requireAuth: async () => fixtures.user }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({}) }));
 vi.mock("@/lib/supabase-helpers/events", () => ({ fetchEventBySlug: async () => fixtures.event }));
-vi.mock("@/lib/supabase-helpers/event-agenda", () => ({ fetchEventParticipantContent: async () => ({ location: null, agenda: [] }) }));
+vi.mock("@/lib/supabase-helpers/event-agenda", () => ({ fetchEventParticipantContent: async () => ({ location: null, agenda: fixtures.agenda }) }));
 vi.mock("@/lib/supabase-helpers/event-people", () => ({ fetchEventPeopleSections: async () => [], fetchEventSponsors: async () => [] }));
 vi.mock("@/lib/supabase-helpers/event-links", () => ({ fetchEventLinks: fixtures.fetchLinks }));
 vi.mock("@/lib/supabase-helpers/event-tickets", () => ({ fetchUserEventTicket: fixtures.fetchTicket }));
@@ -26,7 +28,7 @@ vi.mock("@/features/events/lib/event-states", () => ({ loadEventStates: async ()
 vi.mock("@/features/memberships/lib/term", () => ({ getMembershipTermEndsAt: async () => fixtures.termEndsAt }));
 vi.mock("@/components/shared/PageContainer", () => ({ PageContainer: ({ children }: { children: ReactNode }) => <main>{children}</main> }));
 vi.mock("@/components/shared/FlowLink", () => ({ FlowLink: ({ children }: { children: ReactNode }) => <span>{children}</span> }));
-vi.mock("@/features/events/components/EventAgendaTable", () => ({ EventAgendaTable: () => null }));
+vi.mock("@/features/events/components/EventAgendaTable", () => ({ EventAgendaTable: (props: unknown) => { fixtures.agendaProps(props); return null; } }));
 vi.mock("@/features/events/components/EventPeopleCard", () => ({ EventPeopleCard: () => null }));
 vi.mock("@/features/events/components/teams/TeamCard", () => ({ TeamCard: () => null, TeamInviteNotice: () => null }));
 vi.mock("@/features/events/lib/team-card-data", () => ({ loadTeamCard: async () => null }));
@@ -57,6 +59,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   fixtures.state = { kind: "reg-going", ticketId: fixtures.ticket.id };
   fixtures.fetchLinks.mockResolvedValue([]);
+  fixtures.agenda = [];
   fixtures.fetchTicket.mockResolvedValue(fixtures.ticket);
   fixtures.termEndsAt = null;
   fixtures.user.membership_expires_at = "2099-01-01T00:00:00Z";
@@ -194,4 +197,28 @@ it("offers no test registration on a published event", async () => {
   fixtures.state = { kind: "reg-open", closesAt: null };
   await renderPage();
   expect(screen.queryByText("Test registration (staff only)")).toBeNull();
+});
+
+it("passes only links attached to an agenda item to the agenda, keyed by item", async () => {
+  fixtures.state = { kind: "reg-open", closesAt: null };
+  fixtures.agenda = [{ id: "day-1", date: "2099-01-01", title: "Kickoff", location_overridden: false, location: null, items: [
+    { id: "item-1", title: "Final presentations", starts_at: null, ends_at: null, description: null, check_in: false, location_overridden: false, location: null },
+  ] }];
+  fixtures.fetchLinks.mockResolvedValue([
+    { id: "slides", type: "other", label: "Slides", url: "https://example.test/slides", agenda_item_id: "item-1" },
+    { id: "slack", type: "slack_workspace", label: null, url: "https://example.test/slack", agenda_item_id: null },
+  ]);
+  await renderPage();
+  expect(fixtures.fetchLinks).toHaveBeenCalledWith(expect.anything(), "event-1");
+  expect(fixtures.agendaProps).toHaveBeenCalledWith(expect.objectContaining({
+    itemLinks: { "item-1": "https://example.test/slides" },
+    today: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+  }));
+});
+
+it("doesn't fetch links for agenda items when the event has no agenda", async () => {
+  fixtures.state = { kind: "reg-open", closesAt: null };
+  await renderPage();
+  expect(fixtures.fetchLinks).not.toHaveBeenCalled();
+  expect(fixtures.agendaProps).toHaveBeenCalledWith(expect.objectContaining({ itemLinks: {} }));
 });

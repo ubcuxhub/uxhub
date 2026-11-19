@@ -661,6 +661,7 @@ export type Database = {
       }
       event_links: {
         Row: {
+          agenda_item_id: string | null
           created_at: string
           event_id: string
           id: string
@@ -673,6 +674,7 @@ export type Database = {
         }
         ComputedFields: never
         Insert: {
+          agenda_item_id?: string | null
           created_at?: string
           event_id: string
           id?: string
@@ -684,6 +686,7 @@ export type Database = {
           visibility?: Database["public"]["Enums"]["event_link_visibility"]
         }
         Update: {
+          agenda_item_id?: string | null
           created_at?: string
           event_id?: string
           id?: string
@@ -695,6 +698,13 @@ export type Database = {
           visibility?: Database["public"]["Enums"]["event_link_visibility"]
         }
         Relationships: [
+          {
+            foreignKeyName: "event_links_agenda_item_id_fkey"
+            columns: ["agenda_item_id"]
+            isOneToOne: true
+            referencedRelation: "event_agenda_items"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "event_links_event_id_fkey"
             columns: ["event_id"]
