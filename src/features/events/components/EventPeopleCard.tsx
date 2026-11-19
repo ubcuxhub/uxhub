@@ -3,9 +3,12 @@ import type { ReactNode } from "react";
 import { Separator } from "@/components/ui/separator";
 import type { MentorRow, SponsorRow } from "@/lib/supabase/models";
 
-/** One card shows one kind of person; `type` decides which row type `people` holds. */
+/**
+ * One card is one people section (titled by the event's builder: Judges,
+ * Mentors, Speakers, Panelists or a custom name) or the sponsors list.
+ */
 type EventPeopleCardProps =
-  | { type: "mentors"; people: MentorRow[] }
+  | { type: "people"; title: string; people: MentorRow[] }
   | { type: "sponsors"; people: SponsorRow[] };
 
 /** What a row renders, whichever table it came from. */
@@ -17,69 +20,69 @@ interface PersonItem {
   link: { href: string; label: string; ariaLabel: string; icon: ReactNode } | null;
 }
 
-interface PeopleKind<Row> {
-  title: string;
-  singular: string;
-  plural: string;
-  toItem: (row: Row) => PersonItem;
-}
-
 const linkedInIcon = (
   // eslint-disable-next-line @next/next/no-img-element
   <img src="/icons/linkedin.svg" width={16} height={16} alt="" />
 );
 
 /**
- * Per-type setup. Adding judges or speakers later means adding an entry here
- * and a member to `EventPeopleCardProps`; the card itself stays the same.
+ * The count line's noun for the standard section titles. A custom title
+ * ("Organizers", "Hosts") counts people, since its singular can't be guessed.
  */
-const PEOPLE_KINDS: { mentors: PeopleKind<MentorRow>; sponsors: PeopleKind<SponsorRow> } = {
-  mentors: {
-    title: "Mentors",
-    singular: "mentor",
-    plural: "mentors",
-    toItem: (mentor) => ({
-      id: mentor.id,
-      name: mentor.full_name,
-      subtitle: mentor.position,
-      imageUrl: mentor.profile_image_path,
-      link: mentor.linkedin_url
-        ? {
-            href: mentor.linkedin_url,
-            label: "LinkedIn",
-            ariaLabel: `${mentor.full_name} on LinkedIn`,
-            icon: linkedInIcon,
-          }
-        : null,
-    }),
-  },
-  sponsors: {
-    title: "Sponsors",
-    singular: "sponsor",
-    plural: "sponsors",
-    // `sponsors` has no tagline or website column yet. Once it does, map the
-    // tagline to `subtitle` and the website to:
-    //   { href: sponsor.website_url, label: "Website", ariaLabel: `${sponsor.name} website`,
-    //     icon: <Link2 className="size-4 shrink-0 text-muted-foreground" aria-hidden /> }
-    // with `Link2` from lucide-react.
-    toItem: (sponsor) => ({
-      id: sponsor.id,
-      name: sponsor.name,
-      subtitle: null,
-      imageUrl: sponsor.brand_logo_path,
-      link: null,
-    }),
-  },
+const SECTION_NOUNS: Record<string, { singular: string; plural: string }> = {
+  mentors: { singular: "mentor", plural: "mentors" },
+  judges: { singular: "judge", plural: "judges" },
+  speakers: { singular: "speaker", plural: "speakers" },
+  panelists: { singular: "panelist", plural: "panelists" },
 };
+const PEOPLE_NOUN = { singular: "person", plural: "people" };
+const SPONSOR_NOUN = { singular: "sponsor", plural: "sponsors" };
 
-/** A card listing an event's mentors or sponsors. Renders nothing for an empty list. */
+/** Matches the database's one-title-per-event rule: case and spacing don't count. */
+export function sectionNoun(title: string) {
+  return SECTION_NOUNS[title.trim().toLowerCase()] ?? PEOPLE_NOUN;
+}
+
+function mentorItem(mentor: MentorRow): PersonItem {
+  return {
+    id: mentor.id,
+    name: mentor.full_name,
+    subtitle: mentor.position,
+    imageUrl: mentor.profile_image_path,
+    link: mentor.linkedin_url
+      ? {
+          href: mentor.linkedin_url,
+          label: "LinkedIn",
+          ariaLabel: `${mentor.full_name} on LinkedIn`,
+          icon: linkedInIcon,
+        }
+      : null,
+  };
+}
+
+// `sponsors` has description and website_url columns now. To show them, map
+// the description to `subtitle` and the website to:
+//   { href: sponsor.website_url, label: "Website", ariaLabel: `${sponsor.name} website`,
+//     icon: <Link2 className="size-4 shrink-0 text-muted-foreground" aria-hidden /> }
+// with `Link2` from lucide-react.
+function sponsorItem(sponsor: SponsorRow): PersonItem {
+  return {
+    id: sponsor.id,
+    name: sponsor.name,
+    subtitle: null,
+    imageUrl: sponsor.brand_logo_path,
+    link: null,
+  };
+}
+
+/** A card listing one people section or the sponsors. Renders nothing for an empty list. */
 export function EventPeopleCard(props: EventPeopleCardProps) {
   if (props.people.length === 0) return null;
 
-  const { title, singular, plural, items } =
-    props.type === "mentors"
-      ? { ...PEOPLE_KINDS.mentors, items: props.people.map(PEOPLE_KINDS.mentors.toItem) }
-      : { ...PEOPLE_KINDS.sponsors, items: props.people.map(PEOPLE_KINDS.sponsors.toItem) };
+  const { title, noun, items } =
+    props.type === "people"
+      ? { title: props.title, noun: sectionNoun(props.title), items: props.people.map(mentorItem) }
+      : { title: "Sponsors", noun: SPONSOR_NOUN, items: props.people.map(sponsorItem) };
 
   return (
     <section className="flex flex-col gap-5 rounded-md border border-border-subtle p-6">
@@ -87,7 +90,7 @@ export function EventPeopleCard(props: EventPeopleCardProps) {
         <div className="flex flex-col gap-3">
           <h3 className="text-h3">{title}</h3>
           <p className="text-muted-foreground">
-            Displaying {items.length} {items.length === 1 ? singular : plural}
+            Displaying {items.length} {items.length === 1 ? noun.singular : noun.plural}
           </p>
         </div>
         <Separator />
