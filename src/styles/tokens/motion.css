@@ -1,0 +1,45 @@
+/* Motion tokens: the Portal Motion handoff (Notion, section 2), matching the
+   Figma `duration/*` and `ease/*` variables. Names follow docs/design-system.md
+   2.11 (`duration/base` ↔ `--duration-base`).
+
+   Unlike the colour tokens, these are declared in `@theme`, not `:root`: the
+   guide's names are Tailwind's own theme names, so a `:root` token mapped into
+   `@theme` would point at itself. `static` emits every one on `:root` even
+   when no class uses it, so plain CSS (keyframes, inline styles) can read
+   `var(--duration-base)` too. `ease-*` classes come with the namespace; the
+   `duration-*` classes are in globals.css.
+
+   Two tiers. Functional (≤ 250ms) is the only tier allowed in payments,
+   applications, errors, account info, destructive actions and admin.
+   Expressive is for decorative moments only (ticket, membership, Log in brand
+   panel). One-off values the guide approves (ticket spin and sway, brand
+   panel) stay with their component. */
+
+@theme static {
+  /* Movement under reduced motion; old content leaving before new fades in. */
+  --duration-instant: 0ms;
+  /* Hover, press, focus, colour changes, badge swaps; menus, dialogs,
+     tooltips and toasts leaving. */
+  --duration-fast: 150ms;
+  /* Menus, popovers, dialogs and content swaps entering; switch thumb and
+     segmented highlight moving; drawers, sheets and the sidebar leaving. */
+  --duration-base: 200ms;
+  /* Toasts entering; side peek drawer, sheets and the sidebar entering. */
+  --duration-slow: 250ms;
+  /* Expressive: ticket flip, success moments. */
+  --duration-expressive: 600ms;
+  /* One spinner turn; one QR scan-line pass. */
+  --duration-loop: 1200ms;
+
+  /* Entering, hover, press, colour changes, ticket flip. */
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  /* Leaving. */
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  /* Moving between two spots (switch thumb, segmented highlight), ticket
+     sheen, scan line. */
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  /* Expressive: ticket spin, membership card, checkmark draw-on. */
+  --ease-expressive: cubic-bezier(0.16, 1, 0.3, 1);
+  /* Spinners and timers only. */
+  --ease-linear: linear;
+}

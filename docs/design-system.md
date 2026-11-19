@@ -234,16 +234,44 @@ Lucide (`lucide-static` 1.55.0; `lucide-react` in code), 1.5px stroke.
 
 ### 2.8 Motion
 
-One curve, ease-out `cubic-bezier(0, 0, 0.2, 1)`; never linear or bounce.
+The Portal Motion handoff in Notion is the spec: every motion spot by page,
+with a demo, priority and reduced-motion behaviour. Tokens live in
+`src/styles/tokens/motion.css`. Use a token class (`duration-base
+ease-out`) or variable (`var(--duration-base)`), never a typed millisecond
+value, unless the spot's row approves a one-off.
 
-| Duration | Use | What changes |
-| --- | --- | --- |
-| 150ms | Hover/press on buttons, rows, chips, nav | Fill and border colour only |
-| 200ms | Menus, tooltips, dialogs, expanding panels entering | Fade + short slide or scale |
-| 250ms | Toasts entering | Fade + slide from the edge |
+| Duration | CSS variable / class | Value | Tier | Use |
+| --- | --- | --- | --- | --- |
+| `duration/instant` | `--duration-instant` / `duration-instant` | 0ms | Functional | Movement under reduced motion; old content leaving before new fades in |
+| `duration/fast` | `--duration-fast` / `duration-fast` | 150ms | Functional | Hover, press, focus, colour changes; menus, dialogs, tooltips and toasts leaving |
+| `duration/base` | `--duration-base` / `duration-base` | 200ms | Functional | Menus, popovers, dialogs, content swaps entering; thumbs and highlights moving; drawers and sheets leaving |
+| `duration/slow` | `--duration-slow` / `duration-slow` | 250ms | Functional | Toasts entering; drawers, sheets and the sidebar entering |
+| `duration/expressive` | `--duration-expressive` / `duration-expressive` | 600ms | Expressive | Ticket flip, success moments |
+| `duration/loop` | `--duration-loop` / `duration-loop` | 1200ms | Functional | One spinner turn; one QR scan-line pass |
 
-Reduced motion keeps only fades. Cards never lift. Buttons show progress in
-place; content loads into shaped skeletons.
+| Easing | CSS variable / class | Curve | Tier | Use |
+| --- | --- | --- | --- | --- |
+| `ease/out` | `--ease-out` / `ease-out` | `cubic-bezier(0, 0, 0.2, 1)` | Functional | Entering, hover, press, colour changes |
+| `ease/in` | `--ease-in` / `ease-in` | `cubic-bezier(0.4, 0, 1, 1)` | Functional | Leaving |
+| `ease/in-out` | `--ease-in-out` / `ease-in-out` | `cubic-bezier(0.4, 0, 0.2, 1)` | Functional | Moving between two spots |
+| `ease/expressive` | `--ease-expressive` / `ease-expressive` | `cubic-bezier(0.16, 1, 0.3, 1)` | Expressive | Ticket spin, membership card, checkmark draw-on |
+| `ease/linear` | `--ease-linear` / `ease-linear` | `linear` | Functional | Spinners and timers only |
+
+A bare `transition` is `fast` on `ease-out`.
+
+- **Tiers:** functional motion stays at or under 250ms and is the only tier
+  in payments, applications, errors, account info, destructive actions and
+  admin. Expressive motion (at most 1000ms) is for decorative moments only:
+  the ticket, membership, the Log in brand panel.
+- **Direction:** `ease-out` entering, `ease-in` leaving, `ease-in-out`
+  moving between two spots. No bounce.
+- **Properties:** animate only `opacity`, `transform`, `background-color`,
+  `border-color` and `color`. Never animate width or height; space is
+  reserved, so content never shifts after load.
+- **Reduced motion:** movement drops to a fade or an instant change, and
+  expressive motion shows its still frame. Spinners keep turning.
+- Cards never lift. Buttons show progress in place. Content loads into shaped
+  skeletons, which stay still (no pulse). Hubbo doesn't animate.
 
 **Ambient brand motion.** The one place motion is decoration rather than
 feedback: the auth shell's brand panel (`BrandMotion`, used on sign-in,
@@ -350,7 +378,9 @@ Text styles map to the classes in the 2.2 table (`Headers/Header 1` →
 `text-h1`, `Body/Small Body` → `text-small`, `Badge/Labels/Status Label` →
 `text-badge`). Effect style `Shadow/Overlay` → `--shadow-overlay`. Radius,
 Spacing and Stroke map to Tailwind's default classes (2.4, 2.5); only the
-Density variables exist in CSS, used as `h-(--size-control)`.
+Density variables exist in CSS, used as `h-(--size-control)`. Motion
+variables `duration/*` and `ease/*` map to `--duration-*` and `--ease-*` and
+their classes (2.8).
 
 Rules: bind every fill, stroke, radius, gap and padding to a variable (a raw
 hex or typed number is a bug); screens use Colour Tokens only.

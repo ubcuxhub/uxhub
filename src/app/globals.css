@@ -2,6 +2,7 @@
 @import "tw-animate-css";
 @import "../styles/tokens/primitives.css";
 @import "../styles/tokens/semantic.css";
+@import "../styles/tokens/motion.css";
 @import "../styles/marketing.css";
 
 /* Dark mode via `data-theme="dark"` on <html> (see src/lib/theme.ts) */
@@ -136,10 +137,40 @@
   --color-brand-purple-700: var(--colour-purple-700);
 }
 
-/* Every `transition-*` utility uses the design-system curve (§2.8). Tailwind's
-   `ease-out` is the same curve. */
+/* A bare `transition-*` utility enters on `ease-out` at `fast` (§2.8); pick
+   another token with `ease-*` and `duration-*`. Both match Tailwind's own
+   defaults, so this names them rather than changing them. */
 @theme {
-  --default-transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  --default-transition-timing-function: var(--ease-out);
+  --default-transition-duration: var(--duration-fast);
+}
+
+/* Motion duration tokens as classes (`duration-base`), beside Tailwind's
+   numeric `duration-200`. Prefer the tokens; a number needs the motion guide's
+   "other (explain)" reason. */
+@utility duration-instant {
+  --tw-duration: var(--duration-instant);
+  transition-duration: var(--duration-instant);
+}
+@utility duration-fast {
+  --tw-duration: var(--duration-fast);
+  transition-duration: var(--duration-fast);
+}
+@utility duration-base {
+  --tw-duration: var(--duration-base);
+  transition-duration: var(--duration-base);
+}
+@utility duration-slow {
+  --tw-duration: var(--duration-slow);
+  transition-duration: var(--duration-slow);
+}
+@utility duration-expressive {
+  --tw-duration: var(--duration-expressive);
+  transition-duration: var(--duration-expressive);
+}
+@utility duration-loop {
+  --tw-duration: var(--duration-loop);
+  transition-duration: var(--duration-loop);
 }
 
 /* ── shadcn bridge ──────────────────────────────────────────────────────
