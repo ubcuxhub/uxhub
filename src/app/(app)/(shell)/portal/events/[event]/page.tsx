@@ -12,7 +12,7 @@ import { fetchEventAgenda } from "@/lib/supabase-helpers/event-agenda";
 import { Calendar, Link2, MapPin } from "lucide-react";
 import { formatEventDate, formatEventTime, pacificDate } from "@/lib/date";
 import { resolveImagePreviewSrc } from "@/lib/event-image";
-import { fetchEventMentors, fetchEventSponsors } from "@/lib/supabase-helpers/event-people";
+import { fetchEventPeopleSections, fetchEventSponsors } from "@/lib/supabase-helpers/event-people";
 import { EventPeopleCard } from "@/features/events/components/EventPeopleCard";
 import { eventBadgeFor } from "@/features/events/lib/event-badge";
 import { loadEventStates } from "@/features/events/lib/event-states";
@@ -38,10 +38,11 @@ export default async function PortalEventPage({
     notFound();
   }
   
-  const [agenda, mentors, sponsors, states] = await Promise.all([
+  const [agenda, peopleSections, sponsors, states] = await Promise.all([
     fetchEventAgenda(supabase, event.id),
-    // Admins switch these sections off per event, as the public event page does.
-    event.mentors_enabled ? fetchEventMentors(supabase, event.id) : [],
+    // Admins switch these sections off per event, as the public event page
+    // does. `mentors_enabled` predates people sections and covers all of them.
+    event.mentors_enabled ? fetchEventPeopleSections(supabase, event.id) : [],
     event.sponsors_enabled ? fetchEventSponsors(supabase, event.id) : [],
     loadEventStates(supabase, user.id, [event]),
   ]);
@@ -79,10 +80,10 @@ export default async function PortalEventPage({
 
             <hr className="w-full border-border-subtle" />
 
-            <div className="flex flex-col sm:flex-row justify-between gap-4"> 
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <div className="flex items-center gap-3 text-small">
                 <span className="flex size-12 shrink-0 items-center justify-center rounded-md border-[0.8px] text-muted-foreground"><Calendar className="size-5" aria-hidden /></span>
-                <div className="flex flex-col gap-1">
+                <div className="flex min-w-0 flex-col gap-1 break-words">
                   <p className="font-medium">
                     {formatEventDate(event.starts_at, { year: "numeric", month: "short" }) ?? "TBD"}
                     {endsOnLaterDay
@@ -98,9 +99,9 @@ export default async function PortalEventPage({
                 </div>
               </div>
 
-              <div className="flex items-start gap-3 text-small">
+              <div className="flex items-center gap-3 text-small">
                 <span className="flex size-12 shrink-0 items-center justify-center rounded-md border-[0.8px] text-muted-foreground"><MapPin className="size-5" aria-hidden /></span>
-                <div className="flex flex-col gap-1">
+                <div className="flex min-w-0 flex-col gap-1 break-words">
                   <p className="font-medium">{event.location_building || "TBD"}</p>
                   <p className="text-muted-foreground">{event.location_room || ""}</p>
                 </div>
@@ -108,7 +109,7 @@ export default async function PortalEventPage({
 
               <div className="flex items-center gap-3 text-small">
                 <span className="flex size-12 shrink-0 items-center justify-center rounded-md border-[0.8px] text-muted-foreground"><Link2 className="size-5" aria-hidden /></span>
-                <div className="flex flex-col gap-1">
+                <div className="flex min-w-0 flex-col gap-1 break-words">
                   <p className="font-medium">Event details</p>
                   {/* TODO: make this the actual event website - does this need a migration? */}
                   <Link href={`/events/${event.slug}`} className="text-muted-foreground">
@@ -127,7 +128,14 @@ export default async function PortalEventPage({
       
       <EventAgendaTable eventName={event.name} agenda={agenda} />
 
-      <EventPeopleCard type="mentors" people={mentors} />
+      {peopleSections.map((section) => (
+        <EventPeopleCard
+          key={section.id}
+          type="people"
+          title={section.title}
+          people={section.people}
+        />
+      ))}
       <EventPeopleCard type="sponsors" people={sponsors} />
     </PageContainer>
   );
