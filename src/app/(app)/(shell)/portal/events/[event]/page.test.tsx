@@ -34,15 +34,23 @@ vi.mock("@/features/events/lib/team-card-data", () => ({ loadTeamCard: async () 
 import PortalEventPage from "./page";
 import { RegistrationPanel } from "@/features/events/components/RegistrationPanel";
 
-// Resolve the async server child before rendering its client controls in jsdom.
+// Resolve the async server child before rendering its client controls in
+// jsdom. It can sit inside a layout wrapper (the Registration and Your team
+// row), so search the whole tree, not just the page's direct children.
+async function resolveRegistrationPanel(node: ReactNode): Promise<ReactNode> {
+  if (!isValidElement<{ children?: ReactNode }>(node)) return node;
+  if (node.type === RegistrationPanel) {
+    const props = node.props as unknown as Parameters<typeof RegistrationPanel>[0];
+    return cloneElement(await RegistrationPanel(props), { key: node.key });
+  }
+  if (node.props.children === undefined) return node;
+  const children = await Promise.all(Children.toArray(node.props.children).map(resolveRegistrationPanel));
+  return cloneElement(node, {}, children);
+}
+
 async function renderPage() {
   const page = await PortalEventPage({ params: Promise.resolve({ event: "sprint" }), searchParams: Promise.resolve({}) });
-  const children = await Promise.all(Children.toArray(page.props.children).map(async (child) =>
-    isValidElement<Parameters<typeof RegistrationPanel>[0]>(child) && child.type === RegistrationPanel
-      ? cloneElement(await RegistrationPanel(child.props), { key: child.key })
-      : child
-  ));
-  return render(cloneElement(page, {}, children));
+  return render(await resolveRegistrationPanel(page));
 }
 afterEach(cleanup);
 beforeEach(() => {
