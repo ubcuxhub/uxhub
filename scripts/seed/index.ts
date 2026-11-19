@@ -653,25 +653,48 @@ async function reconcileSponsors(
   }
 }
 
-/** The event's links, keyed by URL, in order. */
-function reconcileEventLinks(
+/**
+ * The event's links, keyed by URL, in order. A link with `agendaItem` is
+ * attached to that item, so this runs after `reconcileAgenda`.
+ */
+async function reconcileEventLinks(
   supabase: SupabaseClient,
   eventId: string,
   seed: SeedEvent,
   options: Options
 ): Promise<Counts> {
+  const links = seed.links ?? [];
+  const itemIds = new Map<string, string>();
+  if (!options.dryRun && links.some((link) => link.agendaItem)) {
+    const { data, error } = await supabase
+      .from(TABLE.eventAgendaItems)
+      .select("id, title, event_agenda_days!inner(date, event_id)")
+      .eq("event_agenda_days.event_id", eventId);
+    if (error) throw error;
+    for (const row of data ?? []) {
+      const day = row.event_agenda_days as unknown as { date: string };
+      itemIds.set(`${day.date}|${row.title}`, row.id as string);
+    }
+  }
   return reconcileChildren(
     supabase,
     TABLE.eventLinks,
     "event_id",
     eventId,
     "url",
-    (seed.links ?? []).map((link, sortOrder) => ({
-      ...link,
-      label: link.label ?? null,
-      visibility: link.visibility ?? "everyone",
-      sort_order: sortOrder,
-    })),
+    links.map(({ agendaItem, ...link }, sortOrder) => {
+      const key = agendaItem && `${dateString(agendaItem.date)}|${agendaItem.title}`;
+      if (key && !options.dryRun && !itemIds.has(key)) {
+        throw new Error(`No agenda item "${agendaItem.title}" on ${dateString(agendaItem.date)} for link ${link.url}`);
+      }
+      return {
+        ...link,
+        label: link.label ?? null,
+        visibility: link.visibility ?? "everyone",
+        sort_order: sortOrder,
+        agenda_item_id: key ? itemIds.get(key) ?? null : null,
+      };
+    }),
     options
   );
 }
@@ -1128,12 +1151,13 @@ async function main(): Promise<void> {
       if (!options.dryRun) {
         await reconcileSponsors(supabase, eventId, seed);
       }
+      // The agenda first: a link can name one of its items.
+      addCounts(agendaCounts, await reconcileAgenda(supabase, eventId, seed, options));
       addCounts(linkCounts, await reconcileEventLinks(supabase, eventId, seed, options));
       addCounts(
         privateDetailCounts,
         await reconcilePrivateDetails(supabase, eventId, seed, options)
       );
-      addCounts(agendaCounts, await reconcileAgenda(supabase, eventId, seed, options));
       if (!options.dryRun) await reconcileBuilderSettings(supabase, eventId, seed);
     }
 

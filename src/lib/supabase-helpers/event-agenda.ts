@@ -16,6 +16,8 @@ export interface EventAgendaDay {
   id: string;
   date: string;
   title: string | null;
+  /** The day set its own location, rather than using the event's. */
+  location_overridden: boolean;
   location: ParticipantLocation | null;
   items: EventAgendaItem[];
 }

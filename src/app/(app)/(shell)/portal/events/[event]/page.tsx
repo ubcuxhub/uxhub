@@ -13,6 +13,7 @@ import { FLAGS } from "@/lib/flags";
 import { createClient } from "@/lib/supabase/server";
 import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
 import { fetchEventParticipantContent } from "@/lib/supabase-helpers/event-agenda";
+import { fetchEventLinks } from "@/lib/supabase-helpers/event-links";
 import { Calendar, Link2, MapPin } from "lucide-react";
 import { formatEventDate, formatEventTime, pacificDate } from "@/lib/date";
 import { resolveImagePreviewSrc } from "@/lib/event-image";
@@ -55,7 +56,12 @@ export default async function PortalEventPage({
   const joinCode = typeof join === "string" ? join : null;
   const origin = getHeadersOrigin(await headers()) ?? "";
   const [participant, mentors, sponsors, states, teams] = await Promise.all([
-    fetchEventParticipantContent(supabase, event.id),
+    // Agenda item links come from event_links, which RLS filters by each
+    // link's visibility. Only fetched when there's an agenda to put them on.
+    fetchEventParticipantContent(supabase, event.id).then(async (content) => ({
+      ...content,
+      links: content.agenda.some((day) => day.items.length > 0) ? await fetchEventLinks(supabase, event.id) : [],
+    })),
     // Admins switch these sections off per event, as the public event page does.
     event.mentors_enabled ? fetchEventMentors(supabase, event.id) : [],
     event.sponsors_enabled ? fetchEventSponsors(supabase, event.id) : [],
@@ -164,7 +170,14 @@ export default async function PortalEventPage({
       ) : null}
 
 
-      <EventAgendaTable eventName={event.name} agenda={participant.agenda} />
+      <EventAgendaTable
+        eventName={event.name}
+        agenda={participant.agenda}
+        today={pacificDate(new Date().toISOString())}
+        itemLinks={Object.fromEntries(
+          participant.links.flatMap((link) => (link.agenda_item_id ? [[link.agenda_item_id, link.url]] : []))
+        )}
+      />
 
       {!eventWorkingDocument(event) && <EventPeopleCard type="mentors" people={mentors} />}
       {!eventWorkingDocument(event) && <EventPeopleCard type="sponsors" people={sponsors} />}

@@ -158,10 +158,10 @@ Beyond dates and prices, the fixtures fill in the event page:
 
 | Event | Dates | Also seeds |
 | --- | --- | --- |
-| `design-sprint-past`, `design-sprint-upcoming` | Monday to the next week's Friday | 6-day agenda, Mentors, teams of 3–4, Slack and participant package links |
+| `design-sprint-past`, `design-sprint-upcoming` | Monday to the next week's Friday | 6-day agenda over two weeks (week tabs), Mentors, teams of 3–4, Slack and participant package links. Two agenda item links: Final presentations → slides template (everyone), Crazy eights and storyboards → storyboard template (going only) |
 | `uxathon-past`, `uxathon-upcoming` | Saturday to Sunday | 2-day agenda, Mentors, teams of 2–4, links (the past one has a recap). The upcoming one is featured |
 | `thinkbox-office-tour`, `portfolio-review-night`, `student-panel` | One day | A one-day agenda |
-| `mentorship-program` | Ongoing | Teams open for two weeks, with going-only links |
+| `mentorship-program` | Ongoing | Teams open for two weeks, with going-only links. Three agenda sessions months apart (kickoff, mid-point critique, showcase), so the agenda shows a tab per day |
 | `industry-talk-ai-and-ux`, `student-panel` | — | Online, with meeting details |
 | `industry-talk-design-systems` | — | Hybrid, with meeting details the three deep fixtures can see |
 

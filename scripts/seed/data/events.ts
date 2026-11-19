@@ -65,6 +65,14 @@ type AgendaItem = {
 /** A card of people on the event page; `people` become `mentors` rows. */
 type PeopleSection = { title: string; people: Mentor[] };
 
+/**
+ * An event link. `agendaItem` attaches it to the agenda item with that title
+ * on that day, whose title then links here (`event_links.agenda_item_id`).
+ */
+type SeedLink = Omit<TablesInsert<"event_links">, "event_id" | "agenda_item_id"> & {
+  agendaItem?: { date: Date; title: string };
+};
+
 /** A sponsor, keyed by its logo URL. */
 type SeedSponsor = {
   name: string;
@@ -101,7 +109,7 @@ export interface SeedEvent {
   /** Ordered groups supported by the delivered builder; attendee expansion is deferred. */
   peopleSections?: PeopleSection[];
   sponsors?: SeedSponsor[];
-  links?: Omit<TablesInsert<"event_links">, "event_id">[];
+  links?: SeedLink[];
   staffVolunteerSchedule?: string;
   /** Online meeting details, readable only by ticket holders and admins. */
   privateDetails?: Omit<TablesInsert<"event_private_details">, "event_id">;
@@ -597,6 +605,60 @@ function designSprintAgendaDays(start: Date): SeedAgendaDay[] {
   ];
 }
 
+/**
+ * Design sprint agenda item links (Figma 4640:844): the final day's
+ * presentations link a slides template for everyone, and the sketching
+ * session links a storyboard template for ticket holders only.
+ */
+function designSprintItemLinks(start: Date): SeedLink[] {
+  return [
+    {
+      type: "other",
+      label: "Presentation slides template",
+      url: "https://example.com/design-sprint/presentation-template",
+      visibility: "everyone",
+      agendaItem: { date: addDays(start, 11), title: "Final presentations" },
+    },
+    {
+      type: "other",
+      label: "Storyboard template",
+      url: "https://example.com/design-sprint/storyboard-template",
+      visibility: "going",
+      agendaItem: { date: addDays(start, 7), title: "Crazy eights and storyboards" },
+    },
+  ];
+}
+
+/**
+ * Three program sessions months apart, each in its own week, so the agenda
+ * shows a tab per day (Figma 4623:165).
+ */
+function mentorshipAgendaDays(start: Date, end: Date): SeedAgendaDay[] {
+  return [
+    {
+      date: start,
+      title: "Program kickoff",
+      items: [
+        { title: "Welcome and mentor pairing", start: "18:00", end: "19:00" },
+        { title: "Goal-setting with your mentor", start: "19:00", end: "20:00" },
+      ],
+    },
+    {
+      date: addMonths(start, 3),
+      title: "Mid-point critique",
+      items: [{ title: "Portfolio critique circles", start: "18:00", end: "20:00" }],
+    },
+    {
+      date: end,
+      title: "Showcase",
+      items: [
+        { title: "Mentee showcase", start: "18:00", end: "19:30" },
+        { title: "Closing and thank-yous", start: "19:30", end: "20:00" },
+      ],
+    },
+  ];
+}
+
 /** A Saturday-to-Sunday UXathon. */
 function uxathonAgendaDays(saturday: Date): SeedAgendaDay[] {
   return [
@@ -776,6 +838,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
         url: "https://example.com/design-sprint/participant-package.pdf",
         visibility: "going",
       },
+      ...designSprintItemLinks(schedule.designSprintPast),
     ],
     agendaDays: designSprintAgendaDays(schedule.designSprintPast),
     checkInSessions: [
@@ -980,6 +1043,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
         visibility: "going",
       },
     ],
+    agendaDays: mentorshipAgendaDays(schedule.mentorshipStart, schedule.mentorshipEnd),
     checkInSessions: [
       {
         name: "Door Check-in",
@@ -1243,6 +1307,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
         url: "https://example.com/design-sprint/participant-package.pdf",
         visibility: "going",
       },
+      ...designSprintItemLinks(schedule.designSprintUpcoming),
     ],
     agendaDays: designSprintAgendaDays(schedule.designSprintUpcoming),
     checkInSessions: [

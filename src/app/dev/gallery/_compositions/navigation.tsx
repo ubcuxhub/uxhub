@@ -170,11 +170,11 @@ function Sponsors() {
 
 const agendaLocation = { type: "in_person" as const, restricted: false, building: "Innovation Center", room: "Studio A", address: "2366 Main Mall", map_url: "https://example.com/map" };
 const AGENDA: EventAgendaDay[] = [
-  { id: "day-1", date: "2027-01-09", title: "Opening studio", location: agendaLocation, items: [
+  { id: "day-1", date: "2027-01-09", title: "Opening studio", location_overridden: false, location: agendaLocation, items: [
     { id: "welcome", title: "Check-in and welcome", starts_at: "2027-01-09T16:00:00Z", ends_at: "2027-01-09T17:00:00Z", check_in: true, description: "Bring a laptop and meet your team.", location: agendaLocation, location_overridden: false },
     { id: "overnight", title: "Late-night remote studio", starts_at: "2027-01-10T06:00:00Z", ends_at: "2027-01-10T08:00:00Z", check_in: false, description: null, location_overridden: true, location: { type: "online", restricted: false, meeting_url: "https://example.com/join", meeting_id: "123 456", meeting_passcode: "studio" } },
   ] },
-  { id: "day-2", date: "2027-01-23", title: "Final presentations", location: agendaLocation, items: [
+  { id: "day-2", date: "2027-01-23", title: "Final presentations", location_overridden: false, location: agendaLocation, items: [
     { id: "presentations", title: "Presentations and closing", starts_at: "2027-01-23T21:00:00Z", ends_at: "2027-01-23T23:00:00Z", check_in: false, description: null, location: agendaLocation, location_overridden: false },
   ] },
 ];
