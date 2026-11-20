@@ -55,7 +55,7 @@ describe("getPanelSpec", () => {
     ["reg-closed", "alert", "Registration"],
     ["reg-going", "ticket", "Registration"],
     ["reg-checked-in", "ticket", "Registration"],
-    ["reg-past", "alert", "Registration"],
+    ["reg-past", "action", "Registration"],
     ["reg-past-attended", "ticket", "Registration"],
     ["app-upcoming", "alert", "Application"],
     ["app-open", "action", "Application"],
@@ -142,6 +142,10 @@ describe("getPanelSpec", () => {
     }
   });
 
+  it("leaves a past event without a ticket as plain copy", () => {
+    expect(spec("reg-past").props).not.toHaveProperty("action");
+  });
+
   it("gives no actions on a past ticket", () => {
     const props = spec("reg-past-attended").props as { primary?: unknown; secondary?: unknown };
     expect(props.primary).toBeUndefined();
@@ -184,7 +188,10 @@ describe("getPanelSpec", () => {
   // later offer to someone on the waitlist; nothing else is promised.
   it("says decisions and waitlist offers are emailed", () => {
     expect(spec("app-in-review").props).toMatchObject({ description: "We’ll email you when there’s a decision, and it’ll show here too." });
-    expect(spec("app-waitlisted").props).toMatchObject({ description: "If a spot opens up, we’ll email you and it’ll show here." });
+    expect(spec("app-waitlisted").props).toMatchObject({
+      description:
+        "You’ll be notified here on the portal and by email if you’re offered a spot. You don’t need to do anything until then.",
+    });
     for (const kind of ["app-accepted", "app-rejected", "app-offer-expired"] as const) {
       expect(JSON.stringify(spec(kind).props)).not.toMatch(/e-?mail/i);
     }

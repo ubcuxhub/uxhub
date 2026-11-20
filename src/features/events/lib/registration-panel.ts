@@ -36,7 +36,8 @@ export interface AlertLayoutProps {
 export interface ActionLayoutProps {
   title: string;
   description?: string;
-  action: PanelAction;
+  /** Left out for plain copy, such as a past event the student didn't go to. */
+  action?: PanelAction;
 }
 
 export interface TicketLayoutProps {
@@ -218,11 +219,11 @@ export function getPanelSpec(state: EventState, context: PanelContext): PanelSpe
         },
       };
     case "reg-past":
+      // Plain copy, not an alert: nothing went wrong (Figma 1.17).
       return {
         title: "Registration",
-        layout: "alert",
+        layout: "action",
         props: {
-          variant: "neutral",
           title: "Registration is closed",
           description: context.endsAt
             ? `This event ended on ${longDate(context.endsAt)}.`
@@ -314,7 +315,8 @@ export function getPanelSpec(state: EventState, context: PanelContext): PanelSpe
           variant: "warning",
           icon: Hourglass,
           title: "You’re on the waitlist",
-          description: "If a spot opens up, we’ll email you and it’ll show here.",
+          description:
+            "You’ll be notified here on the portal and by email if you’re offered a spot. You don’t need to do anything until then.",
         },
       };
     case "app-accepted":

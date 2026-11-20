@@ -159,7 +159,7 @@ function ActionLayout({ title, description, action }: ActionLayoutProps) {
         <p className="text-body font-medium">{title}</p>
         {description ? <p className="text-small text-muted-foreground">{description}</p> : null}
       </div>
-      <PanelButton action={action} className="@max-xl:w-full" />
+      {action ? <PanelButton action={action} className="@max-xl:w-full" /> : null}
     </div>
   );
 }
