@@ -201,7 +201,8 @@ describe("getPanelSpec", () => {
     expect(spec("reg-full").props).toMatchObject({ variant: "destructive" });
     expect(spec("app-in-review").props).toMatchObject({ variant: "warning" });
     expect(spec("reg-closed").props).toMatchObject({ variant: "neutral" });
-    expect((spec("reg-closed").props as { icon?: unknown }).icon).toBeUndefined();
+    // A lock, as on Applications are closed (Figma 1.12).
+    expect((spec("reg-closed").props as { icon?: unknown }).icon).toBeTruthy();
     expect((spec("app-rejected").props as { icon?: unknown }).icon).toBeTruthy();
   });
 });

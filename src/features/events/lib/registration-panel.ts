@@ -214,6 +214,7 @@ export function getPanelSpec(state: EventState, context: PanelContext): PanelSpe
         layout: "alert",
         props: {
           variant: "neutral",
+          icon: Lock,
           title: "Registration is closed",
           description: `Registration closed on ${longDate(state.closedAt)}. ${KEEP_AN_EYE_OUT}`,
         },
