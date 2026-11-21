@@ -83,3 +83,54 @@ it("renders the normalized participant agenda through the viewer client instead 
 it("keeps viewer-specific participant content out of the shared page cache", () => {
  expect(dynamic).toBe("force-dynamic");
 });
+
+describe("layout", () => {
+ const publicProps={...props,searchParams:Promise.resolve({})};
+ const live={...row,status:"active",image_url:"https://example.com/icon.png",regular_price:10,member_price:0,max_capacity:25,starts_at:"2099-12-11T21:00:00Z",ends_at:"2099-12-12T00:00:00Z",registration_closes_at:"2099-12-06T20:00:00Z"};
+ beforeEach(()=>{mocks.flags.studentEvents=true});
+ /** Every element's props in the tree that `match` accepts. */
+ function find(node:unknown, match:(props:Record<string,unknown>)=>boolean): Record<string,unknown>[] {
+  if(Array.isArray(node))return node.flatMap(child=>find(child,match));
+  if(!node||typeof node!=="object"||!("props" in node))return [];
+  const elementProps=(node as ReactElement<Record<string,unknown>>).props;
+  return [...(match(elementProps)?[elementProps]:[]),...find(elementProps.children,match)];
+ }
+ const facts=(tree:unknown)=>find(tree,p=>Array.isArray(p.facts))[0].facts as {key:string;value:unknown;detail?:unknown}[];
+
+ it("draws the event image square", async () => {
+  mocks.fetch.mockResolvedValue(live);
+  const tree=await Page(publicProps);
+  const frame=find(tree,p=>typeof p.className==="string"&&p.className.includes("aspect-square"));
+  expect(frame).toHaveLength(1);
+  expect(JSON.stringify(frame[0].children)).toContain("https://example.com/icon.png");
+ });
+ it("lists each key fact once, with the member price and the registration deadline", async () => {
+  mocks.fetch.mockResolvedValue(live);
+  const list=facts(await Page(publicProps));
+  expect(list.map(f=>f.key)).toEqual(["date","location","price","registration"]);
+  expect(list[2]).toMatchObject({value:"$10.00",detail:"Free for UX Hub members"});
+  expect(list[3]).toMatchObject({value:"Register by Sun, Dec 6",detail:"25 of 25 spots left"});
+ });
+ it("marks a past event and drops the registration row", async () => {
+  mocks.fetch.mockResolvedValue({...live,starts_at:"2020-01-26T18:00:00Z",ends_at:"2020-01-27T01:00:00Z",registration_closes_at:"2020-01-21T20:00:00Z"});
+  const tree=await Page(publicProps);
+  expect(find(tree,p=>p.status==="past")).toHaveLength(1);
+  expect(facts(tree).map(f=>f.key)).not.toContain("registration");
+  expect(components(tree)).toContain(EventRegistrationAction);
+ });
+ it("shows a canceled event's note and a disabled button instead of registration", async () => {
+  mocks.fetch.mockResolvedValue({...live,canceled_at:"2099-11-01T00:00:00Z",cancellation_note:"Moved to spring."});
+  const tree=await Page(publicProps);
+  expect(find(tree,p=>p.status==="canceled")).toHaveLength(1);
+  expect(find(tree,p=>p.status==="past")).toHaveLength(0);
+  expect(JSON.stringify(tree)).toContain("Moved to spring.");
+  expect(JSON.stringify(tree)).toContain("Event canceled");
+  expect(components(tree)).not.toContain(EventRegistrationAction);
+ });
+ it("keeps the draft preview's alert and disabled button", async () => {
+  mocks.current.mockResolvedValue({status:"authenticated",user:{role_access:"admin"}});
+  const tree=JSON.stringify(await Page(props));
+  expect(tree).toContain("Draft preview: only admins and managers can see this.");
+  expect(tree).toContain("Registration unavailable in draft preview");
+ });
+});
