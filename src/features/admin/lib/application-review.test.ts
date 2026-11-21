@@ -10,6 +10,7 @@ import {
   getApplicationReviewState,
   getReviewNeighbours,
   parseReviewListQuery,
+  programOptions,
   reviewScopeLabel,
   serializeReviewListQuery,
   type ReviewListItem,
@@ -147,7 +148,13 @@ describe("buildApplicationDecisionUpdate", () => {
   });
 });
 
-function item(id: string, name: string, day: number, state: ReviewListItem["state"]): ReviewListItem {
+function item(
+  id: string,
+  name: string,
+  day: number,
+  state: ReviewListItem["state"],
+  profile: Partial<Pick<ReviewListItem, "program" | "year" | "studentStatus" | "membership">> = {}
+): ReviewListItem {
   return {
     applicationId: id,
     name,
@@ -156,6 +163,7 @@ function item(id: string, name: string, day: number, state: ReviewListItem["stat
     year: null,
     studentStatus: null,
     membership: null,
+    ...profile,
     appliedAt: `2026-10-${String(day).padStart(2, "0")}T18:00:00Z`,
     state,
     offerExpiresAt: null,
@@ -177,7 +185,36 @@ describe("review list query", () => {
       sort: "oldest",
       q: "",
       page: 1,
+      memberships: [],
+      years: [],
+      studentStatuses: [],
+      programs: [],
     });
+  });
+
+  it("keeps reading the sorts older links wrote", () => {
+    for (const sort of ["oldest", "newest", "name"] as const) {
+      expect(parseReviewListQuery(new URLSearchParams(`sort=${sort}`)).sort).toBe(sort);
+    }
+    const desc = parseReviewListQuery(new URLSearchParams("sort=name-desc"));
+    expect(desc.sort).toBe("name-desc");
+    expect(serializeReviewListQuery(desc)).toBe("?sort=name-desc");
+  });
+
+  it("round-trips the panel's filters, a program with a comma included", () => {
+    const query = parseReviewListQuery(
+      new URLSearchParams(
+        "membership=explorer,none&year=4,3,9&student=graduate,alien&program=design&program=arts%2C%20media"
+      )
+    );
+    expect(query).toMatchObject({
+      memberships: ["explorer", "none"],
+      // Known values only, in their own order.
+      years: ["3", "4"],
+      studentStatuses: ["graduate"],
+      programs: ["design", "arts, media"],
+    });
+    expect(parseReviewListQuery(new URLSearchParams(serializeReviewListQuery(query)))).toEqual(query);
   });
 
   it("round-trips a view and leaves defaults out of the URL", () => {
@@ -216,6 +253,50 @@ describe("filterReviewItems", () => {
     expect(filterReviewItems(items, { ...view, sort: "name" }).map((i) => i.name)).toEqual([
       "Abe Lin", "Bo Chen", "Cleo Park", "Dee Ray", "Eli Kim",
     ]);
+  });
+
+  it("sorts by name, Z to A", () => {
+    expect(filterReviewItems(items, { ...view, sort: "name-desc" }).map((i) => i.name)).toEqual([
+      "Eli Kim", "Dee Ray", "Cleo Park", "Bo Chen", "Abe Lin",
+    ]);
+  });
+
+  it("filters by membership, year, student status and program, any within one, all across", () => {
+    const people = [
+      item("m1", "Ana", 1, "submitted", { membership: "explorer", year: "3", studentStatus: "undergraduate", program: "Design" }),
+      item("m2", "Ben", 2, "submitted", { membership: "innovator", year: "4", studentStatus: "graduate", program: " design " }),
+      item("m3", "Cy", 3, "submitted", { year: "3", program: "Commerce" }),
+      item("m4", "Di", 4, "submitted"),
+    ];
+    const on = (filters: object) => ids(filterReviewItems(people, { ...view, ...filters }));
+
+    expect(on({ memberships: ["none"] })).toEqual(["m3", "m4"]);
+    expect(on({ memberships: ["explorer", "innovator"] })).toEqual(["m1", "m2"]);
+    expect(on({ years: ["3"] })).toEqual(["m1", "m3"]);
+    expect(on({ studentStatuses: ["graduate"] })).toEqual(["m2"]);
+    expect(on({ programs: ["design"] })).toEqual(["m1", "m2"]);
+    expect(on({ years: ["3"], memberships: ["none"] })).toEqual(["m3"]);
+    // Missing values match no specific option.
+    expect(on({ years: ["1", "2", "3", "4", "5+"] })).toEqual(["m1", "m2", "m3"]);
+  });
+
+  it("folds programs past the listed ones, and none, into Other", () => {
+    const people = [
+      item("p1", "A", 1, "submitted", { program: "Design" }),
+      item("p2", "B", 2, "submitted", { program: "design" }),
+      item("p3", "C", 3, "submitted", { program: "Commerce" }),
+      item("p4", "D", 4, "submitted", { program: "Arts" }),
+      item("p5", "E", 5, "submitted", { program: "other" }),
+      item("p6", "F", 6, "submitted"),
+    ];
+    expect(programOptions(people, 2)).toEqual([
+      { value: "design", label: "Design" },
+      { value: "arts", label: "Arts" },
+      { value: "other", label: "Other" },
+    ]);
+    // The default limit lists every program here; Other holds "other" and none.
+    expect(ids(filterReviewItems(people, { ...view, programs: ["other"] }))).toEqual(["p5", "p6"]);
+    expect(ids(filterReviewItems(people, { ...view, programs: ["commerce"] }))).toEqual(["p3"]);
   });
 
   it("filters by status and by name or email", () => {
@@ -267,6 +348,21 @@ describe("getReviewNeighbours", () => {
 
   it("is null for an applicant not on the event", () => {
     expect(getReviewNeighbours(items, view, "zzz")).toBeNull();
+  });
+
+  it("walks the list the panel's filters leave, as the table does", () => {
+    const people = items.map((i) =>
+      i.applicationId === "b" || i.applicationId === "d" ? { ...i, year: "4" as const } : i
+    );
+    const filtered = { ...view, years: ["4" as const] };
+    expect(filterReviewItems(people, filtered).map((i) => i.applicationId)).toEqual(["b", "d"]);
+    expect(getReviewNeighbours(people, filtered, "b")).toMatchObject({
+      position: 1,
+      total: 2,
+      previous: null,
+      next: { applicationId: "d" },
+    });
+    expect(reviewScopeLabel(filtered)).toBe("Filtered list");
   });
 });
 

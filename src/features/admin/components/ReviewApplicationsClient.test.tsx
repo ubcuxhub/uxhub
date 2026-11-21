@@ -132,6 +132,43 @@ describe("ReviewApplicationsClient", () => {
     expect(rowLinks()[0].textContent).toBe("Applicant 26");
   });
 
+  it("filters from the panel, keeps the filters in the URL, and clears them", () => {
+    renderList();
+    fireEvent.click(screen.getByRole("button", { name: "Sort and filter" }));
+    const panel = screen.getByRole("dialog", { name: "Sort and filter" });
+    // The fieldset and its chip group share the name.
+    const group = (name: string) => within(panel).getAllByRole("group", { name })[0];
+    const membership = group("Membership");
+    // Tiers applicants hold, then Non-member; Program options come from the data.
+    expect(within(membership).getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "Explorer",
+      "Non-member",
+    ]);
+    expect(
+      within(group("Program")).getAllByRole("button").map((b) => b.textContent)
+    ).toEqual(["Design"]);
+
+    fireEvent.click(within(membership).getByRole("button", { name: "Explorer" }));
+    expect(window.location.search).toBe("?membership=explorer");
+    // Even-numbered applicants are Explorers: 13 of the 26 submitted.
+    expect(rowLinks()).toHaveLength(13);
+    expect(rowLinks()[0].getAttribute("href")).toBe(
+      "/admin/events/e1/review-applications/app-02?membership=explorer",
+    );
+    expect(screen.getByRole("button", { name: "Sort and filter, 1 active" })).toBeTruthy();
+
+    fireEvent.click(within(panel).getByRole("button", { name: "Clear all" }));
+    expect(window.location.search).toBe("");
+    expect(rowLinks()).toHaveLength(25);
+  });
+
+  it("sorts by name, Z to A", () => {
+    window.history.replaceState(null, "", "/admin/events/e1/review-applications?sort=name-desc");
+    renderList();
+    expect(rowLinks()[0].textContent).toBe("Applicant 26");
+    expect(screen.getByRole("button", { name: "Sort and filter, 1 active" })).toBeTruthy();
+  });
+
   it("hides the Notes column until counts are provided", () => {
     const { unmount } = renderList();
     expect(screen.queryByRole("columnheader", { name: "Notes" })).toBeNull();

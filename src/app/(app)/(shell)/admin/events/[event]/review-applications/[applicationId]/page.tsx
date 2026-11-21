@@ -79,8 +79,11 @@ export default async function ApplicationReviewPage({
 
   const query = parseReviewListQuery(
     new URLSearchParams(
+      // A repeated param (`program`) arrives as an array.
       Object.entries(rawQuery).flatMap(([key, value]) =>
-        typeof value === "string" ? [[key, value] as [string, string]] : []
+        (typeof value === "string" ? [value] : (value ?? [])).map(
+          (one) => [key, one] as [string, string]
+        )
       )
     )
   );
