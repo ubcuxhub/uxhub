@@ -399,9 +399,9 @@ export interface RecordViewProps {
   /** Under the title: "User since July 21, 2026". */
   subtitle?: React.ReactNode;
   /**
-   * Beside the identity, before the title, 64 px square: a person's Avatar
+   * Beside the identity, before the title: a person's 64 px Avatar
    * (`size={64}`), or a `RecordThumbnail` for a record with a picture (an
-   * event's icon).
+   * event's icon, 96 px).
    */
   media?: React.ReactNode;
   /** Under the subtitle: status Badges. */
@@ -564,8 +564,9 @@ export interface RecordThumbnailProps {
 }
 
 /**
- * A record's square picture for `RecordView`'s `media`, the counterpart of a
- * person's 64 px Avatar: 64 px, rounded, the image cropped to fill, with a
+ * A record's square picture for `RecordView`'s `media`, where a person has
+ * their Avatar: 96 px (80 px on phones, so a long title keeps room beside it),
+ * the size of the portal event page's icon, rounded, the image cropped to fill, with a
  * hairline edge so a pale picture still reads as a tile. With no picture, or
  * one that fails to load, it shows `fallback` on the muted fill, as the event
  * builder's header preview does. Decorative: the title beside it names the
@@ -580,7 +581,7 @@ export function RecordThumbnail({ src, fallback, className }: RecordThumbnailPro
       data-slot="record-thumbnail"
       aria-hidden
       className={cn(
-        "relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted text-muted-foreground [&_svg]:size-6",
+        "relative flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-muted text-muted-foreground sm:size-24 [&_svg]:size-8",
         className,
       )}
     >

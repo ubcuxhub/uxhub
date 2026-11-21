@@ -144,7 +144,7 @@ describe("AdminEventRecord overview", () => {
     // The drawer renders in a portal, outside the render container.
     let tile = document.querySelector("[data-slot='record-thumbnail']");
     expect(tile?.querySelector("img")?.getAttribute("src")).toBe("https://store/icon.png");
-    expect(tile?.className).toContain("size-16");
+    expect(tile?.className).toContain("sm:size-24");
     expect(document.querySelectorAll("img")).toHaveLength(1);
     unmount();
 

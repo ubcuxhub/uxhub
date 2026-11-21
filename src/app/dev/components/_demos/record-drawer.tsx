@@ -288,7 +288,7 @@ function Demo({ state }: { state: string | undefined }) {
 
       <Composition
         title="Manage Events"
-        description="An event's square icon (its image_url, which the builder crops to 1:1) sits beside the title in a RecordThumbnail, where a person has their Avatar: 64 px, rounded, cropped to fill. An event with no icon, or one whose image fails to load, shows an image placeholder on the muted fill instead."
+        description="An event's square icon (its image_url, which the builder crops to 1:1) sits beside the title in a RecordThumbnail, where a person has their Avatar: 96 px (80 px on phones), rounded, cropped to fill. An event with no icon, or one whose image fails to load, shows an image placeholder on the muted fill instead."
       >
         <TableCard className="max-w-2xl">
           <Table stickyFirstColumn className="min-w-[32rem]">
