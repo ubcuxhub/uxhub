@@ -19,6 +19,10 @@ import type { DateTimeValue } from "@/components/ui/date-time-field";
 import { toast } from "@/components/ui/toast";
 import { updateApplicationDecisionAction } from "@/features/admin/actions";
 import { ApplicantPager, type PagerTarget } from "@/features/admin/components/ApplicantPager";
+import {
+  ApplicantProfileCard,
+  type ApplicantProfile,
+} from "@/features/admin/components/ApplicantProfileCard";
 import { ApplicationDecisionCard } from "@/features/admin/components/ApplicationDecisionCard";
 import { ReviewStateBadge } from "@/features/admin/components/ReviewStateBadge";
 import {
@@ -31,15 +35,11 @@ import type {
   ApplicationAnswers,
   ApplicationQuestion,
 } from "@/features/applications/lib/application-form";
-import { formatTimestamp } from "@/lib/date";
+import { formatEventDate, formatTimestamp } from "@/lib/date";
 import type { SubmittedApplicationRow } from "@/lib/supabase/models";
 import type { DecisionSeats } from "@/lib/supabase-helpers/event-applications";
 
-export interface AdminApplicant {
-  name: string;
-  email: string;
-  program: string | null;
-}
+export type AdminApplicant = ApplicantProfile;
 
 interface ApplicationReviewClientProps {
   eventName: string;
@@ -83,9 +83,10 @@ export function describeHeldSeats(seats: DecisionSeats): string {
 
 /**
  * One application (docs/design/application-review.md, §3): the applicant, the
- * answers, the decision, and room for reviewer notes. Two columns when the
- * content area is wide enough (container query, since the admin shell has a
- * sidebar); DOM order equals visual order at every width.
+ * answers, and an aside with their profile, the decision and room for reviewer
+ * notes. Two columns when the content area is wide enough (container query,
+ * since the admin shell has a sidebar); DOM order equals visual order at every
+ * width.
  */
 export function ApplicationReviewClient({
   eventName,
@@ -206,17 +207,10 @@ export function ApplicationReviewClient({
               <ReviewStateBadge state={state} />
             </div>
             <p className="text-small text-muted-foreground">
-              {applicant.program ? `${applicant.program} · ` : null}
-              <a
-                href={`mailto:${applicant.email}`}
-                className="text-info-foreground underline-offset-4 hover:underline focus-visible:focus-ring"
-              >
-                {applicant.email}
-              </a>
-            </p>
-            <p className="text-small text-muted-foreground">
               Submitted{" "}
-              {formatTimestamp(application.submitted_at ?? application.created_at)}
+              {formatEventDate(application.submitted_at ?? application.created_at, {
+                month: "short",
+              })}
             </p>
           </div>
         </div>
@@ -257,6 +251,11 @@ export function ApplicationReviewClient({
         </Card>
 
         <div className="flex flex-col gap-6">
+          <ApplicantProfileCard
+            applicant={applicant}
+            submittedAt={application.submitted_at ?? application.created_at}
+            showIdentity={false}
+          />
           <ApplicationDecisionCard
             key={state}
             state={state}

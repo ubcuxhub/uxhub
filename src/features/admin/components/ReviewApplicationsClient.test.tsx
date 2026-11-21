@@ -36,7 +36,10 @@ const items: ReviewListItem[] = Array.from({ length: 30 }, (_, index) => {
     applicationId: `app-${n}`,
     name: `Applicant ${n}`,
     email: `applicant${n}@example.com`,
-    program: "2nd year · Design",
+    program: "Design",
+    year: "2",
+    studentStatus: "undergraduate",
+    membership: index % 2 ? "explorer" : null,
     appliedAt: `2026-10-${n}T18:00:00Z`,
     state:
       index < 26

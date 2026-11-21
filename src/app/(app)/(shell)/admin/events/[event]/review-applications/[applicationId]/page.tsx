@@ -130,6 +130,9 @@ export default async function ApplicationReviewPage({
         name: current.name,
         email: current.email,
         program: current.program,
+        year: current.year,
+        studentStatus: current.studentStatus,
+        membership: current.membership,
       }}
       questions={questions}
       answers={answersFromResponses(questions, responses)}

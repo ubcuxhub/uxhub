@@ -1,10 +1,14 @@
 import type { DateTimeValue } from "@/components/ui/date-time-field";
+import { formatMembershipTypeName } from "@/features/memberships/lib/display";
+import { STUDENT_STATUSES } from "@/lib/constants";
 import { pacificDate, timestamptzToDatetimeLocal } from "@/lib/date";
 import type { IsoDate, WallTime } from "@/lib/date-input";
 import type {
   EventApplicationRow,
   EventApplicationSettingsRow,
+  StudentStatus,
   SubmittedApplicationStatus,
+  UniversityYear,
 } from "@/lib/supabase/models";
 
 /**
@@ -184,6 +188,25 @@ export function buildApplicationDecisionUpdate(
   };
 }
 
+// --- How an applicant's profile reads ----------------------------------------
+
+export const YEAR_LABELS: Record<UniversityYear, string> = {
+  "1": "1st year",
+  "2": "2nd year",
+  "3": "3rd year",
+  "4": "4th year",
+  "5+": "5th year or later",
+};
+
+export const STUDENT_STATUS_LABELS = Object.fromEntries(
+  STUDENT_STATUSES.map((status) => [status.value, status.label])
+) as Record<StudentStatus, string>;
+
+/** A tier's display name, or "Non-member" when there is no active one. */
+export function membershipLabel(membership: string | null): string {
+  return membership ? formatMembershipTypeName(membership) : "Non-member";
+}
+
 // --- The review list's view: filters, sort, paging, neighbours ---------------
 
 /** Applicants per page on the review list. */
@@ -222,6 +245,10 @@ export interface ReviewListItem {
   name: string;
   email: string;
   program: string | null;
+  year: UniversityYear | null;
+  studentStatus: StudentStatus | null;
+  /** The active membership tier's stored name; null for a non-member. */
+  membership: string | null;
   appliedAt: string;
   state: ApplicationReviewState;
   offerExpiresAt: string | null;
