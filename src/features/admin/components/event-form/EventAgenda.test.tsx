@@ -2,8 +2,9 @@
 import { useState } from "react";
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { FieldValidation } from "@/components/ui/field";
 import { EventAgenda } from "./EventAgenda";
-import { emptyAgendaDay, emptyAgendaItem, emptyLocation, type EventDateLocationDraft } from "../../lib/event-date-location";
+import { dateLocationIssues, emptyAgendaDay, emptyAgendaItem, emptyLocation, type EventDateLocationDraft } from "../../lib/event-date-location";
 
 afterEach(cleanup);
 function Form({ attended = false }: { attended?: boolean }) {
@@ -49,5 +50,20 @@ describe("unified agenda editor", () => {
     expect((screen.getByRole("button", { name: "Remove item 1" }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole("button", { name: "Remove day 1" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText(/Attendance has been recorded/)).toBeTruthy();
+  });
+  it("shows a day's missing-items error in that day, under Add item", () => {
+    const day = { ...emptyAgendaDay(), label: "Workshop", date: "2099-08-01", location: { ...emptyLocation(), building: "Nest", address: "UBC" }, items: [] };
+    const value: EventDateLocationDraft = { version: 2, automatic: true, audience: "everyone", location: day.location, dates: [day] };
+    const issues = dateLocationIssues(value);
+    expect(issues.map(issue => issue.target)).toEqual([`date-${day.key}-items`]);
+    render(<FieldValidation errors={issues}><EventAgenda value={value} onChange={() => {}} enabled onEnabledChange={() => {}} disabled={false} showErrors /></FieldValidation>);
+    const dayCard = screen.getByRole("group", { name: "Day 1" });
+    const addItem = within(dayCard).getByRole("button", { name: "+ Add item" });
+    expect(addItem.closest("[data-slot=field]")!.textContent).toContain("Add at least one agenda item to each day.");
+  });
+  it("shows agenda-wide errors under Add day", () => {
+    render(<FieldValidation errors={[{ target: "builder-agenda", message: "Add at least one event date." }]}><EventAgenda value={{ version: 2, automatic: true, audience: "everyone", location: emptyLocation(), dates: [] }} onChange={() => {}} enabled onEnabledChange={() => {}} disabled={false} showErrors /></FieldValidation>);
+    const addDay = screen.getByRole("button", { name: "+ Add day" });
+    expect(addDay.closest("[data-slot=field]")!.textContent).toContain("Add at least one event date.");
   });
 });

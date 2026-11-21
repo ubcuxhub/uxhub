@@ -65,7 +65,8 @@ function AgendaDay({ day, index, restricted, onChange, onRemove, showErrors }: {
       <div id={`${uid}-items`} tabIndex={-1} className="space-y-4">
         {!day.items?.length && <FieldDescription>No items yet. Add an item to set this day’s timing.</FieldDescription>}
         {day.items?.map((item, itemIndex) => <AgendaItem key={item.key} day={day} item={item} index={itemIndex} restricted={restricted} showErrors={showErrors} onChange={next => onChange({ ...day, items: day.items!.map(existing => existing.key === item.key ? next : existing) })} onRemove={() => setRemoveItem(item.key)} />)}
-        <Button type="button" variant="outline" className="w-full border-dashed" onClick={() => onChange({ ...day, items: [...day.items ?? [], emptyAgendaItem(day.date)] })}>+ Add item</Button>
+        {/* "Add at least one agenda item" is reported against the day's items. */}
+        <Field validationKey={`${uid}-items`}><Button type="button" variant="outline" className="w-full border-dashed" onClick={() => onChange({ ...day, items: [...day.items ?? [], emptyAgendaItem(day.date)] })}>+ Add item</Button></Field>
       </div>
     </CardContent>
     <ConfirmDialog open={removeItem !== null} onOpenChange={open => { if (!open) setRemoveItem(null); }} title="Remove this agenda item?" description="The item and its configuration will be removed when you save." confirmLabel="Remove item" onConfirm={() => { onChange({ ...day, items: day.items?.filter(item => item.key !== removeItem) }); setRemoveItem(null); }} />
@@ -84,7 +85,8 @@ export function EventAgenda({ value, enabled, onEnabledChange, onChange, disable
     <EventSchedule enabled={enabled} onChange={onEnabledChange} />
     <Card className="gap-4 py-5"><CardHeader className="px-5"><CardTitle>Location visibility</CardTitle><CardDescription>Applies to each day and item. Times use Pacific Time (Vancouver).</CardDescription></CardHeader><CardContent className="px-5"><RadioGroup aria-label="Who can see the location" value={value.audience} onValueChange={audience => update({ ...value, audience: audience as EventDateLocationDraft["audience"] })} className="sm:grid-cols-2">{([["everyone", "Everyone"], ["going", "Confirmed attendees only"]] as const).map(([choice, label]) => <FieldLabel key={choice} htmlFor={`${uid}-${choice}`}><Field orientation="horizontal"><RadioGroupItem id={`${uid}-${choice}`} value={choice} /><FieldContent><span>{label}</span><FieldDescription>{choice === "going" ? "Going ticket holders and staff. An accepted offer alone does not grant access." : "Anyone who can see the event."}</FieldDescription></FieldContent></Field></FieldLabel>)}</RadioGroup></CardContent></Card>
     {value.dates.map((day, index) => <AgendaDay key={day.key} day={day} index={index} restricted={value.audience === "going"} showErrors={showErrors} onChange={next => update({ ...value, dates: value.dates.map(existing => existing.key === day.key ? next : existing) })} onRemove={() => setRemoveDay(day.key)} />)}
-    <Button type="button" variant="outline" className="w-full border-dashed" onClick={() => update({ ...value, dates: [...value.dates, emptyAgendaDay()] })}>+ Add day</Button>
+    {/* Agenda-wide problems ("Add at least one event date.") are reported against the section. */}
+    <Field validationKey="builder-agenda"><Button type="button" variant="outline" className="w-full border-dashed" onClick={() => update({ ...value, dates: [...value.dates, emptyAgendaDay()] })}>+ Add day</Button></Field>
     <ConfirmDialog open={removeDay !== null} onOpenChange={open => { if (!open) setRemoveDay(null); }} title="Remove this agenda day?" description="The day and all its items will be removed when you save." confirmLabel="Remove day" onConfirm={() => { update({ ...value, dates: value.dates.filter(day => day.key !== removeDay) }); setRemoveDay(null); }} />
   </fieldset>;
 }
