@@ -1603,11 +1603,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_event_analytics: { Args: { p_now?: string }; Returns: Json }
       admin_event_pricing_locked: {
         Args: { p_event_id: string }
         Returns: boolean
       }
       admin_event_team_settings: { Args: { p_event_id: string }; Returns: Json }
+      admin_membership_analytics: { Args: { p_now?: string }; Returns: Json }
       agenda_draft_instant: {
         Args: { p_date: string; p_time: string }
         Returns: string
