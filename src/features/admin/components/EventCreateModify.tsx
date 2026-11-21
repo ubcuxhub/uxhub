@@ -160,7 +160,7 @@ export const EventCreateModify = ({
     "builder-teams": { number: 5, description: "Team events show a Your Team card with an invite link on the event page." },
     "builder-people": { number: 6 },
     "builder-resources": { number: 7, description: "Community links, files and the event recap for this event." },
-    "builder-summary": { number: 8, description: "What’s left before the event can go live. Drafts are only visible to staff." },
+    "builder-summary": { number: 8, description: "What’s left before the event can go live. Drafts are only visible to UX Hub execs." },
     "builder-settings": { number: 9, description: "Actions that affect the whole event." },
   };
   const sections: NavigatorSection[] = [
@@ -242,11 +242,11 @@ export const EventCreateModify = ({
           </div>)}
           {section("builder-settings", "Other settings", <div className="space-y-4 rounded-xl border border-border bg-card p-5">
             {draft && <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="min-w-0 space-y-0.5"><h3 className="text-small font-semibold">Save changes</h3><p className="text-small text-muted-foreground">{saveStatus}. Drafts are only visible to staff.</p></div>
+              <div className="min-w-0 space-y-0.5"><h3 className="text-small font-semibold">Save changes</h3><p className="text-small text-muted-foreground">{saveStatus}. Drafts are only visible to UX Hub execs.</p></div>
               <Button type="button" variant="outline" disabled={!form.hasUnsavedChanges || form.isDeleting} loading={form.isSubmitting} onClick={() => void form.handleSaveDraft()}>Save</Button>
             </div>}
             {published && !form.past && <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="min-w-0 space-y-0.5"><h3 className="text-small font-semibold">Revert to draft</h3><p className="text-small text-muted-foreground">Save your changes and hide this event from members. Only staff can see it until you publish again.</p></div>
+              <div className="min-w-0 space-y-0.5"><h3 className="text-small font-semibold">Revert to draft</h3><p className="text-small text-muted-foreground">Save your changes and hide this event from members. Only UX Hub execs can see it until you publish again.</p></div>
               <Button type="button" variant="outline" loading={form.isSubmitting} disabled={form.isDeleting} onClick={() => { setRevertError(null); setRevertOpen(true); }}>Revert to draft</Button>
             </div>}
             {form.eventId && <div className={`flex flex-wrap items-center justify-between gap-4${draft || (published && !form.past) ? " border-t border-border-subtle pt-4" : ""}`}>
@@ -280,7 +280,7 @@ export const EventCreateModify = ({
           <Hubbo emotion="proud" size="hero" className="mx-auto h-50" />
           <DialogHeader className="items-center gap-4 space-y-0 pr-0 text-center sm:text-center">
             <DialogTitle className="pt-2 text-h2">Draft saved</DialogTitle>
-            <DialogDescription className="text-body">{form.formState.name || "Untitled event"} is saved as a draft. Only staff can see it until you publish.</DialogDescription>
+            <DialogDescription className="text-body">{form.formState.name || "Untitled event"} is saved as a draft. Only UX Hub execs can see it until you publish.</DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex-wrap gap-3 pt-2 sm:justify-center">
             <Button variant="outline" asChild>

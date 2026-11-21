@@ -163,7 +163,7 @@ published.
   shows a "This is a draft event" banner and the saved unfinished sections, and
   replaces the registration panel with staff test registration
   (`DraftTestRegistration`): on a free draft, a warning that it creates a real
-  registration and a **Test registration (staff only)** button that opens
+  registration and a **Test registration (UX Hub execs only)** button that opens
   checkout; on a paid draft, a disabled "Paid drafts can’t be test-registered"
   button and no way to pay. Once they hold a ticket, the ordinary panel shows
   it. Checkout is behind `FLAGS.studentEvents`, so while the flag is off the
@@ -185,7 +185,7 @@ published.
   managers register, and only when the event is free (regular and member
   price 0) and the amount is $0. Anything else is `EVENT_NOT_ACTIVE`, so a
   paid draft never gets a purchase or a card hold. The checkout dialog shows
-  the same warning and labels its button **Test registration (staff only)**.
+  the same warning and labels its button **Test registration (UX Hub execs only)**.
 - **Enforced on the server:** fulfillment reads events with the service-role
   client, which bypasses RLS. It has to check the buyer's role itself before it
   sells a draft ticket. `initialize_event_checkout` and `reserve_event_ticket`

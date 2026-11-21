@@ -140,7 +140,7 @@ it.each([
   fixtures.event.regular_price = price;
   fixtures.state = { kind: "reg-open", closesAt: null };
   await renderPage();
-  expect(Boolean(screen.queryByText("Test registration (staff only)"))).toBe(offered);
+  expect(Boolean(screen.queryByText("Test registration (UX Hub execs only)"))).toBe(offered);
   expect(Boolean(screen.queryByText(/This creates a real registration/))).toBe(offered);
   const disabled = screen.queryByRole("button", { name: "Paid drafts can’t be test-registered" });
   expect(Boolean(disabled)).toBe(!offered);
@@ -151,5 +151,5 @@ it.each([
 it("offers no test registration on a published event", async () => {
   fixtures.state = { kind: "reg-open", closesAt: null };
   await renderPage();
-  expect(screen.queryByText("Test registration (staff only)")).toBeNull();
+  expect(screen.queryByText("Test registration (UX Hub execs only)")).toBeNull();
 });

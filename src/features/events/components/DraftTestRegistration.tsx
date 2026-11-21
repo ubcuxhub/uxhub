@@ -43,7 +43,7 @@ export function DraftTestRegistration({
   return (
     <div className="flex flex-col items-start gap-3">
       <Alert variant="warning" className="w-full">
-        <AlertTitle>Staff only</AlertTitle>
+        <AlertTitle>UX Hub execs only</AlertTitle>
         <AlertDescription>{STAFF_TEST_REGISTRATION_WARNING}</AlertDescription>
       </Alert>
       <Button asChild>

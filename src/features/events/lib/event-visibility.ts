@@ -47,7 +47,7 @@ export function allowsStaffTestRegistration(
 }
 
 /** The staff test registration button on a draft. */
-export const STAFF_TEST_REGISTRATION_LABEL = "Test registration (staff only)";
+export const STAFF_TEST_REGISTRATION_LABEL = "Test registration (UX Hub execs only)";
 
 /** Shown beside every staff test registration control. */
 export const STAFF_TEST_REGISTRATION_WARNING =

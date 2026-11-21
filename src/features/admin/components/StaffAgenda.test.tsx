@@ -14,7 +14,7 @@ const days: StaffAgendaDay[] = [{ id: "day", date: "2026-11-20", title: "Opening
   { id: "second", title: "Lunch", starts_at: "2026-11-20T19:00:00Z", ends_at: "2026-11-20T20:00:00Z", location: null, check_in: false, note: { item_id: "second", body: "", revision: 0 } },
 ] }];
 function setup() { render(<StaffAgenda eventId="event" eventName="UXathon" days={days} initialDayId="day" volunteerUrl={null} />); }
-function edit() { fireEvent.click(screen.getAllByRole("button", { name: "View Notes" })[0]); return screen.getByRole("textbox", { name: "Staff note" }) as HTMLTextAreaElement; }
+function edit() { fireEvent.click(screen.getAllByRole("button", { name: "View Notes" })[0]); return screen.getByRole("textbox", { name: "Note for UX Hub execs" }) as HTMLTextAreaElement; }
 it("inherits locations, keeps conditional exact check-in links, and cancels without saving", () => {
   setup();
   expect(screen.getByRole("link", { name: "Check In" }).getAttribute("href")).toBe("/admin/events/event/check-in?item=first&returnTo=%2Fadmin%2Fevents%2Fevent%2Fagenda%3Fday%3Dday");
@@ -61,7 +61,7 @@ it("closes the row popover when opening the editor", async () => {
   setup(); fireEvent.click(screen.getByRole("button", { name: "Actions for Workshop" }));
   const popover = await screen.findByRole("dialog", { name: "Actions for Workshop" });
   fireEvent.click(popover.querySelector("button")!);
-  expect(await screen.findByRole("textbox", { name: "Staff note" })).toBeTruthy();
+  expect(await screen.findByRole("textbox", { name: "Note for UX Hub execs" })).toBeTruthy();
   expect(screen.queryByRole("dialog", { name: "Actions for Workshop" })).toBeNull();
   fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
   await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Actions for Workshop" })));

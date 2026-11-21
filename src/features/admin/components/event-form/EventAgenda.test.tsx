@@ -46,7 +46,7 @@ describe("unified agenda editor", () => {
     expect(saved().value.dates[0].items).toHaveLength(0);
     first.unmount();
     render(<Form attended />);
-    expect((screen.getByRole("switch", { name: "Enable check-in" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("switch", { name: "Check attendees in" }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole("button", { name: "Remove item 1" }) as HTMLButtonElement).disabled).toBe(true);
     expect((screen.getByRole("button", { name: "Remove day 1" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText(/Attendance has been recorded/)).toBeTruthy();
@@ -65,5 +65,11 @@ describe("unified agenda editor", () => {
     render(<FieldValidation errors={[{ target: "builder-agenda", message: "Add at least one event date." }]}><EventAgenda value={{ version: 2, automatic: true, audience: "everyone", location: emptyLocation(), dates: [] }} onChange={() => {}} enabled onEnabledChange={() => {}} disabled={false} showErrors /></FieldValidation>);
     const addDay = screen.getByRole("button", { name: "+ Add day" });
     expect(addDay.closest("[data-slot=field]")!.textContent).toContain("Add at least one event date.");
+  });
+  it("names the day's date under an item's start time", () => {
+    render(<Form />);
+    expect(screen.getByText("Starts on Sat, Aug 1, 2099, the day’s date. Change End date if it runs past midnight.")).toBeTruthy();
+    expect(screen.getByText("Adds this item to the check-in page, where UX Hub execs scan tickets at the door.")).toBeTruthy();
+    expect(screen.getByLabelText("Details for attendees (optional)")).toBeTruthy();
   });
 });

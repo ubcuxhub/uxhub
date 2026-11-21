@@ -35,7 +35,7 @@ it.each([
   const event = { name: "Draft Sprint", status: "draft", pricing_policy: "figma", member_price: 0, regular_price: regular } as EventRow;
   const user = { membership_type_id: null, membership_expires_at: null } as UserInfoRow;
   render(<EventCheckout disabledMessage={null} event={event} formattedDate={null} slug="draft-sprint" user={user} />);
-  expect(screen.queryAllByText("Test registration (staff only)").length > 0).toBe(offered);
+  expect(screen.queryAllByText("Test registration (UX Hub execs only)").length > 0).toBe(offered);
   expect(Boolean(screen.queryByText(/This creates a real registration/))).toBe(offered);
   expect(Boolean(screen.queryByText(/Paid drafts can’t be test-registered/))).toBe(!offered);
   expect(Boolean(screen.queryByRole("status"))).toBe(offered);

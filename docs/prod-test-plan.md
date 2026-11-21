@@ -13,8 +13,8 @@ The draft **QA Team Test** is already set up: free, teams on (max 3), one check-
 5. Send everyone the event link: [QA Team Test](https://www.ubcuxhub.ca/portal/events/qa-team-test)
 
 ## 2. Register (A, B, C, D)
-1. Open [QA Team Test](https://www.ubcuxhub.ca/portal/events/qa-team-test). ✅ "Draft" banner, header, description, and a **Staff only** warning that registering creates a real registration.
-2. Click **Test registration (staff only)**. ✅ The checkout shows the same warning, no card form, and a **Test registration (staff only)** button. Click it.
+1. Open [QA Team Test](https://www.ubcuxhub.ca/portal/events/qa-team-test). ✅ "Draft" banner, header, description, and a **UX Hub execs only** warning that registering creates a real registration.
+2. Click **Test registration (UX Hub execs only)**. ✅ The checkout shows the same warning, no card form, and a **Test registration (UX Hub execs only)** button. Click it.
 3. Back on the event page. ✅ Ticket with a QR code, and a **Your team** card.
 4. **Host:** make a second draft that is **paid** and open its portal page. ✅ A disabled "Paid drafts can’t be test-registered" button and no way to pay. Delete it.
 
