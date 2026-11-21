@@ -34,9 +34,13 @@ interface EventPageHeaderProps {
  *
  * Everything scales with the banner's width (`cqw`, container query width): at
  * the portal page's widest (about 1024 px) the banner is 256 px tall and the
- * icon 96 px, 48 px in from the left and 16 px below the banner. The space for
- * that overhang is part of this component's box, so content after it never
- * runs under the icon.
+ * icon 96 px, 48 px in from the left and 16 px (1/6 of the icon) below the
+ * banner. On narrow banners (under about 600 px, i.e. phones) the icon stops
+ * shrinking at 56 px and its inset at 16 px, so it stays legible; the overhang
+ * stays 1/6 of the icon. The preview and the page both render through this
+ * component, so they still match at any given width. The space for the
+ * overhang is part of this component's box, so content after it never runs
+ * under the icon.
  */
 export function EventPageHeader({
   imageSrc,
@@ -47,7 +51,7 @@ export function EventPageHeader({
 }: EventPageHeaderProps) {
   const showIcon = Boolean(iconSrc) || iconPlaceholder;
   return (
-    <div data-slot="event-page-header" className={cn("@container relative", className)}>
+    <div data-slot="event-page-header" className={cn("@container relative [--event-icon:max(9.375cqw,3.5rem)]", className)}>
       <div
         data-slot="event-page-header-banner"
         className="relative aspect-4/1 w-full overflow-hidden rounded-[inherit] bg-muted"
@@ -58,10 +62,10 @@ export function EventPageHeader({
       {showIcon && (
         <>
           {/* The icon's overhang below the banner: 1/6 of the icon. */}
-          <div aria-hidden className="h-[1.5625cqw]" />
+          <div aria-hidden className="h-[calc(var(--event-icon)/6)]" />
           <div
             data-slot="event-page-header-icon"
-            className="absolute bottom-0 left-[4.6875cqw] flex size-[9.375cqw] items-center justify-center overflow-hidden rounded-[12.5%] bg-muted"
+            className="absolute bottom-0 left-[max(4.6875cqw,1rem)] flex size-(--event-icon) items-center justify-center overflow-hidden rounded-[12.5%] bg-muted"
           >
             {iconSrc ? (
               <Image src={iconSrc} alt="" fill className="object-cover" unoptimized />
