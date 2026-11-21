@@ -20,9 +20,8 @@ import { fetchEventPeopleSections, fetchEventSponsors } from "@/lib/supabase-hel
 import { EventPeopleCard } from "@/features/events/components/EventPeopleCard";
 import { eventBadgeFor } from "@/features/events/lib/event-badge";
 import { loadEventStates } from "@/features/events/lib/event-states";
-import { DRAFT_EVENTS_NOTE, isDraftEvent } from "@/features/events/lib/event-visibility";
+import { DRAFT_EVENTS_NOTE, draftRegistrationBlocks, isDraftEvent } from "@/features/events/lib/event-visibility";
 import { RegistrationPanel } from "@/features/events/components/RegistrationPanel";
-import { DraftTestRegistration } from "@/features/events/components/DraftTestRegistration";
 import { TeamCard, TeamInviteNotice } from "@/features/events/components/teams/TeamCard";
 import { EventDraftSections } from "@/features/events/components/EventDraftSections";
 import { publicMarketingDestination } from "@/lib/event-marketing";
@@ -147,7 +146,7 @@ export default async function PortalEventPage({
       </div>
 
       {/* Registration and applications: one card whose layout follows the student's state. */}
-      {event.status === "draft" ? <DraftTestRegistration event={{ ...event, slug }} user={user} state={states[event.id]} checkoutAvailable={FLAGS.studentEvents} /> : <RegistrationPanel event={{ ...event, slug }} user={user} state={states[event.id]} />}
+      <RegistrationPanel event={{ ...event, slug }} user={user} state={states[event.id]} unavailable={draftRegistrationBlocks(event, FLAGS.studentEvents)} />
       {event.status === "draft" && <EventDraftSections event={event} />}
 
       {/* Ticket holders only. Stacked under the registration panel for now;

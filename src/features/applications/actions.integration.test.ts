@@ -46,9 +46,10 @@ type QuestionInsert = Database["public"]["Tables"]["event_application_questions"
 /** A member signed in for the actions, and an event taking applications. */
 async function setUp(
   fixtures: Fixtures,
-  eventOverrides: Partial<Database["public"]["Tables"]["events"]["Insert"]> = {}
+  eventOverrides: Partial<Database["public"]["Tables"]["events"]["Insert"]> = {},
+  memberOverrides: Partial<Database["public"]["Tables"]["user_info"]["Insert"]> = {}
 ) {
-  const member = await fixtures.createUser();
+  const member = await fixtures.createUser(memberOverrides);
   session.member = member;
   const event = await fixtures.createEvent({
     status: "active",
@@ -187,6 +188,34 @@ describe("saveApplicationDraft", () => {
 });
 
 describe("submitApplication", () => {
+  // The portal page offers Apply on a draft to the admins and managers who can
+  // see it (docs/event-states.md, "Drafts for admins"); the insert policy and
+  // submit_event_application both allow is_admin() on a draft.
+  it.each(["admin", "manager"] as const)("lets a %s apply to a draft event", (role) =>
+    withFixtures(async (fixtures) => {
+      const { member, event, q } = await setUp(fixtures, { status: "draft" }, { role_access: role });
+
+      const result = await submitApplication(event.id, {
+        [q.why]: "Testing",
+        [q.pick]: ["Research"],
+        [q.year]: "1",
+        [q.resume]: "",
+      });
+      expect(result).toEqual({ ok: true, applicationId: expect.any(String) });
+      expect((await applicationOf(event.id, member.id))?.status).toBe("submitted");
+    }));
+
+  it("refuses a member's application to a draft event", () =>
+    withFixtures(async (fixtures) => {
+      const { member, event, q } = await setUp(fixtures, { status: "draft" });
+
+      expect(await submitApplication(event.id, { [q.why]: "Early" })).toMatchObject({
+        ok: false,
+        reason: "not_accepting",
+      });
+      expect(await applicationOf(event.id, member.id)).toBeNull();
+    }));
+
   it("saves the answers and names the questions to fix", () =>
     withFixtures(async (fixtures) => {
       const { member, event, q } = await setUp(fixtures);

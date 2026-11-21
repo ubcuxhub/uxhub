@@ -9,8 +9,8 @@ const context = vi.hoisted(() => ({ membershipTermEndsAt: null as string | null 
 vi.mock("@/lib/auth/user-context", () => ({ useUser: () => context }));
 vi.mock("@/components/shared/FlowDialog", () => ({ useFlowDialog: () => ({ close: vi.fn() }) }));
 vi.mock("@/components/shared/CheckoutLayout", () => ({
-  CheckoutLayout: ({ price, notice, payment }: { price: number; notice?: ReactNode; payment: { freeButtonLabel?: string } }) => (
-    <div><div role="status">{price}</div>{notice}<span>{payment.freeButtonLabel}</span></div>
+  CheckoutLayout: ({ price, notice, payment }: { price: number; notice?: ReactNode; payment: { disabled?: boolean; disabledMessage?: string | null } }) => (
+    <div><div role="status">{price}</div>{notice}<button disabled={payment.disabled}>Checkout</button><span>{payment.disabledMessage}</span></div>
   ),
 }));
 afterEach(() => { cleanup(); context.membershipTermEndsAt = null; });
@@ -28,15 +28,24 @@ it.each([
   expect(screen.getByRole("status").textContent).toBe(String(expected));
 });
 
+// A draft gets the checkout a member gets; the database refuses a paid one.
 it.each([
   ["free", 0, true],
   ["paid", 12.5, false],
-] as const)("lets staff test-register only on a %s draft", (_label, regular, offered) => {
+] as const)("gives a %s draft the normal checkout, enabled only when free", (_label, regular, enabled) => {
   const event = { name: "Draft Sprint", status: "draft", pricing_policy: "figma", member_price: 0, regular_price: regular } as EventRow;
   const user = { membership_type_id: null, membership_expires_at: null } as UserInfoRow;
   render(<EventCheckout disabledMessage={null} event={event} formattedDate={null} slug="draft-sprint" user={user} />);
-  expect(screen.queryAllByText("Test registration (UX Hub execs only)").length > 0).toBe(offered);
-  expect(Boolean(screen.queryByText(/This creates a real registration/))).toBe(offered);
-  expect(Boolean(screen.queryByText(/Paid drafts can’t be test-registered/))).toBe(!offered);
-  expect(Boolean(screen.queryByRole("status"))).toBe(offered);
+  expect(screen.getByRole("status").textContent).toBe(String(regular));
+  expect((screen.getByRole("button", { name: "Checkout" }) as HTMLButtonElement).disabled).toBe(!enabled);
+  expect(Boolean(screen.queryByText("Paid events take registrations once they’re published."))).toBe(!enabled);
+  expect(screen.queryByText(/Test registration|UX Hub execs only|This creates a real registration/)).toBeNull();
+});
+
+it("keeps the route's own reason first on a draft", () => {
+  const event = { name: "Draft Sprint", status: "draft", pricing_policy: "figma", member_price: 0, regular_price: 0, requires_application: true } as EventRow;
+  const user = { membership_type_id: null, membership_expires_at: null } as UserInfoRow;
+  render(<EventCheckout disabledMessage="Apply first." event={event} formattedDate={null} slug="draft-sprint" user={user} />);
+  expect((screen.getByRole("button", { name: "Checkout" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.getByText("Apply first.")).toBeTruthy();
 });

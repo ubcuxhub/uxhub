@@ -13,10 +13,12 @@ The draft **QA Team Test** is already set up: free, teams on (max 3), one check-
 5. Send everyone the event link: [QA Team Test](https://www.ubcuxhub.ca/portal/events/qa-team-test)
 
 ## 2. Register (A, B, C, D)
-1. Open [QA Team Test](https://www.ubcuxhub.ca/portal/events/qa-team-test). ✅ "Draft" banner, header, description, and a **UX Hub execs only** warning that registering creates a real registration.
-2. Click **Test registration (UX Hub execs only)**. ✅ The checkout shows the same warning, no card form, and a **Test registration (UX Hub execs only)** button. Click it.
+Registering on a draft is real: it creates a ticket and a $0 purchase, which go when the draft is deleted.
+1. Open [QA Team Test](https://www.ubcuxhub.ca/portal/events/qa-team-test). ✅ "Draft" banner, header, description, and the same **Registration is open** card and **Register** button members get on a published event.
+2. Click **Register**. ✅ The normal free checkout, with no card form. Confirm.
 3. Back on the event page. ✅ Ticket with a QR code, and a **Your team** card.
-4. **Host:** make a second draft that is **paid** and open its portal page. ✅ A disabled "Paid drafts can’t be test-registered" button and no way to pay. Delete it.
+4. **Host:** make a second draft that is **paid** and open its portal page. ✅ A disabled **Register** button saying paid events take registrations once they’re published, and no way to pay. Delete it.
+5. **Host:** make a third draft that **requires an application**, with one question, and open its portal page. ✅ **Applications are open** and an **Apply** button. Apply and submit. ✅ The page says the application is in review. Delete the draft.
 
 ## 3. Teams (A, B, C, D)
 1. **A:** **Create team** → name "Test Team" → **Copy link**. Send it to B, C and D.
@@ -42,5 +44,5 @@ The draft **QA Team Test** is already set up: free, teams on (max 3), one check-
 
 ## 6. Cleanup (Host)
 1. **A** and **C:** **Manage team → Delete team**.
-2. Delete QA Team Test from its [event page](https://www.ubcuxhub.ca/admin/events/ba0548e5-ed36-44b2-967e-04e312961890). ✅ It deletes: staff test registrations on a free draft don't protect it. If it refuses, the dialog names what does (a member's ticket, offer or payment); ask Claude to look before removing anything.
+2. Delete QA Team Test from its [event page](https://www.ubcuxhub.ca/admin/events/ba0548e5-ed36-44b2-967e-04e312961890). ✅ It deletes: UX Hub execs' registrations on a free draft don't protect it. If it refuses, the dialog names what does (a member's ticket, offer or payment); ask Claude to look before removing anything.
 3. Keep the flag on, or set it to `false` and redeploy.

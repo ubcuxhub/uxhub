@@ -161,14 +161,14 @@ published.
 - **Portal event page:** admins and managers can open a draft's
   `/portal/events/[slug]` page, even while `FLAGS.studentEvents` is off. It
   shows a "This is a draft event" banner and the saved unfinished sections, and
-  replaces the registration panel with staff test registration
-  (`DraftTestRegistration`): on a free draft, a warning that it creates a real
-  registration and a **Test registration (UX Hub execs only)** button that opens
-  checkout; on a paid draft, a disabled "Paid drafts can’t be test-registered"
-  button and no way to pay. Once they hold a ticket, the ordinary panel shows
-  it. Checkout is behind `FLAGS.studentEvents`, so while the flag is off the
-  page keeps the disabled "Registration unavailable in draft preview" button
-  (see "Unified saved drafts and staff previews").
+  the same registration panel a member sees on the published event: **Apply**
+  on an event that takes applications, **Register** otherwise, and the ticket
+  once they hold one. Where a button can't work on a draft, it shows disabled
+  with a short reason (`draftRegistrationBlocks`): Register and Confirm on a
+  paid draft ("Paid events take registrations once they’re published"), and
+  Register and Apply while `FLAGS.studentEvents` is off, since the checkout and
+  the application form are behind it (see "Unified saved drafts and staff
+  previews").
 - **Portal timeline:** `/portal/events` lists drafts to admins and managers
   only (`portalEventStatuses`), each with a "Draft event" badge in place of the
   state badge, under a note that only admins and managers see drafts. Search
@@ -180,12 +180,20 @@ published.
 - **Not on the public site:** the public `/events` pages stay active-only. The
   public `/events/[slug]` page is cached and uses the anon client, so it never
   shows a draft; staff preview one at `/events/<slug>?preview=draft`.
-- **Free drafts only:** staff test registration is for free events. On a
-  draft or scheduled event, `event_ticket_eligibility` lets only admins and
-  managers register, and only when the event is free (regular and member
-  price 0) and the amount is $0. Anything else is `EVENT_NOT_ACTIVE`, so a
-  paid draft never gets a purchase or a card hold. The checkout dialog shows
-  the same warning and labels its button **Test registration (UX Hub execs only)**.
+- **Registering: free drafts only.** On a draft or scheduled event,
+  `event_ticket_eligibility` lets only admins and managers register, and only
+  when the event is free (regular and member price 0) and the amount is $0.
+  Anything else is `EVENT_NOT_ACTIVE`, so a paid draft never gets a purchase or
+  a card hold. The checkout is the one members get; on a paid draft its button
+  is disabled with the same reason, and the card form never loads. On an event
+  that takes applications, registering also needs an accepted, released offer,
+  as on a published one.
+- **Applying: any draft.** The "applications: insert own draft" policy and
+  `submit_event_application` take an application on a draft from
+  `is_admin()` alone, inside the event's application window. Applying costs
+  nothing, so a paid draft takes applications too. Admins review them as any
+  other; an admin's application doesn't stop the draft from being deleted
+  (`event_member_commitments` counts members only).
 - **Enforced on the server:** fulfillment reads events with the service-role
   client, which bypasses RLS. It has to check the buyer's role itself before it
   sells a draft ticket. `initialize_event_checkout` and `reserve_event_ticket`
@@ -193,9 +201,10 @@ published.
 
 Preview deploys share the production database (the free plan has no branching),
 so registrations and check-ins made on a test draft are real production rows.
-Keep the event in Draft afterwards, or delete it: a staff member's $0 test
-purchase on a draft is not a live purchase, so a draft with only staff test
-registrations deletes, taking its tickets and dead purchases with it.
+Keep the event in Draft afterwards, or delete it: a staff member's $0
+purchase on a draft is not a live purchase, so a draft with only staff
+registrations and applications deletes, taking its tickets, applications and
+dead purchases with it.
 
 The portal event page and checkout read the event under the viewer's RLS, so
 staff reach drafts and members get a 404. Fulfillment
@@ -575,7 +584,7 @@ Active membership requires both personal expiry and club-term checks. Existing
 legacy events retain their policy/amounts on unrelated saves; explicitly changing
 pricing configuration converts an eligible event. The temporary pricing
 publication/scheduling/registration blockers have been removed. Staff may still
-test-register on free drafts (see "Drafts for admins"); ordinary required-field,
+register on free drafts (see "Drafts for admins"); ordinary required-field,
 authorization and pricing locks remain.
 
 `initialize_event_checkout` snapshots paid prices under the event lock. A zero
