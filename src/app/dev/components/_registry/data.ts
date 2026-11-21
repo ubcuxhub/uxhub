@@ -121,7 +121,7 @@ export const dataEntries: readonly RegistryEntry[] = [
   },
   {
     slug: "scanner-frame", title: "Scanner frame", category: "Data display", tier: "composite",
-    description: "A full-viewport dark camera surface with a wrapping header, centred controls and a 264px viewfinder. Capture and permission handling belong to callers.",
+    description: "A full-viewport dark camera surface with a wrapping header, centred controls and a 264px viewfinder, shown here in every scanner state with the check-in result panel and the Scan tickets card. Capture and permission handling belong to callers.",
     importPath: "@/components/shared/ScannerFrame", importNames: ["ScannerFrame", "ScannerViewfinder"],
     source: "src/components/shared/ScannerFrame.tsx", spec: "Check-in presentation", layout: "page",
   },

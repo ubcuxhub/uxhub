@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { MoreHorizontal, ScanLine } from "lucide-react";
+import { MoreHorizontal, Scan } from "lucide-react";
 import type { ReactNode } from "react";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { ListRow } from "@/components/shared/ListRow";
@@ -16,9 +16,10 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "@/components/ui/toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
-import { CheckInTarget } from "./CheckInTarget";
+import { CheckInTarget, checkInItemContext } from "./CheckInTarget";
 import { CheckInTicketMenu } from "./CheckInTicketMenu";
 import { CheckInFeedback } from "./CheckInFeedback";
+import { ScanTicketsCard } from "./ScanTicketsCard";
 import { useItemCheckIn } from "@/features/admin/hooks/use-item-check-in";
 import { checkInBackLabel, checkInReturnTo, checkInPath, type ItemCheckInSnapshot, type ItemAttendance } from "@/features/admin/lib/item-check-in";
 import { searchCheckInAttendees } from "@/features/admin/lib/check-in-search";
@@ -88,24 +89,24 @@ export function CheckInManager({ eventId, event, initialItemId, initialSnapshot,
         <StatCard label="Checked in" {...(state.loading ? { kind: "loading" as const } : { kind: "count" as const, count, total, noun: "going", showRate: true })} />
         <StatCard label="Not checked in" {...(state.loading ? { kind: "loading" as const } : { kind: "count" as const, count: total - count, total, noun: "going" })} />
       </div>
-      <div className="flex items-center gap-3">
-      <Button className="min-w-0 flex-1" asChild={state.enabled} disabled={!state.enabled}>{state.enabled ? <Link href={checkInPath(eventId, itemId, true, returnTo)}>
-        <ScanLine aria-hidden />Scan tickets</Link> : <>
-        <ScanLine aria-hidden />Scan tickets</>}</Button>
-      {itemId && phoneLinks[itemId] ? <Dialog>
-        <DialogTrigger asChild>
-          <Button variant="secondary" className="hidden w-fit shrink-0 sm:inline-flex">Open scanner on phone</Button>
-        </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Open scanner on phone</DialogTitle>
-            <DialogDescription>Scan this link to check tickets into {target.label}.</DialogDescription>
-          </DialogHeader>{phoneLinks[itemId]}<Button asChild>
-            <Link href={checkInPath(eventId, itemId, true, returnTo)}>Open scanner</Link>
-          </Button>
-        </DialogContent>
-      </Dialog> : null}
-      </div>
+      <ScanTicketsCard description={`${target.label} · ${checkInItemContext(target)}`}>
+        <Button asChild={state.enabled} disabled={!state.enabled}>{state.enabled ? <Link href={checkInPath(eventId, itemId, true, returnTo)}>
+          <Scan aria-hidden />Scan tickets</Link> : <>
+          <Scan aria-hidden />Scan tickets</>}</Button>
+        {itemId && phoneLinks[itemId] ? <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="secondary" className="hidden sm:inline-flex">Open scanner on phone</Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Open scanner on phone</DialogTitle>
+              <DialogDescription>Scan this link to check tickets into {target.label}.</DialogDescription>
+            </DialogHeader>{phoneLinks[itemId]}<Button asChild>
+              <Link href={checkInPath(eventId, itemId, true, returnTo)}>Open scanner</Link>
+            </Button>
+          </DialogContent>
+        </Dialog> : null}
+      </ScanTicketsCard>
       <div className="grid min-w-0 gap-8 @[56rem]/checkin:grid-cols-2">
         <section className="flex min-w-0 flex-col gap-4" aria-label="Recent check-ins">
           <div className="flex items-center justify-between gap-3">

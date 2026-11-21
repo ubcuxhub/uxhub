@@ -44,6 +44,7 @@ it("retains selected target in scanner and phone QR paths", async () => {
   await act(async () => { });
 
   expect(screen.getByRole("link", { name: "Scan tickets" }).getAttribute("href")).toBe("/admin/events/event/check-in/scan?item=a");
+  expect(screen.getByRole("region", { name: "Scan tickets" }).textContent).toContain("Opening · ");
 
   fireEvent.click(screen.getByRole("button", { name: "Open scanner on phone" }));
 

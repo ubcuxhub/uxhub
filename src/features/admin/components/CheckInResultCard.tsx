@@ -1,53 +1,94 @@
 "use client";
-import { useEffect, useState } from "react";
-import { CircleAlert, History } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import type { FocusEvent } from "react";
+import { CircleAlert, CircleCheck, Search, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter } from "@/components/ui/sheet";
 import type { ItemCheckInResult } from "@/features/admin/lib/item-check-in";
 import { formatEventTime } from "@/lib/date";
+import { CheckInPanel } from "./CheckInPanel";
 
-export function CheckInResultCard({ result, eventName, targetLabel, onNext, onSearch, onUndo, disabled }: { result: ItemCheckInResult; eventName: string; targetLabel: string; onNext: () => void; onSearch: () => void; onUndo: () => void; disabled: boolean }) {
-  const [remaining, setRemaining] = useState(result.status === "rejected" ? 0 : 4);
+/** How long a fresh check-in stays up before the scanner returns by itself. */
+export const AUTO_RETURN_SECONDS = 4;
+
+export function rejectionTitle(result: Extract<ItemCheckInResult, { status: "rejected" }>) {
+  return result.reason === "event_canceled" ? "This event is canceled" : "Ticket not recognized";
+}
+
+interface CheckInResultCardProps {
+  result: ItemCheckInResult;
+  eventName: string;
+  /** Turns off Undo check-in (offline, refreshing, lost access). */
+  disabled: boolean;
+  /** Holds the countdown, e.g. while the undo confirmation is open. */
+  holding?: boolean;
+  /** `auto` when the countdown ran out, `user` for Scan next. */
+  onNext: (source: "auto" | "user") => void;
+  onSearch: () => void;
+  onUndo: () => void;
+}
+
+/**
+ * The outcome of one scan or lookup, shown where the camera was. A fresh
+ * check-in returns to scanning after four seconds; the countdown holds while
+ * the pointer or focus is inside, so nobody loses Undo mid-reach. Other
+ * outcomes wait for Scan next.
+ */
+export function CheckInResultCard({ result, eventName, disabled, holding = false, onNext, onSearch, onUndo }: CheckInResultCardProps) {
+  const autoReturn = result.status === "checked_in";
+  const [remaining, setRemaining] = useState(AUTO_RETURN_SECONDS);
+  const [pointerInside, setPointerInside] = useState(false);
+  const [focusInside, setFocusInside] = useState(false);
+  const paused = holding || pointerInside || focusInside;
+  const onNextRef = useRef(onNext);
   useEffect(() => {
-    if (result.status === "rejected")
+    onNextRef.current = onNext;
+  });
+  useEffect(() => {
+    if (!autoReturn || paused)
       return;
-
     const interval = setInterval(() => setRemaining(value => Math.max(0, value - 1)), 1000);
-
     return () => clearInterval(interval);
-  }, [result.status]);
-  const rejected = result.status === "rejected";
-  const canceled = rejected && result.reason === "event_canceled";
-  const rejectionTitle = canceled ? "This event is canceled" : "Ticket not recognized";
-  return <Sheet open onOpenChange={open => {
-    if (!open)
-      onNext();
-  }}>
-    <SheetContent side="bottom" showCloseButton={false} className="mx-auto max-h-[85dvh] max-w-[480px] overflow-y-auto rounded-t-2xl" onEscapeKeyDown={e => {
-      if (remaining > 0)
-        e.preventDefault();
-    }} onInteractOutside={e => {
-      if (remaining > 0)
-        e.preventDefault();
-    }}>
-      <SheetHeader className="gap-3 p-5">
-        <div>{result.status === "checked_in" ? <StatusBadge status="checked_in" /> : result.status === "already_checked_in" ? <Badge variant="warning">
-          <History aria-hidden />Already checked in</Badge> : <Badge variant="error">
-          <CircleAlert aria-hidden />{rejectionTitle}</Badge>}</div>
-        <SheetTitle className="text-h2 [overflow-wrap:anywhere]">{rejected ? rejectionTitle : result.name}</SheetTitle>
-        <SheetDescription>{rejected ? canceled ? "Canceled events don’t take check-ins." : `This QR code isn't a ticket for ${eventName}. Ask the attendee to open their ticket in the portal, or find them by name.` : `${eventName} · ${result.status === "already_checked_in" ? "Already checked in" : "Checked in"} at ${formatEventTime(result.checkedInAt)}`}</SheetDescription>
-        <p className="text-small text-muted-foreground [overflow-wrap:anywhere]">{targetLabel}</p>
-      </SheetHeader>
-      {!rejected ? <div className="mx-5 flex flex-wrap justify-between gap-3 border-t border-border-subtle pt-5 text-small">
-        <span>{result.checkedCount} of {result.total} checked in</span>
-        <span className="text-muted-foreground">{remaining ? `Next scan in ${remaining} seconds` : "Ready for the next scan"}</span>
-      </div> : null}
-      <SheetFooter className="flex-row gap-3 p-5">
-        {result.status === "checked_in" ? <Button variant="secondary" disabled={disabled} onClick={onUndo} className="flex-1">Undo check-in</Button> : rejected ? <Button variant="secondary" onClick={onSearch} className="flex-1">Search attendees</Button> : null}
-        <Button disabled={remaining > 0} onClick={onNext} className="flex-1">Scan next</Button>
-      </SheetFooter>
-    </SheetContent>
-  </Sheet>;
+  }, [autoReturn, paused]);
+  useEffect(() => {
+    if (autoReturn && remaining === 0)
+      onNextRef.current("auto");
+  }, [autoReturn, remaining]);
+  const leave = (event: FocusEvent<HTMLDivElement>) => {
+    if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+      setFocusInside(false);
+  };
+  const scanNext = <Button onClick={() => onNext("user")}>Scan next</Button>;
+  const name = "name" in result ? <p className="text-body-medium [overflow-wrap:anywhere]">{result.name}</p> : null;
+
+  let panel;
+  if (result.status === "rejected") {
+    const canceled = result.reason === "event_canceled";
+    panel = <CheckInPanel tone="error" icon={<TriangleAlert />} title={rejectionTitle(result)} actions={<>
+      {/* A canceled event refuses lookups too, so only the scan is offered. */}
+      {canceled ? null : <Button variant="secondary" onClick={onSearch}><Search aria-hidden />Search attendees</Button>}{scanNext}
+    </>}>
+      <p className="max-w-sm text-small text-muted-foreground [overflow-wrap:anywhere]">
+        {canceled ? "Canceled events don’t take check-ins." : `This QR code isn’t a ticket for ${eventName}. Ask the attendee to open their ticket in the portal, or find them by name.`}
+      </p>
+    </CheckInPanel>;
+  }
+  else if (result.status === "checked_in")
+    panel = <CheckInPanel tone="success" icon={<CircleCheck />} title="Checked in" actions={<>
+      <Button variant="secondary" disabled={disabled} onClick={onUndo}>Undo check-in</Button>{scanNext}
+    </>}>
+      {name}
+      <p className="text-small text-muted-foreground">
+        Checked in at {formatEventTime(result.checkedInAt)} · {paused ? "Next scan paused" : `Next scan in ${remaining} ${remaining === 1 ? "second" : "seconds"}`}
+      </p>
+    </CheckInPanel>;
+  else
+    panel = <CheckInPanel tone="warning" icon={<CircleAlert />} title="Already checked in" actions={scanNext}>
+      {name}
+      <p className="max-w-sm text-small text-muted-foreground">
+        This ticket was checked in at {formatEventTime(result.checkedInAt)}. Nothing changed, so the count stays the same.
+      </p>
+    </CheckInPanel>;
+  return <div className="flex flex-col" onPointerEnter={() => setPointerInside(true)} onPointerLeave={() => setPointerInside(false)} onFocus={() => setFocusInside(true)} onBlur={leave}>
+    {panel}
+  </div>;
 }
