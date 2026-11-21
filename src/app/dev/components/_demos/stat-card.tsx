@@ -23,6 +23,9 @@ function StatCardDemo() {
             change={{ delta: 24, period: "since last term" }}
           />
         </Specimen>
+        <Specimen label="Value with detail" className="w-56">
+          <StatCard label="Team deadline" kind="value" value="Jan 10" detail="Passed · teams are locked" />
+        </Specimen>
         <Specimen label="Rate" className="w-56">
           <StatCard
             className="h-full w-full"

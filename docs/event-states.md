@@ -555,6 +555,19 @@ The server makes these changes through `create_team`, `join_team`,
 `leave_team` and `delete_team`, which return why a change was refused
 (`NO_TICKET`, `TEAMS_LOCKED`, `TEAM_FULL`, ...) instead of failing.
 
+### Admins: teams
+
+The event's Teams view (`fetchEventTeamsOverview`, `EventTeamsView`) counts:
+
+- **Going**: everyone holding a ticket. **On a team**: the going people on a
+  team, so it never exceeds Going. **To place**: going people on no team.
+- **Full**: a team at `max_team_size`. With no limit, no team is full.
+- **Checked in**: a ticket holder with a check-in time on any of the event's
+  check-in items, whichever and however many. A team is "Everyone checked in"
+  when it has a member holding a ticket and every member holding one is
+  checked in; a member without a ticket doesn't count either way.
+- **Locked**: from `team_deadline` on; with no deadline, never.
+
 ## Seats
 
 Seats taken = tickets + accepted offers that haven't expired and have no ticket

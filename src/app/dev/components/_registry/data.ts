@@ -350,4 +350,17 @@ export const dataEntries: readonly RegistryEntry[] = [
     importPath: "@/components/shared/AgendaDayTable", importNames: ["AgendaDayTable"],
     source: "src/components/shared/AgendaDayTable.tsx", spec: "Agenda presentation", layout: "page",
   },
+  {
+    slug: "event-teams-view",
+    title: "Event teams view",
+    category: "Data display",
+    tier: "app",
+    description:
+      "An event's teams for UX Hub execs: team counts, who is still to place and the team deadline, then every team and its members, with search, sort, and size and check-in filters held in the URL.",
+    importPath: "@/features/admin/components/teams/EventTeamsView",
+    importNames: ["EventTeamsView"],
+    source: "src/features/admin/components/teams/EventTeamsView.tsx",
+    spec: "Manage Events, Teams tab",
+    layout: "page",
+  },
 ];

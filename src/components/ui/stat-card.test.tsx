@@ -67,6 +67,14 @@ describe("StatCard", () => {
     expect(screen.getByText("1,234")).toBeTruthy();
   });
 
+  it("shows a text value as given, with its detail line", () => {
+    render(<StatCard label="Team deadline" kind="value" value="Jan 10" detail="Passed · teams are locked" />);
+
+    const card = screen.getByRole("group", { name: "Team deadline" });
+    expect(card.textContent).toContain("Jan 10");
+    expect(card.textContent).toContain("Passed · teams are locked");
+  });
+
   it("marks loading cards busy and renders content-shaped skeletons", () => {
     const { container } = render(
       <StatCard label="Active members" kind="loading" />,

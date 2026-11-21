@@ -7,8 +7,11 @@ import { cn } from "@/lib/utils";
 type StatCardProps = { label: string; className?: string } & (
   | {
       kind: "value";
-      value: number;
+      /** A number is formatted ("1,234"); a string ("Jan 10") shows as is. */
+      value: number | string;
       change?: { delta: number; period: string };
+      /** A line of context under the value: "6 full · 6 with open spots". */
+      detail?: string;
     }
   | { kind: "count"; count: number; total: number; noun: string; showRate?: boolean }
   | {
@@ -114,9 +117,16 @@ function StatCard({ label, className, ...stat }: StatCardProps) {
       ) : (
         <>
           <p className="text-h1 text-foreground tabular-nums">
-            {numberFormatter.format(stat.value)}
+            {typeof stat.value === "number"
+              ? numberFormatter.format(stat.value)
+              : stat.value}
           </p>
           {stat.change ? <Change {...stat.change} /> : null}
+          {stat.detail ? (
+            <p className="text-label font-normal text-muted-foreground">
+              {stat.detail}
+            </p>
+          ) : null}
         </>
       )}
     </div>
