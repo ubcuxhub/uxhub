@@ -52,8 +52,8 @@ on hover. Charts do not animate or auto-rotate.
 
 ## Deployment and verification
 
-Apply migrations through `20261027230342` to the hosted project before merging
-or deploying this dashboard. Existing tables and checkout behavior are
+The production build applies migrations through `20261121104256` before
+deploying this dashboard. Existing tables and checkout behavior are
 unchanged. No new table entries are needed in `TABLES`.
 
 Database authorization and counting behavior are covered by the local
