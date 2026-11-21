@@ -15,7 +15,7 @@ import { agendaCheckInHref, agendaPath } from "@/features/admin/lib/staff-agenda
 import { agendaDayLabel } from "@/lib/event-agenda";
 import type { AgendaNote, StaffAgendaDay, StaffAgendaItem } from "@/lib/supabase-helpers/event-agenda-notes";
 
-export function StaffAgenda({ eventId, eventName, days, initialDayId, volunteerUrl }: {
+export function StaffAgenda({ eventId, days, initialDayId, volunteerUrl }: {
   eventId: string; eventName: string; days: StaffAgendaDay[]; initialDayId: string | null; volunteerUrl: string | null;
 }) {
   const [dayId, setDayId] = useState(initialDayId);
@@ -42,8 +42,8 @@ export function StaffAgenda({ eventId, eventName, days, initialDayId, volunteerU
     } catch { setError("Couldn’t save the note. Your text is still here. Try saving again."); }
     finally { saving.current = false; setPending(false); }
   }
-  return <PageContainer backHref={`/admin/events/${eventId}`} backLabel="Back to Event overview" className="space-y-6">
-    <h1 className="text-h1">{eventName} agenda</h1>
+  // The event manager's header names the event and holds the way back.
+  return <PageContainer className="space-y-6">
     <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
       {days.length > 1 && <div className="w-full min-w-0 sm:max-w-sm sm:flex-1"><Select value={dayId ?? undefined} onValueChange={id => { setDayId(id); window.history.replaceState(null, "", agendaPath(eventId, id)); }}><SelectTrigger aria-label="Day"><SelectValue /></SelectTrigger><SelectContent>{days.map(entry => <SelectItem key={entry.id} value={entry.id}>{agendaDayLabel(entry.date)} · {entry.title}</SelectItem>)}</SelectContent></Select></div>}
       <VolunteerScheduleButton eventId={eventId} initialUrl={volunteerUrl} />

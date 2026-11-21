@@ -66,6 +66,7 @@ import { formatEventDate } from "@/lib/date";
 
 interface ReviewApplicationsClientProps {
   eventId: string;
+  /** Named by the event manager's header. */
   eventName: string;
   /** "Applications closed Nov 3 · Event Jan 9–10", composed on the server. */
   subtitle?: string;
@@ -169,7 +170,6 @@ function useReviewListQuery() {
 
 export function ReviewApplicationsClient({
   eventId,
-  eventName,
   subtitle,
   capacity = 0,
   seats,
@@ -221,16 +221,11 @@ export function ReviewApplicationsClient({
   const columns = showNotes ? 4 : 3;
 
   return (
-    <PageContainer
-      backHref="/admin/events"
-      backLabel="Back to Manage Events"
-      className="flex flex-col gap-8"
-    >
+    // The event manager's header names the event and holds the way back.
+    <PageContainer className="flex flex-col gap-8">
       <header className="flex flex-col gap-2">
-        <h1 className="text-h1 tracking-tight">Applications</h1>
-        <p className="text-muted-foreground">
-          {[eventName, subtitle].filter(Boolean).join(" · ")}
-        </p>
+        <h2 className="text-h2 tracking-tight">Applications</h2>
+        {subtitle ? <p className="text-muted-foreground">{subtitle}</p> : null}
       </header>
 
       {applications.length === 0 ? (

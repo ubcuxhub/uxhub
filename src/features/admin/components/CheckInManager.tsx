@@ -24,9 +24,9 @@ import { useItemCheckIn } from "@/features/admin/hooks/use-item-check-in";
 import { checkInBackLabel, checkInReturnTo, checkInPath, type ItemCheckInSnapshot, type ItemAttendance } from "@/features/admin/lib/item-check-in";
 import { searchCheckInAttendees } from "@/features/admin/lib/check-in-search";
 import type { EventRow } from "@/lib/supabase/models";
-import { formatEventDate, formatEventTime } from "@/lib/date";
+import { formatEventTime } from "@/lib/date";
 
-export function CheckInManager({ eventId, event, initialItemId, initialSnapshot, phoneLinks, returnTo }: { eventId: string; event: EventRow; initialItemId: string | null; initialSnapshot: ItemCheckInSnapshot; phoneLinks: Record<string, ReactNode>; returnTo?: string }) {
+export function CheckInManager({ eventId, initialItemId, initialSnapshot, phoneLinks, returnTo }: { eventId: string; /** Named by the event manager's header. */ event: EventRow; initialItemId: string | null; initialSnapshot: ItemCheckInSnapshot; phoneLinks: Record<string, ReactNode>; returnTo?: string }) {
   const state = useItemCheckIn(eventId, initialItemId, initialSnapshot, false, returnTo);
   const { snapshot, itemId } = state;
   const [filter, setFilter] = useState<"not" | "checked" | "all">("not");
@@ -73,11 +73,11 @@ export function CheckInManager({ eventId, event, initialItemId, initialSnapshot,
   }}>
     <MoreHorizontal />
   </IconButton>;
-  return <PageContainer backHref={checkInReturnTo(returnTo)} backLabel={checkInBackLabel(checkInReturnTo(returnTo))} className="@container/checkin flex flex-col gap-6">
-    <div>
-      <h1 className="text-h2">{event.name}</h1>
-      <p className="mt-1 text-small text-muted-foreground">{event.starts_at ? formatEventDate(event.starts_at, { month: "short" }) : "Date not set"}{event.location_building ? ` · ${event.location_building}` : ""}</p>
-    </div>
+  // The event manager's header names the event and links back to the list,
+  // so only a page this one was opened from (the agenda) gets a back link.
+  const backHref = returnTo === undefined ? null : checkInReturnTo(returnTo);
+  const back = backHref && backHref !== "/admin/events" ? backHref : undefined;
+  return <PageContainer backHref={back} backLabel={back && checkInBackLabel(back)} className="@container/checkin flex flex-col gap-6">
     <h2 className="text-h3">Check-in</h2>
     {snapshot.items.length ? <CheckInTarget items={snapshot.items} itemId={itemId} onChange={id => {
       setUndoRow(null);

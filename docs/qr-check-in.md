@@ -17,7 +17,8 @@ won't scan. Target: Nov 12, 2026.
   prop with [`toTicketEvent`](../src/features/events/lib/ticket.ts).
 - **Check-in data:** `check_in_sessions` (one or more per event) and
   `check_ins` (one row per ticket per session, unique on that pair).
-  `/admin/events/[event]/check-in` lists tickets with a search box and a
+  `/admin/events/[event]/check-in`, the event manager's Check-in tab
+  (`[event]/(manager)/check-in`), lists tickets with a search box and a
   per-session check-in toggle (`toggleCheckInAction`), and links to the
   scanner.
 - **Scanner:** `/admin/events/[event]/check-in/scan`, a phone camera scanner

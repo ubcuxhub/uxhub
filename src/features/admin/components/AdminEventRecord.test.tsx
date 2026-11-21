@@ -171,6 +171,13 @@ describe("AdminEventRecord overview", () => {
     expect(screen.queryByRole("link", { name: /Review applications/ })).toBeNull();
   });
 
+  it("expands to the event manager's Overview, not the builder", () => {
+    renderRecord();
+    expect(screen.getByRole("link", { name: "Open as full page" }).getAttribute("href")).toBe(
+      `/admin/events/${EVENT_ID}/overview`
+    );
+  });
+
   it("previews drafts even while public browsing is gated", () => {
     renderRecord({ event: event({ status: "draft" }) });
     expect(screen.getByRole("link", { name: /View marketing page/ }).getAttribute("href")).toBe("/events/portfolio-night?preview=draft");

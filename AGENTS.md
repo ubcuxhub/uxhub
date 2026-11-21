@@ -129,9 +129,16 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
   `children`; each record is a child route (`users/[userId]/page.tsx`,
   `events/(browse)/[event]/page.tsx`) whose content (`RecordView`) opens in a
   side peek drawer over the list, on a row click and on a refresh alike. The
-  `(browse)` group keeps the event builder (`events/[event]/edit`),
-  `check-in`, `review-applications` and `create-new` out of the list layout,
-  as full pages; the builder wears the drawer's top bar (`RecordPageTopBar`).
+  `(browse)` group keeps the event builder (`events/[event]/edit`), the
+  event manager and `create-new` out of the list layout, as full pages; the
+  builder wears the drawer's top bar (`RecordPageTopBar`). The event manager
+  is a route group, `events/[event]/(manager)/`, whose layout renders the
+  event's header and tabs (`TabNav`) around each tab's page: `overview`,
+  `check-in`, `agenda` and `review-applications` (the Applications tab, shown
+  when the event takes applications). The tabs are listed in
+  `src/features/admin/lib/event-manager.ts`; a new tab is a line there plus its
+  page in the group. The builder and the phone scanner
+  (`(scanner)/…/check-in/scan`) stay outside it.
   Record route components still call `requireAdmin()` before they fetch
   (layouts and pages render in parallel). Every `@flow` page has a canonical
   twin, and no `@flow/(.)admin` route exists; `src/app/flow-routes.test.ts`
@@ -148,9 +155,10 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
   handlers for callbacks, webhooks, uploads, and flows that require an HTTP
   endpoint.
 - Student-facing event and checkout routes use slugs. Admin event routes use
-  event IDs (a slug redirects to the ID): `/admin/events/<id>` is the event's
-  overview (the record drawer, with a quick edit of its status and dates) and
-  `/admin/events/<id>/edit` is the full builder.
+  event IDs (a slug redirects to the ID): `/admin/events/<id>` is the quick
+  peek (the record drawer, with a quick edit of its status and dates), whose
+  expand button opens `/admin/events/<id>/overview`, the event manager's
+  Overview tab; `/admin/events/<id>/edit` is the full builder.
 - Settings are a hash-driven dialog (`#settings/<tab>`), not standalone portal
   pages. Use `openSettings(tab)` from
   `src/features/settings/components/SettingsDialog`.

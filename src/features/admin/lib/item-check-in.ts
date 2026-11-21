@@ -48,6 +48,7 @@ export function checkInBackLabel(returnTo: string): string {
   if (path.endsWith("/agenda")) return "Back to Agenda";
   if (path === "/admin/events") return "Back to Manage Events";
   if (/^\/admin\/events\/[^/]+$/.test(path)) return "Back to Event overview";
+  if (/^\/admin\/events\/[^/]+\/overview$/.test(path)) return "Back to Overview";
   return "Back to previous page";
 }
 export function checkInPath(eventId: string, itemId: string | null, scan = false, returnTo?: string) {

@@ -221,13 +221,14 @@ export function ApplicationReviewClient({
           <Avatar name={applicant.name} size={56} decorative />
           <div className="flex min-w-0 flex-col gap-1.5">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              <h1
+              {/* Under the event manager's h1, the event's name. */}
+              <h2
                 ref={headingRef}
                 tabIndex={-1}
                 className="text-h2 outline-none"
               >
                 {applicant.name}
-              </h1>
+              </h2>
               <ReviewStateBadge state={state} />
             </div>
             <p className="text-small text-muted-foreground">

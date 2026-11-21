@@ -66,8 +66,8 @@ const chip = (label: RegExp) => screen.getByRole("button", { name: label });
 describe("ReviewApplicationsClient", () => {
   it("opens on Submitted, with counts, 25 to a page, oldest first", () => {
     renderList();
-    expect(screen.getByRole("heading", { level: 1, name: "Applications" })).toBeTruthy();
-    expect(screen.getByText("UXathon · Applications closed Nov 3")).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Applications" })).toBeTruthy();
+    expect(screen.getByText("Applications closed Nov 3")).toBeTruthy();
     expect(chip(/^Submitted/).getAttribute("aria-pressed")).toBe("true");
     expect(chip(/^Submitted/).textContent).toContain("26");
     expect(chip(/^Rejected/).textContent).toContain("1");

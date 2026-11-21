@@ -78,7 +78,7 @@ it("shows the selected day context and optional staff resource without adding ta
   expect(screen.queryByText("Day", { selector: "label" })).toBeNull();
   expect(screen.queryByText("All times are Pacific Time")).toBeNull();
   expect(screen.queryByRole("heading", { name: "Agenda" })).toBeNull();
-  expect(screen.getByRole("link", { name: "Back to Event overview" }).getAttribute("href")).toBe("/admin/events/event");
+  expect(screen.queryByRole("link", { name: /^Back to/ })).toBeNull();
   const schedule = screen.getByRole("link", { name: "View Volunteer Schedule" });
   expect(schedule.getAttribute("target")).toBe("_blank");
   expect(schedule.getAttribute("rel")).toBe("noopener noreferrer");

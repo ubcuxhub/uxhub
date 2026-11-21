@@ -72,10 +72,43 @@ describe("admin record routes", () => {
   });
 
   it("keeps the event builder and the event's other pages outside the list", () => {
-    for (const page of ["[event]/edit", "[event]/check-in", "[event]/review-applications", "create-new"]) {
+    for (const page of [
+      "[event]/edit",
+      "[event]/(manager)/overview",
+      "[event]/(manager)/check-in",
+      "[event]/(manager)/agenda",
+      "[event]/(manager)/review-applications",
+      "create-new",
+    ]) {
       expect(existsSync(path.join(ADMIN, "events", page, "page.tsx"))).toBe(true);
     }
     expect(existsSync(path.join(ADMIN, "events", "layout.tsx"))).toBe(false);
+  });
+
+  it("wraps the event manager's tabs in its layout, but not the builder", () => {
+    expect(existsSync(path.join(ADMIN, "events", "[event]", "(manager)", "layout.tsx"))).toBe(true);
+    // A layout at `[event]` would wrap the builder too.
+    expect(existsSync(path.join(ADMIN, "events", "[event]", "layout.tsx"))).toBe(false);
+    expect(existsSync(path.join(ADMIN, "events", "[event]", "(manager)", "edit"))).toBe(false);
+  });
+
+  it("keeps every event page's URL: route groups don't change them", () => {
+    // `(shell)/admin/events/[event]/(manager)/check-in/page.tsx` → `/admin/events/[event]/check-in`.
+    const urls = filesUnder(path.join(APP, "(app)"))
+      .filter((file) => /(^|\/)page\.tsx$/.test(file))
+      .map((file) => `/${file.split("/").slice(0, -1).filter((segment) => !/^\(.+\)$/.test(segment)).join("/")}`);
+    for (const url of [
+      "/admin/events/[event]",
+      "/admin/events/[event]/overview",
+      "/admin/events/[event]/edit",
+      "/admin/events/[event]/agenda",
+      "/admin/events/[event]/check-in",
+      "/admin/events/[event]/check-in/scan",
+      "/admin/events/[event]/review-applications",
+      "/admin/events/[event]/review-applications/[applicationId]",
+    ]) {
+      expect(urls.filter((candidate) => candidate === url), url).toHaveLength(1);
+    }
   });
 
   it("links Create Event with a soft navigation", () => {
