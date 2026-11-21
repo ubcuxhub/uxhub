@@ -60,8 +60,25 @@ export const HUBBO_EMOTIONS = {
 
 export type HubboEmotion = keyof typeof HUBBO_EMOTIONS;
 
-/** Hubbo's width in the email, in CSS pixels; the height keeps the art's ratio. */
-export const HUBBO_EMAIL_WIDTH = 120;
+/**
+ * Every emotion shows at the same height, in CSS pixels, so Hubbo looks the
+ * same size from one email to the next whatever the shape of the art.
+ */
+export const HUBBO_EMAIL_HEIGHT = 140;
+
+/** A cap on the width, so a wide pose like `resting` can't dominate. */
+export const HUBBO_EMAIL_MAX_WIDTH = 200;
+
+/** Hubbo's size in the email: the shared height, unless the width cap binds. */
+export function hubboEmailSize(emotion: HubboEmotion) {
+  const art = HUBBO_EMOTIONS[emotion];
+  const width = Math.round((art.width * HUBBO_EMAIL_HEIGHT) / art.height);
+  if (width <= HUBBO_EMAIL_MAX_WIDTH) return { width, height: HUBBO_EMAIL_HEIGHT };
+  return {
+    width: HUBBO_EMAIL_MAX_WIDTH,
+    height: Math.round((art.height * HUBBO_EMAIL_MAX_WIDTH) / art.width),
+  };
+}
 
 export function hubboImageUrl(emotion: HubboEmotion) {
   return `${EMAIL_ASSET_ORIGIN}/email/hubbo-${emotion}.png`;
@@ -73,9 +90,7 @@ export function hubboImageUrl(emotion: HubboEmotion) {
  * client blocks images.
  */
 function hubboImage(emotion: HubboEmotion) {
-  const art = HUBBO_EMOTIONS[emotion];
-  const width = HUBBO_EMAIL_WIDTH;
-  const height = Math.round((art.height * width) / art.width);
+  const { width, height } = hubboEmailSize(emotion);
 
   return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0">
           <tr><td align="center" style="padding:0 0 20px;">
@@ -98,6 +113,10 @@ export function renderEmailLayout({
 }) {
   return `<!doctype html>
 <html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+  </head>
   <body style="margin:0;padding:24px;background:#f4f5f7;font-family:Helvetica,Arial,sans-serif;">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;padding:32px;">
       <tr><td>

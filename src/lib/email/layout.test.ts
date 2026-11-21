@@ -5,9 +5,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   EMAIL_ASSET_ORIGIN,
-  HUBBO_EMAIL_WIDTH,
   HUBBO_EMOTIONS,
   type HubboEmotion,
+  hubboEmailSize,
   hubboImageUrl,
   renderEmailLayout,
 } from "./layout";
@@ -28,20 +28,35 @@ describe("renderEmailLayout hubbo option", () => {
     expect(render()).not.toContain("<img");
   });
 
-  it.each(emotions)("renders %s Hubbo with an absolute URL, size and alt", (emotion) => {
+  // 140 px tall, each as wide as its art's ratio makes it, under a 200 px cap.
+  it.each([
+    ["curious", 123, 140],
+    ["excited", 99, 140],
+    ["proud", 102, 140],
+    ["resting", 189, 140],
+    ["thinking", 132, 140],
+    ["welcoming", 101, 140],
+  ] as const)("renders %s Hubbo at %ix%i with an absolute URL and alt", (emotion, width, height) => {
     const html = render(emotion);
-    const { width, height } = HUBBO_EMOTIONS[emotion];
-    const scaledHeight = Math.round((height * HUBBO_EMAIL_WIDTH) / width);
     const img = html.match(/<img [^>]*>/)?.[0] ?? "";
 
+    expect(hubboEmailSize(emotion)).toEqual({ width, height });
     expect(img).toContain(`src="${EMAIL_ASSET_ORIGIN}/email/hubbo-${emotion}.png"`);
-    expect(img).toContain(`width="${HUBBO_EMAIL_WIDTH}"`);
-    expect(img).toContain(`height="${scaledHeight}"`);
+    expect(img).toContain(`width="${width}"`);
+    expect(img).toContain(`height="${height}"`);
+    expect(img).toContain(`width:${width}px;height:${height}px;`);
     expect(img).toContain('alt="Hubbo"');
     expect(img).toContain('border="0"');
     expect(img).toContain("display:block");
     // Above the heading, so it greets the reader first.
     expect(html.indexOf("<img")).toBeLessThan(html.indexOf("<h1"));
+  });
+
+  it("declares UTF-8 and a device-width viewport in the head", () => {
+    const head = render().match(/<head>[\s\S]*<\/head>/)?.[0] ?? "";
+
+    expect(head).toContain('<meta charset="utf-8">');
+    expect(head).toContain('<meta name="viewport" content="width=device-width, initial-scale=1">');
   });
 
   it("links the production site, which a real inbox can load", () => {
