@@ -353,6 +353,11 @@ describe("publication issue collection", () => {
     expect(result.issues.some(issue => issue.target === "long-overview")).toBe(marketing_mode !== "disabled");
     expect(validateEventForm({ ...state, short_description: "" }, [], []).issues.some(issue => issue.target === "short-overview")).toBe(true);
   });
+  it("limits the short overview to 120 characters, counting an emoji once", () => {
+    const issues = (short_description: string) => validateEventForm({ ...validFormState, short_description }, [], []).issues.filter(issue => issue.target === "short-overview");
+    expect(issues("\u{1F389}".repeat(120))).toEqual([]);
+    expect(issues("x".repeat(121))).toEqual([expect.objectContaining({ message: "Short overview must be 120 characters or fewer." })]);
+  });
   it("collects issues across all sections and distinguishes missing values from consistency errors", () => {
     const state = { ...validFormState, name: "", description: "", max_capacity: "-1", registration_opens_at: "2099-08-02T12:00", registration_closes_at: "2099-08-01T12:00", min_team_size: "3", max_team_size: "2" };
     const issues = validateEventForm(state, [], []).issues;

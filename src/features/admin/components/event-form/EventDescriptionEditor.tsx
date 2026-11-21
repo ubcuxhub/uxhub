@@ -9,6 +9,7 @@ import { Field, FieldLabel, FieldDescription, FieldError, useFieldControl, joinI
 import { EventDescription } from "@/components/shared/EventDescription";
 import { descriptionText, plainDescription, safeDescriptionLink, type DescriptionSpan, type EventDescription as RichDescription } from "@/lib/event-description";
 import { useState } from "react";
+import { characterCount, clampCharacters, SHORT_OVERVIEW_MAX_LENGTH } from "../../lib/event-overview";
 
 /** Convert editor DOM to the allowlisted format; paste never inserts HTML. */
 function readEditor(root: HTMLElement): RichDescription {
@@ -65,8 +66,8 @@ export function EventDescriptionEditor({ short, value, rich, disabled, onChange,
   };
   return <div data-slot="card" className="space-y-4 rounded-xl border border-border bg-card p-5">
     <Field validationKey="short-overview">
-      <div className="flex justify-between gap-3"><FieldLabel className="text-small font-medium" htmlFor="short-overview">Short overview</FieldLabel><span id="short-count" className="text-caption text-muted-foreground">{short.length} / 50</span></div>
-      <Textarea id="short-overview" placeholder="One short line. E.g. Portfolio feedback from industry designers" disabled={disabled} value={short} maxLength={50} aria-describedby="short-count" onChange={e => onChange(e.target.value, value, rich ?? plainDescription(value))} />
+      <div className="flex justify-between gap-3"><FieldLabel className="text-small font-medium" htmlFor="short-overview">Short overview</FieldLabel><span id="short-count" className="text-caption text-muted-foreground">{characterCount(short)} / {SHORT_OVERVIEW_MAX_LENGTH}</span></div>
+      <Textarea id="short-overview" placeholder="One short line. E.g. Portfolio feedback from industry designers" disabled={disabled} value={short} aria-describedby="short-count" onChange={e => onChange(clampCharacters(e.target.value, SHORT_OVERVIEW_MAX_LENGTH), value, rich ?? plainDescription(value))} />
     </Field>
     <Field validationKey="long-overview">
       <div className="flex justify-between gap-3"><FieldLabel className="text-small font-medium" id="long-label">Long overview</FieldLabel><span id="long-count" className="text-caption text-muted-foreground">{value.length} / 3,000</span></div>

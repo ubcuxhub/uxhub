@@ -1,6 +1,7 @@
 import { eventContentProblem, type EventContent } from "../../lib/event-content";
 import { dateLocationIssues, emptyAgendaDay, emptyLocation, type EventDateLocationDraft } from "../../lib/event-date-location";
 import { parseEventDescription, type EventDescription } from "@/lib/event-description";
+import { SHORT_OVERVIEW_MAX_LENGTH, shortOverviewTooLong } from "../../lib/event-overview";
 import { eventSlugError, priceError, suggestedEventSlug, websiteUrlError } from "../../lib/event-configuration";
 import {
   ResponseType,
@@ -297,7 +298,7 @@ export function validateEventForm(
   };
   if (!formState.name.trim()) add("basics", "event-name", "Event name is required.", true);
   if (!formState.short_description.trim()) add("description", "short-overview", "Short description is required.", true);
-  if (formState.short_description.length > 50) add("description", "short-overview", "Short overview must be 50 characters or fewer.");
+  if (shortOverviewTooLong(formState.short_description)) add("description", "short-overview", `Short overview must be ${SHORT_OVERVIEW_MAX_LENGTH} characters or fewer.`);
   if (formState.description.length > 3000) add("description", "long-overview", "Long overview must be 3,000 characters or fewer.");
   if (formState.marketing_mode !== "disabled" && !formState.description.trim()) add("description", "long-overview", "Description is required.", true);
   if (formState.marketing_mode === "external") add("basics", "event-website", websiteUrlError(formState.marketing_url), !formState.marketing_url);

@@ -17,3 +17,18 @@ it("exposes overview guidance while empty and removes the visual placeholder whe
   rerender(<EventDescriptionEditor {...props} value="An overview" />);
   expect(screen.queryByText(/Who it’s for/)).toBeNull();
 });
+
+it("counts an emoji as one character and stops the short overview at 120", () => {
+  const onChange = vi.fn();
+  const props = { value: "", rich: null, disabled: false, onChange };
+  const { rerender } = render(<EventDescriptionEditor {...props} short={"Kickoff \u{1F389}"} />);
+  expect(screen.getByText("9 / 120")).toBeTruthy();
+  const short = screen.getByLabelText("Short overview");
+  // No native maxLength: it counts UTF-16 units, so an emoji would cost two.
+  expect(short.hasAttribute("maxlength")).toBe(false);
+
+  fireEvent.change(short, { target: { value: "\u{1F44B}".repeat(125) } });
+  expect(onChange).toHaveBeenLastCalledWith("\u{1F44B}".repeat(120), "", plainDescription(""));
+  rerender(<EventDescriptionEditor {...props} short={"\u{1F44B}".repeat(120)} />);
+  expect(screen.getByText("120 / 120")).toBeTruthy();
+});

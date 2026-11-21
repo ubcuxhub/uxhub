@@ -12,6 +12,7 @@ import { agendaEnvelope, parseDateLocationDraft, dateLocationProblem, dateSessio
 import { saveEventDraft, fetchEventDraft, eventImageIsReferenced, recoverEventDraftReceipt } from "@/lib/supabase-helpers/event-drafts";
 import { workingDocumentImageUrls, type EventWorkingDocument } from "./lib/event-working-document";
 import { parseEventDescription, descriptionText } from "@/lib/event-description";
+import { shortOverviewTooLong } from "./lib/event-overview";
 import { revalidatePath } from "next/cache";
 
 import { requireAdmin, requireManager } from "@/lib/auth/guards";
@@ -378,7 +379,7 @@ export async function saveAdminEventAction(
     datePayload = { _date_revision: input.dateLocationRevision ?? 0, _date_location: { ...config, dates: config.version === 2 ? config.dates : config.dates.map((row, index) => ({ ...row, start_time: sessions[index].start_time, end_time: sessions[index].end_time })) } };
   }
 
-  if ((input.event.short_description?.length ?? 0) > 50 || (input.event.description?.length ?? 0) > 3000) throw new Error("Overview exceeds its character limit.");
+  if (shortOverviewTooLong(input.event.short_description) || (input.event.description?.length ?? 0) > 3000) throw new Error("Overview exceeds its character limit.");
   if (input.event.description_rich != null) {
     const rich = parseEventDescription(input.event.description_rich);
     if (!rich || descriptionText(rich) !== input.event.description) throw new Error("Invalid long overview formatting.");
