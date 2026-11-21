@@ -87,6 +87,7 @@ export function renderRefundIssuedEmail({
     subject: `Your refund for ${itemName}`,
     html: renderEmailLayout({
       heading: "Your refund is on its way",
+      hubbo: "resting",
       intro: full
         ? `${hi}, we’ve refunded ${what} in full.`
         : `${hi}, we’ve refunded part of what you paid for ${what}.`,

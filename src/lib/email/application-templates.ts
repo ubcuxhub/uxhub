@@ -66,6 +66,7 @@ export function renderApplicationEmail({
         subject: `We received your application to ${eventName}`,
         html: renderEmailLayout({
           heading: "Application received",
+          hubbo: "thinking",
           intro: `${hi}, thanks for applying to ${eventName}. We’ve received your application.`,
           body: [
             paragraph(
@@ -84,6 +85,7 @@ export function renderApplicationEmail({
         subject: `You’re in: ${eventName}`,
         html: renderEmailLayout({
           heading: `You’re accepted to ${eventName}`,
+          hubbo: "excited",
           intro: `${hi}, congratulations! Your application to ${eventName} was accepted.`,
           body: [
             paragraph(
@@ -100,6 +102,7 @@ export function renderApplicationEmail({
         subject: `You’re on the waitlist for ${eventName}`,
         html: renderEmailLayout({
           heading: "You’re on the waitlist",
+          hubbo: "resting",
           intro: `${hi}, thanks for applying to ${eventName}. You’re on the waitlist for now.`,
           body: [
             paragraph("If a spot opens up, it’ll show on the event page in the portal."),
@@ -123,6 +126,7 @@ export function renderApplicationEmail({
         subject: `Reminder: confirm your spot at ${eventName}`,
         html: renderEmailLayout({
           heading: "Your spot is waiting",
+          hubbo: "curious",
           intro: `${hi}, your offer for ${eventName} runs out in less than a day.`,
           body: [
             paragraph(
