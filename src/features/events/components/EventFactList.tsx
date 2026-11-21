@@ -79,7 +79,8 @@ export function registrationFact({
   window: RegistrationWindow;
   opensAt: string | null;
   closesAt: string | null;
-  spotsLeft: number;
+  /** `null` when the event has no capacity: no limit, so no count. */
+  spotsLeft: number | null;
   capacity: number | null;
   requiresApplication: boolean;
 }): Pick<EventFact, "value" | "detail"> | null {
@@ -92,7 +93,10 @@ export function registrationFact({
   const value = closesAt
     ? `${requiresApplication ? "Apply" : "Register"} by ${shortDate(closesAt)}`
     : requiresApplication ? "Applications open" : "Registration open";
-  // Application events take applicants, not a first-come count, so seats only show without one.
-  const seats = !requiresApplication && capacity != null ? `${spotsLeft} of ${capacity} spots left` : undefined;
+  // Application events take applicants, not a first-come count, so seats only
+  // show without one, and only when there's a limit to count down to.
+  const seats = !requiresApplication && capacity != null && spotsLeft !== null
+    ? `${spotsLeft} of ${capacity} spots left`
+    : undefined;
   return { value, detail: applicationNote ?? seats };
 }

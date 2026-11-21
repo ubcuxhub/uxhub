@@ -68,6 +68,10 @@ describe("registrationFact", () => {
     expect(registrationFact({ ...base, window: "open", closesAt: null, capacity: null })).toEqual({ value: "Registration open", detail: undefined });
   });
 
+  it("counts no seats for an event without a capacity", () => {
+    expect(registrationFact({ ...base, window: "open", spotsLeft: null, capacity: null })).toEqual({ value: "Register by Sun, Dec 6", detail: undefined });
+  });
+
   it("leaves closed and full to the button", () => {
     expect(registrationFact({ ...base, window: "closed" })).toBeNull();
     expect(registrationFact({ ...base, window: "full" })).toBeNull();

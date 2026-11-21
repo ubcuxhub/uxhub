@@ -118,14 +118,22 @@ export default async function EventDetailPage({
   // Until it ends; then the page reads as any past event's.
   const canceled = isCanceledEvent(event);
   const ended = !canceled && hasEnded(event);
-  // Held offers count as taken (docs/event-states.md, "Seats").
-  const spotsLeft = seatCounts.get(event.id)?.seatsLeft ?? event.max_capacity ?? 0;
-  const canRegister = regStatus === "open" && spotsLeft > 0;
-  const registerLabel = regStatus === "upcoming"
-      ? "Registration Opens Soon"
-      : spotsLeft <= 0
+  // Held offers count as taken (docs/event-states.md, "Seats"). `null`: no
+  // capacity, so no limit.
+  const spotsLeft = seatCounts.get(event.id)?.seatsLeft ?? event.max_capacity;
+  // An application event takes applicants, not a first-come count, so it is
+  // never Full (as on the portal event page).
+  const full = !event.requires_application && spotsLeft !== null && spotsLeft <= 0;
+  // A past event is over whatever its registration dates say, so the button
+  // agrees with the "Past" badge.
+  const canRegister = !ended && regStatus === "open" && !full;
+  const registerLabel = ended
+    ? "Event ended"
+    : regStatus === "upcoming"
+      ? event.requires_application ? "Applications Open Soon" : "Registration Opens Soon"
+      : full
         ? "Event Full"
-        : "Registration Closed";
+        : event.requires_application ? "Applications Closed" : "Registration Closed";
 
   const startDateFormatted = formatEventDate(event.starts_at, {
     weekday: "long",
@@ -182,7 +190,7 @@ export default async function EventDetailPage({
     { key: "price", icon: Tag, term: "Price", ...priceFact(event.regular_price, event.member_price) },
   ];
   const registration = canceled || ended ? null : registrationFact({
-    window: regStatus === "open" && spotsLeft <= 0 ? "full" : regStatus,
+    window: regStatus === "open" && full ? "full" : regStatus,
     opensAt: event.registration_opens_at,
     closesAt: event.registration_closes_at,
     spotsLeft,
@@ -242,6 +250,7 @@ export default async function EventDetailPage({
               eventId={event.id}
               eventSlug={event.slug ?? slug}
               registrationAvailable={canRegister}
+              requiresApplication={event.requires_application}
               unavailableLabel={registerLabel}
             />}
           </div>
