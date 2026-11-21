@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { EventDescription } from "@/components/shared/EventDescription";
 import Link from "next/link";
 import { headers } from "next/headers";
@@ -6,6 +5,7 @@ import { notFound } from "next/navigation";
 import { Alert } from "@/components/ui/alert";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EventLocation } from "@/components/shared/EventLocation";
+import { EventPageHeader } from "@/features/events/components/EventPageHeader";
 import { EventAgendaTable } from "@/features/events/components/EventAgendaTable";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { requireAuth } from "@/lib/auth/guards";
@@ -82,18 +82,12 @@ export default async function PortalEventPage({
       )}
       
       <div className="border-border-subtle rounded-md border">
-        <div className="w-full h-51 bg-muted relative rounded-t-md" style={{ backgroundColor: event.header_colour || undefined }}>
-          {event.header_image_url && <Image src={resolveImagePreviewSrc(event.header_image_url)} alt="" fill className="object-cover" unoptimized />}
-          {/* cover image placeholder */}
-          {event.image_url && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={resolveImagePreviewSrc(event.image_url)}
-              alt=""
-              className="size-24 rounded-xl object-cover absolute -bottom-4 left-12"
-            />
-          )}          
-        </div>
+        <EventPageHeader
+          className="rounded-t-md"
+          imageSrc={event.header_image_url ? resolveImagePreviewSrc(event.header_image_url) : undefined}
+          colour={event.header_colour ?? undefined}
+          iconSrc={event.image_url ? resolveImagePreviewSrc(event.image_url) : undefined}
+        />
         <div className="px-6 pb-6">
           <div className="my-10 flex flex-col gap-6">
             <div className="flex flex-col items-start gap-3">
