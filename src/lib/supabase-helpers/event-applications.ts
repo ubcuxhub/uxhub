@@ -1,7 +1,6 @@
 import { hasActiveMembership } from "@/features/memberships/lib/expiry";
 
 import { fetchMembershipTermEndsAt } from "./app-settings";
-import { listApplicationFiles, removeApplicationFiles } from "./application-files";
 import type { DbClient } from "./types";
 import { TABLES } from "./tables";
 import type {
@@ -286,29 +285,6 @@ export async function createDraftApplication(
   }
   if (error) throw error;
   return { ...data, decisions_release_at: null };
-}
-
-/**
- * Deletes the caller's draft and the files uploaded for it. Files go first,
- * while Storage still sees a draft; responses cascade with the row. Returns
- * false when there was no draft to delete (already submitted, or gone).
- */
-export async function deleteDraftApplication(
-  supabase: DbClient,
-  input: { applicationId: string; userInfoId: string }
-): Promise<boolean> {
-  const files = await listApplicationFiles(supabase, input);
-  await removeApplicationFiles(supabase, files);
-
-  const { data, error } = await supabase
-    .from(TABLES.eventApplications)
-    .delete()
-    .eq("id", input.applicationId)
-    .eq("status", "draft")
-    .select("id");
-
-  if (error) throw error;
-  return (data ?? []).length > 0;
 }
 
 /** Why `submitEventApplication` did not submit, or `SUBMITTED`. */

@@ -7,7 +7,6 @@ import { errorFields, log } from "@/lib/log";
 import { createClient } from "@/lib/supabase/server";
 import {
   createDraftApplication,
-  deleteDraftApplication,
   fetchApplicationQuestions,
   fetchUserEventApplication,
   submitEventApplication,
@@ -54,7 +53,7 @@ export type ApplicationActionResult =
       fieldErrors?: AnswerErrors;
       /** Whether the answers were saved as a draft before it stopped. */
       saved?: boolean;
-      /** Set when the draft exists, so the form can offer Delete. */
+      /** Set when the draft exists. */
       applicationId?: string;
     };
 
@@ -325,37 +324,4 @@ export async function submitApplication(
     saved: true,
     applicationId,
   };
-}
-
-/** Deletes the member's draft, its answers and its files. */
-export async function deleteApplication(
-  applicationId: string
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  const user = await requireAuth();
-  if (typeof applicationId !== "string" || !applicationId) {
-    return { ok: false, error: "This application can't be deleted." };
-  }
-  const supabase = await createClient();
-
-  try {
-    const deleted = await deleteDraftApplication(supabase, {
-      applicationId,
-      userInfoId: user.id,
-    });
-    if (!deleted) {
-      log.warn("application.delete_refused", { applicationId });
-      return {
-        ok: false,
-        error: "This application can't be deleted. Submitted applications are kept.",
-      };
-    }
-  } catch (error) {
-    log.error("application.delete_failed", { applicationId, ...errorFields(error) });
-    return { ok: false, error: "Your application couldn't be deleted. Try again." };
-  }
-
-  log.info("application.draft_deleted", { applicationId });
-  revalidatePath("/portal/events/[event]", "page");
-  revalidatePath("/portal/events/[event]/apply", "page");
-  return { ok: true };
 }

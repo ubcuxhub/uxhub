@@ -396,8 +396,10 @@ Drafts belong to the applicant alone:
   names one of their uploads). It records `submitted_at`, which the review
   list sorts by.
 - Answers and uploaded files can change only while the application is a
-  draft. The applicant may delete their draft; nobody can delete a submitted
-  one.
+  draft. The apply page offers no way to delete a draft: it holds no spot and
+  admins never see it, so an applicant who changes their mind just leaves it.
+  RLS still lets the applicant delete their own draft; nobody can delete a
+  submitted one.
 - Admins never see drafts: RLS hides them and their answers and files, the
   review list and its counts leave them out, and no decision can move one.
   Drafts hold no seat.

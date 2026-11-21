@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ApplicationQuestion } from "../lib/application-form";
@@ -8,7 +8,6 @@ import type { ApplicationQuestion } from "../lib/application-form";
 const actions = vi.hoisted(() => ({
   saveApplicationDraft: vi.fn(),
   submitApplication: vi.fn(),
-  deleteApplication: vi.fn(),
   startApplicationDraft: vi.fn(),
 }));
 vi.mock("../actions", () => actions);
@@ -48,7 +47,6 @@ function renderForm(overrides: Partial<ApplicationFormProps> = {}) {
     <ApplicationForm
       event={{ id: "event-1", slug: "uxathon", name: "UXathon" }}
       status="draft"
-      applicationId="app-1"
       window="open"
       opensAt={null}
       closesAt={null}
@@ -72,6 +70,9 @@ function deferred<T>() {
 
 const tick = (ms = 0) => act(() => vi.advanceTimersByTimeAsync(ms));
 
+const submitArea = () => screen.getByRole("region", { name: "Submit your application" });
+const header = () => screen.getByRole("banner");
+
 beforeAll(() => {
   vi.stubGlobal(
     "ResizeObserver",
@@ -81,6 +82,8 @@ beforeAll(() => {
       disconnect() {}
     }
   );
+  // jsdom has no layout, so jumping to a question only needs this to exist.
+  Element.prototype.scrollIntoView = vi.fn();
 });
 
 beforeEach(() => {
@@ -194,7 +197,7 @@ describe("ApplicationForm autosave", () => {
     renderForm();
 
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "Because" } });
-    fireEvent.click(screen.getByRole("button", { name: "Submit" }));
+    fireEvent.click(within(submitArea()).getByRole("button", { name: "Submit" }));
     await tick();
     expect(actions.saveApplicationDraft).toHaveBeenCalledOnce();
     expect(actions.submitApplication).not.toHaveBeenCalled();
@@ -211,5 +214,90 @@ describe("ApplicationForm autosave", () => {
     renderForm({ status: "submitted", initialAnswers: { why: "Done", year: "1" } });
     expect(screen.queryByRole("textbox")).toBeNull();
     expect(screen.queryByText("Saves automatically")).toBeNull();
+  });
+});
+
+describe("ApplicationForm layout", () => {
+  it("offers no way to delete the application", () => {
+    renderForm();
+    expect(screen.queryByRole("button", { name: /delete/i })).toBeNull();
+    expect(screen.queryByText(/delete/i)).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Other settings" })).toBeNull();
+  });
+
+  it("numbers only About you and Your answers, in the page and the navigator", () => {
+    renderForm();
+    expect(screen.queryByRole("heading", { name: "Review and submit" })).toBeNull();
+    const navigator = screen.getByRole("button", { name: /section 1 of 2/ });
+    fireEvent.keyDown(navigator, { key: "Enter" });
+    const items = screen.getAllByRole("menuitem").map((item) => item.textContent);
+    expect(items).toHaveLength(2);
+    expect(items[0]).toMatch(/About you/);
+    expect(items[1]).toMatch(/Your answers/);
+  });
+});
+
+describe("ApplicationForm submit area", () => {
+  it("lists what is left to answer and jumps to it", async () => {
+    renderForm();
+    const area = within(submitArea());
+    expect(area.getByText("2 left to answer")).toBeTruthy();
+    expect(area.getByText("Once you submit, you can’t edit your answers.")).toBeTruthy();
+
+    fireEvent.click(area.getByRole("button", { name: "Question 1" }));
+    expect(document.activeElement).toBe(screen.getByRole("textbox"));
+
+    fireEvent.click(screen.getByRole("radio", { name: "2" }));
+    await tick();
+    expect(area.getByText("1 left to answer")).toBeTruthy();
+    expect(area.queryByRole("button", { name: "Question 2" })).toBeNull();
+  });
+
+  it("drops the list once everything is answered, keeping Submit", () => {
+    renderForm({ initialAnswers: { why: "Because", year: "1" } });
+    const area = within(submitArea());
+    expect(area.queryByText(/left to answer/)).toBeNull();
+    expect(area.queryByRole("button", { name: /^Question/ })).toBeNull();
+    expect((area.getByRole("button", { name: "Submit" }) as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it.each([
+    ["the submit area", submitArea],
+    ["the header", header],
+  ])("submits from %s, and both buttons show it", async (_where, container) => {
+    const submitted = deferred<unknown>();
+    actions.submitApplication.mockReturnValueOnce(submitted.promise);
+    renderForm({ initialAnswers: { why: "Because", year: "1" } });
+
+    fireEvent.click(within(container()).getByRole("button", { name: "Submit" }));
+    await tick();
+    expect(actions.submitApplication).toHaveBeenCalledExactlyOnceWith("event-1", {
+      why: "Because",
+      year: "1",
+    });
+    for (const button of screen.getAllByRole("button", { name: /Submitting/ })) {
+      expect((button as HTMLButtonElement).disabled).toBe(true);
+    }
+    expect(screen.getAllByRole("button", { name: /Submitting/ })).toHaveLength(2);
+
+    submitted.resolve({ ok: true, applicationId: "app-1" });
+    await tick();
+    expect(screen.queryByRole("button", { name: /Submit/ })).toBeNull();
+  });
+
+  it("disables both Submit buttons while applications aren't open", () => {
+    renderForm({ window: "not_open", opensAt: "December 1, 2026 at 9:00 AM" });
+    expect(within(submitArea()).getByText("Applications aren’t open yet")).toBeTruthy();
+    const buttons = screen.getAllByRole("button", { name: "Submit" }) as HTMLButtonElement[];
+    expect(buttons).toHaveLength(2);
+    expect(buttons.every((button) => button.disabled)).toBe(true);
+  });
+
+  it("has no submit area once submitted", () => {
+    renderForm({ status: "submitted", initialAnswers: { why: "Done", year: "1" } });
+    expect(screen.queryByRole("region", { name: "Submit your application" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Submit/ })).toBeNull();
+    expect(screen.queryByText(/left to answer/)).toBeNull();
+    expect(screen.queryByText("Once you submit, you can’t edit your answers.")).toBeNull();
   });
 });

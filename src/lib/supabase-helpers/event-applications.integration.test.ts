@@ -11,7 +11,6 @@ import { clientAs, createIntegrationClient, withFixtures, type Fixtures } from "
 
 import {
   applicationFilePath,
-  listApplicationFiles,
   uploadApplicationFile,
 } from "./application-files";
 import { fetchMembershipTermEndsAt } from "./app-settings";
@@ -20,7 +19,6 @@ import { fetchEventHistoryInfo } from "./event-mutations";
 import {
   createDraftApplication,
   decideEventApplication,
-  deleteDraftApplication,
   fetchEventApplicationSummaries,
   fetchUserEventApplication,
   submitEventApplication,
@@ -136,14 +134,13 @@ describe("submit_event_application", () => {
       expect(submitted?.status).toBe("submitted");
       expect(submitted?.submitted_at).toBeTruthy();
 
-      // Final now: no more edits, deletes, or second submit.
+      // Final now: no more edits or second submit. (rls.sql checks that a
+      // submitted application can't be deleted.)
       await expect(
         upsertApplicationResponses(client, [
           { application_id: draft.id, event_application_question_id: questions.why, response: "Edited" },
         ])
       ).rejects.toBeTruthy();
-      expect(await deleteDraftApplication(client, { applicationId: draft.id, userInfoId: member.id }))
-        .toBe(false);
       expect((await submitEventApplication(client, draft.id)).status).toBe("NOT_DRAFT");
     }));
 
@@ -225,47 +222,11 @@ describe("submit_event_application", () => {
         status: "NOT_FOUND",
         missingQuestionIds: [],
       });
-      expect(
-        await deleteDraftApplication(clientAs(member), { applicationId: draft.id, userInfoId: other.id })
-      ).toBe(false);
       expect((await statusOf(draft.id))?.status).toBe("draft");
     }));
 });
 
 describe("application drafts", () => {
-  it("deletes a draft with its answers and files", () =>
-    withFixtures(async (fixtures) => {
-      const member = await fixtures.createUser();
-      const { event, questions } = await applicationEvent(fixtures);
-      const client = clientAs(member);
-      const draft = await createDraftApplication(client, event.id, member.id);
-      const path = applicationFilePath({
-        userInfoId: member.id,
-        applicationId: draft.id,
-        questionId: questions.resume,
-        fileName: "cv.pdf",
-      });
-      fixtures.trackStorage(BUCKETS.applicationFiles, path.slice(0, path.lastIndexOf("/")));
-      await uploadApplicationFile(client, path, pdf());
-      await upsertApplicationResponses(client, [
-        { application_id: draft.id, event_application_question_id: questions.why, response: "Hi" },
-      ]);
-
-      expect(await listApplicationFiles(client, { userInfoId: member.id, applicationId: draft.id }))
-        .toEqual([path]);
-      expect(await deleteDraftApplication(client, { applicationId: draft.id, userInfoId: member.id }))
-        .toBe(true);
-
-      expect(await statusOf(draft.id)).toBeNull();
-      const { data: responses } = await db
-        .from("event_application_responses")
-        .select("id")
-        .eq("application_id", draft.id);
-      expect(responses).toEqual([]);
-      expect(await listApplicationFiles(db, { userInfoId: member.id, applicationId: draft.id }))
-        .toEqual([]);
-    }));
-
   it("takes only PDFs into the bucket", () =>
     withFixtures(async (fixtures) => {
       const member = await fixtures.createUser();

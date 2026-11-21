@@ -302,8 +302,9 @@ upload and remove these themselves with their own session, so this bucket
 own draft, under a file question of its event, and remove only while it is a
 draft; they read their own files, and admins read those of submitted
 applications. Downloads use short-lived signed URLs
-(`createApplicationFileUrl`). Deleting a draft removes its files first
-(`deleteDraftApplication`), since the database cannot reach Storage.
+(`createApplicationFileUrl`). The app never deletes a member's draft (the
+apply page has no Delete), and the database cannot reach Storage, so anything
+that deletes one must remove its files first.
 
 ## Type-safety gaps to watch (these do NOT fail `tsc`)
 

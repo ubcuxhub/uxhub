@@ -1,7 +1,7 @@
 /**
  * The application page's server actions against the local database, acting as
  * a member through `clientAs`: saving a draft, submitting it (with and without
- * gaps), file answers, and deleting a draft. Each test makes its own event and
+ * gaps) and file answers. Each test makes its own event and
  * questions, since CI's database is unseeded.
  */
 import { describe, expect, it, vi } from "vitest";
@@ -11,7 +11,6 @@ import type { UserInfoRow } from "@/lib/supabase/models";
 import { BUCKETS } from "@/lib/supabase-helpers/buckets";
 import {
   applicationFilePath,
-  listApplicationFiles,
   uploadApplicationFile,
 } from "@/lib/supabase-helpers/application-files";
 import { clientAs, createIntegrationClient, withFixtures, type Fixtures } from "@/test/integration";
@@ -30,7 +29,6 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 import {
-  deleteApplication,
   saveApplicationDraft,
   startApplicationDraft,
   submitApplication,
@@ -273,7 +271,6 @@ describe("submitApplication", () => {
         error: "You've already submitted this application.",
         reason: "submitted",
       });
-      expect(await deleteApplication(draft.applicationId)).toMatchObject({ ok: false });
       expect((await applicationOf(event.id, member.id))?.status).toBe("submitted");
     }));
 
@@ -288,41 +285,5 @@ describe("submitApplication", () => {
         ok: false,
         fieldErrors: { [q.resume]: "Upload the file again." },
       });
-    }));
-});
-
-describe("deleteApplication", () => {
-  it("deletes the member's draft with its answers and files", () =>
-    withFixtures(async (fixtures) => {
-      const { member, event, q } = await setUp(fixtures);
-
-      const draft = await startApplicationDraft(event.id);
-      if (!draft.ok) throw new Error(draft.error);
-      const path = applicationFilePath({
-        userInfoId: member.id,
-        applicationId: draft.applicationId,
-        questionId: q.resume,
-        fileName: "cv.pdf",
-      });
-      fixtures.trackStorage(BUCKETS.applicationFiles, path.slice(0, path.lastIndexOf("/")));
-      await uploadApplicationFile(clientAs(member), path, pdf());
-      await saveApplicationDraft(event.id, { [q.why]: "Hi", [q.resume]: path });
-
-      expect(await deleteApplication(draft.applicationId)).toEqual({ ok: true });
-      expect(await applicationOf(event.id, member.id)).toBeNull();
-      expect(
-        await listApplicationFiles(db, { userInfoId: member.id, applicationId: draft.applicationId })
-      ).toEqual([]);
-    }));
-
-  it("won't delete someone else's draft", () =>
-    withFixtures(async (fixtures) => {
-      const { member, event, q } = await setUp(fixtures);
-      const saved = await saveApplicationDraft(event.id, { [q.why]: "Mine" });
-      if (!saved.ok) throw new Error(saved.error);
-
-      session.member = await fixtures.createUser();
-      expect(await deleteApplication(saved.applicationId)).toMatchObject({ ok: false });
-      expect((await applicationOf(event.id, member.id))?.status).toBe("draft");
     }));
 });
