@@ -284,6 +284,19 @@ out-of-order deliveries change nothing. `purchases.status` stays `completed`.
 
 Purchase history shows "Refunded" or "Partially refunded" from the amount.
 
+**Refund email.** Once the amount is recorded, the buyer gets one email per
+`COMPLETED` refund (ticket or membership, full or partial; never a pending,
+failed or rejected one): the amount, whether it was full or partial, the 5–10
+business days a bank takes, "Your ticket … is no longer valid" when the ticket
+is gone, and a link to their purchase history. `purchase_refund_emails` keys
+each send on Square's refund ID: every webhook pass that sees the refund tries,
+an atomic claim on `email_attempted_at` lets one send, a failed send releases
+the claim for the next delivery, and `email_sent_at` ends it. The send runs
+after the response and never fails the webhook (`payment.refund_email_failed`
+at `warn`). Refunds that last changed more than seven days ago are not
+emailed, so a refund from before these emails existed stays quiet when a later
+refund on the same payment arrives.
+
 ## Admin: application
 
 Only for events with `requires_application`.

@@ -38,6 +38,7 @@ import {
 } from "@/lib/square/client";
 import {
   completedRefundCents,
+  emailableRefunds,
   formatReservationFailure,
   getSquareErrorDiagnostic,
   getSquareErrorMessage,
@@ -51,6 +52,7 @@ import { resolveMembershipExpiry } from "@/features/memberships/lib/expiry";
 import { fetchMembershipTermEndsAt } from "@/lib/supabase-helpers/app-settings";
 import { ensureSquareCustomerId } from "./customer";
 import { sendPurchaseConfirmationEmail } from "./confirmation-email";
+import { sendRefundIssuedEmail } from "./refund-email";
 import { revalidatePurchasePaths } from "./revalidation";
 import { getExistingCheckoutResult } from "./checkout-results";
 import { isFullyRefunded } from "./purchase-status";
@@ -606,9 +608,14 @@ export async function executeCheckoutForUser(
   };
 }
 
+/**
+ * `origin` is the site Square delivered the webhook to, for links in the
+ * emails it may send; null leaves the links out.
+ */
 export async function processSquarePaymentEvent(
   event: PaymentUpdatedEvent,
-  rawPayload: NonNullable<Json> = event as NonNullable<Json>
+  rawPayload: NonNullable<Json> = event as NonNullable<Json>,
+  origin: string | null = null
 ) {
   const eventId = event.eventId;
   const eventType = event.type;
@@ -619,7 +626,7 @@ export async function processSquarePaymentEvent(
   }
 
   await processOnce(eventId, eventType, rawPayload, () =>
-    applySquarePayment(payment.id!, payment)
+    applySquarePayment(payment.id!, payment, origin)
   );
 }
 
@@ -627,11 +634,13 @@ export async function processSquarePaymentEvent(
  * Handles a `refund.created` or `refund.updated` delivery. The payload's
  * refund only names the payment: the payment and each of its refunds are
  * fetched from Square, so a delivery that arrives late or out of order still
- * records the current total of completed refunds.
+ * records the current total of completed refunds. `origin` is as for
+ * `processSquarePaymentEvent`.
  */
 export async function processSquareRefundEvent(
   event: SquareRefundEvent,
-  rawPayload: NonNullable<Json> = event as NonNullable<Json>
+  rawPayload: NonNullable<Json> = event as NonNullable<Json>,
+  origin: string | null = null
 ) {
   const eventId = event.eventId;
   const eventType = event.type;
@@ -647,7 +656,7 @@ export async function processSquareRefundEvent(
       throw new Error("Square did not return the refunded payment.");
     }
     const purchase = await findPurchaseForPayment(payment.id, payment);
-    if (purchase) await syncPurchaseRefunds(purchase, payment);
+    if (purchase) await syncPurchaseRefunds(purchase, payment, origin);
   });
 }
 
@@ -687,21 +696,51 @@ async function processOnce(
 }
 
 /**
- * Records the payment's completed refunds on its purchase. A full refund of
- * an event ticket takes the ticket back, unless it was checked in
- * (docs/event-states.md, "Refunds").
+ * Records the payment's completed refunds on its purchase, then emails the
+ * buyer about each one. A full refund of an event ticket takes the ticket
+ * back, unless it was checked in (docs/event-states.md, "Refunds"). Refunds
+ * are issued in Square, never in the app, so every one reaches the app here.
  */
-async function syncPurchaseRefunds(purchase: PurchaseRow, payment: Payment) {
+async function syncPurchaseRefunds(
+  purchase: PurchaseRow,
+  payment: Payment,
+  origin: string | null
+) {
   const refunds = await Promise.all(
     (payment.refundIds ?? []).map(
       async (refundId) => (await squareClient.refunds.get({ refundId })).refund
     )
   );
   const refundedCents = completedRefundCents(payment, refunds);
-  if (refundedCents <= purchase.refunded_cents && !isFullyRefunded(purchase)) return;
+  if (refundedCents > purchase.refunded_cents || isFullyRefunded(purchase)) {
+    const known = await recordPurchaseRefunds(purchase, refundedCents);
+    if (!known) return;
+  }
 
+  /**
+   * Scheduled on every pass that sees a completed refund, not only the one
+   * that recorded it, so a send that failed earlier is retried by a later
+   * delivery; the claim on each refund's row keeps it to one send. It runs
+   * after the response, when the refund recorded above is committed. While
+   * Square's own refunded total lags its refund list, the amount recorded is
+   * short of the refunds, so the emails wait for the delivery that catches up.
+   */
+  const recordedInFull =
+    refundedCents >= completedRefundCents({ amountMoney: payment.amountMoney }, refunds);
+  const toEmail = recordedInFull ? emailableRefunds(payment, refunds) : [];
+  if (toEmail.length > 0) {
+    after(async () => {
+      for (const refund of toEmail) {
+        await sendRefundIssuedEmail(adminDb, purchase.id, refund, origin);
+      }
+    });
+  }
+}
+
+/** False for an unknown purchase. */
+async function recordPurchaseRefunds(purchase: PurchaseRow, refundedCents: number) {
   const result = await applyPurchaseRefund(adminDb, purchase.id, refundedCents);
-  if (!result) return;
+  if (!result) return false;
 
   const fields = {
     purchaseId: purchase.id,
@@ -722,6 +761,7 @@ async function syncPurchaseRefunds(purchase: PurchaseRow, payment: Payment) {
   if (result.amountIncreased || result.ticketRemoved) {
     await revalidatePurchasePaths(adminDb, purchase.id);
   }
+  return true;
 }
 
 async function findPurchaseForPayment(
@@ -743,7 +783,11 @@ async function findPurchaseForPayment(
   return purchase;
 }
 
-async function applySquarePayment(paymentId: string, payment: Payment) {
+async function applySquarePayment(
+  paymentId: string,
+  payment: Payment,
+  origin: string | null
+) {
   const purchase = await findPurchaseForPayment(paymentId, payment);
   if (!purchase) return;
 
@@ -752,6 +796,6 @@ async function applySquarePayment(paymentId: string, payment: Payment) {
   // Square also sends payment.updated when a refund completes, so a missed or
   // reordered refund event still lands here.
   if (payment.refundIds?.length) {
-    await syncPurchaseRefunds(updated, payment);
+    await syncPurchaseRefunds(updated, payment, origin);
   }
 }
