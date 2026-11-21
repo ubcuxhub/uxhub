@@ -90,6 +90,9 @@ Gaps found (none block this design):
 `ReviewApplicationsClient` / `ApplicationListCard` (list) and
 `ApplicationReviewClient` / `ApplicantInfoCard` / `ApplicationResponseCard` /
 `StatusUpdateSection` (one application), built Dec 2025 without a design.
+Since then (Nov 2026), `ApplicantProfileCard` has replaced `ApplicantInfoCard`
+and the unused `ApplicationListCard`; the audit below describes the pages as
+they were.
 
 List:
 
