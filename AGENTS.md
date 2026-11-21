@@ -228,8 +228,9 @@ Local values belong in the git-ignored `.env.local`.
   production build pushes migrations through. Never put it in `.env.local`
 - Application emails: secret `APPLICATION_EMAILS_SECRET`, set in Vercel's
   Production environment only, matching the `application_emails_secret` Vault
-  secret the pg_cron job signs with (`supabase/README.md`, "Application
-  emails")
+  secret the pg_cron jobs sign with. It also verifies event reminders, whose
+  job signs its own message with it (`supabase/README.md`, "Application
+  emails" and "Event reminder emails")
 
 `SQUARE_ENV` is optional and defaults to the sandbox; set it to `production`
 only for production credentials.

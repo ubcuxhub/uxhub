@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   createFormSnapshot,
   defaultFormState,
+  formStateFromEvent,
+  getInitialFormState,
   isDateTimeRangeInvalid,
   isEventScheduleRangeInvalid,
   toApplicationQuestionInputs,
@@ -12,6 +14,7 @@ import {
   withSavedQuestionIds,
 } from "./event-form-schema";
 import type { ApplicationQuestionTemplate } from "@/features/events/types";
+import type { EventRow } from "@/lib/supabase/models";
 
 const validFormState = {
   ...defaultFormState,
@@ -374,5 +377,18 @@ describe("publication issue collection", () => {
     expect(validateEventForm({ ...validFormState, max_capacity: "0", marketing_mode: "disabled", description: "" }, [], []).issues).toEqual([]);
     const result = validateEventForm({ ...validFormState, publish_at: "2099-08-01T10:00", registration_closes_at: "2099-08-01T10:00" }, [], []);
     expect(result.issues).toContainEqual(expect.objectContaining({ section: "publish", message: "Publish time must be before registration closes." }));
+  });
+});
+
+describe("reminder schedule", () => {
+  it("starts a new event at a day before, and anything older at off", () => {
+    expect(getInitialFormState().reminder_schedule).toBe("1d");
+    expect(defaultFormState.reminder_schedule).toBe("off");
+  });
+
+  it("loads the stored setting, and off for an unknown value", () => {
+    const stored = { ...({} as EventRow), name: "Event", status: "active", event_type: "regular", reminder_schedule: "both" } as EventRow;
+    expect(formStateFromEvent(stored).reminder_schedule).toBe("both");
+    expect(formStateFromEvent({ ...stored, reminder_schedule: "weekly" }).reminder_schedule).toBe("off");
   });
 });

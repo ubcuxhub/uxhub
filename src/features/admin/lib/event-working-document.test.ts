@@ -27,3 +27,15 @@ it("keeps saved session and question IDs without retired file-control fields", (
   expect(() => parseWorkingDocument({ ...current, checkInEvents: [{ ...current.checkInEvents[0], id: 1 }] })).toThrow();
   expect(() => parseWorkingDocument({ ...current, applicationTemplate: [{ ...current.applicationTemplate[0], id: 1 }] })).toThrow();
 });
+
+describe("reminder schedule", () => {
+  it("turns reminders off for a draft saved before they existed", () => {
+    const oldState = Object.fromEntries(Object.entries({ ...defaultFormState, reminder_schedule: "1d" }).filter(([key]) => key !== "reminder_schedule"));
+    expect(parseWorkingDocument({ ...document, formState: oldState }).formState.reminder_schedule).toBe("off");
+  });
+
+  it("keeps a saved choice and rejects an unknown one", () => {
+    expect(parseWorkingDocument({ ...document, formState: { ...defaultFormState, reminder_schedule: "both" } }).formState.reminder_schedule).toBe("both");
+    expect(() => parseWorkingDocument({ ...document, formState: { ...defaultFormState, reminder_schedule: "weekly" } })).toThrow();
+  });
+});

@@ -18,6 +18,7 @@ import type {
   CheckInSessionInput,
 } from "@/features/admin/types";
 import { APPLICATION_FILE_MAX_BYTES } from "@/lib/supabase-helpers/application-files";
+import { isReminderSchedule, type ReminderSchedule } from "@/lib/supabase-helpers/event-reminders";
 import {
   datetimeLocalToTimestamptz,
   timestamptzToDatetimeLocal,
@@ -55,6 +56,8 @@ export interface EventFormState {
   starts_at: string;
   ends_at: string;
   max_capacity: string;
+  /** Reminder emails to ticket holders before the event starts. */
+  reminder_schedule: ReminderSchedule;
   image_url: string;
   registration_opens_at: string;
   registration_closes_at: string;
@@ -126,6 +129,9 @@ export const defaultFormState: EventFormState = {
   starts_at: "",
   ends_at: "",
   max_capacity: "",
+  // Off for anything saved before reminders existed; a new event starts at a
+  // day before (getInitialFormState).
+  reminder_schedule: "off",
   image_url: "",
   registration_opens_at: "",
   registration_closes_at: "",
@@ -147,6 +153,7 @@ export const defaultFormState: EventFormState = {
 export function getInitialFormState(): EventFormState {
   return {
     ...defaultFormState,
+    reminder_schedule: "1d",
     date_location: { version: 2, automatic: true, audience: "everyone", location: emptyLocation(), dates: [emptyAgendaDay()] },
   };
 }
@@ -183,6 +190,7 @@ export function formStateFromEvent(event: EventRow): EventFormState {
     starts_at: timestamptzToDatetimeLocal(event.starts_at),
     ends_at: timestamptzToDatetimeLocal(event.ends_at),
     max_capacity: String(event.max_capacity ?? ""),
+    reminder_schedule: isReminderSchedule(event.reminder_schedule) ? event.reminder_schedule : "off",
     image_url: event.image_url ?? "",
     registration_opens_at: timestamptzToDatetimeLocal(
       event.registration_opens_at

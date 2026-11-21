@@ -142,6 +142,7 @@ const EVENT: EventRow = {
   location_type: "in_person",
   marketing_url: null,
   max_capacity: 120,
+  reminder_schedule: "off",
   max_team_size: null,
   member_price: 10,
   min_team_size: null,

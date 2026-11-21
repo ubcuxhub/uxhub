@@ -20,6 +20,14 @@ export function detailRow(label: string, value: string | null | undefined) {
   </tr>`;
 }
 
+/** "Orchard Commons 1001": a building and room, either of which may be blank. */
+export function formatEventLocation(
+  building: string | null | undefined,
+  room: string | null | undefined,
+) {
+  return [building, room].filter(Boolean).join(" ");
+}
+
 export function renderMembershipConfirmationEmail({
   expiresAt,
   membershipType,
@@ -114,9 +122,7 @@ function renderEventDetailRows(
   ]
     .filter(Boolean)
     .join(" – ");
-  const location = [event.location_building, event.location_room]
-    .filter(Boolean)
-    .join(" ");
+  const location = formatEventLocation(event.location_building, event.location_room);
 
   return [
     detailRow("Date", formatEventDate(event.starts_at)),

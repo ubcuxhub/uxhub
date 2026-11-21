@@ -45,6 +45,7 @@ function event(overrides: Partial<EventRow> = {}): EventRow {
     regular_price: 0,
     member_price: 0,
     max_capacity: 40,
+    reminder_schedule: "off",
     // 7–9 PM on Nov 19 in Vancouver, which keeps daylight time all year.
     starts_at: "2026-11-20T02:00:00.000Z",
     ends_at: "2026-11-20T04:00:00.000Z",

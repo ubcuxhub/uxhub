@@ -58,6 +58,7 @@ export const BUILDER_DEFAULTS = {
   starts_at: "",
   ends_at: "",
   max_capacity: "",
+  reminder_schedule: "1d",
   image_url: "",
   registration_opens_at: "",
   registration_closes_at: "",
