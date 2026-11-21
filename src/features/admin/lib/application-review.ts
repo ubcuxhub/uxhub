@@ -188,6 +188,50 @@ export function buildApplicationDecisionUpdate(
   };
 }
 
+// --- Seats and the waitlist, for the decision card ---------------------------
+
+/**
+ * Seats still open: capacity less tickets and held offers, never below 0.
+ * Null when the event has no capacity (`max_capacity` null), so any accept
+ * fits. The database counts the same way when it checks an accept.
+ */
+export function openSeats(
+  capacity: number | null | undefined,
+  seats: { tickets: number; heldOffers: number } | null | undefined
+): number | null {
+  if (capacity === null || capacity === undefined) return null;
+  const held = (seats?.tickets ?? 0) + (seats?.heldOffers ?? 0);
+  return Math.max(0, capacity - held);
+}
+
+/**
+ * Whether accepting from `state` takes a seat. A ticket or an unexpired offer
+ * already holds one, so moving an offer's deadline doesn't.
+ */
+export function acceptTakesSeat(state: ApplicationReviewState): boolean {
+  return state !== "accepted" && state !== "registered";
+}
+
+/**
+ * An applicant's place on the waitlist, 1 for the earliest application, or
+ * null when they aren't waitlisted. Application order, for reference only:
+ * admins choose whom to accept.
+ */
+export function waitlistPosition(
+  items: readonly Pick<ReviewListItem, "applicationId" | "state" | "appliedAt">[],
+  applicationId: string
+): number | null {
+  const waitlist = items
+    .filter((item) => item.state === "waitlisted")
+    .sort(
+      (a, b) =>
+        a.appliedAt.localeCompare(b.appliedAt) ||
+        a.applicationId.localeCompare(b.applicationId)
+    );
+  const index = waitlist.findIndex((item) => item.applicationId === applicationId);
+  return index === -1 ? null : index + 1;
+}
+
 // --- How an applicant's profile reads ----------------------------------------
 
 export const YEAR_LABELS: Record<UniversityYear, string> = {

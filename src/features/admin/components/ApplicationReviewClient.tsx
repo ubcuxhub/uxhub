@@ -28,6 +28,7 @@ import { ReviewStateBadge } from "@/features/admin/components/ReviewStateBadge";
 import {
   decisionsReleased,
   getApplicationReviewState,
+  openSeats,
   type ApplicationDecision,
 } from "@/features/admin/lib/application-review";
 import { ApplicationAnswersReadOnly } from "@/features/applications/components/ApplicationAnswersReadOnly";
@@ -62,6 +63,12 @@ interface ApplicationReviewClientProps {
   defaultDeadline: DateTimeValue;
   /** The event's "Release decisions on", null when none is set. */
   decisionsReleaseAt?: string | null;
+  /** The event's capacity, null when it has none. */
+  capacity?: number | null;
+  /** What holds seats when the page loaded: tickets and unexpired offers. */
+  seats?: { tickets: number; heldOffers: number } | null;
+  /** Their place on the waitlist when the page loaded, if waitlisted. */
+  waitlistPosition?: number | null;
   /**
    * The reviewer-notes thread. It sits in the aside under the decision (and
    * after it on one column), where the notes inform the decision and are read
@@ -100,6 +107,9 @@ export function ApplicationReviewClient({
   pager,
   defaultDeadline,
   decisionsReleaseAt = null,
+  capacity = null,
+  seats = null,
+  waitlistPosition = null,
   notes,
 }: ApplicationReviewClientProps) {
   const router = useRouter();
@@ -109,6 +119,20 @@ export function ApplicationReviewClient({
   const state = getApplicationReviewState(application, hasTicket);
   const name = firstName(applicant.name);
   const releaseAt = decisionsReleased(decisionsReleaseAt) ? null : decisionsReleaseAt;
+  // The seat counts are from the page load. This applicant's own decisions
+  // move them: an unexpired offer holds a seat, taking it back frees one.
+  const heldAtLoad = getApplicationReviewState(initialApplication, hasTicket) === "accepted";
+  const holdsSeat = state === "accepted";
+  const open = openSeats(
+    capacity,
+    seats
+      ? {
+          tickets: seats.tickets,
+          heldOffers: seats.heldOffers + Number(holdsSeat) - Number(heldAtLoad),
+        }
+      : null
+  );
+  const waitlistedAtLoad = initialApplication.status === "waitlisted";
   // An accept the event has no seat for, waiting on "Accept anyway".
   const [overCapacity, setOverCapacity] = useState<{
     offerExpiresAt: string | null;
@@ -263,6 +287,16 @@ export function ApplicationReviewClient({
             offerExpiresAt={application.offer_expires_at}
             defaultDeadline={defaultDeadline}
             releaseAt={releaseAt}
+            waitlist={
+              state === "waitlisted" && waitlistedAtLoad && waitlistPosition
+                ? {
+                    position: waitlistPosition,
+                    appliedAt: application.submitted_at ?? application.created_at,
+                  }
+                : null
+            }
+            capacity={capacity}
+            openSeats={open}
             onDecide={(decision, offerExpiresAt) => decide(decision, offerExpiresAt)}
           />
           {notes}

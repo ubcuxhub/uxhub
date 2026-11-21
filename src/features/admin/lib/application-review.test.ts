@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  acceptTakesSeat,
   buildApplicationDecisionUpdate,
   countReviewStates,
   decisionsReleased,
@@ -9,10 +10,12 @@ import {
   getApplicationDecisions,
   getApplicationReviewState,
   getReviewNeighbours,
+  openSeats,
   parseReviewListQuery,
   programOptions,
   reviewScopeLabel,
   serializeReviewListQuery,
+  waitlistPosition,
   type ReviewListItem,
 } from "./application-review";
 
@@ -373,5 +376,44 @@ describe("reviewScopeLabel", () => {
     expect(reviewScopeLabel({ statuses: [], q: "" })).toBe("All applicants");
     expect(reviewScopeLabel({ statuses: ["submitted", "waitlisted"], q: "" })).toBe("Filtered list");
     expect(reviewScopeLabel({ statuses: ["submitted"], q: "ana" })).toBe("Filtered list");
+  });
+});
+
+describe("openSeats", () => {
+  it("is capacity less tickets and held offers, never below 0", () => {
+    expect(openSeats(60, { tickets: 40, heldOffers: 18 })).toBe(2);
+    expect(openSeats(60, { tickets: 50, heldOffers: 12 })).toBe(0);
+    expect(openSeats(0, null)).toBe(0);
+  });
+
+  it("is null when the event has no capacity", () => {
+    expect(openSeats(null, { tickets: 400, heldOffers: 0 })).toBeNull();
+    expect(openSeats(undefined, undefined)).toBeNull();
+  });
+});
+
+describe("acceptTakesSeat", () => {
+  it("is false only where a seat is already held", () => {
+    expect(acceptTakesSeat("accepted")).toBe(false);
+    expect(acceptTakesSeat("registered")).toBe(false);
+    for (const state of ["submitted", "waitlisted", "offer_expired", "rejected"] as const) {
+      expect(acceptTakesSeat(state)).toBe(true);
+    }
+  });
+});
+
+describe("waitlistPosition", () => {
+  it("numbers the waitlist in application order", () => {
+    const list = [
+      item("w3", "Cy", 9, "waitlisted"),
+      item("w1", "Ana", 2, "waitlisted"),
+      item("s1", "Ben", 1, "submitted"),
+      item("w2", "Di", 5, "waitlisted"),
+    ];
+    expect(waitlistPosition(list, "w1")).toBe(1);
+    expect(waitlistPosition(list, "w2")).toBe(2);
+    expect(waitlistPosition(list, "w3")).toBe(3);
+    expect(waitlistPosition(list, "s1")).toBeNull();
+    expect(waitlistPosition(list, "missing")).toBeNull();
   });
 });

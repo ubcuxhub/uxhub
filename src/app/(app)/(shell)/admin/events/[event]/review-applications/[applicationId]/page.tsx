@@ -8,6 +8,7 @@ import {
   parseReviewListQuery,
   reviewScopeLabel,
   serializeReviewListQuery,
+  waitlistPosition,
   withReviewState,
   type ReviewListItem,
 } from "@/features/admin/lib/application-review";
@@ -25,6 +26,7 @@ import {
   isSubmittedApplication,
 } from "@/lib/supabase-helpers/event-applications";
 import { fetchReviewerNotes } from "@/lib/supabase-helpers/application-review-notes";
+import { fetchEventSeatCounts } from "@/lib/supabase-helpers/event-tickets";
 import { fetchEventById } from "@/lib/supabase-helpers/events";
 import { isUuid } from "@/lib/uuid";
 
@@ -62,14 +64,16 @@ export default async function ApplicationReviewPage({
     notFound();
   }
 
-  const [event, summaries, questions, responses, notes, settings] = await Promise.all([
+  const [event, summaries, questions, responses, notes, settings, seatCounts] = await Promise.all([
     fetchEventById(supabase, application.event_id),
     fetchEventApplicationSummaries(supabase, eventId),
     fetchApplicationQuestions(supabase, eventId),
     fetchApplicationResponses(supabase, applicationId),
     fetchReviewerNotes(supabase, applicationId),
     fetchEventApplicationSettings(supabase, eventId),
+    fetchEventSeatCounts(supabase, [eventId]),
   ]);
+  const seats = seatCounts.get(eventId);
 
   const items: ReviewListItem[] = summaries.map((summary) =>
     withReviewState(summary)
@@ -150,6 +154,9 @@ export default async function ApplicationReviewPage({
       }}
       defaultDeadline={defaultOfferDeadline(settings)}
       decisionsReleaseAt={settings?.decisions_release_at ?? null}
+      capacity={event.max_capacity ?? null}
+      seats={seats ? { tickets: seats.tickets, heldOffers: seats.heldOffers } : null}
+      waitlistPosition={waitlistPosition(items, applicationId)}
       notes={
         <ApplicationNotes
           applicationId={applicationId}
