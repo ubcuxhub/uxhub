@@ -65,19 +65,25 @@ describe("admin dashboard analytics", () => {
     const admin = await fixtures.createUser({ role_access: "admin" });
     const manager = await fixtures.createUser({ role_access: "manager" });
     const people = [await fixtures.createUser(), await fixtures.createUser(), await fixtures.createUser()];
-    const variants: Parameters<typeof fixtures.createEvent>[0][] = [
+    const variants: NonNullable<Parameters<typeof fixtures.createEvent>[0]>[] = [
       { status: "active", starts_at: "2200-09-01T07:00:00Z" }, // Inclusive Vancouver boundary.
       { status: "active", starts_at: future, location_building: "AMS Nest", location_room: "101", location_address_url: "https://maps.google.com/?q=AMS+Nest", regular_price: 12, member_price: 5 },
       { status: "active", starts_at: "2201-05-01T07:00:00Z" }, // Exclusive end boundary.
       { status: "draft", starts_at: future },
       { status: "draft", starts_at: future, publish_at: now },
       { status: "draft", starts_at: future, publish_at: future },
-      { status: "active", starts_at: null },
+      { status: "draft", starts_at: null }, // Unscheduled events cannot be published.
       { status: "active", starts_at: "2200-09-01T06:59:59Z" },
       { status: "active", starts_at: "2201-04-30T23:00:00Z" }, // Zero registrations.
     ];
     const events: Awaited<ReturnType<typeof fixtures.createEvent>>[] = [];
-    for (const [i, variant] of variants.entries()) events.push(await fixtures.createEvent({ slug: `${fixtures.tag}-${i}`, ...variant }));
+    for (const [i, variant] of variants.entries()) {
+      // Keep each end after its start rather than inheriting the helper's 2027 date.
+      const ends_at = variant.starts_at
+        ? new Date(new Date(variant.starts_at).getTime() + 2 * 60 * 60 * 1000).toISOString()
+        : null;
+      events.push(await fixtures.createEvent({ slug: `${fixtures.tag}-${i}`, ...variant, ends_at }));
+    }
     for (const [i, event] of events.entries()) {
       const person = i === 0 || i === 1 ? people[0] : people[2];
       const registration = await db.from("event_tickets").insert({ event_id: event.id, user_id: person.id }).select("id").single();
@@ -117,7 +123,13 @@ describe("admin dashboard analytics", () => {
     }
     expect(result.uniqueParticipants).toBe(2);
     expect(result.schoolYearLabel).toBe("2200–2201");
-    expect(await fetchEventAnalytics(clientAs(manager), now)).toEqual(result);
+    const { events: managerEvents, ...managerSummary } = await fetchEventAnalytics(clientAs(manager), now);
+    const { events: adminEvents, ...adminSummary } = result;
+    // Other integration files create/delete events between these two reads.
+    const fixtureIds = new Set(events.map((event) => event.id));
+    expect(managerEvents.filter((event) => fixtureIds.has(event.id)))
+      .toEqual(adminEvents.filter((event) => fixtureIds.has(event.id)));
+    expect(managerSummary).toEqual(adminSummary);
     expect((await fetchEventAnalytics(clientAs(admin), "2201-07-01T00:00:00Z")).schoolYearLabel).toBe("2200–2201");
     expect((await fetchEventAnalytics(clientAs(admin), "2201-09-01T07:00:00Z")).schoolYearLabel).toBe("2201–2202");
   }));
@@ -130,11 +142,12 @@ describe("admin dashboard analytics", () => {
     const overlapping = "2300-10-01T13:00:00Z";
     const overlapEnd = "2300-10-01T15:00:00Z";
     const nextStart = "2300-10-02T12:00:00Z";
+    const nextEnd = "2300-10-02T14:00:00Z";
     const events = [];
     for (const [i, variant] of [
       { starts_at: start, ends_at: end },
       { starts_at: overlapping, ends_at: overlapEnd },
-      { starts_at: nextStart, ends_at: null },
+      { starts_at: nextStart, ends_at: nextEnd },
     ].entries()) {
       events.push(await fixtures.createEvent({ slug: `${fixtures.tag}-${i}`, status: "active", ...variant }));
     }
@@ -147,8 +160,10 @@ describe("admin dashboard analytics", () => {
       ["2300-10-01T14:30:00Z", events[1].id],
       [overlapEnd, events[2].id],
       ["2300-10-02T11:59:59Z", events[2].id],
-      [nextStart, null],
-      ["2300-10-02T13:00:00Z", null],
+      [nextStart, events[2].id],
+      ["2300-10-02T13:00:00Z", events[2].id],
+      [nextEnd, null],
+      ["2300-10-02T15:00:00Z", null],
     ] as const;
     for (const user of [admin, manager]) {
       const client = clientAs(user);
@@ -172,7 +187,7 @@ describe("admin dashboard analytics", () => {
       { status: "draft" },
       { status: "draft", publish_at: at },
       { status: "draft", publish_at: ends_at },
-      { status: "active", starts_at: null },
+      { status: "draft", starts_at: null, ends_at: null },
     ] satisfies Parameters<typeof fixtures.createEvent>[0][];
     for (const [i, variant] of variants.entries()) {
       const event = await fixtures.createEvent({ slug: `${fixtures.tag}-${i}`, starts_at, ends_at, ...variant });
