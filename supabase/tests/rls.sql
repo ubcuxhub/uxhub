@@ -1060,6 +1060,32 @@ begin
 end;
 $$;
 
+-- Refund emails are claimed and marked by the server alone: no member may read
+-- or forge a claim, and the table has no policies to widen that.
+do $$
+declare
+  role_name text;
+  privilege text;
+begin
+  if not (select relrowsecurity from pg_class where oid = 'public.purchase_refund_emails'::regclass) then
+    raise exception 'purchase_refund_emails lost row level security';
+  end if;
+  if exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'purchase_refund_emails') then
+    raise exception 'purchase_refund_emails gained a policy; it is service role only';
+  end if;
+  foreach role_name in array array['anon', 'authenticated'] loop
+    foreach privilege in array array['SELECT', 'INSERT', 'UPDATE', 'DELETE'] loop
+      if has_table_privilege(role_name, 'public.purchase_refund_emails', privilege) then
+        raise exception '% has % on purchase_refund_emails', role_name, privilege;
+      end if;
+    end loop;
+  end loop;
+  if not has_table_privilege('service_role', 'public.purchase_refund_emails', 'UPDATE') then
+    raise exception 'service_role lost access to purchase_refund_emails';
+  end if;
+end;
+$$;
+
 -- Applications, responses and check-ins by application and ticket, without a
 -- registration (docs/registration-rollout.md step 2).
 \o /dev/null

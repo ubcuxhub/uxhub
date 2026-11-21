@@ -1219,6 +1219,45 @@ export type Database = {
           },
         ]
       }
+      purchase_refund_emails: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          currency: string
+          email_attempted_at: string | null
+          email_sent_at: string | null
+          purchase_id: string
+          square_refund_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          currency: string
+          email_attempted_at?: string | null
+          email_sent_at?: string | null
+          purchase_id: string
+          square_refund_id: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          currency?: string
+          email_attempted_at?: string | null
+          email_sent_at?: string | null
+          purchase_id?: string
+          square_refund_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_refund_emails_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchases"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       purchases: {
         Row: {
           amount_cents: number
