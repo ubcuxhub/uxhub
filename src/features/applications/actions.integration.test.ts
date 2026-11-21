@@ -27,6 +27,18 @@ vi.mock("@/lib/auth/guards", () => ({
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => clientAs(session.member)),
 }));
+// The received email: `after` queues it for `flushAfter`, and nothing is sent.
+const queued = vi.hoisted(() => [] as Array<() => unknown>);
+vi.mock("next/server", () => ({ after: (callback: () => unknown) => void queued.push(callback) }));
+vi.mock("next/headers", () => ({
+  headers: async () => new Headers({ host: "www.ubcuxhub.ca", "x-forwarded-proto": "https" }),
+}));
+vi.mock("@/lib/email/client", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/email/client")>()),
+  sendEmail: vi.fn(async () => true),
+}));
+
+import { sendEmail } from "@/lib/email/client";
 
 import {
   saveApplicationDraft,
@@ -79,6 +91,11 @@ async function setUp(
     event,
     q: { why: id("Why?"), pick: id("Pick any"), year: id("Year"), resume: id("Resume") },
   };
+}
+
+/** Runs what `after` queued, as Next does once the response is sent. */
+async function flushAfter() {
+  await Promise.all(queued.splice(0).map((callback) => callback()));
 }
 
 async function applicationOf(eventId: string, userId: string) {
@@ -272,6 +289,38 @@ describe("submitApplication", () => {
         reason: "submitted",
       });
       expect((await applicationOf(event.id, member.id))?.status).toBe("submitted");
+    }));
+
+  it("emails the applicant once, on the submit itself, with the release date", () =>
+    withFixtures(async (fixtures) => {
+      vi.mocked(sendEmail).mockClear();
+      queued.length = 0;
+      const { member, event, q } = await setUp(fixtures);
+      // 11:45 PM Pacific on a known date, well after the window closes.
+      const { error } = await db
+        .from("event_application_settings")
+        .upsert({ event_id: event.id, decisions_release_at: "2099-11-26T06:45:00Z" });
+      if (error) throw error;
+      const answers = { [q.why]: "Because", [q.pick]: ["Research"], [q.year]: "1", [q.resume]: "" };
+
+      // Two submits at once: the RPC lets one through, and only it emails.
+      const results = await Promise.all([
+        submitApplication(event.id, answers),
+        submitApplication(event.id, answers),
+      ]);
+      expect(results.filter((result) => result.ok)).toHaveLength(1);
+      // A retry afterwards is refused before the RPC.
+      expect(await submitApplication(event.id, answers)).toMatchObject({ ok: false, reason: "submitted" });
+      await flushAfter();
+
+      expect(sendEmail).toHaveBeenCalledTimes(1);
+      const [email] = vi.mocked(sendEmail).mock.calls[0];
+      expect(email.to).toBe(member.email);
+      expect(email.subject).toBe(`We received your application to ${event.name}`);
+      expect(email.html).toContain("you’ll hear from us by Wed, Nov 25, 2099.");
+      expect(email.html).toContain(
+        `href="https://www.ubcuxhub.ca/portal/events/${encodeURIComponent(event.slug!)}/apply"`
+      );
     }));
 
   it("refuses a file answer that isn't the member's own upload", () =>
