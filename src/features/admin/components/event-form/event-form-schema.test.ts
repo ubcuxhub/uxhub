@@ -373,6 +373,6 @@ describe("publication issue collection", () => {
   it("does not count optional sections and rejects publication at or after registration closes", () => {
     expect(validateEventForm({ ...validFormState, max_capacity: "0", marketing_mode: "disabled", description: "" }, [], []).issues).toEqual([]);
     const result = validateEventForm({ ...validFormState, publish_at: "2099-08-01T10:00", registration_closes_at: "2099-08-01T10:00" }, [], []);
-    expect(result.issues).toContainEqual(expect.objectContaining({ section: "summary", message: "Publish time must be before registration closes." }));
+    expect(result.issues).toContainEqual(expect.objectContaining({ section: "publish", message: "Publish time must be before registration closes." }));
   });
 });

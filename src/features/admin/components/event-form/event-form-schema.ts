@@ -275,7 +275,7 @@ export function createFormSnapshot(
   });
 }
 
-export type BuilderSection = "basics" | "description" | "agenda" | "registration" | "teams" | "people" | "resources" | "summary" | "settings";
+export type BuilderSection = "basics" | "description" | "agenda" | "registration" | "teams" | "people" | "resources" | "publish";
 export interface EventFormIssue {
   section: BuilderSection;
   target: string;
@@ -284,7 +284,7 @@ export interface EventFormIssue {
   required: boolean;
 }
 
-/** One validation result drives publication, Summary, counts and field feedback. */
+/** One validation result drives publication, the Publish footer, counts and field feedback. */
 export function validateEventForm(
   formState: EventFormState,
   checkInEvents: CheckInSessionDraft[],
@@ -313,10 +313,10 @@ export function validateEventForm(
   if (invalidSections.mentors) add("people", "builder-people", "Every mentor requires a full name.", true);
   if (invalidSections.sponsors) add("people", "builder-people", "Every sponsor requires a name.", true);
   if (formState.publish_at) {
-    if (formState.status !== "draft") add("summary", "publish-date", "Only draft events can have a publish date.");
-    else if (!strictPacificTimestamp(formState.publish_at)) add("summary", "publish-date", "Publish date must be a valid date and time in Pacific time.");
-    else if (Date.parse(strictPacificTimestamp(formState.publish_at)!) <= Date.now()) add("summary", "publish-date", "Publish date must be in the future.");
-    else if (formState.registration_closes_at && strictPacificTimestamp(formState.registration_closes_at) && strictPacificTimestamp(formState.publish_at)! >= strictPacificTimestamp(formState.registration_closes_at)!) add("summary", "publish-date", "Publish time must be before registration closes.");
+    if (formState.status !== "draft") add("publish", "publish-date", "Only draft events can have a publish date.");
+    else if (!strictPacificTimestamp(formState.publish_at)) add("publish", "publish-date", "Publish date must be a valid date and time in Pacific time.");
+    else if (Date.parse(strictPacificTimestamp(formState.publish_at)!) <= Date.now()) add("publish", "publish-date", "Publish date must be in the future.");
+    else if (formState.registration_closes_at && strictPacificTimestamp(formState.registration_closes_at) && strictPacificTimestamp(formState.publish_at)! >= strictPacificTimestamp(formState.registration_closes_at)!) add("publish", "publish-date", "Publish time must be before registration closes.");
   }
   if (formState.date_location) {
     issues.push(...dateLocationIssues(formState.date_location).map(issue => ({ ...issue, section: "agenda" as const })));

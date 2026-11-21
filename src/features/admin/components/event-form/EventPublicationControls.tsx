@@ -28,7 +28,7 @@ export function scheduleTimeProblem(value: string, closes: string, now = Date.no
 
 type Form = ReturnType<typeof useEventForm>;
 
-/** The two builder entry points share the same actions and persisted lifecycle. */
+/** The header and the Publish footer share the same actions and persisted lifecycle. */
 export function EventPublishMenu({ form, size = "default", disabled = false }: { form: Form; size?: "sm" | "default"; disabled?: boolean }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -45,7 +45,7 @@ export function EventPublishMenu({ form, size = "default", disabled = false }: {
   const error = inputError ?? (attempted ? scheduleTimeProblem(time, form.formState.registration_closes_at, clock) : null);
   return <Popover open={pickerOpen} onOpenChange={open => { if (!form.isSubmitting) setPickerOpen(open); }}>
     <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-      <PopoverAnchor asChild><DropdownMenuTrigger asChild disabled={triggerDisabled}><Button ref={trigger} type="button" size={size} disabled={triggerDisabled}>Publish<ChevronDown aria-hidden className="size-4" /></Button></DropdownMenuTrigger></PopoverAnchor>
+      <PopoverAnchor asChild><DropdownMenuTrigger asChild disabled={triggerDisabled}><Button ref={trigger} type="button" size={size} disabled={triggerDisabled} data-publish-trigger>Publish<ChevronDown aria-hidden className="size-4" /></Button></DropdownMenuTrigger></PopoverAnchor>
       {/* Remove the menu during the handoff: its exit animation otherwise leaves
           hoverable items that can steal focus from and dismiss the picker. */}
       {!pickerOpen && <DropdownMenuContent align="end" collisionPadding={20} className="z-40 w-[calc(100vw-40px)] max-w-[calc(100vw-40px)] sm:w-[340px] space-y-0.5 p-2" onCloseAutoFocus={event => { if (pickerOpen || actionOwnsFocus.current) event.preventDefault(); actionOwnsFocus.current = false; }}>
@@ -79,7 +79,7 @@ export function EventPublicationSuccess({ form }: { form: Form }) {
   const scheduled = saved?.status === "draft" && !!saved.publish_at;
   const registration = saved?.registration_opens_at && Date.parse(saved.registration_opens_at) > saved.completed_at ? `Registration opens ${publicationTimeLabel(saved.registration_opens_at)}.` : saved?.registration_closes_at && Date.parse(saved.registration_closes_at) <= saved.completed_at ? "Registration has closed." : "Registration is open.";
   return <Dialog open={!!saved} onOpenChange={open => { if (!open) form.setPublicationSuccess(null); }}>
-    <DialogContent showCloseButton={false} className="max-w-[482px] gap-4 px-7 pt-11 pb-8" onOpenAutoFocus={() => { opener.current = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null; }} onCloseAutoFocus={event => { event.preventDefault(); if (opener.current?.isConnected) opener.current.focus(); else document.querySelector<HTMLButtonElement>("#event-builder-header button[aria-haspopup=menu], #event-builder-header button")?.focus(); }}>
+    <DialogContent showCloseButton={false} className="max-w-[482px] gap-4 px-7 pt-11 pb-8" onOpenAutoFocus={() => { opener.current = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null; }} onCloseAutoFocus={event => { event.preventDefault(); if (opener.current?.isConnected) opener.current.focus(); else (document.querySelector<HTMLButtonElement>("#event-builder-header [data-publish-trigger]") ?? document.querySelector<HTMLButtonElement>("#event-builder-header button"))?.focus(); }}>
       <Hubbo emotion={saved?.updated ? "proud" : "excited"} size="hero" className="mx-auto h-50" />
       <DialogHeader className="items-center gap-4 space-y-0 pr-0 text-center sm:text-center"><DialogTitle className="text-h2">{saved?.updated ? "Event updated" : scheduled ? "Event scheduled" : "Event published"}</DialogTitle><DialogDescription className="text-body">{saved?.updated ? `Members now see the latest version of ${saved.name}.` : scheduled ? `${saved?.name} goes live ${publicationTimeLabel(saved!.publish_at!)}. You can keep editing until then.` : `${saved?.name} is live. Members can find it in the portal. ${registration}`}</DialogDescription></DialogHeader>
       <DialogFooter className="flex-wrap gap-3 pt-2 sm:justify-center"><Button type="button" variant="outline" onClick={() => form.setPublicationSuccess(null)}>Keep editing</Button><Button asChild><a href={saved ? `/admin/events/${saved.id}` : "#"}>View event page</a></Button></DialogFooter>
