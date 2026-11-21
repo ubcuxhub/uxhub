@@ -20,6 +20,17 @@ function event(overrides: Partial<EventRow> = {}): EventRow {
     name: "Portfolio Night",
     short_description: "Show your work.",
     description: "A night of portfolio reviews.",
+    description_rich: null,
+    working_document: null, working_revision: 0, legacy_draft_ids: [], canceled_at: null, cancellation_note: null,
+    configured_marketing_mode: null,
+    configured_marketing_url: null,
+    configured_price: null,
+    configured_pricing_mode: null,
+    configured_slug: null,
+    configured_slug_edited: true,
+    revision: 0,
+    pricing_policy: "legacy",
+    first_published_at: null,
     status: "draft",
     publish_at: null,
     event_type: "regular",
@@ -206,7 +217,7 @@ describe("eventScheduleProblem", () => {
   });
 
   it("requires a start and end, in order", () => {
-    expect(eventScheduleProblem({ ...valid, starts_at: null }, NOW)).toBe(
+    expect(eventScheduleProblem({ ...valid, status: "active", starts_at: null }, NOW)).toBe(
       "Event start and end dates and times are required."
     );
     expect(eventScheduleProblem({ ...valid, ends_at: valid.starts_at }, NOW)).toBe(

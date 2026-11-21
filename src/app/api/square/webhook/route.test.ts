@@ -10,6 +10,7 @@ vi.hoisted(() => {
 
 const processMocks = vi.hoisted(() => ({
   processSquarePaymentEvent: vi.fn(),
+  processSquareRefundEvent: vi.fn(),
   getSquareWebhookEndpoints: vi.fn(),
 }));
 
@@ -17,6 +18,7 @@ vi.mock("server-only", () => ({}));
 
 vi.mock("@/features/payments/fulfillment", () => ({
   processSquarePaymentEvent: processMocks.processSquarePaymentEvent,
+  processSquareRefundEvent: processMocks.processSquareRefundEvent,
 }));
 
 vi.mock("@/lib/square/client", () => ({
@@ -58,6 +60,25 @@ const paymentUpdatedPayload = {
   },
 };
 
+const refundPayload = {
+  merchant_id: "merchant-1",
+  type: "refund.updated",
+  event_id: "refund-event-1",
+  created_at: "2026-11-16T20:43:07Z",
+  data: {
+    type: "refund",
+    id: "refund-1",
+    object: {
+      refund: {
+        id: "refund-1",
+        payment_id: "payment-1",
+        status: "COMPLETED",
+        amount_money: { amount: 1250, currency: "CAD" },
+      },
+    },
+  },
+};
+
 let consoleError: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
@@ -66,6 +87,7 @@ beforeEach(() => {
     { notificationUrl: url, signatureKey },
   ]);
   processMocks.processSquarePaymentEvent.mockResolvedValue(undefined);
+  processMocks.processSquareRefundEvent.mockResolvedValue(undefined);
   consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
 });
 
@@ -121,13 +143,52 @@ describe("POST /api/square/webhook", () => {
     expect(processMocks.processSquarePaymentEvent).not.toHaveBeenCalled();
   });
 
-  it("acknowledges but skips event types other than payment.updated", async () => {
-    const body = JSON.stringify({ type: "refund.updated" });
+  it("acknowledges but skips event types it doesn't handle", async () => {
+    const body = JSON.stringify({ type: "payment.created" });
     const response = await post(body, sign(url, body, signatureKey));
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ ok: true });
     expect(processMocks.processSquarePaymentEvent).not.toHaveBeenCalled();
+    expect(processMocks.processSquareRefundEvent).not.toHaveBeenCalled();
+  });
+
+  it.each(["refund.created", "refund.updated"])("processes a correctly signed %s event", async (type) => {
+    const body = JSON.stringify({ ...refundPayload, type });
+    const response = await post(body, sign(url, body, signatureKey));
+
+    expect(response.status).toBe(200);
+    expect(processMocks.processSquareRefundEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventId: "refund-event-1",
+        type,
+        data: expect.objectContaining({
+          object: { refund: expect.objectContaining({ id: "refund-1", paymentId: "payment-1" }) },
+        }),
+      }),
+      expect.objectContaining({ event_id: "refund-event-1" })
+    );
+    expect(processMocks.processSquarePaymentEvent).not.toHaveBeenCalled();
+  });
+
+  it("rejects a refund event without a payment ID", async () => {
+    const body = JSON.stringify({
+      ...refundPayload,
+      data: { ...refundPayload.data, object: { refund: { id: "refund-1", status: "COMPLETED" } } },
+    });
+    const response = await post(body, sign(url, body, signatureKey));
+
+    expect(response.status).toBe(400);
+    expect(processMocks.processSquareRefundEvent).not.toHaveBeenCalled();
+  });
+
+  it("returns 500 so Square retries when refund processing throws", async () => {
+    processMocks.processSquareRefundEvent.mockRejectedValue(new Error("Square unavailable"));
+
+    const body = JSON.stringify(refundPayload);
+    const response = await post(body, sign(url, body, signatureKey));
+
+    expect(response.status).toBe(500);
   });
 
   it("rejects a payment.updated payload missing required fields", async () => {

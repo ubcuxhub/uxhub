@@ -1,3 +1,9 @@
+import { fetchEventHistoryInfo } from "@/lib/supabase-helpers/event-mutations";
+import { fetchEventContent } from "@/lib/supabase-helpers/event-content";
+import { fetchEventTeamSettingsInfo } from "@/lib/supabase-helpers/teams";
+import { fetchEventApplicationSettings } from "@/lib/supabase-helpers/event-application-settings";
+import { fetchEventDateLocationSettings, fetchEventRegistrationSettings } from "@/lib/supabase-helpers/event-date-locations";
+import { fetchEventDraftForEvent } from "@/lib/supabase-helpers/event-drafts";
 import { notFound } from "next/navigation";
 
 import { PageContainer } from "@/components/shared/PageContainer";
@@ -8,7 +14,7 @@ import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchApplicationQuestions } from "@/lib/supabase-helpers/event-applications";
 import { fetchCheckInSessions } from "@/lib/supabase-helpers/check-ins";
-import { fetchEventById } from "@/lib/supabase-helpers/events";
+import { fetchEventById, fetchEventPricingLocked } from "@/lib/supabase-helpers/events";
 import {
   fetchEventMentors,
   fetchEventSponsors,
@@ -52,6 +58,9 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
     ]);
 
   if (!event) notFound();
+  const pricingLocked = await fetchEventPricingLocked(supabase, eventId);
+  const [dateLocation, registrationInfo, applicationSettings, teamInfo, content, historyInfo] = await Promise.all([fetchEventDateLocationSettings(supabase, eventId), fetchEventRegistrationSettings(supabase, eventId), fetchEventApplicationSettings(supabase, eventId), fetchEventTeamSettingsInfo(supabase, eventId), fetchEventContent(supabase, eventId), fetchEventHistoryInfo(supabase, eventId)]);
+  const workingDraft = event.status === "draft" && !event.publish_at ? await fetchEventDraftForEvent(supabase, eventId) : null;
 
   return (
     <RecordPage
@@ -59,9 +68,18 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
       listLabel="Back to Manage Events"
       recordHref={`/admin/events/${eventId}`}
     >
-      <PageContainer>
+      <PageContainer className="max-w-none min-[821px]:px-12 lg:px-12">
         <EventCreateModify
+          historyInfo={historyInfo}
+          initialContent={content}
+          teamInfo={teamInfo}
+          initialApplicationSettings={applicationSettings}
+          initialDateLocation={dateLocation}
+          registrationInfo={registrationInfo}
+          pricingLocked={pricingLocked}
           eventId={eventId}
+          initialDraft={workingDraft}
+          showBackButton={false}
           initialEvent={event}
           initialCheckInSessions={checkInSessions}
           initialApplicationQuestions={applicationQuestions}

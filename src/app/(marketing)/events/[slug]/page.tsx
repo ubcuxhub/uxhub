@@ -1,23 +1,34 @@
+import Image from "next/image";
+import { EventDescription } from "@/components/shared/EventDescription";
 import { notFound, redirect } from "next/navigation";
+import { unstable_noStore as noStore } from "next/cache";
+import { createClient } from "@/lib/supabase/server";
+import { loadCurrentUser } from "@/lib/auth/current-user";
+import { hasAdminAccess } from "@/lib/auth/roles";
+import { EventDraftSections } from "@/features/events/components/EventDraftSections";
+import { eventWorkingDocument } from "@/features/admin/lib/event-presentation";
+import { Alert } from "@/components/ui/alert";
 import { BackPill } from "@/components/shared/BackButton";
 import { FLAGS } from "@/lib/flags";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { createPublicClient } from "@/lib/supabase/public";
-import {
-  fetchEventBySlug,
-  fetchEvents,
-} from "@/lib/supabase-helpers/events";
+import { fetchEventParticipantContent } from "@/lib/supabase-helpers/event-agenda";
+import { EventAgendaTable } from "@/features/events/components/EventAgendaTable";
+import { EventLocation } from "@/components/shared/EventLocation";
+import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
+import { publicMarketingDestination } from "@/lib/event-marketing";
 import { fetchEventSeatCounts } from "@/lib/supabase-helpers/event-tickets";
 import {
   fetchEventMentors,
   fetchEventSponsors,
 } from "@/lib/supabase-helpers/event-people";
 import type { EventRow } from "@/lib/supabase/models";
-import { formatEventDate, formatEventTime } from "@/lib/date";
+import { formatEventDate, formatEventTime, pacificDate } from "@/lib/date";
 import { EventRegistrationAction } from "@/features/events/components/EventRegistrationAction";
+import { isCanceledEvent } from "@/features/events/lib/event-cancellation";
+import { StatusBadge } from "@/components/ui/status-badge";
 import Navbar from "@/features/marketing/homepage-sections/Navbar";
 import Footer from "@/features/marketing/homepage-sections/Footer";
 import {
@@ -27,18 +38,6 @@ import {
   DollarSign,
 } from "lucide-react";
 import { FaLinkedin } from "react-icons/fa6";
-import type { Json } from "@/lib/supabase/database.types";
-
-/* ─── types for JSONB fields ─── */
-
-interface AgendaItem {
-  time: string;
-  title: string;
-  description?: string;
-  room?: string;
-}
-
-/* ─── helpers ─── */
 
 function getRegistrationStatus(event: EventRow) {
   const now = new Date();
@@ -53,47 +52,49 @@ function getRegistrationStatus(event: EventRow) {
   return "open";
 }
 
-function parseAgenda(raw: Json | null): AgendaItem[] {
-  if (!raw || !Array.isArray(raw)) return [];
-  return raw as unknown as AgendaItem[];
-}
-
-export const revalidate = 300;
-
-export async function generateStaticParams() {
-  // Skip the build-time database read entirely while these pages are gated —
-  // otherwise the production build prerenders pages nobody can reach.
-  if (!FLAGS.studentEvents) return [];
-
-  const events = await fetchEvents(createPublicClient());
-  return events
-    .filter((event) => event.slug)
-    .map((event) => ({ slug: event.slug! }));
-}
+// Viewer-specific location projections must never enter the shared page cache.
+export const dynamic = "force-dynamic";
 
 interface EventDetailPageProps {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ preview?: string }>;
 }
 
 export default async function EventDetailPage({
   params,
+  searchParams,
 }: EventDetailPageProps) {
-  if (!FLAGS.studentEvents) redirect("/#events");
+  noStore();
+  const preview = (await searchParams).preview === "draft";
+  if (preview) {
+    const current = await loadCurrentUser();
+    if (current.status !== "authenticated" || !hasAdminAccess(current.user.role_access)) notFound();
+  } else if (!FLAGS.studentEvents) redirect("/#events");
 
   const { slug } = await params;
-  const supabase = createPublicClient();
-  const event = await fetchEventBySlug(supabase, slug, { status: "active" });
+  const supabase = await createClient();
+  const event = await fetchEventBySlug(supabase, slug, { status: preview ? "draft" : "active" });
   if (!event) notFound();
-  const [seatCounts, mentors, sponsors] = await Promise.all([
+  if (!preview) {
+    const destination = publicMarketingDestination(event);
+    if (destination.kind === "none") notFound();
+    if (destination.kind === "external") redirect(destination.url);
+  }
+  if (preview && (event.configured_marketing_mode === "disabled" || event.configured_marketing_mode === "external")) notFound();
+  const unfinished = preview && !!eventWorkingDocument(event);
+  const [seatCounts, mentors, sponsors, participant] = await Promise.all([
     fetchEventSeatCounts(supabase, [event.id]),
     fetchEventMentors(supabase, event.id),
     fetchEventSponsors(supabase, event.id),
+    fetchEventParticipantContent(supabase, event.id),
   ]);
 
   /* ── Derived data ── */
   const regStatus = getRegistrationStatus(event);
+  // Until it ends; then the page reads as any past event's.
+  const canceled = isCanceledEvent(event);
   // Held offers count as taken (docs/event-states.md, "Seats").
-  const spotsLeft = seatCounts.get(event.id)?.seatsLeft ?? event.max_capacity;
+  const spotsLeft = seatCounts.get(event.id)?.seatsLeft ?? event.max_capacity ?? 0;
   const canRegister = regStatus === "open" && spotsLeft > 0;
   const registerLabel = regStatus === "upcoming"
       ? "Registration Opens Soon"
@@ -109,13 +110,20 @@ export default async function EventDetailPage({
   const startDateFormatted = formatEventDate(event.starts_at, {
     weekday: "long",
   });
+  const endDateFormatted = event.ends_at && pacificDate(event.ends_at) !== pacificDate(event.starts_at)
+    ? formatEventDate(event.ends_at, { weekday: "long" })
+    : null;
   const startTimeFormatted = formatEventTime(event.starts_at);
   const endTimeFormatted = formatEventTime(event.ends_at);
-  const locationDisplay = [event.location_building, event.location_room]
+  const locationBuilding = participant.location
+    ? participant.location.restricted ? participant.location.public_summary : participant.location.building ?? "Online"
+    : event.location_building;
+  const locationRoom = participant.location ? participant.location.room : event.location_room;
+  const locationMap = participant.location ? participant.location.map_url : event.location_address_url;
+  const locationDisplay = [locationBuilding, locationRoom]
     .filter(Boolean)
     .join(", ");
 
-  const agenda = parseAgenda(event.agenda);
   const descriptionImages = event.description_images ?? [];
 
   return (
@@ -125,6 +133,8 @@ export default async function EventDetailPage({
       <div className="font-sans text-body text-foreground">
         {/* ────────────────────── HERO SECTION ────────────────────── */}
         <section className="mt-20 px-[5%] pb-12 pt-8 md:px-[10%] lg:px-[15%]">
+        {preview && <Alert className="mb-6">Draft preview: only admins and managers can see this. Registration and applications are disabled.</Alert>}
+        {(event.header_image_url || event.header_colour) && <div className="relative mb-6 h-48 overflow-hidden rounded-xl" style={{ backgroundColor: event.header_colour || undefined }}>{event.header_image_url && <Image src={event.header_image_url} alt="" fill className="object-cover" unoptimized />}</div>}
         {/* Back link */}
         <BackPill href="/events" label="Back to Events" className="mb-6" />
 
@@ -149,8 +159,17 @@ export default async function EventDetailPage({
           <div className="flex flex-col gap-5">
             <h1 className="text-h1">{event.name}</h1>
 
+            {canceled && (
+              <div className="flex flex-col items-start gap-2">
+                <StatusBadge status="canceled" size="large" />
+                <p className="text-muted-foreground">
+                  {event.cancellation_note || "This event has been canceled."}
+                </p>
+              </div>
+            )}
+
             <p className="line-clamp-4 text-muted-foreground">
-              {event.description}
+              {event.short_description || event.description}
             </p>
 
             {/* Price badge */}
@@ -158,7 +177,7 @@ export default async function EventDetailPage({
               <Badge variant="neutral" size="large">
                 <DollarSign className="text-muted-foreground" />
                 <span>
-                  {isFree
+                  {event.regular_price == null ? "Price to be confirmed" : isFree
                     ? "Free"
                     : `$${Number(event.regular_price).toFixed(2)}`}
                 </span>
@@ -181,7 +200,7 @@ export default async function EventDetailPage({
                 <Calendar className="size-4 text-muted-foreground" />
               </div>
               <div>
-                <p>{startDateFormatted || "TBD"}</p>
+                <p>{startDateFormatted || "TBD"}{endDateFormatted ? ` – ${endDateFormatted}` : ""}</p>
                 {startTimeFormatted && (
                   <p className="text-small text-muted-foreground">
                     {startTimeFormatted}
@@ -198,9 +217,9 @@ export default async function EventDetailPage({
               </div>
               <div>
                 <p>{locationDisplay || "TBD"}</p>
-                {event.location_address_url && (
+                {locationMap && (
                   <a
-                    href={event.location_address_url}
+                    href={locationMap}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-small text-primary hover:underline"
@@ -212,12 +231,12 @@ export default async function EventDetailPage({
             </div>
 
             {/* Register Button */}
-            <EventRegistrationAction
+            {preview ? <Button disabled>Registration unavailable in draft preview</Button> : canceled ? <Button disabled className="self-start">Event canceled</Button> : <EventRegistrationAction
               eventId={event.id}
               eventSlug={event.slug ?? slug}
               registrationAvailable={canRegister}
               unavailableLabel={registerLabel}
-            />
+            />}
           </div>
         </div>
         </section>
@@ -226,9 +245,8 @@ export default async function EventDetailPage({
         <Separator />
         <section className="px-[5%] py-12 md:px-[10%] lg:px-[15%]">
         <h2 className="mb-6 text-h2">Event Description</h2>
-        <p className="mb-8 max-w-3xl whitespace-pre-wrap text-muted-foreground">
-          {event.description}
-        </p>
+        <div className="mb-8 max-w-3xl"><EventDescription rich={event.description_rich} text={event.description ?? ""} /></div>
+        {preview && <EventDraftSections event={event} />}
 
         {/* Description gallery */}
         {descriptionImages.length > 0 && (
@@ -251,7 +269,7 @@ export default async function EventDetailPage({
         </section>
 
       {/* ────────────────────── MENTORS ────────────────────── */}
-      {event.mentors_enabled && mentors.length > 0 && (
+      {!unfinished && event.mentors_enabled && mentors.length > 0 && (
         <>
           <Separator />
           <section className="px-[5%] py-12 md:px-[10%] lg:px-[15%]">
@@ -313,46 +331,15 @@ export default async function EventDetailPage({
         </>
       )}
 
-      {/* ────────────────────── AGENDA ────────────────────── */}
-      {agenda.length > 0 && (
-        <>
-          <Separator />
-          <section className="px-[5%] py-12 md:px-[10%] lg:px-[15%]">
-          <h2 className="mb-8 text-h2">Agenda</h2>
-
-          <Card className="gap-0 overflow-hidden py-0">
-            {agenda.map((item, i) => (
-              <div
-                key={i}
-                className={`flex items-start gap-6 px-5 py-4 ${
-                  i % 2 === 0 ? "bg-card" : "bg-muted/50"
-                } ${i < agenda.length - 1 ? "border-b" : ""}`}
-              >
-                <span className="min-w-20 whitespace-nowrap text-table">
-                  {item.time}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-table">{item.title}</p>
-                  {item.description && (
-                    <p className="mt-0.5 text-small text-muted-foreground">
-                      {item.description}
-                    </p>
-                  )}
-                </div>
-                {item.room && (
-                  <span className="whitespace-nowrap text-small text-muted-foreground">
-                    {item.room}
-                  </span>
-                )}
-              </div>
-            ))}
-          </Card>
-          </section>
-        </>
-      )}
+      {participant.agenda.length > 0 && <>
+        <Separator />
+        <section className="px-[5%] py-12 md:px-[10%] lg:px-[15%]">
+          <EventAgendaTable eventName={event.name} agenda={participant.agenda} />
+        </section>
+      </>}
 
       {/* ────────────────────── SPONSORS ────────────────────── */}
-      {event.sponsors_enabled && sponsors.length > 0 && (
+      {!unfinished && event.sponsors_enabled && sponsors.length > 0 && (
         <>
           <Separator />
           <section className="px-[5%] py-12 md:px-[10%] lg:px-[15%]">
@@ -384,16 +371,16 @@ export default async function EventDetailPage({
       )}
 
       {/* ────────────────────── LOCATION ────────────────────── */}
-      {(locationDisplay || event.location_address_url) && (
+      {(locationDisplay || locationMap) && (
         <>
           <Separator />
           <section className="px-[5%] py-12 md:px-[10%] lg:px-[15%]">
           <h2 className="mb-8 text-h2">Location</h2>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+          {participant.location?.type === "online" ? <EventLocation location={participant.location} /> : <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
             {/* Map embed or static image */}
             <div className="pointer-events-none relative aspect-4/3 overflow-hidden rounded-xl bg-muted">
-              {event.location_address_url ? (
+              {locationMap ? (
                 <iframe
                   src={`https://maps.google.com/maps?q=${encodeURIComponent(
                     locationDisplay || "",
@@ -415,24 +402,26 @@ export default async function EventDetailPage({
               <h3 className="text-h3">Address</h3>
               {locationDisplay && (
                 <p className="text-muted-foreground">
-                  {event.location_building && (
+                  {locationBuilding && (
                     <>
-                      {event.location_building}
+                      {locationBuilding}
                       <br />
                     </>
                   )}
-                  {event.location_room && (
+                  {locationRoom && (
                     <>
-                      {event.location_room}
+                      {locationRoom}
                       <br />
                     </>
                   )}
                 </p>
               )}
-              {event.location_address_url && (
+              {participant.location?.address && <p className="text-muted-foreground">{participant.location.address}</p>}
+              {participant.location?.type === "hybrid" && <EventLocation location={{ ...participant.location, type: "online" }} />}
+              {locationMap && (
                 <Button asChild>
                   <a
-                    href={event.location_address_url}
+                    href={locationMap}
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -442,7 +431,7 @@ export default async function EventDetailPage({
                 </Button>
               )}
             </div>
-          </div>
+          </div>}
           </section>
         </>
       )}

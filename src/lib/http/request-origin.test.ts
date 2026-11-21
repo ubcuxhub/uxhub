@@ -60,6 +60,15 @@ describe("getHeadersOrigin", () => {
     expect(getHeadersOrigin(headers)).toBe("https://ubcuxhub.ca");
   });
 
+  it("uses the first entry of a forwarded protocol chain", () => {
+    const headers = new Headers({
+      host: "localhost:3000",
+      "x-forwarded-host": "uxhub.ca, internal.vercel.app",
+      "x-forwarded-proto": "https, http",
+    });
+    expect(getHeadersOrigin(headers)).toBe("https://uxhub.ca");
+  });
+
   it("assumes http for a local host and https otherwise", () => {
     expect(getHeadersOrigin(new Headers({ host: "localhost:3000" }))).toBe("http://localhost:3000");
     expect(getHeadersOrigin(new Headers({ host: "127.0.0.1:3000" }))).toBe("http://127.0.0.1:3000");

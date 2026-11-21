@@ -253,7 +253,8 @@ const timeOf = (minutes: number): WallTime =>
 /**
  * "9", "9pm", "9:30 a", "21:00", "0930", "noon", "midnight".
  *
- * Without AM/PM a time reads as PM, unless the hour is 13–23 or zero-padded
+ * With `ambiguousStart: "daytime"`, bare 7–11 means AM and 12–6 means PM.
+ * The default preserves existing consumers. Without AM/PM a time reads as PM, unless the hour is 13–23 or zero-padded
  * ("09:00", "0930"), which read as 24-hour. With `after`, an ambiguous hour
  * takes the first match after it: after 9:00 AM, "11" is 11:00 AM. An end time
  * with no match after the start falls back to the PM reading, so the caller's
@@ -261,7 +262,7 @@ const timeOf = (minutes: number): WallTime =>
  */
 export function parseTimeInput(
   text: string,
-  opts: { after?: WallTime } = {},
+  opts: { after?: WallTime; ambiguousStart?: "pm" | "daytime" } = {},
 ): WallTime | null {
   const input = text.trim().toLowerCase().replace(/\./g, "").replace(/\s+/g, "");
   if (!input) return null;
@@ -294,7 +295,7 @@ export function parseTimeInput(
     const start = minutesOf(opts.after);
     if (am > start) return timeOf(am);
   }
-  return timeOf(pm);
+  return timeOf(!opts.after && opts.ambiguousStart === "daytime" && hour >= 7 && hour <= 11 ? am : pm);
 }
 
 /** "9:00 AM". Built by hand: `Intl` puts a narrow no-break space before AM/PM. */

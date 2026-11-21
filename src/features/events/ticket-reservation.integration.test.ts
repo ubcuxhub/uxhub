@@ -124,23 +124,30 @@ describe("reserve_event_ticket", () => {
       expect((await reserve(small.id, b.id)).failure_reason).toBe("SOLD_OUT");
     }));
 
-  it("keeps drafts and scheduled events for admins and managers", () =>
+  it("keeps free drafts and scheduled events for admins and managers to test", () =>
     withFixtures(async (fixtures) => {
       const member = await fixtures.createUser();
       const manager = await fixtures.createUser({ role_access: "manager" });
       const admin = await fixtures.createUser({ role_access: "admin" });
+      const freePrices = { regular_price: 0, member_price: 0 };
 
-      const draft = await openEvent(fixtures, { slug: `draft-${fixtures.tag}`, status: "draft" });
+      const draft = await openEvent(fixtures, { slug: `draft-${fixtures.tag}`, status: "draft", ...freePrices });
       const scheduled = await openEvent(fixtures, {
         slug: `scheduled-${fixtures.tag}`,
         status: "draft",
         publish_at: at(hour),
+        ...freePrices,
       });
+      const paidDraft = await openEvent(fixtures, { slug: `paid-draft-${fixtures.tag}`, status: "draft" });
 
       for (const event of [draft, scheduled]) {
         expect((await reserve(event.id, member.id)).failure_reason).toBe("EVENT_NOT_ACTIVE");
         expect((await reserve(event.id, manager.id)).failure_reason).toBeNull();
         expect((await reserve(event.id, admin.id)).failure_reason).toBeNull();
+      }
+      // A paid draft takes no test registrations, even without a purchase.
+      for (const user of [member, manager, admin]) {
+        expect((await reserve(paidDraft.id, user.id)).failure_reason).toBe("EVENT_NOT_ACTIVE");
       }
     }));
 

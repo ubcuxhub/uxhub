@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { SquareError } from "square";
 import {
+  completedRefundCents,
   formatReservationFailure,
   getSquareErrorDiagnostic,
   getSquareErrorMessage,
@@ -250,8 +251,43 @@ describe("payment fulfillment rules", () => {
     ["SOLD_OUT", "This event is sold out."],
     ["EVENT_NOT_FOUND", "This event could not be found."],
     ["EVENT_NOT_ACTIVE", "This event is no longer open for registration."],
+    ["EVENT_CANCELED", "This event has been canceled."],
     [null, "We could not reserve a ticket for this event."],
   ])("formats reservation failure %s", (reason, expected) => {
     expect(formatReservationFailure(reason)).toBe(expected);
+  });
+});
+
+describe("completedRefundCents", () => {
+  const cad = (amount: number) => ({ amount: BigInt(amount), currency: "CAD" });
+  const payment = (refunded?: number) => ({
+    amountMoney: cad(2000),
+    refundedMoney: refunded === undefined ? undefined : cad(refunded),
+  });
+
+  it("sums only completed refunds", () => {
+    expect(
+      completedRefundCents(payment(2000), [
+        { status: "COMPLETED", amountMoney: cad(500) },
+        { status: "PENDING", amountMoney: cad(1000) },
+        { status: "FAILED", amountMoney: cad(300) },
+        { status: "COMPLETED", amountMoney: cad(200) },
+        undefined,
+      ])
+    ).toBe(700);
+  });
+
+  it("counts nothing while every refund is pending", () => {
+    expect(completedRefundCents(payment(2000), [{ status: "PENDING", amountMoney: cad(2000) }])).toBe(0);
+  });
+
+  it("never records more than Square's running total", () => {
+    expect(completedRefundCents(payment(500), [{ status: "COMPLETED", amountMoney: cad(2000) }])).toBe(500);
+  });
+
+  it("ignores a refund in another currency", () => {
+    expect(
+      completedRefundCents(payment(), [{ status: "COMPLETED", amountMoney: { amount: BigInt(900), currency: "USD" } }])
+    ).toBe(0);
   });
 });

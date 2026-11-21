@@ -370,6 +370,13 @@ describe("TimeField", () => {
     }
   });
 
+  it("supports daytime parsing without changing default consumers", () => {
+    const change = vi.fn();
+    render(<TimeField aria-label="Builder time" ambiguousStart="daytime" value={null} onValueChange={change} />);
+    typeAndBlur(screen.getByRole("combobox", { name: "Builder time" }), "9");
+    expect(change).toHaveBeenLastCalledWith("09:00");
+  });
+
   it("reads a bare 9 as 9:00 PM", () => {
     render(<Time_ />);
     const input = screen.getByRole("combobox", { name: "Time" }) as HTMLInputElement;

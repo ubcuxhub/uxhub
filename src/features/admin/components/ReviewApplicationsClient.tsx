@@ -60,8 +60,14 @@ interface ReviewApplicationsClientProps {
   eventName: string;
   /** "Applications closed Nov 3 · Event Jan 9–10", composed on the server. */
   subtitle?: string;
-  /** Seats, for "Seats filled". 0 or absent hides that card. */
+  /** Seats, for "Seats held". 0 or absent hides that card. */
   capacity?: number;
+  /**
+   * What holds the seats (docs/event-states.md, "Seats"): tickets, and
+   * accepted offers that haven't expired and have no ticket yet. Absent, the
+   * list's own Going and Accepted counts stand in.
+   */
+  seats?: { tickets: number; heldOffers: number };
   applications: ReviewListItem[];
 }
 
@@ -121,6 +127,7 @@ export function ReviewApplicationsClient({
   eventName,
   subtitle,
   capacity = 0,
+  seats,
   applications,
 }: ReviewApplicationsClientProps) {
   const [query, update] = useReviewListQuery();
@@ -128,6 +135,8 @@ export function ReviewApplicationsClient({
   const cameFromRef = useRef<HTMLAnchorElement>(null);
 
   const counts = countReviewStates(applications);
+  const going = seats?.tickets ?? counts.registered;
+  const offersOut = seats?.heldOffers ?? counts.accepted;
   const results = filterReviewItems(applications, query);
   const page = clampPage(query.page, REVIEW_PAGE_SIZE, results.length);
   const rows = results.slice(
@@ -187,10 +196,11 @@ export function ReviewApplicationsClient({
             {capacity > 0 ? (
               <StatCard
                 kind="rate"
-                label="Seats filled"
-                count={counts.registered}
+                label="Seats held"
+                count={going + offersOut}
                 total={capacity}
                 noun="seats"
+                detail={`${going} going, ${offersOut} ${offersOut === 1 ? "offer" : "offers"} out`}
               />
             ) : null}
           </section>

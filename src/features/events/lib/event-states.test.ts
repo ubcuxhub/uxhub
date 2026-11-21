@@ -21,6 +21,8 @@ const event: StateEvent = {
   registration_opens_at: "2026-10-14T19:00:00Z",
   registration_closes_at: "2026-10-22T19:00:00Z",
   requires_application: false,
+  canceled_at: null,
+  cancellation_note: null,
 };
 const appEvent: StateEvent = { ...event, requires_application: true };
 /** Registration closed yesterday; the event is still ahead. */
@@ -47,6 +49,39 @@ const stateOf = (
 ) => eventStateFor({ ...base, ...overrides }, { ...nothing, ...student }, now);
 
 describe("eventStateFor", () => {
+  describe("0. a canceled event", () => {
+    const canceled = { canceled_at: ms(-hour), cancellation_note: "Moved to January." };
+
+    it("is canceled before any other rule, with or without a ticket", () => {
+      expect(stateOf(canceled)).toEqual({ kind: "canceled", note: "Moved to January.", ticketId: null });
+      expect(stateOf(canceled, { ticket: ticket(scan(ms(-hour))) })).toEqual({
+        kind: "canceled",
+        note: "Moved to January.",
+        ticketId: "ticket-1",
+      });
+      // Over an application decision, a full event and a closed window alike.
+      expect(stateOf(canceled, { application: application("accepted", ms(day)) }, appEvent).kind).toBe("canceled");
+      expect(stateOf({ ...canceled, ...closed }, { seatsLeft: 0 }).kind).toBe("canceled");
+    });
+
+    it("is canceled while it runs, up to and including its end", () => {
+      expect(stateOf({ ...canceled, ...running }).kind).toBe("canceled");
+      expect(stateOf({ ...canceled, starts_at: ms(-day), ends_at: ms(0) }).kind).toBe("canceled");
+    });
+
+    it("reads as any past event once it has ended", () => {
+      expect(stateOf({ ...canceled, ...ended })).toEqual({ kind: "reg-past" });
+      expect(stateOf({ ...canceled, ...ended }, { ticket: ticket() })).toEqual({
+        kind: "reg-past-attended",
+        ticketId: "ticket-1",
+      });
+    });
+
+    it("has no note when the club left none", () => {
+      expect(stateOf({ canceled_at: ms(-hour) })).toEqual({ kind: "canceled", note: null, ticketId: null });
+    });
+  });
+
   describe("1. once the event has ended", () => {
     it("is past without a ticket", () => {
       expect(stateOf(ended)).toEqual({ kind: "reg-past" });
@@ -166,6 +201,18 @@ describe("eventStateFor", () => {
         offerExpiredAt: ms(-hour),
         windowOpen: false,
       });
+    });
+
+    it("carries the release time while decisions are held back", () => {
+      const releaseAt = ms(2 * day);
+      const submitted = { ...application("submitted"), decisions_release_at: releaseAt };
+      expect(stateOf({}, { application: submitted }, appEvent)).toEqual({
+        kind: "app-in-review",
+        decisionsReleaseAt: releaseAt,
+      });
+      // Once it has passed, the page needs a refresh to show the decision.
+      const released = { ...submitted, decisions_release_at: ms(-hour) };
+      expect(stateOf({}, { application: released }, appEvent)).toEqual({ kind: "app-in-review" });
     });
 
     it("keeps a draft upcoming, since it can't be submitted yet", () => {

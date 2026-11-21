@@ -13,6 +13,8 @@ export interface NavigatorSection {
   title: string
   state: SectionState
   issues?: number
+  /** Original section number when only part of a form is rendered. */
+  number?: number
   required: boolean
 }
 
@@ -23,6 +25,10 @@ export interface SectionNavigatorProps {
   onNavigate?: (id: string) => void
   className?: string
   defaultOpen?: boolean
+  /** Corner placement stays independent of sidebar expansion. */
+  placement?: "center" | "bottom-right"
+  /** Builder designs use plain numbers; existing consumers keep padded labels. */
+  numberFormat?: "padded" | "plain"
 }
 
 function SectionMark({ state, size = "menu" }: { state: SectionState; size?: "menu" | "pill" }) {
@@ -32,7 +38,7 @@ function SectionMark({ state, size = "menu" }: { state: SectionState; size?: "me
   return <span role="img" aria-label={state === "optional" ? "Optional" : "Not started"} className={cn("inline-block shrink-0 rounded-full border-[1.5px] border-border", state === "optional" && "border-dashed", sizeClass)} />
 }
 
-export function SectionNavigator({ title, sections, currentId, onNavigate, className, defaultOpen }: SectionNavigatorProps) {
+export function SectionNavigator({ title, sections, currentId, onNavigate, className, defaultOpen, placement = "center", numberFormat = "padded" }: SectionNavigatorProps) {
   const currentIndex = Math.max(0, sections.findIndex((section) => section.id === currentId))
   const current = sections[currentIndex]
   const required = sections.filter((section) => section.required)
@@ -55,22 +61,25 @@ export function SectionNavigator({ title, sections, currentId, onNavigate, class
   }
 
   if (!current) return null
-  const accessibleName = `${current.title}, section ${currentIndex + 1} of ${sections.length}${issueCount ? `, ${issueCount} ${issueCount === 1 ? "issue" : "issues"}` : ""}. ${completed} of ${required.length} required sections done`
+  const currentNumber = current.number ?? currentIndex + 1
+  const total = Math.max(sections.length, ...sections.map(section => section.number ?? 0))
+  const formatNumber = (number: number) => numberFormat === "plain" ? String(number) : String(number).padStart(2, "0")
+  const accessibleName = `${current.title}, section ${currentNumber} of ${total}${issueCount ? `, ${issueCount} ${issueCount === 1 ? "issue" : "issues"}` : ""}. ${completed} of ${required.length} required sections done`
 
-  return <DropdownMenu open={open} onOpenChange={setOpen}>
+  return <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
     <DropdownMenuTrigger asChild>
-      <button type="button" aria-label={accessibleName} className={cn("fixed bottom-6 left-1/2 z-50 flex transition-[left] duration-200 ease-out md:group-has-[[data-slot=sidebar][data-state=expanded]]/sidebar-wrapper:left-[calc(50%+var(--sidebar-width)/2)] md:group-has-[[data-slot=sidebar][data-state=collapsed]]/sidebar-wrapper:left-[calc(50%+var(--sidebar-width-icon)/2)] h-14 max-w-[calc(100vw-2rem)] -translate-x-1/2 items-center gap-3 rounded-full border border-border bg-popover py-2 pr-4 pl-2 text-foreground shadow-lg hover:bg-accent focus-visible:focus-ring", className)}>
+      <button type="button" aria-label={accessibleName} className={cn("fixed bottom-6 z-50 flex h-14 w-fit max-w-[calc(100vw-2rem)] items-center gap-3 rounded-full border border-border bg-popover py-2 pr-4 pl-2 text-foreground shadow-lg hover:bg-accent focus-visible:focus-ring", placement === "bottom-right" ? "right-4 bottom-4 sm:right-8 sm:bottom-8" : "left-1/2 -translate-x-1/2 transition-[left] duration-200 ease-out md:group-has-[[data-slot=sidebar][data-state=expanded]]/sidebar-wrapper:left-[calc(50%+var(--sidebar-width)/2)] md:group-has-[[data-slot=sidebar][data-state=collapsed]]/sidebar-wrapper:left-[calc(50%+var(--sidebar-width-icon)/2)]", className)}>
         <span className="relative flex size-10 shrink-0 items-center justify-center" aria-hidden>
           <svg className="absolute inset-0 size-10 -rotate-90" viewBox="0 0 40 40">
             <circle cx="20" cy="20" r="16" fill="none" stroke="currentColor" strokeWidth="3" className="text-border" />
             <circle cx="20" cy="20" r="16" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeDasharray={`${circumference * progress} ${circumference}`} className="text-primary" />
           </svg>
-          <span className="text-label font-semibold tabular-nums">{String(currentIndex + 1).padStart(2, "0")}</span>
+          <span className="text-label font-semibold tabular-nums">{formatNumber(currentNumber)}</span>
         </span>
         <span className="min-w-0 truncate text-small font-semibold">{current.title}</span>
         {issueCount > 0 ? <span className="flex shrink-0 items-center gap-1 text-label text-destructive"><AlertCircle aria-hidden className="size-4" />{issueCount} {issueCount === 1 ? "issue" : "issues"}</span> : null}
         {!issueCount ? <SectionMark state={current.state} size="pill" /> : null}
-        <span className="shrink-0 text-label tabular-nums text-muted-foreground">{String(currentIndex + 1).padStart(2, "0")}/{String(sections.length).padStart(2, "0")}</span>
+        <span className="shrink-0 text-label tabular-nums text-muted-foreground">{formatNumber(currentNumber)}/{formatNumber(total)}</span>
         <ChevronDown aria-hidden className={cn("size-4 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} />
       </button>
     </DropdownMenuTrigger>
@@ -86,7 +95,7 @@ export function SectionNavigator({ title, sections, currentId, onNavigate, class
         <div role="progressbar" aria-label="Required sections completed" aria-valuemin={0} aria-valuemax={required.length} aria-valuenow={completed} className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${progress * 100}%` }} /></div>
       </div>
       <div className="space-y-0.5">{sections.map((section, index) => <DropdownMenuItem key={section.id} aria-current={section.id === current.id ? "step" : undefined} onSelect={() => navigate(section.id)} className="h-10 min-h-10 gap-3 rounded-lg px-3 aria-[current=step]:bg-muted">
-        <span className="w-5 shrink-0 text-label tabular-nums text-muted-foreground">{String(index + 1).padStart(2, "0")}</span>
+        <span className="w-5 shrink-0 text-label tabular-nums text-muted-foreground">{formatNumber(section.number ?? index + 1)}</span>
         <span className="min-w-0 flex-1 truncate text-small">{section.title}</span>
         {section.issues ? <span className="shrink-0 text-label text-destructive">{section.issues} {section.issues === 1 ? "issue" : "issues"}</span> : null}
         <SectionMark state={section.state} />

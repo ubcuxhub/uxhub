@@ -6,6 +6,7 @@ import type {
   EventTicketRow,
 } from "@/lib/supabase/models";
 import { applicationWindow } from "@/features/applications/lib/application-form";
+import { isCanceledEvent } from "./event-cancellation";
 import type { DbClient } from "@/lib/supabase-helpers/types";
 import { fetchUserEventApplications } from "@/lib/supabase-helpers/event-applications";
 import {
@@ -25,6 +26,8 @@ export type StateEvent = Pick<
   | "registration_opens_at"
   | "registration_closes_at"
   | "requires_application"
+  | "canceled_at"
+  | "cancellation_note"
 >;
 
 /** One check-in on the student's ticket, with the end of its session. */
@@ -36,7 +39,16 @@ export type TicketCheckIn = Pick<CheckInRow, "checked_in_at"> & {
 /** What the student has done for one event, and what's left of it. */
 export interface StudentEventState {
   ticket: (Pick<EventTicketRow, "id"> & { check_ins: TicketCheckIn[] }) | null;
-  application: Pick<EventApplicationRow, "status" | "offer_expires_at"> | null;
+  /**
+   * As the student may see it (`get_my_event_applications`): before release a
+   * decided application reads as submitted. `decisions_release_at` is the
+   * event's "Release decisions on", for the in-review copy.
+   */
+  application:
+    | (Pick<EventApplicationRow, "status" | "offer_expires_at"> & {
+        decisions_release_at?: string | null;
+      })
+    | null;
   /** Seats nobody holds; `null` when unknown, which never reads as Full. */
   seatsLeft: number | null;
 }
@@ -53,6 +65,12 @@ export interface StudentEventState {
  * apply page. `null` means no close.
  */
 export type EventState =
+  // ── A canceled event, until it ends ───────────────────────────────────
+  /**
+   * `note`: the club's cancellation note. `ticketId`: the student's ticket,
+   * which they keep (without a scannable code), or `null` without one.
+   */
+  | { kind: "canceled"; note: string | null; ticketId: string | null }
   // ── Shared: registration, ticket, past ────────────────────────────────
   | { kind: "reg-upcoming"; opensAt: string }
   | { kind: "reg-open"; closesAt: string | null }
@@ -67,7 +85,8 @@ export type EventState =
   | { kind: "app-upcoming"; opensAt: string }
   | { kind: "app-open"; closesAt: string | null }
   | { kind: "app-draft"; closesAt: string | null }
-  | { kind: "app-in-review" }
+  /** `decisionsReleaseAt`: when decisions come out, while that's still ahead. */
+  | { kind: "app-in-review"; decisionsReleaseAt?: string }
   | { kind: "app-waitlisted" }
   /**
    * The database requires a deadline on every accepted application; `null`
@@ -109,6 +128,7 @@ function activeCheckIn(
  * The student's state for one event. The first rule that matches wins
  * (docs/event-states.md, "When more than one applies"):
  *
+ * 0. The event was canceled and hasn't ended: canceled, ticket or not.
  * 1. The event has ended: past, attended if they had a ticket.
  * 2. They have a ticket: checked in while a check-in is active, else going.
  * 3. An application event: a decided or submitted application's state, then
@@ -125,6 +145,10 @@ export function eventStateFor(
   now: Date
 ): EventState {
   const t = now.getTime();
+
+  if (isCanceledEvent(event, now)) {
+    return { kind: "canceled", note: event.cancellation_note, ticketId: ticket?.id ?? null };
+  }
 
   // An event without an end ends when it starts.
   const eventEnd = event.ends_at ?? event.starts_at;
@@ -162,8 +186,12 @@ function applicationStateFor(
   const closesAt = event.registration_closes_at;
 
   switch (application?.status) {
-    case "submitted":
-      return { kind: "app-in-review" };
+    case "submitted": {
+      const releaseAt = application.decisions_release_at;
+      return releaseAt && t < time(releaseAt)
+        ? { kind: "app-in-review", decisionsReleaseAt: releaseAt }
+        : { kind: "app-in-review" };
+    }
     case "waitlisted":
       return { kind: "app-waitlisted" };
     case "rejected":

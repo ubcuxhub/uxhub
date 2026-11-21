@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Download, Eye, ScanLine } from "lucide-react";
 
+import { ScannerFrame, ScannerViewfinder } from "@/components/shared/ScannerFrame";
 import { BackButton } from "@/components/shared/BackButton";
 import { ListCard, ListRow } from "@/components/shared/ListRow";
 import {
@@ -325,6 +326,7 @@ function Loading() {
 const ARRIVED: Record<string, string> = { u2: "10:02 AM", u7: "10:14 AM" };
 
 function CheckIn() {
+  const [scannerOpen, setScannerOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [arrived, setArrived] = useState(ARRIVED);
   const needle = query.trim().toLowerCase();
@@ -345,6 +347,12 @@ function CheckIn() {
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
+        <Button onClick={() => setScannerOpen(true)}>Preview scanner</Button>
+        {scannerOpen ? <ScannerFrame header={<><Button variant="secondary" onClick={() => setScannerOpen(false)}>Close scanner preview</Button><h2>Scan tickets</h2><Badge>{count} of {people.length} checked in</Badge></>}>
+          <p>Opening session · Sat, Nov 21 · 10:00 AM – 11:00 AM PT</p>
+          <ScannerViewfinder><p className="p-5">Camera-free gallery preview</p></ScannerViewfinder>
+          <p>Point the camera at the attendee&apos;s QR code.</p>
+        </ScannerFrame> : null}
         <Alert variant="info" icon={<ScanLine />}>
           <AlertTitle>Priya Raman is already checked in</AlertTitle>
           <AlertDescription>Scanned at 10:02 AM. No need to scan again.</AlertDescription>

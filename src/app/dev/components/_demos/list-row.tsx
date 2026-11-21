@@ -1,6 +1,8 @@
 import { ExternalLink } from "lucide-react";
 
 import { ListCard, ListRow } from "@/components/shared/ListRow";
+import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { Avatar } from "@/components/ui/avatar";
 
 import { Composition } from "@/app/dev/_shell/Specimen";
@@ -16,6 +18,12 @@ function LinkedInIcon() {
 function ListRowDemo() {
   return (
     <div className="flex flex-col gap-8">
+      <Composition title="Compact attendee and activity rows" description="No artwork; leading time, supporting badge and trailing actions. Names and operator text wrap.">
+        <ul className="w-full max-w-md rounded-xl border border-border">
+          <ListRow variant="compact" name="Alex Chen" supporting={<StatusBadge status="going"/>} action={<Button variant="secondary">Check in</Button>}/>
+          <ListRow variant="compact" name="Alex Chen with a long attendee name" leading="7:42 PM" description="Checked in manually · Morgan with a long operator name" action={<Button variant="secondary" aria-label="Undo Alex’s check-in">Undo</Button>}/>
+        </ul>
+      </Composition>
       <Composition
         title="People and organizations"
         description="The same card and row structure supports people, organization marks, missing artwork and optional external links."

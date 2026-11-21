@@ -23,6 +23,11 @@ describe("StatCard", () => {
     expect(screen.getByText("412 of 528 registrants")).toBeTruthy();
   });
 
+  it("explains the count behind a rate", () => {
+    render(<StatCard label="Seats held" kind="rate" count={3} total={40} noun="seats" detail="2 tickets, 1 offer" />);
+    expect(screen.getByText("3 of 40 seats · 2 tickets, 1 offer")).toBeTruthy();
+  });
+
   it("uses the insufficient state when a rate has no total", () => {
     render(
       <StatCard
@@ -72,4 +77,9 @@ describe("StatCard", () => {
     ).toBeTruthy();
     expect(container.querySelectorAll('[data-slot="skeleton"]')).toHaveLength(2);
   });
+});
+
+it.each([[12,48,"of 48 going · 25%"],[0,0,"of 0 going · 0%"]] as const)("keeps count primary with a safe denominator/rate caption",(count,total,caption)=>{
+  render(<StatCard label="Checked in" kind="count" count={count} total={total} noun="going" showRate/>);
+  expect(screen.getByText(String(count))).toBeTruthy();expect(screen.getByText(caption)).toBeTruthy();
 });

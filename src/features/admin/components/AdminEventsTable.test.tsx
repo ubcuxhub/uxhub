@@ -3,6 +3,9 @@
 import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
+import { eventPresentation } from "../lib/event-presentation";
+import type { EventWorkingDocument } from "../lib/event-working-document";
+import { defaultFormState } from "./event-form/event-form-schema";
 import type { EventStatus } from "@/lib/supabase/models";
 import { AdminEventsTable, type AdminEventTableRow } from "./AdminEventsTable";
 
@@ -43,11 +46,22 @@ function row(id: string, name: string, starts_at: string | null, status: EventSt
       max_capacity: 30,
       regular_price: 15,
       member_price: 5,
+      working_document: null, working_revision: 0, legacy_draft_ids: [], canceled_at: null, cancellation_note: null,
+    configured_marketing_mode: null,
+      configured_marketing_url: null,
+      configured_price: null,
+      configured_pricing_mode: null,
+      configured_slug: null,
+      configured_slug_edited: true,
+      revision: 0,
+    pricing_policy: "legacy",
+      first_published_at: null,
       agenda: null,
       agenda_enabled: true,
       description_images: [],
       created_at: null,
       description: "Event description",
+      description_rich: null,
       ends_at: null,
       event_colour: null,
       event_type: "regular",
@@ -285,5 +299,100 @@ describe("application signals", () => {
       />,
     );
     expect(screen.queryByText(/to review/)).toBeNull();
+  });
+});
+
+// Unified rows carry their saved document; there is no second draft directory.
+function savedRow(source: AdminEventTableRow, name = "", starts_at = ""): AdminEventTableRow {
+  const document: EventWorkingDocument = { version: 1, formState: { ...defaultFormState, name, starts_at }, checkInEvents: [], mentors: [], sponsors: [], applicationTemplate: [] };
+  return { ...source, event: eventPresentation({ ...source.event, working_document: document as never, max_capacity: null }) };
+}
+
+describe("working drafts in Manage Events", () => {
+  it("shows incomplete saved rows and combines search and filters", () => {
+    const combined = [rows[0], rows[1], savedRow(rows[2], "Working Workshop", "2026-12-02T10:00"), ...rows.slice(3), savedRow(row("empty", "", null, "draft", false))];
+    render(<AdminEventsTable rows={combined} />);
+    expect(rowNames()).toHaveLength(rows.length + 1);
+    expect(screen.queryByRole("link", { name: "Draft Workshop" })).toBeNull();
+    const empty = screen.getByRole("link", { name: "Untitled event" }).closest("tr")!;
+    expect(within(empty).getByText("Draft")).toBeTruthy();
+    expect(within(empty).getAllByText("None")).toHaveLength(2);
+    expect(within(empty).getByText("N/A")).toBeTruthy();
+    toggleChip("Draft");
+    toggleChip("N/A");
+    expect(rowNames()).toEqual(["Working Workshop", "Untitled event"]);
+    search(" working ");
+    expect(rowNames()).toEqual(["Working Workshop"]);
+  });
+
+  it("links saved drafts to their permanent event drawers, including while a drawer is open", () => {
+    pathname = "/admin/events/newer";
+    render(<AdminEventsTable rows={[rows[0], rows[1], savedRow(rows[2], "Existing work"), ...rows.slice(3), savedRow(row("new-draft", "", null, "draft", false), "New work")]} />);
+    for (const [name, href] of [["New work", "/admin/events/new-draft"], ["Existing work", "/admin/events/draft"]]) {
+      const link = screen.getByRole("link", { name });
+      expect(link.getAttribute("href")).toBe(href);
+      expect(link.getAttribute("data-slot")).toBe("table-row-link");
+      expect(link.hasAttribute("data-replace")).toBe(true);
+    }
+    expect(screen.getByRole("link", { name: "Design Meetup" }).hasAttribute("data-replace")).toBe(true);
+  });
+
+  it("sorts draft dates with event dates and leaves missing dates last in either direction", () => {
+    render(<AdminEventsTable rows={[rows[0], savedRow(row("dated", "", null, "draft", false), "Earlier draft", "2026-08-01T10:00"), savedRow(row("undated-draft", "", null, "draft", false))]} />);
+    expect(rowNames()).toEqual(["Design Meetup", "Earlier draft", "Untitled event"]);
+    chooseSort("Date, oldest first");
+    expect(rowNames()).toEqual(["Earlier draft", "Design Meetup", "Untitled event"]);
+  });
+
+
+  it("retains counts and review links when saved events share the table with working drafts", () => {
+    const application = { ...rows[1], event: { ...rows[1].event, requires_application: true }, applicationsToReview: 2 };
+    render(<AdminEventsTable rows={[application, savedRow(rows[2], "Working workshop")]} />);
+    expect(screen.getByRole("link", { name: "2 applications to review for Design Workshop" }).getAttribute("href"))
+      .toBe("/admin/events/newer/review-applications?status=submitted");
+    expect(screen.getByRole("link", { name: "Design Workshop" }).closest("tr")?.textContent).toContain("7 / 30");
+    const existingDraft = screen.getByRole("link", { name: "Working workshop" }).closest("tr")!;
+    expect(existingDraft.textContent).toContain("7 /");
+    expect(within(existingDraft).getAllByText("None")).toHaveLength(2);
+  });
+
+  it("retains application review signals on a saved working document", () => {
+    const source = { ...rows[2], event: { ...rows[2].event, requires_application: true }, applicationsToReview: 3 };
+    render(<AdminEventsTable rows={[savedRow(source, "Working application event")]} />);
+    const editor = screen.getByRole("link", { name: "Working application event" });
+    expect(editor.getAttribute("href")).toBe("/admin/events/draft");
+    const tableRow = editor.closest("tr")!;
+    expect(within(tableRow).getByText("By application")).toBeTruthy();
+    expect(tableRow.textContent).toContain("7 /");
+    const review = within(tableRow).getByRole("link", { name: "3 applications to review for Working application event" });
+    expect(review.getAttribute("href")).toBe("/admin/events/draft/review-applications?status=submitted");
+    expect(review.parentElement?.closest("a")).toBeNull();
+  });
+
+  it("keeps the source event's drawer on its table page when its row resumes a working draft", () => {
+    const many = Array.from({ length: 27 }, (_, index) => {
+      const n = String(index + 1).padStart(2, "0");
+      return row(`e${n}`, `Event ${n}`, `2026-10-${n}T17:00:00.000Z`, "draft", false);
+    });
+    pathname = "/admin/events/e02";
+    render(<AdminEventsTable rows={many.map(source => source.event.id === "e02" ? savedRow(source, "Working Event 02", "2026-10-02T10:00") : source)} />);
+    expect(screen.getByText("Page 2 of 2")).toBeTruthy();
+    const editor = screen.getByRole("link", { name: "Working Event 02" });
+    expect(editor.getAttribute("href")).toBe("/admin/events/e02");
+    expect(editor.closest("tr")?.hasAttribute("data-active")).toBe(true);
+    // The active record is the overview; the editor link is a different page.
+    expect(editor.getAttribute("aria-current")).toBe("page");
+  });
+
+  it("paginates drafts with saved events and keeps the total accurate", () => {
+    const drafts = Array.from({ length: 26 }, (_, index) => savedRow(row(`draft-${index}`, "", null, "draft", false), `Work ${index}`));
+    render(<AdminEventsTable rows={[rows[1], ...drafts]} />);
+    expect(rowNames()).toHaveLength(25);
+    expect(count()).toBe("Showing 1–25 of 27 events");
+    fireEvent.click(screen.getByRole("button", { name: "Next page" }));
+    expect(rowNames()).toEqual(["Work 24", "Work 25"]);
+    search("Work 25");
+    expect(rowNames()).toEqual(["Work 25"]);
+    expect(count()).toBe("Showing 1 of 1 event · filtered from 27");
   });
 });

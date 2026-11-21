@@ -26,6 +26,9 @@ mispaste fails instead of hitting the wrong project.
 | Crowd accounts         | yes                           | **never**                       |
 | Membership tiers       | yes                           | **never** (edited in Club Settings) |
 | Event status           | as written in `data/events.ts`| forced to `draft`               |
+| `first_published_at`   | as written (one fixture)      | never written                   |
+| Working drafts (`data/drafts.ts`) | yes                | **never**                       |
+| Builder documents on seeded events | discarded         | kept (an admin's unsaved work)  |
 | `event-images` bucket  | created if missing            | must already exist              |
 
 Both live in `.env.local`. The prod keys are deliberately not `NEXT_PUBLIC_*`:
@@ -70,7 +73,7 @@ which are `restrict` from their link tables.
 
 ## Fixtures
 
-`data/events.ts` — 18 events. `EVENT_PHASES` at the top is the index of what
+`data/events.ts` — 19 events. `EVENT_PHASES` at the top is the index of what
 each one is for. The biggest group is **purchasable**: upcoming, active,
 registration open, and left unbought by every login fixture so event checkout
 can be run repeatedly. A test fails if a login fixture's purchase ever lands on
@@ -86,20 +89,88 @@ their history, a closed registration window, a not-yet-open one, and:
 | `soldOut` | `figma-basics-workshop` | Registration open, all 20 seats held by the crowd, so the badge reads "Full". One crowd purchase was canceled as sold out |
 | `draft` | `ux-research-workshop` | Draft, no schedule |
 | `scheduled` | `accessibility-audit-clinic` | Draft with `publish_at` three days out (17:00 UTC), the admin "Scheduled" state. The database's own publication job (20261027230347) is armed by the write and *will* publish it if the local database is still up then; the next run puts it back. `--target=prod` writes no `publish_at`, since that would undo the forced draft |
+| `draftWithRegistrations` | `content-design-workshop` | Published a month ago (`first_published_at`), sold six tickets to the crowd, then taken back to draft: the one way a draft holds registrations now that drafts can't be registered for. The builder shows pricing, registration mode and the capacity floor as locked, and the URL as locked after publication. No login fixture holds a ticket. `first_published_at` only takes on a fresh row (the guard pins it on update) and prod never writes it |
+
+A local run writes `working_document: null` on these rows. They are finished
+events; a document left by an older builder Save draft would otherwise survive the run
+and win over the seeded columns wherever a draft is presented, and on the
+scheduled fixture it made the run fail (only an unscheduled draft may hold one).
+Prod keeps the document, since it may be an admin's unsaved work and prod
+writes no schedule for it to conflict with.
+
+### Banners
+
+The page header banner is `header_image_url` or `header_colour`, never both
+(`events_header_image_or_colour`); with neither, the member page shows the muted
+fallback and the marketing page shows no banner. The fixtures cover all three:
+
+| Banner | Events |
+| --- | --- |
+| Uploaded image (`bannerKey`) | `design-sprint-upcoming`, `uxathon-upcoming` (the featured card), `thinkbox-office-tour`, `spring-showcase`, `accessibility-audit-clinic` (scheduled draft), and the `alumni-mixer` working draft |
+| Colour (`header_colour`) | `design-sprint-past`, `uxathon-past`, `figma-basics-workshop`, `portfolio-review-night` (the builder's presets), `design-jam-today` (`#2F7D6D`, not a preset, so it shows as a custom swatch), and `design-ethics-roundtable`'s builder default |
+| Neither | the other nine |
+
+Banner images are `data/images/banner-*.png`, 1600x400 (the builder's minimum
+for a header), uploaded with the covers under `seed/covers/`. They are
+generated gradients with no third-party content. `bannerKey` replaced a
+hotlinked 800px Unsplash URL that `design-sprint-upcoming` used to carry.
+
+### Working drafts
+
+`data/drafts.ts` — two drafts saved through the event builder and never
+finished, the unified lifecycle's `working_document` state. They are written
+through `save_event_working_document`, the RPC the builder's Save draft called
+before it applied edits, so each row is what such a save made: the document, its representable fields
+projected into the columns, and the legacy `admin_event_drafts` mirror.
+
+| Draft | State |
+| --- | --- |
+| `design-ethics-roundtable` | Barely started: name and short overview only. Undated, so `/portal/events` leaves it out; no cover; paid with no amount, so `regular_price` is null |
+| `alumni-mixer` | Nearly finished: dated, free, capacity, cover and banner, but no long overview, so publishing is refused. Staff see it on `/portal/events`, presented from the document |
+
+A repeat run sends the same document, which the RPC treats as a no-op (no new
+revision). A draft edited in the builder is overwritten from its current
+revision, and one finished and published through the app is put back to draft
+first. Local only (`TargetPolicy.workingDrafts`). The slugs are pruned with the
+events, and `lib/working-drafts.test.ts` holds the documents to the builder's
+own defaults and parser.
+
+Every event uses operational Free/Paid settings (`pricing_policy = figma`):
+active members are free; non-members and lapsed members pay the configured CAD
+price. Free purchases have no Square payment/customer ID. Short overviews are
+at most 50 characters, with the full prose retained as the long overview.
+Hosted/external/disabled marketing settings are saved fixtures; destination/Home
+activation remains deferred (AEB-041), as do application release/confirmation
+and attendee/staff team workflows (AEB-043/044). Existing foundations remain.
+
+On a full local seed with pruning, conversion from legacy fixture pricing first
+checks every affected event for non-fixture purchases, tickets or applications.
+If any exist, conversion refuses before deleting records; use a separate fresh
+local database. Otherwise it removes only fixture tickets/purchases (check-ins
+cascade), temporarily expires fixture offers, and restores them through the user pass.
+Event/application/question/team identities and durable question locks survive;
+no trigger is disabled. A partial local failure can be retried. Locked legacy
+conversion refuses `--no-prune`, `--only=events` and prod; normal repeated runs
+with matching pricing support these modes. Prod still forces draft/no schedule,
+never prunes and never writes fixture accounts. No production run is needed.
 
 Beyond dates and prices, the fixtures fill in the event page:
 
 | Event | Dates | Also seeds |
 | --- | --- | --- |
 | `design-sprint-past`, `design-sprint-upcoming` | Monday to the next week's Friday | 6-day agenda, Mentors, teams of 3–4, Slack and participant package links |
-| `uxathon-past`, `uxathon-upcoming` | Saturday to Sunday | 2-day agenda, Mentors, teams of 2–4, links (the past one has a recap). The upcoming one is featured |
+| `uxathon-past`, `uxathon-upcoming` | Saturday to Sunday | 2-day agenda, Speakers, Judges, Panelists, Mentors and a custom Organizers section, teams of 2–4, links (the past one has a recap). The upcoming one is featured |
 | `thinkbox-office-tour`, `portfolio-review-night`, `student-panel` | One day | A one-day agenda |
 | `mentorship-program` | Ongoing | Teams open for two weeks, with going-only links |
 | `industry-talk-ai-and-ux`, `student-panel` | — | Online, with meeting details |
 | `industry-talk-design-systems` | — | Hybrid, with meeting details the three deep fixtures can see |
 
-People sections are Mentors only until the builder reads other sections: it
-saves every person on an event back as a mentor.
+People sections use the builder's ordered groups (Judges, Mentors, Speakers,
+Panelists, or a custom title), and the portal event page shows each as its own
+card. The uxathons have one of every kind, and `design-sprint-upcoming` has
+one person in two sections. Full sponsor details and the remaining resource
+placements are still deferred to AEB-042; saved settings do not imply those
+flows are delivered.
 
 Agendas live in `event_agenda_days` and `event_agenda_items`, not the legacy
 `events.agenda` column, which the fixtures still fill for the public page.
@@ -143,6 +214,16 @@ directory; the first is left empty so the dialog's empty state is visible. `stud
 by `manager-no-membership@example.com`; everyone else is unverified. Each run
 resets verification and profile photos to that, undoing changes made through
 the admin dialog.
+
+Interests are stored the way the app stores them: a label from the member
+taxonomy (`INTEREST_OPTIONS`) becomes its id (`"UX research"` →
+`ux-research`), which Settings → Profile shows as a chosen chip, and anything
+else stays as written, the shape of a manager's free tag (visible only in the
+admin directory). Most fixtures hold both; `non-ubc@example.com` holds only
+free tags. Avatars cover the three Settings → Profile states:
+`student-innovator@example.com` has an uploaded photo,
+`student-explorer@example.com` and `admin-innovator@example.com` a preset
+shape, and everyone else initials. Each run puts these back too.
 
 `manager-no-membership@example.com` is the dedicated manager fixture. It can
 edit users and roles and is the only fixture that can access Club Settings.
@@ -195,7 +276,8 @@ recognises the crowd, so never sign up with one. They cover:
   with check-ins and rejections. Every application past draft has a fixed
   `submitted_at`, so the review list's order doesn't change between runs.
 - Tickets, with completed purchases for paid ones: 22 on `thinkbox-office-tour`,
-  20 on `figma-basics-workshop`, 16 on `design-jam-today`, 20 on last year's
+  20 on `figma-basics-workshop`, 16 on `design-jam-today`, 6 on the
+  `content-design-workshop` draft, 20 on last year's
   `get-to-know-ux-hub` with door check-ins.
 
 All of it goes through the same batched upserts as the login fixtures, so a run
@@ -208,9 +290,15 @@ the new one needs. `RETIRED_FIXTURE_EMAILS` lists those addresses and the seed
 deletes them before writing. Only ever put an address there that an earlier
 version of the seed created.
 
-`data/images/` — square PNGs uploaded to `event-images` under `seed/covers/`.
-Fixtures reference them by file name through `imageKey`; `image_url` is filled
-in at run time from the target's own host.
+`data/images/` — square cover PNGs and 1600x400 `banner-*.png` header banners,
+uploaded to `event-images` under `seed/covers/`. Fixtures reference them by file
+name through `imageKey` and `bannerKey`; `image_url` and `header_image_url` are
+filled in at run time from the target's own host.
+
+`data/profile-photos/` — the one uploaded profile photo (generated), written to
+`profile-photos` at `profiles/<profile id>/<hex>.png`, the path the app's upload
+uses and `user_info_profile_photo_path_owned` requires. The name is derived from
+the profile, so a re-run overwrites the same object.
 
 `data/membership-types.ts` — the four tiers. Names and descriptions mirror
 production. Local only: production's tiers are live and admins edit them in
@@ -225,6 +313,7 @@ Copy a production edit here by hand to keep local in step.
 | `lib/targets.ts`         | local vs prod resolution and per-target policy               |
 | `lib/reconcile.ts`       | upsert-by-slug and child reconciliation primitives           |
 | `lib/reconcile-users.ts` | accounts, crowd, purchases, tickets, applications, files, and their prune |
+| `lib/working-drafts.ts`  | unfinished builder drafts, through the builder's save RPC     |
 | `lib/review-notes.ts`    | reviewer notes and their former-reviewer author: checks, reconcile, prune |
 | `lib/pdf.ts`             | the one-page PDF behind seeded file answers                   |
 | `lib/prune.ts`           | pure delete planning — the ownership rules live here         |
@@ -238,7 +327,8 @@ real run cannot disagree about what would go.
 ## Adding a fixture
 
 1. Edit the file in `data/`.
-2. Add the slug to `EVENT_PHASES` if it is an event, and give it an `imageKey`.
+2. Add the slug to `EVENT_PHASES` if it is an event, and give it an `imageKey`
+   (and a `bannerKey` or `header_colour`, or neither, for its banner).
 3. `pnpm test scripts/seed` — the fixtures are validated and the timeline is
    held to its intended shape.
 4. `pnpm seed --dry-run`, then `pnpm seed`.
@@ -283,3 +373,28 @@ purchased. It deletes an unreferenced tier. After a real purchase, it retains th
 inactive tier because purchases and membership profiles deliberately keep their
 financial references. It never removes purchases, webhook events, users, or
 membership assignments.
+
+Saved builder examples: `design-sprint-upcoming` includes Judges and a custom
+Workshop hosts group alongside Mentors; selected upcoming/draft events include
+single/multiple-date documents, online/public/Going locations and a per-date
+room override. Design Sprint uses one check-in window per agenda day; the selected
+single-day fixtures use their event window (split for the two-stop tour).
+Repeated seeds retain session identities by name. Content documents reference reconciled people, sponsor and
+resource identities, and only advance revision when content changes. Application
+timing settings are saved without resetting the durable submitted-question lock;
+release/expiry enforcement remains deferred. The seed does not expose protected
+location or meeting data through the public event row.
+
+### Unified agenda fixtures
+
+Every event now receives a version-2 builder agenda document. Agenda items and
+check-in sessions share durable mappings; a session without an exact labelled
+item becomes a distinct check-in item. Event timing derives from all agenda
+items. Day/item physical projections honour the saved location audience.
+`pnpm supabase:local` rebuilds and reseeds the empty-event cutover; subsequent
+`pnpm seed` runs reconcile the same item/session identities.
+
+The upcoming UXathon includes an HTTPS Staff Volunteer Schedule example. Builder
+reconciliation stores it in `event_staff_volunteer_schedules`; no generic resource
+link or participant response includes it. Events without this fixture clear it
+on reconciliation.

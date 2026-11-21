@@ -14,18 +14,20 @@ import {
   type PanelContext,
   type TicketLayoutProps,
 } from "@/features/events/lib/registration-panel";
+import { hasActiveMembership } from "@/features/memberships/lib/expiry";
+import { getMembershipTermEndsAt } from "@/features/memberships/lib/term";
 import { hasApplicationAnswer } from "@/lib/application-response";
-import { createCheckInToken } from "@/lib/check-in-token";
 import { formatEventDateLabel, pacificDate } from "@/lib/date";
-import { errorFields, log } from "@/lib/log";
 import { createClient } from "@/lib/supabase/server";
-import type { EventRow, UserInfoRow } from "@/lib/supabase/models";
+import type { EventRow, PurchaseRow, UserInfoRow } from "@/lib/supabase/models";
 import {
   fetchApplicationQuestions,
   fetchApplicationResponses,
   fetchUserEventApplication,
 } from "@/lib/supabase-helpers/event-applications";
 import { fetchEventLinks } from "@/lib/supabase-helpers/event-links";
+import { fetchUserEventTicket } from "@/lib/supabase-helpers/event-tickets";
+import { fetchPurchaseById } from "@/lib/supabase-helpers/purchases";
 import type { DbClient } from "@/lib/supabase-helpers/types";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +45,7 @@ type PanelEvent = Pick<
   | "image_url"
   | "member_price"
   | "regular_price"
+  | "pricing_policy"
 >;
 
 interface RegistrationPanelProps {
@@ -57,7 +60,7 @@ interface TicketView {
   holderName: string;
   eventColour: string | null;
   imageUrl: string | null;
-  /** `null` when the code couldn't be signed; the ticket then shows none. */
+  /** The ticket's `qr_token`; `null` when the ticket wasn't found, and then it shows none. */
   qrToken: string | null;
   dateLabel: string | null;
 }
@@ -65,28 +68,40 @@ interface TicketView {
 /**
  * The Registration card on the portal event page: one of three layouts (an
  * alert, an action, or the ticket) chosen and worded by `getPanelSpec` from
- * the student's event state. A server component, so it signs the ticket's
- * check-in code itself and fetches only what the state needs: the
- * participant package for a ticket holder, and a draft's progress.
+ * the student's event state. A server component, so it draws the ticket's
+ * check-in code itself and fetches only what the state needs: the ticket's
+ * `qr_token` and participant package for a ticket holder, and a draft's
+ * progress.
  */
 export async function RegistrationPanel({ event, user, state }: RegistrationPanelProps) {
   const supabase = await createClient();
   const holdsTicket = state.kind === "reg-going" || state.kind === "reg-checked-in";
 
-  const [links, draftProgress] = await Promise.all([
+  const [links, draftProgress, membershipTermEndsAt, ticketRow] = await Promise.all([
     holdsTicket ? fetchEventLinks(supabase, event.id) : [],
     state.kind === "app-draft" ? loadDraftProgress(supabase, event.id, user.id) : null,
+    event.pricing_policy === "figma" ? getMembershipTermEndsAt() : null,
+    "ticketId" in state && state.ticketId ? fetchUserEventTicket(supabase, event.id, user.id) : null,
   ]);
+  // A canceled event's panel says whether their payment came back.
+  const refund = state.kind === "canceled" && ticketRow?.purchase_id
+    ? refundStatus(await fetchPurchaseById(supabase, ticketRow.purchase_id))
+    : null;
 
-  const isMember = Boolean(user.membership_type_id);
+  const isMember = event.pricing_policy === "figma"
+    ? hasActiveMembership(user, membershipTermEndsAt)
+    : Boolean(user.membership_type_id);
+  const amount = isMember ? event.member_price : event.regular_price;
+  if (amount === null) return <Alert>Registration is unavailable until event pricing is configured.</Alert>;
   const context: PanelContext = {
     eventName: event.name,
     eventSlug: event.slug,
     endsAt: event.ends_at ?? event.starts_at,
     // The checkout's own rule (EventCheckout), so the two never disagree.
-    price: { amount: isMember ? event.member_price : event.regular_price, isMember },
+    price: { amount, isMember },
     participantPackageUrl: links.find((link) => link.type === "participant_package")?.url ?? null,
     draftProgress,
+    refund,
   };
   const spec = getPanelSpec(state, context);
 
@@ -104,12 +119,17 @@ export async function RegistrationPanel({ event, user, state }: RegistrationPane
         ) : (
           <TicketLayout
             {...spec.props}
+            packageActions={links.filter((link) => link.type === "participant_package").map((link) => ({
+              kind: "external",
+              label: !link.label || link.label === "Participant package" ? "View participant package" : link.label,
+              href: link.url,
+            }))}
             ticket={{
               eventName: event.name,
               holderName: holderName(user),
               eventColour: event.event_colour,
               imageUrl: event.image_url,
-              qrToken: "ticketId" in state ? signTicket(state.ticketId) : null,
+              qrToken: ticketRow?.qr_token ?? null,
               dateLabel: ticketDateLabel(event.starts_at, event.ends_at),
             }}
           />
@@ -158,8 +178,10 @@ function TicketLayout({
   primary,
   secondary,
   ticket,
-}: TicketLayoutProps & { ticket: TicketView }) {
-  const hasActions = Boolean(primary || secondary);
+  packageActions,
+}: TicketLayoutProps & { ticket: TicketView; packageActions: PanelAction[] }) {
+  const secondaryActions = packageActions.length ? packageActions : secondary ? [secondary] : [];
+  const hasActions = Boolean(primary || secondaryActions.length);
 
   return (
     <div className="grid gap-4 @4xl:grid-cols-[minmax(0,480px)_444px] @4xl:items-center @4xl:gap-x-10">
@@ -181,7 +203,7 @@ function TicketLayout({
       {hasActions ? (
         <div className="flex flex-col gap-3 @4xl:flex-row @4xl:flex-wrap @4xl:self-start">
           {primary ? <PanelButton action={primary} ticket={ticket} /> : null}
-          {secondary ? <PanelButton action={secondary} variant="secondary" ticket={ticket} /> : null}
+          {secondaryActions.map((action, index) => <PanelButton key={index} action={action} variant="secondary" ticket={ticket} />)}
         </div>
       ) : null}
     </div>
@@ -226,7 +248,7 @@ function PanelButton({
       );
     case "view-ticket": {
       const button = <Button {...props}>{action.label}</Button>;
-      // Without a signed code there's nothing to show.
+      // Without a code there's nothing to show.
       if (!ticket?.qrToken) return <Button {...props} disabled>{action.label}</Button>;
       return (
         <TicketDialog
@@ -243,14 +265,12 @@ function PanelButton({
   }
 }
 
-/** The check-in code for a ticket, or `null` (logged) when it can't be signed. */
-function signTicket(ticketId: string): string | null {
-  try {
-    return createCheckInToken(ticketId);
-  } catch (error) {
-    log.error("event.check_in_token_failed", { ticketId, ...errorFields(error) });
-    return null;
-  }
+/** Whether a paid purchase came back in full; `null` for a free one or none. */
+function refundStatus(
+  purchase: Pick<PurchaseRow, "amount_cents" | "refunded_cents"> | null
+): PanelContext["refund"] {
+  if (!purchase || purchase.amount_cents <= 0) return null;
+  return purchase.refunded_cents >= purchase.amount_cents ? "refunded" : "not-refunded";
 }
 
 function holderName(user: Pick<UserInfoRow, "first_name" | "last_name" | "email">): string {

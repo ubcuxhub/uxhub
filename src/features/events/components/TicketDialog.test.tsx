@@ -10,7 +10,7 @@ afterEach(cleanup);
 const props = {
   eventName: "Design Sprint",
   holderName: "Ada Lovelace",
-  qrToken: "3f1c9a52-8d4e-4b7a-9c61-2e5f0d8b7a14.q1v8Zx3mR0aT9cLwP2nYkA",
+  qrToken: "9f86d081884c7d659a2feaa0c55ad015",
   dateLabel: "Nov 14 and 28, 2026",
   trigger: <button type="button">View ticket</button>,
 };

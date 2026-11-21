@@ -1,6 +1,7 @@
 import * as React from "react";
 import {
   CalendarDays,
+  CalendarX,
   CircleAlert,
   CircleCheck,
   CircleMinus,
@@ -44,7 +45,8 @@ export type StudentEventStatus =
   | "draft"
   | "under_review"
   | "register_by"
-  | "offer_expired";
+  | "offer_expired"
+  | "canceled";
 
 export type Status = CoreStatus | StudentEventStatus;
 
@@ -116,6 +118,11 @@ const STUDENT_STATUS_CONFIG: Record<
     tone: "neutral",
     label: () => "Offer expired",
     icon: ClockAlert,
+  },
+  canceled: {
+    tone: "error",
+    label: () => "Canceled",
+    icon: CalendarX,
   },
 };
 

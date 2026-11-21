@@ -28,9 +28,17 @@ globalThis.ResizeObserver ??= class {
 };
 
 describe("Table", () => {
-  it("is a native table with column headers", () => {
+  it("provides an optional named keyboard scroll region without changing the default", () => {
+    const { rerender } = render(<Table scrollerLabel="Schedule locations"><TableBody /></Table>);
+    expect(screen.getByRole("region", { name: "Schedule locations" }).tabIndex).toBe(0);
+    rerender(<Table><TableBody /></Table>);
+    expect(screen.queryByRole("region")).toBeNull();
+    expect(screen.getByRole("table").parentElement?.getAttribute("tabindex")).toBeNull();
+  });
+
+  it.each(["default", "separated"] as const)("%s rows preserve native table semantics", (variant) => {
     render(
-      <Table>
+      <Table variant={variant}>
         <TableHeader>
           <TableRow>
             <TableHead>Name</TableHead>
@@ -69,6 +77,43 @@ describe("Table", () => {
       </Table>,
     );
     expect(screen.getByRole("cell", { name: "No users match “x”." }).getAttribute("colspan")).toBe("4");
+  });
+
+  // jsdom has no layout, so this pins down the classes: on a phone a pinned
+  // column took most of the card and hid the scrolled columns beneath it.
+  it("pins the first column from md up only, and fades the start edge below md", () => {
+    render(
+      <Table stickyFirstColumn>
+        <TableBody>
+          <TableRow>
+            <TableCell>Alex</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>,
+    );
+    const table = screen.getByRole("table");
+    const pinRules = table.className.split(/\s+/).filter((name) => /:(sticky|left-0|left-13|z-\[1\]|shadow-\[)/.test(name));
+    expect(pinRules.length).toBeGreaterThan(0);
+    for (const rule of pinRules) expect(rule.startsWith("md:")).toBe(true);
+
+    const scroller = table.parentElement!;
+    expect(scroller.dataset.slot).toBe("table-scroller");
+    expect(scroller.className).toContain("max-md:data-[scroll-start=false]:[--fade-start:24px]");
+    expect(scroller.className).not.toMatch(/(^|\s)data-\[scroll-start=false\]:\[--fade-start/);
+  });
+
+  it("fades the start edge at every width when nothing is pinned", () => {
+    render(
+      <Table>
+        <TableBody>
+          <TableRow>
+            <TableCell>Alex</TableCell>
+          </TableRow>
+        </TableBody>
+      </Table>,
+    );
+    const scroller = screen.getByRole("table").parentElement!;
+    expect(scroller.className).toMatch(/(^|\s)data-\[scroll-start=false\]:\[--fade-start:24px\]/);
   });
 });
 
@@ -144,10 +189,10 @@ describe("TableRowButton", () => {
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
-  it("in a sticky table, a click elsewhere on the row opens it once", () => {
+  it.each(["default", "separated"] as const)("%s sticky rows forward clicks once", (variant) => {
     const onClick = vi.fn();
     render(
-      <Table stickyFirstColumn>
+      <Table stickyFirstColumn variant={variant}>
         <TableBody>
           <TableRow>
             <TableCell>

@@ -39,7 +39,7 @@ export async function AdminEventRecordRoute({ eventParam }: { eventParam: string
       event={event}
       seats={{
         tickets: seats?.tickets ?? 0,
-        seatsLeft: seats?.seatsLeft ?? event.max_capacity,
+        seatsLeft: seats?.seatsLeft ?? event.max_capacity ?? 0,
       }}
       applications={applications}
       now={new Date().toISOString()}

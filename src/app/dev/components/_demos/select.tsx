@@ -1,6 +1,6 @@
 "use client";
 
-import { Select, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 
 import { Specimen, SpecimenGroup } from "@/app/dev/_shell/Specimen";
 import type { SectionProps } from "@/app/dev/_shell/types";
@@ -13,7 +13,7 @@ function SelectDemo({ open }: SectionProps) {
       <SpecimenGroup
         title="Select"
         spec="§3.2"
-        description="Trigger states. The menu opens with ?open=select (checked in light and dark)."
+        description="Enabled triggers show a pointer cursor; disabled triggers show not-allowed. The menu opens with ?open=select (checked in light and dark)."
       >
         <Specimen label="placeholder" className="w-56">
           <Select>
@@ -29,6 +29,15 @@ function SelectDemo({ open }: SectionProps) {
               <SelectValue />
             </SelectTrigger>
             <YearSelectOptions />
+          </Select>
+        </Specimen>
+        <Specimen label="Two-line value, card-radius corners, wrapping long content" className="w-64">
+          <Select defaultValue="opening">
+            <SelectTrigger multiline aria-label="Check-in item"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="opening" description="Nov 15 · 11:00 AM – 12:00 PM PT">Opening session with a long descriptive name</SelectItem>
+              <SelectItem value="overnight" description="Nov 15 · 11:00 PM – Nov 16 · 1:00 AM PT">Overnight workshop</SelectItem>
+            </SelectContent>
           </Select>
         </Specimen>
         <Specimen label="aria-invalid" className="w-56">

@@ -27,18 +27,21 @@ function StatefulPicker({
   initialCustom = [],
   disabled,
   defaultOpen,
+  hideLabel,
 }: {
   label: string;
   initialValue?: string;
   initialCustom?: readonly string[];
   disabled?: boolean;
   defaultOpen?: boolean;
+  hideLabel?: boolean;
 }) {
   const [value, setValue] = useState(initialValue);
   const [custom, setCustom] = useState<string[]>([...initialCustom]);
   return (
     <ColourPicker
       label={label}
+      hideLabel={hideLabel}
       value={value}
       onValueChange={setValue}
       customColours={custom}
@@ -89,6 +92,7 @@ function GradientPreview({ name, hex }: { name: string; hex: string }) {
 function ColourPickerSection({ open }: SectionProps) {
   return (
     <div className="flex flex-col gap-10">
+      <Composition title="Caller supplies the heading" description="hideLabel keeps the accessible group name while avoiding a duplicate visible label in the builder."><StatefulPicker label="Header colour" hideLabel /></Composition>
       <SpecimenGroup
         title="ColourSwatch"
         spec="§3.10"

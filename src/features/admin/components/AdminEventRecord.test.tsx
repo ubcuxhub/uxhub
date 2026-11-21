@@ -28,6 +28,17 @@ function event(overrides: Partial<EventRow> = {}): EventRow {
     name: "Portfolio Night",
     short_description: "Show your work.",
     description: "A night of portfolio reviews.",
+    description_rich: null,
+    working_document: null, working_revision: 0, legacy_draft_ids: [], canceled_at: null, cancellation_note: null,
+    configured_marketing_mode: null,
+    configured_marketing_url: null,
+    configured_price: null,
+    configured_pricing_mode: null,
+    configured_slug: null,
+    configured_slug_edited: true,
+    revision: 0,
+    pricing_policy: "legacy",
+    first_published_at: null,
     status: "active",
     publish_at: null,
     event_type: "regular",
@@ -135,21 +146,21 @@ describe("AdminEventRecord overview", () => {
       `/admin/events/${EVENT_ID}/edit`
     );
     expect(screen.getByRole("link", { name: "Check-in" }).getAttribute("href")).toBe(
-      `/admin/events/${EVENT_ID}/check-in`
+      `/admin/events/${EVENT_ID}/check-in?returnTo=${encodeURIComponent(`/admin/events/${EVENT_ID}`)}`
     );
-    const publicPage = screen.getByRole("link", { name: /^View public page/ });
-    expect(publicPage.textContent).toBe("View public page (opens in a new tab)");
+    const publicPage = screen.getByRole("link", { name: /^View marketing page/ });
+    expect(publicPage.textContent).toBe("View marketing page (opens in a new tab)");
     expect(publicPage.getAttribute("href")).toBe("/events/portfolio-night");
     expect(publicPage.getAttribute("target")).toBe("_blank");
     expect(screen.queryByRole("link", { name: /Review applications/ })).toBeNull();
   });
 
-  it("hides the public page link for a draft, or while event pages are off", () => {
+  it("previews drafts even while public browsing is gated", () => {
     renderRecord({ event: event({ status: "draft" }) });
-    expect(screen.queryByRole("link", { name: /View public page/ })).toBeNull();
+    expect(screen.getByRole("link", { name: /View marketing page/ }).getAttribute("href")).toBe("/events/portfolio-night?preview=draft");
     cleanup();
     renderRecord({ publicPages: false });
-    expect(screen.queryByRole("link", { name: /View public page/ })).toBeNull();
+    expect(screen.queryByRole("link", { name: /View marketing page/ })).toBeNull();
   });
 
   it("shows applications and how many wait for review when the event takes them", () => {
@@ -172,7 +183,7 @@ describe("AdminEventRecord overview", () => {
 
 describe("AdminEventRecord quick edit", () => {
   function startEditing() {
-    fireEvent.click(screen.getByRole("button", { name: "Change status and schedule" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change status and registration schedule" }));
   }
 
   it("swaps the schedule for its controls and the Edit link for Cancel / Save", () => {
@@ -180,10 +191,9 @@ describe("AdminEventRecord quick edit", () => {
     startEditing();
 
     expect(screen.getByLabelText("Status")).toBeTruthy();
-    expect(screen.getByRole("group", { name: "Starts" })).toBeTruthy();
-    expect(field("Start date").value).toBe("Thu, Nov 19, 2026");
-    expect(field("Start time").value).toBe("7:00 PM");
-    expect(field("End time").value).toBe("9:00 PM");
+    expect(screen.queryByLabelText("Start date")).toBeNull();
+    expect(screen.queryByLabelText("End time")).toBeNull();
+    expect(screen.getByRole("link", { name: "Edit the agenda" }).getAttribute("href")).toBe(`/admin/events/${EVENT_ID}/edit#builder-agenda`);
     // The library's typed fields, never the browser's own date and time inputs.
     expect(container.ownerDocument.querySelector('input[type="time"], input[type="date"]')).toBeNull();
     expect(screen.getByRole("button", { name: "Save schedule" })).toBeTruthy();
@@ -239,48 +249,15 @@ describe("AdminEventRecord quick edit", () => {
     });
   });
 
-  it("marks an end before the start under the end field", () => {
+  it("saves registration timing while retaining the item-derived event timing", async () => {
+    updateEventScheduleAction.mockResolvedValue({ ok: true, event: event() });
     renderRecord();
     startEditing();
-
-    typeAndBlur(field("End date"), "Nov 18, 2026");
-
-    const ends = screen.getByRole("group", { name: "Ends" });
-    expect(within(ends).getByText("Pick a date on or after Thu, Nov 19, 2026.")).toBeTruthy();
+    typeAndBlur(field("Registration opening date"), "Nov 10, 2026");
+    typeAndBlur(field("Registration opening time"), "9:00 AM");
     fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
-    expect(updateEventScheduleAction).not.toHaveBeenCalled();
-  });
-
-  it("marks an end time before the start on the same day", () => {
-    renderRecord();
-    startEditing();
-
-    typeAndBlur(field("End time"), "6:00 PM");
-
-    const ends = screen.getByRole("group", { name: "Ends" });
-    expect(within(ends).getByText("End time is before the start time.")).toBeTruthy();
-  });
-
-  it("saves the dates as Pacific timestamps and shows what was saved", async () => {
-    const saved = event({ starts_at: "2026-11-20T02:30:00.000Z" });
-    updateEventScheduleAction.mockResolvedValue({ ok: true, event: saved });
-    renderRecord();
-    startEditing();
-
-    typeAndBlur(field("Start time"), "7:30 PM");
-    fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
-
     await waitFor(() => expect(router.refresh).toHaveBeenCalled());
-    expect(updateEventScheduleAction).toHaveBeenCalledWith(EVENT_ID, {
-      status: "active",
-      publish_at: null,
-      starts_at: "2026-11-20T02:30:00.000Z",
-      ends_at: "2026-11-20T04:00:00.000Z",
-      registration_opens_at: null,
-      registration_closes_at: null,
-    });
-    expect(screen.queryByRole("button", { name: "Save schedule" })).toBeNull();
-    expect(screen.getByText("Thu, Nov 19 7:30 PM–9:00 PM")).toBeTruthy();
+    expect(updateEventScheduleAction.mock.calls[0][1]).toMatchObject({ starts_at: "2026-11-20T02:00:00.000Z", ends_at: "2026-11-20T04:00:00.000Z", registration_opens_at: "2026-11-10T16:00:00.000Z" });
   });
 
   it("keeps editing and announces why the server refused", async () => {
@@ -290,7 +267,8 @@ describe("AdminEventRecord quick edit", () => {
     });
     renderRecord({ event: event({ status: "draft" }) });
     startEditing();
-    typeAndBlur(field("Start time"), "7:15 PM");
+    typeAndBlur(field("Registration opening date"), "Nov 10, 2026");
+    typeAndBlur(field("Registration opening time"), "9:00 AM");
     fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
 
     expect(
@@ -302,24 +280,11 @@ describe("AdminEventRecord quick edit", () => {
     expect(router.refresh).not.toHaveBeenCalled();
   });
 
-  it("catches a half-filled date before asking the server", () => {
-    renderRecord();
-    startEditing();
-
-    typeAndBlur(field("End time"), "");
-    fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
-
-    expect(screen.getByRole("alert").textContent).toBe(
-      "Event start and end dates and times are required."
-    );
-    expect(updateEventScheduleAction).not.toHaveBeenCalled();
-  });
-
   it("won't save text a field couldn't read", () => {
     renderRecord();
     startEditing();
 
-    typeAndBlur(field("Start time"), "teatime");
+    typeAndBlur(field("Registration opening time"), "teatime");
     fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
 
     expect(screen.getByText("Fix the dates and times marked above.")).toBeTruthy();
@@ -330,7 +295,8 @@ describe("AdminEventRecord quick edit", () => {
     updateEventScheduleAction.mockRejectedValue(new Error("network"));
     renderRecord();
     startEditing();
-    typeAndBlur(field("Start time"), "7:30 PM");
+    typeAndBlur(field("Registration opening date"), "Nov 10, 2026");
+    typeAndBlur(field("Registration opening time"), "9:00 AM");
     fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
 
     expect(

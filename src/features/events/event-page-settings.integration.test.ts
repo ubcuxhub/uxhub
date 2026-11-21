@@ -60,6 +60,22 @@ describe("event page settings", () => {
       });
     }));
 
+  it("switches agenda visibility without changing saved agenda rows", () =>
+    withFixtures(async fixtures => {
+      const event = await fixtures.createEvent();
+      const day = await fixtures.supabase.from("event_agenda_days").insert({ event_id: event.id, date: "2026-11-14", title: "Kickoff" }).select().single();
+      if (day.error) throw day.error;
+      const item = await fixtures.supabase.from("event_agenda_items").insert({ event_agenda_day_id: day.data.id, title: "Welcome", start_time: "09:00", end_time: "10:00" }).select().single();
+      if (item.error) throw item.error;
+      for (const enabled of [false, true]) {
+        await save(fixtures, { agenda_enabled: enabled }, event.id);
+        expect((await readEvent(fixtures, event.id)).agenda_enabled).toBe(enabled);
+        const retained = await fixtures.supabase.from("event_agenda_days").select("*, items:event_agenda_items(*)").eq("id", day.data.id).single();
+        expect(retained.error).toBeNull();
+        expect(retained.data).toEqual({ ...day.data, items: [item.data] });
+      }
+    }));
+
   it("takes a header image or a header colour, never both", () =>
     withFixtures(async (fixtures) => {
       const event = await fixtures.createEvent({ header_colour: "#325DC4" });
@@ -115,7 +131,7 @@ describe("event page settings", () => {
       const id = await save(fixtures, { ...base, ...settings });
       expect(await readEvent(fixtures, id)).toMatchObject(settings);
 
-      // Today's builder sends none of these: a save must not reset them.
+      // A caller omitting settings must not reset the stored choices.
       await save(fixtures, { ...base, name: `Renamed ${fixtures.tag}` }, id);
       expect(await readEvent(fixtures, id)).toMatchObject({
         ...settings,

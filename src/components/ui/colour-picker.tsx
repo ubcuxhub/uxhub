@@ -249,6 +249,8 @@ interface ColourPickerProps {
   onCustomColoursChange: (hexes: string[]) => void;
   /** Names the group: "Event colour". */
   label: string;
+  /** Keep an accessible group name when the surrounding section supplies its heading. */
+  hideLabel?: boolean;
   disabled?: boolean;
   className?: string;
   /** Opens the custom popover on mount. For the gallery's forced states. */
@@ -264,6 +266,7 @@ function ColourPicker({
   disabled,
   className,
   defaultOpen,
+  hideLabel = false,
 }: ColourPickerProps) {
   const labelId = React.useId();
   const rowRef = React.useRef<HTMLDivElement>(null);
@@ -332,7 +335,7 @@ function ColourPicker({
       data-slot="colour-picker"
       className={cn("flex flex-col gap-3", className)}
     >
-      <span id={labelId} className="text-body-medium text-foreground">
+      <span id={labelId} className={hideLabel ? "sr-only" : "text-body-medium text-foreground"}>
         {label}
       </span>
       <div ref={rowRef} className="flex flex-wrap items-center gap-3 pt-2">

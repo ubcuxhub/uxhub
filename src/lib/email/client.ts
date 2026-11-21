@@ -11,6 +11,21 @@ interface SendEmailInput {
 
 let resend: Resend | null = null;
 
+/**
+ * A send Resend refused. `code` is Resend's error name
+ * (`rate_limit_exceeded`, `daily_quota_exceeded`, `validation_error`, ...),
+ * safe to log; the message can quote the address, so callers shouldn't.
+ */
+export class EmailSendError extends Error {
+  readonly code: string;
+
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = "EmailSendError";
+    this.code = code;
+  }
+}
+
 function getResend() {
   const apiKey = process.env.RESEND_API_KEY;
   if (!apiKey) return null;
@@ -49,7 +64,7 @@ export async function sendEmail({ html, subject, to }: SendEmailInput) {
   });
 
   if (error) {
-    throw new Error(error.message);
+    throw new EmailSendError(error.name, error.message);
   }
 
   return true;

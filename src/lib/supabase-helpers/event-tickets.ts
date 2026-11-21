@@ -144,3 +144,61 @@ export async function releaseEventTicket(
 
   if (error) throw error;
 }
+
+/** Authoritative price snapshot; free registration also issues its ticket atomically. */
+export async function initializeEventCheckout(
+  supabase: DbClient,
+  input: { eventId: string; userId: string; idempotencyKey: string; freeOnly: boolean; expectedAmountCents?: number },
+) {
+  const { data, error } = await supabase.rpc("initialize_event_checkout", {
+    p_event_id: input.eventId,
+    p_user_id: input.userId,
+    p_idempotency_key: input.idempotencyKey,
+    p_free_only: input.freeOnly,
+    p_expected_amount_cents: input.expectedAmountCents,
+  });
+  if (error) throw error;
+  const row = data?.[0];
+  if (!row) throw new Error("Checkout initialization returned no result.");
+  return row;
+}
+
+/**
+ * Gives a ticket a new QR code through `regenerate_event_ticket_token`, so the
+ * old one (screenshots included) stops scanning. False when the ticket is
+ * gone. Service role only.
+ */
+export async function regenerateEventTicketToken(
+  supabase: DbClient,
+  ticketId: string
+): Promise<boolean> {
+  const { data, error } = await supabase.rpc("regenerate_event_ticket_token", {
+    p_ticket_id: ticketId,
+  });
+
+  if (error) throw error;
+  return data === true;
+}
+
+/** Why `void_event_ticket` refused, or null once the ticket is gone. */
+export type VoidEventTicketRefusal =
+  | "TICKET_NOT_FOUND"
+  | "TICKET_CHECKED_IN"
+  | "TICKET_PAID";
+
+/**
+ * Takes a ticket back through `void_event_ticket`, freeing its seat and team
+ * spot. Refused while it has a check-in, or while its purchase holds money
+ * that has not been refunded in full. Service role only.
+ */
+export async function voidEventTicket(
+  supabase: DbClient,
+  ticketId: string
+): Promise<VoidEventTicketRefusal | null> {
+  const { data, error } = await supabase.rpc("void_event_ticket", {
+    p_ticket_id: ticketId,
+  });
+
+  if (error) throw error;
+  return (data as VoidEventTicketRefusal | null) ?? null;
+}

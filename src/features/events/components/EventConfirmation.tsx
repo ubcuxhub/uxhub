@@ -17,6 +17,7 @@ export function EventConfirmation({
   slug: string;
 }) {
   const router = useRouter();
+  const free = purchase.amount_cents === 0;
   const completed = purchase.status === "completed";
   const failed = purchase.status === "failed" || purchase.status === "canceled";
   const pending = !completed && !failed;
@@ -37,7 +38,7 @@ export function EventConfirmation({
         )}
         <h1 className="mt-6 text-h1">
           {completed
-            ? "Payment successful"
+            ? free ? "Registration confirmed" : "Payment successful"
             : failed
               ? "Payment wasn’t completed"
               : pollingCutoffReached

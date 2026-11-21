@@ -1,9 +1,10 @@
 # Settings: Profile tab redesign
 
-Design proposal for the Profile tab of the Settings dialog (`#settings/profile`).
-There is no Figma for Settings; the brief is "make it look nice and clean". Built
-as working UI on fixture data in the dev docs. The production tab
-(`ProfileSettings`, `ProfileFields`, `SetupSettings`) is unchanged.
+**Status: implemented.** The redesign is the live Profile tab of the Settings
+dialog (`#settings/profile`). There is no Figma for Settings; the brief was
+"make it look nice and clean". It was proposed (Nov 9) as working UI on fixture
+data, then wired to the member's real row; §1 describes the tab it replaced,
+and §4 records how it was wired and where it departs from §2.
 
 Where to look (run `pnpm dev`, no sign-in needed):
 
@@ -13,19 +14,24 @@ Where to look (run `pnpm dev`, no sign-in needed):
 | `/dev/templates?open=profile-new` | Signed up and skipped setup: initials, nothing optional set, dietary not answered |
 | `/dev/templates?open=profile-saving` | Admin with a preset icon, photo chooser open, About you saved, Food saving |
 | `/dev/templates?open=profile-error` | Non-member: About you failed to save (Retry works), invalid student number |
+| `/dev/templates?open=profile-pending` | Pre-order: "Payment processing", student number locked |
 
 Each also renders alone with `-frame` (e.g. `?open=profile-new-frame`), which is
 what the 375px iframe shows; at a desktop window the frame is the dialog at its
-real 1000 x 760. All four work in dark mode. Saving is faked per section: 800ms
-debounce, then 600ms.
+real 1000 x 760. All of them work in dark mode. The templates run the real
+`ProfileTab` with a fake autosave (800ms debounce, then 600ms).
 
 Code:
 
-- `src/features/settings/components/profile-redesign/` (promotable):
-  `ProfileTab` (the tab body, presentational), `ProfileHeader`,
-  `ProfileSection`, `model.ts` (section ids, membership summary, labels).
-- `src/app/dev/templates/profile.tsx` (design-only): fixtures, the fake
-  autosave and a static copy of the dialog chrome.
+- `src/features/settings/components/ProfileSettings.tsx`: `ProfileSettings`
+  (the signed-in member, from `useUser`) and `ProfileEditor` (the wiring:
+  state, validation and one autosave per section).
+- `src/features/settings/components/profile/`: `ProfileTab` (the tab body,
+  presentational), `ProfileHeader`, `ProfileSection`, `model.ts` (section
+  ids, payloads, validation, membership summary, labels) and `client.ts` (the
+  saves, behind an interface so tests run the real tab on fixtures).
+- `src/app/dev/templates/profile.tsx`: fixtures, the fake autosave and a
+  static copy of the dialog chrome.
 
 ## 1. Problems with the current tab
 
@@ -123,14 +129,13 @@ Everything is composed from existing pieces (`Field`, `FieldLabel`,
 `FieldError`, `FieldDescription`, `Input`, `Select`, `Badge`, `Button`,
 `DetailList`/`DetailRow`, `MemberAvatar`, `AvatarPicker`, `DietaryFields`,
 `InterestFields`, `AutosaveStatus`). Nothing new was added to
-`src/components/ui` or `src/components/shared`. Gaps worth closing before this
-ships:
+`src/components/ui` or `src/components/shared`. Gaps still open:
 
-- **Shared autosave status.** `AutosaveStatus` lives in
-  `src/features/applications` and announces "Your answers are saved." Promote
-  it to `src/components/shared` with the announcement copy as a prop (Profile
-  wants "Your profile is saved."). The Profile tab imports it across features
-  for now.
+- **Shared autosave status.** `AutosaveStatus` (and `createAutosave`, which
+  the tab now uses per section) live in `src/features/applications`, and the
+  status announces "Your answers are saved." Promote both to shared code with
+  the announcement copy as a prop (Profile wants "Your profile is saved."). The
+  Profile tab imports them across features for now.
 - **Disclosure / Collapsible.** There is no collapsible primitive, so the photo
   panel is a button with `aria-expanded`/`aria-controls` and a conditional
   region. Fine for one use; add a `Collapsible` (Radix) if a second appears.
@@ -139,16 +144,46 @@ ships:
   multi-field groups. If General or Purchase history grow sections, move it to
   `src/features/settings/components` beside `SettingsRow`.
 
-## 4. Promoting it
+## 4. How it is wired
 
-1. Swap `ProfileFields` + `SetupSettings`'s section wrappers for `ProfileTab`
-   in `ProfileSettings`, keeping its data loading and actions. Split the single
-   `saveStatus` into a per-section `ProfileSaveStates`: profile fields report
-   as `about` or `studies` (by which fields changed), and `track` takes a
-   section id.
-2. Build the membership summary with `membershipSummary(user, membershipName,
-   membershipTermEndsAt)`.
-3. Track blurred fields so errors show after blur.
-4. Route the photo upload through the photo section's status.
-5. Move the student-number message to say what is wrong ("Student numbers are
-   8 digits") in `validateStudentNumber`; the current copy only says "valid".
+`ProfileFields` and `SetupSettings` are gone; `ProfileSettings` renders
+`ProfileEditor`, which feeds `ProfileTab`. The saves are the ones the old tab
+made, unchanged on the server:
+
+| Section | Saves through |
+| --- | --- |
+| About you | `updateUserInfoById` on the member's own row (RLS) |
+| Studies | `updateEligibilityProfileAction` when the student number changed (it validates, and refuses while a membership is active or pending), then `updateUserInfoById` for the columns the account type owns |
+| Photo | `saveSetupPhotoAction` for an icon; `POST /api/profile-photo` (`uploadProfilePhoto`) for an upload, inside the crop dialog |
+| Food and allergies | `saveSetupDietaryAction` |
+| Interests | `saveInterestsAction` (keeps managers' free tags) |
+
+- **One autosave per section.** Each section runs its own `createAutosave`
+  (the application form's controller): an 800ms debounce, one save in flight
+  at a time, two quiet retries of a failed save, then "Couldn't save" with
+  Retry beside that section. Retry moves focus to the section heading (the
+  photo panel, for the photo) so it isn't lost when the button turns into
+  "Saving…". Closing the dialog mid-debounce flushes what was changed.
+- **Validation.** Errors show after blur and update as you type from then on.
+  An empty name holds About you; a bad student number holds Studies; the rest
+  keep saving. A student number is checked only while it is editable and
+  differs from the saved one, so an old, oddly formatted number never blocks
+  the rest of Studies.
+- **Edits in progress survive a refresh.** The form starts from the row once;
+  saving refreshes `useUser` for the rest of the app (sidebar avatar,
+  membership pages) without resetting what's being typed.
+
+Departures from §2 and §4 of the proposal:
+
+- **"Membership ended".** A lapsed membership keeps its type id, so the
+  proposal's summary would have called it current with a past "Until" date.
+  The header now says "Membership ended" (neutral) with "Ended <date>".
+- **Lock copy by reason.** A pre-order locks the student number with "Locked
+  while your membership payment is processing", and the faculty email (always
+  locked: it is the sign-in address) says so instead of blaming a membership.
+- **Student-number copy stays in Settings.** Rather than changing
+  `validateStudentNumber` (shared with membership join), Settings checks the
+  length first ("Student numbers are 8 digits.") and defers to it after.
+- **"No dietary needs" is saved as an answer.** On an unanswered profile,
+  choosing it now writes the empty lists (and moves setup past dietary), so
+  "Not answered" doesn't come back next time. The old tab skipped that write.

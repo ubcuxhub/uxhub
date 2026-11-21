@@ -15,10 +15,13 @@ import {
   uploadApplicationFile,
 } from "./application-files";
 import { BUCKETS } from "./buckets";
+import { fetchEventHistoryInfo } from "./event-mutations";
 import {
   createDraftApplication,
+  decideEventApplication,
   deleteDraftApplication,
   fetchEventApplicationSummaries,
+  fetchUserEventApplication,
   submitEventApplication,
   upsertApplicationResponses,
 } from "./event-applications";
@@ -304,5 +307,149 @@ describe("application drafts", () => {
         expect(summaries.map((summary) => summary.applicationId)).toEqual([submitted.id]);
         expect(summaries[0].appliedAt).toBe(submitted.submitted_at);
       }
+    }));
+});
+
+describe("decision release and decide_event_application", () => {
+  const day = 24 * hour;
+
+  /**
+   * An application event with `capacity` seats, releasing in `releaseIn` ms
+   * (or none), whose applications close in `closesIn` ms.
+   */
+  async function decidedEvent(fixtures: Fixtures, capacity: number, releaseIn: number | null, closesIn = -hour) {
+    const { event } = await applicationEvent(fixtures, {
+      registration_opens_at: at(-2 * day),
+      registration_closes_at: at(closesIn),
+      max_capacity: capacity,
+    });
+    if (releaseIn !== null) {
+      const { error } = await db
+        .from("event_application_settings")
+        .upsert({ event_id: event.id, decisions_release_at: at(releaseIn) });
+      if (error) throw error;
+    }
+    return event;
+  }
+
+  async function submitted(fixtures: Fixtures, eventId: string) {
+    const user = await fixtures.createUser();
+    const { data, error } = await db
+      .from("event_applications")
+      .insert({ event_id: eventId, user_id: user.id })
+      .select()
+      .single();
+    if (error) throw error;
+    return { user, application: data };
+  }
+
+  it("shows the applicant a decision only once it's released", () =>
+    withFixtures(async (fixtures) => {
+      // Still open, so starting a draft reaches the unique row.
+      const event = await decidedEvent(fixtures, 10, day, hour);
+      const { user, application } = await submitted(fixtures, event.id);
+      const accepted = await decideEventApplication(db, {
+        applicationId: application.id,
+        decision: "accept",
+        offerExpiresAt: at(3 * day),
+      });
+      expect(accepted).toMatchObject({ ok: true, status: "accepted", previousStatus: "submitted" });
+
+      const client = clientAs(user);
+      const before = await fetchUserEventApplication(client, event.id, user.id);
+      expect(before).toMatchObject({ status: "submitted", offer_expires_at: null, updated_at: null });
+      expect(before?.decisions_release_at).toBeTruthy();
+      // A second draft start hits the unique row it can't select, and gets
+      // back what the applicant may see.
+      expect((await createDraftApplication(client, event.id, user.id)).status).toBe("submitted");
+
+      const { error } = await db
+        .from("event_application_settings")
+        .update({ decisions_release_at: at(-60_000) })
+        .eq("event_id", event.id);
+      if (error) throw error;
+      const after = await fetchUserEventApplication(client, event.id, user.id);
+      expect(after).toMatchObject({ status: "accepted" });
+      expect(after?.offer_expires_at).toBeTruthy();
+    }));
+
+  it("lets exactly one of two concurrent accepts take the last seat", () =>
+    withFixtures(async (fixtures) => {
+      const event = await decidedEvent(fixtures, 1, null);
+      const first = await submitted(fixtures, event.id);
+      const second = await submitted(fixtures, event.id);
+
+      const results = await Promise.all(
+        [first, second].map(({ application }) =>
+          decideEventApplication(createIntegrationClient(), {
+            applicationId: application.id,
+            decision: "accept",
+            offerExpiresAt: at(3 * day),
+          })
+        )
+      );
+
+      expect(results.filter((result) => result.ok)).toHaveLength(1);
+      const refused = results.filter((result) => !result.ok);
+      expect(refused).toHaveLength(1);
+      expect(refused[0]).toMatchObject({
+        reason: "OVER_CAPACITY",
+        seats: { tickets: 0, heldOffers: 1, capacity: 1 },
+      });
+
+      // The admin can accept anyway, which the result reports.
+      const forced = await decideEventApplication(db, {
+        applicationId: refused[0].applicationId,
+        decision: "accept",
+        offerExpiresAt: at(3 * day),
+        allowOverCapacity: true,
+      });
+      expect(forced).toMatchObject({ ok: true, overCapacity: true });
+
+      // Moving the deadline of an offer that already holds a seat takes no new seat.
+      const winner = results.find((result) => result.ok)!;
+      const moved = await decideEventApplication(db, {
+        applicationId: winner.applicationId,
+        decision: "accept",
+        offerExpiresAt: at(4 * day),
+      });
+      expect(moved).toMatchObject({ ok: true, overCapacity: false });
+    }));
+
+  it("refuses a deadline that isn't after the release", () =>
+    withFixtures(async (fixtures) => {
+      const event = await decidedEvent(fixtures, 10, 2 * day);
+      const { application } = await submitted(fixtures, event.id);
+      const early = await decideEventApplication(db, {
+        applicationId: application.id,
+        decision: "accept",
+        offerExpiresAt: at(day),
+      });
+      expect(early).toMatchObject({ ok: false, reason: "DEADLINE_TOO_EARLY", status: "submitted" });
+    }));
+
+  it("counts applications, drafts and reviewer notes for the delete dialog", () =>
+    withFixtures(async (fixtures) => {
+      const event = await decidedEvent(fixtures, 10, null, hour);
+      const admin = await fixtures.createUser({ role_access: "admin" });
+      const { application } = await submitted(fixtures, event.id);
+      const drafter = await fixtures.createUser();
+      await createDraftApplication(clientAs(drafter), event.id, drafter.id);
+      const note = await db
+        .from("application_review_notes")
+        .insert({ application_id: application.id, author_id: admin.id, body: "Strong" });
+      if (note.error) throw note.error;
+
+      expect(await fetchEventHistoryInfo(db, event.id)).toMatchObject({
+        applications: 1,
+        drafts: 1,
+        reviewerNotes: 1,
+      });
+      // An admin's own client never sees someone else's draft.
+      expect(await fetchEventHistoryInfo(clientAs(admin), event.id)).toMatchObject({
+        applications: 1,
+        drafts: 0,
+        reviewerNotes: 1,
+      });
     }));
 });

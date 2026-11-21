@@ -17,6 +17,8 @@ interface CheckoutPaymentSectionProps {
   collectBuyerDetails?: boolean;
   description?: string;
   buttonLabel?: string;
+  /** The submit label for a free event ticket, which takes no card. */
+  freeButtonLabel?: string;
   disabled?: boolean;
   disabledMessage?: string | null;
   framed?: boolean;
@@ -40,6 +42,7 @@ export function CheckoutPaymentSection({
   collectBuyerDetails = true,
   description,
   buttonLabel = "Secure Checkout",
+  freeButtonLabel,
   disabled = false,
   disabledMessage = null,
   framed = true,
@@ -56,11 +59,16 @@ export function CheckoutPaymentSection({
   title = "Secure Checkout",
   userId,
 }: CheckoutPaymentSectionProps) {
+  const freeEvent = kind === "event_ticket" && amountCents === 0;
+  const securityMessage = freeEvent
+    ? "Your eligibility and available capacity are checked before your ticket is confirmed."
+    : "Square securely processes your payment details. UX Hub confirms pricing, eligibility, and fulfillment before purchase.";
   const form = (
     <SquareCheckoutForm
       amountCents={amountCents}
       amountLabel={amount}
       buttonLabel={buttonLabel}
+      freeButtonLabel={freeButtonLabel}
       collectBuyerDetails={collectBuyerDetails}
       disabled={disabled}
       disabledMessage={disabledMessage}
@@ -80,9 +88,9 @@ export function CheckoutPaymentSection({
 
   if (!framed) {
     return (
-      <section className="space-y-6" aria-labelledby="payment-details-heading">
+      <section className="space-y-6" aria-label={title}>
         <div>
-          <h2 id="payment-details-heading" className="text-subheading">
+          <h2 className="text-subheading">
             {title}
           </h2>
           {description ? (
@@ -94,8 +102,7 @@ export function CheckoutPaymentSection({
         <div className="space-y-2">
           {form}
           <p className="text-small text-muted-foreground">
-            Square securely processes your payment details. UX Hub confirms
-            pricing, eligibility, and fulfillment before purchase.
+            {securityMessage}
           </p>
         </div>
       </section>
@@ -123,8 +130,7 @@ export function CheckoutPaymentSection({
         {form}
       </CardContent>
       <CardFooter className="pt-0 text-small text-muted-foreground">
-        Square securely processes your payment details. UX Hub confirms pricing,
-        eligibility, and fulfillment before purchase.
+        {securityMessage}
       </CardFooter>
     </Card>
   );

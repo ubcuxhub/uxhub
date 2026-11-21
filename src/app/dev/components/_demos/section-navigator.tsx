@@ -11,9 +11,9 @@ const sections: readonly NavigatorSection[] = [
   { id: "navigator-registration", title: "Registration", state: "attention", issues: 1, required: true },
   { id: "navigator-teams", title: "Teams", state: "complete", required: true },
   { id: "navigator-schedule", title: "Schedule", state: "optional", required: false },
-  { id: "navigator-people", title: "People and sponsors", state: "complete", required: false },
-  { id: "navigator-links", title: "Links and resources", state: "optional", required: false },
-  { id: "navigator-publishing", title: "Publishing", state: "not-started", required: true },
+  { id: "navigator-people", number: 7, title: "People and sponsors", state: "complete", required: false },
+  { id: "navigator-links", number: 8, title: "Links and resources", state: "optional", required: false },
+  { id: "navigator-publishing", number: 9, title: "Summary", state: "not-started", required: true },
 ];
 
 function NavigatorGallery({ open }: SectionProps) {
@@ -25,7 +25,8 @@ function NavigatorGallery({ open }: SectionProps) {
     <div className="h-full overflow-y-auto p-4 pb-28 sm:p-6 sm:pb-28">
     <div className="mb-6 rounded-2xl border border-border bg-card p-6">
       <h3 className="text-title font-semibold text-foreground">Event setup</h3>
-      <p className="mt-2 max-w-2xl text-small text-muted-foreground">Scroll through this mock event form to follow the current section. The floating pill shows required-section progress; open it to jump to any section. Use Tab to inspect its focus ring, Enter or Space to open, arrow keys to move, and Escape to return focus.</p>
+      <p className="mt-2 text-small text-muted-foreground">Optional number preserves original section labels when some sections are omitted. This example uses the plain number format for the builder; the default keeps zero-padded labels. Required progress still counts rendered sections only.</p>
+      <p className="mt-2 max-w-2xl text-small text-muted-foreground">Scroll through this mock event form to follow the current section. The floating pill keeps its content width with bottom-right placement independent of the sidebar and truncates long titles within the viewport. Opening this navigation menu preserves page scrolling and scrollbar space so the tracker stays still. It shows required-section progress; open it to jump to any section. Use Tab to inspect its focus ring, Enter or Space to open, arrow keys to move, and Escape to return focus.</p>
     </div>
     <div className="space-y-5">{sections.map((section, index) => <section key={section.id} id={section.id} className="min-h-64 scroll-mt-6 rounded-2xl border border-border bg-card p-6 sm:min-h-80">
       <span className="text-label tabular-nums text-muted-foreground">{String(index + 1).padStart(2, "0")} / {String(sections.length).padStart(2, "0")}</span>
@@ -36,7 +37,7 @@ function NavigatorGallery({ open }: SectionProps) {
         <div className="h-12 rounded-xl border border-border-subtle bg-muted" />
       </div>
     </section>)}</div>
-    <SectionNavigator title="Event setup" sections={sections} currentId={observedId} defaultOpen={open === "menu"} />
+    <SectionNavigator title="Event setup" sections={sections} currentId={observedId} placement="bottom-right" numberFormat="plain" defaultOpen={open === "menu"} />
     </div>
   </div>;
 }

@@ -1,7 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import type { EventState, EventStateKind } from "./event-states";
-import { getPanelSpec, type PanelContext } from "./registration-panel";
+import {
+  CANCELED_TITLE,
+  getPanelSpec,
+  REFUND_DONE,
+  REFUND_PENDING,
+  type PanelContext,
+} from "./registration-panel";
 
 // Wed, Aug 26, 2026 at noon Pacific.
 const DATE = "2026-08-26T19:00:00Z";
@@ -16,6 +22,7 @@ const context: PanelContext = {
 };
 
 const STATES: Record<EventStateKind, EventState> = {
+  canceled: { kind: "canceled", note: "Moved to January.", ticketId: "t" },
   "reg-upcoming": { kind: "reg-upcoming", opensAt: DATE },
   "reg-open": { kind: "reg-open", closesAt: DATE },
   "reg-full": { kind: "reg-full" },
@@ -41,6 +48,7 @@ const spec = (kind: EventStateKind, overrides: Partial<PanelContext> = {}) =>
 
 describe("getPanelSpec", () => {
   it.each([
+    ["canceled", "alert", "Registration"],
     ["reg-upcoming", "alert", "Registration"],
     ["reg-open", "action", "Registration"],
     ["reg-full", "alert", "Registration"],
@@ -150,11 +158,66 @@ describe("getPanelSpec", () => {
     expect(spec("app-in-review").subheading).toBeUndefined();
   });
 
+  it("says when decisions are released while they're held back", () => {
+    const held = getPanelSpec({ kind: "app-in-review", decisionsReleaseAt: DATE }, context);
+    expect(held).toMatchObject({
+      title: "Application",
+      layout: "alert",
+      props: {
+        variant: "warning",
+        title: "Your application is in review",
+        description: "Decisions are released Wed, Aug 26, 2026 at 12:00 PM. We’ll also email you then.",
+      },
+    });
+  });
+
+  // The application-emails job sends each released decision, including a
+  // later offer to someone on the waitlist; nothing else is promised.
+  it("says decisions and waitlist offers are emailed", () => {
+    expect(spec("app-in-review").props).toMatchObject({ description: "We’ll email you when there’s a decision, and it’ll show here too." });
+    expect(spec("app-waitlisted").props).toMatchObject({ description: "If a spot opens up, we’ll email you and it’ll show here." });
+    for (const kind of ["app-accepted", "app-rejected", "app-offer-expired"] as const) {
+      expect(JSON.stringify(spec(kind).props)).not.toMatch(/e-?mail/i);
+    }
+  });
+
   it("uses the alert variant and icon the copy names", () => {
     expect(spec("reg-full").props).toMatchObject({ variant: "destructive" });
     expect(spec("app-in-review").props).toMatchObject({ variant: "warning" });
     expect(spec("reg-closed").props).toMatchObject({ variant: "neutral" });
     expect((spec("reg-closed").props as { icon?: unknown }).icon).toBeUndefined();
     expect((spec("app-rejected").props as { icon?: unknown }).icon).toBeTruthy();
+  });
+});
+
+describe("getPanelSpec for a canceled event", () => {
+  const canceled = (state: Partial<Extract<EventState, { kind: "canceled" }>>, overrides: Partial<PanelContext> = {}) =>
+    getPanelSpec({ kind: "canceled", note: null, ticketId: null, ...state }, { ...context, ...overrides });
+
+  it("shows an alert, never the ticket or its code", () => {
+    const spec = canceled({ ticketId: "t" });
+    expect(spec).toMatchObject({
+      title: "Registration",
+      layout: "alert",
+      props: { variant: "destructive", title: CANCELED_TITLE },
+    });
+    expect((spec.props as { icon?: unknown }).icon).toBeTruthy();
+  });
+
+  it("gives the note, then where the refund stands", () => {
+    expect(canceled({ note: "Moved to January.", ticketId: "t" }, { refund: "not-refunded" }).props).toMatchObject({
+      description: `Moved to January. ${REFUND_PENDING}`,
+    });
+    expect(canceled({ ticketId: "t" }, { refund: "refunded" }).props).toMatchObject({ description: REFUND_DONE });
+  });
+
+  it("says nothing about refunds without a payment", () => {
+    expect(canceled({ note: "Moved to January.", ticketId: "t" }).props).toMatchObject({
+      description: "Moved to January.",
+    });
+    expect(canceled({ ticketId: "t" }, { refund: null }).props).toMatchObject({
+      description: "You don’t need to do anything.",
+    });
+    expect((canceled({}).props as { description: string }).description).toMatch(/^Keep an eye out/);
   });
 });

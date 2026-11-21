@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ApplicationNotes } from "@/features/admin/components/ApplicationNotes";
 import { ApplicationReviewClient } from "@/features/admin/components/ApplicationReviewClient";
 import {
+  defaultOfferDeadline,
   getReviewNeighbours,
   parseReviewListQuery,
   reviewScopeLabel,
@@ -13,9 +14,9 @@ import {
 import { resolveAdminEventId } from "@/features/admin/lib/resolve-event-param";
 import { answersFromResponses } from "@/features/applications/lib/application-form";
 import { requireAdmin } from "@/lib/auth/guards";
-import { pacificDate } from "@/lib/date";
 import { createClient } from "@/lib/supabase/server";
 import { createApplicationFileUrl } from "@/lib/supabase-helpers/application-files";
+import { fetchEventApplicationSettings } from "@/lib/supabase-helpers/event-application-settings";
 import {
   fetchApplicationQuestions,
   fetchApplicationResponses,
@@ -30,15 +31,6 @@ import { isUuid } from "@/lib/uuid";
 interface ApplicationReviewPageProps {
   params: Promise<{ event: string; applicationId: string }>;
   searchParams: Promise<Record<string, string | string[] | undefined>>;
-}
-
-/** A week out at 11:45 PM Pacific: the deadline offered until one is chosen. */
-function defaultOfferDeadline() {
-  const week = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-  return {
-    date: pacificDate(week) as `${number}-${number}-${number}`,
-    time: "23:45" as const,
-  };
 }
 
 export default async function ApplicationReviewPage({
@@ -70,12 +62,13 @@ export default async function ApplicationReviewPage({
     notFound();
   }
 
-  const [event, summaries, questions, responses, notes] = await Promise.all([
+  const [event, summaries, questions, responses, notes, settings] = await Promise.all([
     fetchEventById(supabase, application.event_id),
     fetchEventApplicationSummaries(supabase, eventId),
     fetchApplicationQuestions(supabase, eventId),
     fetchApplicationResponses(supabase, applicationId),
     fetchReviewerNotes(supabase, applicationId),
+    fetchEventApplicationSettings(supabase, eventId),
   ]);
 
   const items: ReviewListItem[] = summaries.map((summary) =>
@@ -149,7 +142,8 @@ export default async function ApplicationReviewPage({
         previous: target(neighbours.previous),
         next: target(neighbours.next),
       }}
-      defaultDeadline={defaultOfferDeadline()}
+      defaultDeadline={defaultOfferDeadline(settings)}
+      decisionsReleaseAt={settings?.decisions_release_at ?? null}
       notes={
         <ApplicationNotes
           applicationId={applicationId}

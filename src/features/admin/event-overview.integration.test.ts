@@ -99,19 +99,17 @@ describe("updateEventSchedule (the overview's quick edit)", () => {
       expect(await fetchEventById(clientAs(null), event.id)).not.toBeNull();
     }));
 
-  it("writes nothing for a member or, under the current policy, a manager", () =>
+  it("denies member quick edits and allows authorized manager quick edits", () =>
     withFixtures(async (fixtures) => {
       const event = await fixtures.createEvent({ status: "draft" });
       const member = await fixtures.createUser();
       const manager = await fixtures.createUser({ role_access: "manager" });
       const patch = { status: "active" as const, publish_at: null, ...schedule() };
 
-      expect(await updateEventSchedule(clientAs(member), event.id, patch)).toBeNull();
-      // admin_update_events admits role 'admin' only, which is why
-      // updateEventScheduleAction writes a manager's change with the service
-      // role. When that policy moves to is_admin(), this becomes the row.
-      expect(await updateEventSchedule(clientAs(manager), event.id, patch)).toBeNull();
+      await expect(updateEventSchedule(clientAs(member), event.id, patch)).rejects.toMatchObject({ code: "42501" });
       expect((await fetchEventById(fixtures.supabase, event.id))!.status).toBe("draft");
+      expect(await updateEventSchedule(clientAs(manager), event.id, patch)).toMatchObject({ id: event.id, status: "active" });
+      expect((await fetchEventById(fixtures.supabase, event.id))!.status).toBe("active");
     }));
 
   it("is refused by the database for a publish date on an active event", () =>

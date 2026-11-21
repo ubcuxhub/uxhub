@@ -215,8 +215,6 @@ Local values belong in the git-ignored `.env.local`.
 - Sentry: `NEXT_PUBLIC_SENTRY_DSN` enables error reporting; leave it unset
   locally. Build-time `SENTRY_ORG`, `SENTRY_PROJECT`, and secret
   `SENTRY_AUTH_TOKEN` upload source maps on Vercel builds
-- Check-in: server-only `CHECK_IN_TOKEN_SECRET` signs ticket QR codes
- (`src/lib/check-in-token.ts`); rotating it invalidates every issued ticket
 - Discount codes: server-only `DISCOUNT_CODE_<BUSINESS>`, one per partner in
   `src/features/memberships/lib/discount-codes.ts`, kept out of the public repo.
   A code whose variable is unset is not shown
@@ -228,13 +226,17 @@ Local values belong in the git-ignored `.env.local`.
 - Migrations: secret `SUPABASE_MIGRATIONS_DB_URL`, set in Vercel's Production
   environment only, is the session-mode pooler connection string the
   production build pushes migrations through. Never put it in `.env.local`
+- Application emails: secret `APPLICATION_EMAILS_SECRET`, set in Vercel's
+  Production environment only, matching the `application_emails_secret` Vault
+  secret the pg_cron job signs with (`supabase/README.md`, "Application
+  emails")
 
 `SQUARE_ENV` is optional and defaults to the sandbox; set it to `production`
 only for production credentials.
 
 Never expose the Supabase secret keys, migrations database URL, Square access
-token, webhook signature key, Resend API key, Sentry auth token, or check-in
-token secret to client components.
+token, webhook signature key, Resend API key, Sentry auth token, or
+application-emails secret to client components.
 
 ## Quality
 

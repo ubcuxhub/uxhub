@@ -5,6 +5,7 @@ import type { RegistryEntry } from "./types";
  * for how shards work.
  */
 export const interactionEntries: readonly RegistryEntry[] = [
+  { slug: "sortable-section", title: "Sortable section", category: "Data display", tier: "composite", description: "Collapsible cards with persistent drag handles, simple position numbers and keyboard reordering. Keep disclosure independent of ordering.", importPath: "@/components/shared/SortableSection", importNames: ["SortableSection", "ReorderControls"], source: "src/components/shared/SortableSection.tsx", spec: "§3.18", layout: "split" },
   // --- Actions ---------------------------------------------------------------
   {
     slug: "button",
@@ -12,7 +13,7 @@ export const interactionEntries: readonly RegistryEntry[] = [
     category: "Actions",
     tier: "primitive",
     description:
-      "Use a Button for an action on the page. Primary for the one step you want taken, secondary for the rest, destructive for what can’t be undone.",
+      "Use a Button for an action on the page. Primary for the one step you want taken, secondary for the rest, dotted for an optional add/link action, destructive for what can’t be undone.",
     importPath: "@/components/ui/button",
     importNames: ["Button"],
     source: "src/components/ui/button.tsx",
@@ -118,6 +119,7 @@ export const interactionEntries: readonly RegistryEntry[] = [
       "dialog-mobile",
       "dialog-tall",
       "dialog-delete",
+      "dialog-actions",
     ],
     aliases: [{ id: "overlays" }],
   },
@@ -280,7 +282,7 @@ export const interactionEntries: readonly RegistryEntry[] = [
     category: "Navigation",
     tier: "composite",
     description:
-      "A floating pill that tracks progress through a long form and jumps between its sections.",
+      "A floating pill with plain or padded section numbers that tracks progress through a long form and jumps between sections.",
     importPath: "@/components/shared/SectionNavigator",
     importNames: ["SectionNavigator"],
     source: "src/components/shared/SectionNavigator.tsx",

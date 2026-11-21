@@ -471,7 +471,8 @@ Hubbo and the white logo don't change. Contrast on the dark page: primary
 ### 3.1 Buttons
 
 - Variants: **Primary** (`action-primary` fill, white label; one per view),
-  **Secondary** (white, `border-default`; everything else), **Destructive**
+  **Secondary** (white, `border-default`; everything else), **Dotted**
+  (`variant="dotted"`, secondary styling with a dotted border for optional add/link actions), **Destructive**
   (only inside a confirming Dialog).
 - Sizes: md 40px (forms, pages), sm 32px (cards, tables, toolbars). States:
   Default, Hover, Pressed, Focus, Disabled, Loading (keeps width, progress in
@@ -550,6 +551,10 @@ and error meanings for the other rows.
   `background-surface-subtle` at `radius-md`, no underline, bar or bold-only.
   20px icon in `text-secondary`, 12px gap. Group labels use `label`, sentence
   case.
+- **Phone shell header:** `AppShellHeader` provides sticky menu access below
+  the sidebar's mobile breakpoint (768px, or 640px on event-builder routes). Its `SidebarInset` uses `group/shell`; pages with a
+  `data-hides-app-header` top bar hide the shell header to avoid duplicate
+  navigation. The app-sidebar gallery shows browsing and record-page examples.
 - **Tabs:** sections of one object (Overview, Registrations 128, Teams 32,
   Judges); counts in `text-secondary`.
 - **Pagination:** inside the Table's Card, "Showing 1–10 of 48 · Page 1 of 5".
@@ -583,10 +588,19 @@ Border + `shadow-overlay`, enter in 200ms.
 - **Dialog:** confirms destructive or blocking steps. Title asks the question
   ("Delete UXathon?"), buttons name both outcomes ("Keep event" / "Delete
   event"). Esc closes.
+  `DialogContent showCloseButton={false}` omits the X when visible actions already
+  provide dismissal; focus trapping, Escape and outside-click behavior remain.
+  `closeDisabled` still blocks every dismissal while a mutation is pending.
 - Keyboard: Enter opens, arrows move, Esc closes and returns focus. One overlay
   at a time. Outlines survive high-contrast mode.
 
 ### 3.8 Feedback
+
+- **Alert:** inline note with optional icon/title/description. Variants are
+  `neutral`, `warning` (default), `info` and `destructive`. Use `neutral` for
+  locked settings/status summaries: `bg-muted text-foreground`, with secondary
+  description text supplied by the caller. Status colours and the default
+  warning treatment for existing consumers remain unchanged.
 
 - **Toast:** bottom right, stacked, 380px, auto-dismiss after 5s. Tones Success,
   Neutral, Info, Warning, Error; optional action ("Try again"). Every admin result gets one.
@@ -609,6 +623,10 @@ Border + `shadow-overlay`, enter in 200ms.
 
 Sets an event's header and event colours in the event builder.
 
+`ColourPicker hideLabel` retains its accessible group name while hiding the
+visible label when the surrounding section already supplies a heading. Its
+default label and keyboard behavior are unchanged.
+
 - Swatch: 44px circle, 1px rgba(17,17,17,.12) edge. Selected: 2px white gap +
   2px `text-primary` ring, `aria-pressed`. Custom colours join after the
   presets with a 22px remove button. Dashed "Add" circle opens the custom
@@ -622,7 +640,9 @@ Sets an event's header and event colours in the event builder.
 
 - Type or pick. On blur, input is tidied to "Sat, Nov 14, 2026" and "9:00 AM".
   A time without AM/PM reads as PM; an end time takes the first match after the
-  start.
+  start. The event builder opts into `ambiguousStart="daytime"`: bare 7–11
+  means AM and 12–6 means PM. Explicit AM/PM and 24-hour input remain supported;
+  existing consumers keep the default PM interpretation.
 - Date popover: selected day `action-primary` fill; today a `border-default`
   ring; out-of-range days `text-disabled`. Error: "Use a real date, like Nov 14."
 - Time list: 15-minute steps; end-time options show duration ("2 hr 15 min");
@@ -630,6 +650,13 @@ Sets an event's header and event colours in the event builder.
 - One row per event day; "Add another date" for multi-day.
 - 40px pill like TextInput; popovers `radius-2xl`, `border-default`,
   `shadow-overlay`. Enter accepts, Esc closes, focus returns.
+
+`DateTimeFieldPair` composes existing date/time controls, preserving their labels
+and date-then-time tab order. It stacks below 24rem (384px) of its own available
+width and uses a flexible date plus an 8rem time column above that threshold.
+`timeWidth="wide"` reserves 9rem for time, shortening the flexible date by 1rem;
+registration window controls use this option. Other consumers retain the default.
+Use it inside cards and sidebar layouts instead of viewport-based paired grids.
 
 ### 3.12 Textarea, radio buttons and image upload
 
@@ -641,6 +668,10 @@ Sets an event's header and event colours in the event builder.
 - **ImageUpload:** states Empty ("Upload image · Or drag one here. JPG or PNG,
   1600 × 400 px or larger"), Dragging, Uploading (progress %, Cancel upload),
   Uploaded (Replace), Error ("That file is a GIF. Upload a JPG or PNG.").
+- `ImageUpload presentation="icon"` uses a 220px tile capped to the available
+  width; `presentation="header"` uses a shallow picker with “Upload header
+  image” and a visually hidden, associated file label. Both keep the 4 MB limit and existing validation, progress and replace
+  behavior. Omitting the prop preserves existing presentation.
 - Nothing auto-submits; the page's Save or Publish does.
 
 ### 3.13 Searchable dropdown
@@ -711,7 +742,8 @@ scrolls there and closes. Enter/Space opens, arrows move, Esc returns focus.
   drawer.
 - Export follows the view: selected rows, or all current results if none.
 - Wide tables scroll sideways inside the card with a fade; first column stays
-  put; long values ellipsize.
+  put from 768px up (narrower, every column scrolls, so none hides under a
+  pinned one); long values ellipsize.
 - SortFilterPanel: popover; filters apply as picked; button shows the count
   ("Sort and filter · 2"); footer "Clear all · 12 users".
 
@@ -825,6 +857,16 @@ logo or Hubbo in the grid.
   columns). Admin page: StatCards, one filter row above the table, Table and
   Pagination in one Card.
 
+**Checkout composites.** `CheckoutLayout` owns the summary, busy screen and
+`FlowDialog` close protection; `CheckoutPaymentSection` owns framed/unframed
+payment content. For `kind="event_ticket"` with zero cents, both render a
+cardless **Confirm spot** path: no Square setup, card fields or payment-security
+claims. Membership and positive-price event checkout keep tokenization and buyer
+verification. Prices are quotes; the database checks the amount and eligibility
+before fulfillment. A changed quote asks the member to refresh. Timeouts retain
+an attempt key; confirmation navigates to the existing receipt and real ticket.
+Examples: `/dev/components/checkout`.
+
 ### 4.5 Back navigation
 
 Pill link at the top of every detail page: 40px tall, fully rounded, 20px side
@@ -937,3 +979,142 @@ Organization lead), and Patterns parts (`Ticket`, `Hubbo/Placeholder`,
   side peek drawer and record page top bar icons 20; the 24px and 18px icons
   (ConfirmDialog title on phones, image upload and event-card placeholders,
   section navigator marks) redrawn at 16 or 20.
+
+
+### Partial section navigation
+
+`SectionNavigator` accepts an optional `number` on each section to retain the
+original section number while later feature sections are absent. The pill,
+accessible name and menu agree; the displayed total is the greatest section
+number or the rendered section count. Required progress counts rendered required
+sections only. Existing callers without explicit numbers keep sequential labels.
+`numberFormat="plain"` displays builder numbers as `7/10` and `7` in the menu;
+the default `"padded"` preserves `07/10` and `07` for existing consumers.
+
+
+`Table variant="separated"` uses rounded cell ends, 12px vertical gaps, and
+16px horizontal / 12px vertical cell padding for editable item summaries,
+matching event sponsor item 4619:1025. Cell height follows content plus padding. It preserves native table semantics, density, selection,
+keyboard actions and the internal horizontal scroller. The default joined rows
+remain unchanged. See `/dev/components/table` for separated rows.
+
+`RegistrationTicket` composes the registered-attendee card from Figma 4619:149:
+a divided Registration / 1 ticket header and slots for title, description,
+Ticket and actions. At a card width of 56rem, the copy column grows to 480px,
+followed by a 40px gap and a 444px ticket; surplus space stays at the right.
+Narrower containers order text, ticket, then vertically stacked actions, each
+up to 444px wide. Actions retain natural widths in the wide layout. Features own
+ticket state, QR dialogs and authorized resource links; omit a package action
+when there is no accessible configured resource. See
+`/dev/components/registration-ticket` for wide, phone, half-width and checked-in
+examples. Existing Ticket colours, contrast, QR and used-state behavior remain.
+
+### 3.18 Sortable section
+
+`SortableSection` composes Card and controlled disclosure with an always-visible
+drag grip, plain position number and entry count. Reordering uses the drag
+handle; no separate Move up/down buttons are shown. Focus a handle and press
+Up/Down to reorder with the keyboard; boundaries do not move. Disclosure and movement
+are separate controls. Keep stable item keys/focus across movement, announce new
+positions in the caller, and supply labelled drag/drop data. Set `dragType` to
+ignore unrelated drags. The whole card accepts drops: its upper/lower half
+selects before/after, with a horizontal insertion bar. The `onDrop` placement
+argument describes the insertion boundary; callers adjust for removal of the
+source item. `sectionId` enables programmatic focus and scrolling on creation. `ReorderControls`
+provides the same drag handle and keyboard movement for entries. Collapsed content
+retains edits; callers expand and focus errors before navigation. Disable lone-item handles and keep at least 44px handle targets on phones.
+See `/dev/components/sortable-section` for interactive collapse/reorder examples.
+
+Entry photos/logos reuse ImageUpload with `requirements={{ square: false }}`:
+JPG/PNG up to 4 MB without cover/header minimum dimensions. The authorized
+entry upload validates file bytes server-side; it does not enable SVG uploads.
+
+
+`FieldValidation` supplies already-visible `{ target, message }` issues to fields.
+Use `Field validationKey="target"` to render icon/copy errors and associate them
+with its controls through the existing Field context. The caller owns delayed
+required-field validation and immediate consistency feedback; fields without a
+key retain existing behavior. See `/dev/components/field` for an example.
+
+
+SectionNavigator defaults to sidebar-aware centered placement. Use
+`placement="bottom-right"` for a fixed corner tracker (16px phone / 32px desktop
+insets) that stays anchored when the sidebar expands or collapses.
+
+The section navigation menu is non-modal: opening it preserves page scrolling
+and scrollbar space, keeping the fixed trigger stationary. Escape and selection
+retain the existing focus behavior.
+
+### Location editor
+
+`shared/LocationEditor` composes the standard segmented toggle and labelled
+fields for in-person, online and hybrid locations. `LocationDraft` lives in
+`src/lib/location.ts`. Callers pass a unique `prefix`, controlled `value`,
+`onChange` and `restricted` (adds the public summary). Changing type preserves
+inactive fields. Audience enforcement, whole-location inheritance, required-field
+validation and persistence belong to the caller. See `/dev/components/location-editor`.
+
+### Participant location display
+
+`shared/EventLocation` renders an already-authorized `ParticipantLocation`:
+physical building/room/address and map, online join link and labelled CopyCode
+meeting ID/passcode, or both for hybrid. `restricted` renders only the public
+summary. Privacy belongs at the database projection boundary; never pass editor
+settings to participant components. Only HTTP(S) links render. Optional
+`showRoom={false}` supports a separate room column; `details={false}` keeps
+credentials and address/map in the day header for inherited table locations. See `/dev/components/event-location`.
+
+`Table scrollerLabel="…"` gives the horizontal scroll wrapper a region name and
+keyboard focus, allowing arrow-key scrolling without making rows interactive.
+Existing tables retain their default behavior. The separated People example at
+`/dev/components/table` demonstrates a named scroll region.
+
+CopyCode keeps its 12rem preferred minimum where space permits and shrinks to
+its container in narrow location cells. Long values retain the full tooltip and
+clipboard value. See the narrow long-passcode example at `/dev/components/copy-code`.
+
+### Shared agenda table
+
+`shared/AgendaDayTable` renders the participant day heading, Time, Item, Building
+or online location and Room columns. Place it inside `@container/agenda`
+(`data-agenda-container` enables dismissing open actions on resize). At 48rem
+container width it expands to four columns; narrower containers show complete
+two-line times and muted building/room beneath the item. Optional `actions(item)`
+adds secondary small icon buttons in an Actions column. Expanded staff columns
+use Time 24%, Item 24%, Building 20%, Room 12%, Actions 20%; participant
+column widths stay unchanged. Below the same breakpoint
+a native stretched row button opens those actions in a row-anchored Popover.
+Escape/outside dismissal returns focus; action handlers own editor transitions
+and subsequent focus restoration using the trigger passed to `onSelect`. Only pass authorized presentation data; staff
+notes and resource URLs remain in staff features. See `/dev/components/agenda-day-table`
+for participant, staff and narrow desktop examples.
+
+### Check-in presentation
+
+StatCard `kind="count"` makes `count` the primary number and renders `of total noun`
+as its context; `showRate` appends the rounded percentage. Zero total renders 0%
+without changing the existing rate variant's insufficient-data behavior. See
+`/dev/components/stat-card` for count, zero, loading and existing variants.
+The rate variant accepts optional `detail` text after its count caption to explain
+what the count includes (for example, tickets and held offers).
+
+ListRow `variant="compact"` omits artwork and accepts optional `leading`,
+`supporting` and `action` slots for time, a status badge and trailing controls.
+Names/descriptions wrap and rows grow; the caller provides a labelled list and
+library buttons. Default people/organization rows retain their existing layout.
+See `/dev/components/list-row`.
+
+ScannerFrame is a full-viewport dark surface with a wrapping header and centred
+480px content. ScannerViewfinder supplies a 264px square within the available
+width. Callers own capture, lifecycle, selection, permissions and recovery.
+See `/dev/components/scanner-frame` for the camera-free preview at all widths.
+
+SelectTrigger `multiline` allows the value to wrap and the outlined trigger to
+grow with its content. It uses `rounded-xl`, matching StatCard corners; standard
+single-line triggers retain their pill shape. SelectItem `description` adds a muted second line to both the
+menu and selected value; use them together. Supply `textValue` when typeahead
+should search only the primary label. Default single-line consumers retain their
+height and truncation. Keep an associated label or `aria-label` on the trigger.
+Enabled Select triggers show a pointer cursor; disabled triggers retain
+`cursor-not-allowed`. See `/dev/components/select` for long labels and overnight
+date context.

@@ -17,7 +17,7 @@ export interface EventTicketProps {
   eventColour?: string | null;
   /** The event's image, shown on a white tile. An image icon stands in without one. */
   imageUrl?: string | null;
-  /** Check-in token from `createCheckInToken`, drawn as the QR code. */
+  /** The ticket's `qr_token`, drawn as the QR code. */
   qrToken: string;
   className?: string;
 }

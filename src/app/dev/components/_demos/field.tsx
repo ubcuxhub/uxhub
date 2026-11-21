@@ -15,6 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Field,
   FieldContent,
+  FieldValidation,
   FieldDescription,
   FieldError,
   FieldGroup,
@@ -46,6 +47,11 @@ function FieldDemo() {
         spec="§3.2"
         description="Label (src/components/ui/label.tsx) has no page of its own: on its own it is a plain form label, and inside a Field you use FieldLabel instead."
       >
+        <Specimen label="Validator feedback (FieldValidation)" className="w-64">
+          <FieldValidation errors={[{ target: "demo-event", message: "Event name is required." }]}>
+            <Field validationKey="demo-event"><FieldLabel htmlFor={id("validated")}>Event name</FieldLabel><Input id={id("validated")} /></Field>
+          </FieldValidation>
+        </Specimen>
         <Specimen label="Label alone">
           <Label>Full name</Label>
         </Specimen>

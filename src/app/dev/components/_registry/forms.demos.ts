@@ -6,6 +6,7 @@ import type { DemoLoader } from "@/app/dev/_shell/types";
  * only the component page imports this, and it loads one demo.
  */
 export const formsDemos: Record<string, DemoLoader> = {
+  "location-editor": () => import("../_demos/location-editor"),
   field: () => import("../_demos/field"),
   input: () => import("../_demos/input"),
   "password-input": () => import("../_demos/password-input"),

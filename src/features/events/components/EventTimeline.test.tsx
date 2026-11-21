@@ -108,7 +108,7 @@ describe("EventTimeline", () => {
   });
 
   it.each([
-    [false, "No events scheduled yet"],
+    [false, "Events coming soon"],
     [true, "No past events"],
   ])("says so when there are no events (past: %s), with no clear action", (past, title) => {
     render(<EventTimeline upcomingEvents={[]} pastEvents={[]} />);
