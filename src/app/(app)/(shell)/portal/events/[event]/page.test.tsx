@@ -104,6 +104,40 @@ it("keeps the ticket and larger QR accessible after check-in", async () => {
   expect(within(dialog).getByRole("img", { name: /QR code/i })).toBeTruthy();
 });
 
+const slackLink = { id: "slack", type: "slack_workspace", label: null, url: "https://example.test/slack" };
+
+it.each([
+  ["going", { kind: "reg-going", ticketId: "ticket-1" }],
+  ["checked in", { kind: "reg-checked-in", ticketId: "ticket-1", checkedInAt: "2099-01-01T18:00:00Z" }],
+] as const)("shows Open Slack to a student who is %s, opening the workspace in a new tab", async (_label, state) => {
+  fixtures.state = state;
+  fixtures.fetchLinks.mockResolvedValue([slackLink]);
+  await renderPage();
+  const link = screen.getByRole("link", { name: /^Open Slack/ });
+  expect(link.getAttribute("href")).toBe("https://example.test/slack");
+  expect(link.getAttribute("target")).toBe("_blank");
+});
+
+it("hides Open Slack when the event has no Slack link", async () => {
+  fixtures.fetchLinks.mockResolvedValue([
+    { id: "package", type: "participant_package", label: null, url: "https://example.test/package" },
+  ]);
+  await renderPage();
+  expect(screen.queryByRole("link", { name: /^Open Slack/ })).toBeNull();
+});
+
+it.each([
+  ["registration open", { kind: "reg-open", closesAt: null }],
+  ["accepted without a ticket", { kind: "app-accepted", offerExpiresAt: null }],
+  ["past", { kind: "reg-past-attended", ticketId: "ticket-1" }],
+  ["canceled", { kind: "canceled", note: null, ticketId: "ticket-1" }],
+] as const)("hides Open Slack from a student who isn't going (%s)", async (_label, state) => {
+  fixtures.state = state;
+  fixtures.fetchLinks.mockResolvedValue([slackLink]);
+  await renderPage();
+  expect(screen.queryByRole("link", { name: /^Open Slack/ })).toBeNull();
+});
+
 it.each([
   ["active membership", "2099-01-01T00:00:00Z", null, "figma", false],
   ["personal expiry", "2000-01-01T00:00:00Z", null, "figma", true],
