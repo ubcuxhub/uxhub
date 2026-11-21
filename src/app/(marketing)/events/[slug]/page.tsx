@@ -1,4 +1,3 @@
-import Image from "next/image";
 import { EventDescription } from "@/components/shared/EventDescription";
 import { notFound, redirect } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
@@ -16,6 +15,7 @@ import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { fetchEventParticipantContent } from "@/lib/supabase-helpers/event-agenda";
 import { EventAgendaTable } from "@/features/events/components/EventAgendaTable";
+import { EventPageHeader } from "@/features/events/components/EventPageHeader";
 import { EventLocation } from "@/components/shared/EventLocation";
 import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
 import { publicMarketingDestination } from "@/lib/event-marketing";
@@ -134,7 +134,8 @@ export default async function EventDetailPage({
         {/* ────────────────────── HERO SECTION ────────────────────── */}
         <section className="mt-20 px-[5%] pb-12 pt-8 md:px-[10%] lg:px-[15%]">
         {preview && <Alert className="mb-6">Draft preview: only admins and managers can see this. Registration and applications are disabled.</Alert>}
-        {(event.header_image_url || event.header_colour) && <div className="relative mb-6 h-48 overflow-hidden rounded-xl" style={{ backgroundColor: event.header_colour || undefined }}>{event.header_image_url && <Image src={event.header_image_url} alt="" fill className="object-cover" unoptimized />}</div>}
+        {/* The portal event page's 4:1 header, without the icon, so a header crops the same in both. */}
+        {(event.header_image_url || event.header_colour) && <EventPageHeader className="mb-6 overflow-hidden rounded-xl" imageSrc={event.header_image_url ?? undefined} colour={event.header_colour ?? undefined} />}
         {/* Back link */}
         <BackPill href="/events" label="Back to Events" className="mb-6" />
 
