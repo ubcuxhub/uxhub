@@ -1026,7 +1026,9 @@ retains edits; callers expand and focus errors before navigation. Disable lone-i
 See `/dev/components/sortable-section` for interactive collapse/reorder examples.
 
 Entry photos/logos reuse ImageUpload with `requirements={{ square: false }}`:
-JPG/PNG up to 4 MB without cover/header minimum dimensions. The authorized
+JPG/PNG up to 20 MB, with no crop and no minimum dimensions; the picker shrinks
+anything over the 4 MB upload limit in the browser. Icons crop to a square and
+headers to 4:1 (`requirements.aspect`) in a crop dialog first. The authorized
 entry upload validates file bytes server-side; it does not enable SVG uploads.
 
 
