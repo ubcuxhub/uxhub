@@ -342,7 +342,8 @@ describe("ImageUpload picks", () => {
       crop: { x: 200, y: 0, width: 400, height: 400 },
     });
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-    expect(screen.getByText("wide.jpg")).toBeTruthy();
+    // The name shows with the preview, which FileReader loads asynchronously.
+    expect(await screen.findByText("wide.jpg")).toBeTruthy();
   });
 
   it("crops a header to 4:1 and keeps it above the minimum", async () => {
