@@ -8,6 +8,7 @@ import {
   RecordFrame,
   RecordPage,
   RecordSection,
+  RecordThumbnail,
   RecordView,
 } from "@/components/shared/RecordDrawer";
 import { TransactionRow } from "@/components/shared/TransactionRow";
@@ -47,6 +48,49 @@ const PEOPLE: Person[] = [
   { id: "u2", name: "Priya Raman", pronouns: "she/her", email: "priya.raman@student.ubc.ca", phone: "604-555-0190", membership: "Innovator", major: "Psychology", since: "July 21, 2026" },
   { id: "u3", name: "Jordan Lee", pronouns: "they/them", email: "jordan.lee@gmail.com", phone: "", membership: null, major: "Business", since: "September 3, 2026" },
 ];
+
+interface DemoEvent {
+  id: string;
+  name: string;
+  when: string;
+  /** The event's square icon (`image_url`), or none. */
+  image: string | null;
+  location: string;
+  capacity: string;
+}
+
+const EVENTS: DemoEvent[] = [
+  { id: "e1", name: "Portfolio Night", when: "Thursday, October 9, 2026 · 6:00 – 9:00 PM", image: "/about-us-1.png", location: "AMS Nest, Room 2306", capacity: "80" },
+  { id: "e2", name: "Design Systems Workshop with a Very Long Name for Wrapping", when: "Saturday, November 14, 2026 · 1:00 – 4:00 PM", image: null, location: "Hugh Dempster Pavilion 110", capacity: "40" },
+];
+
+/** An event's overview, as AdminEventRecord shows it: its square icon beside the title. */
+function EventRecord({ event }: { event: DemoEvent }) {
+  return (
+    <RecordView
+      title={event.name}
+      subtitle={event.when}
+      media={<RecordThumbnail src={event.image} />}
+      status={
+        <>
+          <Badge variant="success">Published</Badge>
+          <Badge variant="info">Registration open</Badge>
+        </>
+      }
+      actions={
+        <Button variant="secondary" size="sm">
+          <Pencil aria-hidden /> Edit event
+        </Button>
+      }
+      details={
+        <RecordSection title="Venue">
+          <RecordField label="Location" value={event.location} />
+          <RecordField label="Capacity" value={event.capacity} />
+        </RecordSection>
+      }
+    />
+  );
+}
 
 const PHONE = /^\d{3}-\d{3}-\d{4}$/;
 
@@ -167,6 +211,9 @@ function Demo({ state }: { state: string | undefined }) {
   const [open, setOpen] = useState(Boolean(drawerStart));
   // Stays set after closing, so the drawer slides out with its content.
   const [personIndex, setPersonIndex] = useState(0);
+  // Which list the open record belongs to; also kept after closing.
+  const [kind, setKind] = useState<"person" | "event">("person");
+  const [eventIndex, setEventIndex] = useState(0);
   // Each opening is a fresh record, as each navigation from the list is.
   const [session, setSession] = useState(0);
   const [start, setStart] = useState<Start>(drawerStart ?? "view");
@@ -218,10 +265,11 @@ function Demo({ state }: { state: string | undefined }) {
                 <TableRow key={person.id}>
                   <TableCell className="whitespace-nowrap">
                     <TableRowButton
-                      aria-current={(open && personIndex === index) || undefined}
+                      aria-current={(open && kind === "person" && personIndex === index) || undefined}
                       onClick={() => {
                         if (!open) setSession((current) => current + 1);
                         setStart("view");
+                        setKind("person");
                         setPersonIndex(index);
                         setOpen(true);
                       }}
@@ -238,13 +286,53 @@ function Demo({ state }: { state: string | undefined }) {
         </TableCard>
       </Composition>
 
+      <Composition
+        title="Manage Events"
+        description="An event's square icon (its image_url, which the builder crops to 1:1) sits beside the title in a RecordThumbnail, where a person has their Avatar: 64 px, rounded, cropped to fill. An event with no icon, or one whose image fails to load, shows an image placeholder on the muted fill instead."
+      >
+        <TableCard className="max-w-2xl">
+          <Table stickyFirstColumn className="min-w-[32rem]">
+            <TableHeader>
+              <TableRow>
+                <TableHead>Event</TableHead>
+                <TableHead>Icon</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {EVENTS.map((event, index) => (
+                <TableRow key={event.id}>
+                  <TableCell className="max-w-72 truncate">
+                    <TableRowButton
+                      aria-current={(open && kind === "event" && eventIndex === index) || undefined}
+                      onClick={() => {
+                        if (!open) setSession((current) => current + 1);
+                        setKind("event");
+                        setEventIndex(index);
+                        setOpen(true);
+                      }}
+                    >
+                      {event.name}
+                    </TableRowButton>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{event.image ? "Uploaded" : <TableNone />}</TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableCard>
+      </Composition>
+
       <RecordFrame listHref={PATH} open={open} onClose={() => setOpen(false)}>
-        <PersonRecord
-          key={`${session}-${people[personIndex].id}`}
-          person={people[personIndex]}
-          start={start}
-          onSaved={saved}
-        />
+        {kind === "event" ? (
+          <EventRecord key={`${session}-${EVENTS[eventIndex].id}`} event={EVENTS[eventIndex]} />
+        ) : (
+          <PersonRecord
+            key={`${session}-${people[personIndex].id}`}
+            person={people[personIndex]}
+            start={start}
+            onSaved={saved}
+          />
+        )}
       </RecordFrame>
     </div>
   );

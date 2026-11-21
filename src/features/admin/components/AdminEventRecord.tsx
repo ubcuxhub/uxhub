@@ -9,6 +9,7 @@ import { CopyCode } from "@/components/shared/CopyCode";
 import {
   RecordField,
   RecordSection,
+  RecordThumbnail,
   RecordView,
   useRecordMorphTypes,
 } from "@/components/shared/RecordDrawer";
@@ -410,16 +411,7 @@ export function AdminEventRecord({
     <RecordView
       title={event.name}
       subtitle={formatEventDateTimeRange(event.starts_at, event.ends_at) ?? "No date set"}
-      cover={
-        event.image_url ? (
-          // eslint-disable-next-line @next/next/no-img-element -- storage URLs, as on EventCard
-          <img
-            src={event.image_url}
-            alt=""
-            className="aspect-video w-full bg-muted object-cover"
-          />
-        ) : undefined
-      }
+      media={<RecordThumbnail src={event.image_url} />}
       status={
         <>
           <EventStatusBadge status={event.status} publishAt={event.publish_at} />

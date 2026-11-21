@@ -4,7 +4,7 @@ import * as React from "react";
 import { ViewTransition } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { History, Minimize2, SearchX } from "lucide-react";
+import { History, Image as ImageIcon, Minimize2, SearchX } from "lucide-react";
 
 import { DetailList, DetailRow } from "@/components/shared/DetailRow";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -398,10 +398,12 @@ export interface RecordViewProps {
   titleAdornment?: React.ReactNode;
   /** Under the title: "User since July 21, 2026". */
   subtitle?: React.ReactNode;
-  /** Beside the identity, before the title: an Avatar. */
+  /**
+   * Beside the identity, before the title, 64 px square: a person's Avatar
+   * (`size={64}`), or a `RecordThumbnail` for a record with a picture (an
+   * event's icon).
+   */
   media?: React.ReactNode;
-  /** Full width above the identity: an event's 16:9 cover. */
-  cover?: React.ReactNode;
   /** Under the subtitle: status Badges. */
   status?: React.ReactNode;
   /** Top bar buttons ("Edit user", "Edit event"). Hidden while editing, when the footer takes over. */
@@ -446,7 +448,6 @@ export function RecordView({
   titleAdornment,
   subtitle,
   media,
-  cover,
   status,
   actions,
   fullPageHref,
@@ -488,20 +489,17 @@ export function RecordView({
   const showActions = !editing && actions;
 
   const identity = (
-    <div className="flex flex-col gap-6">
-      {cover ? <div className="overflow-hidden rounded-xl">{cover}</div> : null}
-      <div className="flex min-w-0 items-start gap-4 sm:gap-5">
-        {media ? <div className="shrink-0">{media}</div> : null}
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <SidePeekDrawerTitle ref={titleRef} className="min-w-0 break-words">
-              {title}
-            </SidePeekDrawerTitle>
-            {titleAdornment}
-          </div>
-          {subtitle ? <p className="text-small text-muted-foreground">{subtitle}</p> : null}
-          {status ? <div className="flex flex-wrap items-center gap-2 pt-1">{status}</div> : null}
+    <div className="flex min-w-0 items-start gap-4 sm:gap-5">
+      {media ? <div className="shrink-0">{media}</div> : null}
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <SidePeekDrawerTitle ref={titleRef} className="min-w-0 break-words">
+            {title}
+          </SidePeekDrawerTitle>
+          {titleAdornment}
         </div>
+        {subtitle ? <p className="text-small text-muted-foreground">{subtitle}</p> : null}
+        {status ? <div className="flex flex-wrap items-center gap-2 pt-1">{status}</div> : null}
       </div>
     </div>
   );
@@ -554,6 +552,46 @@ export function RecordView({
         </SidePeekDrawerFooter>
       ) : null}
     </RecordViewContext.Provider>
+  );
+}
+
+export interface RecordThumbnailProps {
+  /** The picture: an event's square icon. Without one, `fallback` shows. */
+  src?: string | null;
+  /** Shown with no picture, or when it fails to load. Defaults to an image icon. */
+  fallback?: React.ReactNode;
+  className?: string;
+}
+
+/**
+ * A record's square picture for `RecordView`'s `media`, the counterpart of a
+ * person's 64 px Avatar: 64 px, rounded, the image cropped to fill, with a
+ * hairline edge so a pale picture still reads as a tile. With no picture, or
+ * one that fails to load, it shows `fallback` on the muted fill, as the event
+ * builder's header preview does. Decorative: the title beside it names the
+ * record.
+ */
+export function RecordThumbnail({ src, fallback, className }: RecordThumbnailProps) {
+  // The src that failed to load, so a new src gets its own try.
+  const [failed, setFailed] = React.useState<string | null>(null);
+  const image = src && src !== failed ? src : null;
+  return (
+    <div
+      data-slot="record-thumbnail"
+      aria-hidden
+      className={cn(
+        "relative flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted text-muted-foreground [&_svg]:size-6",
+        className,
+      )}
+    >
+      {image ? (
+        // eslint-disable-next-line @next/next/no-img-element -- storage URLs, as on EventCard
+        <img src={image} alt="" className="size-full object-cover" onError={() => setFailed(image)} />
+      ) : (
+        (fallback ?? <ImageIcon />)
+      )}
+      <span className="pointer-events-none absolute inset-0 rounded-[inherit] ring-1 ring-inset ring-border-subtle" />
+    </div>
   );
 }
 

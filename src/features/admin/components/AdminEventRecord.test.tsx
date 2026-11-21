@@ -139,6 +139,21 @@ describe("AdminEventRecord overview", () => {
     expect(screen.getAllByText("Free")).toHaveLength(2);
   });
 
+  it("shows the event's icon as a square thumbnail, or a placeholder without one", () => {
+    const { unmount } = renderRecord({ event: event({ image_url: "https://store/icon.png" }) });
+    // The drawer renders in a portal, outside the render container.
+    let tile = document.querySelector("[data-slot='record-thumbnail']");
+    expect(tile?.querySelector("img")?.getAttribute("src")).toBe("https://store/icon.png");
+    expect(tile?.className).toContain("size-16");
+    expect(document.querySelectorAll("img")).toHaveLength(1);
+    unmount();
+
+    renderRecord();
+    tile = document.querySelector("[data-slot='record-thumbnail']");
+    expect(tile).not.toBeNull();
+    expect(tile?.querySelector("img")).toBeNull();
+  });
+
   it("links to the builder, check-in and the public page", () => {
     renderRecord();
 
