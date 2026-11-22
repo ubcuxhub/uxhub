@@ -70,7 +70,6 @@ function SortFilterPanel({
         <Button
           type="button"
           variant="secondary"
-          size="sm"
           aria-label={triggerLabel}
         >
           <ListFilter aria-hidden />

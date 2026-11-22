@@ -155,7 +155,7 @@ function Attendees() {
           }
           selectedCount={selection.selected.size}
           bulkActions={
-            <Button variant="secondary" size="sm">
+            <Button variant="secondary">
               <Download aria-hidden />
               CSV
             </Button>
