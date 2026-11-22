@@ -8,7 +8,7 @@ const mocks = vi.hoisted(() => ({
   seats: vi.fn(),
   attendees: vi.fn(),
   statuses: vi.fn(),
-  toReview: vi.fn(),
+  applications: vi.fn(),
   settings: vi.fn(),
   lifecycle: vi.fn(),
   notFound: vi.fn(() => {
@@ -25,8 +25,8 @@ vi.mock("@/lib/supabase-helpers/check-ins", () => ({
   fetchCheckInAttendees: mocks.attendees,
   fetchCheckInStatuses: mocks.statuses,
 }));
-vi.mock("@/lib/supabase-helpers/event-application-review-counts", () => ({
-  fetchSubmittedApplicationCounts: mocks.toReview,
+vi.mock("@/lib/supabase-helpers/event-applications", () => ({
+  fetchEventApplicationStatusCounts: mocks.applications,
 }));
 vi.mock("@/lib/supabase-helpers/event-application-settings", () => ({
   fetchEventApplicationSettings: mocks.settings,
@@ -87,10 +87,11 @@ it("passes registrations newest first and counts each checked-in holder once", a
       { id: "t2", name: "Ada Lovelace" },
       { id: "t1", name: "Grace Hopper" },
     ],
+    applications: null,
     needsAction: [],
   });
   // No applications or cancel: nothing else to read.
-  expect(mocks.toReview).not.toHaveBeenCalled();
+  expect(mocks.applications).not.toHaveBeenCalled();
   expect(mocks.settings).not.toHaveBeenCalled();
   expect(mocks.lifecycle).not.toHaveBeenCalled();
 });
@@ -105,12 +106,15 @@ it("reads review counts for an application event and paid tickets for a canceled
     registration_opens_at: null,
     registration_closes_at: null,
   });
-  mocks.toReview.mockResolvedValue(new Map([["event-id", 4]]));
+  const counts = { submitted: 4, accepted: 1, waitlisted: 0, rejected: 2, total: 7 };
+  mocks.applications.mockResolvedValue(counts);
   mocks.settings.mockResolvedValue({ decisions_release_at: null });
   mocks.lifecycle.mockResolvedValue({ registered: 2, memberApplications: 0, paidTickets: 2 });
 
   const result = await page();
   expect(mocks.lifecycle).toHaveBeenCalledWith({ service: true }, "event-id");
+  expect(mocks.applications).toHaveBeenCalledWith({}, "event-id");
+  expect(result.props.applications).toEqual(counts);
   expect(result.props.needsAction).toEqual([{ kind: "refund", type: "todo", count: 2 }]);
 });
 

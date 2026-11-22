@@ -1,6 +1,5 @@
 "use client";
 
-import { useId } from "react";
 import Link from "next/link";
 import { CalendarClock, CircleAlert, CircleCheck } from "lucide-react";
 
@@ -13,7 +12,9 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatTimestamp } from "@/lib/date";
 import type { EventRow } from "@/lib/supabase/models";
+import type { EventApplicationStatusCounts } from "@/lib/supabase-helpers/event-applications";
 import type { NeedsActionItem } from "../../lib/event-needs-action";
+import { EventRegistrationsCard } from "../EventRegistrationsCard";
 import { EventScheduleSection, useEventScheduleEditor } from "../EventScheduleEditor";
 
 export interface EventOverviewRegistration {
@@ -28,6 +29,8 @@ export interface EventOverviewProps {
   seats: { tickets: number; seatsLeft: number | null };
   /** Ticket holders checked in to at least one agenda item. */
   checkedIn: number;
+  /** Applications by status, for an event that takes them; null otherwise. */
+  applications: EventApplicationStatusCounts | null;
   /** Ticket holders, newest first. */
   registrations: EventOverviewRegistration[];
   needsAction: NeedsActionItem[];
@@ -159,57 +162,6 @@ function RegistrationsListCard({ registrations }: { registrations: EventOverview
   );
 }
 
-function RegistrationsStatCard({
-  capacity,
-  seats,
-  checkedIn,
-}: {
-  capacity: number | null;
-  seats: EventOverviewProps["seats"];
-  checkedIn: number;
-}) {
-  const labelId = useId();
-  const percent = capacity ? Math.min(100, Math.round((seats.tickets / capacity) * 100)) : 0;
-  return (
-    <Card role="group" aria-labelledby={labelId} className="gap-4">
-      <CardHeader>
-        {/* A label, as StatCard's: the list beside it is the Registrations heading. */}
-        <p id={labelId} className="text-small font-medium text-muted-foreground">
-          Registrations
-        </p>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <p className="text-h1 tabular-nums">
-            {seats.tickets}
-            {capacity ? (
-              <span className="text-body-medium text-muted-foreground"> / {capacity}</span>
-            ) : null}
-          </p>
-          <p className="text-small text-muted-foreground">
-            {capacity == null
-              ? "No capacity set"
-              : `${plural(Math.max(0, seats.seatsLeft ?? 0), "spot", "spots")} left`}
-          </p>
-        </div>
-        {capacity ? (
-          <div aria-hidden className="h-2 overflow-hidden rounded-full bg-muted">
-            <div className="h-full rounded-full bg-primary" style={{ width: `${percent}%` }} />
-          </div>
-        ) : null}
-        <DetailList>
-          <DetailRow label="Going" className="grid-cols-[1fr_auto] sm:grid-cols-[1fr_auto]">
-            <span className="tabular-nums">{seats.tickets}</span>
-          </DetailRow>
-          <DetailRow label="Checked in" className="grid-cols-[1fr_auto] border-b-0 pb-0 sm:grid-cols-[1fr_auto]">
-            <span className="tabular-nums">{checkedIn}</span>
-          </DetailRow>
-        </DetailList>
-      </CardContent>
-    </Card>
-  );
-}
-
 function EventDetailsCard({ event: loaded, now }: { event: EventRow; now: string }) {
   const schedule = useEventScheduleEditor(loaded);
   const { event } = schedule;
@@ -273,6 +225,7 @@ export function EventOverview({
   event,
   seats,
   checkedIn,
+  applications,
   registrations,
   needsAction,
   now,
@@ -285,10 +238,13 @@ export function EventOverview({
           <RegistrationsListCard registrations={registrations} />
         </div>
         <div className="flex min-w-0 flex-col gap-6">
-          <RegistrationsStatCard
+          <EventRegistrationsCard
+            eventId={event.id}
             capacity={event.max_capacity}
-            seats={seats}
+            tickets={seats.tickets}
+            seatsLeft={seats.seatsLeft}
             checkedIn={checkedIn}
+            applications={event.requires_application ? applications : null}
           />
           <EventDetailsCard event={event} now={now} />
         </div>

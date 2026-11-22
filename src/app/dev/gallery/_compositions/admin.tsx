@@ -44,6 +44,8 @@ import {
 import { TabNav, TabNavLink } from "@/components/ui/tab-nav";
 import { useRowSelection } from "@/hooks/use-row-selection";
 
+import { EventRegistrationsCard } from "@/features/admin/components/EventRegistrationsCard";
+
 import { HERE, USERS } from "../_fixtures";
 import { LIFT, Panel } from "./frame";
 import type { Components } from "./types";
@@ -74,6 +76,21 @@ function AdminStats() {
       />
       <StatCard className={LIFT} label="Revenue" kind="loading" />
     </div>
+  );
+}
+
+/** The event manager's Overview and the event drawer share this card. */
+function EventRegistrations() {
+  return (
+    <EventRegistrationsCard
+      className={LIFT}
+      eventId="uxathon"
+      capacity={120}
+      tickets={96}
+      seatsLeft={14}
+      checkedIn={41}
+      applications={{ submitted: 12, accepted: 106, waitlisted: 18, rejected: 31, total: 167 }}
+    />
   );
 }
 
@@ -400,6 +417,7 @@ function CheckIn() {
 
 export const ADMIN_COMPONENTS = {
   "admin-stats": AdminStats,
+  "event-registrations": EventRegistrations,
   "attendee-table": Attendees,
   "admin-event-header": EventHeader,
   "mentors": Mentors,

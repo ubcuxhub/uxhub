@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   fetchEventById: vi.fn(),
   fetchEventSeatCounts: vi.fn(),
   fetchEventApplicationStatusCounts: vi.fn(),
+  fetchCheckInStatuses: vi.fn(),
   fetchEventBySlug: vi.fn(),
   notFound: vi.fn(() => {
     throw new Error("NEXT_NOT_FOUND");
@@ -32,6 +33,9 @@ vi.mock("@/lib/supabase-helpers/events", () => ({
 }));
 vi.mock("@/lib/supabase-helpers/event-tickets", () => ({
   fetchEventSeatCounts: mocks.fetchEventSeatCounts,
+}));
+vi.mock("@/lib/supabase-helpers/check-ins", () => ({
+  fetchCheckInStatuses: mocks.fetchCheckInStatuses,
 }));
 vi.mock("@/lib/supabase-helpers/event-applications", () => ({
   fetchEventApplicationStatusCounts: mocks.fetchEventApplicationStatusCounts,
@@ -76,6 +80,13 @@ beforeEach(() => {
     new Map([[EVENT_ID, { tickets: 12, heldOffers: 1, seatsLeft: 27 }]])
   );
   mocks.fetchEventApplicationStatusCounts.mockResolvedValue(counts);
+  mocks.fetchCheckInStatuses.mockResolvedValue(
+    new Map([
+      ["t1_s1", "2026-11-20T02:00:00.000Z"],
+      ["t1_s2", "2026-11-20T03:00:00.000Z"],
+      ["t2_s1", null],
+    ])
+  );
   mocks.fetchEventBySlug.mockResolvedValue(null);
 });
 
@@ -88,8 +99,16 @@ describe("AdminEventRecordRoute", () => {
     expect(element.props).toMatchObject({
       event: { id: EVENT_ID },
       seats: { tickets: 12, seatsLeft: 27 },
-      applications: counts,
+      checkedIn: 1,
+      // No applications on an event that doesn't take them.
+      applications: null,
     });
+  });
+
+  it("passes the application counts for an event that takes them", async () => {
+    mocks.fetchEventById.mockResolvedValue(event({ requires_application: true }));
+
+    expect((await route(EVENT_ID)).props.applications).toEqual(counts);
   });
 
   it("stops at the guard for someone who isn't an admin", async () => {
@@ -106,6 +125,15 @@ describe("AdminEventRecordRoute", () => {
     const element = await route(EVENT_ID);
 
     expect(element.props.seats).toEqual({ tickets: 0, seatsLeft: 40 });
+  });
+
+  it("keeps no seats left for an event without a capacity", async () => {
+    mocks.fetchEventById.mockResolvedValue(event({ max_capacity: null }));
+    mocks.fetchEventSeatCounts.mockResolvedValue(
+      new Map([[EVENT_ID, { tickets: 12, heldOffers: 0, seatsLeft: null }]])
+    );
+
+    expect((await route(EVENT_ID)).props.seats).toEqual({ tickets: 12, seatsLeft: null });
   });
 
   it("shows not found in the drawer for a missing event", async () => {

@@ -86,6 +86,7 @@ function renderRecord(props: Partial<AdminEventRecordProps> = {}) {
       <AdminEventRecord
         event={event()}
         seats={{ tickets: 10, seatsLeft: 30 }}
+        checkedIn={2}
         applications={counts}
         now="2026-11-05T20:00:00.000Z"
         publicPages
@@ -119,9 +120,14 @@ describe("AdminEventRecord overview", () => {
     expect(screen.getAllByText("Active").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Registration open").length).toBeGreaterThan(0);
 
-    const registered = screen.getByRole("group", { name: "Registered" });
-    expect(within(registered).getByText("10 of 40 seats")).toBeTruthy();
-    expect(within(screen.getByRole("group", { name: "Seats left" })).getByText("30")).toBeTruthy();
+    const registrations = screen.getByRole("group", { name: "Registrations" });
+    expect(registrations.textContent).toContain("10 / 40");
+    expect(within(registrations).getByText("30 spots left")).toBeTruthy();
+    expect(within(registrations).getByText("Checked in").nextElementSibling?.textContent).toBe("2");
+    // The one card replaces the separate stat cards.
+    expect(document.querySelector("[data-slot='stat-card']")).toBeNull();
+    expect(screen.queryByRole("group", { name: "Registered" })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Seats left" })).toBeNull();
     expect(screen.queryByRole("group", { name: "Applications" })).toBeNull();
     expect(screen.getAllByText("Free")).toHaveLength(2);
   });
@@ -175,10 +181,20 @@ describe("AdminEventRecord overview", () => {
   it("shows applications and how many wait for review when the event takes them", () => {
     renderRecord({ event: event({ requires_application: true }) });
 
-    expect(within(screen.getByRole("group", { name: "Applications" })).getByText("4")).toBeTruthy();
+    const applications = screen.getByRole("group", { name: "Applications" });
+    expect(within(applications).getByRole("link", { name: "4 in total" })).toBeTruthy();
+    expect(within(applications).getByRole("link", { name: "3 to review" })).toBeTruthy();
+    expect(within(applications).getByRole("link", { name: "1 accepted" })).toBeTruthy();
     const review = screen.getByRole("link", { name: /^Review applications/ });
     expect(review.getAttribute("href")).toBe(`/admin/events/${EVENT_ID}/review-applications`);
     expect(review.textContent).toBe("Review applications3 to review");
+  });
+
+  it("reads an event without a capacity as unlimited", () => {
+    renderRecord({ event: event({ max_capacity: null }), seats: { tickets: 10, seatsLeft: null } });
+    const registrations = screen.getByRole("group", { name: "Registrations" });
+    expect(within(registrations).getByText("No capacity limit")).toBeTruthy();
+    expect(registrations.textContent).not.toContain("/");
   });
 
   it("says when a draft publishes itself", () => {

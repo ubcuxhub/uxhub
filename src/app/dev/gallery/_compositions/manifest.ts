@@ -90,6 +90,11 @@ export const MANIFEST = [
     uses: ["stat-card"],
   },
   {
+    id: "event-registrations",
+    column: 3,
+    uses: ["card", "detail-row", "separator"],
+  },
+  {
     id: "attendee-table",
     column: 3,
     uses: ["table", "table-toolbar", "search-field", "sort-filter-panel", "select", "filter-chip", "checkbox", "avatar", "status-badge", "pagination", "button"],

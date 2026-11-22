@@ -46,6 +46,7 @@ function renderOverview(props: Partial<EventOverviewProps> = {}) {
       event={event}
       seats={{ tickets: 12, seatsLeft: 26 }}
       checkedIn={3}
+      applications={{ submitted: 4, accepted: 6, waitlisted: 2, rejected: 3, total: 15 }}
       registrations={[
         { id: "t2", name: "Ada Lovelace" },
         { id: "t1", name: "Grace Hopper" },
@@ -109,6 +110,14 @@ describe("EventOverview", () => {
     expect(card.textContent).toContain("12 / 40");
     expect(within(card).getByText("26 spots left")).toBeTruthy();
     expect(within(card).getByText("Checked in")).toBeTruthy();
+    const applications = within(card).getByRole("group", { name: "Applications" });
+    expect(within(applications).getByRole("link", { name: "15 in total" })).toBeTruthy();
+    expect(within(applications).getByRole("link", { name: "6 accepted" })).toBeTruthy();
+  });
+
+  it("leaves applications out of the numbers for an open-registration event", () => {
+    renderOverview({ event: { ...event, requires_application: false } });
+    expect(screen.queryByRole("group", { name: "Applications" })).toBeNull();
   });
 
   it("shows the event's details and opens the schedule quick edit", () => {

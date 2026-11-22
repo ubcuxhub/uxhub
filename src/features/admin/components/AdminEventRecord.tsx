@@ -14,13 +14,13 @@ import {
 } from "@/components/shared/RecordDrawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { StatCard } from "@/components/ui/stat-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { formatEventDateTimeRange, formatTimestamp } from "@/lib/date";
 import type { EventRow } from "@/lib/supabase/models";
 import type { EventApplicationStatusCounts } from "@/lib/supabase-helpers/event-applications";
 import { registrationWindow } from "../lib/event-registration-window";
 import { eventManagerHref } from "../lib/event-manager";
+import { EventRegistrationsCard } from "./EventRegistrationsCard";
 import { EventStatusBadge } from "./EventStatusBadge";
 import { CancelEventDialog } from "./CancelEventDialog";
 import { EventScheduleFields, RegistrationBadge, hasEnded } from "./EventScheduleEditor";
@@ -28,8 +28,12 @@ import { eventMarketingHref } from "../lib/event-presentation";
 
 export interface AdminEventRecordProps {
   event: EventRow;
-  seats: { tickets: number; seatsLeft: number };
-  applications: EventApplicationStatusCounts;
+  /** Tickets, and the seats nobody holds (`null` without a capacity). */
+  seats: { tickets: number; seatsLeft: number | null };
+  /** Ticket holders checked in to at least one agenda item. */
+  checkedIn: number;
+  /** Applications by status, for an event that takes them; null otherwise. */
+  applications: EventApplicationStatusCounts | null;
   /** When the server rendered this, so the registration window reads the same on both sides. */
   now: string;
   /** Whether the public event pages are live (the student events flag). */
@@ -55,6 +59,7 @@ function formatPrice(value: number | null) {
 export function AdminEventRecord({
   event: loaded,
   seats,
+  checkedIn,
   applications,
   now,
   publicPages,
@@ -100,25 +105,14 @@ export function AdminEventRecord({
       details={
         <>
           <RecordSection title="At a glance" kind="content" className="gap-4">
-            <div
-              className={
-                event.requires_application
-                  ? "grid gap-3 sm:grid-cols-3"
-                  : "grid gap-3 sm:grid-cols-2"
-              }
-            >
-              <StatCard
-                kind="rate"
-                label="Registered"
-                count={seats.tickets}
-                total={event.max_capacity ?? 0}
-                noun="seats"
-              />
-              {event.max_capacity == null ? <StatCard kind="insufficient" label="Seats left" reason="Capacity is not set" /> : <StatCard kind="value" label="Seats left" value={Math.max(0, seats.seatsLeft)} />}
-              {event.requires_application ? (
-                <StatCard kind="value" label="Applications" value={applications.total} />
-              ) : null}
-            </div>
+            <EventRegistrationsCard
+              eventId={event.id}
+              capacity={event.max_capacity}
+              tickets={seats.tickets}
+              seatsLeft={seats.seatsLeft}
+              checkedIn={checkedIn}
+              applications={event.requires_application ? applications : null}
+            />
             <div className="flex flex-wrap gap-2">
               <Button asChild variant="secondary" size="sm"><Link href={`${base}/agenda`}><ClipboardList aria-hidden />Agenda</Link></Button>
               <Button asChild variant="secondary" size="sm">
@@ -132,7 +126,7 @@ export function AdminEventRecord({
                   <Link href={`${base}/review-applications`}>
                     <ClipboardList aria-hidden />
                     Review applications
-                    {applications.submitted > 0 ? (
+                    {applications && applications.submitted > 0 ? (
                       <Badge variant="warning" className="tabular-nums">
                         {applications.submitted}
                         <span className="sr-only"> to review</span>

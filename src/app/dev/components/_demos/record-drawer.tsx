@@ -28,6 +28,7 @@ import {
   TableRowButton,
 } from "@/components/ui/table";
 
+import { EventRegistrationsCard, type EventRegistrationsCardProps } from "@/features/admin/components/EventRegistrationsCard";
 import { EVENT_MANAGER_COLUMN, EventManagerHeader } from "@/features/admin/components/event-manager/EventManagerHeader";
 import { eventManagerHref, eventManagerTabs } from "@/features/admin/lib/event-manager";
 import type { EventRow } from "@/lib/supabase/models";
@@ -60,11 +61,17 @@ interface DemoEvent {
   image: string | null;
   location: string;
   capacity: string;
+  /** What the At a glance card shows. */
+  registrations: Omit<EventRegistrationsCardProps, "eventId">;
 }
 
 const EVENTS: DemoEvent[] = [
-  { id: "e1", name: "Portfolio Night", when: "Thursday, October 9, 2026 · 6:00 – 9:00 PM", image: "/about-us-1.png", location: "AMS Nest, Room 2306", capacity: "80" },
-  { id: "e2", name: "Design Systems Workshop with a Very Long Name for Wrapping", when: "Saturday, November 14, 2026 · 1:00 – 4:00 PM", image: null, location: "Hugh Dempster Pavilion 110", capacity: "40" },
+  { id: "e1", name: "Portfolio Night", when: "Thursday, October 9, 2026 · 6:00 – 9:00 PM", image: "/about-us-1.png", location: "AMS Nest, Room 2306", capacity: "80",
+    // Takes applications: the card breaks them down.
+    registrations: { capacity: 80, tickets: 52, seatsLeft: 22, checkedIn: 0, applications: { submitted: 3, accepted: 58, waitlisted: 9, rejected: 14, total: 84 } } },
+  { id: "e2", name: "Design Systems Workshop with a Very Long Name for Wrapping", when: "Saturday, November 14, 2026 · 1:00 – 4:00 PM", image: null, location: "Hugh Dempster Pavilion 110", capacity: "No limit",
+    // Open registration with no capacity: a count, no bar.
+    registrations: { capacity: null, tickets: 17, seatsLeft: null, checkedIn: 0 } },
 ];
 
 /** The first event, as the manager's header reads it. */
@@ -109,6 +116,9 @@ function EventRecord({ event }: { event: DemoEvent }) {
       }
       details={
         <>
+          <RecordSection title="At a glance" kind="content">
+            <EventRegistrationsCard eventId={event.id} {...event.registrations} />
+          </RecordSection>
           {/* Read-only here: the status and schedule are changed on the manager's Overview. */}
           <RecordSection
             title="Status and registration schedule"
@@ -282,8 +292,10 @@ function Demo({ state }: { state: string | undefined }) {
             publicPages
             pathname={eventManagerHref(MANAGER_EVENT.id)}
           />
-          <div className={`${EVENT_MANAGER_COLUMN} pb-10 pt-8`}>
+          <div className={`${EVENT_MANAGER_COLUMN} grid gap-6 pb-10 pt-8 lg:grid-cols-2 lg:items-start`}>
+            {/* Overview's left column (Needs action, the registrations list) is elided here. */}
             <div className="h-40 rounded-lg border border-dashed border-border" aria-hidden />
+            <EventRegistrationsCard eventId={MANAGER_EVENT.id} {...EVENTS[0].registrations} />
           </div>
         </RecordPage>
       </Composition>
