@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("./profile/client", () => ({ createServerProfileClient: vi.fn() }));
 vi.mock("@/features/setup/actions", () => ({
   finishSetupAction: vi.fn(),
+  saveBirthDateAction: vi.fn(),
   saveSetupAboutAction: vi.fn(),
   saveSetupDietaryAction: vi.fn(),
   saveSetupPhotoAction: vi.fn(),
@@ -21,7 +22,9 @@ globalThis.ResizeObserver ??= class {
   disconnect() {}
 };
 
+import { BIRTHDAY_HINT } from "@/features/setup/components/BirthdayField";
 import type { SetupState } from "@/features/setup/lib/state";
+import { FUTURE_BIRTH_DATE } from "@/lib/birth-date";
 import type { UserInfoRow } from "@/lib/supabase/models";
 
 import type { ProfileClient } from "./profile/client";
@@ -93,6 +96,7 @@ const SETUP: SetupState = {
   avatarPreset: null,
   profilePhotoPath: null,
   interests: [],
+  birthDate: null,
 };
 
 type FakeClient = { [K in keyof ProfileClient]: ReturnType<typeof vi.fn> & ProfileClient[K] };
@@ -100,6 +104,7 @@ type FakeClient = { [K in keyof ProfileClient]: ReturnType<typeof vi.fn> & Profi
 function fakeClient(): FakeClient {
   return {
     saveAbout: vi.fn(async () => {}),
+    saveBirthDate: vi.fn(async (birthDate) => ({ ...SETUP, birthDate })),
     saveStudies: vi.fn(async () => {}),
     saveDietary: vi.fn(async (needs) => ({ ...SETUP, ...needs })),
     savePreset: vi.fn(async (preset) => ({ ...SETUP, avatarPreset: preset })),
@@ -272,6 +277,77 @@ describe("ProfileEditor autosave", () => {
       ),
     );
     await waitFor(() => expect(section("Studies").getByText(/Saved/)).toBeTruthy());
+  });
+
+  describe("birthday", () => {
+    const birthday = () => screen.getByLabelText(/^Birthday/) as HTMLInputElement;
+
+    it("sits in About you with setup's hint, showing what's stored", () => {
+      renderEditor({ ...MEMBER, birth_date: "2004-03-14" });
+      const field = birthday();
+      expect(field.type).toBe("date");
+      expect(field.value).toBe("2004-03-14");
+      expect(section("About you").getByText(BIRTHDAY_HINT)).toBeTruthy();
+      cleanup();
+      renderEditor();
+      expect(birthday().value).toBe("");
+    });
+
+    it("saves through the birthday action alone, then says Saved", async () => {
+      renderEditor();
+      type("Birthday", "2004-03-14");
+      await waitFor(() => expect(client.saveBirthDate).toHaveBeenCalledWith("2004-03-14"));
+      await waitFor(() => expect(section("About you").getByText(/Saved/)).toBeTruthy());
+      expect(client.saveAbout).not.toHaveBeenCalled();
+      expect(refreshUser).toHaveBeenCalled();
+    });
+
+    it("clears a stored birthday", async () => {
+      renderEditor({ ...MEMBER, birth_date: "2004-03-14" });
+      type("Birthday", "");
+      await waitFor(() => expect(client.saveBirthDate).toHaveBeenCalledWith(null));
+    });
+
+    it("sends each part of About you only when it changed", async () => {
+      renderEditor();
+      type("Phone", "604 555 0134");
+      type("Birthday", "2004-03-14");
+      await waitFor(() => expect(client.saveBirthDate).toHaveBeenCalledTimes(1));
+      expect(client.saveAbout).toHaveBeenCalledTimes(1);
+      expect(client.saveAbout.mock.calls[0][1]).not.toHaveProperty("birth_date");
+
+      type("Phone", "604 555 0199");
+      await waitFor(() => expect(client.saveAbout).toHaveBeenCalledTimes(2));
+      expect(client.saveBirthDate).toHaveBeenCalledTimes(1);
+    });
+
+    it("retries only the birthday when it fails after the details saved", async () => {
+      client.saveBirthDate.mockRejectedValueOnce(new Error("offline"));
+      renderEditor();
+      type("Phone", "604 555 0134");
+      type("Birthday", "2004-03-14");
+      const retry = await section("About you").findByRole("button", { name: "Retry" });
+      act(() => retry.click());
+      await waitFor(() => expect(section("About you").getByText(/Saved/)).toBeTruthy());
+      expect(client.saveAbout).toHaveBeenCalledTimes(1);
+      expect(client.saveBirthDate).toHaveBeenCalledTimes(2);
+    });
+
+    it("holds a future date with setup's message after blur, and saves once fixed", async () => {
+      renderEditor();
+      type("Birthday", "2999-01-01");
+      expect(screen.queryByText(FUTURE_BIRTH_DATE)).toBeNull();
+      fireEvent.blur(birthday());
+      expect(screen.getByText(FUTURE_BIRTH_DATE)).toBeTruthy();
+      expect(birthday().getAttribute("aria-invalid")).toBe("true");
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(client.saveBirthDate).not.toHaveBeenCalled();
+      expect(client.saveAbout).not.toHaveBeenCalled();
+
+      type("Birthday", "2004-03-14");
+      expect(screen.queryByText(FUTURE_BIRTH_DATE)).toBeNull();
+      await waitFor(() => expect(client.saveBirthDate).toHaveBeenCalledWith("2004-03-14"));
+    });
   });
 
   it("records 'no dietary needs' as an answer", async () => {

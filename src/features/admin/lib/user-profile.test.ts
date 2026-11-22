@@ -1,21 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { normalizeInterests, parseProfilePhoto, validateBirthDate } from "./user-profile";
+import { normalizeInterests, parseProfilePhoto } from "./user-profile";
 
 describe("admin profile validation", () => {
-  it("validates leap days without silently rolling to another date", () => {
-    expect(validateBirthDate("2000-02-29")).toBe("2000-02-29");
-    expect(() => validateBirthDate("2001-02-29")).toThrow("valid birth date");
-    expect(() => validateBirthDate("2000-04-31")).toThrow("valid birth date");
-    expect(() => validateBirthDate("0000-01-01")).toThrow("valid birth date");
-    expect(validateBirthDate(null)).toBeNull();
-  });
-
-  it("rejects future dates and unsupported date formats", () => {
-    expect(() => validateBirthDate("2999-01-01")).toThrow("future");
-    expect(() => validateBirthDate("01/01/2000")).toThrow("valid birth date");
-    expect(() => validateBirthDate({})).toThrow("valid birth date");
-  });
-
   it("deduplicates tags while preserving the first spelling and rejects invalid tags", () => {
     expect(normalizeInterests([" Design ", "design", "RESEARCH"])).toEqual(["Design", "RESEARCH"]);
     expect(() => normalizeInterests([" "])).toThrow();

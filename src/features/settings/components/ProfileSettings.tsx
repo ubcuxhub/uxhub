@@ -196,8 +196,18 @@ export function ProfileEditor({
           const values = pickFields(current.current.form, ABOUT_FIELDS);
           return sameFields(values, saved.current.about) ? null : values;
         },
+        // The details and the birthday take different paths; each is sent
+        // only when it changed, and a half-done save remembers the half.
         write: async (values) => {
-          await context.current.client.saveAbout(context.current.user, values);
+          const { birth_date: birthDate, ...details } = values;
+          const { birth_date: savedBirthDate, ...savedDetails } = saved.current.about;
+          if (!sameFields(details, savedDetails)) {
+            await context.current.client.saveAbout(context.current.user, details);
+            saved.current.about = { ...details, birth_date: savedBirthDate };
+          }
+          if (birthDate !== savedBirthDate) {
+            await context.current.client.saveBirthDate(birthDate || null);
+          }
           saved.current.about = values;
           refresh();
           return "saved";
@@ -364,6 +374,7 @@ export function ProfileEditor({
         first_name: touched.has("first_name") ? errors.first_name : null,
         last_name: touched.has("last_name") ? errors.last_name : null,
         student_number: touched.has("student_number") ? errors.student_number : null,
+        birth_date: touched.has("birth_date") ? errors.birth_date : null,
       }}
       canEditEligibility={canEditEligibility}
       avatarChoice={choice}

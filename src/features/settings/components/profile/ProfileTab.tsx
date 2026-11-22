@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { AutosaveStatus } from "@/features/applications/components/AutosaveStatus";
 import { AvatarPicker, type AvatarChoice } from "@/features/setup/components/AvatarPicker";
+import { BirthdayField } from "@/features/setup/components/BirthdayField";
 import { DietaryFields, type DietaryValue } from "@/features/setup/components/DietaryFields";
 import { InterestFields } from "@/features/setup/components/InterestFields";
 import type { InterestId } from "@/features/setup/lib/options";
@@ -209,6 +210,12 @@ export function ProfileTab({
             onChange={(phone) => onFormChange({ phone })}
             placeholder="e.g. 604 555 0134"
             autoComplete="tel"
+          />
+          <BirthdayField
+            value={form.birth_date}
+            onChange={(birth_date) => onFormChange({ birth_date })}
+            onBlur={() => onFieldBlur?.("birth_date")}
+            error={errors.birth_date}
           />
         </FieldGrid>
       </ProfileSection>

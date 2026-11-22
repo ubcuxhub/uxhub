@@ -79,6 +79,7 @@ describe("toSetupState", () => {
         avatar_preset: null,
         profile_photo_path: "profiles/a/b.png",
         interests: ["ux-research"],
+        birth_date: "2004-03-14",
       })
     ).toEqual({
       step: "photo",
@@ -90,6 +91,7 @@ describe("toSetupState", () => {
       avatarPreset: null,
       profilePhotoPath: "profiles/a/b.png",
       interests: ["ux-research"],
+      birthDate: "2004-03-14",
     });
   });
 });
@@ -106,6 +108,7 @@ describe("toSetupState, user type", () => {
       avatar_preset: null,
       profile_photo_path: null,
       interests: [],
+      birth_date: null,
     });
     expect(state).toMatchObject({ step: "about", userType: "ubcStudent", userTypeConfirmed: false });
   });

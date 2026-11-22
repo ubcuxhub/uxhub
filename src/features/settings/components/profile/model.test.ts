@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { toDietaryValue } from "@/features/setup/components/DietaryFields";
+import { FUTURE_BIRTH_DATE, INCOMPLETE_BIRTH_DATE, INVALID_BIRTH_DATE } from "@/lib/birth-date";
 
 import {
   dietaryPayload,
@@ -94,6 +95,7 @@ const form = {
   school_institution: "",
   student_status: "" as const,
   year: "" as const,
+  birth_date: "",
 };
 
 describe("profileErrors", () => {
@@ -125,6 +127,21 @@ describe("profileErrors", () => {
     ).toBeNull();
   });
 
+  it("checks the birthday with setup's validator, holding only About you", () => {
+    expect(profileErrors(form, context).birth_date).toBeNull();
+    expect(profileErrors({ ...form, birth_date: "2000-02-29" }, context).birth_date).toBeNull();
+
+    const future = profileErrors({ ...form, birth_date: "2999-01-01" }, context);
+    expect(future.birth_date).toBe(FUTURE_BIRTH_DATE);
+    expect(sectionBlocked("about", future)).toBe(true);
+    expect(sectionBlocked("studies", future)).toBe(false);
+
+    // Half-typed is not cleared.
+    const incomplete = profileErrors({ ...form, birth_date: INCOMPLETE_BIRTH_DATE }, context);
+    expect(incomplete.birth_date).toBe(INVALID_BIRTH_DATE);
+    expect(sectionBlocked("about", incomplete)).toBe(true);
+  });
+
   it("only checks student numbers for UBC students", () => {
     expect(
       profileErrors({ ...form, student_number: "1" }, { ...context, userType: "nonUbc" }).student_number,
@@ -145,6 +162,7 @@ describe("sections", () => {
   it("files each field under the section that saves it", () => {
     expect(sectionOf("phone")).toBe("about");
     expect(sectionOf("first_name")).toBe("about");
+    expect(sectionOf("birth_date")).toBe("about");
     expect(sectionOf("student_number")).toBe("studies");
     expect(sectionOf("school_institution")).toBe("studies");
   });

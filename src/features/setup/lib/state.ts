@@ -48,6 +48,8 @@ export interface SetupState {
   avatarPreset: AvatarPreset | null;
   profilePhotoPath: string | null;
   interests: string[];
+  /** `YYYY-MM-DD`, or null when the member hasn't given one. */
+  birthDate: string | null;
 }
 
 export type SetupRow = UserSetupRow;
@@ -69,6 +71,7 @@ export function toSetupState(row: SetupRow): SetupState {
     avatarPreset: row.avatar_preset as AvatarPreset | null,
     profilePhotoPath: row.profile_photo_path,
     interests: row.interests,
+    birthDate: row.birth_date,
   };
 }
 

@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireAuth } from "@/lib/auth/guards";
 import { getSafeInternalPath } from "@/lib/auth/paths";
+import { validateBirthDate } from "@/lib/birth-date";
 import { errorFields, log } from "@/lib/log";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
@@ -163,6 +164,20 @@ export async function finishSetupAction(input: { interests: InterestId[] }): Pro
     // `interests` has no member grant (managers' free tags share it), so the
     // service role writes it, scoped to the caller's id.
     return updateUserSetup(supabaseAdmin, user.id, { interests, setup_step: "done" });
+  });
+}
+
+/**
+ * The member's birthday, from setup step 1 and Settings › Profile alike.
+ * Optional: null or "" clears it. Leaves `setup_step` alone, so setup's
+ * step 1 saves it beside `saveSetupAboutAction`. `birth_date` has no member
+ * grant (like `interests`), so the service role writes it, scoped to the
+ * caller's id.
+ */
+export async function saveBirthDateAction(input: { birthDate: string | null }): Promise<SetupState> {
+  return run("setup.birth_date_save_failed", async (user) => {
+    const birthDate = validateBirthDate(input?.birthDate);
+    return updateUserSetup(supabaseAdmin, user.id, { birth_date: birthDate });
   });
 }
 
