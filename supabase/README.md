@@ -189,6 +189,7 @@ helper file, and fix it in one place.
 | `application_emails.deliveries` (private, RPCs only) | `src/lib/supabase-helpers/application-emails.ts` |
 | `user_info`                   | `src/lib/supabase-helpers/users.ts`               |
 | `membership_types`            | `src/lib/supabase-helpers/memberships.ts`         |
+| `membership_awards` / `membership_award_months` / `membership_history_coverage` | `src/lib/supabase-helpers/admin-dashboard.ts` (aggregate reads), `membership-history.ts` (trusted fulfillment) |
 | `purchases`                   | `src/lib/supabase-helpers/purchases.ts`           |
 | `square_webhook_events`       | `src/lib/supabase-helpers/purchases.ts`           |
 | `app_settings`                | `src/lib/supabase-helpers/app-settings.ts`        |
@@ -743,3 +744,13 @@ Resource-only saves for ended and canceled events share the schedule-aware
 older callers and private volunteer schedules; do not add a separate four-argument
 overload, which makes PostgREST calls ambiguous. The reconciliation migration
 combines cancellation access with schedule synchronization and service-role grants.
+
+## Membership history
+
+See [dashboard metric and coverage contracts](../docs/admin-dashboard-statistics.md#durable-membership-history-and-all-account-majors).
+Private durable awards survive account/purchase deletion. Monthly summaries are
+transactionally derived from that ledger. `rebuild_membership_history()` is a
+service-only, idempotent reliable-purchase import and summary reconciliation;
+it cannot recover undated manual assignments. Do not advance the coverage start
+to pretend old history is complete. Local seeding has a separate, explicitly
+scoped fixture reset, never used by production account deletion.

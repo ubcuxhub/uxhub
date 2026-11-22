@@ -59,3 +59,41 @@ export async function fetchConfirmedEventRegistrationCount(db: DbClient, eventId
   if (error) throw error;
   return count ?? 0;
 }
+
+/** Complete counts are exact as of the requested time; partial counts are lower
+ * bounds for years; partial monthly attribution is provisional until earlier
+ * grants are known. Null means unavailable or future, never a fabricated zero. */
+export type MembershipCoverage = "complete" | "partial" | "unavailable" | "future";
+export interface MembershipHistoryPeriod {
+  count: number | null;
+  coverage: MembershipCoverage;
+}
+export interface MembershipHistory {
+  latestAcademicYear: number;
+  completeFrom: string;
+  years: (MembershipHistoryPeriod & {
+    academicYear: number;
+    label: string;
+    months: (MembershipHistoryPeriod & { month: string })[];
+  })[];
+}
+export interface MajorDistribution {
+  totalAccounts: number;
+  majors: { major: string; count: number }[];
+}
+
+export async function fetchMembershipHistory(
+  db: DbClient, now: string, range: { firstYear?: number; lastYear?: number } = {},
+): Promise<MembershipHistory> {
+  const { data, error } = await db.rpc("admin_membership_history", {
+    p_now: now, p_first_year: range.firstYear, p_last_year: range.lastYear,
+  });
+  if (error) throw error;
+  return data as unknown as MembershipHistory;
+}
+
+export async function fetchMajorDistribution(db: DbClient): Promise<MajorDistribution> {
+  const { data, error } = await db.rpc("admin_major_distribution");
+  if (error) throw error;
+  return data as unknown as MajorDistribution;
+}

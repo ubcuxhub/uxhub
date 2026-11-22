@@ -69,8 +69,8 @@ const purchasesMocks = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/supabase-helpers/purchases", () => purchasesMocks);
 
-const usersMocks = vi.hoisted(() => ({ updateUserInfoById: vi.fn() }));
-vi.mock("@/lib/supabase-helpers/users", () => usersMocks);
+const grantMocks = vi.hoisted(() => ({ fulfillMembershipGrant: vi.fn() }));
+vi.mock("@/lib/supabase-helpers/membership-history", () => grantMocks);
 
 const appSettingsMocks = vi.hoisted(() => ({
   fetchMembershipTermEndsAt: vi.fn(),
@@ -191,6 +191,7 @@ beforeEach(() => {
   customerMocks.ensureSquareCustomerId.mockResolvedValue("customer-1");
   appSettingsMocks.fetchMembershipTermEndsAt.mockResolvedValue(null);
   policyMocks.isEligibleForMembership.mockReturnValue(true);
+  grantMocks.fulfillMembershipGrant.mockResolvedValue(purchase({ kind: "membership", status: "completed" }));
   expiryMocks.resolveMembershipExpiry.mockReturnValue("2027-06-01T00:00:00.000Z");
   revalidationMocks.revalidatePurchasePaths.mockResolvedValue(undefined);
   confirmationEmailMocks.sendPurchaseConfirmationEmail.mockResolvedValue(undefined);
@@ -491,15 +492,8 @@ describe("membership fulfillment", () => {
     const result = await executeCheckoutForUser(user, membershipInput);
 
     expect(result).toMatchObject({ ok: true, resolution: "completed" });
-    expect(usersMocks.updateUserInfoById).toHaveBeenCalledWith(
-      adminDb,
-      "user-1",
-      {
-        membership_expires_at: "2027-06-01T00:00:00.000Z",
-        membership_pre_ordered_type_id: null,
-        membership_type_id: "membership-type-1",
-        square_customer_id: "customer-1",
-      }
+    expect(grantMocks.fulfillMembershipGrant).toHaveBeenCalledWith(
+      adminDb, "purchase-1", "2027-06-01T00:00:00.000Z",
     );
   });
 
@@ -517,7 +511,7 @@ describe("membership fulfillment", () => {
 
     await executeCheckoutForUser(user, membershipInput);
 
-    expect(usersMocks.updateUserInfoById).not.toHaveBeenCalled();
+    expect(grantMocks.fulfillMembershipGrant).not.toHaveBeenCalled();
     // Still scheduled, so a send that failed on an earlier pass gets retried.
     expect(afterMocks.after).toHaveBeenCalled();
   });
@@ -740,7 +734,7 @@ describe("refund webhooks", () => {
       "payment.membership_refunded",
       expect.objectContaining({ purchaseId: "purchase-1" })
     );
-    expect(usersMocks.updateUserInfoById).not.toHaveBeenCalled();
+    expect(grantMocks.fulfillMembershipGrant).not.toHaveBeenCalled();
   });
 
   it("does nothing on a duplicate delivery", async () => {

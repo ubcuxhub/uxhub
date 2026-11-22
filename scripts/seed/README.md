@@ -398,3 +398,13 @@ The upcoming UXathon includes an HTTPS Staff Volunteer Schedule example. Builder
 reconciliation stores it in `event_staff_volunteer_schedules`; no generic resource
 link or participant response includes it. Events without this fixture clear it
 on reconciliation.
+
+## Membership history fixtures
+
+After local user reconciliation/pruning, the seed resets ledger awards only for
+its fixture profile IDs and reimports their reliably dated fulfilled membership
+purchases. This also undoes awards from purchases made through the UI as those
+fixtures. Monthly summary triggers apply the same deltas. Undated profile
+memberships do not fabricate historical grant dates. `--no-prune` retains awards;
+production seeding never resets membership history. Normal account deletion
+preserves awards. See [metric coverage](../../docs/admin-dashboard-statistics.md#durable-membership-history-and-all-account-majors).

@@ -28,7 +28,7 @@ import {
   recordSquareWebhookEvent,
   updatePurchase,
 } from "@/lib/supabase-helpers/purchases";
-import { updateUserInfoById } from "@/lib/supabase-helpers/users";
+import { fulfillMembershipGrant } from "@/lib/supabase-helpers/membership-history";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { hasAdminAccess } from "@/lib/auth/roles";
 import {
@@ -89,18 +89,10 @@ async function fulfillMembershipPurchase(purchaseId: string) {
     throw new Error("Membership purchase is missing a membership type.");
   }
 
-  const updatedPurchase = await updatePurchase(adminDb, purchase.id, {
-    fulfilled_at: new Date().toISOString(),
-  });
-
   const termEndsAt = await fetchMembershipTermEndsAt(adminDb);
-
-  await updateUserInfoById(adminDb, purchase.user_id, {
-    membership_expires_at: resolveMembershipExpiry(termEndsAt),
-    membership_pre_ordered_type_id: null,
-    membership_type_id: purchase.membership_type_id,
-    square_customer_id: purchase.square_customer_id,
-  });
+  const updatedPurchase = await fulfillMembershipGrant(
+    adminDb, purchase.id, resolveMembershipExpiry(termEndsAt),
+  );
 
   await revalidatePurchasePaths(adminDb, purchase.id);
   return updatedPurchase;
