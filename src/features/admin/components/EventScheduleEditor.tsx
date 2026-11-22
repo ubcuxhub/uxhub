@@ -238,7 +238,7 @@ export function RegistrationBadge({
 
 /**
  * The quick edit of an event's status and registration schedule, shared by
- * the record drawer and the event manager's Overview. Holds the draft, saves
+ * the event manager's Overview (the record drawer shows it read-only). Holds the draft, saves
  * it through `updateEventScheduleAction`, and shows the saved row until the
  * refreshed props arrive. Render it with `EventScheduleSection`; the caller
  * places the Cancel / Save buttons (`cancel`, `save`).
@@ -382,6 +382,45 @@ export function useEventScheduleEditor(loaded: EventRow) {
 
 export type EventScheduleEditor = ReturnType<typeof useEventScheduleEditor>;
 
+/** The event's status and registration schedule as read-only rows. */
+export function EventScheduleFields({ event, now }: { event: EventRow; now: string }) {
+  const registration = registrationWindow(event, new Date(now));
+  return (
+    <>
+      <RecordField
+        label="Status"
+        value={<EventStatusBadge status={event.status} publishAt={event.publish_at} />}
+      />
+      {event.status === "draft" ? (
+        <RecordField
+          label="Publishes"
+          value={formatTimestamp(event.publish_at) ?? "When you set it to Active"}
+        />
+      ) : null}
+      <RecordField label="Starts" value={formatTimestamp(event.starts_at)} />
+      <RecordField label="Ends" value={formatTimestamp(event.ends_at)} />
+      <RecordField
+        label="Registration"
+        value={
+          registration === "not-applicable" ? (
+            "Opens once the event is active"
+          ) : (
+            <RegistrationBadge state={registration} opensAt={event.registration_opens_at} />
+          )
+        }
+      />
+      <RecordField
+        label="Registration opens"
+        value={formatTimestamp(event.registration_opens_at) ?? "As soon as it’s active"}
+      />
+      <RecordField
+        label="Registration closes"
+        value={formatTimestamp(event.registration_closes_at) ?? "No closing date"}
+      />
+    </>
+  );
+}
+
 /**
  * "Status and registration schedule": the event's status and dates with a
  * Change button, or, while editing, the quick edit's fields. Also holds the
@@ -398,7 +437,6 @@ export function EventScheduleSection({
   const ids = useId();
   const { event, draft, editing, saving, update, reportField, momentError } = editor;
   const canceled = event.canceled_at !== null;
-  const registration = registrationWindow(event, new Date(now));
   const publishingNow = draft !== null && event.status === "draft" && draft.status === "active";
   const unpublishingNow = draft !== null && event.status === "active" && draft.status === "draft";
 
@@ -494,38 +532,7 @@ export function EventScheduleSection({
             />
           </fieldset>
         ) : (
-          <>
-            <RecordField
-              label="Status"
-              value={<EventStatusBadge status={event.status} publishAt={event.publish_at} />}
-            />
-            {event.status === "draft" ? (
-              <RecordField
-                label="Publishes"
-                value={formatTimestamp(event.publish_at) ?? "When you set it to Active"}
-              />
-            ) : null}
-            <RecordField label="Starts" value={formatTimestamp(event.starts_at)} />
-            <RecordField label="Ends" value={formatTimestamp(event.ends_at)} />
-            <RecordField
-              label="Registration"
-              value={
-                registration === "not-applicable" ? (
-                  "Opens once the event is active"
-                ) : (
-                  <RegistrationBadge state={registration} opensAt={event.registration_opens_at} />
-                )
-              }
-            />
-            <RecordField
-              label="Registration opens"
-              value={formatTimestamp(event.registration_opens_at) ?? "As soon as it’s active"}
-            />
-            <RecordField
-              label="Registration closes"
-              value={formatTimestamp(event.registration_closes_at) ?? "No closing date"}
-            />
-          </>
+          <EventScheduleFields event={event} now={now} />
         )}
       </RecordSection>
 

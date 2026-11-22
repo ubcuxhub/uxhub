@@ -23,12 +23,7 @@ import { registrationWindow } from "../lib/event-registration-window";
 import { eventManagerHref } from "../lib/event-manager";
 import { EventStatusBadge } from "./EventStatusBadge";
 import { CancelEventDialog } from "./CancelEventDialog";
-import {
-  EventScheduleSection,
-  RegistrationBadge,
-  hasEnded,
-  useEventScheduleEditor,
-} from "./EventScheduleEditor";
+import { EventScheduleFields, RegistrationBadge, hasEnded } from "./EventScheduleEditor";
 import { eventMarketingHref } from "../lib/event-presentation";
 
 export interface AdminEventRecordProps {
@@ -53,8 +48,8 @@ function formatPrice(value: number | null) {
 
 /**
  * An event's admin overview, in the drawer over Manage events: who's
- * coming, the links to run the event, its details, and a quick edit of its
- * status and dates. Expand opens the event manager (its Overview), and "Edit
+ * coming, the links to run the event, its details, and its status and dates
+ * (read-only; change them on Overview). Expand opens the event manager (its Overview), and "Edit
  * event" the builder (`/edit`) for the rest.
  */
 export function AdminEventRecord({
@@ -65,8 +60,7 @@ export function AdminEventRecord({
   publicPages,
 }: AdminEventRecordProps) {
   const router = useRouter();
-  const schedule = useEventScheduleEditor(loaded);
-  const { event, editing } = schedule;
+  const event = loaded;
   const [canceling, setCanceling] = useState(false);
   // Canceled for good, or over: the drawer shows the record but edits nothing.
   const canceled = event.canceled_at !== null;
@@ -103,13 +97,6 @@ export function AdminEventRecord({
         {eventMarketingHref(event, publicPages) && <Button asChild variant="outline" size="sm"><a href={eventMarketingHref(event, publicPages)!} target="_blank" rel="noopener noreferrer"><ExternalLink aria-hidden />View marketing page<span className="sr-only"> (opens in a new tab)</span></a></Button>}
         </>
       }
-      editing={editing}
-      dirty={schedule.dirty}
-      saving={schedule.saving}
-      error={schedule.error}
-      onCancel={schedule.cancel}
-      onSave={() => void schedule.save()}
-      saveLabel="Save schedule"
       details={
         <>
           <RecordSection title="At a glance" kind="content" className="gap-4">
@@ -157,7 +144,21 @@ export function AdminEventRecord({
             </div>
           </RecordSection>
 
-          <EventScheduleSection editor={schedule} now={now} />
+          <RecordSection
+            title="Status and registration schedule"
+            action={
+              canceled ? null : (
+                <Button asChild variant="secondary" size="sm">
+                  <Link href={eventManagerHref(event.id)}>
+                    <Pencil aria-hidden />
+                    Change on Overview
+                  </Link>
+                </Button>
+              )
+            }
+          >
+            <EventScheduleFields event={event} now={now} />
+          </RecordSection>
 
           {canceled ? (
             <RecordSection title="Canceled">
@@ -174,7 +175,6 @@ export function AdminEventRecord({
                   type="button"
                   variant="outline"
                   size="sm"
-                  disabled={editing}
                   onClick={() => setCanceling(true)}
                 >
                   <CalendarX aria-hidden />
@@ -193,8 +193,7 @@ export function AdminEventRecord({
             eventName={event.name}
             open={canceling}
             onOpenChange={setCanceling}
-            onCanceled={(row) => {
-              schedule.showSaved(row);
+            onCanceled={() => {
               setCanceling(false);
               router.refresh();
             }}

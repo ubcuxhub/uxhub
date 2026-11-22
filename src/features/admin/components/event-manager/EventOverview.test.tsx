@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
-import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { EventRow } from "@/lib/supabase/models";
 import { EventOverview, type EventOverviewProps } from "./EventOverview";
@@ -18,7 +18,8 @@ vi.mock("next/link", () => ({
     </a>
   ),
 }));
-vi.mock("../../event-overview-actions", () => ({ updateEventScheduleAction: vi.fn() }));
+const updateEventScheduleAction = vi.hoisted(() => vi.fn());
+vi.mock("../../event-overview-actions", () => ({ updateEventScheduleAction }));
 
 const event = {
   id: EVENT_ID,
@@ -62,6 +63,10 @@ beforeAll(() => {
     unobserve() {}
     disconnect() {}
   };
+});
+
+beforeEach(() => {
+  updateEventScheduleAction.mockReset();
 });
 
 afterEach(() => {
@@ -116,5 +121,26 @@ describe("EventOverview", () => {
     expect(screen.getByRole("button", { name: "Save schedule" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("button", { name: "Save schedule" })).toBeNull();
+  });
+
+  it("saves the schedule from the quick edit", async () => {
+    updateEventScheduleAction.mockResolvedValue({ ok: true, event });
+    renderOverview();
+    fireEvent.click(screen.getByRole("button", { name: "Change status and registration schedule" }));
+
+    const date = screen.getByLabelText("Registration opening date");
+    fireEvent.focus(date);
+    fireEvent.change(date, { target: { value: "Nov 10, 2026" } });
+    fireEvent.blur(date);
+    const time = screen.getByLabelText("Registration opening time");
+    fireEvent.focus(time);
+    fireEvent.change(time, { target: { value: "9:00 AM" } });
+    fireEvent.blur(time);
+    fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
+
+    await waitFor(() => expect(updateEventScheduleAction).toHaveBeenCalled());
+    expect(updateEventScheduleAction.mock.calls[0][1]).toMatchObject({
+      registration_opens_at: "2026-11-10T16:00:00.000Z",
+    });
   });
 });

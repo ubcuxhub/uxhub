@@ -108,10 +108,28 @@ function EventRecord({ event }: { event: DemoEvent }) {
         </Button>
       }
       details={
-        <RecordSection title="Venue">
-          <RecordField label="Location" value={event.location} />
-          <RecordField label="Capacity" value={event.capacity} />
-        </RecordSection>
+        <>
+          {/* Read-only here: the status and schedule are changed on the manager's Overview. */}
+          <RecordSection
+            title="Status and registration schedule"
+            action={
+              <Button asChild variant="secondary" size="sm">
+                <a href={`${PATH}?open=page`}>
+                  <Pencil aria-hidden /> Change on Overview
+                </a>
+              </Button>
+            }
+          >
+            <RecordField label="Status" value={<Badge variant="success">Published</Badge>} />
+            <RecordField label="Starts" value={event.when} />
+            <RecordField label="Registration opens" value="As soon as it’s active" />
+            <RecordField label="Registration closes" value="No closing date" />
+          </RecordSection>
+          <RecordSection title="Venue">
+            <RecordField label="Location" value={event.location} />
+            <RecordField label="Capacity" value={event.capacity} />
+          </RecordSection>
+        </>
       }
     />
   );
