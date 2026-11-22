@@ -142,8 +142,8 @@ function FeaturedEvent() {
       status={{ status: "register_by", date: "Jan 20" }}
       image={{ src: ART_BLUE }}
       // A 360px card is phone-sized, but the viewport is not: keep the
-      // thumbnail stacked above the text as it is on phones.
-      className={`sm:flex-col-reverse sm:items-stretch sm:gap-4 sm:p-4 [&_[data-slot=event-card-thumbnail]]:sm:h-35 [&_[data-slot=event-card-thumbnail]]:sm:w-full ${LIFT}`}
+      // phone look, a small square thumbnail beside the text.
+      className={`sm:items-start sm:gap-4 sm:p-4 [&_[data-slot=event-card-thumbnail]]:sm:size-22 [&_[data-slot=event-card-thumbnail]]:sm:rounded-2xl ${LIFT}`}
     />
   );
 }

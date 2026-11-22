@@ -114,6 +114,24 @@ describe("EventCard", () => {
     expect(container.querySelector("[data-slot=event-card-thumbnail] svg")).toBeTruthy();
   });
 
+  it("keeps the thumbnail a square beside the text on phones", () => {
+    const { container, rerender } = render(
+      <EventCard title="UXathon" href="/x" when="Sat, Jan 9" image={{ src: "/a.png" }} />,
+    );
+    const card = container.querySelector("[data-slot=event-card]") as HTMLElement;
+    const thumb = container.querySelector("[data-slot=event-card-thumbnail]") as HTMLElement;
+    // Square at narrow width (size-*), never a wide strip, and the row never
+    // stacks (no flex-col) so the thumbnail stays beside the text.
+    expect(thumb.className).toMatch(/(^|\s)size-22(\s|$)/);
+    expect(thumb.className).not.toMatch(/(^|\s)(h-|w-full)/);
+    expect(card.className).not.toMatch(/flex-col/);
+
+    // The no-image placeholder is the same square.
+    rerender(<EventCard title="UXathon" href="/x" when="Sat, Jan 9" />);
+    const fallback = container.querySelector("[data-slot=event-card-thumbnail]") as HTMLElement;
+    expect(fallback.className).toMatch(/(^|\s)size-22(\s|$)/);
+  });
+
   it("falls back to the calendar icon when the image fails to load", () => {
     const { container, rerender } = render(
       <EventCard title="UXathon" href="/x" when="Sat, Jan 9" image={{ src: "/gone.png" }} />,
