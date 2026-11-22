@@ -10,6 +10,7 @@ import { checkInPath } from "../../lib/item-check-in";
 import type { EventManagerTabLink } from "../../lib/event-manager";
 import { eventMarketingHref } from "../../lib/event-presentation";
 import { EventStatusBadge } from "../EventStatusBadge";
+import { RecordThumbnail } from "@/components/shared/RecordDrawer";
 
 /** The column every manager tab's `PageContainer` uses, so the header lines up with them. */
 export const EVENT_MANAGER_COLUMN = "mx-auto w-full max-w-6xl px-5 sm:px-6 lg:px-16";
@@ -24,7 +25,7 @@ export interface EventManagerHeaderProps {
 }
 
 /**
- * The event manager's header: the event's name and status, its actions (the
+ * The event manager's header: the event's icon, name and status, its actions (the
  * public page, the builder, the scanner), and the tabs. It sits under the
  * drawer's top bar (`RecordPage` in the manager's layout), which is the way
  * back to the list. Each tab's page renders below it in its own
@@ -38,14 +39,17 @@ export function EventManagerHeader({ event, tabs, publicPages, pathname }: Event
 
   return (
     <header className={`${EVENT_MANAGER_COLUMN} flex flex-col gap-6 pt-8 sm:pt-10`}>
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-        <div className="flex min-w-0 flex-col gap-2">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-            <h1 className="min-w-0 text-h1 tracking-tight break-words">{event.name}</h1>
-            <EventStatusBadge status={event.status} publishAt={event.publish_at} />
-            {event.canceled_at ? <StatusBadge status="canceled" /> : null}
+      <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-start lg:justify-between">
+        <div className="flex min-w-0 items-center gap-4 lg:min-w-[min(100%,24rem)]">
+          <RecordThumbnail src={event.image_url} className="size-16 sm:size-20" />
+          <div className="flex min-w-0 flex-col gap-2">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <h1 className="min-w-0 text-h1 tracking-tight break-words">{event.name}</h1>
+              <EventStatusBadge status={event.status} publishAt={event.publish_at} />
+              {event.canceled_at ? <StatusBadge status="canceled" /> : null}
+            </div>
+            {subtitle ? <p className="text-muted-foreground">{subtitle}</p> : null}
           </div>
-          {subtitle ? <p className="text-muted-foreground">{subtitle}</p> : null}
         </div>
         <div className="flex shrink-0 flex-wrap gap-2">
           {liveHref ? (

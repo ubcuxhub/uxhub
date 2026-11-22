@@ -71,6 +71,7 @@ const EVENTS: DemoEvent[] = [
 const MANAGER_EVENT = {
   id: "e1",
   name: EVENTS[0].name,
+  image_url: EVENTS[0].image,
   status: "active",
   publish_at: null,
   canceled_at: null,
