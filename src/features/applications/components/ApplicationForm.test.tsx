@@ -217,6 +217,58 @@ describe("ApplicationForm autosave", () => {
   });
 });
 
+describe("ApplicationForm after a profile edit", () => {
+  it("shows the new About you and keeps the answers and the save in progress", async () => {
+    const props: ApplicationFormProps = {
+      event: { id: "event-1", slug: "uxathon", name: "UXathon" },
+      status: "draft",
+      window: "open",
+      opensAt: null,
+      closesAt: null,
+      submittedAt: null,
+      profile: { name: "Ada", email: "ada@example.com", studentNumber: "1", year: "3rd year" },
+      questions: QUESTIONS,
+      initialAnswers: { why: "", year: "" },
+    };
+    const { rerender } = render(<ApplicationForm {...props} />);
+    const textarea = screen.getByRole("textbox") as HTMLTextAreaElement;
+    fireEvent.change(textarea, { target: { value: "Because" } });
+    fireEvent.click(screen.getByRole("radio", { name: "2" }));
+    await tick();
+    expect(actions.saveApplicationDraft).toHaveBeenLastCalledWith("event-1", {
+      why: "Because",
+      year: "2",
+    });
+    fireEvent.change(textarea, { target: { value: "Because I" } });
+
+    // What `router.refresh()` does once Settings closes: the page renders
+    // again with the new profile, and with answers read before the last edit.
+    rerender(
+      <ApplicationForm
+        {...props}
+        profile={{ name: "Ada Lovelace", email: "ada@example.com", studentNumber: "31415926", year: "4th year" }}
+        initialAnswers={{ why: "", year: "" }}
+      />
+    );
+
+    expect(screen.getByText("Ada Lovelace")).toBeTruthy();
+    expect(screen.getByText("31415926")).toBeTruthy();
+    expect(screen.getByText("4th year")).toBeTruthy();
+    expect(screen.queryByText("3rd year")).toBeNull();
+    expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("Because I");
+    expect((screen.getByRole("radio", { name: "2" }) as HTMLElement).getAttribute("aria-checked")).toBe(
+      "true"
+    );
+    expect(screen.getByText("Saving…")).toBeTruthy();
+
+    // The pending edit still saves, alone: the rest already went.
+    await tick(1000);
+    expect(actions.saveApplicationDraft).toHaveBeenCalledTimes(2);
+    expect(actions.saveApplicationDraft).toHaveBeenLastCalledWith("event-1", { why: "Because I" });
+    expect(screen.getByText(/^Saved/)).toBeTruthy();
+  });
+});
+
 describe("ApplicationForm layout", () => {
   it("offers no way to delete the application", () => {
     renderForm();

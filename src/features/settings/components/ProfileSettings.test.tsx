@@ -301,6 +301,48 @@ describe("ProfileEditor autosave", () => {
   });
 });
 
+describe("ProfileEditor onSaved", () => {
+  function renderWithOnSaved(onSaved: () => void) {
+    return render(
+      <ProfileEditor
+        user={MEMBER}
+        membershipTermEndsAt={null}
+        refreshUser={refreshUser as () => Promise<void>}
+        onSaved={onSaved}
+        client={client}
+        timing={{ delayMs: 5, retryDelaysMs: [] }}
+      />,
+    );
+  }
+
+  it("reports a save the server accepted", async () => {
+    const onSaved = vi.fn();
+    renderWithOnSaved(onSaved);
+    type("Phone", "604 555 0134");
+    await waitFor(() => expect(section("About you").getByText(/Saved/)).toBeTruthy());
+    expect(onSaved).toHaveBeenCalledTimes(1);
+  });
+
+  it("doesn't report a failed save", async () => {
+    client.saveAbout.mockRejectedValueOnce(new Error("offline"));
+    const onSaved = vi.fn();
+    renderWithOnSaved(onSaved);
+    type("Pronouns", "they/them");
+    await section("About you").findByRole("button", { name: "Retry" });
+    expect(onSaved).not.toHaveBeenCalled();
+  });
+
+  it("doesn't report a change put back before it saved", async () => {
+    const onSaved = vi.fn();
+    renderWithOnSaved(onSaved);
+    type("Pronouns", "they/them");
+    type("Pronouns", "she/her");
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    expect(client.saveAbout).not.toHaveBeenCalled();
+    expect(onSaved).not.toHaveBeenCalled();
+  });
+});
+
 describe("ProfileEditor photo", () => {
   it("opens the chooser in place, saves a picked icon, and Done returns focus", async () => {
     renderEditor(NEW_MEMBER);
