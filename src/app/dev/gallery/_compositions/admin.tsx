@@ -60,7 +60,7 @@ function AdminStats() {
       />
       <StatCard
         className={LIFT}
-        label="Show-up rate"
+        label="Checked in"
         kind="rate"
         count={96}
         total={128}

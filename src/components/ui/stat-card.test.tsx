@@ -8,39 +8,41 @@ import { StatCard } from "./stat-card";
 afterEach(cleanup);
 
 describe("StatCard", () => {
-  it("rounds rates and always shows their count", () => {
-    render(
-      <StatCard
-        label="Registration rate"
-        kind="rate"
-        count={412}
-        total={528}
-        noun="registrants"
-      />,
+  it("shows a rate as a fraction, not a percentage", () => {
+    const { container } = render(
+      <StatCard label="Registered" kind="rate" count={412} total={528} noun="seats" />,
     );
 
-    expect(screen.getByText("78")).toBeTruthy();
-    expect(screen.getByText("412 of 528 registrants")).toBeTruthy();
+    const card = screen.getByRole("group", { name: "Registered" });
+    expect(card.textContent).toContain("412 / 528 seats");
+    expect(card.textContent).not.toContain("%");
+    expect(screen.getByText("412 of 528 seats")).toBeTruthy();
+    expect(container.querySelector("p.text-h1")?.textContent).toBe("412 / 528 seats");
   });
 
-  it("explains the count behind a rate", () => {
-    render(<StatCard label="Seats held" kind="rate" count={3} total={40} noun="seats" detail="2 tickets, 1 offer" />);
-    expect(screen.getByText("3 of 40 seats · 2 tickets, 1 offer")).toBeTruthy();
+  it("shows only the detail under a rate", () => {
+    render(<StatCard label="Seats held" kind="rate" count={3} total={40} noun="seats" detail="2 going, 1 offer out" />);
+    expect(screen.getByText("2 going, 1 offer out")).toBeTruthy();
+    expect(screen.queryByText(/ · /)).toBeNull();
   });
 
-  it("uses the insufficient state when a rate has no total", () => {
-    render(
-      <StatCard
-        label="Registration rate"
-        kind="rate"
-        count={0}
-        total={0}
-        noun="registrants"
-      />,
-    );
+  it("formats large numbers and shows a count above the total as is", () => {
+    render(<StatCard label="Registered" kind="rate" count={1234} total={1000} noun="seats" />);
+    expect(screen.getByRole("group", { name: "Registered" }).textContent).toContain("1,234 / 1,000 seats");
+  });
 
+  it("shows 0 / 0 when the total is 0, without dividing", () => {
+    render(<StatCard label="Registered" kind="rate" count={0} total={0} noun="seats" />);
+    const card = screen.getByRole("group", { name: "Registered" });
+    expect(card.textContent).toContain("0 / 0 seats");
+    expect(card.textContent).not.toContain("NaN");
+    expect(screen.queryByText("Not enough data")).toBeNull();
+  });
+
+  it("uses the insufficient state with its reason", () => {
+    render(<StatCard label="Sponsor return" kind="insufficient" reason="Fewer than 3 sponsors." />);
     expect(screen.getByText("Not enough data")).toBeTruthy();
-    expect(screen.queryByText("0%")).toBeNull();
+    expect(screen.getByText("Fewer than 3 sponsors.")).toBeTruthy();
   });
 
   it("keeps change styling neutral and gives screen readers the direction", () => {

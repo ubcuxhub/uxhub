@@ -180,7 +180,9 @@ describe("ReviewApplicationsClient", () => {
   it("counts held seats: tickets and offers out", () => {
     const { unmount } = renderList();
     // Without seat counts, the list's own Going and Accepted stand in.
-    expect(screen.getByText("2 of 60 seats · 1 going, 1 offer out")).toBeTruthy();
+    const first = screen.getByRole("group", { name: "Seats held" });
+    expect(first.textContent).toContain("2 / 60 seats");
+    expect(within(first).getByText("1 going, 1 offer out")).toBeTruthy();
     unmount();
     render(
       <ReviewApplicationsClient
@@ -192,7 +194,8 @@ describe("ReviewApplicationsClient", () => {
       />,
     );
     const card = screen.getByRole("group", { name: "Seats held" });
-    expect(within(card).getByText("52 of 60 seats · 40 going, 12 offers out")).toBeTruthy();
+    expect(card.textContent).toContain("52 / 60 seats");
+    expect(within(card).getByText("40 going, 12 offers out")).toBeTruthy();
   });
 
   it("says so when nobody has applied", () => {
