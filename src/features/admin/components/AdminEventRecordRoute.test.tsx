@@ -98,7 +98,7 @@ describe("AdminEventRecordRoute", () => {
     expect(element.type.name).toBe("AdminEventRecord");
     expect(element.props).toMatchObject({
       event: { id: EVENT_ID },
-      seats: { tickets: 12, seatsLeft: 27 },
+      seats: { tickets: 12, heldOffers: 1, seatsLeft: 27 },
       checkedIn: 1,
       // No applications on an event that doesn't take them.
       applications: null,
@@ -124,7 +124,7 @@ describe("AdminEventRecordRoute", () => {
 
     const element = await route(EVENT_ID);
 
-    expect(element.props.seats).toEqual({ tickets: 0, seatsLeft: 40 });
+    expect(element.props.seats).toEqual({ tickets: 0, heldOffers: 0, seatsLeft: 40 });
   });
 
   it("keeps no seats left for an event without a capacity", async () => {
@@ -133,7 +133,7 @@ describe("AdminEventRecordRoute", () => {
       new Map([[EVENT_ID, { tickets: 12, heldOffers: 0, seatsLeft: null }]])
     );
 
-    expect((await route(EVENT_ID)).props.seats).toEqual({ tickets: 12, seatsLeft: null });
+    expect((await route(EVENT_ID)).props.seats).toEqual({ tickets: 12, heldOffers: 0, seatsLeft: null });
   });
 
   it("shows not found in the drawer for a missing event", async () => {

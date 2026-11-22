@@ -79,18 +79,35 @@ function AdminStats() {
   );
 }
 
-/** The event manager's Overview and the event drawer share this card. */
+/**
+ * The event manager's Overview and the event drawer share this card. The
+ * second is an event whose first acceptance hasn't bought a ticket yet: no
+ * one going, one seat held by the offer.
+ */
 function EventRegistrations() {
   return (
-    <EventRegistrationsCard
-      className={LIFT}
-      eventId="uxathon"
-      capacity={120}
-      tickets={96}
-      seatsLeft={14}
-      checkedIn={41}
-      applications={{ submitted: 12, accepted: 106, waitlisted: 18, rejected: 31, total: 167 }}
-    />
+    <div className="flex flex-col gap-3">
+      <EventRegistrationsCard
+        className={LIFT}
+        eventId="uxathon"
+        capacity={120}
+        tickets={96}
+        heldOffers={10}
+        seatsLeft={14}
+        checkedIn={41}
+        applications={{ submitted: 12, accepted: 106, waitlisted: 18, rejected: 31, total: 167 }}
+      />
+      <EventRegistrationsCard
+        className={LIFT}
+        eventId="design-jam"
+        capacity={100}
+        tickets={0}
+        heldOffers={1}
+        seatsLeft={99}
+        checkedIn={0}
+        applications={{ submitted: 5, accepted: 1, waitlisted: 0, rejected: 0, total: 6 }}
+      />
+    </div>
   );
 }
 

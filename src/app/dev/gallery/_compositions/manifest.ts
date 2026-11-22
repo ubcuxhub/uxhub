@@ -92,7 +92,7 @@ export const MANIFEST = [
   {
     id: "event-registrations",
     column: 3,
-    uses: ["card", "detail-row", "separator"],
+    uses: ["card", "detail-row"],
   },
   {
     id: "attendee-table",

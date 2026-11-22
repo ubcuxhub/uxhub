@@ -18,6 +18,7 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { formatEventDateTimeRange, formatTimestamp } from "@/lib/date";
 import type { EventRow } from "@/lib/supabase/models";
 import type { EventApplicationStatusCounts } from "@/lib/supabase-helpers/event-applications";
+import type { EventSeatCount } from "@/lib/supabase-helpers/event-tickets";
 import { registrationWindow } from "../lib/event-registration-window";
 import { eventManagerHref } from "../lib/event-manager";
 import { EventRegistrationsCard } from "./EventRegistrationsCard";
@@ -28,8 +29,8 @@ import { eventMarketingHref } from "../lib/event-presentation";
 
 export interface AdminEventRecordProps {
   event: EventRow;
-  /** Tickets, and the seats nobody holds (`null` without a capacity). */
-  seats: { tickets: number; seatsLeft: number | null };
+  /** Tickets, offers out, and the seats nobody holds (`null` without a capacity). */
+  seats: EventSeatCount;
   /** Ticket holders checked in to at least one agenda item. */
   checkedIn: number;
   /** Applications by status, for an event that takes them; null otherwise. */
@@ -109,6 +110,7 @@ export function AdminEventRecord({
               eventId={event.id}
               capacity={event.max_capacity}
               tickets={seats.tickets}
+              heldOffers={seats.heldOffers}
               seatsLeft={seats.seatsLeft}
               checkedIn={checkedIn}
               applications={event.requires_application ? applications : null}

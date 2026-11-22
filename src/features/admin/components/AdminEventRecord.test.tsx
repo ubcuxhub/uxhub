@@ -85,7 +85,7 @@ function renderRecord(props: Partial<AdminEventRecordProps> = {}) {
     <RecordFrame listHref="/admin/events">
       <AdminEventRecord
         event={event()}
-        seats={{ tickets: 10, seatsLeft: 30 }}
+        seats={{ tickets: 10, heldOffers: 0, seatsLeft: 30 }}
         checkedIn={2}
         applications={counts}
         now="2026-11-05T20:00:00.000Z"
@@ -191,7 +191,7 @@ describe("AdminEventRecord overview", () => {
   });
 
   it("reads an event without a capacity as unlimited", () => {
-    renderRecord({ event: event({ max_capacity: null }), seats: { tickets: 10, seatsLeft: null } });
+    renderRecord({ event: event({ max_capacity: null }), seats: { tickets: 10, heldOffers: 0, seatsLeft: null } });
     const registrations = screen.getByRole("group", { name: "Registrations" });
     expect(within(registrations).getByText("No capacity limit")).toBeTruthy();
     expect(registrations.textContent).not.toContain("/");

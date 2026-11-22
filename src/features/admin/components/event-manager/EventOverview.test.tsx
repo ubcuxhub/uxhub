@@ -44,7 +44,7 @@ function renderOverview(props: Partial<EventOverviewProps> = {}) {
   return render(
     <EventOverview
       event={event}
-      seats={{ tickets: 12, seatsLeft: 26 }}
+      seats={{ tickets: 12, heldOffers: 2, seatsLeft: 26 }}
       checkedIn={3}
       applications={{ submitted: 4, accepted: 6, waitlisted: 2, rejected: 3, total: 15 }}
       registrations={[

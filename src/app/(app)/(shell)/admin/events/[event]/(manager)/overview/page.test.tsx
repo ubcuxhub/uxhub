@@ -53,7 +53,7 @@ beforeEach(() => {
     registration_opens_at: null,
     registration_closes_at: null,
   });
-  mocks.seats.mockResolvedValue(new Map([["event-id", { tickets: 2, heldOffers: 0, seatsLeft: 38 }]]));
+  mocks.seats.mockResolvedValue(new Map([["event-id", { tickets: 2, heldOffers: 1, seatsLeft: 37 }]]));
   mocks.attendees.mockResolvedValue([
     { id: "t2", user_name: "Ada Lovelace" },
     { id: "t1", user_name: "Grace Hopper" },
@@ -81,7 +81,7 @@ it("authorizes before any fetch and resolves a slug to the Overview's own path",
 it("passes registrations newest first and counts each checked-in holder once", async () => {
   const result = await page();
   expect(result.props).toMatchObject({
-    seats: { tickets: 2, seatsLeft: 38 },
+    seats: { tickets: 2, heldOffers: 1, seatsLeft: 37 },
     checkedIn: 1,
     registrations: [
       { id: "t2", name: "Ada Lovelace" },

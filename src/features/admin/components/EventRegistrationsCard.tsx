@@ -5,7 +5,6 @@ import Link from "next/link";
 
 import { DetailList, DetailRow } from "@/components/shared/DetailRow";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import type { EventApplicationStatusCounts } from "@/lib/supabase-helpers/event-applications";
 import { cn } from "@/lib/utils";
 import type { ApplicationReviewState } from "../lib/application-review";
@@ -18,8 +17,13 @@ export interface EventRegistrationsCardProps {
   /** Tickets issued. */
   tickets: number;
   /**
-   * Seats nobody holds, tickets and open offers taken off (`fetchEventSeatCounts`);
-   * null without a capacity.
+   * Offers out: accepted applications whose offer hasn't lapsed and that have
+   * no ticket yet (`fetchEventSeatCounts`). Each holds a seat.
+   */
+  heldOffers: number;
+  /**
+   * Seats nobody holds, tickets and offers out taken off
+   * (`fetchEventSeatCounts`); null without a capacity.
    */
   seatsLeft: number | null;
   /** Ticket holders checked in to at least one agenda item. */
@@ -34,6 +38,55 @@ const plural = (value: number, one: string, many: string) =>
 
 // A label on the left, the number on the right, at every width.
 const ROW = "grid-cols-[1fr_auto] sm:grid-cols-[1fr_auto]";
+
+/** `part` of `whole` as a whole percentage, 0 to 100. */
+const percentOf = (part: number, whole: number) =>
+  whole > 0 ? Math.min(100, Math.max(0, Math.round((part / whole) * 100))) : 0;
+
+/**
+ * Seats taken against capacity: tickets solid, offers out a lighter band
+ * straight after them, so the filled length is what "spots left" is left of.
+ * Each segment that counts anything shows at least a dot, so a single offer
+ * on a big event is still visible. The held band tucks its rounded start
+ * under the tickets' rounded end.
+ */
+function SeatBar({
+  capacity,
+  tickets,
+  heldOffers,
+}: {
+  capacity: number;
+  tickets: number;
+  heldOffers: number;
+}) {
+  const ticketsWidth = percentOf(tickets, capacity);
+  // What the offers add on top of the tickets, capped at the capacity.
+  const heldWidth = percentOf(tickets + heldOffers, capacity) - ticketsWidth;
+  const showTickets = tickets > 0;
+  const showHeld = heldOffers > 0 && ticketsWidth < 100;
+  return (
+    <div aria-hidden className="flex h-2 overflow-hidden rounded-full bg-muted">
+      {showTickets ? (
+        <div
+          data-segment="tickets"
+          className="relative min-w-2 shrink-0 rounded-full bg-primary"
+          style={{ width: `${ticketsWidth}%` }}
+        />
+      ) : null}
+      {showHeld ? (
+        <div
+          data-segment="held"
+          className={cn(
+            // Stronger on dark, where the blue sits close to the track.
+            "shrink-0 rounded-full bg-primary/30 dark:bg-primary/50",
+            showTickets ? "-ml-2 min-w-4" : "min-w-2"
+          )}
+          style={{ width: showTickets ? `calc(${heldWidth}% + 0.5rem)` : `${heldWidth}%` }}
+        />
+      ) : null}
+    </div>
+  );
+}
 
 /** One application row: its count links to the review list on those chips. */
 const APPLICATION_ROWS: readonly {
@@ -73,8 +126,9 @@ function ApplicationsSection({
 }) {
   const labelId = useId();
   return (
-    <div role="group" aria-labelledby={labelId} className="flex flex-col gap-1">
-      <div className="flex items-baseline justify-between gap-4">
+    <div role="group" aria-labelledby={labelId} className="flex flex-col">
+      {/* A header row on the rows' own rhythm: 12px to its rule, as theirs. */}
+      <div className="flex items-baseline justify-between gap-4 border-b border-border-subtle pb-3">
         <p id={labelId} className="text-body-medium">
           Applications
         </p>
@@ -100,14 +154,16 @@ function ApplicationsSection({
 }
 
 /**
- * An event's registration numbers: tickets against capacity, who's going and
- * checked in, and, for an event that takes applications, where they stand.
- * The event manager's Overview and the event drawer both show it.
+ * An event's registration numbers: tickets and offers out against capacity,
+ * who's going, holding an offer and checked in, and, for an event that takes
+ * applications, where they stand. The event manager's Overview and the event
+ * drawer both show it.
  */
 export function EventRegistrationsCard({
   eventId,
   capacity,
   tickets,
+  heldOffers,
   seatsLeft,
   checkedIn,
   applications,
@@ -115,8 +171,10 @@ export function EventRegistrationsCard({
 }: EventRegistrationsCardProps) {
   const labelId = useId();
   const capped = capacity != null;
-  const percent = capped && capacity > 0 ? Math.min(100, Math.round((tickets / capacity) * 100)) : 0;
-  const left = capped ? Math.max(0, seatsLeft ?? capacity - tickets) : null;
+  const left = capped ? Math.max(0, seatsLeft ?? capacity - tickets - heldOffers) : null;
+  // Offers come from applications: the row shows on every event that takes
+  // them (0 included), and on any other that still has one out.
+  const showOffers = applications != null || heldOffers > 0;
 
   return (
     <Card role="group" aria-labelledby={labelId} className={cn("gap-4", className)}>
@@ -138,24 +196,26 @@ export function EventRegistrationsCard({
             {left === null ? "No capacity limit" : `${plural(left, "spot", "spots")} left`}
           </p>
         </div>
-        {capped ? (
-          <div aria-hidden className="h-2 overflow-hidden rounded-full bg-muted">
-            <div className="h-full rounded-full bg-primary" style={{ width: `${percent}%` }} />
-          </div>
-        ) : null}
+        {capped ? <SeatBar capacity={capacity} tickets={tickets} heldOffers={heldOffers} /> : null}
         <DetailList>
           <DetailRow label="Going" className={ROW}>
             <span className="tabular-nums">{tickets}</span>
           </DetailRow>
+          {showOffers ? (
+            <DetailRow label="Offers out" className={ROW}>
+              <span className="tabular-nums">{heldOffers}</span>
+            </DetailRow>
+          ) : null}
           <DetailRow label="Checked in" className={cn(ROW, "border-b-0 pb-0")}>
             <span className="tabular-nums">{checkedIn}</span>
           </DetailRow>
         </DetailList>
         {applications ? (
-          <>
-            <Separator />
+          // A rule with more room either side than a row gets (24px against
+          // 12px), so the break reads as a new section, not one more row.
+          <div className="mt-2 border-t border-border-subtle pt-6">
             <ApplicationsSection eventId={eventId} counts={applications} />
-          </>
+          </div>
         ) : null}
       </CardContent>
     </Card>

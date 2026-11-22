@@ -53,6 +53,7 @@ export default async function EventOverviewPage({
       event={event}
       seats={{
         tickets: seats?.tickets ?? 0,
+        heldOffers: seats?.heldOffers ?? 0,
         seatsLeft: seats?.seatsLeft ?? event.max_capacity,
       }}
       checkedIn={countCheckedInTickets(

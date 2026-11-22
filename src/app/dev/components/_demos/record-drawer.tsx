@@ -67,11 +67,11 @@ interface DemoEvent {
 
 const EVENTS: DemoEvent[] = [
   { id: "e1", name: "Portfolio Night", when: "Thursday, October 9, 2026 · 6:00 – 9:00 PM", image: "/about-us-1.png", location: "AMS Nest, Room 2306", capacity: "80",
-    // Takes applications: the card breaks them down.
-    registrations: { capacity: 80, tickets: 52, seatsLeft: 22, checkedIn: 0, applications: { submitted: 3, accepted: 58, waitlisted: 9, rejected: 14, total: 84 } } },
+    // Takes applications: the card breaks them down. 6 offers out hold seats.
+    registrations: { capacity: 80, tickets: 52, heldOffers: 6, seatsLeft: 22, checkedIn: 0, applications: { submitted: 3, accepted: 58, waitlisted: 9, rejected: 14, total: 84 } } },
   { id: "e2", name: "Design Systems Workshop with a Very Long Name for Wrapping", when: "Saturday, November 14, 2026 · 1:00 – 4:00 PM", image: null, location: "Hugh Dempster Pavilion 110", capacity: "No limit",
     // Open registration with no capacity: a count, no bar.
-    registrations: { capacity: null, tickets: 17, seatsLeft: null, checkedIn: 0 } },
+    registrations: { capacity: null, tickets: 17, heldOffers: 0, seatsLeft: null, checkedIn: 0 } },
 ];
 
 /** The first event, as the manager's header reads it. */
