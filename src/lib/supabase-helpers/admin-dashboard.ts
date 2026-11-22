@@ -2,41 +2,6 @@ import type { DbClient } from "./types";
 import { TABLES } from "./tables";
 import type { EventRow } from "@/lib/supabase/models";
 
-export interface MembershipAnalytics {
-  activeMembers: number;
-  buyersLast30Days: number;
-  tiers: { id: string; name: string; count: number }[];
-}
-
-export interface EventAnalyticsRow {
-  id: string;
-  name: string;
-  startsAt: string;
-  registrations: number;
-  attendees: number;
-}
-
-export interface EventAnalytics {
-  events: EventAnalyticsRow[];
-  currentEvent: { id: string; name: string; registrations: number } | null;
-  schoolYearLabel: string;
-  uniqueParticipants: number;
-}
-
-export async function fetchMembershipAnalytics(db: DbClient, now: string): Promise<MembershipAnalytics> {
-  const { data, error } = await db.rpc("admin_membership_analytics", { p_now: now });
-  if (error) throw error;
-  // These JSON contracts are owned by the matching migration and exercised
-  // against Postgres in the integration suite. RPC Json cannot express them.
-  return data as unknown as MembershipAnalytics;
-}
-
-export async function fetchEventAnalytics(db: DbClient, now: string): Promise<EventAnalytics> {
-  const { data, error } = await db.rpc("admin_event_analytics", { p_now: now });
-  if (error) throw error;
-  return data as unknown as EventAnalytics;
-}
-
 export type DashboardEvent = Pick<EventRow,
   "id" | "name" | "slug" | "image_url" | "short_description" |
   "starts_at" | "location_building" | "location_room" | "location_address_url" | "regular_price" | "member_price"
@@ -96,4 +61,11 @@ export async function fetchMajorDistribution(db: DbClient): Promise<MajorDistrib
   const { data, error } = await db.rpc("admin_major_distribution");
   if (error) throw error;
   return data as unknown as MajorDistribution;
+}
+
+/** Unique qualifying members awarded in the inclusive [now - 720 hours, now] window. */
+export async function fetchRecentMembershipAdditions(db: DbClient, now: string): Promise<MembershipHistoryPeriod> {
+  const { data, error } = await db.rpc("admin_recent_membership_additions", { p_now: now });
+  if (error) throw error;
+  return data as unknown as MembershipHistoryPeriod;
 }

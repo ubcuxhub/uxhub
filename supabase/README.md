@@ -748,6 +748,10 @@ combines cancellation access with schedule synchronization and service-role gran
 ## Membership history
 
 See [dashboard metric and coverage contracts](../docs/admin-dashboard-statistics.md#durable-membership-history-and-all-account-majors).
+The admin/manager-only `admin_recent_membership_additions(p_now)` aggregate
+counts distinct members with first-award timestamps in the inclusive rolling
+720-hour window ending at the server cutoff; it never exposes ledger rows or
+changes monthly/yearly calculations.
 Private durable awards survive account/purchase deletion. Monthly summaries are
 transactionally derived from that ledger. `rebuild_membership_history()` is a
 service-only, idempotent reliable-purchase import and summary reconciliation;

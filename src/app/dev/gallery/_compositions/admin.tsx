@@ -1,5 +1,7 @@
 "use client";
 
+import { DashboardAreaOfStudy } from "@/features/admin/components/dashboard/DashboardAreaOfStudy";
+import { DashboardClubMembers } from "@/features/admin/components/dashboard/DashboardClubMembers";
 import { useState } from "react";
 import { Download, Eye, ScanLine } from "lucide-react";
 
@@ -75,6 +77,19 @@ function AdminStats() {
       <StatCard className={LIFT} label="Revenue" kind="loading" />
     </div>
   );
+}
+
+function ReportingStatistics() {
+  return <div className="space-y-5">
+    <DashboardAreaOfStudy data={{ totalAccounts: 200, majors: [{ major: "Cognitive Systems", count: 120 }, { major: "Unknown", count: 80 }] }} />
+    <DashboardClubMembers recentAdditions={{ count: 11, coverage: "complete" }} data={{
+      latestAcademicYear: 2026, completeFrom: "2025-09-01T07:00:00Z",
+      years: [2025, 2026].map((year) => ({
+        academicYear: year, label: `${year}–${year + 1}`, count: year === 2026 ? 11 : 16, coverage: "complete",
+        months: Array.from({ length: 8 }, (_, index) => ({ month: new Date(Date.UTC(year, 8 + index, 1)).toISOString().slice(0, 10), count: index > 2 && year === 2026 ? null : index < 2 ? 5 : 1, coverage: index > 2 && year === 2026 ? "future" : "complete" })),
+      })),
+    }} />
+  </div>;
 }
 
 const STATUS_FILTERS: { status: Status; label: string }[] = [
@@ -400,6 +415,7 @@ function CheckIn() {
 
 export const ADMIN_COMPONENTS = {
   "admin-stats": AdminStats,
+  "reporting-statistics": ReportingStatistics,
   "attendee-table": Attendees,
   "admin-event-header": EventHeader,
   "mentors": Mentors,

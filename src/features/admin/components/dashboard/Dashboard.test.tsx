@@ -7,13 +7,14 @@ vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({}) }));
 vi.mock("@/features/memberships/lib/term", () => ({ getMembershipTermEndsAt: async () => null }));
 vi.mock("@/lib/log", () => ({ log: { error: vi.fn(), info: vi.fn() }, errorFields: () => ({}) }));
 const reads = vi.hoisted(() => ({
-  fetchMembershipAnalytics: vi.fn(), fetchEventAnalytics: vi.fn(),
+  fetchMajorDistribution: vi.fn(), fetchMembershipHistory: vi.fn(), fetchRecentMembershipAdditions: vi.fn(),
   fetchNextDashboardEvent: vi.fn(),
   fetchConfirmedEventRegistrationCount: vi.fn(),
 }));
 vi.mock("@/lib/supabase-helpers/admin-dashboard", () => reads);
 
-import { DashboardEventData, DashboardStats, DashboardStatsSkeleton } from "./DashboardData";
+import { DashboardEventData, DashboardMajorData, DashboardMembershipData } from "./DashboardData";
+import { StatisticsCard } from "@/components/shared/StatisticsCard";
 import { DashboardUpcomingEvent } from "./DashboardUpcomingEvent";
 import { DashboardQuickLinks } from "./DashboardQuickLinks";
 import { DashboardActivityPlaceholder } from "./DashboardActivityPlaceholder";
@@ -22,13 +23,31 @@ afterEach(cleanup);
 beforeEach(() => vi.resetAllMocks());
 
 describe("dashboard states", () => {
-  it("keeps the membership slide available when event statistics fail", async () => {
-    reads.fetchMembershipAnalytics.mockResolvedValue({ activeMembers: 0, buyersLast30Days: 12, tiers: [] });
-    reads.fetchEventAnalytics.mockRejectedValue(new Error("Database unavailable"));
-    render(await DashboardStats({ now: "2026-10-26T12:00:00Z" }));
-    expect(screen.getByText("No active members")).toBeTruthy();
-    expect(screen.getByText("12")).toBeTruthy();
-    expect(screen.getByText(/Event statistics unavailable/)).toBeTruthy();
+  it("loads rolling additions using the same server cutoff as membership history", async () => {
+    reads.fetchMembershipHistory.mockResolvedValue(null);
+    reads.fetchRecentMembershipAdditions.mockResolvedValue({ count: 7, coverage: "complete" });
+    const now = "2026-11-21T12:00:00Z";
+    const card = await DashboardMembershipData({ now });
+    expect(reads.fetchMembershipHistory).toHaveBeenCalledWith({}, now);
+    expect(reads.fetchRecentMembershipAdditions).toHaveBeenCalledWith({}, now);
+    expect(card.props.recentAdditions).toEqual({ count: 7, coverage: "complete" });
+  });
+
+  it("keeps membership history when the rolling metric fails", async () => {
+    const history = { latestAcademicYear: 2026, completeFrom: "2026-09-01T07:00:00Z", years: [] };
+    reads.fetchMembershipHistory.mockResolvedValue(history);
+    reads.fetchRecentMembershipAdditions.mockRejectedValue(new Error("Unavailable"));
+    const card = await DashboardMembershipData({ now: "2026-11-21T12:00:00Z" });
+    expect(card.props.data).toBe(history);
+    expect(card.props.recentAdditions).toBeNull();
+  });
+
+  it("keeps the successful account card available when membership loading fails", async () => {
+    reads.fetchMajorDistribution.mockResolvedValue({ totalAccounts: 0, majors: [] });
+    reads.fetchMembershipHistory.mockRejectedValue(new Error("Database unavailable"));
+    render(<>{await DashboardMajorData()}{await DashboardMembershipData({ now: "2026-10-26T12:00:00Z" })}</>);
+    expect(screen.getByText("No accounts yet")).toBeTruthy();
+    expect(screen.getByText("We couldn’t load club members")).toBeTruthy();
   });
 
   it("distinguishes no upcoming event from a failed event query", async () => {
@@ -88,7 +107,7 @@ describe("dashboard states", () => {
   });
 
   it("renders external quick links, a disabled Drive placeholder, and activity and loading states", () => {
-    render(<><DashboardQuickLinks /><DashboardActivityPlaceholder /><DashboardStatsSkeleton /></>);
+    render(<><DashboardQuickLinks /><DashboardActivityPlaceholder /><StatisticsCard title="Area of Study" size="compact" loading /></>);
     const links = screen.getAllByRole("link");
     expect(links.map((link) => link.getAttribute("href"))).toEqual([
       "https://www.ubcuxhub.ca/",
@@ -101,6 +120,6 @@ describe("dashboard states", () => {
     }
     expect((screen.getByRole("button", { name: "Drive" }) as HTMLButtonElement).disabled).toBe(true);
     expect(screen.getByText("User activity will appear here.")).toBeTruthy();
-    expect(screen.getByRole("status", { name: "Loading statistics" })).toBeTruthy();
+    expect(screen.getByRole("status", { name: "Loading Area of Study" })).toBeTruthy();
   });
 });

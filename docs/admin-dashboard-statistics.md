@@ -1,62 +1,59 @@
 # Admin dashboard statistics
 
-The Statistics panel has two manually selected slides. Both summaries load in
-parallel on the server, through `admin_membership_analytics` and
-`admin_event_analytics`. These functions explicitly require `is_admin()`
-(including managers) and return only aggregated data. Membership reads retain
-the caller's RLS permissions. Event aggregation runs as owner after the explicit
-admin check to avoid repeating the same authorization checks for every source
-row; its search path is fixed and anonymous execution is revoked. Their JSON
-envelopes avoid PostgREST's response row limit.
+Statistics contains independently streamed Area of Study and Club Members cards,
+using `admin_major_distribution`, `admin_membership_history` and the independent
+`admin_recent_membership_additions` tag aggregate. Each card has its own
+loading/error surface; a rolling-tag failure hides the tag. All readers
+explicitly require admin/manager access and return aggregate JSON,
+without PostgREST row-limit truncation. Private history has no browser access.
 
-## Members
+## Presentation
 
-Active members have a membership tier, have not deleted their account, and
-have not passed either their individual expiry or the club-wide term end. A
-missing expiry places no ceiling on that membership. Active tiers appear in
-the legend even at zero; inactive tiers appear while they still have active
-members.
+Area of Study includes all non-deleted accounts, including non-members and
+Unknown. It starts with the full distribution, no selected major, the all-account
+total and the exact **Select** button. Selecting emphasizes an existing segment
+and shows its count/share/label without filtering other segments or the denominator.
+Narrow cards hide the visual donut following Figma and accepted D-14; the full
+textual distribution remains accessible. All-Unknown is valid data; zero accounts
+and failed queries have separate text-only states.
 
-The footer counts distinct buyers of completed membership purchases fulfilled
-within the last 720 hours, including both endpoints and excluding future
-fulfillment timestamps. Renewals count, but repeated purchases by one user do
-not increase the buyer count. Purchases retained after account deletion remain
-part of this historical metric. This is a purchase count, not net member growth;
-there are no snapshots or scheduled jobs.
+Club Members defaults to Monthly and the latest reporting academic year from the
+server; summer uses the most recently completed year. Monthly starts at September
+with the scrollbar at the left, including after year changes. Its headline and
+single subtitle show the selected year's total and label. Yearly keeps the latest
+reporting year's total and shows one data-derived range subtitle (currently
+2025–2027). Monthly bars show September–April first-grant additions. Its year submenu
+lists academic years in descending order, with the current reporting year first.
 
-## Events
+The trend icon and “+N past 30 days” pill use unique first-grant members in the
+rolling past 30 days, not a calendar-month bucket. The window includes award
+timestamps from the server cutoff minus exactly 720 hours through that cutoff,
+including both boundaries. Only Yearly/current-year Monthly show a numeric pill;
+historical Monthly, unavailable history and failed rolling queries hide it.
+Monthly/yearly bar calculations remain unchanged. Summer still uses the same
+award ledger rules: May windows can include late-April awards; fully summer
+windows have no qualifying additions. Missing counts never become zero.
 
-Bars represent published `active` events with a start timestamp, ordered by
-start time and ID. Drafts, archived events and scheduled unpublished events are
-excluded. Past and upcoming events are both included. The two bars represent
-confirmed registrations (`attending = true`) and distinct registered people
-with at least one non-null check-in timestamp in a session belonging to that
-event. Multiple check-in sessions never multiply a person's attendance.
+One accessible info control immediately to the right of the Club Members heading says exactly “Membership data
+collection began in the 2026-2027 academic year”. Partial-coverage annotations and
+asterisks are suppressed across this card's bars, details and accessible labels;
+coverage metadata and database counts remain unchanged. Data unavailable, Not yet
+reported and known zero retain separate displays. Arrows step the scroll viewport
+and disable at its ends. Drag the native thumb or focus/tap/hover a bar for counts.
+Up to seven bars fit when space and readable labels allow. Page scrolling and
+browser zoom remain native; charts do not animate. Donut segment clicks and the
+Area of Study dropdown update the same count, share and selected highlight.
+The donut and metrics form a centered group within their content column. A
+16rem maximum wrapper reserves text space beside the non-shrinking donut,
+keeping it horizontally stationary when the selected label/count/share changes.
 
-The current event is the earliest-starting published event that has not ended,
-matching the left-hand preview. Events remain selected until their end timestamp;
-without one, the start timestamp is the cutoff. Selection advances at the exact
-cutoff when the dashboard next loads.
-The yearly total counts distinct checked-in people across events starting from
-September 1 (inclusive) through May 1 (exclusive) in `America/Vancouver`. From
-May through August the most recently completed school year remains selected.
-Retained records belonging to deleted accounts remain in these historical
-totals.
-
-The chart starts on the latest six events. Wheel input over the chart retains
-normal page scrolling and browser zoom. Left/right keys pan only while the
-chart surface has focus. Visible controls provide zoom, pan and reset actions. Carousel
-changes preserve the chart range, and chart navigation does not change slides.
-The expandable data list provides full names, dates and counts without relying
-on hover. Charts do not animate or auto-rotate.
+The old membership-tier/event carousel and feature zoom/pan code are removed.
+The two legacy analytics RPCs remain deployed for compatibility with the old
+application during rollout; no new migration drops them. Their TypeScript-only
+wrappers and obsolete carousel tests are removed. Current data regressions cover
+the supported aggregates and upcoming-event helpers.
 
 ## Durable membership history and all-account majors
-
-The additive `admin_membership_history` and `admin_major_distribution` RPCs
-supply the replacement cards in the dashboard-refresh project. The current
-carousel continues using the older RPCs above until its UI ticket lands.
-Only admin/manager viewers can execute these aggregate readers; private tables
-and trusted writer RPCs have no anonymous/authenticated privileges.
 
 `membership_awards` stores one opaque profile UUID per academic year, the first
 qualifying timestamp/month, and purchase/manual source. It has no foreign key
@@ -111,8 +108,14 @@ For example, two people first granted in November 2026 add two to November and
 2026–2027; granting either person another tier in December adds zero. A reliable
 October fulfillment imported later moves that person's contribution from
 November to October. On a November deployment, pre-deployment uncertainty still
-marks that academic year partial. Previous-calendar-month additions are read
-from the corresponding month; null/partial must not become an exact “+0”.
+marks that academic year partial. `admin_recent_membership_additions(p_now)`
+reads distinct people from award timestamps in `[p_now - 720 hours, p_now]` using
+an award-time index. It authorizes the requesting admin/manager and returns only
+count/coverage; private award rows never reach the client. `complete` means the
+whole rolling window follows the recording start; before that, observed counts
+remain `partial`, with wholly unknown history returning null/`unavailable`.
+The server loads this aggregate independently so a failed rolling query hides
+only the pill. The obsolete previous-calendar-month helper and tests are removed.
 
 Major distribution returns `totalAccounts` and `{major,count}` segments across
 **all non-deleted profiles**, regardless of membership. Whitespace-only/missing
@@ -130,13 +133,14 @@ normal account deletion never takes this fixture-only maintenance path.
 
 ## Deployment and verification
 
-The production build applies additive migrations before deploying the app. The
-history migration preserves the existing analytics RPCs and their consumers.
-The ledger, summary and coverage tables are registered in `TABLES`.
+The additive history migration precedes this UI release; old analytics RPCs
+remain available during deployment/rollback. Tables and generated types are
+unchanged by the presentation ticket. Database authorization/counting remain
+covered by integration and RLS suites. UI regressions cover selection, reporting
+periods, honest coverage, independent failure/loading and native interaction.
 
-Database authorization and counting behavior are covered by the local
-integration and RLS suites. Component tests cover slide selection, chart range
-preservation, wheel and keyboard handling, empty states and failed summaries.
-Manual review should check responsive chart rendering, pointer tooltips,
-trackpad behavior and keyboard focus; repository instructions prohibit browser
-automation unless explicitly requested.
+Human review covers `/admin` at 1440px with both sidebar modes, 768px and 390px,
+intermediate widths/200% zoom, both themes/densities and reduced motion. Check
+normal, selected, all-Unknown, empty/error and unavailable/partial history states;
+drag the scrollbar, navigate period menus with keyboard and tap/focus values.
+Agents do not sign in or enter credentials.

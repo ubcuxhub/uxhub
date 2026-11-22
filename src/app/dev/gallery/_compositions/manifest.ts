@@ -85,6 +85,10 @@ export const MANIFEST = [
   },
   // Column 3: Admin data, check-in and alerts
   {
+    id: "reporting-statistics", column: 3,
+    uses: ["statistics-card", "distribution-chart", "scrollable-bar-chart", "chart-period-menu", "metric-badge"],
+  },
+  {
     id: "admin-stats",
     column: 3,
     uses: ["stat-card"],

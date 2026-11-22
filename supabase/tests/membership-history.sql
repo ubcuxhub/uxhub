@@ -3,6 +3,10 @@ reset role;
 do $$
 declare role_name text; table_name text;
 begin
+  if has_function_privilege('anon','public.admin_recent_membership_additions(timestamptz)','EXECUTE')
+    or not has_function_privilege('authenticated','public.admin_recent_membership_additions(timestamptz)','EXECUTE') then
+    raise exception 'Rolling membership aggregate grants are invalid';
+  end if;
   foreach role_name in array array['anon','authenticated'] loop
     foreach table_name in array array['membership_awards','membership_award_months','membership_history_coverage'] loop
       if has_table_privilege(role_name, 'public.' || table_name, 'SELECT,INSERT,UPDATE,DELETE') then

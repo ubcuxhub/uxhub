@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/auth/guards";
 import { DashboardQuickLinks } from "@/features/admin/components/dashboard/DashboardQuickLinks";
 import { DashboardActivityPlaceholder } from "@/features/admin/components/dashboard/DashboardActivityPlaceholder";
 import { DashboardEventSkeleton } from "@/features/admin/components/dashboard/DashboardUpcomingEvent";
-import { DashboardEventData, DashboardStats, DashboardStatsSkeleton } from "@/features/admin/components/dashboard/DashboardData";
+import { DashboardEventData, DashboardStats } from "@/features/admin/components/dashboard/DashboardData";
 
 export default async function AdminDashboard() {
   await requireAdmin();
@@ -29,7 +29,7 @@ export default async function AdminDashboard() {
           <DashboardQuickLinks />
           <section aria-labelledby="statistics-heading" className="space-y-5">
             <h2 id="statistics-heading" className="text-h2">Statistics</h2>
-            <Suspense fallback={<DashboardStatsSkeleton />}><DashboardStats now={now} /></Suspense>
+            <DashboardStats now={now} />
           </section>
         </div>
       </div>

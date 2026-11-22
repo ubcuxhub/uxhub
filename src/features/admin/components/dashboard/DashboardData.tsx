@@ -1,12 +1,14 @@
+import { Suspense } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { errorFields, log } from "@/lib/log";
 import { FLAGS } from "@/lib/flags";
 import {
   fetchConfirmedEventRegistrationCount, fetchNextDashboardEvent,
-  fetchMembershipAnalytics, fetchEventAnalytics,
+  fetchMembershipHistory, fetchMajorDistribution, fetchRecentMembershipAdditions,
 } from "@/lib/supabase-helpers/admin-dashboard";
-import { Skeleton } from "@/components/ui/skeleton";
-import { DashboardStatsCarousel } from "./DashboardStatsCarousel";
+import { StatisticsCard } from "@/components/shared/StatisticsCard";
+import { DashboardAreaOfStudy } from "./DashboardAreaOfStudy";
+import { DashboardClubMembers } from "./DashboardClubMembers";
 import { DashboardUpcomingEvent } from "./DashboardUpcomingEvent";
 import { DashboardPanel } from "./DashboardPanel";
 
@@ -22,17 +24,26 @@ async function readDashboardData<T>(metric: string, read: () => Promise<T>): Pro
   }
 }
 
-export function DashboardStatsSkeleton() {
-  return <div role="status" aria-label="Loading statistics"><DashboardPanel className="min-h-[480px] gap-6"><Skeleton className="h-7 w-28" /><Skeleton className="mx-auto size-52 rounded-full" /><Skeleton className="h-16 w-full" /></DashboardPanel></div>;
+export async function DashboardMajorData() {
+  const db = await createClient();
+  const data = await readDashboardData("major_distribution", () => fetchMajorDistribution(db));
+  return <DashboardAreaOfStudy data={data} />;
 }
 
-export async function DashboardStats({ now }: { now: string }) {
+export async function DashboardMembershipData({ now }: { now: string }) {
   const db = await createClient();
-  const [members, events] = await Promise.all([
-    readDashboardData("membership_analytics", () => fetchMembershipAnalytics(db, now)),
-    readDashboardData("event_analytics", () => fetchEventAnalytics(db, now)),
+  const [data, recentAdditions] = await Promise.all([
+    readDashboardData("membership_history", () => fetchMembershipHistory(db, now)),
+    readDashboardData("recent_membership_additions", () => fetchRecentMembershipAdditions(db, now)),
   ]);
-  return <DashboardStatsCarousel members={members} events={events} />;
+  return <DashboardClubMembers data={data} recentAdditions={recentAdditions} />;
+}
+
+export function DashboardStats({ now }: { now: string }) {
+  return <div className="min-w-0 space-y-5">
+    <Suspense fallback={<StatisticsCard title="Area of Study" size="compact" loading />}><DashboardMajorData /></Suspense>
+    <Suspense fallback={<StatisticsCard title="Club Members" loading />}><DashboardMembershipData now={now} /></Suspense>
+  </div>;
 }
 
 export async function DashboardEventData({ now }: { now: string }) {

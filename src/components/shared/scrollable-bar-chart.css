@@ -1,0 +1,8 @@
+/* Native scrollbar keeps drag, touch, keyboard and browser zoom behaviour. */
+.statistics-scrollbar {
+  scrollbar-color: var(--muted-foreground) var(--muted);
+  scrollbar-width: thin;
+}
+.statistics-scrollbar::-webkit-scrollbar { height: 6px; }
+.statistics-scrollbar::-webkit-scrollbar-track { background: var(--muted); border-radius: 999px; }
+.statistics-scrollbar::-webkit-scrollbar-thumb { background: var(--muted-foreground); border-radius: 999px; }

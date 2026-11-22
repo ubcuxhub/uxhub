@@ -1675,6 +1675,10 @@ export type Database = {
         Args: { p_first_year?: number; p_last_year?: number; p_now?: string }
         Returns: Json
       }
+      admin_recent_membership_additions: {
+        Args: { p_now?: string }
+        Returns: Json
+      }
       agenda_draft_instant: {
         Args: { p_date: string; p_time: string }
         Returns: string

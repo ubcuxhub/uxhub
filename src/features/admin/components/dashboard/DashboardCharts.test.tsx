@@ -1,117 +1,180 @@
 // @vitest-environment jsdom
-import { cleanup, createEvent, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { DashboardStatsCarousel } from "./DashboardStatsCarousel";
-import type { EventAnalytics, MembershipAnalytics } from "@/lib/supabase-helpers/admin-dashboard";
+import { DashboardAreaOfStudy } from "./DashboardAreaOfStudy";
+import { DashboardClubMembers } from "./DashboardClubMembers";
+import type { MajorDistribution, MembershipHistory } from "@/lib/supabase-helpers/admin-dashboard";
 
 beforeAll(() => {
   vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
+  // jsdom has no layout; give Recharts its real compact viewport.
+  const rect = HTMLElement.prototype.getBoundingClientRect;
+  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
+    return this.classList.contains("recharts-responsive-container") ? new DOMRect(0, 0, 85, 85) : rect.call(this);
+  });
+  HTMLElement.prototype.scrollIntoView = vi.fn();
+  HTMLElement.prototype.hasPointerCapture = vi.fn(() => false);
 });
-afterEach(() => { cleanup(); vi.restoreAllMocks(); });
+afterEach(cleanup);
 
-const members: MembershipAnalytics = {
-  activeMembers: 6, buyersLast30Days: 3,
-  tiers: [{ id: "explorer", name: "Explorer", count: 2 }, { id: "innovator", name: "Innovator", count: 4 }],
+const majors: MajorDistribution = { totalAccounts: 10, majors: [{ major: "Cognitive Systems", count: 6 }, { major: "Unknown", count: 4 }] };
+const history: MembershipHistory = {
+  latestAcademicYear: 2026, completeFrom: "2025-09-01T07:00:00Z",
+  years: [2025, 2026].map((year) => ({
+    academicYear: year, label: `${year}–${year + 1}`, count: year === 2026 ? 8 : 20, coverage: "complete",
+    months: Array.from({ length: 8 }, (_, i) => ({ month: new Date(Date.UTC(year, 8 + i, 1)).toISOString().slice(0, 10), count: i === 0 ? 5 : i === 1 ? 3 : year === 2026 ? null : 0, coverage: i > 1 && year === 2026 ? "future" : "complete" })),
+  })),
 };
-const events: EventAnalytics = {
-  currentEvent: { id: "event7", name: "Design Sprint", registrations: 24 },
-  schoolYearLabel: "2026–2027", uniqueParticipants: 40,
-  events: Array.from({ length: 8 }, (_, index) => ({ id: `event${index}`, name: `Event ${index}`, startsAt: `2026-10-${String(index + 10).padStart(2, "0")}T12:00:00Z`, registrations: index + 1, attendees: index })),
-};
 
-describe("statistics carousel and event chart", () => {
-  it("starts on members and preserves the chart range across manual slide changes", () => {
-    render(<DashboardStatsCarousel members={members} events={events} />);
-    expect(screen.getByRole("heading", { name: "Members" })).toBeTruthy();
-    expect(screen.queryByRole("heading", { name: "Events" })).toBeNull();
-    fireEvent.click(screen.getByRole("button", { name: "Next statistics slide" }));
-    expect(screen.getByRole("heading", { name: "Events" })).toBeTruthy();
-    expect(screen.getByText("Events 3–8 of 8")).toBeTruthy();
-    const chart = screen.getByRole("group", { name: "Event registration and attendance chart" });
-    fireEvent.keyDown(chart, { key: "ArrowLeft" });
-    expect(screen.getByText("Events 2–7 of 8")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
-    expect(screen.getByText("Events 3–7 of 8")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Previous statistics slide" }));
-    fireEvent.click(screen.getByRole("button", { name: "Show events statistics" }));
-    expect(screen.getByText("Events 3–7 of 8")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Reset event chart" }));
-    expect(screen.getByText("Events 3–8 of 8")).toBeTruthy();
+async function openMenu(name: string) {
+  const trigger = screen.getByRole("button", { name });
+  fireEvent.keyDown(trigger, { key: "ArrowDown" });
+  await screen.findByRole("menu");
+  return trigger;
+}
+
+async function chooseMonth(year = "2025–2026") {
+  await openMenu("Chart period: Monthly");
+  const month = screen.getByRole("menuitem", { name: "Monthly" });
+  act(() => month.focus());
+  fireEvent.keyDown(month, { key: "ArrowRight" });
+  fireEvent.click(await screen.findByRole("menuitem", { name: year }));
+}
+
+describe("Area of Study", () => {
+  it("starts with every segment and no selection; selection retains population and denominator", async () => {
+    const { container } = render(<DashboardAreaOfStudy data={majors} />);
+    expect(screen.getByText("All accounts")).toBeTruthy();
+    expect(screen.getByText("10")).toBeTruthy();
+    const list = screen.getByRole("list", { name: "Account major distribution" });
+    expect(list.textContent).toContain("Cognitive Systems: 6 (60%)");
+    expect(list.textContent).toContain("Unknown: 4 (40%)");
+    expect(list.textContent).not.toContain("selected");
+    expect(container.querySelectorAll(".recharts-sector").length).toBe(2);
+    const trigger = await openMenu("Select");
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Unknown" }));
+    expect(screen.getByText("40%")).toBeTruthy();
+    expect(screen.getByText("4")).toBeTruthy();
+    expect(trigger.textContent).toBe("Select");
+    expect(list.textContent).toContain("Unknown: 4 (40%), selected");
+    expect(list.textContent).toContain("Cognitive Systems: 6 (60%)");
+    expect(container.querySelectorAll(".recharts-sector").length).toBe(2);
+    expect(container.querySelector('.recharts-sector[fill="var(--primary)"]')).toBeTruthy();
+    fireEvent.click(container.querySelectorAll(".recharts-sector")[0]);
+    expect(screen.getByText("60%")).toBeTruthy();
+    expect(screen.getByText("6")).toBeTruthy();
+    expect(list.textContent).toContain("Cognitive Systems: 6 (60%), selected");
+    await openMenu("Select");
+    expect(screen.getByRole("menuitemradio", { name: "Cognitive Systems" }).getAttribute("aria-checked")).toBe("true");
+
   });
 
-  it("zooms with buttons, scopes keyboard navigation, and bounds visible controls", () => {
-    render(<DashboardStatsCarousel members={members} events={events} />);
-    fireEvent.click(screen.getByRole("button", { name: "Show events statistics" }));
-    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
-    expect(screen.getByText("Events 4–8 of 8")).toBeTruthy();
-    fireEvent.keyDown(screen.getByRole("region", { name: "Dashboard statistics" }), { key: "ArrowLeft" });
-    expect(screen.getByText("Events 4–8 of 8")).toBeTruthy();
-    for (let i = 0; i < 10; i++) fireEvent.click(screen.getByRole("button", { name: "Zoom out" }));
-    expect(screen.getByText("Events 1–8 of 8")).toBeTruthy();
-    expect((screen.getByRole("button", { name: "Earlier events" }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole("button", { name: "Later events" }) as HTMLButtonElement).disabled).toBe(true);
-    expect((screen.getByRole("button", { name: "Zoom out" }) as HTMLButtonElement).disabled).toBe(true);
+  it("distinguishes zero accounts, query failure and valid all-Unknown accounts", () => {
+    const { rerender } = render(<DashboardAreaOfStudy data={{ totalAccounts: 0, majors: [] }} />);
+    expect(screen.getByText("No accounts yet")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Select" })).toBeNull();
+    rerender(<DashboardAreaOfStudy data={null} />);
+    expect(screen.getByText("We couldn’t load areas of study")).toBeTruthy();
+    rerender(<DashboardAreaOfStudy data={{ totalAccounts: 3, majors: [{ major: "Unknown", count: 3 }] }} />);
+    expect(screen.getByRole("list").textContent).toContain("Unknown: 3 (100%)");
+    expect(screen.getByText("3")).toBeTruthy();
+    expect(screen.queryByText("No accounts yet")).toBeNull();
+  });
+});
+
+describe("Club Members", () => {
+  it("lists Monthly years newest first without changing chronological bars", async () => {
+    render(<DashboardClubMembers data={history} recentAdditions={{ count: 7, coverage: "complete" }} />);
+    await openMenu("Chart period: Monthly");
+    const monthly = screen.getByRole("menuitem", { name: "Monthly" });
+    act(() => monthly.focus());
+    fireEvent.keyDown(monthly, { key: "ArrowRight" });
+    await screen.findByRole("menuitem", { name: "2026–2027" });
+    expect(screen.getAllByRole("menuitem").map((item) => item.textContent).filter((label) => /^\d{4}/.test(label ?? ""))).toEqual(["2026–2027", "2025–2026"]);
+    fireEvent.click(screen.getByRole("menuitem", { name: "2025–2026" }));
+    expect(within(screen.getByRole("group", { name: "2025–2026 monthly additions" })).getAllByRole("button").map((bar) => bar.getAttribute("aria-label")?.split(":")[0])).toEqual(["Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr"]);
   });
 
-  it("keeps empty results separate from unavailable data", () => {
-    const { unmount } = render(<DashboardStatsCarousel members={{ activeMembers: 0, buyersLast30Days: 0, tiers: [] }} events={{ ...events, events: [], currentEvent: null, uniqueParticipants: 0 }} />);
-    expect(screen.getByText("No active members")).toBeTruthy();
-    fireEvent.click(screen.getByRole("button", { name: "Show events statistics" }));
-    expect(screen.getByText("No published events to show.")).toBeTruthy();
-    expect(screen.getByText("No upcoming event")).toBeTruthy();
-    unmount();
-    render(<DashboardStatsCarousel members={null} events={null} />);
-    expect(screen.getByText(/Membership statistics unavailable/)).toBeTruthy();
-    expect(screen.queryByText("No active members")).toBeNull();
+  it("switches to Yearly with a data-derived range and current reporting total", async () => {
+    render(<DashboardClubMembers data={{ ...history, years: [{ ...history.years[0], academicYear: 2022, label: "2022–2023" }, history.years[1]] }} recentAdditions={{ count: 7, coverage: "complete" }} />);
+    await chooseMonth("2022–2023");
+    expect(screen.getByLabelText("Academic-year total: 20")).toBeTruthy();
+    await openMenu("Chart period: Monthly");
+    fireEvent.click(screen.getByRole("menuitem", { name: "Yearly" }));
+    expect(screen.getByRole("button", { name: "Chart period: Yearly" })).toBeTruthy();
+    expect(screen.getAllByText("2022–2027")).toHaveLength(1);
+    expect(screen.getByLabelText("Academic-year total: 8")).toBeTruthy();
+    expect(screen.getByText("+7 past 30 days")).toBeTruthy();
   });
 
-  it("leaves wheel input untouched at the initial range, while zoomed, and at both limits", () => {
-    render(<DashboardStatsCarousel members={members} events={events} />);
-    fireEvent.click(screen.getByRole("button", { name: "Show events statistics" }));
-    const chart = screen.getByRole("group", { name: "Event registration and attendance chart" });
-    const assertWheelUnchanged = (range: string) => {
-      for (const deltaY of [-100, -1, 1, 100]) {
-        const wheel = createEvent.wheel(chart, { deltaY, cancelable: true });
-        fireEvent(chart, wheel);
-        expect(wheel.defaultPrevented).toBe(false);
-        expect(screen.getByText(range)).toBeTruthy();
-      }
-    };
-    assertWheelUnchanged("Events 3–8 of 8");
-    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
-    assertWheelUnchanged("Events 4–8 of 8");
-    for (let i = 0; i < events.events.length; i++) {
-      fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
-    }
-    const minimumRange = screen.getByText(/Events \d+–\d+ of 8/).textContent!;
-    assertWheelUnchanged(minimumRange);
-    for (let i = 0; i < events.events.length; i++) {
-      fireEvent.click(screen.getByRole("button", { name: "Zoom out" }));
-    }
-    assertWheelUnchanged("Events 1–8 of 8");
+  it("provides exactly one data-collection info control and its tooltip", async () => {
+    render(<DashboardClubMembers data={history} recentAdditions={{ count: 7, coverage: "complete" }} />);
+    const copy = "Membership data collection began in the 2026-2027 academic year";
+    const info = screen.getByRole("button", { name: copy });
+    expect(info.previousElementSibling).toBe(screen.getByRole("heading", { name: "Club Members" }));
+    fireEvent.keyDown(document.body, { key: "Tab" });
+    fireEvent.focus(info);
+    expect((await screen.findByRole("tooltip")).textContent).toBe(copy);
   });
 
-  it("never captures wheel scrolling for a single event", () => {
-    render(<DashboardStatsCarousel members={members} events={{ ...events, events: events.events.slice(0, 1) }} />);
-    fireEvent.click(screen.getByRole("button", { name: "Show events statistics" }));
-    const chart = screen.getByRole("group", { name: "Event registration and attendance chart" });
-    for (const deltaY of [-100, 100]) {
-      const wheel = createEvent.wheel(chart, { deltaY, cancelable: true });
-      fireEvent(chart, wheel);
-      expect(wheel.defaultPrevented).toBe(false);
-    }
-    expect(screen.getByText("Events 1–1 of 1")).toBeTruthy();
+  it("uses academic-year totals, server-provided rolling 30-day additions, and no carousel/Week controls", () => {
+    render(<DashboardClubMembers data={history} recentAdditions={{ count: 7, coverage: "complete" }} />);
+    expect(screen.getByRole("button", { name: "Chart period: Monthly" })).toBeTruthy();
+    expect(screen.getByLabelText("Academic-year total: 8")).toBeTruthy();
+    expect(screen.getByText("+7 past 30 days")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Sep: 5" })).toBeTruthy();
+    expect(screen.getAllByText("2026–2027")).toHaveLength(1);
+    expect(document.querySelector("[data-slot=metric-badge] .lucide-trending-up")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /statistics slide|Week/ })).toBeNull();
   });
 
-  it("leaves browser zoom and horizontal wheel input untouched", () => {
-    render(<DashboardStatsCarousel members={members} events={events} />);
-    fireEvent.click(screen.getByRole("button", { name: "Show events statistics" }));
-    const chart = screen.getByRole("group", { name: "Event registration and attendance chart" });
-    for (const input of [{ deltaY: -100, ctrlKey: true }, { deltaY: 100, metaKey: true }, { deltaY: 0, deltaX: 100 }]) {
-      const wheel = createEvent.wheel(chart, { ...input, cancelable: true });
-      fireEvent(chart, wheel);
-      expect(wheel.defaultPrevented).toBe(false);
-    }
-    expect(screen.getByText("Events 3–8 of 8")).toBeTruthy();
+  it("shows historical year totals and one subtitle, hiding the past-month badge", async () => {
+    render(<DashboardClubMembers data={history} recentAdditions={{ count: 7, coverage: "complete" }} />);
+    await chooseMonth();
+    expect(screen.getByRole("button", { name: "Chart period: Monthly" })).toBeTruthy();
+    expect(screen.getByText("2025–2026")).toBeTruthy();
+    const chart = screen.getByRole("group", { name: "2025–2026 monthly additions" });
+    expect(within(chart).getAllByRole("button")).toHaveLength(8);
+    expect(within(chart).getByRole("button", { name: "Sep: 5" })).toBeTruthy();
+    expect(within(chart).getByRole("button", { name: "Oct: 3" })).toBeTruthy();
+    expect(within(chart).getByRole("button", { name: "Apr: 0" })).toBeTruthy();
+    expect(screen.getByLabelText("Academic-year total: 20")).toBeTruthy();
+    expect(screen.queryByText("+7 past 30 days")).toBeNull();
+  });
+
+  it("hides a failed rolling metric without fabricating a zero", () => {
+    render(<DashboardClubMembers data={history} recentAdditions={null} />);
+    expect(screen.getByLabelText("Academic-year total: 8")).toBeTruthy();
+    expect(screen.queryByText(/past 30 days/)).toBeNull();
+  });
+
+  it("reports future months honestly rather than as zero", async () => {
+    render(<DashboardClubMembers data={history} recentAdditions={{ count: 7, coverage: "complete" }} />);
+    await chooseMonth("2026–2027");
+    expect(screen.getByRole("button", { name: "Dec: Not yet reported" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Dec: 0" })).toBeNull();
+  });
+
+  it("distinguishes partial, absent history, complete empty coverage and failure", () => {
+    const partial: MembershipHistory = { ...history, years: history.years.map((y) => ({ ...y, count: 0, coverage: "partial", months: y.months.map((m) => ({ ...m, count: 0, coverage: "partial" })) })) };
+    const { rerender } = render(<DashboardClubMembers data={partial} recentAdditions={{ count: 0, coverage: "partial" }} />);
+    expect(screen.getByLabelText("Academic-year total: 0")).toBeTruthy();
+    expect(screen.getByText("+0 past 30 days")).toBeTruthy();
+    expect(screen.queryByText(/incomplete/i)).toBeNull();
+    expect(screen.queryByText("No members yet")).toBeNull();
+    rerender(<DashboardClubMembers data={{ ...partial, years: partial.years.map((y) => ({ ...y, count: null, coverage: "unavailable", months: y.months.map((m) => ({ ...m, count: null, coverage: "unavailable" })) })) }} recentAdditions={{ count: null, coverage: "unavailable" }} />);
+    expect(screen.getByLabelText("Academic-year total: Data unavailable")).toBeTruthy();
+    expect(screen.queryByText(/past 30 days/)).toBeNull();
+    expect(screen.queryByText("No members yet")).toBeNull();
+    rerender(<DashboardClubMembers data={{ ...partial, years: partial.years.map((y) => ({ ...y, coverage: "complete" })) }} recentAdditions={{ count: 7, coverage: "complete" }} />);
+    expect(screen.getByText("No members yet")).toBeTruthy();
+    rerender(<DashboardClubMembers data={null} recentAdditions={{ count: 7, coverage: "complete" }} />);
+    expect(screen.getByText("We couldn’t load club members")).toBeTruthy();
+  });
+
+  it("preserves the server-provided latest completed year during summer", () => {
+    render(<DashboardClubMembers data={{ ...history, latestAcademicYear: 2025, years: history.years.slice(0, 1) }} recentAdditions={{ count: 7, coverage: "complete" }} />);
+    expect(screen.getByLabelText("Academic-year total: 20")).toBeTruthy();
+    expect(screen.getByText("+7 past 30 days")).toBeTruthy();
   });
 });

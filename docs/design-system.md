@@ -1118,3 +1118,50 @@ height and truncation. Keep an associated label or `aria-label` on the trigger.
 Enabled Select triggers show a pointer cursor; disabled triggers retain
 `cursor-not-allowed`. See `/dev/components/select` for long labels and overnight
 date context.
+
+
+### Statistics surfaces and charts
+
+`StatisticsCard` (`components/shared/StatisticsCard`) composes Card, EmptyState
+and shaped Skeletons: compact distributions have a 120px minimum (124px on
+wide screens), charts a 290px minimum. Titles remain pinned in loading, empty
+and error states; long content can grow the surface. Optional `titleAction`
+places a help control immediately to the right of the heading and retains it in
+loading/empty/error states; `action` remains the separate data-control slot. The compact loaded layout
+keeps its title/control in the first column. Center the chart/metric group in
+the second column with a full-width, 16rem maximum wrapper and automatic side
+margins. Reserve the remaining width beside the non-shrinking donut for metrics,
+so selected labels, counts and percentages cannot change the group width or
+shift the donut horizontally. Text wraps within its reserved space.
+
+`MetricBadge` (`components/ui/metric-badge`) is a neutral numeric-context pill,
+with an optional 16px trend icon. It never communicates success/error status.
+Existing StatCard consumers retain their existing API and appearance.
+
+`DistributionChart` (`components/shared/DistributionChart`) draws every segment
+using neutral marks, card-coloured boundaries and a primary selection/hover.
+`onSelect(label)` optionally lets pointer/touch segment clicks update caller-owned
+selection alongside a dropdown. Selecting never replaces other segments or changes the denominator. Its textual
+list always includes every label, count, share and selection. Callers can hide
+only the visual with `visualClassName`; never hide its accessible equivalent.
+Dashboard narrow cards omit the donut under accepted D-14.
+
+`ScrollableBarChart` (`components/shared/ScrollableBarChart`) takes ordered
+`ChartPeriod` rows (id, label, nullable count, coverage). Complete zero is a
+reported zero; partial counts carry an incomplete marker by default; unavailable/future
+periods never become zero-height actuals. Hover, focus and tap show identical
+values. A native horizontal scrollbar can be dragged, arrows step one period
+and disable at boundaries, up to seven bars fit when labels/space allow. No
+wheel interception, zoom handler or animation. `initialScroll="start"` starts at
+the left edge and resets when period IDs change; the default `"end"` preserves
+latest-period positioning. `showPartialCoverage={false}` suppresses only partial
+annotations across bars, details and accessible data; missing/future markers and
+original counts remain intact. `chartPeriodValue(period, false)` shares this
+presentation. `ChartPeriodMenu` offers a Yearly
+overview and a Monthly submenu of caller-named reporting years, using the shared
+DropdownMenu and Button controls. Caller order is preserved; Club Members
+supplies academic years newest first. Feature code owns reporting semantics.
+
+See `/dev/components/statistics-card` for imports and narrow/wide, selection,
+Unknown, missing/partial/zero/future, loading and error examples. The gallery's
+theme/density controls apply; keyboard/touch work without hover or motion.
