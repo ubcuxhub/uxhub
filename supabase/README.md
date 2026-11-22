@@ -446,6 +446,13 @@ migration `*_application_emails.sql` adds:
   the timestamp in `x-application-emails-timestamp`. Without either secret it
   does nothing.
 
+`application_emails.due_work` decides what is due. It emailed published events
+only until `*_draft_event_application_emails.sql`, which adds draft events for
+staff applicants (admins and managers), so execs can test the flow on an
+unpublished event; members on an event that went back to Draft still get
+nothing. That migration has no backfill: decisions already released to staff
+on a draft send on the job's next run.
+
 Preview deploys share the production database, so the job calls only the URL in
 Vault, and only production has it. `/api/internal/application-emails` checks
 the signature within five minutes of server time, returns `{"skipped":"flag"}`

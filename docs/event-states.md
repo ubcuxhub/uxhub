@@ -392,10 +392,14 @@ supabase/README.md, "Application emails"):
   changes after release (waitlisted to accepted, accepted to rejected) sends
   the new one. A new deadline on the same offer sends no new acceptance, but
   gets its own reminder.
-- Nothing is sent for a canceled event, a draft (unpublished) event, an event
-  that has ended, an event that no longer requires applications, a deleted
-  account, or an applicant who already has a ticket. Before release nothing is
-  sent, so decisions changed before then send only the final one.
+- Nothing is sent for a canceled event, an event that has ended, an event that
+  no longer requires applications, a deleted account, or an applicant who
+  already has a ticket. Before release nothing is sent, so decisions changed
+  before then send only the final one.
+- A draft (unpublished) event emails staff (admins and managers) only, so
+  execs can test the whole flow before publishing. A member's decision on an
+  event that went back to Draft isn't sent: the page it links to is a 404 to
+  them.
 - No email when an offer expires, and none when an application is submitted.
 - Decisions released before the job shipped were marked sent when it
   deployed, so nobody got an email for them.
