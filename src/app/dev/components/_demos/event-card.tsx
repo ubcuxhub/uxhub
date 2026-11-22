@@ -294,7 +294,7 @@ function EventCardDemo() {
         <div className="mx-auto w-full max-w-5xl">
           <EventTimeline
             upcomingEvents={[UXATHON, CONFERENCE, WORKSHOP, PORTFOLIO, MIXER]}
-            pastEvents={PAST}
+            pastEvents={[...PAST].reverse()}
             badges={MEMBER_BADGES}
           />
         </div>
