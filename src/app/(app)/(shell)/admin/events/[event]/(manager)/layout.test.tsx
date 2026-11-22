@@ -48,6 +48,7 @@ function event(overrides: Partial<EventRow> = {}) {
     publish_at: null,
     canceled_at: null,
     requires_application: false,
+    teams_enabled: false,
     slug: "portfolio-review-night",
     marketing_url: null,
     configured_marketing_mode: null,
@@ -108,15 +109,29 @@ describe("event manager layout", () => {
     expect(screen.getByText("Tab content")).toBeTruthy();
   });
 
-  it("shows Overview, Check-in and Agenda, without Applications for an event that takes none", async () => {
+  it("shows Overview, Agenda and Check-in, without Teams or Applications for an event that has neither", async () => {
     await renderAt(`${BASE}/overview`);
 
     expect(tabs().map((tab) => [tab.textContent, tab.getAttribute("href")])).toEqual([
       ["Overview", `${BASE}/overview`],
-      ["Check-in", `${BASE}/check-in`],
       ["Agenda", `${BASE}/agenda`],
+      ["Check-in", `${BASE}/check-in`],
     ]);
     expect(mocks.toReview).not.toHaveBeenCalled();
+  });
+
+  it("shows Teams only for an event with teams, before Applications", async () => {
+    mocks.event.mockResolvedValue(event({ teams_enabled: true, requires_application: true }));
+    await renderAt(`${BASE}/teams`);
+
+    expect(tabs().map((tab) => tab.textContent)).toEqual([
+      "Overview",
+      "Agenda",
+      "Check-in",
+      "Teams",
+      "Applications 3",
+    ]);
+    expect(current().map((tab) => tab.textContent)).toEqual(["Teams"]);
   });
 
   it.each([

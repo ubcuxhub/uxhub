@@ -134,8 +134,9 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
   builder wears the drawer's top bar (`RecordPageTopBar`). The event manager
   is a route group, `events/[event]/(manager)/`, whose layout renders the
   event's header and tabs (`TabNav`) around each tab's page: `overview`,
-  `check-in`, `agenda` and `review-applications` (the Applications tab, shown
-  when the event takes applications). The tabs are listed in
+  `agenda`, `check-in`, `teams` (shown when the event has teams) and
+  `review-applications` (the Applications tab, shown when the event takes
+  applications). The tabs are listed in
   `src/features/admin/lib/event-manager.ts`; a new tab is a line there plus its
   page in the group. The builder and the phone scanner
   (`(scanner)/…/check-in/scan`) stay outside it.

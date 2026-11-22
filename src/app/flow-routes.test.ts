@@ -77,6 +77,7 @@ describe("admin record routes", () => {
       "[event]/(manager)/overview",
       "[event]/(manager)/check-in",
       "[event]/(manager)/agenda",
+      "[event]/(manager)/teams",
       "[event]/(manager)/review-applications",
       "create-new",
     ]) {
@@ -104,6 +105,7 @@ describe("admin record routes", () => {
       "/admin/events/[event]/agenda",
       "/admin/events/[event]/check-in",
       "/admin/events/[event]/check-in/scan",
+      "/admin/events/[event]/teams",
       "/admin/events/[event]/review-applications",
       "/admin/events/[event]/review-applications/[applicationId]",
     ]) {

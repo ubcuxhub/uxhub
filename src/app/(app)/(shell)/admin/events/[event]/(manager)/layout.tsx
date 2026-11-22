@@ -10,8 +10,8 @@ import { fetchEventById } from "@/lib/supabase-helpers/events";
 import { isUuid } from "@/lib/uuid";
 
 /**
- * The event manager: one event's header and tabs (Overview, Check-in, Agenda,
- * Applications) around the tab's page. A route group, so it wraps the tabs
+ * The event manager: one event's header and tabs (Overview, Agenda, Check-in,
+ * Teams, Applications) around the tab's page. A route group, so it wraps the tabs
  * but not the builder (`[event]/edit`), and the URLs stay as they were.
  * The tabs are listed in `src/features/admin/lib/event-manager.ts`.
  *

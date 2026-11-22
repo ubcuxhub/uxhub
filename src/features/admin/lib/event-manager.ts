@@ -19,7 +19,7 @@ export interface EventManagerCounts {
   applicationsToReview: number;
 }
 
-type TabEvent = Pick<EventRow, "requires_application">;
+type TabEvent = Pick<EventRow, "requires_application" | "teams_enabled">;
 
 interface EventManagerTab {
   label: string;
@@ -37,8 +37,9 @@ interface EventManagerTab {
  */
 const EVENT_MANAGER_TABS: readonly EventManagerTab[] = [
   { label: "Overview", segment: "overview" },
-  { label: "Check-in", segment: "check-in" },
   { label: "Agenda", segment: "agenda" },
+  { label: "Check-in", segment: "check-in" },
+  { label: "Teams", segment: "teams", shows: (event) => event.teams_enabled },
   {
     label: "Applications",
     segment: "review-applications",
