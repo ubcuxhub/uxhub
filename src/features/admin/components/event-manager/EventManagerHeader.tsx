@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { ExternalLink, Pencil, Scan } from "lucide-react";
 
-import { BackButton } from "@/components/shared/BackButton";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { TabNav, TabNavLink } from "@/components/ui/tab-nav";
@@ -25,9 +24,11 @@ export interface EventManagerHeaderProps {
 }
 
 /**
- * The event manager's header: back to the list, the event's name and status,
- * its actions (the public page, the builder, the scanner), and the tabs.
- * Each tab's page renders below it in its own `PageContainer`.
+ * The event manager's header: the event's name and status, its actions (the
+ * public page, the builder, the scanner), and the tabs. It sits under the
+ * drawer's top bar (`RecordPage` in the manager's layout), which is the way
+ * back to the list. Each tab's page renders below it in its own
+ * `PageContainer`.
  */
 export function EventManagerHeader({ event, tabs, publicPages, pathname }: EventManagerHeaderProps) {
   const liveHref = eventMarketingHref(event, publicPages);
@@ -37,7 +38,6 @@ export function EventManagerHeader({ event, tabs, publicPages, pathname }: Event
 
   return (
     <header className={`${EVENT_MANAGER_COLUMN} flex flex-col gap-6 pt-8 sm:pt-10`}>
-      <BackButton link="/admin/events" label="Back to Manage Events" />
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex min-w-0 flex-col gap-2">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">

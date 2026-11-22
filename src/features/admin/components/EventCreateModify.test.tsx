@@ -11,7 +11,8 @@ import { toast } from "@/components/ui/toast";
 vi.mock("@/components/ui/toast", () => ({ toast: { error: vi.fn(), success: vi.fn(), dismiss: vi.fn() } }));
 
 vi.mock("@/components/shared/Hubbo", () => ({ Hubbo: ({ emotion, className }: { emotion: string; className: string }) => <span data-testid="hubbo" data-emotion={emotion} className={className}>Hubbo</span> }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }) }));
+const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("@/features/admin/event-overview-actions", () => ({ loadEventLifecycleCountsAction: vi.fn(async () => ({ registered: 0, memberApplications: 2, paidTickets: 0 })) }));
 vi.mock("@/features/admin/actions", () => ({ recoverAdminEventDraftAction: vi.fn(async () => null), recoverAdminEventMutationAction: vi.fn(async () => null), savePastEventResourcesAction: vi.fn(), loadAdminEventDeletionInfoAction: vi.fn(async () => null), saveAdminEventDraftAction: vi.fn(), saveAdminEventAction: vi.fn(), deleteAdminEventAction: vi.fn(), discardUnusedEventImageAction: vi.fn(), searchAdminEventPeopleAction: vi.fn(async () => []) }));
 
@@ -299,4 +300,42 @@ it("keeps failed draft saves retryable", async () => {
   }
   expect(saveAdminEventAction).toHaveBeenCalledTimes(2);
   expect(screen.getByLabelText("Short overview")).toHaveProperty("value", "Changed overview");
+});
+
+it("starts the header with Back to event, to the event manager's Overview", () => {
+  const event = { ...publishedEvent, status: "draft" } as EventRow;
+  const { container } = render(<EventCreateModify eventId={event.id} initialEvent={event} />);
+  const back = screen.getByRole("link", { name: "Back to event" });
+  expect(back.getAttribute("href")).toBe("/admin/events/event-1/overview");
+  const header = container.querySelector<HTMLElement>("#event-builder-header")!;
+  expect(header.firstElementChild).toBe(back);
+  expect(screen.queryByRole("link", { name: "Back to Manage Events" })).toBeNull();
+  // The drawer's top bar belongs to the manager now, not the builder.
+  expect(screen.queryByRole("link", { name: "Collapse to drawer" })).toBeNull();
+});
+
+it("goes back to Manage Events from a new event, which has no manager yet", () => {
+  render(<EventCreateModify />);
+  expect(screen.getByRole("link", { name: "Back to Manage Events" }).getAttribute("href")).toBe("/admin/events");
+  expect(screen.queryByRole("link", { name: "Back to event" })).toBeNull();
+});
+
+it("asks before Back to event leaves unsaved changes", async () => {
+  const event = { ...publishedEvent, status: "draft" } as EventRow;
+  render(<EventCreateModify eventId={event.id} initialEvent={event} />);
+  fireEvent.change(screen.getByLabelText("Event name"), { target: { value: "Renamed event" } });
+  await waitFor(() => expectActionsDisabled("Save", false));
+
+  const back = screen.getByRole("link", { name: "Back to event" });
+  expect(fireEvent.click(back)).toBe(false);
+  const dialog = await screen.findByRole("dialog", { name: "Leave without saving?" });
+  expect(router.push).not.toHaveBeenCalled();
+
+  fireEvent.click(within(dialog).getByRole("button", { name: "Keep editing" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(router.push).not.toHaveBeenCalled();
+
+  fireEvent.click(back);
+  fireEvent.click(within(await screen.findByRole("dialog", { name: "Leave without saving?" })).getByRole("button", { name: "Discard and leave" }));
+  expect(router.push).toHaveBeenCalledWith("/admin/events/event-1/overview");
 });

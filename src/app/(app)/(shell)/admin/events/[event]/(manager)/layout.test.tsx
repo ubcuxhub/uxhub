@@ -31,8 +31,13 @@ vi.mock("next/navigation", () => ({
   usePathname: () => mocks.pathname.current,
 }));
 vi.mock("next/link", () => ({
-  default: ({ href, children, ...props }: { href: string; children: React.ReactNode } & React.ComponentProps<"a">) => (
-    <a href={href} {...props}>
+  default: ({
+    href,
+    children,
+    transitionTypes,
+    ...props
+  }: { href: string; children: React.ReactNode; transitionTypes?: string[] } & React.ComponentProps<"a">) => (
+    <a href={href} data-transition-types={transitionTypes?.join(" ")} {...props}>
       {children}
     </a>
   ),
@@ -96,7 +101,7 @@ describe("event manager layout", () => {
   it("renders the header, its actions and the page below", async () => {
     await renderAt(`${BASE}/overview`);
 
-    expect(screen.getByRole("link", { name: "Back to Manage Events" }).getAttribute("href")).toBe("/admin/events");
+    expect(screen.queryByRole("link", { name: "Back to Manage Events" })).toBeNull();
     expect(screen.getByRole("heading", { level: 1, name: "Portfolio Review Night" })).toBeTruthy();
     expect(screen.getByText("Active")).toBeTruthy();
     expect(screen.getByRole("link", { name: /^View live site/ }).getAttribute("href")).toBe(
@@ -107,6 +112,43 @@ describe("event manager layout", () => {
       `${BASE}/check-in/scan?returnTo=${encodeURIComponent(`${BASE}/overview`)}`
     );
     expect(screen.getByText("Tab content")).toBeTruthy();
+  });
+
+  it.each([
+    `${BASE}/overview`,
+    `${BASE}/agenda`,
+    `${BASE}/check-in`,
+    `${BASE}/teams`,
+    `${BASE}/review-applications`,
+  ])("wears the drawer's top bar on %s: close to the list, collapse to the drawer", async (pathname) => {
+    mocks.event.mockResolvedValue(event({ teams_enabled: true, requires_application: true }));
+    await renderAt(pathname);
+
+    const close = screen.getByRole("link", { name: "Close" });
+    expect(close.getAttribute("href")).toBe("/admin/events");
+    const collapse = screen.getByRole("link", { name: "Collapse to drawer" });
+    expect(collapse.getAttribute("href")).toBe(BASE);
+    // One panel holds the bar, the header and the tab, so it can morph.
+    const page = collapse.closest('[data-slot="record-page"]') as HTMLElement;
+    expect(page).toBeTruthy();
+    expect(within(page).getByRole("heading", { level: 1, name: "Portfolio Review Night" })).toBeTruthy();
+    expect(within(page).getByText("Tab content")).toBeTruthy();
+    // The bar is the way out, so the shell's phone header hides under it.
+    expect(page.querySelector("[data-hides-app-header]")).toBeTruthy();
+  });
+
+  it("collapses with the morph's transition type where view transitions play", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: true, media: query, addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    Object.assign(document, { startViewTransition: vi.fn() });
+    try {
+      await renderAt(`${BASE}/check-in`);
+      expect(screen.getByRole("link", { name: "Collapse to drawer" }).getAttribute("data-transition-types")).toBe(
+        "record-collapse"
+      );
+    } finally {
+      vi.unstubAllGlobals();
+      delete (document as { startViewTransition?: unknown }).startViewTransition;
+    }
   });
 
   it("shows Overview, Agenda and Check-in, without Teams or Applications for an event that has neither", async () => {

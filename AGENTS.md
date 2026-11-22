@@ -130,16 +130,19 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
   `events/(browse)/[event]/page.tsx`) whose content (`RecordView`) opens in a
   side peek drawer over the list, on a row click and on a refresh alike. The
   `(browse)` group keeps the event builder (`events/[event]/edit`), the
-  event manager and `create-new` out of the list layout, as full pages; the
-  builder wears the drawer's top bar (`RecordPageTopBar`). The event manager
-  is a route group, `events/[event]/(manager)/`, whose layout renders the
-  event's header and tabs (`TabNav`) around each tab's page: `overview`,
+  event manager and `create-new` out of the list layout, as full pages. The
+  event manager is a route group, `events/[event]/(manager)/`, whose layout
+  wears the drawer's top bar on every tab (`RecordPage`: close to the list,
+  collapse back into the drawer, and the expand/collapse morph) and renders
+  the event's header and tabs (`TabNav`) around each tab's page: `overview`,
   `agenda`, `check-in`, `teams` (shown when the event has teams) and
   `review-applications` (the Applications tab, shown when the event takes
   applications). The tabs are listed in
   `src/features/admin/lib/event-manager.ts`; a new tab is a line there plus its
   page in the group. The builder and the phone scanner
-  (`(scanner)/…/check-in/scan`) stay outside it.
+  (`(scanner)/…/check-in/scan`) stay outside it; the builder opens with a
+  "Back to event" link to the manager's Overview ("Back to Manage Events" on
+  `create-new`).
   Record route components still call `requireAdmin()` before they fetch
   (layouts and pages render in parallel). Every `@flow` page has a canonical
   twin, and no `@flow/(.)admin` route exists; `src/app/flow-routes.test.ts`

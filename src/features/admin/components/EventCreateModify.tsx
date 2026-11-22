@@ -17,7 +17,6 @@ import { EventPricing } from "./event-form/EventPricing";
 import { EventFeatured } from "./event-form/EventMarketing";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { BackButton } from "@/components/shared/BackButton";
 import { SectionNavigator, type NavigatorSection } from "@/components/shared/SectionNavigator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { EventBranding } from "./event-form/EventBranding";
@@ -50,6 +49,7 @@ import { EventPeopleEditor, EventResourcesEditor } from "./event-form/EventPeopl
 import { emptyContent, type EventContent } from "../lib/event-content";
 import { ApplicationQuestionsSection } from "./event-form/ApplicationQuestionsSection";
 import { DeleteEventModal } from "./DeleteEventModal";
+import { EventBuilderBackPill } from "./EventBuilderBackPill";
 
 interface EventCreateModifyProps {
   historyInfo?: EventHistoryInfo;
@@ -60,8 +60,6 @@ interface EventCreateModifyProps {
   pricingLocked?: boolean;
   teamInfo?: EventTeamSettingsInfo;
   eventId?: string;
-  /** Hide when the surrounding record page supplies navigation. */
-  showBackButton?: boolean;
   initialDraft?: { id: string; revision: number; document: EventWorkingDocument } | null;
   initialEvent?: EventRow | null;
   initialCheckInSessions?: CheckInSessionRow[];
@@ -77,7 +75,6 @@ export const EventCreateModify = ({
   eventId,
   historyInfo,
   initialContent,
-  showBackButton = true,
   pricingLocked = false,
   teamInfo = { teamCount: 0, largestTeam: 0 },
   initialDateLocation,
@@ -217,7 +214,9 @@ export const EventCreateModify = ({
   return (
     <FieldValidation errors={visibleIssues}><div className="event-builder flex w-full min-w-0 flex-col gap-6 pb-50">
       <div id="event-builder-header" ref={header} className="sticky top-4 z-20 -mx-5 space-y-2 border-b border-border-subtle bg-background px-5 pb-3.5 sm:-top-10 sm:-mx-6 sm:px-6 min-[821px]:-mx-12 min-[821px]:px-12">
-        {showBackButton && <BackButton link="/admin/events" label="Back to Manage Events" className="h-8 w-fit px-4 text-small" />}
+        {/* When the header sticks on sm+, this row (h-8 and the gap under it)
+            scrolls out under the top edge (`sm:-top-10`). */}
+        <EventBuilderBackPill eventId={eventId} className="h-8 px-4 text-small" />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-2.5">
             <h1 className="break-words text-h2">{form.formState.name || "Untitled event"}</h1>

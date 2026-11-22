@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 
+import { RecordPage } from "@/components/shared/RecordDrawer";
 import { EventManagerHeader } from "@/features/admin/components/event-manager/EventManagerHeader";
 import { eventManagerTabs } from "@/features/admin/lib/event-manager";
 import { requireAdmin } from "@/lib/auth/guards";
@@ -14,6 +15,12 @@ import { isUuid } from "@/lib/uuid";
  * Teams, Applications) around the tab's page. A route group, so it wraps the tabs
  * but not the builder (`[event]/edit`), and the URLs stay as they were.
  * The tabs are listed in `src/features/admin/lib/event-manager.ts`.
+ *
+ * It is the record drawer's full page (`RecordPage`), so it wears the
+ * drawer's top bar on every tab: close returns to the list, collapse to the
+ * list with this event's drawer open. The drawer's expand opens Overview, and
+ * expand and collapse morph the drawer's panel into this page and back. The
+ * layout stays mounted while the tabs change, so the panel does too.
  *
  * Each tab's page still guards and resolves the param itself: layouts and
  * pages render in parallel, so this guard doesn't stop the page's queries.
@@ -38,7 +45,11 @@ export default async function EventManagerLayout({
     : null;
 
   return (
-    <>
+    <RecordPage
+      listHref="/admin/events"
+      listLabel="Back to Manage Events"
+      recordHref={`/admin/events/${event.id}`}
+    >
       <EventManagerHeader
         event={event}
         tabs={eventManagerTabs(event.id, event, {
@@ -47,6 +58,6 @@ export default async function EventManagerLayout({
         publicPages={FLAGS.studentEvents}
       />
       {children}
-    </>
+    </RecordPage>
   );
 }

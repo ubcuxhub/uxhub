@@ -28,6 +28,9 @@ import {
   TableRowButton,
 } from "@/components/ui/table";
 
+import { EVENT_MANAGER_COLUMN, EventManagerHeader } from "@/features/admin/components/event-manager/EventManagerHeader";
+import { eventManagerHref, eventManagerTabs } from "@/features/admin/lib/event-manager";
+import type { EventRow } from "@/lib/supabase/models";
 import { Composition } from "@/app/dev/_shell/Specimen";
 import type { SectionProps } from "@/app/dev/_shell/types";
 
@@ -64,11 +67,32 @@ const EVENTS: DemoEvent[] = [
   { id: "e2", name: "Design Systems Workshop with a Very Long Name for Wrapping", when: "Saturday, November 14, 2026 · 1:00 – 4:00 PM", image: null, location: "Hugh Dempster Pavilion 110", capacity: "40" },
 ];
 
+/** The first event, as the manager's header reads it. */
+const MANAGER_EVENT = {
+  id: "e1",
+  name: EVENTS[0].name,
+  status: "active",
+  publish_at: null,
+  canceled_at: null,
+  requires_application: true,
+  teams_enabled: true,
+  slug: "portfolio-night",
+  marketing_url: null,
+  configured_marketing_mode: null,
+  configured_marketing_url: null,
+  starts_at: "2026-10-10T01:00:00.000Z",
+  ends_at: "2026-10-10T04:00:00.000Z",
+  location_building: "AMS Nest",
+  location_room: "2306",
+} as EventRow;
+
 /** An event's overview, as AdminEventRecord shows it: its square icon beside the title. */
 function EventRecord({ event }: { event: DemoEvent }) {
   return (
     <RecordView
       title={event.name}
+      // Expand morphs this drawer into the manager's full page, as in the app.
+      fullPageHref={`${PATH}?open=page`}
       subtitle={event.when}
       media={<RecordThumbnail src={event.image} />}
       status={
@@ -224,8 +248,8 @@ function Demo({ state }: { state: string | undefined }) {
   if (state === "page") {
     return (
       <Composition
-        title="Full page: the event builder"
-        description="Users only ever open in the drawer. An event’s “Edit event”, and the expand button beside close, open its builder, a page of its own at /admin/events/<id>/edit (RecordPage) that wears the drawer’s top bar in place of a back pill: close returns to the list, collapse returns to the list with the event’s drawer open. Both are links, so the builder’s unsaved-changes guard asks before either. Expand and collapse morph: the drawer’s panel grows into the page, or the page shrinks back into the drawer, while the list (RecordList) fades out or in; not on phones, with reduced motion, or in browsers without view transitions, where the page swaps instantly. Opening, closing and swapping records keep the drawer’s own slide. The builder keeps the portal’s page width and margins. Below sm only close shows, and on phones the builder hides the app header. Here close goes to this page and collapse to ?open=drawer, which morphs this box into the drawer."
+        title="Full page: the event manager"
+        description="Users only ever open in the drawer. An event’s expand button beside close opens its manager, a page of its own at /admin/events/<id>/overview (RecordPage in the manager’s layout) that wears the drawer’s top bar on every tab (Overview, Agenda, Check-in, Teams, Applications) in place of a back pill: close returns to the list, collapse returns to the list with the event’s drawer open, whichever tab is showing. Expand and collapse morph: the drawer’s panel grows into the page, or the page shrinks back into the drawer, while the list (RecordList) fades out or in; not on phones, with reduced motion, or in browsers without view transitions, where the page swaps instantly. Opening, closing and swapping records keep the drawer’s own slide. Below sm only close shows, and on phones the manager hides the app header. “Edit event” opens the builder, a plain page that starts with a “Back to event” pill to Overview. Here close goes to this page and collapse to ?open=drawer, which morphs this box into the drawer."
       >
         <RecordPage
           className="overflow-hidden rounded-xl border border-border-subtle"
@@ -233,11 +257,13 @@ function Demo({ state }: { state: string | undefined }) {
           listLabel="Back to Manage Events"
           recordHref={`${PATH}?open=drawer`}
         >
-          <div className="flex flex-col gap-4 px-5 pb-10 pt-8 sm:px-6 sm:pt-10 lg:px-16">
-            <div>
-              <h2 className="text-subheading">Modify Event</h2>
-              <p className="text-small text-muted-foreground">Update the details for this event.</p>
-            </div>
+          <EventManagerHeader
+            event={MANAGER_EVENT}
+            tabs={eventManagerTabs(MANAGER_EVENT.id, MANAGER_EVENT, { applicationsToReview: 3 })}
+            publicPages
+            pathname={eventManagerHref(MANAGER_EVENT.id)}
+          />
+          <div className={`${EVENT_MANAGER_COLUMN} pb-10 pt-8`}>
             <div className="h-40 rounded-lg border border-dashed border-border" aria-hidden />
           </div>
         </RecordPage>

@@ -11,7 +11,6 @@ import {
   RecordSection,
   RecordThumbnail,
   RecordView,
-  useRecordMorphTypes,
 } from "@/components/shared/RecordDrawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -55,7 +54,8 @@ function formatPrice(value: number | null) {
 /**
  * An event's admin overview, in the drawer over Manage events: who's
  * coming, the links to run the event, its details, and a quick edit of its
- * status and dates. "Edit event" opens the builder (`/edit`) for the rest.
+ * status and dates. Expand opens the event manager (its Overview), and "Edit
+ * event" the builder (`/edit`) for the rest.
  */
 export function AdminEventRecord({
   event: loaded,
@@ -73,8 +73,6 @@ export function AdminEventRecord({
   const ended = event.status === "active" && hasEnded(event, new Date(now));
 
   const base = `/admin/events/${event.id}`;
-  // "Edit event" grows the drawer into the builder, as expand does.
-  const expandTypes = useRecordMorphTypes("expand");
   const registration = registrationWindow(event, new Date(now));
 
   return (
@@ -96,7 +94,8 @@ export function AdminEventRecord({
       actions={
         <>
         <Button asChild variant="secondary" size="sm">
-          <Link href={`${base}/edit`} transitionTypes={expandTypes}>
+          {/* The builder is a plain page: only expand, to the manager, morphs. */}
+          <Link href={`${base}/edit`}>
             <Pencil aria-hidden />
             Edit event
           </Link>

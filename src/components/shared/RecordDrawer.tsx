@@ -34,8 +34,8 @@ import { cn } from "@/lib/utils";
  * `RecordFrame` around its `children`, so the drawer opens whenever the URL is
  * one of the list's records, on a row click and on a refresh alike, and the
  * list stays mounted behind it while records are swapped. Users have no other
- * view of a record; an event's "Edit event" opens its builder, a page of its
- * own that wears the drawer's top bar (`RecordPage`).
+ * view of a record; an event's expand opens its manager (the Overview tab), a
+ * page of its own that wears the drawer's top bar (`RecordPage`).
  *
  * The content (`RecordView` and its sections and fields) fills the drawer and
  * never needs to know how it was opened.
@@ -44,7 +44,7 @@ import { cn } from "@/lib/utils";
  * morph one panel into the other: the drawer's panel (in `RecordFrame`) and
  * the page (`RecordPage`) are a named `<ViewTransition>` pair, and the list
  * (`RecordList`) fades out or in behind them. Only navigations from the
- * expand, "Edit event" and collapse links carry the transition types that
+ * expand and collapse links carry the transition types that
  * switch the pair on (`useRecordMorphTypes`); every other way in or out
  * (opening from a row, closing, swapping rows, Back) keeps the drawer's own
  * slide, or none.
@@ -190,7 +190,7 @@ export interface RecordFrameProps {
  * Close (the chevron, Esc) returns to the list: `router.back()` when the
  * record was opened from the list (so Back and Forward still make sense),
  * otherwise `router.replace` to the list (a refresh, a shared link, the
- * builder's collapse). Browser Back closes it too. A row click while a record
+ * manager's collapse). Browser Back closes it too. A row click while a record
  * is open replaces it, so Back skips the records looked at.
  *
  * While the content reports unsaved changes, leaving any way the app can see
@@ -327,7 +327,7 @@ export interface RecordPageTopBarProps {
 }
 
 /**
- * The drawer's top bar for a record's full page (an event's builder): close
+ * The drawer's top bar for a record's full page (an event's manager): close
  * returns to the list, collapse to the list with this record's drawer open.
  * Both are plain links, so the page's own unsaved-changes guard sees them.
  * Collapse is hidden below `sm`, as expand is in the drawer. The shell's
@@ -370,7 +370,7 @@ export interface RecordPageProps extends RecordPageTopBarProps {
 }
 
 /**
- * A record's full page (an event's builder): `RecordPageTopBar` over the
+ * A record's full page (an event's manager): `RecordPageTopBar` over the
  * content, as one panel that the record's drawer grows into on expand and
  * shrinks back into on collapse.
  */
@@ -409,9 +409,9 @@ export interface RecordViewProps {
   /** Top bar buttons ("Edit user", "Edit event"). Hidden while editing, when the footer takes over. */
   actions?: React.ReactNode;
   /**
-   * The record's full page (an event's builder). Shows an expand button
+   * The record's full page (an event's manager). Shows an expand button
    * beside close, the twin of the page's collapse; hidden below `sm`. Another
-   * link to the page (an "Edit event" action) morphs into it too when it
+   * link to the page (another button in the drawer) morphs into it too when it
    * passes `useRecordMorphTypes("expand")` as its `transitionTypes`.
    */
   fullPageHref?: string;
