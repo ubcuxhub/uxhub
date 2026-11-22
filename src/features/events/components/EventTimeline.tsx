@@ -28,24 +28,26 @@ export function EventTimeline({
   badges = {},
 }: EventTimelineProps) {
   const showPastId = useId();
+  const pastHeadingId = useId();
   const searchRef = useRef<HTMLInputElement>(null);
   const [showPastEvents, setShowPastEvents] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
-  const displayedEvents = showPastEvents ? pastEvents : upcomingEvents;
-
-  // filter events based on search query
+  // Search filters both sections.
   const query = normalizeString(searchQuery);
-  const filteredEvents = (query) ? displayedEvents.filter((event) => {
-    return (
-      normalizeString(event.name).includes(query) ||
-      (event.location_building && normalizeString(event.location_building).includes(query)) ||
-      (event.location_room && normalizeString(event.location_room).includes(query))
-    )
-  }) : displayedEvents;
+  const matches = (event: EventRow) =>
+    !query ||
+    normalizeString(event.name).includes(query) ||
+    (event.location_building && normalizeString(event.location_building).includes(query)) ||
+    (event.location_room && normalizeString(event.location_room).includes(query));
+
+  const filteredUpcoming = upcomingEvents.filter(matches);
+  const filteredPast = showPastEvents ? pastEvents.filter(matches) : [];
+  const resultCount = filteredUpcoming.length + filteredPast.length;
 
   // group events by month
-  const filteredGroups = groupEventsByMonth(filteredEvents);
+  const upcomingGroups = groupEventsByMonth(filteredUpcoming);
+  const pastGroups = groupEventsByMonth(filteredPast);
 
   const clearSearch = () => {
     setSearchQuery("");
@@ -62,7 +64,7 @@ export function EventTimeline({
           value={searchQuery}
           onValueChange={setSearchQuery}
           // Announce the count only while searching, not on every page load.
-          resultCount={query ? filteredEvents.length : undefined}
+          resultCount={query ? resultCount : undefined}
         />
         <div className="flex w-fit shrink-0 items-center whitespace-nowrap text-foreground">
           <Label htmlFor={showPastId} className="mr-2">
@@ -76,7 +78,7 @@ export function EventTimeline({
         </div>
       </div>
 
-      {filteredGroups.length === 0 ? (
+      {resultCount === 0 ? (
         query ? (
           <EmptyState
             size="inline"
@@ -95,17 +97,50 @@ export function EventTimeline({
             size="inline"
             titleAs="h2"
             className="my-8"
-            title={showPastEvents ? "No past events" : "Events coming soon"}
+            title="Events coming soon"
           />
         )
       ) : (
-        <EventTimelineRail
-          className="mb-8"
-          groups={filteredGroups}
-          statusFor={(event) =>
-            badges[event.id] ?? (showPastEvents ? "past" : null)
-          }
-        />
+        <>
+          {upcomingGroups.length > 0 ? (
+            <EventTimelineRail
+              className="mb-8"
+              groups={upcomingGroups}
+              statusFor={(event) => badges[event.id] ?? null}
+            />
+          ) : (
+            // Only with the switch on and nothing searched: the past list
+            // below is all there is, so say so rather than start it cold.
+            !query && (
+              <EmptyState
+                size="inline"
+                titleAs="h2"
+                className="mb-8"
+                title="No upcoming events"
+              />
+            )
+          )}
+
+          {showPastEvents && (!query || pastGroups.length > 0) && (
+            <section aria-labelledby={pastHeadingId} className="mb-8">
+              <h2
+                id={pastHeadingId}
+                className="mb-6 border-t border-border-subtle pt-8 text-h1 tracking-tight"
+              >
+                Past events
+              </h2>
+              {pastGroups.length > 0 ? (
+                <EventTimelineRail
+                  monthHeadingAs="h3"
+                  groups={pastGroups}
+                  statusFor={(event) => badges[event.id] ?? "past"}
+                />
+              ) : (
+                <EmptyState size="inline" titleAs="h3" title="No past events" />
+              )}
+            </section>
+          )}
+        </>
       )}
     </>
   );

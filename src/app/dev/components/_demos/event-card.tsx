@@ -289,7 +289,7 @@ function EventCardDemo() {
 
       <Composition
         title="EventTimeline (the portal's timeline)"
-        description="The real portal component on fixture events, with a badge per card from its badges map. Upcoming, grouped by month: a date marker on the dashed rail, then the card. Turn on Show Past Events to see the past list. On phones the rail hides and the date sits above the card."
+        description="The real portal component on fixture events, with a badge per card from its badges map. Upcoming, grouped by month: a date marker on the dashed rail, then the card. Turn on Show Past Events to add the past list under a Past events heading, most recent first. On phones the rail hides and the date sits above the card."
       >
         <div className="mx-auto w-full max-w-5xl">
           <EventTimeline
