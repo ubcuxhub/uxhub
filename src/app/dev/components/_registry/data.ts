@@ -346,7 +346,7 @@ export const dataEntries: readonly RegistryEntry[] = [
   },
   {
     slug: "agenda-day-table", title: "Agenda day table", category: "Data display", tier: "composite",
-    description: "Shared agenda with container-responsive locations, proportional staff columns (24/24/20/12/20%) and row action popovers.",
+    description: "Shared agenda with container-responsive locations, proportional staff columns (20/30/16/14% plus a fixed one-row actions column) and row action popovers.",
     importPath: "@/components/shared/AgendaDayTable", importNames: ["AgendaDayTable"],
     source: "src/components/shared/AgendaDayTable.tsx", spec: "Agenda presentation", layout: "page",
   },

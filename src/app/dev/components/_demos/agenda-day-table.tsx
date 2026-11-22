@@ -17,7 +17,7 @@ export default function AgendaDayTableDemo() {
   ];
   return <div className="space-y-8">
     <Composition title="Participant" description="Same day headings, columns, time wrapping and compact locations as the participant agenda."><div data-agenda-container className="@container/agenda"><AgendaDayTable day={day} /></div></Composition>
-    <Composition title="Staff actions" description="Expanded staff columns: Time 24%, Item 24%, Building 20%, Room 12%, Actions 20%. Resize through 48rem container width; below it, click a row or focus its trigger and press Enter/Space. Escape and outside clicks dismiss. Switch themes and densities."><div data-agenda-container className="@container/agenda"><AgendaDayTable day={day} actions={actions} /></div></Composition>
+    <Composition title="Staff actions" description="Expanded staff columns: Time 20%, Item 30%, Building 16%, Room 14%, Actions a fixed 17rem with the buttons in one row. Resize through 48rem container width; below it, click a row or focus its trigger and press Enter/Space. Escape and outside clicks dismiss. Switch themes and densities."><div data-agenda-container className="@container/agenda"><AgendaDayTable day={day} actions={actions} /></div></Composition>
     <Composition title="Narrow desktop container" description="Container width controls the collapsed layout even on desktop."><div data-agenda-container className="@container/agenda max-w-lg"><AgendaDayTable day={day} actions={actions} /></div></Composition>
     <p role="status">{selected ? `View Notes selected: ${selected}` : "Choose a demo action."}</p>
   </div>;

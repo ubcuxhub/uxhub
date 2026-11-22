@@ -49,8 +49,19 @@ it("allocates expanded staff columns without changing participant or compact tim
   expect(columns()[3].className).toContain("w-24");
   view.rerender(<AgendaDayTable day={day} actions={() => [{ label: "View Notes", icon: null }]} />);
   expect(columns()).toHaveLength(5);
-  for (const [index, percentage] of [24, 24, 20, 12, 20].entries()) {
+  for (const [index, percentage] of [20, 30, 16, 14].entries()) {
     expect(columns()[index].className).toContain(`@min-[48rem]/agenda:w-[${percentage}%]`);
   }
+  expect(columns()[4].className).toContain("@min-[48rem]/agenda:w-[17rem]");
   expect(columns()[0].className).toContain("w-48");
+});
+
+it("lays the wide actions cell out as one right-aligned, non-wrapping row", () => {
+  const view = render(<AgendaDayTable day={day} actions={() => [{ label: "View Notes", icon: null }, { label: "Check In", icon: null }]} />);
+  const cell = view.container.querySelector("[data-agenda-actions]")!;
+  expect(cell.querySelectorAll("button")).toHaveLength(2);
+  expect(cell.className).toContain("flex-row");
+  expect(cell.className).toContain("justify-end");
+  expect(cell.className).toContain("whitespace-nowrap");
+  expect(cell.className).not.toContain("flex-col");
 });
