@@ -60,6 +60,51 @@ export function completedRefundCents(
   return Number(total);
 }
 
+/**
+ * How long after it last changed a completed refund still gets an email.
+ * Longer than Square's three days of webhook retries, so a failed send is
+ * retried; short enough that a refund from before refund emails existed, seen
+ * again when a later refund on the same payment arrives, stays quiet.
+ */
+export const REFUND_EMAIL_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** A completed refund that the buyer should hear about. */
+export interface EmailableRefund {
+  id: string;
+  amountCents: number;
+  currency: string;
+}
+
+/**
+ * The refunds to email the buyer about: COMPLETED ones, in the payment's
+ * currency, that changed within `REFUND_EMAIL_WINDOW_MS`. A PENDING refund can
+ * still fail, and REJECTED and FAILED ones returned nothing.
+ */
+export function emailableRefunds(
+  payment: { amountMoney?: SquareMoney },
+  refunds: ({
+    id?: string;
+    status?: string | null;
+    amountMoney?: SquareMoney;
+    updatedAt?: string;
+  } | undefined)[],
+  now = Date.now(),
+): EmailableRefund[] {
+  const paymentCurrency = payment.amountMoney?.currency;
+  const emailable: EmailableRefund[] = [];
+  for (const refund of refunds) {
+    if (!refund?.id || refund.status !== "COMPLETED") continue;
+    const currency = refund.amountMoney?.currency ?? paymentCurrency;
+    if (!currency || (paymentCurrency && currency !== paymentCurrency)) continue;
+    const amountCents = Number(refund.amountMoney?.amount ?? 0);
+    if (!(amountCents > 0)) continue;
+    const changedAt = refund.updatedAt ? Date.parse(refund.updatedAt) : Number.NaN;
+    if (Number.isFinite(changedAt) && now - changedAt > REFUND_EMAIL_WINDOW_MS) continue;
+    emailable.push({ id: refund.id, amountCents, currency });
+  }
+  return emailable;
+}
+
 export function normalizeSquareStatus(status: string | undefined) {
   switch (status) {
     case "APPROVED":

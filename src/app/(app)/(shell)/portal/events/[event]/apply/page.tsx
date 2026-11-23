@@ -79,7 +79,6 @@ export default async function ApplyPage({ params }: ApplyPageProps) {
     <ApplicationForm
       event={{ id: event.id, slug: event.slug ?? slug, name: event.name }}
       status={!application ? "new" : application.status === "submitted" ? "submitted" : "draft"}
-      applicationId={application?.id ?? null}
       window={applicationWindow(event)}
       opensAt={formatDeadline(event.registration_opens_at)}
       closesAt={formatDeadline(event.registration_closes_at)}

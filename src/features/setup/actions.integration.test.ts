@@ -34,6 +34,7 @@ import { saveMembershipProfileAction } from "@/features/memberships/actions";
 import { USER_TYPE_LOCKED_MESSAGE } from "./lib/state";
 import {
   finishSetupAction,
+  saveBirthDateAction,
   saveSetupAboutAction,
   saveSetupDietaryAction,
   saveSetupPhotoAction,
@@ -176,6 +177,34 @@ describe("member setup against local Supabase", () => {
     expect((await fetchUserSetup(db, other.id)).diets).toEqual([]);
   }));
 
+  it("saves, clears and refuses birthdays on the member's own row only", () => withFixtures(async (fixtures) => {
+    const other = await fixtures.createUser();
+    const member = await signUp(fixtures);
+
+    // Saving a birthday leaves the step where it was.
+    expect(await saveBirthDateAction({ birthDate: "2000-02-29" })).toMatchObject({
+      step: "about",
+      birthDate: "2000-02-29",
+    });
+    expect(await fetchUserSetup(db, member.id)).toMatchObject({ birth_date: "2000-02-29", setup_step: "about" });
+
+    // Refused dates change nothing, with the admin record's messages.
+    await expect(saveBirthDateAction({ birthDate: "2999-01-01" })).rejects.toThrow("Birth date cannot be in the future.");
+    await expect(saveBirthDateAction({ birthDate: "2001-02-29" })).rejects.toThrow("Enter a valid birth date.");
+    await expect(saveBirthDateAction({ birthDate: "incomplete" })).rejects.toThrow("Enter a valid birth date.");
+    expect((await fetchUserSetup(db, member.id)).birth_date).toBe("2000-02-29");
+
+    // The step it reports is what's stored, and later saves read it afresh.
+    await nextRequest(member.id);
+    await saveSetupAboutAction({ userType: "ubcStudent" });
+    expect((await saveBirthDateAction({ birthDate: "" })).birthDate).toBeNull();
+    expect(await fetchUserSetup(db, member.id)).toMatchObject({ birth_date: null, setup_step: "dietary" });
+
+    // Members still can't write it themselves, and nobody else's row moved.
+    await expect(updateUserSetup(clientAs(member), member.id, { birth_date: "2000-01-01" })).rejects.toBeTruthy();
+    expect((await fetchUserSetup(db, other.id)).birth_date).toBeNull();
+  }));
+
   it("changes the user type without a membership, clearing the old type's details", () => withFixtures(async (fixtures) => {
     // Its own tier, made before the member who references it: CI's database is unseeded.
     const tier = (await fixtures.createMembershipType()).id;
@@ -248,5 +277,6 @@ describe("member setup against local Supabase", () => {
     await expect(skipSetupStepAction("dietary")).rejects.toThrow("No member signed in");
     await expect(finishSetupAction({ interests: [] })).rejects.toThrow("No member signed in");
     await expect(saveSetupAboutAction({ userType: "faculty" })).rejects.toThrow("No member signed in");
+    await expect(saveBirthDateAction({ birthDate: "2000-01-01" })).rejects.toThrow("No member signed in");
   }));
 });

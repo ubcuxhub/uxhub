@@ -1,10 +1,14 @@
 import type { DateTimeValue } from "@/components/ui/date-time-field";
+import { formatMembershipTypeName } from "@/features/memberships/lib/display";
+import { STUDENT_STATUSES } from "@/lib/constants";
 import { pacificDate, timestamptzToDatetimeLocal } from "@/lib/date";
 import type { IsoDate, WallTime } from "@/lib/date-input";
 import type {
   EventApplicationRow,
   EventApplicationSettingsRow,
+  StudentStatus,
   SubmittedApplicationStatus,
+  UniversityYear,
 } from "@/lib/supabase/models";
 
 /**
@@ -184,6 +188,69 @@ export function buildApplicationDecisionUpdate(
   };
 }
 
+// --- Seats and the waitlist, for the decision card ---------------------------
+
+/**
+ * Seats still open: capacity less tickets and held offers, never below 0.
+ * Null when the event has no capacity (`max_capacity` null), so any accept
+ * fits. The database counts the same way when it checks an accept.
+ */
+export function openSeats(
+  capacity: number | null | undefined,
+  seats: { tickets: number; heldOffers: number } | null | undefined
+): number | null {
+  if (capacity === null || capacity === undefined) return null;
+  const held = (seats?.tickets ?? 0) + (seats?.heldOffers ?? 0);
+  return Math.max(0, capacity - held);
+}
+
+/**
+ * Whether accepting from `state` takes a seat. A ticket or an unexpired offer
+ * already holds one, so moving an offer's deadline doesn't.
+ */
+export function acceptTakesSeat(state: ApplicationReviewState): boolean {
+  return state !== "accepted" && state !== "registered";
+}
+
+/**
+ * An applicant's place on the waitlist, 1 for the earliest application, or
+ * null when they aren't waitlisted. Application order, for reference only:
+ * admins choose whom to accept.
+ */
+export function waitlistPosition(
+  items: readonly Pick<ReviewListItem, "applicationId" | "state" | "appliedAt">[],
+  applicationId: string
+): number | null {
+  const waitlist = items
+    .filter((item) => item.state === "waitlisted")
+    .sort(
+      (a, b) =>
+        a.appliedAt.localeCompare(b.appliedAt) ||
+        a.applicationId.localeCompare(b.applicationId)
+    );
+  const index = waitlist.findIndex((item) => item.applicationId === applicationId);
+  return index === -1 ? null : index + 1;
+}
+
+// --- How an applicant's profile reads ----------------------------------------
+
+export const YEAR_LABELS: Record<UniversityYear, string> = {
+  "1": "1st year",
+  "2": "2nd year",
+  "3": "3rd year",
+  "4": "4th year",
+  "5+": "5th year or later",
+};
+
+export const STUDENT_STATUS_LABELS = Object.fromEntries(
+  STUDENT_STATUSES.map((status) => [status.value, status.label])
+) as Record<StudentStatus, string>;
+
+/** A tier's display name, or "Non-member" when there is no active one. */
+export function membershipLabel(membership: string | null): string {
+  return membership ? formatMembershipTypeName(membership) : "Non-member";
+}
+
 // --- The review list's view: filters, sort, paging, neighbours ---------------
 
 /** Applicants per page on the review list. */
@@ -204,12 +271,14 @@ export const DEFAULT_REVIEW_STATUSES: readonly ApplicationReviewState[] = [
   "submitted",
 ];
 
-export type ReviewSort = "oldest" | "newest" | "name";
+/** `name` is A to Z; older links with `sort=name` keep working. */
+export type ReviewSort = "oldest" | "newest" | "name" | "name-desc";
 export const DEFAULT_REVIEW_SORT: ReviewSort = "oldest";
 export const REVIEW_SORTS: readonly { value: ReviewSort; label: string }[] = [
-  { value: "oldest", label: "Oldest first" },
-  { value: "newest", label: "Newest first" },
-  { value: "name", label: "Name, A to Z" },
+  { value: "oldest", label: "Applied: oldest first" },
+  { value: "newest", label: "Applied: newest first" },
+  { value: "name", label: "Name (A–Z)" },
+  { value: "name-desc", label: "Name (Z–A)" },
 ];
 
 /**
@@ -222,18 +291,47 @@ export interface ReviewListItem {
   name: string;
   email: string;
   program: string | null;
+  year: UniversityYear | null;
+  studentStatus: StudentStatus | null;
+  /** The active membership tier's stored name; null for a non-member. */
+  membership: string | null;
   appliedAt: string;
   state: ApplicationReviewState;
   offerExpiresAt: string | null;
   noteCount?: number;
 }
 
+/** The membership filter's value for an applicant without an active tier. */
+export const NO_MEMBERSHIP = "none";
+
+/**
+ * The Sort and filter panel's filters. Values within one are alternatives
+ * (any matches); the filters, the status chips and the search intersect. An
+ * empty list doesn't filter.
+ */
+export interface ReviewFilters {
+  /** Tier names, or `NO_MEMBERSHIP`. */
+  memberships: string[];
+  years: UniversityYear[];
+  studentStatuses: StudentStatus[];
+  /** Program keys (`programKey`), or `OTHER_PROGRAM`. */
+  programs: string[];
+}
+
+export const EMPTY_REVIEW_FILTERS: ReviewFilters = {
+  memberships: [],
+  years: [],
+  studentStatuses: [],
+  programs: [],
+};
+
 /**
  * The list's view state. It lives in the URL (`?status=waitlisted,accepted&
- * sort=name&q=ana&page=2`) so back, refresh and sharing keep it. `from` is
- * the applicant you came back from; it highlights their row.
+ * sort=name&q=ana&page=2&year=3,4&program=design`) so back, refresh and
+ * sharing keep it. `from` is the applicant you came back from; it highlights
+ * their row.
  */
-export interface ReviewListQuery {
+export interface ReviewListQuery extends ReviewFilters {
   /** Empty means every state (`status=all`). */
   statuses: ApplicationReviewState[];
   sort: ReviewSort;
@@ -242,7 +340,31 @@ export interface ReviewListQuery {
   from?: string;
 }
 
-type ParamSource = { get(name: string): string | null };
+/** What filters the list: everything but the sort, page and highlight. */
+export type ReviewListView = Pick<ReviewListQuery, "statuses" | "sort" | "q"> &
+  Partial<ReviewFilters>;
+
+type ParamSource = {
+  get(name: string): string | null;
+  getAll(name: string): string[];
+};
+
+const YEARS = Object.keys(YEAR_LABELS) as UniversityYear[];
+const STUDENT_STATUS_VALUES = STUDENT_STATUSES.map((status) => status.value);
+
+/** A comma list, kept to the values `allowed` names (in its order). */
+function listParam<T extends string>(
+  params: ParamSource,
+  name: string,
+  allowed?: readonly T[]
+): T[] {
+  const raw = params.get(name);
+  if (!raw) return [];
+  const values = [...new Set(raw.split(",").map((value) => value.trim()).filter(Boolean))];
+  return allowed
+    ? allowed.filter((value) => values.includes(value))
+    : (values.slice(0, 20) as T[]);
+}
 
 export function parseReviewListQuery(params: ParamSource): ReviewListQuery {
   const rawStatus = params.get("status");
@@ -266,6 +388,11 @@ export function parseReviewListQuery(params: ParamSource): ReviewListQuery {
     sort,
     q: (params.get("q") ?? "").slice(0, 100),
     page: Number.isFinite(page) && page > 1 ? page : 1,
+    memberships: listParam(params, "membership"),
+    years: listParam(params, "year", YEARS),
+    studentStatuses: listParam(params, "student", STUDENT_STATUS_VALUES),
+    // Program names are free text and may hold commas: one param each.
+    programs: [...new Set(params.getAll("program").map((value) => value.trim()).filter(Boolean))].slice(0, 20),
     ...(from ? { from } : {}),
   };
 }
@@ -280,10 +407,74 @@ export function serializeReviewListQuery(query: ReviewListQuery): string {
   else if (!isDefaultStatus) params.set("status", query.statuses.join(","));
   if (query.sort !== DEFAULT_REVIEW_SORT) params.set("sort", query.sort);
   if (query.q.trim()) params.set("q", query.q.trim());
+  if (query.memberships.length) params.set("membership", query.memberships.join(","));
+  if (query.years.length) params.set("year", query.years.join(","));
+  if (query.studentStatuses.length) {
+    params.set("student", query.studentStatuses.join(","));
+  }
+  for (const program of query.programs) params.append("program", program);
   if (query.page > 1) params.set("page", String(query.page));
   if (query.from) params.set("from", query.from);
   const text = params.toString();
   return text ? `?${text}` : "";
+}
+
+/** How many filter values the panel has on, for "Sort and filter · 3". */
+export function countReviewFilters(filters: Partial<ReviewFilters>): number {
+  return (
+    (filters.memberships?.length ?? 0) +
+    (filters.years?.length ?? 0) +
+    (filters.studentStatuses?.length ?? 0) +
+    (filters.programs?.length ?? 0)
+  );
+}
+
+// --- Program options, from the applicants themselves -------------------------
+
+/** The program filter's value for the programs not listed, and no program. */
+export const OTHER_PROGRAM = "other";
+
+/** Programs listed by name before the rest fold into Other. */
+export const PROGRAM_OPTION_LIMIT = 6;
+
+/** Programs are free text: "Design" and " design " are one. */
+export function programKey(program: string | null): string | null {
+  const key = program?.trim().replace(/\s+/g, " ").toLowerCase();
+  return key || null;
+}
+
+/**
+ * The program filter's options: the most common programs among the
+ * applicants (ties by name), then Other for the rest and for applicants
+ * without one. Both pages derive them from the same full list, so the table
+ * and the pager agree on what Other holds.
+ */
+export function programOptions(
+  items: readonly Pick<ReviewListItem, "program">[],
+  limit: number = PROGRAM_OPTION_LIMIT
+): { value: string; label: string }[] {
+  const byKey = new Map<string, { label: string; count: number }>();
+  let unlisted = 0;
+  for (const { program } of items) {
+    const key = programKey(program);
+    // Someone who typed "Other" belongs with the others.
+    if (!program || !key || key === OTHER_PROGRAM) {
+      unlisted += 1;
+      continue;
+    }
+    const entry = byKey.get(key);
+    if (entry) entry.count += 1;
+    else byKey.set(key, { label: program.trim().replace(/\s+/g, " "), count: 1 });
+  }
+  const ranked = [...byKey.entries()].sort(
+    ([, a], [, b]) => b.count - a.count || a.label.localeCompare(b.label, "en")
+  );
+  const listed = ranked.slice(0, limit);
+  unlisted += ranked.slice(limit).reduce((sum, [, entry]) => sum + entry.count, 0);
+  return [
+    ...listed.map(([value, entry]) => ({ value, label: entry.label })),
+    ...(unlisted > 0 ? [{ value: OTHER_PROGRAM, label: "Other" }] : []),
+  ];
 }
 
 /** Adds the derived review state to an application summary. */
@@ -312,22 +503,48 @@ function compareItems(sort: ReviewSort) {
         ? -byDate
         : sort === "name"
           ? a.name.localeCompare(b.name, "en") || byDate
-          : byDate;
+          : sort === "name-desc"
+            ? b.name.localeCompare(a.name, "en") || byDate
+            : byDate;
     return result || a.applicationId.localeCompare(b.applicationId);
   };
 }
 
-/** The items a view shows: filtered by status and search, then sorted. */
+/**
+ * The items a view shows: filtered by status, search and the panel's
+ * filters, then sorted. Program filters are matched against the options
+ * `programOptions` derives from `items`, so pass the event's whole list.
+ */
 export function filterReviewItems<T extends ReviewListItem>(
   items: readonly T[],
-  query: Pick<ReviewListQuery, "statuses" | "sort" | "q">
+  query: ReviewListView
 ): T[] {
   const needle = query.q.trim().toLowerCase();
+  const memberships = query.memberships ?? [];
+  const years = query.years ?? [];
+  const studentStatuses = query.studentStatuses ?? [];
+  const programs = query.programs ?? [];
+  const listedPrograms = new Set(
+    programs.length ? programOptions(items).map((option) => option.value) : []
+  );
+  const programValue = (item: ReviewListItem) => {
+    const key = programKey(item.program);
+    return key && listedPrograms.has(key) && key !== OTHER_PROGRAM
+      ? key
+      : OTHER_PROGRAM;
+  };
   return items
     .filter(
       (item) =>
         (query.statuses.length === 0 || query.statuses.includes(item.state)) &&
-        (!needle || `${item.name} ${item.email}`.toLowerCase().includes(needle))
+        (!needle || `${item.name} ${item.email}`.toLowerCase().includes(needle)) &&
+        (memberships.length === 0 ||
+          memberships.includes(item.membership ?? NO_MEMBERSHIP)) &&
+        (years.length === 0 || (item.year !== null && years.includes(item.year))) &&
+        (studentStatuses.length === 0 ||
+          (item.studentStatus !== null &&
+            studentStatuses.includes(item.studentStatus))) &&
+        (programs.length === 0 || programs.includes(programValue(item)))
     )
     .sort(compareItems(query.sort));
 }
@@ -344,9 +561,9 @@ export function countReviewStates(
 
 /** What the pager's "3 of 18 · …" counts. */
 export function reviewScopeLabel(
-  query: Pick<ReviewListQuery, "statuses" | "q">
+  query: Pick<ReviewListQuery, "statuses" | "q"> & Partial<ReviewFilters>
 ): string {
-  if (query.q.trim()) return "Filtered list";
+  if (query.q.trim() || countReviewFilters(query) > 0) return "Filtered list";
   if (query.statuses.length === 0) return "All applicants";
   if (query.statuses.length === 1) {
     return APPLICATION_REVIEW_STATE_LABELS[query.statuses[0]];
@@ -362,7 +579,7 @@ export function reviewScopeLabel(
  */
 export function getReviewNeighbours<T extends ReviewListItem>(
   items: readonly T[],
-  query: Pick<ReviewListQuery, "statuses" | "sort" | "q">,
+  query: ReviewListView,
   currentId: string,
   pageSize: number = REVIEW_PAGE_SIZE
 ): {

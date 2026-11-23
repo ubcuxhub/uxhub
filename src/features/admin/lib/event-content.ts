@@ -87,7 +87,7 @@ export function parseEventContent(input: unknown): EventContent {
     if (link.type === "volunteer_schedule") {
       if (hasSchedule) throw new Error("Only one Volunteer Schedule is allowed per event.");
       hasSchedule = true;
-      if (link.visibility !== "staff") throw new Error("Volunteer Schedule is visible only to staff.");
+      if (link.visibility !== "staff") throw new Error("Volunteer Schedule is visible only to UX Hub execs.");
       if (link.url && !safeStaffScheduleUrl(link.url)) throw new Error("Volunteer Schedule must use an absolute HTTPS URL without a username or password.");
     } else {
       if (!["everyone", "going", "after_event"].includes(link.visibility)) throw new Error("Invalid resource audience.");

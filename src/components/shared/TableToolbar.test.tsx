@@ -30,6 +30,17 @@ function Harness({ initial = 0 }: { initial?: number }) {
 }
 
 describe("TableToolbar", () => {
+  it("sizes its buttons to the search field's height tokens", () => {
+    const { container, rerender } = render(<TableToolbar search={search} actions={actions} />);
+    const classes = (selector: string) => container.querySelector(selector)?.className ?? "";
+    expect(classes("[data-slot=table-toolbar-actions]")).toContain("[&_button]:h-11");
+    expect(classes("[data-slot=table-toolbar-actions]")).toContain("sm:[&_button]:h-(--size-control)");
+
+    rerender(<TableToolbar search={search} actions={actions} selectedCount={1} bulkActions={<button type="button">CSV</button>} />);
+    const bulk = screen.getByRole("button", { name: "CSV" }).parentElement;
+    expect(bulk?.className).toContain("sm:[&_button]:h-(--size-control)");
+  });
+
   it("shows the actions until rows are selected", () => {
     render(<TableToolbar search={search} actions={actions} />);
     expect(screen.getByRole("button", { name: "Sort and filter" })).not.toBeNull();

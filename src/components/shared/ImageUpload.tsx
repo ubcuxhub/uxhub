@@ -11,6 +11,11 @@ import {
 import Image from "next/image";
 import { Image as ImageIcon, Trash2, Upload } from "lucide-react";
 
+import {
+  ImageCropDialog,
+  type CropResult,
+  type CropSource,
+} from "@/components/shared/ImageCropDialog";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { IconButton } from "@/components/ui/icon-button";
@@ -19,11 +24,15 @@ import {
   describeMinSize,
   describeWrongFileType,
   EVENT_IMAGE_ERRORS,
-  EVENT_IMAGE_MAX_BYTES,
+  EVENT_IMAGE_SOURCE_MAX_BYTES,
   isAllowedEventImageType,
+  needsEventImageOptimization,
   resolveImagePreviewSrc,
   type EventImageRequirements,
+  type ImageDimensions,
 } from "@/lib/event-image";
+import { optimizeEventImage } from "@/lib/event-image-optimize";
+import { coverSize } from "@/lib/image-crop";
 import { cn } from "@/lib/utils";
 
 const getImageDimensions = (file: File) =>
@@ -57,6 +66,23 @@ function fileNameFromValue(value: string): string | null {
 }
 
 const DEFAULT_REQUIREMENTS: EventImageRequirements = { square: true };
+
+/**
+ * A non-square aspect within this share of the target is close enough to
+ * skip the crop dialog. Square stays exact: the upload route requires it.
+ */
+const ASPECT_TOLERANCE = 0.01;
+
+/** Thrown from the crop dialog's confirm when the crop can't fit the upload limit. */
+class ImageTooLargeError extends Error {}
+
+/** A pick waiting in the crop dialog. */
+interface PendingCrop {
+  source: CropSource;
+  file: File;
+  dimensions: ImageDimensions;
+  request: number;
+}
 
 interface ImageUploadProps {
   value?: string;
@@ -131,6 +157,9 @@ export const ImageUpload = ({
   const [status, setStatus] = useState("");
   const [wasUploading, setWasUploading] = useState(uploading);
   const [cancelled, setCancelled] = useState(false);
+  // Shrinking a large pick to fit the upload limit; see `event-image-optimize`.
+  const [optimizing, setOptimizing] = useState(false);
+  const [cropping, setCropping] = useState<PendingCrop | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   // dragenter and dragleave also fire for every child crossed; counting them
   // keeps the dragging state from flickering off mid-drag.
@@ -161,6 +190,7 @@ export const ImageUpload = ({
     setPreviewedValue(value);
     setPreview(value ? resolveImagePreviewSrc(value) : null);
     setPickedName(null);
+    setOptimizing(false);
   }
 
   // The parent drives uploading; announce when it ends.
@@ -180,7 +210,9 @@ export const ImageUpload = ({
     progress === undefined
       ? undefined
       : Math.floor(Math.min(100, Math.max(0, progress)) / 25) * 25;
-  const liveMessage = uploading
+  const liveMessage = optimizing
+    ? "Optimizing image"
+    : uploading
     ? progressStep === undefined
       ? "Uploading"
       : `Uploading ${progressStep}%`
@@ -237,20 +269,22 @@ export const ImageUpload = ({
     input.value = "";
   };
 
-  const handleFile = async (file: File) => {
+  const handleFile = async (picked: File) => {
     const request = ++latestRequest.current;
     const isStale = () => request !== latestRequest.current;
     reader.current?.abort();
     reader.current = null;
+    setOptimizing(false);
+    let file = picked;
 
     if (!isAllowedEventImageType(file.type)) {
       setLocalError(describeWrongFileType(file.type));
       return;
     }
 
-    // Mirrors the server-side limit in @/lib/event-image.
-    if (file.size > EVENT_IMAGE_MAX_BYTES) {
-      setLocalError(EVENT_IMAGE_ERRORS.size);
+    // A file over the upload limit is shrunk below, up to this cap.
+    if (file.size > EVENT_IMAGE_SOURCE_MAX_BYTES) {
+      setLocalError(EVENT_IMAGE_ERRORS.sourceSize);
       return;
     }
 
@@ -262,20 +296,49 @@ export const ImageUpload = ({
       return;
     }
 
-    if (requirements.square && dimensions.width !== dimensions.height) {
-      setLocalError(EVENT_IMAGE_ERRORS.square);
-      return;
-    }
-
     const { minWidth, minHeight } = requirements;
-    if (
-      dimensions.width < (minWidth ?? 0) ||
-      dimensions.height < (minHeight ?? 0)
-    ) {
+    const aspect = requirements.square ? 1 : requirements.aspect;
+    // What survives the crop at its widest: it must still meet the minimum.
+    const kept = aspect ? coverSize(dimensions, aspect) : dimensions;
+    if (kept.width < (minWidth ?? 0) || kept.height < (minHeight ?? 0)) {
       setLocalError(describeMinSize(minWidth ?? 1, minHeight ?? 1));
       return;
     }
 
+    if (aspect && !hasAspect(dimensions, aspect, !!requirements.square)) {
+      setLocalError(null);
+      setCropping({
+        source: { url: URL.createObjectURL(file), name: file.name },
+        file,
+        dimensions,
+        request,
+      });
+      return;
+    }
+
+    if (needsEventImageOptimization(file.size, dimensions)) {
+      setLocalError(null);
+      setPickedName(file.name);
+      setOptimizing(true);
+      const optimized = await optimizeEventImage(file, dimensions, {
+        minWidth,
+        minHeight,
+      }).catch(() => null);
+      if (isStale()) return;
+      setOptimizing(false);
+      if (!optimized) {
+        setPickedName(null);
+        setLocalError(EVENT_IMAGE_ERRORS.optimize);
+        return;
+      }
+      file = optimized;
+    }
+
+    accept(file, request);
+  };
+
+  /** Previews a ready file and hands it to the parent. */
+  const accept = (file: File, request: number) => {
     setLocalError(null);
     setPickedName(file.name);
     setStatus("Image selected");
@@ -283,17 +346,37 @@ export const ImageUpload = ({
     const fileReader = new FileReader();
     reader.current = fileReader;
     fileReader.onload = () => {
-      if (isStale()) return;
+      if (request !== latestRequest.current) return;
       setPreview(fileReader.result as string);
     };
     fileReader.readAsDataURL(file);
     onFileChange?.(file);
   };
 
+  const closeCrop = () => {
+    if (cropping) URL.revokeObjectURL(cropping.source.url);
+    setCropping(null);
+  };
+
+  const confirmCrop = async ({ rect }: CropResult) => {
+    if (!cropping) return;
+    const { file, dimensions, request } = cropping;
+    const cropped = await optimizeEventImage(file, dimensions, {
+      minWidth: requirements.minWidth,
+      minHeight: requirements.minHeight,
+      crop: rect,
+    });
+    if (!cropped) throw new ImageTooLargeError(EVENT_IMAGE_ERRORS.optimize);
+    closeCrop();
+    if (request !== latestRequest.current) return;
+    accept(cropped, request);
+  };
+
   const handleRemove = () => {
     latestRequest.current += 1;
     reader.current?.abort();
     reader.current = null;
+    setOptimizing(false);
     setPreview(null);
     setPickedName(null);
     setLocalError(null);
@@ -310,7 +393,7 @@ export const ImageUpload = ({
     onCancelUpload?.();
   };
 
-  const view = uploading
+  const view = uploading || optimizing
     ? "uploading"
     : isDragging
       ? "dragging"
@@ -401,7 +484,11 @@ export const ImageUpload = ({
               <p className="min-w-0 flex-1 truncate text-small font-medium text-foreground">
                 {showFileName ?? "Uploading image"}
               </p>
-              {progress !== undefined && (
+              {optimizing ? (
+                <p className="shrink-0 text-xs text-muted-foreground">
+                  Optimizing…
+                </p>
+              ) : progress !== undefined && (
                 <p className="shrink-0 text-xs text-muted-foreground tabular-nums">
                   {Math.round(Math.min(100, Math.max(0, progress)))}%
                 </p>
@@ -409,11 +496,11 @@ export const ImageUpload = ({
             </div>
             <div
               role="progressbar"
-              aria-label="Upload progress"
+              aria-label={optimizing ? "Optimizing image" : "Upload progress"}
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={
-                progress === undefined
+                optimizing || progress === undefined
                   ? undefined
                   : Math.round(Math.min(100, Math.max(0, progress)))
               }
@@ -422,12 +509,12 @@ export const ImageUpload = ({
               <div
                 className={cn(
                   "h-full rounded-full bg-primary",
-                  progress === undefined
+                  optimizing || progress === undefined
                     ? "w-2/5 motion-safe:animate-pulse"
                     : "transition-[width] duration-200",
                 )}
                 style={
-                  progress === undefined
+                  optimizing || progress === undefined
                     ? undefined
                     : {
                         width: `${Math.min(100, Math.max(0, progress))}%`,
@@ -435,7 +522,7 @@ export const ImageUpload = ({
                 }
               />
             </div>
-            {onCancelUpload && (
+            {onCancelUpload && !optimizing && (
               <Button
                 type="button"
                 variant="secondary"
@@ -528,9 +615,31 @@ export const ImageUpload = ({
       </div>
 
       <FieldError id={errorId}>{error}</FieldError>
+      <ImageCropDialog
+        source={cropping?.source ?? null}
+        onCancel={closeCrop}
+        onConfirm={confirmCrop}
+        aspect={requirements.square ? 1 : requirements.aspect}
+        minSize={{ width: requirements.minWidth, height: requirements.minHeight }}
+        title="Crop image"
+        description="Drag or use the arrow keys to choose what shows. Use the slider to zoom."
+        confirmLabel="Use image"
+        describeError={(caught) =>
+          caught instanceof ImageTooLargeError ? caught.message : null
+        }
+        className={
+          (requirements.aspect ?? 1) > 1 ? "sm:max-w-[640px]" : undefined
+        }
+      />
       <div role="status" aria-live="polite" className="sr-only">
         {liveMessage}
       </div>
     </Field>
   );
 };
+
+/** Whether `size` already has the crop's shape, so the dialog can be skipped. */
+function hasAspect(size: ImageDimensions, aspect: number, exact: boolean) {
+  if (exact) return size.width === Math.round(size.height * aspect);
+  return Math.abs(size.width / size.height / aspect - 1) <= ASPECT_TOLERANCE;
+}

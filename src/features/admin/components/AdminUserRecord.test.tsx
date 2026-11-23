@@ -478,3 +478,70 @@ describe("AdminUserRecord: photo", () => {
     expect(mocks.saveDetails).toHaveBeenCalledOnce();
   });
 });
+
+describe("AdminUserRecord: avatar", () => {
+  // jsdom never loads images, so Radix's Avatar would always show initials.
+  class LoadedImage {
+    complete = true;
+    naturalWidth = 1;
+    src = "";
+    referrerPolicy = "";
+    crossOrigin: string | null = null;
+    addEventListener() {}
+    removeEventListener() {}
+  }
+  beforeEach(() => {
+    vi.stubGlobal("Image", LoadedImage);
+    URL.createObjectURL = vi.fn(() => "blob:photo");
+    URL.revokeObjectURL = vi.fn();
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  /** What an avatar shows: its image's src, else its initials. */
+  function avatar(size: 64 | 40) {
+    const root = document.querySelector(`[data-slot="avatar"][data-size="${size}"]`);
+    if (!root) throw new Error(`No ${size}px avatar`);
+    return root.querySelector("img")?.getAttribute("src") ?? root.textContent;
+  }
+  const withUser = (overrides: Partial<UserRecord>) => savedUsers.set("dora", user(overrides));
+
+  it("shows the uploaded photo over a preset, in the header and the edit preview", () => {
+    withUser({ profile_photo_path: "profiles/dora/photo.png", avatar_preset: "flower" });
+    renderRecord();
+    expect(avatar(64)).toBe("http://localhost/profiles/dora/photo.png");
+    edit();
+    expect(avatar(40)).toBe("http://localhost/profiles/dora/photo.png");
+  });
+
+  it("shows the member's avatar preset when there's no photo", () => {
+    withUser({ avatar_preset: "flower" });
+    renderRecord();
+    expect(avatar(64)).toBe("/auth/shapes/flower.png");
+    edit();
+    expect(avatar(40)).toBe("/auth/shapes/flower.png");
+    // A preset isn't a photo: there's nothing to remove.
+    expect(screen.getByRole("button", { name: "Upload photo" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Remove photo" })).toBeNull();
+  });
+
+  it("shows initials with neither a photo nor a preset", () => {
+    renderRecord();
+    expect(avatar(64)).toBe("DH");
+    edit();
+    expect(avatar(40)).toBe("DH");
+  });
+
+  it("falls back to the preset when a photo is removed, and previews a staged photo over it", () => {
+    withUser({ profile_photo_path: "profiles/dora/photo.png", avatar_preset: "sparkle" });
+    renderRecord();
+    edit();
+    fireEvent.click(screen.getByRole("button", { name: "Remove photo" }));
+    expect(avatar(40)).toBe("/auth/shapes/sparkle.png");
+    expect(avatar(64)).toBe("/auth/shapes/sparkle.png");
+    fireEvent.change(screen.getByLabelText("Profile photo", { selector: "input" }), {
+      target: { files: [new File(["image"], "photo.png", { type: "image/png" })] },
+    });
+    expect(avatar(40)).toBe("blob:photo");
+    expect(avatar(64)).toBe("blob:photo");
+  });
+});

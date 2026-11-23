@@ -3,6 +3,9 @@ import type {
   ReviewerNoteAuthor,
 } from "@/features/applications/components/ReviewerNotes";
 
+import { AVATAR_PRESET_ART } from "@/features/setup/lib/avatar";
+import { resolveAvatar } from "@/features/setup/lib/state";
+
 import { BUCKETS } from "./buckets";
 import { TABLES } from "./tables";
 import type { DbClient } from "./types";
@@ -22,7 +25,7 @@ export type { ReviewerNote, ReviewerNoteAuthor };
 
 const NOTE_COLUMNS =
   "id, body, created_at, edited_at, " +
-  "author:user_info!application_review_notes_author_id_fkey(id, first_name, last_name, profile_photo_path, deleted_at)";
+  "author:user_info!application_review_notes_author_id_fkey(id, first_name, last_name, profile_photo_path, avatar_preset, deleted_at)";
 
 /** An `.in()` filter travels in the URL, so long id lists go a chunk at a time. */
 const IN_CHUNK = 50;
@@ -37,6 +40,7 @@ interface NoteRow {
     first_name: string;
     last_name: string;
     profile_photo_path: string | null;
+    avatar_preset: string | null;
     deleted_at: string | null;
   } | null;
 }
@@ -52,13 +56,22 @@ function toAuthor(supabase: DbClient, row: NoteRow): ReviewerNoteAuthor {
   return {
     id: author.id,
     name: formatUserName(author),
-    avatarUrl: author.profile_photo_path
-      ? supabase.storage
-          .from(BUCKETS.profilePhotos)
-          .getPublicUrl(author.profile_photo_path).data.publicUrl
-      : null,
+    avatarUrl: avatarUrl(supabase, author),
     deleted: false,
   };
+}
+
+/** Their photo, else their preset's art, else null for initials, as setup and Settings show it. */
+function avatarUrl(
+  supabase: DbClient,
+  author: Pick<NonNullable<NoteRow["author"]>, "profile_photo_path" | "avatar_preset">
+): string | null {
+  const avatar = resolveAvatar(author);
+  if (avatar.kind === "photo") {
+    return supabase.storage.from(BUCKETS.profilePhotos).getPublicUrl(avatar.path).data.publicUrl;
+  }
+  if (avatar.kind === "preset") return AVATAR_PRESET_ART[avatar.preset] ?? null;
+  return null;
 }
 
 function toNote(supabase: DbClient, row: NoteRow): ReviewerNote {
