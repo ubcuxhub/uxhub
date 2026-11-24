@@ -8,8 +8,9 @@ import { clientAs, createIntegrationClient, withFixtures, type Fixtures } from "
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-const guard = vi.hoisted(() => ({ requireManager: vi.fn() }));
-vi.mock("@/lib/auth/guards", () => guard);
+const guard = vi.hoisted(() => ({ requireManager: vi.fn(), loadCurrentUser: vi.fn() }));
+vi.mock("@/lib/auth/guards", () => ({ requireManager: guard.requireManager }));
+vi.mock("@/lib/auth/current-user", () => ({ loadCurrentUser: guard.loadCurrentUser }));
 
 import { POST } from "@/app/api/admin/users/[userId]/photo/route";
 import { parseProfilePhoto } from "@/features/admin/lib/user-profile";
@@ -37,6 +38,7 @@ function withProfiles(fn: (profiles: Profiles, fixtures: Fixtures) => Promise<vo
       fixtures.trackStorage("profile-photos", `profiles/${profile.id}`);
     }
     guard.requireManager.mockReset().mockResolvedValue(profiles.manager);
+    guard.loadCurrentUser.mockReset().mockResolvedValue({ status: "authenticated", user: profiles.manager });
     await fn(profiles, fixtures);
   });
 }
@@ -136,12 +138,16 @@ describe("admin profile persistence against local Supabase", () => {
     expect((await POST(new NextRequest(`${url}/test`, { method: "POST", body: stale }), { params: Promise.resolve({ userId: user.id }) })).status).toBe(409);
   }));
 
-  it("requires manager authorization for every action and upload route", () => withProfiles(async ({ user }) => {
+  it("requires manager authorization for every action and upload route", () => withProfiles(async ({ user, admin }) => {
     guard.requireManager.mockRejectedValue(new Error("Manager required"));
     await expect(saveManagerUserDetailsAction(user.id, { birth_date: "2000-01-01", interests: ["Design"] })).rejects.toThrow("Manager required");
     await expect(setStudentVerificationAction(user.id, true)).rejects.toThrow("Manager required");
     await expect(removeUserProfilePhotoAction(user.id, null)).rejects.toThrow("Manager required");
-    await expect(POST(new NextRequest(`${url}/test`, { method: "POST" }), { params: Promise.resolve({ userId: user.id }) })).rejects.toThrow("Manager required");
+    // The route answers JSON a fetch can parse, rather than the guards' redirect to an HTML page.
+    guard.loadCurrentUser.mockResolvedValue({ status: "authenticated", user: admin });
+    const refused = await POST(new NextRequest(`${url}/test`, { method: "POST" }), { params: Promise.resolve({ userId: user.id }) });
+    expect(refused.status).toBe(403);
+    expect((await refused.json()).error).toMatch(/Only managers/);
     expect(await fetchActiveProfile(db, user.id)).toMatchObject({ birth_date: null, interests: [], student_verified_at: null });
   }));
 

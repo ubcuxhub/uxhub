@@ -170,7 +170,8 @@ export function AdminUserRecord({
           form.set("file", draft.photo.file);
           form.set("expectedPath", updated.profile_photo_path ?? "");
           const response = await fetch(`/api/admin/users/${updated.id}/photo`, { method: "POST", body: form });
-          const data = await response.json();
+          // A response that is not JSON (a gateway error page, say) reads as a plain failure.
+          const data = await response.json().catch(() => ({}));
           if (!response.ok) throw new Error(data.error || "Unable to upload photo.");
           commit(data.user);
         } else if (updated.profile_photo_path) {
