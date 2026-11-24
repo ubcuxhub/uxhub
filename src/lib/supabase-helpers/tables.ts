@@ -40,8 +40,6 @@ export const TABLES = {
   // Initial-link creation uses the service-only create_staff_volunteer_schedule RPC.
   eventStaffVolunteerSchedules: "event_staff_volunteer_schedules",
   eventLinks: "event_links",
-  // `event_private_details` is retired: nothing reads or writes it, and the
-  // table is kept only until a follow-up migration drops it.
 } as const;
 
 export type TableName = (typeof TABLES)[keyof typeof TABLES];

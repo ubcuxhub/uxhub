@@ -794,42 +794,6 @@ export type Database = {
           },
         ]
       }
-      event_private_details: {
-        Row: {
-          created_at: string
-          event_id: string
-          meeting_id: string | null
-          meeting_passcode: string | null
-          meeting_url: string
-          updated_at: string
-        }
-        ComputedFields: never
-        Insert: {
-          created_at?: string
-          event_id: string
-          meeting_id?: string | null
-          meeting_passcode?: string | null
-          meeting_url: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          event_id?: string
-          meeting_id?: string | null
-          meeting_passcode?: string | null
-          meeting_url?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "event_private_details_event_id_fkey"
-            columns: ["event_id"]
-            isOneToOne: true
-            referencedRelation: "events"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       event_sponsors: {
         Row: {
           event_id: string
