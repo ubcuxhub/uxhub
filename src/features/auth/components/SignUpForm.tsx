@@ -198,14 +198,17 @@ export function SignUpForm({
           </Field>
 
           <Field>
-            <FieldLabel htmlFor="last-name">
+            {/* Optional, for people with one name. */}
+            <FieldLabel htmlFor="last-name" className="items-baseline">
               Last name
+              <span className="text-small font-normal text-muted-foreground">
+                Optional
+              </span>
             </FieldLabel>
             <Input
               id="last-name"
               placeholder="Last"
               autoComplete="family-name"
-              required
               value={formData.lastName}
               onChange={(e) => handleChange("lastName", e.target.value)}
             />

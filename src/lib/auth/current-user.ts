@@ -14,8 +14,8 @@ export type CurrentUserResult =
   | { status: "authenticated"; user: UserInfoRow }
   | { status: "unauthenticated" }
   /**
-   * Signed in, but no profile row and no name to build one from (an OAuth
-   * account with a one-word name). The guards send them to
+   * Signed in, but no profile row and no first name to build one from (an
+   * OAuth account that shared none). The guards send them to
    * `/auth/complete-profile`.
    */
   | { status: "needs_profile" }

@@ -14,9 +14,10 @@ import { getPartialUserNameFromMetadata } from "@/lib/user-name";
 export type EnsureUserInfoResult =
   | { status: "ok" }
   /**
-   * Neither the caller nor the auth metadata supplied both names, e.g. a
-   * Google account with a one-word name. Recoverable: the caller sends the
-   * user to `/auth/complete-profile` to type them.
+   * Neither the caller nor the auth metadata supplied a first name, e.g. a
+   * provider that shared only a family name. Recoverable: the caller sends
+   * the user to `/auth/complete-profile` to type it. A missing last name is
+   * fine: people with one name have none.
    */
   | { status: "missing_name" }
   | { status: "conflict"; reason: ProfileConflictReason; message: string };
@@ -79,9 +80,14 @@ export async function ensureUserInfo(
     authUser.user_metadata ?? {},
   );
   const firstName = overrides?.firstName?.trim() || metadataName.first_name;
-  const lastName = overrides?.lastName?.trim() || metadataName.last_name;
+  // The last name is optional, for people with one name, so a typed blank
+  // one stands rather than falling back to the metadata's.
+  const lastName =
+    overrides?.lastName !== undefined
+      ? overrides.lastName.trim()
+      : metadataName.last_name;
 
-  if (!firstName || !lastName) {
+  if (!firstName) {
     // Expected for some OAuth accounts, so `warn`: the user can fix it.
     log.warn("auth.profile_name_missing", { authUserId: authUser.id });
     return { status: "missing_name" };

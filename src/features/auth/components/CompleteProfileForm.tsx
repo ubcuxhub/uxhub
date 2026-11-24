@@ -20,17 +20,14 @@ import { AuthSubmitButton } from "./AuthSubmitButton";
 
 type NameField = "firstName" | "lastName";
 
-const REQUIRED: Record<NameField, string> = {
-  firstName: "Enter your first name.",
-  lastName: "Enter your last name.",
-};
+const FIRST_NAME_REQUIRED = "Enter your first name.";
 
 const SAVE_FAILED = "We couldn't save your name. Please try again.";
 
 /**
- * Asks a signed-in user for the names their sign-in provider didn't share
- * (a Google account with a one-word name, say), creates their profile, and
- * carries on to where they were going.
+ * Asks a signed-in user for the name their sign-in provider didn't share,
+ * creates their profile, and carries on to where they were going. The last
+ * name is optional, for people with one name.
  */
 export function CompleteProfileForm({
   nextPath = "/portal",
@@ -50,17 +47,12 @@ export function CompleteProfileForm({
     firstName: defaultFirstName,
     lastName: defaultLastName,
   });
-  const [fieldErrors, setFieldErrors] = useState<
-    Partial<Record<NameField, string>>
-  >({});
+  const [firstNameError, setFirstNameError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSigningOut, setIsSigningOut] = useState(false);
   const submittingRef = useRef(false);
-  const inputRefs = {
-    firstName: useRef<HTMLInputElement>(null),
-    lastName: useRef<HTMLInputElement>(null),
-  };
+  const firstNameRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
   const recoverStalledNavigation = useNavigationRecovery(() => {
     submittingRef.current = false;
@@ -79,16 +71,12 @@ export function CompleteProfileForm({
 
     const firstName = names.firstName.trim();
     const lastName = names.lastName.trim();
-    const errors: Partial<Record<NameField, string>> = {};
-    if (!firstName) errors.firstName = REQUIRED.firstName;
-    if (!lastName) errors.lastName = REQUIRED.lastName;
-    setFieldErrors(errors);
-
-    const firstInvalid = (Object.keys(errors) as NameField[])[0];
-    if (firstInvalid) {
-      inputRefs[firstInvalid].current?.focus();
+    if (!firstName) {
+      setFirstNameError(FIRST_NAME_REQUIRED);
+      firstNameRef.current?.focus();
       return;
     }
+    setFirstNameError(null);
 
     submittingRef.current = true;
     setIsLoading(true);
@@ -154,40 +142,13 @@ export function CompleteProfileForm({
 
   const handleChange = (field: NameField, value: string) => {
     setNames((prev) => ({ ...prev, [field]: value }));
-    if (fieldErrors[field]) {
-      setFieldErrors((prev) => ({ ...prev, [field]: undefined }));
-    }
+    if (field === "firstName") setFirstNameError(null);
   };
-
-  const renderField = (
-    field: NameField,
-    id: string,
-    label: string,
-    autoComplete: string,
-    placeholder: string,
-  ) => (
-    <Field data-invalid={fieldErrors[field] ? true : undefined}>
-      <FieldLabel htmlFor={id}>{label}</FieldLabel>
-      <Input
-        ref={inputRefs[field]}
-        id={id}
-        placeholder={placeholder}
-        autoComplete={autoComplete}
-        required
-        aria-invalid={fieldErrors[field] ? true : undefined}
-        value={names[field]}
-        onChange={(e) => handleChange(field, e.target.value)}
-      />
-      {fieldErrors[field] ? (
-        <FieldError>{fieldErrors[field]}</FieldError>
-      ) : null}
-    </Field>
-  );
 
   return (
     <AuthPanel
       title="What should we call you?"
-      description="Google didn't share your full name with us. We'll use it on your tickets and membership."
+      description="Google didn't share your name with us. We'll use it on your tickets and membership."
       illustration={<Hubbo emotion="welcoming" size="hero" className="h-50" />}
       className={className}
       {...props}
@@ -198,8 +159,35 @@ export function CompleteProfileForm({
         className="flex flex-col gap-4"
       >
         <div className="grid gap-4 sm:grid-cols-2">
-          {renderField("firstName", "first-name", "First name", "given-name", "First")}
-          {renderField("lastName", "last-name", "Last name", "family-name", "Last")}
+          <Field data-invalid={firstNameError ? true : undefined}>
+            <FieldLabel htmlFor="first-name">First name</FieldLabel>
+            <Input
+              ref={firstNameRef}
+              id="first-name"
+              placeholder="First"
+              autoComplete="given-name"
+              required
+              aria-invalid={firstNameError ? true : undefined}
+              value={names.firstName}
+              onChange={(e) => handleChange("firstName", e.target.value)}
+            />
+            {firstNameError ? <FieldError>{firstNameError}</FieldError> : null}
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="last-name" className="items-baseline">
+              Last name
+              <span className="text-small font-normal text-muted-foreground">
+                Optional
+              </span>
+            </FieldLabel>
+            <Input
+              id="last-name"
+              placeholder="Last"
+              autoComplete="family-name"
+              value={names.lastName}
+              onChange={(e) => handleChange("lastName", e.target.value)}
+            />
+          </Field>
         </div>
 
         {error ? <FieldError>{error}</FieldError> : null}

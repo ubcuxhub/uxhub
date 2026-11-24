@@ -28,12 +28,12 @@ describe("SignUpForm existing account", () => {
 
   afterEach(cleanup);
 
-  async function submit() {
+  async function submit(lastName = "Lee") {
     fireEvent.change(screen.getByLabelText("First name"), {
       target: { value: "Sam" },
     });
-    fireEvent.change(screen.getByLabelText("Last name"), {
-      target: { value: "Lee" },
+    fireEvent.change(screen.getByLabelText(/^Last name/), {
+      target: { value: lastName },
     });
     fireEvent.change(screen.getByLabelText("Email"), {
       target: { value: " Student@Example.com " },
@@ -104,6 +104,29 @@ describe("SignUpForm existing account", () => {
     });
     render(<SignUpForm />);
     await submit();
+    expect(routerMocks.push).toHaveBeenCalledWith(
+      "/auth/verify-email?next=%2Fportal",
+    );
+  });
+
+  it("signs up someone with one name, leaving the optional last name empty", async () => {
+    authMocks.signUp.mockResolvedValue({
+      data: { user: { id: "u", identities: [{ id: "i" }] }, session: null },
+      error: null,
+    });
+    render(<SignUpForm />);
+    const lastName = screen.getByLabelText(/^Last name/) as HTMLInputElement;
+    expect(lastName.required).toBe(false);
+    expect(lastName.labels?.[0]?.textContent).toContain("Optional");
+
+    await submit("  ");
+    expect(authMocks.signUp).toHaveBeenCalledWith(
+      expect.objectContaining({
+        options: expect.objectContaining({
+          data: { first_name: "Sam", last_name: "" },
+        }),
+      }),
+    );
     expect(routerMocks.push).toHaveBeenCalledWith(
       "/auth/verify-email?next=%2Fportal",
     );
