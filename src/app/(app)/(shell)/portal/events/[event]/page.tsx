@@ -3,6 +3,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { Alert } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EventLocation } from "@/components/shared/EventLocation";
 import { EventPageHeader } from "@/features/events/components/EventPageHeader";
@@ -13,6 +14,7 @@ import { FLAGS } from "@/lib/flags";
 import { createClient } from "@/lib/supabase/server";
 import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
 import { fetchEventParticipantContent } from "@/lib/supabase-helpers/event-agenda";
+import { fetchEventLinks } from "@/lib/supabase-helpers/event-links";
 import { Calendar, Link2, MapPin } from "lucide-react";
 import { formatEventDate, formatEventTime, pacificDate } from "@/lib/date";
 import { resolveImagePreviewSrc } from "@/lib/event-image";
@@ -28,6 +30,8 @@ import { publicMarketingDestination } from "@/lib/event-marketing";
 import { eventWorkingDocument } from "@/features/admin/lib/event-presentation";
 import { loadTeamCard, type TeamCardData } from "@/features/events/lib/team-card-data";
 import { getHeadersOrigin } from "@/lib/http/request-origin";
+import { adminIsUnpublishedEvent } from "@/lib/supabase-helpers/admin-server";
+import { EventRemovedStatus } from "@/features/events/components/EventPageStatus";
 
 interface PortalEventPageProps {
   params: Promise<{ event: string }>;
@@ -45,8 +49,11 @@ export default async function PortalEventPage({
   // No status filter: RLS returns drafts to admins and managers only, who
   // can open one to test it (docs/event-states.md, "Drafts for admins").
   const event = await fetchEventBySlug(supabase, slug);
-  
+
   if (!event) {
+    // A published event moved back to draft is hidden by RLS, so ask with the
+    // service role (a yes/no only) to say it was removed rather than missing.
+    if (await adminIsUnpublishedEvent(slug)) return <EventRemovedStatus />;
     notFound();
   }
   if (!FLAGS.studentEvents && event.status !== "draft") notFound();
@@ -66,8 +73,13 @@ export default async function PortalEventPage({
   ]);
   const badge = eventBadgeFor(states[event.id]);
   const canceled = states[event.id].kind === "canceled";
-  // Ticket holders only. A canceled event's teams are locked for good, so the card goes.
-  const showTeam = Boolean(teams?.show) && !canceled;
+
+  // Open Slack is for students going (checked in or not), and only when the
+  // event has a Slack workspace link. RLS returns the links this viewer may see.
+  const going = states[event.id].kind === "reg-going" || states[event.id].kind === "reg-checked-in";
+  const slackUrl = going
+    ? (await fetchEventLinks(supabase, event.id)).find((link) => link.type === "slack_workspace")?.url ?? null
+    : null;
   const website = publicMarketingDestination(event);
 
   const startTime = formatEventTime(event.starts_at);
@@ -91,9 +103,22 @@ export default async function PortalEventPage({
         />
         <div className="px-6 pb-6">
           <div className="my-10 flex flex-col gap-6">
-            <div className="flex flex-col items-start gap-3">
-              <h1 className="text-h1">{event.name}</h1>
-              {badge && <StatusBadge {...badge} size="large" />}
+            <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-end sm:justify-between">
+              <div className="flex flex-col items-start gap-3">
+                <h1 className="text-h1">{event.name}</h1>
+                {badge && <StatusBadge {...badge} size="large" />}
+              </div>
+              {slackUrl && (
+                <Button asChild variant="secondary" className="px-5">
+                  <a href={slackUrl} target="_blank" rel="noopener noreferrer">
+                    {/* The Slack mark keeps its brand colours, so it's an image, not a Lucide icon. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/icons/slack.svg" width={16} height={16} alt="" />
+                    Open Slack
+                    <span className="sr-only"> (opens in a new tab)</span>
+                  </a>
+                </Button>
+              )}
             </div>
 
             <hr className="w-full border-border-subtle" />
@@ -151,7 +176,7 @@ export default async function PortalEventPage({
           stretched to the same height. Registration takes the full width when
           there's no team card, and they stack below `xl`, where a column would
           be too narrow for the ticket. */}
-      <div className={showTeam ? "grid grid-cols-1 gap-6 xl:grid-cols-2" : undefined}>
+      <div className={teams?.show && !canceled ? "grid grid-cols-1 gap-6 xl:grid-cols-2" : undefined}>
 
         {/* Registration and applications: one card whose layout follows the student's state. */}
         <RegistrationPanel event={{ ...event, slug }} user={user} state={states[event.id]} unavailable={draftRegistrationBlocks(event, FLAGS.studentEvents)} />

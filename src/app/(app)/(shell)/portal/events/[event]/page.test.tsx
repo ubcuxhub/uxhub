@@ -6,7 +6,9 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 const fixtures = vi.hoisted(() => ({
   state: { kind: "reg-going", ticketId: "ticket-1" } as import("@/features/events/lib/event-states").EventState,
   fetchTicket: vi.fn(),
+  fetchEvent: vi.fn(),
   fetchLinks: vi.fn(),
+  isUnpublished: vi.fn(),
   termEndsAt: null as string | null,
   user: { id: "user-1", first_name: "Ada", last_name: "Lovelace", email: "ada@example.test", membership_type_id: "tier", membership_expires_at: "2099-01-01T00:00:00Z" },
   event: { id: "event-1", slug: "sprint", name: "Design Sprint", status: "active", starts_at: "2099-01-01T18:00:00Z", ends_at: "2099-01-01T20:00:00Z", agenda_enabled: false, mentors_enabled: false, sponsors_enabled: false, description: "An event.", pricing_policy: "figma", regular_price: 20, member_price: 0 },
@@ -18,7 +20,10 @@ vi.mock("@/lib/flags", () => ({ FLAGS: fixtures.flags }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 vi.mock("@/lib/auth/guards", () => ({ requireAuth: async () => fixtures.user }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({}) }));
-vi.mock("@/lib/supabase-helpers/events", () => ({ fetchEventBySlug: async () => fixtures.event }));
+vi.mock("@/lib/supabase-helpers/events", () => ({ fetchEventBySlug: fixtures.fetchEvent }));
+vi.mock("@/lib/supabase-helpers/admin-server", () => ({ adminIsUnpublishedEvent: fixtures.isUnpublished }));
+// Static image imports don't resolve outside the Next bundler.
+vi.mock("@/components/shared/Hubbo", () => ({ Hubbo: () => null }));
 vi.mock("@/lib/supabase-helpers/event-agenda", () => ({ fetchEventParticipantContent: async () => ({ location: null, agenda: [] }) }));
 vi.mock("@/lib/supabase-helpers/event-people", () => ({ fetchEventPeopleSections: async () => [], fetchEventSponsors: async () => [] }));
 vi.mock("@/lib/supabase-helpers/event-links", () => ({ fetchEventLinks: fixtures.fetchLinks }));
@@ -57,7 +62,9 @@ afterEach(cleanup);
 beforeEach(() => {
   vi.clearAllMocks();
   fixtures.state = { kind: "reg-going", ticketId: fixtures.ticket.id };
+  fixtures.fetchEvent.mockImplementation(async () => fixtures.event);
   fixtures.fetchLinks.mockResolvedValue([]);
+  fixtures.isUnpublished.mockResolvedValue(false);
   fixtures.fetchTicket.mockResolvedValue(fixtures.ticket);
   fixtures.termEndsAt = null;
   fixtures.user.membership_expires_at = "2099-01-01T00:00:00Z";
@@ -112,6 +119,40 @@ it("keeps the ticket and larger QR accessible after check-in", async () => {
   fireEvent.click(screen.getByRole("button", { name: "View ticket" }));
   const dialog = await screen.findByRole("dialog");
   expect(within(dialog).getByRole("img", { name: /QR code/i })).toBeTruthy();
+});
+
+const slackLink = { id: "slack", type: "slack_workspace", label: null, url: "https://example.test/slack" };
+
+it.each([
+  ["going", { kind: "reg-going", ticketId: "ticket-1" }],
+  ["checked in", { kind: "reg-checked-in", ticketId: "ticket-1", checkedInAt: "2099-01-01T18:00:00Z" }],
+] as const)("shows Open Slack to a student who is %s, opening the workspace in a new tab", async (_label, state) => {
+  fixtures.state = state;
+  fixtures.fetchLinks.mockResolvedValue([slackLink]);
+  await renderPage();
+  const link = screen.getByRole("link", { name: /^Open Slack/ });
+  expect(link.getAttribute("href")).toBe("https://example.test/slack");
+  expect(link.getAttribute("target")).toBe("_blank");
+});
+
+it("hides Open Slack when the event has no Slack link", async () => {
+  fixtures.fetchLinks.mockResolvedValue([
+    { id: "package", type: "participant_package", label: null, url: "https://example.test/package" },
+  ]);
+  await renderPage();
+  expect(screen.queryByRole("link", { name: /^Open Slack/ })).toBeNull();
+});
+
+it.each([
+  ["registration open", { kind: "reg-open", closesAt: null }],
+  ["accepted without a ticket", { kind: "app-accepted", offerExpiresAt: null }],
+  ["past", { kind: "reg-past-attended", ticketId: "ticket-1" }],
+  ["canceled", { kind: "canceled", note: null, ticketId: "ticket-1" }],
+] as const)("hides Open Slack from a student who isn't going (%s)", async (_label, state) => {
+  fixtures.state = state;
+  fixtures.fetchLinks.mockResolvedValue([slackLink]);
+  await renderPage();
+  expect(screen.queryByRole("link", { name: /^Open Slack/ })).toBeNull();
 });
 
 it.each([
@@ -202,4 +243,36 @@ it("leaves a published event's Register enabled", async () => {
   expect(screen.queryByRole("button", { name: "Register" })).toBeNull();
   expect(screen.getByText("Register")).toBeTruthy();
   expect(screen.queryByText(/Paid events take registrations/)).toBeNull();
+});
+
+const loadPage = () => PortalEventPage({ params: Promise.resolve({ event: "sprint" }), searchParams: Promise.resolve({}) });
+
+it("sends a deleted, never-published or unknown event to the neutral not-found.tsx", async () => {
+  fixtures.fetchEvent.mockResolvedValue(null);
+  await expect(loadPage()).rejects.toMatchObject({ digest: expect.stringContaining("404") });
+  expect(fixtures.isUnpublished).toHaveBeenCalledWith("sprint");
+});
+
+it("says an event that was published and then moved back to draft was removed", async () => {
+  fixtures.fetchEvent.mockResolvedValue(null);
+  fixtures.isUnpublished.mockResolvedValue(true);
+  render(await loadPage());
+  expect(screen.getByRole("heading", { level: 1, name: "This event is no longer available" })).toBeTruthy();
+});
+
+it("hides a published event behind the neutral not-found.tsx while student events are off", async () => {
+  const { FLAGS } = await import("@/lib/flags");
+  (FLAGS as { studentEvents: boolean }).studentEvents = false;
+  try {
+    await expect(loadPage()).rejects.toMatchObject({ digest: expect.stringContaining("404") });
+    expect(fixtures.isUnpublished).not.toHaveBeenCalled();
+  } finally {
+    (FLAGS as { studentEvents: boolean }).studentEvents = true;
+  }
+});
+
+it("lets a failed event query reach error.tsx instead of showing it as removed", async () => {
+  const failure = new Error("fetch failed");
+  fixtures.fetchEvent.mockRejectedValue(failure);
+  await expect(loadPage()).rejects.toBe(failure);
 });
