@@ -44,16 +44,18 @@ import {
   registrationWindow,
   type RegistrationWindow,
 } from "../lib/event-registration-window";
-import { isCompleteDateTime } from "./event-form/event-form-schema";
+import { momentEndsTooEarly, pacificMomentProblem } from "../lib/pacific-moment";
 import { EventStatusBadge, EVENT_STATUS_LABELS } from "./EventStatusBadge";
 import { EventUnpublishDialog } from "./EventUnpublishDialog";
 
-/** The quick edit's fields, as the builder's Pacific `YYYY-MM-DDTHH:mm` strings. */
+/**
+ * The quick edit's fields, as the builder's Pacific `YYYY-MM-DDTHH:mm`
+ * strings. The event's own dates aren't among them: the agenda owns those,
+ * in the builder.
+ */
 interface ScheduleDraft {
   status: EventStatus;
   publish_at: string;
-  starts_at: string;
-  ends_at: string;
   registration_opens_at: string;
   registration_closes_at: string;
 }
@@ -62,8 +64,6 @@ function draftFrom(event: EventRow): ScheduleDraft {
   return {
     status: event.status,
     publish_at: timestamptzToDatetimeLocal(event.publish_at),
-    starts_at: timestamptzToDatetimeLocal(event.starts_at),
-    ends_at: timestamptzToDatetimeLocal(event.ends_at),
     registration_opens_at: timestamptzToDatetimeLocal(event.registration_opens_at),
     registration_closes_at: timestamptzToDatetimeLocal(event.registration_closes_at),
   };
@@ -75,32 +75,29 @@ function sameDraft(a: ScheduleDraft, b: ScheduleDraft) {
 
 /**
  * A field the pickers left half filled (a date without a time) reads as empty
- * once converted, so it's caught here, before the conversion hides it.
+ * once converted, and a wall time that a daylight-saving change skips or
+ * repeats converts to a guess, so both are caught here, by the same rule as
+ * the builder (`pacificMomentProblem`).
  */
-function incompleteDateProblem(draft: ScheduleDraft): string | null {
-  if ([draft.starts_at, draft.ends_at].some(value => value && !isCompleteDateTime(value)) || ((draft.status === "active" || draft.publish_at) && (!isCompleteDateTime(draft.starts_at) || !isCompleteDateTime(draft.ends_at)))) {
-    return "Event start and end dates and times are required.";
+function momentsProblem(draft: ScheduleDraft): string | null {
+  for (const value of [draft.registration_opens_at, draft.registration_closes_at]) {
+    const problem = pacificMomentProblem(value, "Registration dates require both a date and time.");
+    if (problem) return problem;
   }
-  if (
-    [draft.registration_opens_at, draft.registration_closes_at].some(
-      (value) => value && !isCompleteDateTime(value)
-    )
-  ) {
-    return "Registration dates require both a date and time.";
-  }
-  if (draft.status === "draft" && draft.publish_at && !isCompleteDateTime(draft.publish_at)) {
-    return "Publish date must be a valid date and time in Pacific time.";
+  if (draft.status === "draft") {
+    return pacificMomentProblem(draft.publish_at, "Publish date must be a valid date and time in Pacific time.");
   }
   return null;
 }
 
-function toInput(draft: ScheduleDraft): EventScheduleInput {
+/** The action's input: the draft's fields, and the event's own dates as stored. */
+function toInput(draft: ScheduleDraft, event: Pick<EventRow, "starts_at" | "ends_at">): EventScheduleInput {
   return {
     status: draft.status,
     publish_at:
       draft.status === "draft" ? datetimeLocalToTimestamptz(draft.publish_at) : null,
-    starts_at: datetimeLocalToTimestamptz(draft.starts_at),
-    ends_at: datetimeLocalToTimestamptz(draft.ends_at),
+    starts_at: event.starts_at,
+    ends_at: event.ends_at,
     registration_opens_at: datetimeLocalToTimestamptz(draft.registration_opens_at),
     registration_closes_at: datetimeLocalToTimestamptz(draft.registration_closes_at),
   };
@@ -119,18 +116,11 @@ function splitMoment(value: string): DateTimeValue {
 
 /**
  * Back to `YYYY-MM-DDTHH:mm`, as the builder joins them: a half left empty
- * stays visible (`2026-11-19T`), so `incompleteDateProblem` can name it.
+ * stays visible (`2026-11-19T`), so `momentsProblem` can name it.
  */
 function joinMoment({ date, time }: DateTimeValue): string {
   if (!date && !time) return "";
   return `${date ?? ""}T${time ?? ""}`;
-}
-
-/** Whether a complete `end` falls at or before a complete `start`, as the server checks. */
-function endsTooEarly(start: string, end: string) {
-  const from = datetimeLocalToTimestamptz(start);
-  const to = datetimeLocalToTimestamptz(end);
-  return Boolean(from && to && Date.parse(from) >= Date.parse(to));
 }
 
 /**
@@ -323,8 +313,8 @@ export function useEventScheduleEditor(loaded: EventRow) {
       setError("Fix the dates and times marked above.");
       return;
     }
-    const input = toInput(draft);
-    const problem = incompleteDateProblem(draft) ?? eventScheduleProblem(input);
+    const input = toInput(draft, event);
+    const problem = momentsProblem(draft) ?? eventScheduleProblem(input);
     if (problem) {
       setError(problem);
       return;
@@ -343,7 +333,7 @@ export function useEventScheduleEditor(loaded: EventRow) {
     if (fieldErrors[field]) return fieldErrors[field];
     if (
       field === "registration_closes_at" &&
-      endsTooEarly(draft.registration_opens_at, draft.registration_closes_at)
+      momentEndsTooEarly(draft.registration_opens_at, draft.registration_closes_at)
     ) {
       return "Registration end time must be after the start time.";
     }
@@ -539,7 +529,7 @@ export function EventScheduleSection({
         pending={saving}
         error={editor.unpublishError}
         onConfirm={() => {
-          if (draft) void editor.commit(toInput(draft));
+          if (draft) void editor.commit(toInput(draft, editor.event));
         }}
       />
     </>
