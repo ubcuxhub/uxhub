@@ -171,7 +171,8 @@ export async function findEventHolders(
 
   for (const eventId of eventIds) {
     for (const holding of HOLDINGS) {
-      const columns = "embed" in holding ? `id, ${holding.embed}` : "id";
+      // Not `id`: `team_members` has none (its key is event and user).
+      const columns = "embed" in holding ? `${holding.user}, ${holding.embed}` : holding.user;
       let query = supabase
         .from(holding.table)
         .select(columns, { count: "exact", head: true })
