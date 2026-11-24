@@ -92,6 +92,7 @@ beforeEach(() => {
   adminServer.adminDeleteEventImageByUrl.mockResolvedValue(undefined);
   events.fetchEventSlugsByPrefix.mockResolvedValue([]);
   adminRpc.mockResolvedValue({ data: { id: "event-1" }, error: null });
+  serverRpc.mockResolvedValue({ data: null, error: null });
 });
 
 // ---------------------------------------------------------------------------
@@ -114,10 +115,9 @@ describe("updateManagerUserAction: the column allowlist", () => {
       updateManagerUserAction("user-1", field, "anything"),
     ).rejects.toThrow("This user field cannot be edited.");
 
-    // This write goes through the service role, which bypasses RLS. The
-    // allowlist is the only thing between a manager and a privilege
-    // escalation, so nothing may reach the helper.
-    expect(adminServer.adminUpdateUserInfoById).not.toHaveBeenCalled();
+    // The database function re-checks this list, but a rejection here must
+    // stop short of the write either way.
+    expect(serverRpc).not.toHaveBeenCalled();
   });
 
   it.each([
@@ -132,25 +132,40 @@ describe("updateManagerUserAction: the column allowlist", () => {
   ])("writes the allowlisted column %s", async (field) => {
     await updateManagerUserAction("user-1", field, "value");
 
-    expect(adminServer.adminUpdateUserInfoById).toHaveBeenCalledWith("user-1", {
-      [field]: "value",
+    expect(serverRpc).toHaveBeenCalledWith("admin_update_user_info", {
+      p_user_id: "user-1",
+      p_patch: { [field]: "value" },
     });
     expect(revalidatePath).toHaveBeenCalledWith("/admin/users", "layout");
+  });
+
+  it("surfaces a refusal from the database function", async () => {
+    // The function re-checks the caller and the columns, so its error is the
+    // one that matters when the action's own checks have passed.
+    const refusal = { message: "Only managers can edit a member profile" };
+    serverRpc.mockResolvedValue({ data: null, error: refusal });
+
+    await expect(
+      updateManagerUserAction("user-1", "major", "Design"),
+    ).rejects.toBe(refusal);
+    expect(revalidatePath).not.toHaveBeenCalled();
   });
 
   it("maps the form's order_date onto the deprecated column", async () => {
     await updateManagerUserAction("user-1", "order_date", "2026-01-05");
 
-    expect(adminServer.adminUpdateUserInfoById).toHaveBeenCalledWith("user-1", {
-      order_date_deprecated: "2026-01-05",
+    expect(serverRpc).toHaveBeenCalledWith("admin_update_user_info", {
+      p_user_id: "user-1",
+      p_patch: { order_date_deprecated: "2026-01-05" },
     });
   });
 
   it("trims whitespace around a name", async () => {
     await updateManagerUserAction("user-1", "first_name", "  Jamie  ");
 
-    expect(adminServer.adminUpdateUserInfoById).toHaveBeenCalledWith("user-1", {
-      first_name: "Jamie",
+    expect(serverRpc).toHaveBeenCalledWith("admin_update_user_info", {
+      p_user_id: "user-1",
+      p_patch: { first_name: "Jamie" },
     });
   });
 
@@ -161,14 +176,14 @@ describe("updateManagerUserAction: the column allowlist", () => {
     await expect(updateManagerUserAction("user-1", field, "   ")).rejects.toThrow(
       message,
     );
-    expect(adminServer.adminUpdateUserInfoById).not.toHaveBeenCalled();
+    expect(serverRpc).not.toHaveBeenCalled();
   });
 
   it("rejects a name that is not a string", async () => {
     await expect(
       updateManagerUserAction("user-1", "first_name", 7),
     ).rejects.toThrow("First name is required.");
-    expect(adminServer.adminUpdateUserInfoById).not.toHaveBeenCalled();
+    expect(serverRpc).not.toHaveBeenCalled();
   });
 
   it.each(["6", "0", "first", ""])(
@@ -177,23 +192,25 @@ describe("updateManagerUserAction: the column allowlist", () => {
       await expect(
         updateManagerUserAction("user-1", "year", year),
       ).rejects.toThrow("Invalid university year.");
-      expect(adminServer.adminUpdateUserInfoById).not.toHaveBeenCalled();
+      expect(serverRpc).not.toHaveBeenCalled();
     },
   );
 
   it.each(["1", "2", "3", "4", "5+"])("accepts the year %s", async (year) => {
     await updateManagerUserAction("user-1", "year", year);
 
-    expect(adminServer.adminUpdateUserInfoById).toHaveBeenCalledWith("user-1", {
-      year,
+    expect(serverRpc).toHaveBeenCalledWith("admin_update_user_info", {
+      p_user_id: "user-1",
+      p_patch: { year },
     });
   });
 
   it("allows clearing the year", async () => {
     await updateManagerUserAction("user-1", "year", null);
 
-    expect(adminServer.adminUpdateUserInfoById).toHaveBeenCalledWith("user-1", {
-      year: null,
+    expect(serverRpc).toHaveBeenCalledWith("admin_update_user_info", {
+      p_user_id: "user-1",
+      p_patch: { year: null },
     });
   });
 
@@ -201,7 +218,7 @@ describe("updateManagerUserAction: the column allowlist", () => {
     await expect(updateManagerUserAction("", "major", "Art")).rejects.toThrow(
       "A user id is required.",
     );
-    expect(adminServer.adminUpdateUserInfoById).not.toHaveBeenCalled();
+    expect(serverRpc).not.toHaveBeenCalled();
   });
 
   it("checks the manager guard before validating anything", async () => {
@@ -211,7 +228,7 @@ describe("updateManagerUserAction: the column allowlist", () => {
     await expect(updateManagerUserAction("user-1", "major", "Art")).rejects.toBe(
       redirect,
     );
-    expect(adminServer.adminUpdateUserInfoById).not.toHaveBeenCalled();
+    expect(serverRpc).not.toHaveBeenCalled();
   });
 });
 

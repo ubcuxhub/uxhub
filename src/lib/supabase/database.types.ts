@@ -151,6 +151,51 @@ export type Database = {
           },
         ]
       }
+      audit_events: {
+        Row: {
+          action: string
+          actor_id: string | null
+          changes: Json | null
+          context: NonNullable<Json>
+          created_at: string
+          id: string
+          source: Database["public"]["Enums"]["audit_event_source"]
+          subject_id: string | null
+          subject_table: string | null
+        }
+        ComputedFields: never
+        Insert: {
+          action: string
+          actor_id?: string | null
+          changes?: Json | null
+          context?: NonNullable<Json>
+          created_at?: string
+          id?: string
+          source: Database["public"]["Enums"]["audit_event_source"]
+          subject_id?: string | null
+          subject_table?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          changes?: Json | null
+          context?: NonNullable<Json>
+          created_at?: string
+          id?: string
+          source?: Database["public"]["Enums"]["audit_event_source"]
+          subject_id?: string | null
+          subject_table?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_events_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "user_info"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       check_in_activity: {
         Row: {
           attendance_version: string
@@ -1660,6 +1705,14 @@ export type Database = {
         Returns: boolean
       }
       admin_event_team_settings: { Args: { p_event_id: string }; Returns: Json }
+      admin_update_user_info: {
+        Args: { p_patch: Json; p_user_id: string }
+        Returns: undefined
+      }
+      admin_user_editable_columns: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
       agenda_draft_instant: {
         Args: { p_date: string; p_time: string }
         Returns: string
@@ -1681,6 +1734,10 @@ export type Database = {
           refunded_total_cents: number
           ticket_removed: boolean
         }[]
+      }
+      audit_ignored_columns: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
       }
       can_edit_application_response: {
         Args: { p_application_id: string; p_question_id: string }
@@ -2295,6 +2352,7 @@ export type Database = {
       void_event_ticket: { Args: { p_ticket_id: string }; Returns: string }
     }
     Enums: {
+      audit_event_source: "admin_change" | "user_activity"
       event_application_status:
         | "draft"
         | "submitted"
@@ -2448,6 +2506,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      audit_event_source: ["admin_change", "user_activity"],
       event_application_status: [
         "draft",
         "submitted",
