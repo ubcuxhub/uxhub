@@ -112,7 +112,7 @@ describe("saveInterestsAction", () => {
     updateUserSetup.mockImplementation(async (_db, _id, patch) => ({ ...row, ...patch }));
   });
 
-  it("keeps managers' free tags and replaces the member's chips, without touching setup", async () => {
+  it("keeps execs' free tags and replaces the member's chips, without touching setup", async () => {
     const saved = await saveInterestsAction({ interests: ["uxathon", "mentorship"] });
     expect(updateUserSetup).toHaveBeenCalledWith({}, "member-1", {
       interests: ["Figma whiz", "uxathon", "mentorship"],

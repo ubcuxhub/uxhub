@@ -15,8 +15,9 @@ import { mergeMemberInterests } from "./lib/interests";
 
 /**
  * Settings' interests chips. Unlike setup's `finishSetupAction`, it keeps the
- * free tags managers added to the same column and leaves `setup_step` alone,
- * so editing interests here neither drops a manager's tags nor ends setup.
+ * free tags execs added to the same column (shown read-only beside the chips)
+ * and leaves `setup_step` alone, so editing interests here neither drops an
+ * exec's tags nor ends setup.
  * The service role writes, as `interests` has no member grant, and only the
  * signed-in member's own row.
  */

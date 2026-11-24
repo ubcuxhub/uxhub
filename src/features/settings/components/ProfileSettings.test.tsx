@@ -174,6 +174,20 @@ describe("ProfileEditor states", () => {
     expect(client.membershipName).not.toHaveBeenCalled();
   });
 
+  it("shows every stored interest, including tags execs added, and keeps those out of the save", async () => {
+    renderEditor({ ...MEMBER, interests: ["Figma whiz", "ux-research"] });
+    const interests = section("Interests");
+    expect(interests.getByText("Added by UX Hub execs")).toBeTruthy();
+    expect(interests.getByText("Figma whiz")).toBeTruthy();
+    expect(interests.queryByRole("button", { name: "Figma whiz" })).toBeNull();
+    expect(interests.getByText("2 selected")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: "UI design" }));
+    // The chips are all the member sends; the server keeps the exec's tag.
+    await waitFor(() => expect(client.saveInterests).toHaveBeenCalledWith(["ux-research", "ui-design"]));
+    expect(interests.getByText("3 selected")).toBeTruthy();
+  });
+
   it("tags admins and managers", () => {
     renderEditor({ ...MEMBER, role_access: "admin" });
     expect(screen.getByText("Admin")).toBeTruthy();

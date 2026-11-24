@@ -18,7 +18,7 @@ import { AutosaveStatus } from "@/features/applications/components/AutosaveStatu
 import { AvatarPicker, type AvatarChoice } from "@/features/setup/components/AvatarPicker";
 import { BirthdayField } from "@/features/setup/components/BirthdayField";
 import { DietaryFields, type DietaryValue } from "@/features/setup/components/DietaryFields";
-import { InterestFields } from "@/features/setup/components/InterestFields";
+import { InterestFields, pickExecInterestTags } from "@/features/setup/components/InterestFields";
 import type { InterestId } from "@/features/setup/lib/options";
 import { FACULTIES, STUDENT_STATUSES, YEAR_LEVELS } from "@/lib/constants";
 import { formatEventDate } from "@/lib/date";
@@ -98,6 +98,10 @@ export function ProfileTab({
   onRetry,
   defaultPhotoOpen = false,
 }: ProfileTabProps) {
+  // Everything stored in `interests` shows: the chips the member picks, plus
+  // any free tags execs added, which saving keeps (`mergeMemberInterests`).
+  const execTags = pickExecInterestTags(user.interests ?? []);
+  const interestCount = interests.length + execTags.length;
   const photoPanelId = useId();
   const photoButtonRef = useRef<HTMLButtonElement>(null);
   const photoPanelRef = useRef<HTMLDivElement>(null);
@@ -303,13 +307,13 @@ export function ProfileTab({
         description="Helps us plan events you'll enjoy."
         meta={
           <Badge variant="neutral" aria-live="polite">
-            {interests.length ? `${interests.length} selected` : "None selected"}
+            {interestCount ? `${interestCount} selected` : "None selected"}
           </Badge>
         }
         saveState={saveStates.interests}
         onRetry={() => onRetry("interests")}
       >
-        <InterestFields value={interests} onChange={onInterestsChange} />
+        <InterestFields value={interests} onChange={onInterestsChange} execTags={execTags} />
       </ProfileSection>
 
       <ProfileSection

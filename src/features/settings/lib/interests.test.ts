@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { mergeMemberInterests } from "./interests";
 
 describe("mergeMemberInterests", () => {
-  it("replaces the member's chips and keeps managers' free tags", () => {
+  it("replaces the member's chips and keeps the free tags execs added", () => {
     expect(mergeMemberInterests(["Figma whiz", "workshops", "uxathon"], ["mentorship"])).toEqual([
       "Figma whiz",
       "mentorship",
