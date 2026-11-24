@@ -23,6 +23,9 @@ const NOT_IN_GALLERY: readonly string[] = [
   "event-location",
   // Responsive staff actions have dedicated wide and narrow interactive examples.
   "agenda-day-table",
+  // Not on a screen yet: its own demo covers it until the event manager's
+  // Teams tab lands, which the admin compositions can then show.
+  "event-teams-view",
 ];
 
 const SLUGS = new Set(ENTRIES.map((entry) => entry.slug));

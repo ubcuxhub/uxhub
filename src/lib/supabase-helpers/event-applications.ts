@@ -1,4 +1,6 @@
-import { listApplicationFiles, removeApplicationFiles } from "./application-files";
+import { hasActiveMembership } from "@/features/memberships/lib/expiry";
+
+import { fetchMembershipTermEndsAt } from "./app-settings";
 import type { DbClient } from "./types";
 import { TABLES } from "./tables";
 import type {
@@ -6,8 +8,11 @@ import type {
   EventApplicationQuestionRow,
   EventApplicationResponseInsert,
   EventApplicationRow,
+  StudentStatus,
   SubmittedApplicationRow,
   SubmittedApplicationStatus,
+  UniversityYear,
+  UserInfoRow,
 } from "@/lib/supabase/models";
 import { formatUserName } from "@/lib/user-name";
 
@@ -80,6 +85,13 @@ export interface ApplicationSummary {
   email: string;
   /** Their major, else faculty, for a second line under the name. */
   program: string | null;
+  year: UniversityYear | null;
+  studentStatus: StudentStatus | null;
+  /**
+   * Their membership tier's stored name (`explorer`, `nonUbc`) while it is
+   * active, else null: a lapsed member reads as a non-member.
+   */
+  membership: string | null;
   /** When it was submitted. */
   appliedAt: string;
   status: SubmittedApplicationStatus;
@@ -197,15 +209,20 @@ export async function fetchEventApplicationSummaries(
   const ticketHolders = new Set(
     (ticketsResult.data ?? []).map((ticket) => ticket.user_id)
   );
-  const { data: users, error: usersError } = await supabase
-    .from(TABLES.userInfo)
-    .select("id, first_name, last_name, email, major, faculty")
-    .in(
-      "id",
-      applications.map((application) => application.user_id)
-    );
-  if (usersError) throw usersError;
-  const userById = new Map((users ?? []).map((user) => [user.id, user]));
+  const [usersResult, termEndsAt] = await Promise.all([
+    supabase
+      .from(TABLES.userInfo)
+      .select(
+        "id, first_name, last_name, email, major, faculty, year, student_status, membership_type_id, membership_expires_at, membership_types!membership_type_id(name)"
+      )
+      .in(
+        "id",
+        applications.map((application) => application.user_id)
+      ),
+    fetchMembershipTermEndsAt(supabase),
+  ]);
+  if (usersResult.error) throw usersResult.error;
+  const userById = new Map((usersResult.data ?? []).map((user) => [user.id, user]));
 
   return applications.map((application) => {
     const user = userById.get(application.user_id);
@@ -215,12 +232,32 @@ export async function fetchEventApplicationSummaries(
       name: user ? formatUserName(user) : "Unknown User",
       email: user?.email ?? "",
       program: user?.major || user?.faculty || null,
+      year: user?.year ?? null,
+      studentStatus: user?.student_status ?? null,
+      membership: user ? activeMembershipName(user, termEndsAt) : null,
       appliedAt: application.submitted_at ?? application.created_at,
       status: application.status,
       offerExpiresAt: application.offer_expires_at,
       hasTicket: ticketHolders.has(application.user_id),
     };
   });
+}
+
+/**
+ * The tier name of a membership that is still active (its own expiry and the
+ * club-wide term end both ahead), else null.
+ */
+export function activeMembershipName(
+  user: Pick<UserInfoRow, "membership_type_id" | "membership_expires_at"> & {
+    membership_types?: { name: string } | { name: string }[] | null;
+  },
+  termEndsAt: string | null
+): string | null {
+  if (!hasActiveMembership(user, termEndsAt)) return null;
+  const tier = Array.isArray(user.membership_types)
+    ? user.membership_types[0]
+    : user.membership_types;
+  return tier?.name ?? null;
 }
 
 /**
@@ -248,29 +285,6 @@ export async function createDraftApplication(
   }
   if (error) throw error;
   return { ...data, decisions_release_at: null };
-}
-
-/**
- * Deletes the caller's draft and the files uploaded for it. Files go first,
- * while Storage still sees a draft; responses cascade with the row. Returns
- * false when there was no draft to delete (already submitted, or gone).
- */
-export async function deleteDraftApplication(
-  supabase: DbClient,
-  input: { applicationId: string; userInfoId: string }
-): Promise<boolean> {
-  const files = await listApplicationFiles(supabase, input);
-  await removeApplicationFiles(supabase, files);
-
-  const { data, error } = await supabase
-    .from(TABLES.eventApplications)
-    .delete()
-    .eq("id", input.applicationId)
-    .eq("status", "draft")
-    .select("id");
-
-  if (error) throw error;
-  return (data ?? []).length > 0;
 }
 
 /** Why `submitEventApplication` did not submit, or `SUBMITTED`. */

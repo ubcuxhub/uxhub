@@ -38,6 +38,62 @@ export async function fetchEventMentors(
     .filter((mentor): mentor is MentorRow => Boolean(mentor));
 }
 
+/** One people section on an event page: its title, and its people in order. */
+export interface EventPeopleSection {
+  id: string;
+  title: string;
+  people: MentorRow[];
+}
+
+/**
+ * The event's people sections (Judges, Mentors, Speakers, Panelists, or a
+ * custom title) in their page order, each with its people in order. A person
+ * can sit in several sections. Sections with nobody in them are left out.
+ */
+export async function fetchEventPeopleSections(
+  supabase: DbClient,
+  eventId: string
+): Promise<EventPeopleSection[]> {
+  const [sectionsResult, linksResult] = await Promise.all([
+    supabase
+      .from(TABLES.eventPeopleSections)
+      .select("id, title")
+      .eq("event_id", eventId)
+      .order("sort_order", { ascending: true })
+      .order("created_at", { ascending: true }),
+    supabase
+      .from(TABLES.eventMentors)
+      .select("section_id, mentor_id, sort_order")
+      .eq("event_id", eventId)
+      .order("sort_order", { ascending: true }),
+  ]);
+
+  if (sectionsResult.error) throw sectionsResult.error;
+  if (linksResult.error) throw linksResult.error;
+  const sections = sectionsResult.data ?? [];
+  const links = linksResult.data ?? [];
+  if (!sections.length || !links.length) return [];
+
+  const { data: mentors, error } = await supabase
+    .from(TABLES.mentors)
+    .select("*")
+    .in("id", [...new Set(links.map((link) => link.mentor_id))]);
+
+  if (error) throw error;
+  const byId = new Map((mentors ?? []).map((mentor) => [mentor.id, mentor]));
+
+  return sections
+    .map((section) => ({
+      id: section.id,
+      title: section.title,
+      people: links
+        .filter((link) => link.section_id === section.id)
+        .map((link) => byId.get(link.mentor_id))
+        .filter((mentor): mentor is MentorRow => Boolean(mentor)),
+    }))
+    .filter((section) => section.people.length > 0);
+}
+
 export async function fetchEventSponsors(
   supabase: DbClient,
   eventId: string

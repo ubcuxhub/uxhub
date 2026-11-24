@@ -129,9 +129,20 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
   `children`; each record is a child route (`users/[userId]/page.tsx`,
   `events/(browse)/[event]/page.tsx`) whose content (`RecordView`) opens in a
   side peek drawer over the list, on a row click and on a refresh alike. The
-  `(browse)` group keeps the event builder (`events/[event]/edit`),
-  `check-in`, `review-applications` and `create-new` out of the list layout,
-  as full pages; the builder wears the drawer's top bar (`RecordPageTopBar`).
+  `(browse)` group keeps the event builder (`events/[event]/edit`), the
+  event manager and `create-new` out of the list layout, as full pages. The
+  event manager is a route group, `events/[event]/(manager)/`, whose layout
+  wears the drawer's top bar on every tab (`RecordPage`: close to the list,
+  collapse back into the drawer, and the expand/collapse morph) and renders
+  the event's header and tabs (`TabNav`) around each tab's page: `overview`,
+  `agenda`, `check-in`, `teams` (shown when the event has teams) and
+  `review-applications` (the Applications tab, shown when the event takes
+  applications). The tabs are listed in
+  `src/features/admin/lib/event-manager.ts`; a new tab is a line there plus its
+  page in the group. The builder and the phone scanner
+  (`(scanner)/…/check-in/scan`) stay outside it; the builder opens with a
+  "Back to event" link to the manager's Overview ("Back to Manage Events" on
+  `create-new`).
   Record route components still call `requireAdmin()` before they fetch
   (layouts and pages render in parallel). Every `@flow` page has a canonical
   twin, and no `@flow/(.)admin` route exists; `src/app/flow-routes.test.ts`
@@ -148,9 +159,10 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
   handlers for callbacks, webhooks, uploads, and flows that require an HTTP
   endpoint.
 - Student-facing event and checkout routes use slugs. Admin event routes use
-  event IDs (a slug redirects to the ID): `/admin/events/<id>` is the event's
-  overview (the record drawer, with a quick edit of its status and dates) and
-  `/admin/events/<id>/edit` is the full builder.
+  event IDs (a slug redirects to the ID): `/admin/events/<id>` is the quick
+  peek (the record drawer, with a quick edit of its status and dates), whose
+  expand button opens `/admin/events/<id>/overview`, the event manager's
+  Overview tab; `/admin/events/<id>/edit` is the full builder.
 - Settings are a hash-driven dialog (`#settings/<tab>`), not standalone portal
   pages. Use `openSettings(tab)` from
   `src/features/settings/components/SettingsDialog`.
@@ -228,8 +240,9 @@ Local values belong in the git-ignored `.env.local`.
   production build pushes migrations through. Never put it in `.env.local`
 - Application emails: secret `APPLICATION_EMAILS_SECRET`, set in Vercel's
   Production environment only, matching the `application_emails_secret` Vault
-  secret the pg_cron job signs with (`supabase/README.md`, "Application
-  emails")
+  secret the pg_cron jobs sign with. It also verifies event reminders, whose
+  job signs its own message with it (`supabase/README.md`, "Application
+  emails" and "Event reminder emails")
 
 `SQUARE_ENV` is optional and defaults to the sandbox; set it to `production`
 only for production credentials.

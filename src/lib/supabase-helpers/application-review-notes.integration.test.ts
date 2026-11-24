@@ -80,17 +80,25 @@ describe("fetchReviewerNotes", () => {
         last_name: "Pictured",
       });
       const photoPath = `profiles/${pictured.id}/${randomUUID()}.png`;
+      // A photo wins over a preset, as setup and Settings show it.
       const { error: photoError } = await fixtures.supabase
         .from("user_info")
-        .update({ profile_photo_path: photoPath })
+        .update({ profile_photo_path: photoPath, avatar_preset: "sparkle" })
         .eq("id", pictured.id);
       if (photoError) throw photoError;
+      const shaped = await fixtures.createUser({ role_access: "manager" });
+      const { error: presetError } = await fixtures.supabase
+        .from("user_info")
+        .update({ avatar_preset: "flower" })
+        .eq("id", shaped.id);
+      if (presetError) throw presetError;
       const leaver = await fixtures.createUser({ role_access: "admin" });
 
       // Written out of order, so the read has to sort.
       const second = await seedNote(fixtures, applicationId, pictured.id, "Second.\nTwo lines.", "2026-11-02T10:00:00.000Z");
       const first = await seedNote(fixtures, applicationId, leaver.id, "First.", "2026-11-01T10:00:00.000Z");
       const third = await seedNote(fixtures, applicationId, reader.id, "Third.", "2026-11-03T10:00:00.000Z");
+      const fourth = await seedNote(fixtures, applicationId, shaped.id, "Fourth.", "2026-11-04T10:00:00.000Z");
       await seedNote(fixtures, other.applicationId, reader.id, "Elsewhere.");
 
       // Accounts are anonymised, not removed: the note stays as "Deleted user".
@@ -100,7 +108,7 @@ describe("fetchReviewerNotes", () => {
       if (deleteError) throw deleteError;
 
       const notes = await fetchReviewerNotes(clientAs(reader), applicationId);
-      expect(notes.map((note) => note.id)).toEqual([first, second, third]);
+      expect(notes.map((note) => note.id)).toEqual([first, second, third, fourth]);
       expect(notes[0]).toEqual({
         id: first,
         body: "First.",
@@ -118,6 +126,7 @@ describe("fetchReviewerNotes", () => {
         avatarUrl: null,
         deleted: false,
       });
+      expect(notes[3].author).toMatchObject({ id: shaped.id, avatarUrl: "/auth/shapes/flower.png" });
 
       // Applicants never see the thread, not even on their own application.
       expect(await fetchReviewerNotes(clientAs(applicant), applicationId)).toEqual([]);

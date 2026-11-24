@@ -24,6 +24,7 @@ const FIXTURE: SetupState = {
   avatarPreset: null,
   profilePhotoPath: null,
   interests: [],
+  birthDate: null,
 };
 
 const wait = () => new Promise((resolve) => setTimeout(resolve, 600));
@@ -40,6 +41,7 @@ function fakeClient(): SetupClient {
       ok: true,
       setup: await write({ userType, userTypeConfirmed: true, step: nextSetupStep(state.step, "about") }),
     }),
+    saveBirthDate: (birthDate) => write({ birthDate }),
     saveDietary: (needs) => write({ ...needs, step: nextSetupStep(state.step, "dietary") }),
     savePhoto: ({ avatarPreset }) =>
       write({

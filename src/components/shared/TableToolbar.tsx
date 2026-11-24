@@ -13,7 +13,7 @@ export interface TableToolbarProps {
   actions?: React.ReactNode;
   /** Above 0, swaps `actions` for the count, `bulkActions` and Clear selection. */
   selectedCount?: number;
-  /** E.g. `<Button variant="secondary" size="sm"><Download />Export to CSV</Button>`. */
+  /** E.g. `<Button variant="secondary"><Download />Export to CSV</Button>`. */
   bulkActions?: React.ReactNode;
   onClearSelection?: () => void;
   /**
@@ -44,12 +44,22 @@ export interface TableRowCountValue {
   range?: { from: number; to: number };
 }
 
+/**
+ * Buttons in the toolbar are as tall as the search field: 44px on phones, then
+ * `--size-control` (40, or 32 in compact density), the same token `Input` uses.
+ * Set on the action groups so a caller's own buttons match too.
+ */
+const MATCH_FIELD_HEIGHT = "[&_button]:h-11 sm:[&_button]:h-(--size-control)";
+
 const FOCUSABLE = "button:not(:disabled), a[href], [tabindex]:not([tabindex='-1'])";
 
 /**
  * The bar above an admin table (§3.16). Search always fills the row; the right
  * side is "Sort and filter" until rows are selected, then "2 selected", the
  * bulk actions and Clear selection.
+ *
+ * Buttons in the action groups are sized to the search field (see
+ * `MATCH_FIELD_HEIGHT`), so a caller passes plain `md` buttons.
  *
  * The count is announced from a live region that stays mounted, so the first
  * tick is read as well as the later ones. When the selection empties and
@@ -96,7 +106,7 @@ function TableToolbar({
         {selecting ? `${selectedCount} selected` : ""}
       </p>
       {selecting ? (
-        <div className="flex flex-wrap items-center gap-3 sm:shrink-0 sm:flex-nowrap">
+        <div className={cn("flex flex-wrap items-center gap-3 sm:shrink-0 sm:flex-nowrap", MATCH_FIELD_HEIGHT)}>
           <p
             aria-hidden
             className="text-body text-foreground tabular-nums sm:whitespace-nowrap"
@@ -107,7 +117,6 @@ function TableToolbar({
           <Button
             type="button"
             variant="secondary"
-            size="sm"
             onClick={onClearSelection}
           >
             <X aria-hidden />
@@ -117,7 +126,7 @@ function TableToolbar({
       ) : actions ? (
         <div
           data-slot="table-toolbar-actions"
-          className="flex items-center gap-3 sm:shrink-0"
+          className={cn("flex items-center gap-3 sm:shrink-0", MATCH_FIELD_HEIGHT)}
         >
           {actions}
         </div>

@@ -146,6 +146,84 @@ export async function releasePurchaseConfirmationEmailClaim(
   if (error) throw error;
 }
 
+/** One completed Square refund on a purchase, as its email is tracked. */
+export interface PurchaseRefundEmailInput {
+  squareRefundId: string;
+  purchaseId: string;
+  /** This refund's amount, not the purchase's running total. */
+  amountCents: number;
+  currency: string;
+}
+
+/**
+ * Atomically reserves the one allowed email for a completed refund. The row
+ * is created on first sight (a duplicate insert is ignored), then claimed by
+ * setting `email_attempted_at` where it is still unset, which only one caller
+ * can win. False when another pass already claimed or sent it. Service role
+ * only.
+ */
+export async function claimPurchaseRefundEmail(
+  supabase: DbClient,
+  input: PurchaseRefundEmailInput
+): Promise<boolean> {
+  const { error: insertError } = await supabase
+    .from(TABLES.purchaseRefundEmails)
+    .upsert(
+      {
+        square_refund_id: input.squareRefundId,
+        purchase_id: input.purchaseId,
+        amount_cents: input.amountCents,
+        currency: input.currency,
+      },
+      { onConflict: "square_refund_id", ignoreDuplicates: true }
+    );
+
+  if (insertError) throw insertError;
+
+  const { data, error } = await supabase
+    .from(TABLES.purchaseRefundEmails)
+    .update({ email_attempted_at: new Date().toISOString() })
+    .eq("square_refund_id", input.squareRefundId)
+    .eq("purchase_id", input.purchaseId)
+    .is("email_attempted_at", null)
+    .is("email_sent_at", null)
+    .select("square_refund_id")
+    .maybeSingle();
+
+  if (error) throw error;
+  return data !== null;
+}
+
+/**
+ * Hands a refund email's claim back when the send did not happen, so a later
+ * webhook pass may try again. Never undoes a send that went out.
+ */
+export async function releasePurchaseRefundEmailClaim(
+  supabase: DbClient,
+  squareRefundId: string
+): Promise<void> {
+  const { error } = await supabase
+    .from(TABLES.purchaseRefundEmails)
+    .update({ email_attempted_at: null })
+    .eq("square_refund_id", squareRefundId)
+    .is("email_sent_at", null);
+
+  if (error) throw error;
+}
+
+/** Records that a refund's email went out. */
+export async function markPurchaseRefundEmailSent(
+  supabase: DbClient,
+  squareRefundId: string
+): Promise<void> {
+  const { error } = await supabase
+    .from(TABLES.purchaseRefundEmails)
+    .update({ email_sent_at: new Date().toISOString() })
+    .eq("square_refund_id", squareRefundId);
+
+  if (error) throw error;
+}
+
 export async function fetchPurchasesForUser(
   supabase: DbClient,
   userId: string,

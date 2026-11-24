@@ -58,7 +58,7 @@ describe("Volunteer Schedule validation", () => {
     expect(eventContentProblem({ ...emptyContent(), links: [staffLink("")] }, true)).toBeNull();
     expect(eventContentProblem({ ...emptyContent(), links: [staffLink("")] })).toContain("URL");
     expect(() => parseEventContent({ ...emptyContent(), links: [staffLink(), staffLink()] })).toThrow(/one Volunteer/);
-    for (const visibility of ["everyone", "going", "after_event"]) expect(() => parseEventContent({ ...emptyContent(), links: [{ ...staffLink(), visibility }] })).toThrow(/staff/);
+    for (const visibility of ["everyone", "going", "after_event"]) expect(() => parseEventContent({ ...emptyContent(), links: [{ ...staffLink(), visibility }] })).toThrow(/only to UX Hub execs/);
   });
   it("forces staff access on type changes and restores normal defaults on conversion back", () => {
     const ordinary = { ...staffLink(), type: "other" as const, visibility: "everyone" as const, audience_edited: true };

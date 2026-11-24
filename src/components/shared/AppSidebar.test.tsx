@@ -8,7 +8,10 @@ import ShellLayout from "@/app/(app)/(shell)/layout";
 const nav = vi.hoisted(() => ({ pathname: "/portal" }));
 const cookieJar = vi.hoisted(() => ({ value: undefined as string | undefined }));
 
-vi.mock("next/navigation", () => ({ usePathname: () => nav.pathname }));
+vi.mock("next/navigation", () => ({
+  usePathname: () => nav.pathname,
+  useRouter: () => ({ refresh: () => {} }),
+}));
 vi.mock("next/headers", () => ({
   cookies: async () => ({
     get: (name: string) =>

@@ -9,6 +9,12 @@ function input(f: Fixtures, eventId: string | null, event: Record<string, unknow
 const future = "2099-08-01T17:00:00Z";
 
 describe("event builder publication", () => {
+  it("publishes a short overview of up to 120 characters, counting an emoji once", () => withFixtures(async f => {
+    const event = await f.createEvent({ status: "draft" });
+    const publish = (short_description: string) => f.supabase.from("events").update({ status: "active", short_description }).eq("id", event.id);
+    expect((await publish("\u{1F389}".repeat(120))).error).toBeNull();
+    expect((await publish("x".repeat(121))).error?.hint).toBe("EVENT_PUBLICATION_INVALID");
+  }));
   it("publishes/schedules/reschedules/cancels atomically while preserving registration dates", () => withFixtures(async f => {
     const event = await f.createEvent({ status: "draft" });
     const read = () => fetchEventById(f.supabase, event.id);

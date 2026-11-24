@@ -56,6 +56,7 @@ function storedEvent(overrides: Partial<EventRow> = {}): EventRow {
     regular_price: 10,
     member_price: 5,
     max_capacity: 40,
+    reminder_schedule: "off",
     starts_at: "2099-11-20T02:00:00.000Z",
     ends_at: "2099-11-20T04:00:00.000Z",
     registration_opens_at: null,

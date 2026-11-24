@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { FlowLink } from "@/components/shared/FlowLink";
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
@@ -11,6 +12,8 @@ interface EventRegistrationActionProps {
   eventId: string;
   eventSlug: string;
   registrationAvailable: boolean;
+  /** An application event: the action is Apply, and opens the application form. */
+  requiresApplication?: boolean;
   unavailableLabel: string;
 }
 
@@ -18,6 +21,7 @@ export function EventRegistrationAction({
   eventId,
   eventSlug,
   registrationAvailable,
+  requiresApplication = false,
   unavailableLabel,
 }: EventRegistrationActionProps) {
   const [alreadyRegistered, setAlreadyRegistered] = useState(false);
@@ -56,6 +60,16 @@ export function EventRegistrationAction({
     return (
       <Button disabled className="self-start">
         {unavailableLabel}
+      </Button>
+    );
+  }
+
+  // As on the portal event page's registration panel: applicants apply on the
+  // application form first, and register once accepted.
+  if (requiresApplication) {
+    return (
+      <Button asChild className="self-start">
+        <Link href={`/portal/events/${eventSlug}/apply`}>Apply</Link>
       </Button>
     );
   }

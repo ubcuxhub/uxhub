@@ -30,7 +30,7 @@ export function deletionRefusal(blockers: DeletionInfo["blockers"]) {
     members.length ? `${members.join(", ")}.` : null,
     blockers.livePurchases ? "Some purchases aren’t failed, canceled or refunded." : null,
   ].filter(Boolean);
-  return `${reasons.join(" ")} Free staff test registrations on a draft don’t count. Nothing has been deleted.`;
+  return `${reasons.join(" ")} Free test registrations by UX Hub execs on a draft don’t count. Nothing has been deleted.`;
 }
 
 /**

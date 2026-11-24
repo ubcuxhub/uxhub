@@ -1,13 +1,15 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { headers } from "next/headers";
+import { after } from "next/server";
 
 import { requireAuth } from "@/lib/auth/guards";
+import { getHeadersOrigin } from "@/lib/http/request-origin";
 import { errorFields, log } from "@/lib/log";
 import { createClient } from "@/lib/supabase/server";
 import {
   createDraftApplication,
-  deleteDraftApplication,
   fetchApplicationQuestions,
   fetchUserEventApplication,
   submitEventApplication,
@@ -28,6 +30,7 @@ import {
   type ApplicationAnswers,
   type ApplicationQuestion,
 } from "./lib/application-form";
+import { sendApplicationReceivedEmail } from "./received-email";
 
 /**
  * Why an action stopped. The refusals (`not_accepting`, `not_open`, `closed`,
@@ -54,7 +57,7 @@ export type ApplicationActionResult =
       fieldErrors?: AnswerErrors;
       /** Whether the answers were saved as a draft before it stopped. */
       saved?: boolean;
-      /** Set when the draft exists, so the form can offer Delete. */
+      /** Set when the draft exists. */
       applicationId?: string;
     };
 
@@ -258,8 +261,28 @@ const SUBMIT_REFUSALS: Partial<Record<SubmitApplicationStatus, string>> = {
 };
 
 /**
+ * Queues the "we received your application" email to send after the response.
+ * Called only on `SUBMITTED`: the RPC moves a draft to submitted under a row
+ * lock and answers any later submit with `NOT_DRAFT`, so a retried or
+ * concurrent submit can't send it twice. The application is submitted by now,
+ * so nothing here may fail the action.
+ */
+async function scheduleReceivedEmail(context: Context, applicationId: string) {
+  try {
+    const origin = getHeadersOrigin(await headers());
+    const { supabase, event, user } = context;
+    after(() =>
+      sendApplicationReceivedEmail({ supabase, applicationId, event, user, origin })
+    );
+  } catch (error) {
+    log.warn("application.received_email_failed", { applicationId, ...errorFields(error) });
+  }
+}
+
+/**
  * Saves the answers, then submits the draft. Unanswered or invalid questions
- * come back as `fieldErrors`, with the answers still saved as a draft.
+ * come back as `fieldErrors`, with the answers still saved as a draft. A
+ * successful submit also emails the applicant that it was received.
  */
 export async function submitApplication(
   eventId: string,
@@ -299,6 +322,7 @@ export async function submitApplication(
   if (result.status === "SUBMITTED") {
     log.info("application.submitted", { applicationId });
     revalidate();
+    await scheduleReceivedEmail(context, applicationId);
     return { ok: true, applicationId };
   }
 
@@ -325,37 +349,4 @@ export async function submitApplication(
     saved: true,
     applicationId,
   };
-}
-
-/** Deletes the member's draft, its answers and its files. */
-export async function deleteApplication(
-  applicationId: string
-): Promise<{ ok: true } | { ok: false; error: string }> {
-  const user = await requireAuth();
-  if (typeof applicationId !== "string" || !applicationId) {
-    return { ok: false, error: "This application can't be deleted." };
-  }
-  const supabase = await createClient();
-
-  try {
-    const deleted = await deleteDraftApplication(supabase, {
-      applicationId,
-      userInfoId: user.id,
-    });
-    if (!deleted) {
-      log.warn("application.delete_refused", { applicationId });
-      return {
-        ok: false,
-        error: "This application can't be deleted. Submitted applications are kept.",
-      };
-    }
-  } catch (error) {
-    log.error("application.delete_failed", { applicationId, ...errorFields(error) });
-    return { ok: false, error: "Your application couldn't be deleted. Try again." };
-  }
-
-  log.info("application.draft_deleted", { applicationId });
-  revalidatePath("/portal/events/[event]", "page");
-  revalidatePath("/portal/events/[event]/apply", "page");
-  return { ok: true };
 }

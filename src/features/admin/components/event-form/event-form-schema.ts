@@ -1,6 +1,7 @@
 import { eventContentProblem, type EventContent } from "../../lib/event-content";
 import { dateLocationIssues, emptyAgendaDay, emptyLocation, type EventDateLocationDraft } from "../../lib/event-date-location";
 import { parseEventDescription, type EventDescription } from "@/lib/event-description";
+import { SHORT_OVERVIEW_MAX_LENGTH, shortOverviewTooLong } from "../../lib/event-overview";
 import { eventSlugError, priceError, suggestedEventSlug, websiteUrlError } from "../../lib/event-configuration";
 import {
   ResponseType,
@@ -17,6 +18,7 @@ import type {
   CheckInSessionInput,
 } from "@/features/admin/types";
 import { APPLICATION_FILE_MAX_BYTES } from "@/lib/supabase-helpers/application-files";
+import { isReminderSchedule, type ReminderSchedule } from "@/lib/supabase-helpers/event-reminders";
 import {
   datetimeLocalToTimestamptz,
   timestamptzToDatetimeLocal,
@@ -54,6 +56,8 @@ export interface EventFormState {
   starts_at: string;
   ends_at: string;
   max_capacity: string;
+  /** Reminder emails to ticket holders before the event starts. */
+  reminder_schedule: ReminderSchedule;
   image_url: string;
   registration_opens_at: string;
   registration_closes_at: string;
@@ -125,6 +129,9 @@ export const defaultFormState: EventFormState = {
   starts_at: "",
   ends_at: "",
   max_capacity: "",
+  // Off for anything saved before reminders existed; a new event starts at a
+  // day before (getInitialFormState).
+  reminder_schedule: "off",
   image_url: "",
   registration_opens_at: "",
   registration_closes_at: "",
@@ -146,6 +153,7 @@ export const defaultFormState: EventFormState = {
 export function getInitialFormState(): EventFormState {
   return {
     ...defaultFormState,
+    reminder_schedule: "1d",
     date_location: { version: 2, automatic: true, audience: "everyone", location: emptyLocation(), dates: [emptyAgendaDay()] },
   };
 }
@@ -182,6 +190,7 @@ export function formStateFromEvent(event: EventRow): EventFormState {
     starts_at: timestamptzToDatetimeLocal(event.starts_at),
     ends_at: timestamptzToDatetimeLocal(event.ends_at),
     max_capacity: String(event.max_capacity ?? ""),
+    reminder_schedule: isReminderSchedule(event.reminder_schedule) ? event.reminder_schedule : "off",
     image_url: event.image_url ?? "",
     registration_opens_at: timestamptzToDatetimeLocal(
       event.registration_opens_at
@@ -274,7 +283,7 @@ export function createFormSnapshot(
   });
 }
 
-export type BuilderSection = "basics" | "description" | "agenda" | "registration" | "teams" | "people" | "resources" | "summary" | "settings";
+export type BuilderSection = "basics" | "description" | "agenda" | "registration" | "teams" | "people" | "resources" | "publish";
 export interface EventFormIssue {
   section: BuilderSection;
   target: string;
@@ -283,7 +292,7 @@ export interface EventFormIssue {
   required: boolean;
 }
 
-/** One validation result drives publication, Summary, counts and field feedback. */
+/** One validation result drives publication, the Publish footer, counts and field feedback. */
 export function validateEventForm(
   formState: EventFormState,
   checkInEvents: CheckInSessionDraft[],
@@ -297,7 +306,7 @@ export function validateEventForm(
   };
   if (!formState.name.trim()) add("basics", "event-name", "Event name is required.", true);
   if (!formState.short_description.trim()) add("description", "short-overview", "Short description is required.", true);
-  if (formState.short_description.length > 50) add("description", "short-overview", "Short overview must be 50 characters or fewer.");
+  if (shortOverviewTooLong(formState.short_description)) add("description", "short-overview", `Short overview must be ${SHORT_OVERVIEW_MAX_LENGTH} characters or fewer.`);
   if (formState.description.length > 3000) add("description", "long-overview", "Long overview must be 3,000 characters or fewer.");
   if (formState.marketing_mode !== "disabled" && !formState.description.trim()) add("description", "long-overview", "Description is required.", true);
   if (formState.marketing_mode === "external") add("basics", "event-website", websiteUrlError(formState.marketing_url), !formState.marketing_url);
@@ -312,10 +321,10 @@ export function validateEventForm(
   if (invalidSections.mentors) add("people", "builder-people", "Every mentor requires a full name.", true);
   if (invalidSections.sponsors) add("people", "builder-people", "Every sponsor requires a name.", true);
   if (formState.publish_at) {
-    if (formState.status !== "draft") add("summary", "publish-date", "Only draft events can have a publish date.");
-    else if (!strictPacificTimestamp(formState.publish_at)) add("summary", "publish-date", "Publish date must be a valid date and time in Pacific time.");
-    else if (Date.parse(strictPacificTimestamp(formState.publish_at)!) <= Date.now()) add("summary", "publish-date", "Publish date must be in the future.");
-    else if (formState.registration_closes_at && strictPacificTimestamp(formState.registration_closes_at) && strictPacificTimestamp(formState.publish_at)! >= strictPacificTimestamp(formState.registration_closes_at)!) add("summary", "publish-date", "Publish time must be before registration closes.");
+    if (formState.status !== "draft") add("publish", "publish-date", "Only draft events can have a publish date.");
+    else if (!strictPacificTimestamp(formState.publish_at)) add("publish", "publish-date", "Publish date must be a valid date and time in Pacific time.");
+    else if (Date.parse(strictPacificTimestamp(formState.publish_at)!) <= Date.now()) add("publish", "publish-date", "Publish date must be in the future.");
+    else if (formState.registration_closes_at && strictPacificTimestamp(formState.registration_closes_at) && strictPacificTimestamp(formState.publish_at)! >= strictPacificTimestamp(formState.registration_closes_at)!) add("publish", "publish-date", "Publish time must be before registration closes.");
   }
   if (formState.date_location) {
     issues.push(...dateLocationIssues(formState.date_location).map(issue => ({ ...issue, section: "agenda" as const })));

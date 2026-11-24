@@ -106,7 +106,10 @@ export interface SeedEvent {
    * `event.header_colour`, or neither for the muted fallback.
    */
   bannerKey?: string;
-  /** Ordered groups supported by the delivered builder; attendee expansion is deferred. */
+  /**
+   * In page order. The builder and the portal event page both show every
+   * section: Judges, Mentors, Speakers, Panelists, or a custom title.
+   */
   peopleSections?: PeopleSection[];
   sponsors?: SeedSponsor[];
   links?: SeedLink[];
@@ -281,16 +284,13 @@ const designSprintAgenda: AgendaItem[] = [
   },
 ];
 
+/**
+ * Every kind of people section the event page shows: the four standard
+ * titles and a custom one. Speakers has one person, to show the singular
+ * count line; the people added for these sections have no photo, to show the
+ * initials. `design-sprint-upcoming` covers one person in two sections.
+ */
 const uxathonMentors: Mentor[] = [
-  {
-    name: "Alex Whitfield",
-    role: "Principal Designer",
-    company: "Electronic Arts",
-    image_url:
-      "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=400",
-    linkedin_url: "https://www.linkedin.com/in/example-alex-whitfield",
-    bio: "Judges the final round and runs a late-night crit for teams that are stuck.",
-  },
   {
     name: "Sofia Marchetti",
     role: "Staff Product Designer",
@@ -309,6 +309,18 @@ const uxathonMentors: Mentor[] = [
     linkedin_url: "https://www.linkedin.com/in/example-jordan-pike",
     bio: "Runs the Saturday-evening component workshop and the Sunday morning polish clinic.",
   },
+];
+
+const uxathonJudges: Mentor[] = [
+  {
+    name: "Alex Whitfield",
+    role: "Principal Designer",
+    company: "Electronic Arts",
+    image_url:
+      "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&q=80&w=400",
+    linkedin_url: "https://www.linkedin.com/in/example-alex-whitfield",
+    bio: "Judges the final round and runs a late-night crit for teams that are stuck.",
+  },
   {
     name: "Renée Bouchard",
     role: "Head of UX",
@@ -318,6 +330,69 @@ const uxathonMentors: Mentor[] = [
     linkedin_url: "https://www.linkedin.com/in/example-renee-bouchard",
     bio: "Final-round judge, focused on how well teams defend their design decisions.",
   },
+  {
+    name: "Tomás Ferreira",
+    role: "Design Director",
+    company: "Hootsuite",
+    linkedin_url: "https://www.linkedin.com/in/example-tomas-ferreira",
+    bio: "Final-round judge. Scores on research rigour first and visual polish second.",
+  },
+];
+
+const uxathonSpeakers: Mentor[] = [
+  {
+    name: "Nadia Haddad",
+    role: "VP of Design",
+    company: "Clio",
+    linkedin_url: "https://www.linkedin.com/in/example-nadia-haddad",
+    bio: "Opening keynote on framing an open-ended brief before you open Figma.",
+  },
+];
+
+const uxathonPanelists: Mentor[] = [
+  {
+    name: "Kenji Watanabe",
+    role: "Senior UX Researcher",
+    company: "Amazon",
+    linkedin_url: "https://www.linkedin.com/in/example-kenji-watanabe",
+    bio: "Sits on the Saturday lunch panel on running research in a weekend.",
+  },
+  {
+    name: "Olivia Brennan",
+    role: "Product Designer",
+    company: "Klue",
+    bio: "UXathon alumna, now on the panel she once asked questions of.",
+  },
+  {
+    name: "Samir Patel",
+    role: "Design Lead",
+    company: "Visier",
+    linkedin_url: "https://www.linkedin.com/in/example-samir-patel",
+    bio: "Talks about how hiring managers read a hackathon project in a portfolio.",
+  },
+];
+
+/** A custom title: the page counts its members as people. */
+const uxathonOrganizers: Mentor[] = [
+  {
+    name: "Ava Lindqvist",
+    role: "Events Lead",
+    company: "UX Hub",
+    bio: "Your first stop for anything about the venue, food, or schedule.",
+  },
+  {
+    name: "Ethan Mah",
+    role: "Logistics Coordinator",
+    company: "UX Hub",
+  },
+];
+
+const uxathonPeopleSections: PeopleSection[] = [
+  { title: "Speakers", people: uxathonSpeakers },
+  { title: "Judges", people: uxathonJudges },
+  { title: "Panelists", people: uxathonPanelists },
+  { title: "Mentors", people: uxathonMentors },
+  { title: "Organizers", people: uxathonOrganizers },
 ];
 
 const uxathonAgendaDayOne: AgendaItem[] = [
@@ -883,7 +958,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
       description_images: uxathonDescriptionImages,
     },
     imageKey: "4.png",
-    peopleSections: [{ title: "Mentors", people: uxathonMentors }],
+    peopleSections: uxathonPeopleSections,
     sponsors: seedSponsors,
     links: [
       slackLink("uxathon"),
@@ -1195,7 +1270,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
     staffVolunteerSchedule: "https://example.com/uxathon-volunteers",
     imageKey: "5.png",
     bannerKey: "banner-3.png",
-    peopleSections: [{ title: "Mentors", people: uxathonMentors }],
+    peopleSections: uxathonPeopleSections,
     sponsors: seedSponsors,
     links: [
       slackLink("uxathon"),

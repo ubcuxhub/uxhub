@@ -159,15 +159,18 @@ Beyond dates and prices, the fixtures fill in the event page:
 | Event | Dates | Also seeds |
 | --- | --- | --- |
 | `design-sprint-past`, `design-sprint-upcoming` | Monday to the next week's Friday | 6-day agenda over two weeks (week tabs), Mentors, teams of 3–4, Slack and participant package links. Two agenda item links: Final presentations → slides template (everyone), Crazy eights and storyboards → storyboard template (going only) |
-| `uxathon-past`, `uxathon-upcoming` | Saturday to Sunday | 2-day agenda, Mentors, teams of 2–4, links (the past one has a recap). The upcoming one is featured |
+| `uxathon-past`, `uxathon-upcoming` | Saturday to Sunday | 2-day agenda, Speakers, Judges, Panelists, Mentors and a custom Organizers section, teams of 2–4, links (the past one has a recap). The upcoming one is featured |
 | `thinkbox-office-tour`, `portfolio-review-night`, `student-panel` | One day | A one-day agenda |
 | `mentorship-program` | Ongoing | Teams open for two weeks, with going-only links. Three agenda sessions months apart (kickoff, mid-point critique, showcase), so the agenda shows a tab per day |
 | `industry-talk-ai-and-ux`, `student-panel` | — | Online, with meeting details |
 | `industry-talk-design-systems` | — | Hybrid, with meeting details the three deep fixtures can see |
 
-People sections use the delivered builder’s ordered groups. Attendee rendering
-of additional groups, full sponsor details and remaining resource placements
-is deferred to AEB-042; saved settings do not imply those flows are delivered.
+People sections use the builder's ordered groups (Judges, Mentors, Speakers,
+Panelists, or a custom title), and the portal event page shows each as its own
+card. The uxathons have one of every kind, and `design-sprint-upcoming` has
+one person in two sections. Full sponsor details and the remaining resource
+placements are still deferred to AEB-042; saved settings do not imply those
+flows are delivered.
 
 Agendas live in `event_agenda_days` and `event_agenda_items`, not the legacy
 `events.agenda` column, which the fixtures still fill for the public page.
