@@ -73,6 +73,7 @@ export default async function PortalEventPage({
   ]);
   const badge = eventBadgeFor(states[event.id]);
   const canceled = states[event.id].kind === "canceled";
+
   // Open Slack is for students going (checked in or not), and only when the
   // event has a Slack workspace link. RLS returns the links this viewer may see.
   const going = states[event.id].kind === "reg-going" || states[event.id].kind === "reg-checked-in";
@@ -87,7 +88,7 @@ export default async function PortalEventPage({
     event.ends_at && pacificDate(event.ends_at) !== pacificDate(event.starts_at);
 
   return (
-    <PageContainer backHref="/portal/events" backLabel="Back to Events" className="space-y-4">
+    <PageContainer backHref="/portal/events" backLabel="Back to Events" className="space-y-6">
       {/* RLS returns a draft to admins and managers only, so only they see this. */}
       {isDraftEvent(event) && (
         <Alert>This is a draft event. {DRAFT_EVENTS_NOTE}</Alert>
@@ -171,17 +172,21 @@ export default async function PortalEventPage({
         </div>
       </div>
 
-      {/* Registration and applications: one card whose layout follows the student's state. */}
-      <RegistrationPanel event={{ ...event, slug }} user={user} state={states[event.id]} unavailable={draftRegistrationBlocks(event, FLAGS.studentEvents)} />
-      {event.status === "draft" && <EventDraftSections event={event} />}
+      {/* Registration and Your team side by side (Figma 4640:2): equal columns,
+          stretched to the same height. Registration takes the full width when
+          there's no team card, and they stack below `xl`, where a column would
+          be too narrow for the ticket. */}
+      <div className={teams?.show && !canceled ? "grid grid-cols-1 gap-6 xl:grid-cols-2" : undefined}>
 
-      {/* Ticket holders only. Stacked under the registration panel for now;
-          placing it beside the panel is a follow-up. */}
-      {/* A canceled event's teams are locked for good, so the card goes. */}
-      {teams?.show && !canceled ? <TeamCard {...teams.props} /> : null}
+        {/* Registration and applications: one card whose layout follows the student's state. */}
+        <RegistrationPanel event={{ ...event, slug }} user={user} state={states[event.id]} unavailable={draftRegistrationBlocks(event, FLAGS.studentEvents)} />
+        {/* A canceled event's teams are locked for good, so the card goes. */}
+        {teams?.show && !canceled ? <TeamCard {...teams.props} /> : null}
+      </div>
       {teams && !teams.show && teams.inviteError && !canceled ? (
         <TeamInviteNotice inviteError={teams.inviteError} />
       ) : null}
+      {event.status === "draft" && <EventDraftSections event={event} />}
 
 
       <EventAgendaTable eventName={event.name} agenda={participant.agenda} />
