@@ -1,6 +1,7 @@
 import type { DbClient } from "./types";
 import { TABLES } from "./tables";
 import { eventPresentation } from "@/features/admin/lib/event-presentation";
+import { isUuid } from "@/lib/uuid";
 import type {
   EventInsert,
   EventRow,
@@ -107,8 +108,11 @@ export async function fetchEventBySlug(
   return data ? eventPresentation(data) : null;
 }
 
-/** Canonical IDs and recorded legacy routes share the same permanent event. */
+/** Canonical IDs and recorded legacy routes share the same permanent event.
+ * The id goes into a PostgREST `.or()` filter string, so anything but a UUID
+ * is unknown. */
 export async function fetchEventByLegacyDraftId(supabase: DbClient, id: string) {
+  if (!isUuid(id)) return null;
   const { data, error } = await supabase.from(TABLES.events).select("*").or(`id.eq.${id},legacy_draft_ids.cs.{${id}}`).maybeSingle();
   if (error) throw error;
   return data ? eventPresentation(data) : null;
