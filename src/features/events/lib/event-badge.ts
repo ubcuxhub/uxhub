@@ -66,8 +66,10 @@ export function eventBadgeFor(state: EventState): EventBadge {
     case "app-missed":
     case "app-draft-expired":
       return { status: "applications_closed" };
+    // Not "Applications open" even while the window is: an accepted
+    // application can't be resubmitted, so there's nothing to apply for.
     case "app-offer-expired":
-      return { status: state.windowOpen ? "applications_open" : "applications_closed" };
+      return { status: "offer_expired" };
     default:
       return assertNever(state);
   }

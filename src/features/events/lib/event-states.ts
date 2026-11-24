@@ -98,7 +98,10 @@ export type EventState =
   /** `closedAt`: when applications closed. */
   | { kind: "app-missed"; closedAt: string }
   | { kind: "app-draft-expired"; closedAt: string }
-  /** `windowOpen`: applications are still open, so they could reapply. */
+  /**
+   * `windowOpen`: applications are still open to others. They can't reapply:
+   * their accepted application stands, so the badge says Offer expired.
+   */
   | { kind: "app-offer-expired"; offerExpiredAt: string; windowOpen: boolean };
 
 export type EventStateKind = EventState["kind"];

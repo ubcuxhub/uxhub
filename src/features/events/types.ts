@@ -53,6 +53,7 @@ export interface EventBadge {
     | "register_by"
     | "not_selected"
     | "applications_closed"
+    | "offer_expired"
     | "canceled";
   date?: string;
   /** Replaces the status's label, as for a draft event (`DRAFT_EVENT_BADGE`). */
