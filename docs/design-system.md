@@ -1221,3 +1221,27 @@ tooltip on hover and keyboard focus. Phone tiles are at least 60px tall with a
 See `/dev/components/event-preview`, `/dev/components/event-banner` and
 `/dev/components/quick-link` for wide/narrow, loading, missing/broken image,
 empty/error and disabled examples under the gallery theme/density controls.
+
+
+### Grouped action search
+
+`shared/ActionSearch` composes SearchField and a non-modal anchored Popover for
+navigation commands. The caller controls query, open state, groups, lookup states
+and selection; it owns authorization, recents and destinations. Item IDs must be
+unique across groups. Optional leading icons and descriptions support typed
+results. Disabled options remain visible with an explanation and are skipped by
+keyboard navigation. No action executes until a row is selected.
+
+Input focus stays in the combobox: arrows move the active descendant, Enter
+selects, Escape dismisses while preserving text, and Tab/outside interaction
+dismisses; when a context or retry button is present, Tab first reaches that
+control. Popup buttons follow their visual order; Shift+Tab from the first
+returns to the input, and Tab from the last returns to the input and closes
+the popup. An optional `contextAction` provides scoped
+back navigation with focus restoration. Clear restores input focus. Async callers must remove stale options
+while loading. The live status provides loading, empty and error/retry feedback;
+retry restores input focus. Menus match anchor width, stay within the viewport
+and scroll with available height; rows wrap and retain phone touch targets.
+SearchField and SearchableDropdown retain their existing contracts. See
+`/dev/components/action-search` for Recent/Suggested, typed/long results, narrow,
+loading, empty and retry examples with gallery theme/density controls.

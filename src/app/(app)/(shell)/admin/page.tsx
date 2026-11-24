@@ -1,3 +1,5 @@
+import { DashboardSearch } from "@/features/admin/components/dashboard/DashboardSearch";
+import { createClient } from "@/lib/supabase/server";
 import { Suspense } from "react";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { requireAdmin } from "@/lib/auth/guards";
@@ -7,7 +9,11 @@ import { DashboardEventSkeleton } from "@/features/admin/components/dashboard/Da
 import { DashboardEventData, DashboardStats } from "@/features/admin/components/dashboard/DashboardData";
 
 export default async function AdminDashboard() {
-  await requireAdmin();
+  const user = await requireAdmin();
+  const db = await createClient();
+  const { data: claims } = await db.auth.getClaims();
+  const sessionId = claims?.claims.session_id;
+  const sessionKey = typeof sessionId === "string" ? sessionId : null;
   const now = new Date().toISOString();
   return (
     <PageContainer className="admin-dashboard flex flex-col gap-10 max-w-none">
@@ -16,6 +22,7 @@ export default async function AdminDashboard() {
           <h1 className="text-h1">Dashboard</h1>
           <p className="text-muted-foreground">View events, users, and statistics at a glance.</p>
         </div>
+        <DashboardSearch userId={user.id} sessionKey={sessionKey} />
       </header>
       <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,10fr)_minmax(0,7fr)]">
         <div className="min-w-0 space-y-6">
@@ -28,7 +35,7 @@ export default async function AdminDashboard() {
         <div className="min-w-0 space-y-6">
           <DashboardQuickLinks />
           <section aria-labelledby="statistics-heading" className="space-y-5">
-            <h2 id="statistics-heading" className="text-h2">Statistics</h2>
+            <h2 id="statistics-heading" tabIndex={-1} className="text-h2">Statistics</h2>
             <DashboardStats now={now} />
           </section>
         </div>

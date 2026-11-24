@@ -86,7 +86,7 @@ export const MANIFEST = [
   // Column 3: Admin data, check-in and alerts
   {
     id: "dashboard-preview", column: 3,
-    uses: ["event-banner", "event-preview", "quick-link", "status-badge", "button"],
+    uses: ["action-search", "event-banner", "event-preview", "quick-link", "status-badge", "button"],
   },
   {
     id: "reporting-statistics", column: 3,

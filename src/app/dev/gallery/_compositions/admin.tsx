@@ -1,5 +1,6 @@
 "use client";
 
+import { ActionSearch } from "@/components/shared/ActionSearch";
 import { DashboardAreaOfStudy } from "@/features/admin/components/dashboard/DashboardAreaOfStudy";
 import { DashboardClubMembers } from "@/features/admin/components/dashboard/DashboardClubMembers";
 import { useState } from "react";
@@ -55,7 +56,16 @@ import { LIFT, Panel } from "./frame";
 import type { Components } from "./types";
 
 function DashboardPreview() {
+  const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [selection, setSelection] = useState("");
   return <div className="space-y-6">
+    <ActionSearch label="Search dashboard preview" placeholder="What are you searching for?" query={query} onQueryChange={setQuery}
+      open={searchOpen} onOpenChange={setSearchOpen}
+      groups={[{ label: "Recent", items: [{ id: "sprint", label: "Design Sprint" }].filter((item) => item.label.toLowerCase().includes(query.toLowerCase())) },
+        { label: "Suggested", items: [{ id: "upcoming", label: "Upcoming events" }, { id: "statistics", label: "Club statistics" }].filter((item) => item.label.toLowerCase().includes(query.toLowerCase())) }]}
+      onSelect={(item) => { setSelection(item.label); setSearchOpen(false); }} />
+    {selection ? <p role="status" className="text-small text-muted-foreground">Selected {selection}</p> : null}
     <EventPreview title="Design Sprint" href={HERE} description="A team-based design challenge with fellow creatives."
       banner={{ colour: "#325DC4" }} status={<StatusBadge status="registration_open" />}
       facts={[{ label: "Check-in", icon: ScanLine, value: "40/50 spots" }]}

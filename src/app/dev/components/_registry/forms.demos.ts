@@ -21,6 +21,7 @@ export const formsDemos: Record<string, DemoLoader> = {
   "time-picker": () => import("../_demos/time-picker"),
   "date-time-field": () => import("../_demos/date-time-field"),
   "colour-picker": () => import("../_demos/colour-picker"),
+  "action-search": () => import("../_demos/action-search"),
   "searchable-dropdown": () => import("../_demos/searchable-dropdown"),
   "segmented-toggle": () => import("../_demos/segmented-toggle"),
   "filter-chip": () => import("../_demos/filter-chip"),
