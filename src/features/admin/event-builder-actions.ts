@@ -1,6 +1,6 @@
 "use server";
 
-import type { Json } from "@/lib/supabase/database.types";
+import type { Database, Json } from "@/lib/supabase/database.types";
 import { fetchEventMutationResult, eventMutationResult, fetchEventHistoryInfo, fetchEventDeletionBlockers, eventDeletionBlocked } from "@/lib/supabase-helpers/event-mutations";
 import { eventContentProblem, type EventContent } from "./lib/event-content";
 import { searchMentors, searchSponsors } from "@/lib/supabase-helpers/event-people";
@@ -30,6 +30,18 @@ import type {
   CheckInSessionInput,
 } from "@/features/admin/types";
 import type { EventUpdate } from "@/lib/supabase/models";
+
+type GeneratedBuilderSaveArgs = Database["public"]["Functions"]["save_admin_event_builder"]["Args"];
+/** The builder save's arguments as SQL takes them: the generator omits
+ * argument nullability, but a new event, a missing draft, an unclaimed slug
+ * and an absent image all send null. */
+type BuilderSaveArgs = Omit<GeneratedBuilderSaveArgs, "p_event_id" | "p_draft_id" | "p_slug" | "p_expected_image_url" | "p_expected_header_image_url"> & {
+  p_event_id: string | null;
+  p_draft_id: string | null;
+  p_slug: string | null;
+  p_expected_image_url: string | null;
+  p_expected_header_image_url: string | null;
+};
 
 export interface SavedEventPublication {
   id: string;
@@ -272,24 +284,20 @@ export async function saveAdminEventAction(
     if (state.date_location && !input.dateLocation) return { error: "Reload saved dates and locations before publishing." };
     if ((state.decisions_release_at || state.confirmation_deadline) && !input.applicationTiming) return { error: "Reload saved application timing before publishing." };
   }
-  // The generator omits SQL argument nullability: `(x ?? null)!` still sends
-  // null for a new event, a missing draft, or no expected image.
-  const { data, error } = await supabaseAdmin.rpc(
-    "save_admin_event_builder",
-    {
-      p_event_id: (input.eventId ?? null)!,
-      p_draft_id: (input.draftId ?? null)!,
-      p_draft_revision: input.draftRevision ?? 0,
-      p_expected_header_image_url: (input.expectedHeaderImageUrl ?? null)!,
-      p_event: { ...input.event, ...datePayload, ...(input.operationId ? { _operation_id: input.operationId } : {}), ...(input.expectedRevision !== undefined ? { _expected_revision: input.expectedRevision } : {}), ...(input.expectedPublication ? { _expected_publication: input.expectedPublication } : {}), ...(input.content ? { _content: input.content } : {}), ...(input.applicationTiming ? { _application_timing: input.applicationTiming } : {}) } as unknown as Json,
-      p_slug: slug!,
-      p_expected_image_url: input.expectedImageUrl!,
-      p_check_in_sessions: input.checkInSessions as unknown as Json,
-      p_application_questions: input.applicationQuestions,
-      p_mentors: input.mentorIds,
-      p_sponsors: input.sponsorIds,
-    }
-  );
+  const args: BuilderSaveArgs = {
+    p_event_id: input.eventId ?? null,
+    p_draft_id: input.draftId ?? null,
+    p_draft_revision: input.draftRevision ?? 0,
+    p_expected_header_image_url: input.expectedHeaderImageUrl ?? null,
+    p_event: { ...input.event, ...datePayload, ...(input.operationId ? { _operation_id: input.operationId } : {}), ...(input.expectedRevision !== undefined ? { _expected_revision: input.expectedRevision } : {}), ...(input.expectedPublication ? { _expected_publication: input.expectedPublication } : {}), ...(input.content ? { _content: input.content } : {}), ...(input.applicationTiming ? { _application_timing: input.applicationTiming } : {}) } as unknown as Json,
+    p_slug: slug,
+    p_expected_image_url: input.expectedImageUrl,
+    p_check_in_sessions: input.checkInSessions as unknown as Json,
+    p_application_questions: input.applicationQuestions,
+    p_mentors: input.mentorIds,
+    p_sponsors: input.sponsorIds,
+  };
+  const { data, error } = await supabaseAdmin.rpc("save_admin_event_builder", args as GeneratedBuilderSaveArgs);
   if (error) {
     if (["EVENT_REVISION_CONFLICT", "EVENT_HISTORY_LOCKED"].includes(error.hint ?? "")) return { error: error.message };
     if (error.hint === "EVENT_PUBLICATION_CONFLICT" || error.hint === "EVENT_PUBLICATION_INVALID") return { error: error.message };
