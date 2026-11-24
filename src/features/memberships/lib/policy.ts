@@ -134,10 +134,10 @@ const ELIGIBILITY_COLUMNS = [
 type EligibilityColumn = (typeof ELIGIBILITY_COLUMNS)[number];
 
 /**
- * Which of those columns each classification keeps. Mirrors the three branches
- * of `saveMembershipProfileAction`; anything absent here is cleared on the way
- * in, so a column the profile UI hides for a classification can never hold a
- * stale value from a previous one.
+ * Which of those columns each classification keeps. Both membership
+ * classification actions write through `buildEligibilityUpdate`; anything
+ * absent here is cleared on the way in, so a column the profile UI hides for
+ * a classification can never hold a stale value from a previous one.
  */
 const OWNED_COLUMNS: Record<UserType, ReadonlySet<EligibilityColumn>> = {
   ubcStudent: new Set(["faculty", "major", "student_number", "year"]),

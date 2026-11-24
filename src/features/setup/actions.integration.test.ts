@@ -283,9 +283,9 @@ describe("member setup against local Supabase", () => {
     // A checkout completes after this request loaded the row.
     await setColumns(member.id, { membership_pre_ordered_type_id: tier.id });
 
-    await expect(updateEligibilityProfileAction({
+    expect(await updateEligibilityProfileAction({
       userType: "nonUbc",
-    })).rejects.toThrow("cannot be changed while a membership is active or pending");
+    })).toMatchObject({ ok: false, error: expect.stringContaining("cannot be changed while a membership is active or pending") });
     expect(await saveMembershipProfileAction({
       audience: "non-ubc",
       schoolInstitution: "SFU",
@@ -300,13 +300,13 @@ describe("member setup against local Supabase", () => {
   it("only stores a faculty from the list when Settings saves eligibility", () => withFixtures(async (fixtures) => {
     const member = await signUp(fixtures);
     for (const faculty of ["x".repeat(5000), 42 as unknown as string]) {
-      await expect(updateEligibilityProfileAction({
+      expect(await updateEligibilityProfileAction({
         userType: "ubcStudent",
         studentNumber: "37201946",
         faculty,
-      })).rejects.toThrow("Select a valid faculty.");
+      })).toEqual({ ok: false, error: "Select a valid faculty." });
     }
-    await updateEligibilityProfileAction({ userType: "ubcStudent", studentNumber: "37201946", faculty: "Faculty of Science" });
+    expect(await updateEligibilityProfileAction({ userType: "ubcStudent", studentNumber: "37201946", faculty: "Faculty of Science" })).toEqual({ ok: true });
     const { data: row } = await db.from("user_info").select("student_number, faculty").eq("id", member.id).single();
     expect(row).toEqual({ student_number: 37201946, faculty: "Faculty of Science" });
   }));
