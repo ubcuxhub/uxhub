@@ -55,6 +55,35 @@ describe("deleteAccountAction", () => {
     consoleError.mockRestore();
   });
 
+  it("explains why the final manager can't delete their account", async () => {
+    adminDeleteAccount.mockRejectedValue(
+      Object.assign(new Error("The final manager cannot delete their account"), {
+        code: "55000",
+      }),
+    );
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => undefined);
+    const consoleLog = vi
+      .spyOn(console, "log")
+      .mockImplementation(() => undefined);
+
+    const result = await deleteAccountAction("member@student.ubc.ca");
+
+    expect(result).toEqual({
+      ok: false,
+      error: expect.stringContaining("only manager"),
+    });
+    // An expected refusal, so it stays out of Sentry.
+    expect(consoleError).not.toHaveBeenCalled();
+    expect(String(consoleLog.mock.calls[0]?.[0])).toContain(
+      "account.deletion_refused_final_manager",
+    );
+
+    consoleError.mockRestore();
+    consoleLog.mockRestore();
+  });
+
   it("preserves authentication redirects thrown by requireAuth", async () => {
     const redirectError = new Error("NEXT_REDIRECT");
     requireAuth.mockRejectedValue(redirectError);
@@ -83,7 +112,7 @@ describe("saveInterestsAction", () => {
     updateUserSetup.mockImplementation(async (_db, _id, patch) => ({ ...row, ...patch }));
   });
 
-  it("keeps managers' free tags and replaces the member's chips, without touching setup", async () => {
+  it("keeps execs' free tags and replaces the member's chips, without touching setup", async () => {
     const saved = await saveInterestsAction({ interests: ["uxathon", "mentorship"] });
     expect(updateUserSetup).toHaveBeenCalledWith({}, "member-1", {
       interests: ["Figma whiz", "uxathon", "mentorship"],
@@ -92,7 +121,7 @@ describe("saveInterestsAction", () => {
   });
 
   it("rejects ids outside the taxonomy before writing", async () => {
-    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    vi.spyOn(console, "log").mockImplementation(() => undefined);
     await expect(saveInterestsAction({ interests: ["Hacking" as never] })).rejects.toThrow(
       "Choose interests from the list.",
     );

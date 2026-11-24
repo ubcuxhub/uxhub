@@ -934,7 +934,79 @@ begin
 end;
 $$;
 
+-- Not even a manager inserts or hard-deletes profiles from the browser:
+-- profiles come from the service role, and deletion anonymizes through
+-- delete_account.
+do $$
+begin
+  begin
+    delete from public.user_info
+    where id = current_setting('rls.user_b_id')::uuid;
+    raise exception 'a manager hard-deleted a profile from the browser client';
+  exception when insufficient_privilege then null;
+  end;
+
+  begin
+    insert into public.user_info (email, first_name, last_name, role_access)
+    values ('rls-manager-insert@example.test', 'Evil', 'Insert', 'manager');
+    raise exception 'a manager inserted a profile from the browser client';
+  exception when insufficient_privilege then null;
+  end;
+end;
+$$;
+
 reset role;
+
+do $$
+begin
+  if has_table_privilege('anon', 'public.user_info', 'INSERT')
+     or has_table_privilege('anon', 'public.user_info', 'DELETE')
+     or has_table_privilege('authenticated', 'public.user_info', 'INSERT')
+     or has_table_privilege('authenticated', 'public.user_info', 'DELETE') then
+    raise exception 'clients can still insert or delete user_info rows';
+  end if;
+
+  if exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'user_info'
+      and cmd in ('INSERT', 'DELETE')
+  ) then
+    raise exception 'user_info still has an insert or delete policy';
+  end if;
+
+  if to_regprocedure('public.get_user_info_id()') is not null
+     or to_regprocedure('public.is_authenticated()') is not null then
+    raise exception 'the legacy SECURITY DEFINER functions are back';
+  end if;
+end;
+$$;
+
+-- delete_account keeps the final manager, as set_user_role does. User A is
+-- the only manager here.
+select set_config('rls.user_a_auth_user_id', :'user_a_auth_user_id', true) \g /dev/null
+
+do $$
+begin
+  begin
+    perform public.delete_account(current_setting('rls.user_a_auth_user_id')::uuid);
+    raise exception 'the final manager deleted their account';
+  exception
+    when object_not_in_prerequisite_state then
+      if sqlerrm <> 'The final manager cannot delete their account' then
+        raise;
+      end if;
+  end;
+
+  if not exists (
+    select 1 from public.user_info
+    where id = current_setting('rls.user_a_id')::uuid
+      and role_access = 'manager'::public.role_access_enum
+      and deleted_at is null
+  ) then
+    raise exception 'a refused deletion still changed the final manager';
+  end if;
+end;
+$$;
 
 do $$
 declare

@@ -127,12 +127,12 @@ describe("requireAuth", () => {
   it("surfaces a profile-loading error on the auth error page", async () => {
     currentUserMocks.loadCurrentUser.mockResolvedValue({
       status: "error",
-      message: "Unable to load your profile.",
+      code: "profile_unavailable",
     });
 
     await expectRedirect(
       () => requireAuth(),
-      "/auth/error?error=Unable%20to%20load%20your%20profile."
+      "/auth/error?code=profile_unavailable"
     );
     // `loadCurrentUser` logged the cause; the redirect adds no second line.
     expect(logMocks.warn).not.toHaveBeenCalled();
@@ -245,12 +245,12 @@ describe("redirectIfAuthenticated", () => {
   it("surfaces a profile-loading error instead of redirecting", async () => {
     currentUserMocks.loadCurrentUser.mockResolvedValue({
       status: "error",
-      message: "Your profile could not be loaded.",
+      code: "linked_elsewhere",
     });
 
     await expectRedirect(
       () => redirectIfAuthenticated(),
-      "/auth/error?error=Your%20profile%20could%20not%20be%20loaded."
+      "/auth/error?code=linked_elsewhere"
     );
   });
 });

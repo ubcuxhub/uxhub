@@ -21,6 +21,7 @@ import {
   buildEligibilityUpdate,
   hasActiveOrPendingMembership,
 } from "@/features/memberships/lib/policy";
+import { mergeMemberInterests } from "@/features/settings/lib/interests";
 import type { AvatarPreset, InterestId, SetupStepId, UserTypeId } from "./lib/options";
 import {
   nextSetupStep,
@@ -155,15 +156,21 @@ export async function saveSetupPhotoAction(input: {
 }
 
 /**
- * Step 4 and the end of setup. Replaces `interests` with the chosen taxonomy
- * ids (an empty list is allowed) and marks setup `done`.
+ * Step 4 and the end of setup. Replaces the member's taxonomy ids in
+ * `interests` with the chosen ones (an empty list is allowed), keeps any free
+ * tags execs added (as Settings does, `mergeMemberInterests`), and marks
+ * setup `done`.
  */
 export async function finishSetupAction(input: { interests: InterestId[] }): Promise<SetupState> {
   return run("setup.finish_failed", async (user) => {
-    const interests = parseInterests(input?.interests);
-    // `interests` has no member grant (managers' free tags share it), so the
-    // service role writes it, scoped to the caller's id.
-    return updateUserSetup(supabaseAdmin, user.id, { interests, setup_step: "done" });
+    const chosen = parseInterests(input?.interests);
+    // `interests` has no member grant (execs' free tags share it), so the
+    // service role reads and writes it, scoped to the caller's id.
+    const current = await fetchUserSetup(supabaseAdmin, user.id);
+    return updateUserSetup(supabaseAdmin, user.id, {
+      interests: mergeMemberInterests(current.interests, chosen),
+      setup_step: "done",
+    });
   });
 }
 

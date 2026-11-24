@@ -395,9 +395,14 @@ describe("SetupFlow", () => {
       expect(screen.getByRole("link", { name: "Go to your portal" }).getAttribute("href")).toBe("/portal");
     });
 
-    it("leaves out managers' free tags it can't show as chips", () => {
+    it("shows execs' free tags read-only beside the chips, and sends only the chips", async () => {
       renderFlow({ step: "interests", interests: ["Figma whiz", "uxathon"] });
-      expect(screen.getByText("1 selected")).toBeTruthy();
+      expect(screen.getByText("2 selected")).toBeTruthy();
+      expect(screen.getByText("Added by UX Hub execs")).toBeTruthy();
+      expect(screen.getByText("Figma whiz")).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Figma whiz" })).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Finish setup" }));
+      await waitFor(() => expect(client.finish).toHaveBeenCalledWith({ interests: ["uxathon"] }));
     });
 
     it("shows a busy, width-keeping button while saving", async () => {

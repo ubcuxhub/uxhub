@@ -107,9 +107,8 @@ describe("GET /auth/callback", () => {
     });
     const location = new URL((await callback()).headers.get("location")!);
     expect(location.pathname).toBe("/auth/error");
-    expect(location.searchParams.get("error")).toBe(
-      "An account with this email is already linked to another sign-in method.",
-    );
+    expect(location.searchParams.get("code")).toBe("linked_elsewhere");
+    expect(location.searchParams.has("error")).toBe(false);
     expect(logMocks.warn).toHaveBeenCalledWith("auth.profile_linked_elsewhere", {
       authUserId: "auth-user-1",
       source: "callback",
@@ -280,9 +279,7 @@ describe("GET /auth/callback", () => {
 
     expect(location.pathname).toBe("/auth/error");
     expect(location.searchParams.get("next")).toBe("/portal");
-    expect(location.searchParams.get("error")).toBe(
-      "We couldn't complete sign-in. The link may have expired or already been used. Try signing in again.",
-    );
+    expect(location.searchParams.get("code")).toBe("callback");
     expect(location.toString()).not.toContain("raw%20provider%20details");
     expect(logMocks.error).toHaveBeenCalledWith("auth.callback_failed", {
       errorType: "Error",

@@ -1,22 +1,17 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
 import { flush } from "@sentry/nextjs";
+import { verifyCronSignature } from "@/lib/http/cron-signature";
 import { adminGetPublicationHealth } from "@/lib/supabase-helpers/admin-server";
 import { errorFields, log } from "@/lib/log";
 
 export const runtime = "nodejs";
 
 export async function POST(request: Request) {
-  const secret = process.env.EVENT_PUBLICATION_HEALTH_SECRET;
-  const timestamp = request.headers.get("x-publication-timestamp") ?? "";
-  const signature = request.headers.get("x-publication-signature") ?? "";
-  if (!secret || !/^\d{10}$/.test(timestamp) || !/^[a-f0-9]{64}$/.test(signature)
-    || Math.abs(Date.now() / 1000 - Number(timestamp)) > 300) {
-    return new Response(null, { status: 401 });
-  }
-  const expected = createHmac("sha256", secret).update(`event-publication:${timestamp}`).digest("hex");
-  if (!timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) {
-    return new Response(null, { status: 401 });
-  }
+  const signed = verifyCronSignature(request, {
+    secret: process.env.EVENT_PUBLICATION_HEALTH_SECRET,
+    purpose: "event-publication",
+    headerPrefix: "x-publication",
+  });
+  if (!signed) return new Response(null, { status: 401 });
 
   try {
     // Allow for the publisher's minute rounding and a five-minute grace period.

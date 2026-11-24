@@ -22,7 +22,7 @@ import {
   toDietaryValue,
   type DietaryValue,
 } from "./DietaryFields";
-import { InterestFields, pickInterestIds, selectedCountLabel } from "./InterestFields";
+import { InterestFields, pickExecInterestTags, pickInterestIds, selectedCountLabel } from "./InterestFields";
 import { SAVE_FAILED, serverSetupClient, type SetupClient } from "./setup-client";
 
 export type SetupView = SetupStepId | "welcome";
@@ -125,6 +125,8 @@ export function SetupFlow({
   );
   const [choice, setChoice] = useState<AvatarChoice>(() => initialChoice(initial));
   const [interests, setInterests] = useState<InterestId[]>(() => pickInterestIds(initial.interests));
+  // Free tags execs added: shown read-only, and finishing keeps them.
+  const [execTags] = useState(() => pickExecInterestTags(initial.interests));
   const [birthDate, setBirthDate] = useState(initial.birthDate ?? "");
   // Its error shows once the member has left the field or tried to continue.
   const [birthDateChecked, setBirthDateChecked] = useState(false);
@@ -285,8 +287,8 @@ export function SetupFlow({
     };
   } else {
     primaryLabel = "Finish setup";
-    meta = selectedCountLabel(interests.length);
-    body = <InterestFields value={interests} onChange={setInterests} disabled={busy} />;
+    meta = selectedCountLabel(interests.length + execTags.length);
+    body = <InterestFields value={interests} onChange={setInterests} disabled={busy} execTags={execTags} />;
     onSubmit = () => void run("save", () => client.finish({ interests }), "welcome");
   }
 

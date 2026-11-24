@@ -74,7 +74,7 @@ describe("loadCurrentUser", () => {
 
     await expect(loadCurrentUser()).resolves.toEqual({
       status: "error",
-      message: "Unable to load your profile.",
+      code: "profile_unavailable",
     });
     expect(ensureUserInfo).not.toHaveBeenCalled();
     expect(logMocks.error).toHaveBeenCalledWith("auth.profile_read_failed", {
@@ -116,7 +116,7 @@ describe("loadCurrentUser", () => {
 
     await expect(loadCurrentUser()).resolves.toEqual({
       status: "error",
-      message: "An account with this email is already linked to another sign-in method.",
+      code: "linked_elsewhere",
     });
     expect(logMocks.warn).toHaveBeenCalledWith("auth.profile_linked_elsewhere", {
       authUserId: "auth-user-1",
@@ -129,7 +129,7 @@ describe("loadCurrentUser", () => {
 
     await expect(loadCurrentUser()).resolves.toEqual({
       status: "error",
-      message: "Unable to load your profile.",
+      code: "profile_unavailable",
     });
     expect(logMocks.warn).toHaveBeenCalledWith("auth.profile_repair_missing", {
       authUserId: "auth-user-1",
@@ -143,7 +143,7 @@ describe("loadCurrentUser", () => {
 
     await expect(loadCurrentUser()).resolves.toEqual({
       status: "error",
-      message: "Unable to load your profile.",
+      code: "profile_unavailable",
     });
     expect(logMocks.error).toHaveBeenCalledWith("auth.profile_read_failed", {
       errorType: "Error",

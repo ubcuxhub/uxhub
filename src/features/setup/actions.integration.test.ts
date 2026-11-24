@@ -30,7 +30,10 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 import { POST } from "@/app/api/profile-photo/route";
-import { saveMembershipProfileAction } from "@/features/memberships/actions";
+import {
+  saveMembershipProfileAction,
+  updateEligibilityProfileAction,
+} from "@/features/memberships/actions";
 import { USER_TYPE_LOCKED_MESSAGE } from "./lib/state";
 import {
   finishSetupAction,
@@ -211,7 +214,7 @@ describe("member setup against local Supabase", () => {
     const member = await signUp(fixtures);
     // A lapsed membership no longer holds the type.
     await setColumns(member.id, {
-      student_number: 12345678,
+      student_number: 37201946,
       faculty: "Faculty of Arts",
       major: "Design",
       year: "2",
@@ -270,6 +273,52 @@ describe("member setup against local Supabase", () => {
     const saved = await fetchUserSetup(db, member.id);
     expect(saved).toMatchObject({ user_type: "nonUbc", setup_step: "about" });
     expect(saved.user_type_confirmed_at).not.toBeNull();
+  }));
+
+  it("doesn't change eligibility in Settings or membership join after a membership lands mid-request", () => withFixtures(async (fixtures) => {
+    const tier = await fixtures.createMembershipType();
+    const member = await signUp(fixtures);
+    await setColumns(member.id, { student_number: 37201946, faculty: "Faculty of Science" });
+    await nextRequest(member.id);
+    // A checkout completes after this request loaded the row.
+    await setColumns(member.id, { membership_pre_ordered_type_id: tier.id });
+
+    await expect(updateEligibilityProfileAction({
+      userType: "nonUbc",
+    })).rejects.toThrow("cannot be changed while a membership is active or pending");
+    expect(await saveMembershipProfileAction({
+      audience: "non-ubc",
+      schoolInstitution: "SFU",
+      studentStatus: "",
+      year: "",
+    })).toMatchObject({ ok: false });
+
+    const { data: row } = await db.from("user_info").select("*").eq("id", member.id).single();
+    expect(row).toMatchObject({ user_type: "ubcStudent", student_number: 37201946, faculty: "Faculty of Science" });
+  }));
+
+  it("only stores a faculty from the list when Settings saves eligibility", () => withFixtures(async (fixtures) => {
+    const member = await signUp(fixtures);
+    for (const faculty of ["x".repeat(5000), 42 as unknown as string]) {
+      await expect(updateEligibilityProfileAction({
+        userType: "ubcStudent",
+        studentNumber: "37201946",
+        faculty,
+      })).rejects.toThrow("Select a valid faculty.");
+    }
+    await updateEligibilityProfileAction({ userType: "ubcStudent", studentNumber: "37201946", faculty: "Faculty of Science" });
+    const { data: row } = await db.from("user_info").select("student_number, faculty").eq("id", member.id).single();
+    expect(row).toEqual({ student_number: 37201946, faculty: "Faculty of Science" });
+  }));
+
+  it("keeps the free tags execs added when the member finishes setup", () => withFixtures(async (fixtures) => {
+    const member = await signUp(fixtures);
+    await setColumns(member.id, { interests: ["Figma whiz", "uxathon"] });
+    await nextRequest(member.id);
+
+    const done = await finishSetupAction({ interests: ["ux-research"] });
+    expect(done.interests).toEqual(["Figma whiz", "ux-research"]);
+    expect((await fetchUserSetup(db, member.id)).interests).toEqual(["Figma whiz", "ux-research"]);
   }));
 
   it("requires a signed-in member", () => withFixtures(async () => {

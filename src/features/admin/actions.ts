@@ -75,10 +75,11 @@ import {
   type ApplicationDecision,
 } from "./lib/application-review";
 
+// `email` is handled on its own in saveManagerUserDetailsAction: it's the
+// sign-in address for a linked account, so it can't take the generic path.
 const MANAGER_USER_FIELDS = new Set([
   "first_name",
   "last_name",
-  "email",
   "phone",
   "newsletter",
   "student_number",
@@ -158,6 +159,19 @@ export async function saveManagerUserDetailsAction(userId: string, changes: Reco
         ? await fetchMembershipTypeById(supabaseAdmin, membershipId) : null;
       if (membership?.name !== "nonUbc") throw new Error("School can only be changed for Non-UBC members.");
       patch.school_institution = school;
+    }
+    else if (field === "email") {
+      // A linked account's address is its sign-in email, so editing only
+      // user_info would split the two: deletion, faculty eligibility and
+      // receipts would follow the new one while sign-in kept the old. Only a
+      // profile with no sign-in yet (an import a sign-up will adopt by email)
+      // can be corrected here, normalized the way ensureUserInfo matches it.
+      const email = typeof value === "string" ? value.trim().toLowerCase() : "";
+      const user = await fetchActiveProfile(supabaseAdmin, userId);
+      if (email === user.email) continue;
+      if (user.auth_user_id) throw new Error("This member signs in with this email, so it can't be changed here.");
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email address.");
+      patch.email = email;
     }
     else {
       if (value !== null && !["string", "number", "boolean"].includes(typeof value)) throw new Error("Invalid user field value.");

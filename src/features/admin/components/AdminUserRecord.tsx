@@ -310,7 +310,13 @@ export function AdminUserRecord({
             </RecordSection>
 
             <RecordSection title="Contact">
-              {textField("email", "Email", user.email, { type: "email", autoComplete: "off" })}
+              {/* A linked account's email is its sign-in address, so only an unlinked profile's can be corrected. */}
+              {textField("email", "Email", user.email, {
+                type: "email",
+                autoComplete: "off",
+                readOnly: Boolean(user.auth_user_id),
+                title: user.auth_user_id ? "This member signs in with this email" : undefined,
+              })}
               {textField("phone", "Phone", user.phone, { type: "tel", autoComplete: "off" })}
               <RecordField label="Newsletter" value={user.newsletter ? "Subscribed" : "Not subscribed"}>
                 {draft ? (

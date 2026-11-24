@@ -107,6 +107,8 @@ describe("updateManagerUserAction: the column allowlist", () => {
     "membership_pre_ordered_type_id",
     "square_customer_id",
     "created_at",
+    // Only saveManagerUserDetailsAction writes it, with its own checks.
+    "email",
   ])("refuses to write the unlisted column %s", async (field) => {
     await expect(
       updateManagerUserAction("user-1", field, "anything"),
@@ -121,7 +123,6 @@ describe("updateManagerUserAction: the column allowlist", () => {
   it.each([
     "first_name",
     "last_name",
-    "email",
     "phone",
     "newsletter",
     "student_number",
@@ -1076,6 +1077,28 @@ describe("saveManagerUserDetailsAction", () => {
     fetchActiveProfile.mockResolvedValue({ membership_type_id: "ubc-tier", school_institution: null });
     await saveManagerUserDetailsAction("user-1", { first_name: "Jamie", school_institution: "" });
     expect(fetchMembershipTypeById).not.toHaveBeenCalled();
+    expect(saveAdminProfile).toHaveBeenCalledWith(expect.anything(), "user-1", { first_name: "Jamie" });
+  });
+
+  it("normalizes a corrected email on a profile nobody signs in to yet", async () => {
+    fetchActiveProfile.mockResolvedValue({ auth_user_id: null, email: "typo@exmaple.com" });
+    await saveManagerUserDetailsAction("user-1", { email: "  Member@Example.com " });
+    expect(saveAdminProfile).toHaveBeenCalledWith(expect.anything(), "user-1", { email: "member@example.com" });
+  });
+
+  it.each([
+    [{ auth_user_id: "auth-1", email: "member@example.com" }, "someone@example.com", "signs in with this email"],
+    [{ auth_user_id: null, email: "member@example.com" }, "not an email", "valid email"],
+    [{ auth_user_id: null, email: "member@example.com" }, 42, "valid email"],
+  ])("refuses an email change on %j to %j", async (profile, email, message) => {
+    fetchActiveProfile.mockResolvedValue(profile);
+    await expect(saveManagerUserDetailsAction("user-1", { first_name: "Jamie", email })).rejects.toThrow(message);
+    expect(saveAdminProfile).not.toHaveBeenCalled();
+  });
+
+  it("ignores an unchanged sign-in email", async () => {
+    fetchActiveProfile.mockResolvedValue({ auth_user_id: "auth-1", email: "member@example.com" });
+    await saveManagerUserDetailsAction("user-1", { first_name: "Jamie", email: "Member@example.com" });
     expect(saveAdminProfile).toHaveBeenCalledWith(expect.anything(), "user-1", { first_name: "Jamie" });
   });
 

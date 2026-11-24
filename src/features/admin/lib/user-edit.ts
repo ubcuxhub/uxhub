@@ -55,6 +55,13 @@ export function userEditChanges(user: UserRecord, draft: UserEditDraft, membersh
     if (field === "first_name" || field === "last_name") {
       if (!value.trim()) throw new Error(`${field === "first_name" ? "First" : "Last"} name is required.`);
       changes[field] = value.trim();
+    } else if (field === "email") {
+      // Mirrors saveManagerUserDetailsAction: a linked account's address is its sign-in email.
+      const email = value.trim().toLowerCase();
+      if (email === user.email) continue;
+      if (user.auth_user_id) throw new Error("This member signs in with this email, so it can't be changed here.");
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email address.");
+      changes[field] = email;
     } else if (field === "newsletter") changes[field] = value === "true";
     else if (field === "student_number") {
       if (value && (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)))) throw new Error("Enter a valid student number.");

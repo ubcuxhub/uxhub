@@ -1,10 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-import {
-  getAsyncErrorMessage,
-  isAsyncTimeoutError,
-  withDeadline,
-} from "@/lib/async/deadline";
+import { isAsyncTimeoutError, withDeadline } from "@/lib/async/deadline";
 import {
   getExpiredLinkPath,
   getExpiredLinkTypeForNext,
@@ -16,24 +12,19 @@ import {
   PROFILE_CONFLICT_EVENTS,
   ensureUserInfo,
 } from "@/lib/auth/ensure-user-info";
+import { authErrorPath, type AuthErrorCode } from "@/lib/auth/auth-error";
 import { completeProfilePath, getSafeInternalPath } from "@/lib/auth/paths";
 import { getRequestOrigin } from "@/lib/http/request-origin";
 import { errorFields, log } from "@/lib/log";
 import { createClient } from "@/lib/supabase/server";
 import { fetchSetupStepByAuthId } from "@/lib/supabase-helpers/setup";
 
-const CALLBACK_ERROR_MESSAGE =
-  "We couldn't complete sign-in. The link may have expired or already been used. Try signing in again.";
-
 function redirectToAuthError(
   origin: string,
-  message: string,
+  code: AuthErrorCode,
   nextPath: string,
 ) {
-  const url = new URL("/auth/error", origin);
-  url.searchParams.set("error", message);
-  url.searchParams.set("next", nextPath);
-  return NextResponse.redirect(url);
+  return NextResponse.redirect(new URL(authErrorPath(code, nextPath), origin));
 }
 
 /**
@@ -45,12 +36,6 @@ function redirectToExpiredLink(origin: string, nextPath: string) {
   return NextResponse.redirect(
     new URL(getExpiredLinkPath(type, nextPath), origin),
   );
-}
-
-function getCallbackErrorMessage(error: unknown) {
-  return isAsyncTimeoutError(error)
-    ? getAsyncErrorMessage(error, CALLBACK_ERROR_MESSAGE)
-    : CALLBACK_ERROR_MESSAGE;
 }
 
 export async function GET(request: NextRequest) {
@@ -77,12 +62,12 @@ export async function GET(request: NextRequest) {
 
   if (providerError) {
     log.warn("auth.callback_provider_error", { errorCode });
-    return redirectToAuthError(origin, CALLBACK_ERROR_MESSAGE, nextPath);
+    return redirectToAuthError(origin, "callback", nextPath);
   }
 
   if (!code) {
     log.warn("auth.callback_missing_code");
-    return redirectToAuthError(origin, CALLBACK_ERROR_MESSAGE, nextPath);
+    return redirectToAuthError(origin, "callback", nextPath);
   }
 
   try {
@@ -104,7 +89,7 @@ export async function GET(request: NextRequest) {
         ...errorFields(exchangeError),
         code: exchangeCode,
       });
-      return redirectToAuthError(origin, CALLBACK_ERROR_MESSAGE, nextPath);
+      return redirectToAuthError(origin, "callback", nextPath);
     }
 
     const {
@@ -120,7 +105,7 @@ export async function GET(request: NextRequest) {
         authUserId: authUser?.id ?? null,
         missingEmail: Boolean(authUser?.id && !authUser.email),
       });
-      return redirectToAuthError(origin, CALLBACK_ERROR_MESSAGE, nextPath);
+      return redirectToAuthError(origin, "callback", nextPath);
     }
 
     const result = await withDeadline(() => ensureUserInfo(authUser), {
@@ -141,7 +126,7 @@ export async function GET(request: NextRequest) {
         authUserId: authUser.id,
         source: "callback",
       });
-      return redirectToAuthError(origin, result.message, nextPath);
+      return redirectToAuthError(origin, result.reason, nextPath);
     }
 
     // A new member heading for the portal home goes straight to setup, so the
@@ -170,7 +155,7 @@ export async function GET(request: NextRequest) {
     }
     return redirectToAuthError(
       origin,
-      getCallbackErrorMessage(error),
+      isAsyncTimeoutError(error) ? "timeout" : "callback",
       nextPath,
     );
   }

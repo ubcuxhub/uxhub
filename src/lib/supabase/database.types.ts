@@ -1891,7 +1891,6 @@ export type Database = {
           user_id: string
         }[]
       }
-      get_user_info_id: { Args: Record<PropertyKey, never>; Returns: string }
       initialize_event_checkout: {
         Args: {
           p_event_id: string
@@ -1908,7 +1907,6 @@ export type Database = {
         }[]
       }
       is_admin: { Args: Record<PropertyKey, never>; Returns: boolean }
-      is_authenticated: { Args: Record<PropertyKey, never>; Returns: boolean }
       is_manager: { Args: Record<PropertyKey, never>; Returns: boolean }
       join_team: {
         Args: { p_invite_code: string; p_user_id: string }

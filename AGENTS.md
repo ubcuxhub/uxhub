@@ -111,7 +111,10 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
 ## Important Patterns
 
 - `src/proxy.ts` refreshes sessions for `/portal/*`, `/admin/*`, `/join/*`
-  (team invite links), and `/api/*`; it does not authorize users.
+  (team invite links), `/api/*`, `/auth/*` (except the callback) and
+  `/events/*`; it does not authorize users. Any route that reads the session
+  with the cookie client belongs in its matcher, since a Server Component
+  can't save a refreshed token.
 - `src/app/(app)/layout.tsx` calls `requireAuth()` and provides the current user.
   `src/app/(app)/(shell)/admin/layout.tsx` adds `requireAdmin()`. Keep access
   control in these server-side guards rather than relying on client UI.
@@ -246,13 +249,18 @@ Local values belong in the git-ignored `.env.local`.
   secret the pg_cron jobs sign with. It also verifies event reminders, whose
   job signs its own message with it (`supabase/README.md`, "Application
   emails" and "Event reminder emails")
+- Publication watchdog: secret `EVENT_PUBLICATION_HEALTH_SECRET`, matching the
+  `event_publication_health_secret` Vault secret the `check-event-publication`
+  job signs `/api/internal/event-publication` with (`supabase/README.md`,
+  "Publication watchdog"). Every `/api/internal/*` route checks its job's
+  signature with `verifyCronSignature` from `src/lib/http/cron-signature.ts`
 
 `SQUARE_ENV` is optional and defaults to the sandbox; set it to `production`
 only for production credentials.
 
 Never expose the Supabase secret keys, migrations database URL, Square access
-token, webhook signature key, Resend API key, Sentry auth token, or
-application-emails secret to client components.
+token, webhook signature key, Resend API key, Sentry auth token,
+application-emails secret, or publication health secret to client components.
 
 ## Quality
 
