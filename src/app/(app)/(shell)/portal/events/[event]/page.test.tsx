@@ -311,3 +311,14 @@ it("dates an overnight event on its start day alone, as the timeline does", asyn
   expect(screen.getByText("Dec 4, 2099")).toBeTruthy();
   expect(screen.queryByText(/Dec 5, 2099/)).toBeNull();
 });
+
+it("reads the links and the ticket once for a going student with an agenda", async () => {
+  fixtures.agenda = [{ id: "day-1", date: "2099-01-01", title: "Kickoff", location_overridden: false, location: null, items: [
+    { id: "item-1", title: "Talk", starts_at: null, ends_at: null, description: null, check_in: false, location_overridden: false, location: null },
+  ] }];
+  fixtures.fetchLinks.mockResolvedValue([slackLink]);
+  await renderPage();
+  expect(fixtures.fetchLinks).toHaveBeenCalledTimes(1);
+  expect(fixtures.fetchTicket).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole("link", { name: /^Open Slack/ })).toBeTruthy();
+});

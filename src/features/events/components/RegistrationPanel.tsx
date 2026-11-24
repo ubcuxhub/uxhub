@@ -20,14 +20,12 @@ import { getMembershipTermEndsAt } from "@/features/memberships/lib/term";
 import { hasApplicationAnswer } from "@/lib/application-response";
 import { formatEventDateLabel, pacificDate } from "@/lib/date";
 import { createClient } from "@/lib/supabase/server";
-import type { EventRow, PurchaseRow, UserInfoRow } from "@/lib/supabase/models";
+import type { EventLinkRow, EventRow, EventTicketRow, PurchaseRow, UserInfoRow } from "@/lib/supabase/models";
 import {
   fetchApplicationQuestions,
   fetchApplicationResponses,
   fetchUserEventApplication,
 } from "@/lib/supabase-helpers/event-applications";
-import { fetchEventLinks } from "@/lib/supabase-helpers/event-links";
-import { fetchUserEventTicket } from "@/lib/supabase-helpers/event-tickets";
 import { fetchPurchaseById } from "@/lib/supabase-helpers/purchases";
 import type { DbClient } from "@/lib/supabase-helpers/types";
 import { cn } from "@/lib/utils";
@@ -55,6 +53,13 @@ interface RegistrationPanelProps {
   state: EventState;
   /** Buttons that can't work here, and why (`draftRegistrationBlocks`). */
   unavailable?: PanelContext["unavailable"];
+  /**
+   * The event's links the viewer may see (`fetchEventLinks`), which the page
+   * already read; only a ticket holder's participant packages are shown.
+   */
+  links: EventLinkRow[];
+  /** The student's ticket, which the page already read; `null` without one. */
+  ticket: EventTicketRow | null;
 }
 
 /** What the ticket layout draws, beyond its copy. */
@@ -72,19 +77,17 @@ interface TicketView {
  * The Registration card on the portal event page: one of three layouts (an
  * alert, an action, or the ticket) chosen and worded by `getPanelSpec` from
  * the student's event state. A server component, so it draws the ticket's
- * check-in code itself and fetches only what the state needs: the ticket's
- * `qr_token` and participant package for a ticket holder, and a draft's
- * progress.
+ * check-in code itself. The page passes the ticket and links it already read;
+ * the panel fetches only a draft's progress and the club term.
  */
-export async function RegistrationPanel({ event, user, state, unavailable }: RegistrationPanelProps) {
+export async function RegistrationPanel({ event, user, state, unavailable, links: eventLinks, ticket: ticketRow }: RegistrationPanelProps) {
   const supabase = await createClient();
   const holdsTicket = state.kind === "reg-going" || state.kind === "reg-checked-in";
+  const links = holdsTicket ? eventLinks : [];
 
-  const [links, draftProgress, membershipTermEndsAt, ticketRow] = await Promise.all([
-    holdsTicket ? fetchEventLinks(supabase, event.id) : [],
+  const [draftProgress, membershipTermEndsAt] = await Promise.all([
     state.kind === "app-draft" ? loadDraftProgress(supabase, event.id, user.id) : null,
     event.pricing_policy === "figma" ? getMembershipTermEndsAt() : null,
-    "ticketId" in state && state.ticketId ? fetchUserEventTicket(supabase, event.id, user.id) : null,
   ]);
   // A canceled event's panel says whether their payment came back.
   const refund = state.kind === "canceled" && ticketRow?.purchase_id
