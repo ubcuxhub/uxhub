@@ -134,6 +134,9 @@ describe("atomic item check-in", () => {
     const snap = await fetchItemCheckInSnapshot(client, x.event.id, x.item.id);
 
     expect(snap.attendance[0]).toMatchObject({ operator: null, method: null, checkedInAt: "2020-01-01T00:00:00+00:00" });
+    expect(snap.sessionId).toBe(x.session.id);
+    // A picker chooses the item from the event's items in the same read.
+    expect((await fetchItemCheckInSnapshot(client, x.event.id, items => items[0]?.id ?? null)).attendance).toEqual(snap.attendance);
     const unknown = await fetchItemCheckInSnapshot(client, x.event.id, randomUUID());
 
     expect(unknown.attendance).toEqual([]);

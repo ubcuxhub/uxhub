@@ -2,11 +2,15 @@ import type { DbClient } from "./types";
 import { fetchAllPages } from "./all-pages";
 import { TABLES } from "./tables";
 import { fetchCheckInAttendees } from "./check-ins";
-import type { ItemCheckInSnapshot, ItemCheckInResult } from "@/features/admin/lib/item-check-in";
+import type { CheckInItem, ItemCheckInSnapshot, ItemCheckInResult } from "@/features/admin/lib/item-check-in";
 import { formatUserName } from "@/lib/user-name";
 
-/** Use a staff viewer client: activity and operator information are staff-only. */
-export async function fetchItemCheckInSnapshot(client: DbClient, eventId: string, itemId: string | null): Promise<ItemCheckInSnapshot> {
+/**
+ * Use a staff viewer client: activity and operator information are staff-only.
+ * `item` is the selected item's id, or picks one from the event's items, so a
+ * page that chooses the item by time reads everything in one pass.
+ */
+export async function fetchItemCheckInSnapshot(client: DbClient, eventId: string, item: string | null | ((items: CheckInItem[]) => string | null)): Promise<ItemCheckInSnapshot> {
   const [agenda, attendees] = await Promise.all([
     fetchAllPages((from, to) => client.from(TABLES.eventAgendaItems)
       .select("id,title,starts_at,ends_at,event_agenda_days!inner(event_id)")
@@ -16,6 +20,7 @@ export async function fetchItemCheckInSnapshot(client: DbClient, eventId: string
   ]);
   const items = agenda.map(item => ({ id: item.id, label: item.title, starts_at: item.starts_at, ends_at: item.ends_at }))
     .sort((a, b) => (a.starts_at ?? "\uffff").localeCompare(b.starts_at ?? "\uffff") || a.id.localeCompare(b.id));
+  const itemId = typeof item === "function" ? item(items) : item;
   if (!itemId || !items.some(i => i.id === itemId))
     return { refreshedAt: new Date().toISOString(), items, attendees, attendance: [] };
   const sessions = await client.from(TABLES.checkInSessions).select("id").eq("event_id", eventId).eq("agenda_item_id", itemId).maybeSingle();
@@ -30,7 +35,7 @@ export async function fetchItemCheckInSnapshot(client: DbClient, eventId: string
   const byVersion = new Map(activity.map(a => [a.attendance_version, a]));
   const validTickets = new Set(attendees.map(a => a.id));
   return {
-    refreshedAt: new Date().toISOString(), items, attendees, attendance: rows.filter(r => r.checked_in_at && validTickets.has(r.ticket_id)).map(r => {
+    refreshedAt: new Date().toISOString(), sessionId: sessions.data.id, items, attendees, attendance: rows.filter(r => r.checked_in_at && validTickets.has(r.ticket_id)).map(r => {
       const a = byVersion.get(r.attendance_version);
       return {
         ticketId: r.ticket_id, attendanceVersion: r.attendance_version, checkedInAt: r.checked_in_at!, method: a?.method as "scan" | "manual" | undefined ?? null,

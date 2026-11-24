@@ -17,9 +17,10 @@ export default async function CheckInScanPage({params,searchParams}:{params:Prom
   if(query.returnTo!==undefined)queryParams.set("returnTo",returnTo);
   const suffix=queryParams.size?`?${queryParams}`:"";
   const eventId=await resolveAdminEventId(client,eventParam,`/check-in/scan${suffix}`);
-  const [event,base]=await Promise.all([fetchEventById(client,eventId),fetchItemCheckInSnapshot(client,eventId,null)]);
+  // One read: the snapshot picks the item by the same clock the page uses.
+  const now=new Date();
+  const [event,snapshot]=await Promise.all([fetchEventById(client,eventId),fetchItemCheckInSnapshot(client,eventId,items=>selectedCheckInItem(items,query.item,now))]);
   if(!event)notFound();
-  const selected=selectedCheckInItem(base.items,query.item,new Date());
-  const snapshot=selected?await fetchItemCheckInSnapshot(client,eventId,selected):base;
+  const selected=selectedCheckInItem(snapshot.items,query.item,now);
   return <CheckInScanner key={`${eventId}:${selected ?? query.item ?? ""}`} eventId={eventId} eventName={event.name} initialItemId={selected} initialSnapshot={snapshot} returnTo={query.returnTo === undefined ? undefined : returnTo}/>;
 }
