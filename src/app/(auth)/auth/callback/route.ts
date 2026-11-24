@@ -161,12 +161,13 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.redirect(new URL(destination, origin));
   } catch (error) {
-    log.warn(
-      isAsyncTimeoutError(error)
-        ? "auth.callback_timeout"
-        : "auth.callback_failed",
-      errorFields(error),
-    );
+    // A timeout is a slow network or auth service; anything else is a bug,
+    // so it goes to Sentry.
+    if (isAsyncTimeoutError(error)) {
+      log.warn("auth.callback_timeout", errorFields(error));
+    } else {
+      log.error("auth.callback_failed", errorFields(error));
+    }
     return redirectToAuthError(
       origin,
       getCallbackErrorMessage(error),

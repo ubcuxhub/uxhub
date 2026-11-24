@@ -180,10 +180,20 @@ describe("GET /auth/callback", () => {
     });
   });
 
+  it("logs a timeout at warn, not to Sentry", async () => {
+    const { AsyncTimeoutError } = await import("@/lib/async/deadline");
+    ensureUserInfo.mockRejectedValue(new AsyncTimeoutError(25_000, "Profile setup"));
+    await callback();
+    expect(logMocks.warn).toHaveBeenCalledWith("auth.callback_timeout", {
+      errorType: "AsyncTimeoutError",
+    });
+    expect(logMocks.error).not.toHaveBeenCalled();
+  });
+
   it("logs an unexpected failure through errorFields", async () => {
     ensureUserInfo.mockRejectedValue(new TypeError("row data here"));
     await callback();
-    expect(logMocks.warn).toHaveBeenCalledWith("auth.callback_failed", {
+    expect(logMocks.error).toHaveBeenCalledWith("auth.callback_failed", {
       errorType: "TypeError",
     });
   });
@@ -274,7 +284,7 @@ describe("GET /auth/callback", () => {
       "We couldn't complete sign-in. The link may have expired or already been used. Try signing in again.",
     );
     expect(location.toString()).not.toContain("raw%20provider%20details");
-    expect(logMocks.warn).toHaveBeenCalledWith("auth.callback_failed", {
+    expect(logMocks.error).toHaveBeenCalledWith("auth.callback_failed", {
       errorType: "Error",
     });
   });
