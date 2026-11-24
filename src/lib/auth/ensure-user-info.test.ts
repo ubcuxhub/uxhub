@@ -86,6 +86,7 @@ describe("ensureUserInfo", () => {
 
     await expect(ensureUserInfo(authUser)).resolves.toEqual({
       status: "conflict",
+      reason: "linked_elsewhere",
       message:
         "An account with this email is already linked to another sign-in method.",
     });

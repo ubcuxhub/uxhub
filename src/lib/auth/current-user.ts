@@ -2,8 +2,14 @@ import { cache } from "react";
 
 import type { UserInfoRow } from "@/lib/supabase/models";
 import { createClient } from "@/lib/supabase/server";
-import { ensureUserInfo } from "@/lib/auth/ensure-user-info";
+import {
+  PROFILE_CONFLICT_EVENTS,
+  ensureUserInfo,
+} from "@/lib/auth/ensure-user-info";
+import { errorFields, log } from "@/lib/log";
 import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";
+
+const PROFILE_LOAD_ERROR = "Unable to load your profile.";
 
 export type CurrentUserResult =
   | { status: "authenticated"; user: UserInfoRow }
@@ -46,9 +52,18 @@ export const loadCurrentUser = cache(async (): Promise<CurrentUserResult> => {
     return { status: "unauthenticated" };
   }
 
-  const existing = await fetchUserInfoByAuthId(supabase, authUser.id).catch(
-    () => null
-  );
+  // A failed read is not "no profile": treating it as one would run the
+  // repair below, which writes, on a database hiccup.
+  let existing: UserInfoRow | null;
+  try {
+    existing = await fetchUserInfoByAuthId(supabase, authUser.id);
+  } catch (error) {
+    log.error("auth.profile_read_failed", {
+      ...errorFields(error),
+      authUserId: authUser.id,
+    });
+    return { status: "error", message: PROFILE_LOAD_ERROR };
+  }
 
   if (existing) {
     return { status: "authenticated", user: existing };
@@ -65,16 +80,30 @@ export const loadCurrentUser = cache(async (): Promise<CurrentUserResult> => {
     return { status: "needs_profile" };
   }
 
+  // Logged here, once per request, so the guards that turn these into an
+  // /auth/error redirect don't log the same cause again.
   if (ensured.status === "conflict") {
+    log.warn(PROFILE_CONFLICT_EVENTS[ensured.reason], {
+      authUserId: authUser.id,
+      source: "current_user",
+    });
     return { status: "error", message: ensured.message };
   }
 
-  const repaired = await fetchUserInfoByAuthId(supabase, authUser.id).catch(
-    () => null
-  );
+  let repaired: UserInfoRow | null;
+  try {
+    repaired = await fetchUserInfoByAuthId(supabase, authUser.id);
+  } catch (error) {
+    log.error("auth.profile_read_failed", {
+      ...errorFields(error),
+      authUserId: authUser.id,
+    });
+    return { status: "error", message: PROFILE_LOAD_ERROR };
+  }
 
   if (!repaired) {
-    return { status: "error", message: "Unable to load your profile." };
+    log.warn("auth.profile_repair_missing", { authUserId: authUser.id });
+    return { status: "error", message: PROFILE_LOAD_ERROR };
   }
 
   return { status: "authenticated", user: repaired };

@@ -24,6 +24,14 @@ const currentUserMocks = vi.hoisted(() => ({
 
 vi.mock("next/navigation", () => ({ redirect: navigationMocks.redirect }));
 
+const logMocks = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+}));
+
+vi.mock("@/lib/log", () => ({ log: logMocks, errorFields: vi.fn() }));
+
 vi.mock("@/lib/auth/current-user", () => ({
   loadCurrentUser: currentUserMocks.loadCurrentUser,
 }));
@@ -126,6 +134,9 @@ describe("requireAuth", () => {
       () => requireAuth(),
       "/auth/error?error=Unable%20to%20load%20your%20profile."
     );
+    // `loadCurrentUser` logged the cause; the redirect adds no second line.
+    expect(logMocks.warn).not.toHaveBeenCalled();
+    expect(logMocks.error).not.toHaveBeenCalled();
   });
 });
 
