@@ -149,7 +149,9 @@ export function AdminUserRecord({
     try {
       const changes = userEditChanges(updated, draft, membershipTypes);
       if (Object.keys(changes).length) {
-        commit(await saveManagerUserDetailsAction(updated.id, changes));
+        const saved = await saveManagerUserDetailsAction(updated.id, changes);
+        if (!saved.ok) throw new Error(saved.error);
+        commit(saved.user);
         const savedDraft = createUserEditDraft(updated);
         setDraft((current) => current && {
           ...current,
@@ -168,7 +170,8 @@ export function AdminUserRecord({
           form.set("file", draft.photo.file);
           form.set("expectedPath", updated.profile_photo_path ?? "");
           const response = await fetch(`/api/admin/users/${updated.id}/photo`, { method: "POST", body: form });
-          const data = await response.json();
+          // A response that is not JSON (a gateway error page, say) reads as a plain failure.
+          const data = await response.json().catch(() => ({}));
           if (!response.ok) throw new Error(data.error || "Unable to upload photo.");
           commit(data.user);
         } else if (updated.profile_photo_path) {
@@ -180,7 +183,8 @@ export function AdminUserRecord({
       const roleChanged = draft.role !== updated.role_access;
       if (roleChanged) {
         const role = await updateUserRoleAction(updated.id, draft.role);
-        updated = { ...updated, role_access: role };
+        if (!role.ok) throw new Error(role.error);
+        updated = { ...updated, role_access: role.role };
         setUser(updated);
         savedAny = true;
       }

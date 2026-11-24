@@ -22,7 +22,7 @@ import {
   TableRow,
   TableRowLink,
 } from "@/components/ui/table";
-import type { MembershipTypeOption, UserRecord } from "@/features/admin/types";
+import type { MembershipTypeOption, UserListRecord } from "@/features/admin/types";
 import { formatMembershipTypeName } from "@/features/memberships/lib/display";
 import type { RoleAccess } from "@/lib/supabase/models";
 import { formatUserName } from "@/lib/user-name";
@@ -33,7 +33,7 @@ import { ChipFilterSection } from "./ChipFilterSection";
 
 interface AdminUsersManagerProps {
   /** Every user, from the server. A save re-renders the page with fresh rows. */
-  users: UserRecord[];
+  users: UserListRecord[];
   /** Active tiers. Tiers only past members hold are added for filtering. */
   membershipTypes: MembershipTypeOption[];
 }
@@ -62,14 +62,14 @@ const USER_NOUN = { one: "user", other: "users" };
 const LIST_HREF = "/admin/users";
 const COLUMNS = 6;
 
-const userHref = (user: UserRecord) => `${LIST_HREF}/${user.id}`;
+const userHref = (user: UserListRecord) => `${LIST_HREF}/${user.id}`;
 
-function compareNames(a: UserRecord, b: UserRecord) {
+function compareNames(a: UserListRecord, b: UserListRecord) {
   return a.last_name.localeCompare(b.last_name) || a.first_name.localeCompare(b.first_name);
 }
 
 /** Sorts in place. Users without a creation date come last either way. */
-function sortUsers(users: UserRecord[], sort: UserSort) {
+function sortUsers(users: UserListRecord[], sort: UserSort) {
   return users.sort((a, b) => {
     if (sort === "name-asc") return compareNames(a, b);
     if (sort === "name-desc") return compareNames(b, a);

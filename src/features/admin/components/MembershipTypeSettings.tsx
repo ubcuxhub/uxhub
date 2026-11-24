@@ -66,11 +66,16 @@ function TierEditor({ tier }: { tier: MembershipTypeRow }) {
     setPending(true);
     setError(null);
     try {
-      const next = await updateMembershipTypeAction(tier.id, {
+      const result = await updateMembershipTypeAction(tier.id, {
         active: draft.active,
         description: draft.description,
         price: parsedPrice,
       });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      const next = result.tier;
       const applied = {
         active: next.active,
         description: next.description,

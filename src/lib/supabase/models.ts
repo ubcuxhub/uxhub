@@ -5,12 +5,6 @@ import type {
   TablesUpdate,
 } from "@/lib/supabase/database.types";
 
-export type AppSettingsRow = Tables<"app_settings">;
-export type AppSettingsUpdate = TablesUpdate<"app_settings">;
-
-export type EventStaffVolunteerScheduleRow = Tables<"event_staff_volunteer_schedules">;
-export type EventContentSettingsRow = Tables<"event_content_settings">;
-
 // PostgREST computed fields are returned only when explicitly selected.
 export type EventRow = Omit<Tables<"events">, "event_has_ended">;
 export type EventInsert = TablesInsert<"events">;
@@ -20,20 +14,14 @@ export type EventType = Enums<"event_type">;
 
 export type MentorRow = Tables<"mentors">;
 export type SponsorRow = Tables<"sponsors">;
-export type EventMentorInsert = TablesInsert<"event_mentors">;
-export type EventPeopleSectionRow = Tables<"event_people_sections">;
-export type EventPeopleSectionInsert = TablesInsert<"event_people_sections">;
-export type EventSponsorInsert = TablesInsert<"event_sponsors">;
 
 export type TeamRow = Tables<"teams">;
 export type TeamMemberRow = Tables<"team_members">;
 
 export type EventLinkRow = Tables<"event_links">;
-export type EventLinkInsert = TablesInsert<"event_links">;
 export type EventPrivateDetailsRow = Tables<"event_private_details">;
 
 export type UserInfoRow = Tables<"user_info">;
-export type UserInfoInsert = TablesInsert<"user_info">;
 export type UserInfoUpdate = TablesUpdate<"user_info">;
 
 export type MembershipTypeRow = Tables<"membership_types">;
@@ -54,34 +42,18 @@ export type EventTicketRow = Tables<"event_tickets">;
 export type EventApplicationSettingsRow = Tables<"event_application_settings">;
 
 export type EventApplicationRow = Tables<"event_applications">;
-export type EventApplicationInsert = TablesInsert<"event_applications">;
-export type EventApplicationUpdate = TablesUpdate<"event_applications">;
 
 export type EventApplicationQuestionRow =
   Tables<"event_application_questions">;
 export type EventApplicationQuestionInsert =
   TablesInsert<"event_application_questions">;
-export type EventApplicationQuestionUpdate =
-  TablesUpdate<"event_application_questions">;
 
-export type EventApplicationResponseRow =
-  Tables<"event_application_responses">;
 export type EventApplicationResponseInsert =
   TablesInsert<"event_application_responses">;
-export type EventApplicationResponseUpdate =
-  TablesUpdate<"event_application_responses">;
 
 export type CheckInSessionRow = Tables<"check_in_sessions">;
-export type CheckInSessionInsert = TablesInsert<"check_in_sessions">;
-export type CheckInSessionUpdate = TablesUpdate<"check_in_sessions">;
 
 export type CheckInRow = Tables<"check_ins">;
-export type CheckInInsert = TablesInsert<"check_ins">;
-export type CheckInUpdate = TablesUpdate<"check_ins">;
-
-export type ApplicationReviewNoteRow = Tables<"application_review_notes">;
-export type ApplicationReviewNoteInsert =
-  TablesInsert<"application_review_notes">;
 
 export type EventApplicationStatus = Enums<"event_application_status">;
 /** Every status but `draft`: what admins review and decide. */
@@ -90,9 +62,6 @@ export type SubmittedApplicationStatus = Exclude<EventApplicationStatus, "draft"
 export type SubmittedApplicationRow = EventApplicationRow & {
   status: SubmittedApplicationStatus;
 };
-export type EventLocationType = Enums<"event_location_type">;
-export type EventLinkType = Enums<"event_link_type">;
-export type EventLinkVisibility = Enums<"event_link_visibility">;
 export type ResponseType = Enums<"response_type">;
 export type UserType = Enums<"user_type">;
 export type RoleAccess = Enums<"role_access_enum">;

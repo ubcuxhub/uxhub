@@ -1,4 +1,5 @@
 import type { DbClient } from "./types";
+import { fetchAllPages } from "./all-pages";
 import { TABLES } from "./tables";
 import type { UserInfoRow, UserInfoUpdate } from "@/lib/supabase/models";
 
@@ -59,21 +60,6 @@ export async function fetchUserMembershipExpiryById(
   return data;
 }
 
-export async function fetchUserInfoContactsByIds(
-  supabase: DbClient,
-  ids: string[]
-): Promise<UserInfoContact[]> {
-  if (ids.length === 0) return [];
-
-  const { data, error } = await supabase
-    .from(TABLES.userInfo)
-    .select("id, first_name, last_name, email")
-    .in("id", ids);
-
-  if (error) throw error;
-  return data ?? [];
-}
-
 export async function updateUserInfoById(
   supabase: DbClient,
   id: string,
@@ -88,29 +74,30 @@ export async function updateUserInfoById(
 }
 
 /**
- * Admin user directory rows: user_info joined with the related membership
- * type name. The `membership_types!membership_type_id(name)` hint pins the
- * foreign-key relationship used for the join.
+ * The admin user directory: every account's listed columns (what the list
+ * shows, searches, sorts and filters on, and nothing more, since every row
+ * goes to the browser) with its membership tier name. The
+ * `membership_types!membership_type_id(name)` hint pins the foreign key used
+ * for the join. Paged, so the directory is complete past PostgREST's
+ * 1000-row cap; a user's record reads the rest of their row.
  *
  * Rows left behind by self-serve account deletion are excluded — they are
  * anonymized placeholders kept only so purchases and event registrations keep
  * a referent, and they are not people an admin can act on.
  */
 export async function fetchAdminUserRecords(supabase: DbClient) {
-  const { data, error } = await supabase
-    .from(TABLES.userInfo)
-    .select(
-      `
-      *,
-      membership_types!membership_type_id(name)
-    `
-    )
-    .is("deleted_at", null)
-    .order("last_name", { ascending: true })
-    .order("first_name", { ascending: true });
-
-  if (error) throw error;
-  return data ?? [];
+  return fetchAllPages((from, to) =>
+    supabase
+      .from(TABLES.userInfo)
+      .select(
+        "id, first_name, last_name, email, major, role_access, membership_type_id, created_at, membership_types!membership_type_id(name)"
+      )
+      .is("deleted_at", null)
+      .order("last_name", { ascending: true })
+      .order("first_name", { ascending: true })
+      .order("id")
+      .range(from, to)
+  );
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

@@ -1,5 +1,5 @@
 import type { DbClient } from "./types";
-import { fetchCheckInPages } from "./check-in-pages";
+import { fetchAllPages } from "./all-pages";
 import { TABLES } from "./tables";
 import type { EventRow, TeamMemberRow, TeamRow, UserInfoRow } from "@/lib/supabase/models";
 import { formatUserName } from "@/lib/user-name";
@@ -175,7 +175,7 @@ export async function fetchEventTeamsOverview(
   if (!event) return null;
 
   const [teams, tickets] = await Promise.all([
-    fetchCheckInPages<EventTeamsSource["teams"][number]>((from, to) =>
+    fetchAllPages<EventTeamsSource["teams"][number]>((from, to) =>
       client
         .from(TABLES.teams)
         .select("id, name, owner_id, team_members(user_id, joined_at, user_info(first_name, last_name))")
@@ -183,7 +183,7 @@ export async function fetchEventTeamsOverview(
         .order("id")
         .range(from, to)
     ),
-    fetchCheckInPages<EventTeamsSource["tickets"][number]>((from, to) =>
+    fetchAllPages<EventTeamsSource["tickets"][number]>((from, to) =>
       client
         .from(TABLES.eventTickets)
         .select("user_id, check_ins(checked_in_at)")

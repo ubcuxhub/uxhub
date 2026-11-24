@@ -129,7 +129,8 @@ describe("AdminEventRecord overview", () => {
     expect(screen.queryByRole("group", { name: "Registered" })).toBeNull();
     expect(screen.queryByRole("group", { name: "Seats left" })).toBeNull();
     expect(screen.queryByRole("group", { name: "Applications" })).toBeNull();
-    expect(screen.getAllByText("Free")).toHaveLength(2);
+    // One price line, worded as the event manager's Overview words it.
+    expect(screen.getAllByText("Free")).toHaveLength(1);
   });
 
   it("shows the event's icon as a square thumbnail, or a placeholder without one", () => {

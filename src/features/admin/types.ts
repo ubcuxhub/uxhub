@@ -48,8 +48,8 @@ export interface CheckInAttendee {
   user_email: string;
 }
 
-/** Why a scan or a manual check-in was refused. */
-export type CheckInRejection = "invalid_code" | "not_found" | "wrong_event" | "event_canceled";
+/** Why a scan or a manual check-in was refused (`mutate_item_check_in`). */
+export type CheckInRejection = "not_found" | "event_canceled";
 
 /** What the door sees after a scan or a manual check-in. */
 export type CheckInResult =
@@ -61,6 +61,20 @@ export type UserRecord = UserInfoRow & {
   membership_type_name?: string | null;
   order_date?: string | null;
 };
+
+/** One row of the user directory: only what it shows, searches, sorts and filters on. */
+export type UserListRecord = Pick<
+  UserRecord,
+  | "id"
+  | "first_name"
+  | "last_name"
+  | "email"
+  | "major"
+  | "role_access"
+  | "membership_type_id"
+  | "created_at"
+  | "membership_type_name"
+>;
 
 export interface UserPurchaseSummary {
   id: string;

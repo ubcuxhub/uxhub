@@ -24,7 +24,8 @@ import { eventManagerHref } from "../lib/event-manager";
 import { EventRegistrationsCard } from "./EventRegistrationsCard";
 import { EventStatusBadge } from "./EventStatusBadge";
 import { CancelEventDialog } from "./CancelEventDialog";
-import { EventScheduleFields, RegistrationBadge, hasEnded } from "./EventScheduleEditor";
+import { EventScheduleFields, RegistrationBadge } from "./EventScheduleEditor";
+import { describeEventPrice, eventHasEnded } from "../lib/event-facts";
 import { eventMarketingHref } from "../lib/event-presentation";
 
 export interface AdminEventRecordProps {
@@ -39,16 +40,6 @@ export interface AdminEventRecordProps {
   now: string;
   /** Whether the public event pages are live (the student events flag). */
   publicPages: boolean;
-}
-
-const currency = new Intl.NumberFormat("en-CA", {
-  style: "currency",
-  currency: "CAD",
-});
-
-function formatPrice(value: number | null) {
-  if (value === null) return "Not set";
-  return Number(value) === 0 ? "Free" : currency.format(Number(value));
 }
 
 /**
@@ -70,7 +61,7 @@ export function AdminEventRecord({
   const [canceling, setCanceling] = useState(false);
   // Canceled for good, or over: the drawer shows the record but edits nothing.
   const canceled = event.canceled_at !== null;
-  const ended = event.status === "active" && hasEnded(event, new Date(now));
+  const ended = eventHasEnded(event, new Date(now));
 
   const base = `/admin/events/${event.id}`;
   const registration = registrationWindow(event, new Date(now));
@@ -216,8 +207,7 @@ export function AdminEventRecord({
           </RecordSection>
 
           <RecordSection title="Tickets">
-            <RecordField label="Regular price" value={formatPrice(event.regular_price)} />
-            <RecordField label="Member price" value={formatPrice(event.member_price)} />
+            <RecordField label="Price" value={describeEventPrice(event)} />
             <RecordField label="Capacity" value={event.max_capacity == null ? "Not set" : `${event.max_capacity} seats`} />
             <RecordField
               label="Event type"
