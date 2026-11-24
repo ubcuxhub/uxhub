@@ -17,7 +17,7 @@ interface SegmentedToggleProps
   /**
    * `md` (default) is the form control. `lg` is the page-level view switch
    * (Figma 3759:15793, the events timeline's Upcoming | Past): 34px options
-   * with 16px labels on a borderless track.
+   * with 16px labels on a borderless track, 4px padding all round.
    */
   size?: SegmentedToggleSize;
   "aria-label": string;
@@ -76,8 +76,8 @@ function SegmentedToggle({
             "inline-flex h-11 items-stretch rounded-full bg-muted",
             size === "md" &&
               "gap-0.5 border border-border-subtle p-[3px] sm:h-[calc(var(--size-control)-4px)]",
-            // 4px apart, 4 x 2px around them: a 38px track from `sm`, 44px on phones.
-            size === "lg" && "gap-1 px-1 py-0.5 sm:h-[38px]",
+            // 4px apart and 4px around them: a 42px track from `sm`, 44px on phones.
+            size === "lg" && "gap-1 p-1 sm:h-[42px]",
             "[&.w-full>[data-slot=segmented-toggle-item]]:flex-1",
             className,
           )}
