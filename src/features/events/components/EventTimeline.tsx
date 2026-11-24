@@ -1,12 +1,11 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Label } from "@/components/ui/label";
 import { SearchField } from "@/components/ui/search-field";
-import { Switch } from "@/components/ui/switch";
+import { SegmentedToggle, SegmentedToggleItem } from "@/components/ui/segmented-toggle";
 import type { EventBadge } from "@/features/events/types";
 import type { EventRow } from "@/lib/supabase/models";
 import { groupEventsByMonth, normalizeString } from "@/features/events/lib/event-timeline";
@@ -27,7 +26,6 @@ export function EventTimeline({
   pastEvents,
   badges = {},
 }: EventTimelineProps) {
-  const showPastId = useId();
   const searchRef = useRef<HTMLInputElement>(null);
   const [showPastEvents, setShowPastEvents] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -64,16 +62,16 @@ export function EventTimeline({
           // Announce the count only while searching, not on every page load.
           resultCount={query ? filteredEvents.length : undefined}
         />
-        <div className="flex w-fit shrink-0 items-center whitespace-nowrap text-foreground">
-          <Label htmlFor={showPastId} className="mr-2">
-            Show past events
-          </Label>
-          <Switch
-            id={showPastId}
-            checked={showPastEvents}
-            onCheckedChange={setShowPastEvents}
-          />
-        </div>
+        {/* Upcoming or Past (Figma 3759:15793): two views of the same list. */}
+        <SegmentedToggle
+          aria-label="Which events"
+          className="shrink-0"
+          value={showPastEvents ? "past" : "upcoming"}
+          onValueChange={(view) => setShowPastEvents(view === "past")}
+        >
+          <SegmentedToggleItem value="upcoming">Upcoming</SegmentedToggleItem>
+          <SegmentedToggleItem value="past">Past</SegmentedToggleItem>
+        </SegmentedToggle>
       </div>
 
       {filteredGroups.length === 0 ? (

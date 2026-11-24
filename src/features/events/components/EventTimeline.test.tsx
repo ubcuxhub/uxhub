@@ -34,11 +34,11 @@ const type = (text: string) => fireEvent.change(search(), { target: { value: tex
 const status = () => screen.queryByRole("status")?.textContent ?? null;
 
 describe("EventTimeline", () => {
-  it("lists upcoming events, and past ones behind the switch", () => {
+  it("lists upcoming events, and past ones behind the Past toggle", () => {
     render(<EventTimeline upcomingEvents={UPCOMING} pastEvents={PAST} />);
     expect(screen.getAllByRole("link")).toHaveLength(3);
 
-    fireEvent.click(screen.getByRole("switch", { name: "Show past events" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Past" }));
     expect(screen.getAllByRole("link").map((link) => link.textContent)).toEqual(["Spring Mixer"]);
   });
 
@@ -68,9 +68,13 @@ describe("EventTimeline", () => {
         badges={{ mixer: { status: "checked_in" } }}
       />
     );
-    fireEvent.click(screen.getByRole("switch", { name: "Show past events" }));
+    fireEvent.click(screen.getByRole("radio", { name: "Past" }));
     expect(screen.getByText("Checked in")).toBeTruthy();
-    expect(screen.getByText("Past")).toBeTruthy();
+    // The badge, not the toggle's own "Past" option.
+    const badges = screen
+      .getAllByText("Past")
+      .filter((element) => !element.closest("[data-slot='segmented-toggle']"));
+    expect(badges).toHaveLength(1);
   });
 
   it("announces nothing until there is a query", () => {
@@ -112,7 +116,7 @@ describe("EventTimeline", () => {
     [true, "No past events"],
   ])("says so when there are no events (past: %s), with no clear action", (past, title) => {
     render(<EventTimeline upcomingEvents={[]} pastEvents={[]} />);
-    if (past) fireEvent.click(screen.getByRole("switch", { name: "Show past events" }));
+    if (past) fireEvent.click(screen.getByRole("radio", { name: "Past" }));
     expect(screen.getByRole("heading", { name: title })).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Clear search" })).toBeNull();
   });
