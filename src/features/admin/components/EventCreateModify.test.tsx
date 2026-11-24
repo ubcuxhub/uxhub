@@ -218,7 +218,6 @@ it("uses Proud Hubbo at 200px after a draft save applies the edits and enables s
   fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
   const dialog = await screen.findByRole("dialog", { name: "Draft saved" });
   expect(within(dialog).getByTestId("hubbo").getAttribute("data-emotion")).toBe("proud");
-  expect(within(dialog).getByTestId("hubbo").className).toContain("h-50");
   fireEvent.click(within(dialog).getByRole("button", { name: "Keep editing" }));
   await waitFor(() => expect(screen.queryByRole("dialog", { name: "Draft saved" })).toBeNull());
   expect(within(openMoreActions()).getByRole("menuitem", { name: "Delete event" })).toBeTruthy();

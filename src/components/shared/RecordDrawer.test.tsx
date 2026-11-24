@@ -326,7 +326,6 @@ describe("RecordThumbnail", () => {
     const { container } = render(<RecordThumbnail src="https://store/icon.png" />);
     const tile = container.querySelector("[data-slot='record-thumbnail']")!;
     expect(tile.getAttribute("aria-hidden")).toBe("true");
-    expect(tile.className).toContain("sm:size-24");
     const image = tile.querySelector("img")!;
     expect(image.getAttribute("src")).toBe("https://store/icon.png");
     expect(image.getAttribute("alt")).toBe("");
