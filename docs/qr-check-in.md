@@ -13,8 +13,7 @@ won't scan. Target: Nov 12, 2026.
   shows the event, the holder, and the check-in QR code. Its badge is one of
   the student-facing badges in `docs/event-states.md`. The code shows for Going
   and Checked in, drawn from the `qrToken` prop with
-  [`QrCode`](../src/features/events/components/QrCode.tsx). Build its `event`
-  prop with [`toTicketEvent`](../src/features/events/lib/ticket.ts).
+  [`QrCode`](../src/features/events/components/QrCode.tsx).
 - **Check-in data:** `check_in_sessions` (one or more per event) and
   `check_ins` (one row per ticket per session, unique on that pair).
   `/admin/events/[event]/check-in`, the event manager's Check-in tab

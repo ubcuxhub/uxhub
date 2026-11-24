@@ -23,15 +23,6 @@ export interface ApplicationQuestionTemplate {
   response_options: string[];
 }
 
-/** Display-ready event details for a ticket; build one with `toTicketEvent`. */
-export interface TicketEvent {
-  eventColour?: string;
-  name: string;
-  date: string | null;
-  time: string | null;
-  location: string | null;
-}
-
 /**
  * The badge on a student's event card and event page, naming their event
  * state (docs/event-states.md). `date` completes "Opens" and "Register by".
