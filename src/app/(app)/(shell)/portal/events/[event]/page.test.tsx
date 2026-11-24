@@ -303,3 +303,11 @@ it("doesn't fetch links for agenda items when the event has no agenda", async ()
   expect(fixtures.fetchLinks).not.toHaveBeenCalled();
   expect(fixtures.agendaProps).toHaveBeenCalledWith(expect.objectContaining({ itemLinks: {} }));
 });
+
+it("dates an overnight event on its start day alone, as the timeline does", async () => {
+  const event = fixtures.event;
+  fixtures.fetchEvent.mockResolvedValue({ ...event, starts_at: "2099-12-05T03:00:00Z", ends_at: "2099-12-05T09:00:00Z" });
+  await renderPage();
+  expect(screen.getByText("Dec 4, 2099")).toBeTruthy();
+  expect(screen.queryByText(/Dec 5, 2099/)).toBeNull();
+});

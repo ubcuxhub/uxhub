@@ -75,7 +75,9 @@ it("renders the normalized participant agenda through the viewer client instead 
  const tree=await Page({...props,searchParams:Promise.resolve({})});
  expect(mocks.participant).toHaveBeenCalledWith("staff-client","event-1");
  expect(JSON.stringify(tree)).toContain("Normalized day");
- expect(JSON.stringify(tree)).toContain("Saturday, November 21, 2026");
+ // 11 PM to 2 AM Pacific: one evening, dated by its start.
+ expect(JSON.stringify(tree)).toContain("Friday, November 20, 2026");
+ expect(JSON.stringify(tree)).not.toContain("November 21");
  expect(JSON.stringify(tree)).not.toContain("LEGACY-");
  expect(mocks.noStore).toHaveBeenCalled();
 });
@@ -110,6 +112,13 @@ describe("layout", () => {
   expect(list.map(f=>f.key)).toEqual(["date","location","price","registration"]);
   expect(list[2]).toMatchObject({value:"$10.00",detail:"Free for UX Hub members"});
   expect(list[3]).toMatchObject({value:"Register by Sun, Dec 6",detail:"25 of 25 spots left"});
+ });
+ it("dates an overnight event on its start day alone", async () => {
+  // An evening to 2:00 AM Pacific, six hours.
+  mocks.fetch.mockResolvedValue({...live,starts_at:"2099-12-05T03:00:00Z",ends_at:"2099-12-05T09:00:00Z"});
+  const date=facts(await Page(publicProps))[0];
+  expect(date.value).toBe("Friday, December 4, 2099");
+  expect(date.detail).toMatch(/PM – 2:00 AM$/);
  });
  it("marks a past event and drops the registration row", async () => {
   mocks.fetch.mockResolvedValue({...live,starts_at:"2020-01-26T18:00:00Z",ends_at:"2020-01-27T01:00:00Z",registration_closes_at:"2020-01-21T20:00:00Z"});

@@ -16,7 +16,7 @@ import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
 import { fetchEventParticipantContent } from "@/lib/supabase-helpers/event-agenda";
 import { fetchEventLinks } from "@/lib/supabase-helpers/event-links";
 import { Calendar, Link2, MapPin } from "lucide-react";
-import { formatEventDate, formatEventTime, pacificDate } from "@/lib/date";
+import { endsOnLaterDay, formatEventDate, formatEventTime, pacificDate } from "@/lib/date";
 import { resolveImagePreviewSrc } from "@/lib/event-image";
 import { fetchEventPeopleSections, fetchEventSponsors } from "@/lib/supabase-helpers/event-people";
 import { EventPeopleCard } from "@/features/events/components/EventPeopleCard";
@@ -88,8 +88,8 @@ export default async function PortalEventPage({
 
   const startTime = formatEventTime(event.starts_at);
   const endTime = formatEventTime(event.ends_at);
-  const endsOnLaterDay =
-    event.ends_at && pacificDate(event.ends_at) !== pacificDate(event.starts_at);
+  // A 7 PM to 1 AM social is one day, as on the timeline card.
+  const multiDay = endsOnLaterDay(event.starts_at, event.ends_at);
 
   return (
     <PageContainer backHref="/portal/events" backLabel="Back to Events" className="space-y-6">
@@ -133,7 +133,7 @@ export default async function PortalEventPage({
                 <div className="flex min-w-0 flex-col gap-1 break-words">
                   <p className="font-medium">
                     {formatEventDate(event.starts_at, { year: "numeric", month: "short" }) ?? "TBD"}
-                    {endsOnLaterDay
+                    {multiDay
                       ? ` – ${formatEventDate(event.ends_at, { year: "numeric", month: "short" }) ?? "TBD"}`
                       : ""}
                   </p>

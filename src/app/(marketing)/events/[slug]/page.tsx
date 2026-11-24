@@ -31,7 +31,7 @@ import {
   fetchEventSponsors,
 } from "@/lib/supabase-helpers/event-people";
 import type { EventRow } from "@/lib/supabase/models";
-import { formatEventDate, formatEventTime, pacificDate } from "@/lib/date";
+import { endsOnLaterDay, formatEventDate, formatEventTime } from "@/lib/date";
 import { EventRegistrationAction } from "@/features/events/components/EventRegistrationAction";
 import { isCanceledEvent } from "@/features/events/lib/event-cancellation";
 import { StatusBadge } from "@/components/ui/status-badge";
@@ -138,7 +138,8 @@ export default async function EventDetailPage({
   const startDateFormatted = formatEventDate(event.starts_at, {
     weekday: "long",
   });
-  const endDateFormatted = event.ends_at && pacificDate(event.ends_at) !== pacificDate(event.starts_at)
+  // A 7 PM to 1 AM social is one day, as on the timeline card.
+  const endDateFormatted = endsOnLaterDay(event.starts_at, event.ends_at)
     ? formatEventDate(event.ends_at, { weekday: "long" })
     : null;
   const startTimeFormatted = formatEventTime(event.starts_at);
