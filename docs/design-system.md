@@ -1161,7 +1161,9 @@ and shaped Skeletons: compact distributions have a 120px minimum (124px on
 wide screens), charts a 290px minimum. Titles remain pinned in loading, empty
 and error states; long content can grow the surface. Optional `titleAction`
 places a help control immediately to the right of the heading and retains it in
-loading/empty/error states; `action` remains the separate data-control slot. The compact loaded layout
+loading/empty/error states; `action` remains the separate data-control slot. Chart
+headers wrap that control to another row when space is limited, keeping the
+heading and help control together. The compact loaded layout
 keeps its title/control in the first column. Center the chart/metric group in
 the second column with a full-width, 16rem maximum wrapper and automatic side
 margins. Reserve the remaining width beside the non-shrinking donut for metrics,
@@ -1178,7 +1180,13 @@ using neutral marks, card-coloured boundaries and a primary selection/hover.
 selection alongside a dropdown. Selecting never replaces other segments or changes the denominator. Its textual
 list always includes every label, count, share and selection. Callers can hide
 only the visual with `visualClassName`; never hide its accessible equivalent.
-Dashboard narrow cards omit the donut under accepted D-14.
+Dashboard narrow cards omit the donut under accepted D-14. The donut has explicit
+85px chart dimensions, so hiding it never measures a zero-size parent.
+`ChartContainer` (`components/ui/chart`) defaults to responsive measurement and
+accepts `initialDimension` for its initial render. Use `responsive={false}` only
+when the child chart supplies explicit width/height; configuration, theme colours
+and tooltip context remain available in either mode. The resizable real dashboard
+card at `/dev/components/distribution-chart` demonstrates hide/show and long labels.
 
 `ScrollableBarChart` (`components/shared/ScrollableBarChart`) takes ordered
 `ChartPeriod` rows (id, label, nullable count, coverage). Complete zero is a

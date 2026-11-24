@@ -1,5 +1,6 @@
 "use client";
 
+import { DashboardAreaOfStudy } from "@/features/admin/components/dashboard/DashboardAreaOfStudy";
 import { useState } from "react";
 import { Info } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
@@ -19,6 +20,9 @@ export default function StatisticsCardDemo() {
   const [period, setPeriod] = useState<"year" | "month">("year");
   const [year, setYear] = useState(2026);
   return <div className="flex flex-col gap-8">
+    <SpecimenGroup title="Donut hide/show transition" description="Resize this real dashboard card across 380px outer width (330px content). The visual hides, the full accessible distribution and selection remain. Long labels must not shift the donut.">
+      <Specimen label="Resizable Area of Study" className="w-full" wide><div data-donut-resize className="w-[491px] min-w-[280px] max-w-full resize-x overflow-auto"><DashboardAreaOfStudy data={{ totalAccounts: 25, majors: segments.map(({ label, count }) => ({ major: label, count })) }} /></div></Specimen>
+    </SpecimenGroup>
     <SpecimenGroup title="Statistics surfaces and metrics" description="Card titles stay pinned; messages centre below. Neutral metric pills convey no success/error status. Use the theme/density controls to compare every example.">
       <Specimen label="Centered group: reserved text space keeps the donut stationary" className="w-[491px]">
         <StatisticsCard title="Distribution" size="compact" action={<Button size="sm" variant="secondary" onClick={() => setSelected(selected ? undefined : "Unknown")}>Select</Button>}>
@@ -32,9 +36,9 @@ export default function StatisticsCardDemo() {
       <Specimen label="Loading" className="w-[350px]"><StatisticsCard title="Area of Study" size="compact" loading /></Specimen>
       <Specimen label="Chart loading" className="w-[421px]"><StatisticsCard title="Club Members" loading /></Specimen>
     </SpecimenGroup>
-    <SpecimenGroup title="Scrollable periods" description="Monthly starts at September and hides partial annotations; Yearly keeps coverage annotations and starts at the latest period. Hover, Tab/focus, or tap a bar for the same actual count and coverage. Arrows step one period; drag the native scrollbar. Up to seven bars fit, with fewer for long labels/narrow containers. Wheel scrolling and browser zoom stay native. No chart animation.">
-      {[350, 616, 1000].map((width) => <Specimen key={width} label={`${width}px · unknown, partial, exact zero and future`} className="w-full" wide>
-        <div className="min-w-0 max-w-full" style={{ width }}><StatisticsCard title="Reporting periods" titleAction={<IconButton label="Reporting periods use the selected academic year" variant="ghost" size="icon-sm"><Info /></IconButton>} action={<ChartPeriodMenu period={period} selectedYear={year} years={[{ value: 2026, label: "2026–2027" }, { value: 2025, label: "2025–2026" }]} onChange={(p, y) => { setPeriod(p); setYear(y); }} />}>
+    <SpecimenGroup title="Scrollable periods" description="Monthly starts at September and hides partial annotations; Yearly keeps coverage annotations and starts at the latest period. Hover, Tab/focus, or tap a bar for the same actual count and coverage. Arrows step one period; drag the native scrollbar. Up to seven bars fit, with fewer for long labels/narrow containers. Wheel scrolling and browser zoom stay native. The period control wraps onto its own row before crowding the title/info group. No chart animation.">
+      {[280, 350, 616, 1000].map((width) => <Specimen key={width} label={`${width}px · unknown, partial, exact zero and future`} className="w-full" wide>
+        <div className="min-w-0 max-w-full" style={{ width }}><StatisticsCard title="Club Members" titleAction={<IconButton label="Reporting periods use the selected academic year" variant="ghost" size="icon-sm"><Info /></IconButton>} action={<ChartPeriodMenu period={period} selectedYear={year} years={[{ value: 2026, label: "2026–2027" }, { value: 2025, label: "2025–2026" }]} onChange={(p, y) => { setPeriod(p); setYear(y); }} />}>
           <p className="text-h1">70 <MetricBadge trend>+11 past 30 days</MetricBadge></p>
           <p className="text-label text-muted-foreground">{year}–{year + 1}</p>
           <ScrollableBarChart key={`${period}:${year}`} initialScroll={period === "month" ? "start" : "end"} showPartialCoverage={period === "year"} label={`${width}px example`} periods={period === "year" ? periods : periods.slice(0, 8).map((p, i) => ({ ...p, label: ["Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar", "Apr"][i] }))} wideLabels={period === "year"} />

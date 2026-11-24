@@ -7,11 +7,6 @@ import type { MajorDistribution, MembershipHistory } from "@/lib/supabase-helper
 
 beforeAll(() => {
   vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
-  // jsdom has no layout; give Recharts its real compact viewport.
-  const rect = HTMLElement.prototype.getBoundingClientRect;
-  vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (this: HTMLElement) {
-    return this.classList.contains("recharts-responsive-container") ? new DOMRect(0, 0, 85, 85) : rect.call(this);
-  });
   HTMLElement.prototype.scrollIntoView = vi.fn();
   HTMLElement.prototype.hasPointerCapture = vi.fn(() => false);
 });
@@ -50,6 +45,8 @@ describe("Area of Study", () => {
     expect(list.textContent).toContain("Cognitive Systems: 6 (60%)");
     expect(list.textContent).toContain("Unknown: 4 (40%)");
     expect(list.textContent).not.toContain("selected");
+    expect(container.querySelector(".recharts-responsive-container")).toBeNull();
+    expect(container.querySelector("svg.recharts-surface")?.getAttribute("width")).toBe("85");
     expect(container.querySelectorAll(".recharts-sector").length).toBe(2);
     const trigger = await openMenu("Select");
     fireEvent.click(screen.getByRole("menuitemradio", { name: "Unknown" }));

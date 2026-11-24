@@ -1,5 +1,6 @@
 "use client";
 
+import { DashboardResponsiveDemo } from "./dashboard-responsive";
 import Link from "next/link";
 import { CalendarDays, DollarSign, MapPin, User } from "lucide-react";
 import { SiNotion } from "react-icons/si";
@@ -29,6 +30,7 @@ function Preview({ long = false }: { long?: boolean }) {
 }
 export default function EventPreviewDemo() {
   return <div className="space-y-10">
+    <Composition title="Responsive dashboard" description="Production layout with simulated 256px/88px sidebar and page padding. Stacks below 1024px usable content width in Event, Links, Statistics, Activity order; wide columns flow independently. Use the state controls and theme/density toolbar."><DashboardResponsiveDemo /></Composition>
     <Composition title="Wide preview" description="A 200px banner, independent bordered details and two-column actions. Feature code owns state, facts and destinations."><div className="max-w-2xl"><Preview /></div></Composition>
     <Composition title="Phone and long copy" description="At 350px, text wraps and actions stack; content grows without clipping."><div className="max-w-87.5"><Preview long /></div></Composition>
     <Composition title="Missing and broken artwork" description="Failed URLs fall back in the same frame. A configured header colour remains visible."><div className="grid gap-4 sm:grid-cols-2"><EventBanner /><EventBanner src="/missing-event-banner.png" colour="#325DC4" /></div></Composition>

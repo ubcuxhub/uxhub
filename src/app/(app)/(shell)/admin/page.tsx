@@ -1,3 +1,4 @@
+import { DashboardLayout } from "@/features/admin/components/dashboard/DashboardLayout";
 import { DashboardSearch } from "@/features/admin/components/dashboard/DashboardSearch";
 import { createClient } from "@/lib/supabase/server";
 import { Suspense } from "react";
@@ -24,22 +25,18 @@ export default async function AdminDashboard() {
         </div>
         <DashboardSearch userId={user.id} sessionKey={sessionKey} />
       </header>
-      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,10fr)_minmax(0,7fr)]">
-        <div className="min-w-0 space-y-6">
-          <section aria-labelledby="upcoming-event-heading" className="space-y-5">
-            <h2 id="upcoming-event-heading" className="text-h2">Upcoming Event</h2>
-            <Suspense fallback={<DashboardEventSkeleton />}><DashboardEventData now={now} /></Suspense>
-          </section>
-          <DashboardActivityPlaceholder />
-        </div>
-        <div className="min-w-0 space-y-6">
-          <DashboardQuickLinks />
-          <section aria-labelledby="statistics-heading" className="space-y-5">
-            <h2 id="statistics-heading" tabIndex={-1} className="text-h2">Statistics</h2>
-            <DashboardStats now={now} />
-          </section>
-        </div>
-      </div>
+      <DashboardLayout
+        event={<section aria-labelledby="upcoming-event-heading" className="space-y-5">
+          <h2 id="upcoming-event-heading" className="text-h2">Upcoming Event</h2>
+          <Suspense fallback={<DashboardEventSkeleton />}><DashboardEventData now={now} /></Suspense>
+        </section>}
+        quickLinks={<DashboardQuickLinks />}
+        statistics={<section aria-labelledby="statistics-heading" className="space-y-5">
+          <h2 id="statistics-heading" tabIndex={-1} className="text-h2">Statistics</h2>
+          <DashboardStats now={now} />
+        </section>}
+        activity={<DashboardActivityPlaceholder />}
+      />
     </PageContainer>
   );
 }

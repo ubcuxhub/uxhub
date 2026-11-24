@@ -12,8 +12,8 @@ export function DistributionChart({ segments, selected, label, className, visual
   const total = segments.reduce((sum, segment) => sum + segment.count, 0);
   return <div className={className}>
     <div aria-hidden="true" className={visualClassName}>
-      <ChartContainer config={{ count: { label } }} className="size-[85px] aspect-square" initialDimension={{ width: 85, height: 85 }}>
-        <PieChart accessibilityLayer={false}>
+      <ChartContainer config={{ count: { label } }} className="size-[85px] aspect-square" responsive={false}>
+        <PieChart width={85} height={85} accessibilityLayer={false}>
           <Pie onClick={(_, index) => onSelect?.(segments[index].label)} data={segments} dataKey="count" nameKey="label" innerRadius={25} outerRadius={42} stroke="var(--card)" strokeWidth={1} isAnimationActive={false}>
             {segments.map((segment) => <Cell key={segment.label} fill={segment.label === selected ? "var(--primary)" : "var(--border)"} className={onSelect ? "cursor-pointer hover:fill-primary" : "hover:fill-primary"} />)}
           </Pie>

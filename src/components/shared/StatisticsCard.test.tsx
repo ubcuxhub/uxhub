@@ -23,3 +23,13 @@ it("keeps title help available across loading and failure while hiding data cont
   expect(screen.queryByRole("button", { name: "Choose period" })).toBeNull();
   expect(screen.getByText("Unavailable")).toBeTruthy();
 });
+
+it("keeps title help grouped ahead of the period control in reading and focus order", () => {
+  render(<StatisticsCard title="Club Members" titleAction={<Button>About members</Button>} action={<Button>Monthly</Button>}>25</StatisticsCard>);
+  const heading = screen.getByRole("heading", { name: "Club Members" });
+  const help = screen.getByRole("button", { name: "About members" });
+  const period = screen.getByRole("button", { name: "Monthly" });
+  expect(heading.parentElement).toBe(help.parentElement);
+  expect(period.parentElement).toBe(help.parentElement?.parentElement);
+  expect(screen.getAllByRole("button").map(button => button.textContent)).toEqual(["About members", "Monthly"]);
+});

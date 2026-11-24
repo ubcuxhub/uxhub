@@ -23,7 +23,7 @@ export const dataEntries: readonly RegistryEntry[] = [
   },
   {
     slug: "distribution-chart", title: "Distribution chart", category: "Data display", tier: "composite",
-    description: "Full-population donut with primary selection, neutral segments and an accessible count/share list. Optional segment clicks synchronize caller selection without filtering the denominator.",
+    description: "Full-population donut with primary selection, neutral segments and an accessible count/share list. Fixed 85px sizing survives hidden/visible transitions. Optional segment clicks synchronize caller selection without filtering the denominator.",
     importPath: "@/components/shared/DistributionChart", importNames: ["DistributionChart"],
     source: "src/components/shared/DistributionChart.tsx", spec: "Statistics extensions", layout: "page",
   },
@@ -41,7 +41,7 @@ export const dataEntries: readonly RegistryEntry[] = [
   },
   {
     slug: "statistics-card", title: "Statistics card and charts", category: "Data display", tier: "composite",
-    description: "Bordered statistics surfaces with optional title help controls, neutral numeric pills, full-distribution donuts and scrollable reporting periods with explicit missing, partial, zero and future data. Keyboard, touch and pointer values share one contract.",
+    description: "Bordered statistics surfaces with wrapping chart headers, optional title help controls, neutral numeric pills, full-distribution donuts and scrollable reporting periods with explicit missing, partial, zero and future data. Keyboard, touch and pointer values share one contract.",
     importPath: "@/components/shared/StatisticsCard", importNames: ["StatisticsCard"],
     source: "src/components/shared/StatisticsCard.tsx", spec: "§3.5 · Statistics extensions", layout: "page",
   },

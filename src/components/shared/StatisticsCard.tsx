@@ -14,7 +14,7 @@ export function StatisticsCard({ title, titleAction, size = "chart", action, mes
   const heading = <h3 id={id} className="text-body-medium">{title}</h3>;
   return <Card role="region" aria-labelledby={id} aria-busy={loading || undefined}
     className={cn("@container/statistics min-w-0 gap-2 px-6 py-5", size === "compact" ? "min-h-[120px] sm:min-h-[124px]" : "min-h-[290px]", size === "chart" && !message && !loading && "gap-0 pt-4 pb-3", size === "compact" && !message && !loading && "grid grid-cols-[auto_minmax(0,1fr)] items-center gap-4", className)}>
-    <div className={cn("flex min-w-0 items-center justify-between gap-2", size === "compact" && !message && !loading && "flex-col items-start gap-2.5")}>
+    <div className={cn("flex min-w-0 items-center justify-between gap-2", size === "chart" && "flex-wrap", size === "compact" && !message && !loading && "flex-col items-start gap-2.5")}>
       {titleAction ? <div className="flex min-w-0 items-center gap-1">{heading}{titleAction}</div> : heading}
       {!message && !loading && action}
     </div>
