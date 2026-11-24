@@ -70,16 +70,17 @@ export function MembershipCardSurface({
   }, [canTilt]);
 
   return (
-    <div ref={frameRef} className={cn("perspective-distant", className)}>
+    <div ref={frameRef} className={cn("@container perspective-distant", className)}>
       <section
         ref={cardRef}
         className={cn(
           // `isolate` keeps the dither's overlay blend to the card's own fill.
           "relative isolate overflow-hidden rounded-xl bg-membership-card text-white shadow-sm",
-          // Figma's 492 × 309, growing taller when the content needs it. The
-          // card clips its overflow (for the tilt and dither), which drops the
-          // usual aspect-ratio minimum, so `min-h-fit` puts it back.
-          "flex aspect-[492/309] min-h-fit flex-col",
+          // At least Figma's 492 × 309 shape (a minimum height from the frame's
+          // width), and taller whenever the content needs it, so nothing is
+          // clipped on narrow screens. Not `aspect-ratio`: with the overflow
+          // clipped (for the tilt and dither) it holds the shape and crops.
+          "flex min-h-[calc(100cqw*309/492)] flex-col",
           "transform-[rotateX(var(--tilt-x,0deg))_rotateY(var(--tilt-y,0deg))] transition-transform duration-expressive ease-expressive",
         )}
       >
