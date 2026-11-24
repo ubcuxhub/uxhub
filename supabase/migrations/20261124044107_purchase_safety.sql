@@ -11,7 +11,9 @@
 --    and records the completion. pg_cron runs it every five minutes.
 -- 2. One live membership purchase per user: two checkouts from two tabs (or
 --    for two tiers) both passed the app's checks and both charged the card.
---    Abandoned attempts are failed first, so the index never meets one.
+--    Abandoned attempts are failed first. If live duplicates still remain,
+--    the index is skipped with a warning rather than failing the deploy
+--    (see create_one_live_membership_index).
 --
 -- Backward compatible with the deployed code: it never creates a second live
 -- membership purchase except in that race, which now fails with 23505 and
@@ -43,6 +45,43 @@ select cron.schedule(
   'select public.fail_abandoned_purchases()'
 );
 
-create unique index purchases_one_live_membership_per_user
-  on public.purchases (user_id)
-  where kind = 'membership' and status in ('pending', 'authorized');
+-- Creates the index unless live membership purchases the cleanup above left
+-- (ones with a Square payment ID) still give some user two. Production data
+-- isn't visible from here, and a failed migration fails the deploy, so
+-- duplicates skip the index with a warning instead: once they settle, a
+-- follow-up migration calls this again. Checkout settles a live purchase
+-- before charging either way; the index only closes the race between two.
+-- True when the index exists afterwards.
+create function public.create_one_live_membership_index()
+returns boolean
+language plpgsql set search_path = '' as $$
+declare
+  v_users integer;
+begin
+  if to_regclass('public.purchases_one_live_membership_per_user') is not null then
+    return true;
+  end if;
+
+  select count(*)::integer into v_users
+  from (
+    select user_id from public.purchases
+    where kind = 'membership' and status in ('pending', 'authorized')
+    group by user_id
+    having count(*) > 1
+  ) duplicated;
+
+  if v_users > 0 then
+    raise warning '% user(s) have more than one live membership purchase, so purchases_one_live_membership_per_user was not created. Settle them, then create it in a follow-up migration with select public.create_one_live_membership_index().', v_users;
+    return false;
+  end if;
+
+  create unique index purchases_one_live_membership_per_user
+    on public.purchases (user_id)
+    where kind = 'membership' and status in ('pending', 'authorized');
+  return true;
+end;
+$$;
+
+revoke all on function public.create_one_live_membership_index() from public, anon, authenticated;
+
+select public.create_one_live_membership_index();

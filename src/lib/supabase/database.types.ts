@@ -1744,6 +1744,10 @@ export type Database = {
         Args: { p_error_code?: string; p_send_id: string; p_sent: boolean }
         Returns: number
       }
+      create_one_live_membership_index: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       create_staff_volunteer_schedule: {
         Args: { p_event_id: string; p_operation_id: string; p_url: string }
         Returns: Json

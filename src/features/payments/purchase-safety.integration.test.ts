@@ -4,6 +4,7 @@
  * release and check-in of uncaptured tickets, and offers ended with a ticket.
  * Square is mocked; everything the database decides is real.
  */
+import { spawnSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { SquareError } from "square";
@@ -170,6 +171,56 @@ describe("one live membership purchase", () => {
       ).rejects.toMatchObject({ code: "23505" });
       // Settled attempts don't count.
       await insertPurchase(fixtures, { user_id: user.id, kind: "membership", membership_type_id: b.id, status: "failed" });
+    }));
+
+  // The migration's path when production already holds duplicates: it must
+  // warn and skip the index, never fail the deploy. Index DDL needs SQL, so
+  // this runs through psql (as `pnpm test:rls` does) in a transaction it
+  // rolls back, leaving the index in place.
+  it("skips the index with a warning, without failing, while duplicates exist", () =>
+    withFixtures(async (fixtures) => {
+      const dbUrl = process.env.SUPABASE_DB_URL ?? "postgresql://postgres:postgres@127.0.0.1:15432/postgres";
+      expect(["127.0.0.1", "localhost"]).toContain(new URL(dbUrl).hostname);
+      const [a, b] = [
+        await fixtures.createMembershipType({ ...uniqueTier(), eligible_user_types: ["nonUbc"] }),
+        await fixtures.createMembershipType({ ...uniqueTier(), eligible_user_types: ["nonUbc"] }),
+      ];
+      const user = await member(fixtures);
+      const purchase = (tierId: string, key: string) =>
+        `insert into public.purchases (user_id, kind, status, amount_cents, currency, idempotency_key, membership_type_id, square_payment_id)
+         values ('${user.id}', 'membership', 'pending', 2000, 'CAD', '${fixtures.tag}-${key}', '${tierId}', '${fixtures.tag}-payment-${key}');`;
+      const script = [
+        "begin;",
+        "drop index public.purchases_one_live_membership_per_user;",
+        purchase(a.id, "a"),
+        purchase(b.id, "b"),
+        // Live, with Square payment IDs: the abandoned-purchase cleanup leaves them.
+        "select public.fail_abandoned_purchases();",
+        "select 'duplicates:' || public.create_one_live_membership_index();",
+        "select 'index:' || (to_regclass('public.purchases_one_live_membership_per_user') is not null);",
+        `delete from public.purchases where idempotency_key = '${fixtures.tag}-b';`,
+        "select 'settled:' || public.create_one_live_membership_index();",
+        "select 'index:' || (to_regclass('public.purchases_one_live_membership_per_user') is not null);",
+        "rollback;",
+      ].join("\n");
+
+      const run = spawnSync("psql", [dbUrl, "-v", "ON_ERROR_STOP=1", "-tAq", "-f", "-"], { input: script, encoding: "utf8" });
+
+      expect(run.status, run.stderr).toBe(0);
+      expect(run.stdout.split("\n").filter((line) => line.includes(":"))).toEqual([
+        "duplicates:false",
+        "index:false",
+        "settled:true",
+        "index:true",
+      ]);
+      expect(run.stderr).toContain("1 user(s) have more than one live membership purchase");
+      // Rolled back: the real index is still there.
+      await expect(
+        insertPurchase(fixtures, { user_id: user.id, kind: "membership", membership_type_id: a.id, status: "pending" })
+      ).resolves.toBeTruthy();
+      await expect(
+        insertPurchase(fixtures, { user_id: user.id, kind: "membership", membership_type_id: b.id, status: "pending" })
+      ).rejects.toMatchObject({ code: "23505" });
     }));
 
   it("won't charge for another tier while a membership payment is processing", () =>
