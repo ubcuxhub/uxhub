@@ -20,6 +20,7 @@
 import type { TablesInsert } from "../../../src/lib/supabase/database.types.ts";
 import { DIET_OPTIONS } from "../../../src/features/setup/lib/options.ts";
 import { encodeCheckboxResponse } from "../../../src/lib/application-response.ts";
+import { formatUserName } from "../../../src/lib/user-name.ts";
 import { addDays, startOfUtcDay, timestamp } from "../lib/relative-dates.ts";
 import type { SeedEvent } from "./events.ts";
 import {
@@ -131,7 +132,8 @@ const PEOPLE: CrowdPerson[] = [
   { type: "student", first: "Hiro", last: "Yamamoto", pronouns: "he/him", faculty: SCIENCE, major: "Computer Science", year: "5+", membership: "explorer", expiredDaysAgo: 25, interests: ["Creative coding", "Prototyping"], birthDate: "2002-10-10" },
   // Never a member: one abandoned checkout, one sold-out attempt.
   { type: "student", first: "Elena", last: "Popescu", pronouns: "she/her", faculty: ARTS, major: "International Relations", year: "2", membership: null, interests: ["Service design", "Civic tech"], birthDate: "2005-02-26" },
-  { type: "student", first: "Kai", last: "Nakamura", pronouns: "he/they", faculty: ARTS, major: "Cognitive Systems", year: "3", membership: null, interests: ["Interaction design", "Accessibility"], birthDate: "2004-05-19", newsletter: true },
+  // One name, no last name, as the sign-up form allows.
+  { type: "student", first: "Kai", last: "", pronouns: "he/they", faculty: ARTS, major: "Cognitive Systems", year: "3", membership: null, interests: ["Interaction design", "Accessibility"], birthDate: "2004-05-19", newsletter: true },
   { type: "faculty", first: "Margaret", last: "Ellis", pronouns: "she/her", faculty: SCIENCE, membership: "faculty", interests: ["Human-computer interaction", "Mentorship"], birthDate: "1979-07-03", newsletter: true },
   { type: "faculty", first: "Rajesh", last: "Iyer", pronouns: "he/him", faculty: APSC, membership: "faculty", interests: ["Engineering design", "Accessibility"], birthDate: "1975-02-14" },
   { type: "faculty", first: "Claire", last: "Dubois", pronouns: "she/her", faculty: EDUCATION, membership: null, interests: ["Learning design", "Inclusive design"], birthDate: "1983-09-27" },
@@ -144,9 +146,11 @@ const PEOPLE: CrowdPerson[] = [
   { type: "nonUbc", first: "Wei", last: "Chen", pronouns: "he/him", school: "University of Victoria", status: "graduate", membership: "non-ubc", interests: ["Data visualization", "HCI research"], birthDate: "1999-05-05" },
 ];
 
-/** `amara-osei`: ASCII, lowercase, hyphenated. */
+/** `amara-osei`: ASCII, lowercase, hyphenated; `kai` for someone with one name. */
 function handleOf(person: CrowdPerson): string {
-  return `${person.first}-${person.last}`
+  return [person.first, person.last]
+    .filter(Boolean)
+    .join("-")
     .normalize("NFKD")
     .replace(/[̀-ͯ]/g, "")
     .replace(/[^A-Za-z-]/g, "")
@@ -159,7 +163,7 @@ function emailOf(person: CrowdPerson): string {
 }
 
 function fullName(person: CrowdPerson): string {
-  return `${person.first} ${person.last}`;
+  return formatUserName({ first_name: person.first, last_name: person.last });
 }
 
 /** Eight digits, distinct, and not a pattern `validateStudentNumber` rejects. */
@@ -586,7 +590,7 @@ export function buildSeedCrowd(events: SeedEvent[], now: Date): SeedUser[] {
         responses: responsesOf(person, plan.person, plan),
         files: plan.portfolio
           ? {
-              [uxathonQuestions.portfolio]: `${person.first}_${person.last}_Portfolio.pdf`
+              [uxathonQuestions.portfolio]: `${[person.first, person.last].filter(Boolean).join("_")}_Portfolio.pdf`
                 .normalize("NFKD")
                 .replace(/[̀-ͯ']/g, ""),
             }

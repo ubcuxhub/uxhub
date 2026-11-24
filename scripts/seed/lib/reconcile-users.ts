@@ -4,6 +4,7 @@ import type { SupabaseClient, User } from "@supabase/supabase-js";
 
 import type { SeedRegistration, SeedUser } from "../data/users.ts";
 import { CROWD_EMAIL_DOMAINS } from "../data/crowd.ts";
+import { formatUserName } from "../../../src/lib/user-name.ts";
 import { emptyCounts, type Counts } from "./reconcile.ts";
 import { planPrune, pruneKey } from "./prune.ts";
 import { minimalPdf } from "./pdf.ts";
@@ -917,7 +918,7 @@ async function reconcileResponses(
         );
         uploads.push({
           path,
-          title: `${fixture.profile.first_name} ${fixture.profile.last_name} - Portfolio`,
+          title: `${formatUserName(fixture.profile)} - Portfolio`,
         });
         return [question, path] as const;
       });
