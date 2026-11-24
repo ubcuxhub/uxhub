@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { getSafeInternalPath, withReturnTo } from "./paths";
+import {
+  completeProfilePath,
+  getSafeInternalPath,
+  withReturnTo,
+} from "./paths";
 
 describe("auth paths", () => {
   describe("getSafeInternalPath", () => {
@@ -54,5 +58,22 @@ describe("auth paths", () => {
         "/auth/login?returnTo=%2Fportal",
       );
     });
+  });
+
+  describe("completeProfilePath", () => {
+    it("carries a safe next path to the add-your-name form", () => {
+      expect(completeProfilePath("/portal/membership/join?tier=a")).toBe(
+        "/auth/complete-profile?next=%2Fportal%2Fmembership%2Fjoin%3Ftier%3Da",
+      );
+    });
+
+    it.each([null, undefined, "https://evil.example", "//evil.example"])(
+      "falls back to the portal for %j",
+      (next) => {
+        expect(completeProfilePath(next)).toBe(
+          "/auth/complete-profile?next=%2Fportal",
+        );
+      },
+    );
   });
 });

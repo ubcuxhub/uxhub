@@ -38,3 +38,11 @@ export function withReturnTo(path: string, returnTo?: string | null) {
   url.searchParams.set("returnTo", getSafeInternalPath(returnTo));
   return `${url.pathname}${url.search}`;
 }
+
+/**
+ * The add-your-name form for a signed-in user whose sign-in provider didn't
+ * supply both names. It returns to `next` once the profile is saved.
+ */
+export function completeProfilePath(next: string | null | undefined) {
+  return `/auth/complete-profile?next=${encodeURIComponent(getSafeInternalPath(next))}`;
+}

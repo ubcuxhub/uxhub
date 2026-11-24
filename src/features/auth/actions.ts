@@ -13,12 +13,14 @@ import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";
 export type CompleteProfileResult = { ok: true } | { ok: false; error: string };
 
 /**
- * Creates the signed-in user's profile right after sign-up.
+ * Creates the signed-in user's profile from the names they typed.
  *
- * Only called when email confirmation is disabled, so `signUp` returned a
- * session; otherwise the confirmation callback creates the profile once the
- * session exists. The user is identified by that session, never by the input,
- * and a repeat call after the profile exists succeeds without writing.
+ * Called right after sign-up when email confirmation is disabled, so `signUp`
+ * returned a session (otherwise the confirmation callback creates the profile
+ * once the session exists), and by `/auth/complete-profile` when an OAuth
+ * provider didn't supply both names. The user is identified by the session,
+ * never by the input, and a repeat call after the profile exists succeeds
+ * without writing.
  */
 export async function completeProfileAction(input: {
   firstName: string;
@@ -65,6 +67,12 @@ export async function completeProfileAction(input: {
 
     if (result.status === "conflict") {
       return { ok: false, error: result.message };
+    }
+
+    // Unreachable with both names checked above; kept so a new result can't
+    // be mistaken for success.
+    if (result.status !== "ok") {
+      return { ok: false, error: "First and last name are required." };
     }
 
     return { ok: true };

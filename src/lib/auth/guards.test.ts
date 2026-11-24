@@ -24,6 +24,14 @@ const currentUserMocks = vi.hoisted(() => ({
 
 vi.mock("next/navigation", () => ({ redirect: navigationMocks.redirect }));
 
+const logMocks = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+}));
+
+vi.mock("@/lib/log", () => ({ log: logMocks, errorFields: vi.fn() }));
+
 vi.mock("@/lib/auth/current-user", () => ({
   loadCurrentUser: currentUserMocks.loadCurrentUser,
 }));
@@ -94,6 +102,28 @@ describe("requireAuth", () => {
     );
   });
 
+  it("asks a signed-in user without a name to add one, keeping the path", async () => {
+    currentUserMocks.loadCurrentUser.mockResolvedValue({
+      status: "needs_profile",
+    });
+
+    await expectRedirect(
+      () => requireAuth("/portal/membership/join"),
+      "/auth/complete-profile?next=%2Fportal%2Fmembership%2Fjoin"
+    );
+  });
+
+  it("sanitizes the path it carries to the add-your-name form", async () => {
+    currentUserMocks.loadCurrentUser.mockResolvedValue({
+      status: "needs_profile",
+    });
+
+    await expectRedirect(
+      () => requireAuth("//evil.example"),
+      "/auth/complete-profile?next=%2Fportal"
+    );
+  });
+
   it("surfaces a profile-loading error on the auth error page", async () => {
     currentUserMocks.loadCurrentUser.mockResolvedValue({
       status: "error",
@@ -104,6 +134,9 @@ describe("requireAuth", () => {
       () => requireAuth(),
       "/auth/error?error=Unable%20to%20load%20your%20profile."
     );
+    // `loadCurrentUser` logged the cause; the redirect adds no second line.
+    expect(logMocks.warn).not.toHaveBeenCalled();
+    expect(logMocks.error).not.toHaveBeenCalled();
   });
 });
 
@@ -195,6 +228,17 @@ describe("redirectIfAuthenticated", () => {
     await expectRedirect(
       () => redirectIfAuthenticated(destination),
       "/portal"
+    );
+  });
+
+  it("sends a signed-in user without a name to add one first", async () => {
+    currentUserMocks.loadCurrentUser.mockResolvedValue({
+      status: "needs_profile",
+    });
+
+    await expectRedirect(
+      () => redirectIfAuthenticated("/portal/events/x/checkout"),
+      "/auth/complete-profile?next=%2Fportal%2Fevents%2Fx%2Fcheckout"
     );
   });
 

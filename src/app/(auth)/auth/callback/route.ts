@@ -12,9 +12,13 @@ import {
   readErrorCode,
 } from "@/features/auth/link-expired";
 import { resolveSetupDestination } from "@/features/setup/lib/state";
-import { ensureUserInfo } from "@/lib/auth/ensure-user-info";
-import { getSafeInternalPath } from "@/lib/auth/paths";
+import {
+  PROFILE_CONFLICT_EVENTS,
+  ensureUserInfo,
+} from "@/lib/auth/ensure-user-info";
+import { completeProfilePath, getSafeInternalPath } from "@/lib/auth/paths";
 import { getRequestOrigin } from "@/lib/http/request-origin";
+import { errorFields, log } from "@/lib/log";
 import { createClient } from "@/lib/supabase/server";
 import { fetchSetupStepByAuthId } from "@/lib/supabase-helpers/setup";
 
@@ -60,15 +64,24 @@ export async function GET(request: NextRequest) {
   const providerError =
     searchParams.get("error_description") || searchParams.get("error");
 
-  if (isExpiredLinkCode(searchParams.get("error_code"))) {
+  const errorCode = searchParams.get("error_code");
+
+  // Every way out to /auth/error below logs a stable event at `warn`: these
+  // are expected-ish (a cancelled consent screen, a reused link), so they
+  // shouldn't page through Sentry. Fields are ids and codes only, never the
+  // provider's description or the member-facing message.
+  if (isExpiredLinkCode(errorCode)) {
+    log.info("auth.callback_link_expired", { source: "provider" });
     return redirectToExpiredLink(origin, nextPath);
   }
 
   if (providerError) {
+    log.warn("auth.callback_provider_error", { errorCode });
     return redirectToAuthError(origin, CALLBACK_ERROR_MESSAGE, nextPath);
   }
 
   if (!code) {
+    log.warn("auth.callback_missing_code");
     return redirectToAuthError(origin, CALLBACK_ERROR_MESSAGE, nextPath);
   }
 
@@ -82,9 +95,15 @@ export async function GET(request: NextRequest) {
     );
 
     if (exchangeError) {
-      if (isExpiredLinkCode(readErrorCode(exchangeError))) {
+      const exchangeCode = readErrorCode(exchangeError) ?? null;
+      if (isExpiredLinkCode(exchangeCode)) {
+        log.info("auth.callback_link_expired", { source: "exchange" });
         return redirectToExpiredLink(origin, nextPath);
       }
+      log.warn("auth.callback_exchange_failed", {
+        ...errorFields(exchangeError),
+        code: exchangeCode,
+      });
       return redirectToAuthError(origin, CALLBACK_ERROR_MESSAGE, nextPath);
     }
 
@@ -96,6 +115,11 @@ export async function GET(request: NextRequest) {
     });
 
     if (authUserError || !authUser?.id || !authUser.email) {
+      log.warn("auth.callback_user_lookup_failed", {
+        ...(authUserError ? errorFields(authUserError) : {}),
+        authUserId: authUser?.id ?? null,
+        missingEmail: Boolean(authUser?.id && !authUser.email),
+      });
       return redirectToAuthError(origin, CALLBACK_ERROR_MESSAGE, nextPath);
     }
 
@@ -103,7 +127,20 @@ export async function GET(request: NextRequest) {
       operation: "Profile setup",
     });
 
+    // The provider didn't send both names (a one-word Google name, say), so
+    // ask for them. The form returns to `next`, and the portal home keeps its
+    // own setup gate.
+    if (result.status === "missing_name") {
+      return NextResponse.redirect(
+        new URL(completeProfilePath(nextPath), origin),
+      );
+    }
+
     if (result.status === "conflict") {
+      log.warn(PROFILE_CONFLICT_EVENTS[result.reason], {
+        authUserId: authUser.id,
+        source: "callback",
+      });
       return redirectToAuthError(origin, result.message, nextPath);
     }
 
@@ -124,6 +161,13 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.redirect(new URL(destination, origin));
   } catch (error) {
+    // A timeout is a slow network or auth service; anything else is a bug,
+    // so it goes to Sentry.
+    if (isAsyncTimeoutError(error)) {
+      log.warn("auth.callback_timeout", errorFields(error));
+    } else {
+      log.error("auth.callback_failed", errorFields(error));
+    }
     return redirectToAuthError(
       origin,
       getCallbackErrorMessage(error),
