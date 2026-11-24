@@ -38,6 +38,9 @@ export async function saveInterestsAction(input: { interests: InterestId[] }): P
 
 export type DeleteAccountResult = { ok: true } | { ok: false; error: string };
 
+/** object_not_in_prerequisite_state, raised by delete_account for the final manager. */
+const FINAL_MANAGER_ERROR_CODE = "55000";
+
 /**
  * Permanently deletes the signed-in member's account.
  *
@@ -77,6 +80,17 @@ export async function deleteAccountAction(
 
     return { ok: true };
   } catch (error) {
+    // delete_account refuses the final manager (SQLSTATE 55000), as
+    // set_user_role does, so the club always keeps someone who can change roles.
+    if ((error as { code?: unknown } | null)?.code === FINAL_MANAGER_ERROR_CODE) {
+      log.warn("account.deletion_refused_final_manager", { userId: user.id });
+      return {
+        ok: false,
+        error:
+          "You're the only manager. Make another UX Hub exec a manager before you delete your account.",
+      };
+    }
+
     log.error("account.deletion_failed", errorFields(error));
 
     return { ok: false, error: "Your account could not be deleted." };
