@@ -4,15 +4,12 @@ import type { Json } from "@/lib/supabase/database.types";
 import { parseWorkingDocument, type EventWorkingDocument } from "@/features/admin/lib/event-working-document";
 import { eventPresentation, eventWorkingDocument } from "@/features/admin/lib/event-presentation";
 import type { EventRow } from "@/lib/supabase/models";
-import { isUuid } from "@/lib/uuid";
+import { fetchEventRowByIdOrLegacyDraftId } from "./events";
 
-/** An event's working document, by its id or a legacy draft id. The id goes
- * into a PostgREST `.or()` filter string, so anything but a UUID is unknown. */
+/** An event's working document, by its id or a legacy draft id. */
 export async function fetchEventDraft(supabase: DbClient, id: string) {
-  if (!isUuid(id)) return null;
-  const { data, error } = await supabase.from(TABLES.events).select("*").or(`id.eq.${id},legacy_draft_ids.cs.{${id}}`).maybeSingle();
-  if (error) throw error;
-  return data ? eventDraftFromRow(data) : null;
+  const row = await fetchEventRowByIdOrLegacyDraftId(supabase, id);
+  return row ? eventDraftFromRow(row) : null;
 }
 
 /** The working document a stored event row carries: an unscheduled draft's only. */
