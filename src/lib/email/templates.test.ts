@@ -15,6 +15,7 @@ const purchase = {
 // move it.
 const event = {
   ends_at: "2025-09-13T03:00:00+00:00",
+  location_address: null,
   location_address_url: null,
   location_building: "Buchanan",
   location_room: "A101",
@@ -54,6 +55,25 @@ describe("renderEventConfirmationEmail", () => {
     expect(html).not.toContain("Location");
     expect(html).toContain("6:00 PM");
     expect(html).not.toContain("–");
+  });
+
+  it("shows the street address, linked to its map, never the map URL as the address", () => {
+    const mapUrl = "https://maps.google.com/?q=6000+Iona+Dr";
+    const { html } = renderEventConfirmationEmail({
+      event: { ...event, location_address: "6000 Iona Dr, Vancouver", location_address_url: mapUrl },
+      purchase,
+      userName: "Ada",
+    });
+
+    expect(html).toContain(`<a href="${mapUrl}" style="color:#111827;">6000 Iona Dr, Vancouver</a>`);
+    expect(html).not.toContain(`>${mapUrl}<`);
+
+    const withoutAddress = renderEventConfirmationEmail({
+      event: { ...event, location_address_url: mapUrl },
+      purchase,
+      userName: "Ada",
+    }).html;
+    expect(withoutAddress).not.toContain("Address");
   });
 
   it("escapes HTML in event-supplied text", () => {

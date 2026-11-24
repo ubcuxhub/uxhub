@@ -10,6 +10,7 @@ import { renderEventConfirmationEmail, renderMembershipConfirmationEmail } from 
 const purchase = { amount_cents: 1500, created_at: "2026-08-01T00:00:00Z", currency: "CAD", id: "purchase-1" };
 const event = {
   ends_at: "2025-09-13T03:00:00+00:00",
+  location_address: null,
   location_address_url: null,
   location_building: "Buchanan",
   location_room: "A101",

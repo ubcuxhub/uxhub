@@ -8,6 +8,7 @@ import { Check, CircleAlert, LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { PurchaseWithDetails } from "@/lib/supabase-helpers/purchases";
 import { useConfirmationPolling } from "@/features/payments/use-confirmation-polling";
+import { isFullyRefunded } from "@/features/payments/purchase-status";
 
 export function EventConfirmation({
   purchase,
@@ -18,9 +19,12 @@ export function EventConfirmation({
 }) {
   const router = useRouter();
   const free = purchase.amount_cents === 0;
-  const completed = purchase.status === "completed";
+  // A refund leaves the status completed (it mirrors Square's payment), and a
+  // full one takes the ticket back, so a revisit must not read "registered".
+  const refunded = purchase.status === "completed" && isFullyRefunded(purchase);
+  const completed = purchase.status === "completed" && !refunded;
   const failed = purchase.status === "failed" || purchase.status === "canceled";
-  const pending = !completed && !failed;
+  const pending = !completed && !failed && !refunded;
   const eventName = purchase.events?.name ?? "the event";
   const eventHref = `/portal/events/${purchase.events?.slug ?? slug}`;
   const refresh = useCallback(() => router.refresh(), [router]);
@@ -31,6 +35,8 @@ export function EventConfirmation({
       <div className="max-w-lg">
         {completed ? (
           <Check className="mx-auto size-16 rounded-full bg-success-foreground/10 p-3 text-success-foreground" />
+        ) : refunded ? (
+          <CircleAlert className="mx-auto size-16 rounded-full bg-muted p-3 text-muted-foreground" />
         ) : failed ? (
           <CircleAlert className="mx-auto size-16 rounded-full bg-destructive/10 p-3 text-destructive" />
         ) : (
@@ -39,7 +45,9 @@ export function EventConfirmation({
         <h1 className="mt-6 text-h1">
           {completed
             ? free ? "Registration confirmed" : "Payment successful"
-            : failed
+            : refunded
+              ? "Payment refunded"
+              : failed
               ? "Payment wasn’t completed"
               : pollingCutoffReached
                 ? "Payment is still processing"
@@ -50,7 +58,9 @@ export function EventConfirmation({
             ? purchase.confirmation_email_sent_at
               ? `You’re registered for ${eventName}. A confirmation email has been sent to your inbox.`
               : `You’re registered for ${eventName}.`
-            : failed
+            : refunded
+              ? `Your payment for ${eventName} was refunded in full.`
+              : failed
               ? purchase.failure_reason ?? "Your payment could not be completed."
               : pollingCutoffReached
                 ? "This is taking longer than expected. You can leave this page and check your purchases later; we won’t submit another charge."

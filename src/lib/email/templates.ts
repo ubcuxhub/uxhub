@@ -20,6 +20,20 @@ export function detailRow(label: string, value: string | null | undefined) {
   </tr>`;
 }
 
+/**
+ * The street address, linked to its map when the event has an http(s) map
+ * link. No address, no row: the map link alone is not an address.
+ */
+function addressRow(address: string | null | undefined, mapUrl: string | null | undefined) {
+  if (!address?.trim()) return "";
+  if (!mapUrl || !/^https?:\/\//i.test(mapUrl)) return detailRow("Address", address);
+
+  return `<tr>
+    <td style="padding:6px 16px 6px 0;color:#6b7280;font-size:14px;">Address</td>
+    <td style="padding:6px 0;color:#111827;font-size:14px;font-weight:500;"><a href="${escapeHtml(mapUrl)}" style="color:#111827;">${escapeHtml(address)}</a></td>
+  </tr>`;
+}
+
 /** "Orchard Commons 1001": a building and room, either of which may be blank. */
 export function formatEventLocation(
   building: string | null | undefined,
@@ -77,6 +91,7 @@ export function renderEventConfirmationEmail({
   event: Pick<
     EventRow,
     | "ends_at"
+    | "location_address"
     | "location_address_url"
     | "location_building"
     | "location_room"
@@ -107,6 +122,7 @@ function renderEventDetailRows(
   event: Pick<
     EventRow,
     | "ends_at"
+    | "location_address"
     | "location_address_url"
     | "location_building"
     | "location_room"
@@ -130,7 +146,7 @@ function renderEventDetailRows(
     detailRow("Date", formatEventDate(event.starts_at)),
     detailRow("Time", timeRange),
     detailRow("Location", location),
-    detailRow("Address", event.location_address_url),
+    addressRow(event.location_address, event.location_address_url),
     detailRow("Amount paid", formatAmount(purchase.amount_cents, purchase.currency)),
     detailRow("Order ID", purchase.id),
   ].join("");
