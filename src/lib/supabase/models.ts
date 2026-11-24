@@ -19,7 +19,6 @@ export type TeamRow = Tables<"teams">;
 export type TeamMemberRow = Tables<"team_members">;
 
 export type EventLinkRow = Tables<"event_links">;
-export type EventPrivateDetailsRow = Tables<"event_private_details">;
 
 export type UserInfoRow = Tables<"user_info">;
 export type UserInfoInsert = TablesInsert<"user_info">;

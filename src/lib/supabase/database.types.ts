@@ -1798,10 +1798,6 @@ export type Database = {
         Args: { target_event_id: string }
         Returns: undefined
       }
-      delete_event_before_safe_mutations: {
-        Args: { target_event_id: string }
-        Returns: undefined
-      }
       delete_team: {
         Args: { p_team_id: string; p_user_id: string }
         Returns: string
@@ -2002,58 +1998,6 @@ export type Database = {
         }
         Returns: Json
       }
-      save_admin_event_before_agenda: {
-        Args: {
-          p_application_questions: Json
-          p_check_in_sessions: Json
-          p_event: Json
-          p_event_id: string
-          p_expected_image_url: string
-          p_mentors: Json
-          p_slug: string
-          p_sponsors: Json
-        }
-        Returns: Json
-      }
-      save_admin_event_before_application_settings: {
-        Args: {
-          p_application_questions: Json
-          p_check_in_sessions: Json
-          p_event: Json
-          p_event_id: string
-          p_expected_image_url: string
-          p_mentors: Json
-          p_slug: string
-          p_sponsors: Json
-        }
-        Returns: Json
-      }
-      save_admin_event_before_content: {
-        Args: {
-          p_application_questions: Json
-          p_check_in_sessions: Json
-          p_event: Json
-          p_event_id: string
-          p_expected_image_url: string
-          p_mentors: Json
-          p_slug: string
-          p_sponsors: Json
-        }
-        Returns: Json
-      }
-      save_admin_event_before_date_locations: {
-        Args: {
-          p_application_questions: Json
-          p_check_in_sessions: Json
-          p_event: Json
-          p_event_id: string
-          p_expected_image_url: string
-          p_mentors: Json
-          p_slug: string
-          p_sponsors: Json
-        }
-        Returns: Json
-      }
       save_admin_event_builder: {
         Args: {
           p_application_questions: Json
@@ -2070,96 +2014,7 @@ export type Database = {
         }
         Returns: Json
       }
-      save_admin_event_builder_before_agenda_timing: {
-        Args: {
-          p_application_questions: Json
-          p_check_in_sessions: Json
-          p_draft_id: string
-          p_draft_revision: number
-          p_event: Json
-          p_event_id: string
-          p_expected_header_image_url: string
-          p_expected_image_url: string
-          p_mentors: Json
-          p_slug: string
-          p_sponsors: Json
-        }
-        Returns: Json
-      }
-      save_admin_event_builder_before_cancellation: {
-        Args: {
-          p_application_questions: Json
-          p_check_in_sessions: Json
-          p_draft_id: string
-          p_draft_revision: number
-          p_event: Json
-          p_event_id: string
-          p_expected_header_image_url: string
-          p_expected_image_url: string
-          p_mentors: Json
-          p_slug: string
-          p_sponsors: Json
-        }
-        Returns: Json
-      }
-      save_admin_event_builder_before_publication: {
-        Args: {
-          p_application_questions: Json
-          p_check_in_sessions: Json
-          p_draft_id: string
-          p_draft_revision: number
-          p_event: Json
-          p_event_id: string
-          p_expected_header_image_url: string
-          p_expected_image_url: string
-          p_mentors: Json
-          p_slug: string
-          p_sponsors: Json
-        }
-        Returns: Json
-      }
-      save_admin_event_builder_before_safe_mutations: {
-        Args: {
-          p_application_questions: Json
-          p_check_in_sessions: Json
-          p_draft_id: string
-          p_draft_revision: number
-          p_event: Json
-          p_event_id: string
-          p_expected_header_image_url: string
-          p_expected_image_url: string
-          p_mentors: Json
-          p_slug: string
-          p_sponsors: Json
-        }
-        Returns: Json
-      }
-      save_admin_event_builder_before_unified_drafts: {
-        Args: {
-          p_application_questions: Json
-          p_check_in_sessions: Json
-          p_draft_id: string
-          p_draft_revision: number
-          p_event: Json
-          p_event_id: string
-          p_expected_header_image_url: string
-          p_expected_image_url: string
-          p_mentors: Json
-          p_slug: string
-          p_sponsors: Json
-        }
-        Returns: Json
-      }
       save_admin_event_draft: {
-        Args: {
-          p_document: Json
-          p_event_id: string
-          p_id: string
-          p_revision: number
-        }
-        Returns: Json
-      }
-      save_admin_event_draft_before_url_activation: {
         Args: {
           p_document: Json
           p_event_id: string
