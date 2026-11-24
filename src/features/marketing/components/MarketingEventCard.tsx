@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { isCanceledEvent } from "@/features/events/lib/event-cancellation";
 import { formatEventDate } from "@/lib/date";
+import { formatDollars, formatPrice } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import type { EventRow } from "@/lib/supabase/models";
 
@@ -84,12 +85,10 @@ export function MarketingEventCard({ event, href, external, onClick, className }
           </Button>
         ) : (
           <div className="text-small font-medium text-foreground">
-            {Number(event.regular_price) === 0
-              ? "Free"
-              : `$${Number(event.regular_price).toFixed(2)}`}
+            {formatPrice(Number(event.regular_price))}
             {event.member_price !== event.regular_price && (
               <span className="ml-1 font-normal text-muted-foreground">
-                / ${Number(event.member_price ?? 0).toFixed(2)} member
+                / {formatDollars(Number(event.member_price ?? 0))} member
               </span>
             )}
           </div>

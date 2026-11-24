@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
 import { formatEventDate } from "@/lib/date";
+import { formatPrice } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
 /** One row of an event's key facts: an icon, a line, and an optional muted line under it. */
@@ -35,11 +36,6 @@ export function EventFactList({ facts, className }: { facts: EventFact[]; classN
       ))}
     </dl>
   );
-}
-
-/** "$10.00", or "Free" for zero. */
-export function formatPrice(value: number): string {
-  return value === 0 ? "Free" : `$${value.toFixed(2)}`;
 }
 
 /** The price line, with the member price under it when members pay something else. */

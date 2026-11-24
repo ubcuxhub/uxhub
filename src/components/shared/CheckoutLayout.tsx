@@ -7,6 +7,7 @@ import { CheckoutPaymentSection } from "@/components/shared/CheckoutPaymentSecti
 import { useFlowDialog } from "@/components/shared/FlowDialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { PurchaseKind } from "@/features/payments/types";
+import { formatDollars } from "@/lib/money";
 import type { UserInfoRow } from "@/lib/supabase/models";
 import { cn } from "@/lib/utils";
 
@@ -39,11 +40,6 @@ interface CheckoutLayoutProps {
   user: UserInfoRow;
 }
 
-const currency = new Intl.NumberFormat("en-CA", {
-  style: "currency",
-  currency: "CAD",
-});
-
 /**
  * Shared frame for every checkout dialog: heading, payment form, order summary,
  * footer, and the processing screen shown while a payment is confirmed. Callers
@@ -61,7 +57,7 @@ export function CheckoutLayout({
 }: CheckoutLayoutProps) {
   const { setBusy } = useFlowDialog();
   const [processing, setProcessing] = useState(false);
-  const formattedPrice = currency.format(price);
+  const formattedPrice = formatDollars(price);
   const free = price === 0;
   const freeEvent = free && payment.kind === "event_ticket";
 

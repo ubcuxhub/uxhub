@@ -2,7 +2,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { Calendar, Tag } from "lucide-react";
-import { EventFactList, formatPrice, priceFact, registrationFact } from "./EventFactList";
+import { EventFactList, priceFact, registrationFact } from "./EventFactList";
 
 afterEach(cleanup);
 
@@ -25,11 +25,6 @@ describe("EventFactList", () => {
 });
 
 describe("priceFact", () => {
-  it("formats prices", () => {
-    expect(formatPrice(0)).toBe("Free");
-    expect(formatPrice(10)).toBe("$10.00");
-  });
-
   it("shows the member price only when it differs", () => {
     expect(priceFact(10, 0)).toEqual({ value: "$10.00", detail: "Free for UX Hub members" });
     expect(priceFact(10, 5)).toEqual({ value: "$10.00", detail: "$5.00 for UX Hub members" });
