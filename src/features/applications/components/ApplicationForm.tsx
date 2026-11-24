@@ -20,8 +20,9 @@ import { useCurrentSection } from "@/hooks/use-current-section";
 import { createClient } from "@/lib/supabase/client";
 import {
   applicationFilePath,
+  numberedApplicationFilePath,
   removeApplicationFiles,
-  replaceApplicationFile,
+  uploadApplicationFile,
 } from "@/lib/supabase-helpers/application-files";
 import { cn } from "@/lib/utils";
 
@@ -266,20 +267,31 @@ export function ApplicationForm({
     const supabase = createClient();
     const saved = savedRef.current[question.id];
     const previous = typeof saved === "string" ? saved : "";
-    const path = applicationFilePath({
+    const named = applicationFilePath({
       userInfoId: draft.userInfoId,
       applicationId: draft.applicationId,
       questionId: question.id,
       fileName: file.name,
     });
+    // Objects can't be overwritten, so a file replacing one of the same name
+    // goes up under a numbered name. The new file goes up and the answer is
+    // saved before the old file goes, so a failure keeps the old answer whole.
+    const path = named === previous ? numberedApplicationFilePath(named) : named;
     try {
-      await replaceApplicationFile(supabase, { path, file, previousPath: previous || null });
+      await uploadApplicationFile(supabase, path, file);
     } catch {
       return "The file couldn't be uploaded. Try again.";
     }
 
     const result = await saveApplicationDraft(event.id, { [question.id]: path });
-    if (!result.ok) return result.fieldErrors?.[question.id] ?? result.error;
+    if (!result.ok) {
+      // Nothing answers with the new file, so it would only be an orphan.
+      await removeApplicationFiles(supabase, [path]).catch(() => undefined);
+      return result.fieldErrors?.[question.id] ?? result.error;
+    }
+    if (previous && previous !== path) {
+      await removeApplicationFiles(supabase, [previous]).catch(() => undefined);
+    }
 
     setAnswer(question, path);
     markSaved({ [question.id]: path });

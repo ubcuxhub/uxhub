@@ -71,7 +71,9 @@ export function applicationFilePath(input: {
 
 /**
  * Uploads a file to `path` and returns `path`. Fails if an object is already
- * there; remove it first (see `replaceApplicationFile`).
+ * there: a replacement goes up under a new key (`numberedApplicationFilePath`
+ * when the name is the same), and the old one is removed once the answer
+ * names the new key.
  */
 export async function uploadApplicationFile(
   supabase: DbClient,
@@ -90,23 +92,22 @@ export async function uploadApplicationFile(
 }
 
 /**
- * Uploads `file` for a question and removes the file it replaces, returning
- * the new key for the answer. The new file goes up first, so a failed upload
- * leaves the old answer intact; a same-named file is removed first, since
- * objects cannot be overwritten.
+ * The same key with a numbered file name, for a replacement that would
+ * otherwise reuse the key of the file it replaces: `cv.pdf` becomes
+ * `cv (1).pdf`, and `cv (1).pdf` becomes `cv (2).pdf`.
  */
-export async function replaceApplicationFile(
-  supabase: DbClient,
-  input: { path: string; file: Blob; previousPath?: string | null }
-): Promise<string> {
-  if (input.previousPath === input.path) {
-    await removeApplicationFiles(supabase, [input.path]);
-  }
-  await uploadApplicationFile(supabase, input.path, input.file);
-  if (input.previousPath && input.previousPath !== input.path) {
-    await removeApplicationFiles(supabase, [input.previousPath]);
-  }
-  return input.path;
+export function numberedApplicationFilePath(path: string): string {
+  const slash = path.lastIndexOf("/");
+  const name = path.slice(slash + 1);
+  const dot = name.lastIndexOf(".");
+  const extension = dot > 0 ? name.slice(dot) : "";
+  const stem = extension ? name.slice(0, dot) : name;
+  const numbered = /^(.*) \((\d+)\)$/.exec(stem);
+  const base = numbered ? numbered[1] : stem;
+  const suffix = ` (${numbered ? Number(numbered[2]) + 1 : 1})`;
+  // Shorten the name, not the number, to stay within the 120-character limit.
+  const room = Math.max(1, 120 - extension.length - suffix.length);
+  return path.slice(0, slash + 1) + base.slice(0, room).trimEnd() + suffix + extension;
 }
 
 export async function removeApplicationFiles(

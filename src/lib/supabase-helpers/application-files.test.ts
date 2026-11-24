@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   APPLICATION_FILE_MAX_BYTES,
   applicationFilePath,
+  numberedApplicationFilePath,
   sanitizeApplicationFileName,
   validateApplicationFile,
 } from "./application-files";
@@ -17,6 +18,22 @@ describe("applicationFilePath", () => {
         fileName: "Résumé (final)!.pdf",
       })
     ).toBe("user/application/question/Resume (final)-.pdf");
+  });
+});
+
+describe("numberedApplicationFilePath", () => {
+  it("numbers a same-named replacement, then counts up", () => {
+    expect(numberedApplicationFilePath("u/a/q/cv.pdf")).toBe("u/a/q/cv (1).pdf");
+    expect(numberedApplicationFilePath("u/a/q/cv (1).pdf")).toBe("u/a/q/cv (2).pdf");
+    expect(numberedApplicationFilePath("u/a/q/cv (9).pdf")).toBe("u/a/q/cv (10).pdf");
+  });
+
+  it("keeps the number when the name is at the length limit", () => {
+    const name = sanitizeApplicationFileName(`${"a".repeat(200)}.pdf`);
+    const numbered = numberedApplicationFilePath(`u/a/q/${name}`);
+    expect(numbered).not.toBe(`u/a/q/${name}`);
+    expect(numbered.endsWith(" (1).pdf")).toBe(true);
+    expect(numbered.slice("u/a/q/".length)).toHaveLength(120);
   });
 });
 
