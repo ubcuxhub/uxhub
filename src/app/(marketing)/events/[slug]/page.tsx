@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { cache, type ReactNode } from "react";
+import type { Metadata } from "next";
 import { EventDescription } from "@/components/shared/EventDescription";
 import { notFound, redirect } from "next/navigation";
 import { unstable_noStore as noStore } from "next/cache";
@@ -11,29 +12,31 @@ import { Alert } from "@/components/ui/alert";
 import { BackPill } from "@/components/shared/BackButton";
 import { FLAGS } from "@/lib/flags";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { fetchEventParticipantContent } from "@/lib/supabase-helpers/event-agenda";
 import { EventAgendaTable } from "@/features/events/components/EventAgendaTable";
 import { EventPageHeader } from "@/features/events/components/EventPageHeader";
+import { EventPeopleCard } from "@/features/events/components/EventPeopleCard";
 import {
   EventFactList,
   priceFact,
   registrationFact,
   type EventFact,
+  type RegistrationWindow,
 } from "@/features/events/components/EventFactList";
 import { EventLocation } from "@/components/shared/EventLocation";
 import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
 import { publicMarketingDestination } from "@/lib/event-marketing";
 import { fetchEventSeatCounts } from "@/lib/supabase-helpers/event-tickets";
 import {
-  fetchEventMentors,
+  fetchEventPeopleSections,
   fetchEventSponsors,
 } from "@/lib/supabase-helpers/event-people";
-import type { EventRow } from "@/lib/supabase/models";
+import type { EventStatus } from "@/lib/supabase/models";
 import { endsOnLaterDay, formatEventDate, formatEventTime } from "@/lib/date";
 import { EventRegistrationAction } from "@/features/events/components/EventRegistrationAction";
-import { isCanceledEvent } from "@/features/events/lib/event-cancellation";
+import { eventStateFor, loadEventStates, type EventState } from "@/features/events/lib/event-states";
+import { publicEventActionFor } from "@/features/events/lib/public-event-action";
 import { StatusBadge } from "@/components/ui/status-badge";
 import Navbar from "@/features/marketing/homepage-sections/Navbar";
 import Footer from "@/features/marketing/homepage-sections/Footer";
@@ -44,26 +47,6 @@ import {
   Tag,
   Ticket,
 } from "lucide-react";
-import { FaLinkedin } from "react-icons/fa6";
-
-function getRegistrationStatus(event: EventRow) {
-  const now = new Date();
-  const regStart = event.registration_opens_at
-    ? new Date(event.registration_opens_at)
-    : null;
-  const regEnd = event.registration_closes_at
-    ? new Date(event.registration_closes_at)
-    : null;
-  if (regStart && now < regStart) return "upcoming";
-  if (regEnd && now > regEnd) return "closed";
-  return "open";
-}
-
-/** An event is past once it ends, or once it starts if it has no end (as on the portal timeline). */
-function hasEnded(event: Pick<EventRow, "starts_at" | "ends_at">, now = new Date()) {
-  const end = event.ends_at ?? event.starts_at;
-  return !!end && Date.parse(end) < now.getTime();
-}
 
 /** One titled block below the hero. `id` makes it a link target. */
 function PageSection({ title, id, children }: { title: string; id?: string; children: ReactNode }) {
@@ -75,12 +58,68 @@ function PageSection({ title, id, children }: { title: string; id?: string; chil
   );
 }
 
+/** The registration row's window, from the event's own state. `null`: no row. */
+function registrationWindowFor(state: EventState): RegistrationWindow | null {
+  switch (state.kind) {
+    case "reg-upcoming":
+    case "app-upcoming":
+      return "upcoming";
+    case "reg-open":
+    case "app-open":
+      return "open";
+    default:
+      return null;
+  }
+}
+
+/** The event, read once per request by both the metadata and the page. */
+const loadEvent = cache(async (slug: string, status: EventStatus) =>
+  fetchEventBySlug(await createClient(), slug, { status })
+);
+
 // Viewer-specific location projections must never enter the shared page cache.
 export const dynamic = "force-dynamic";
 
 interface EventDetailPageProps {
   params: Promise<{ slug: string }>;
   searchParams: Promise<{ preview?: string }>;
+}
+
+/**
+ * The event's name, summary and image for the tab and link previews. Only a
+ * published event with a page here gets its own; a draft preview names
+ * nothing before the page checks the viewer is an admin.
+ */
+export async function generateMetadata({
+  params,
+  searchParams,
+}: EventDetailPageProps): Promise<Metadata> {
+  if ((await searchParams).preview === "draft") {
+    return { title: "Draft preview · UBC UX Hub", robots: { index: false } };
+  }
+  if (!FLAGS.studentEvents) return {};
+  const event = await loadEvent((await params).slug, "active");
+  if (!event || publicMarketingDestination(event).kind !== "hosted") return {};
+
+  const description = event.short_description || undefined;
+  const image = event.header_image_url || event.image_url;
+  return {
+    title: `${event.name} · UBC UX Hub`,
+    description,
+    openGraph: {
+      type: "website",
+      title: event.name,
+      description,
+      siteName: "UBC UX Hub",
+      images: image ? [image] : undefined,
+    },
+    twitter: {
+      card: image ? "summary_large_image" : "summary",
+      title: event.name,
+      description,
+      images: image ? [image] : undefined,
+    },
+  };
 }
 
 export default async function EventDetailPage({
@@ -96,7 +135,7 @@ export default async function EventDetailPage({
 
   const { slug } = await params;
   const supabase = await createClient();
-  const event = await fetchEventBySlug(supabase, slug, { status: preview ? "draft" : "active" });
+  const event = await loadEvent(slug, preview ? "draft" : "active");
   if (!event) notFound();
   if (!preview) {
     const destination = publicMarketingDestination(event);
@@ -105,35 +144,31 @@ export default async function EventDetailPage({
   }
   if (preview && (event.configured_marketing_mode === "disabled" || event.configured_marketing_mode === "external")) notFound();
   const unfinished = preview && !!eventWorkingDocument(event);
-  const [seatCounts, mentors, sponsors, participant] = await Promise.all([
+  const [seatCounts, peopleSections, sponsors, participant, current] = await Promise.all([
     fetchEventSeatCounts(supabase, [event.id]),
-    fetchEventMentors(supabase, event.id),
-    fetchEventSponsors(supabase, event.id),
+    // Admins switch these sections off per event, as on the portal event page.
+    !unfinished && event.mentors_enabled ? fetchEventPeopleSections(supabase, event.id) : [],
+    !unfinished && event.sponsors_enabled ? fetchEventSponsors(supabase, event.id) : [],
     fetchEventParticipantContent(supabase, event.id),
+    // The viewer, for their own registration state. A preview never registers.
+    preview ? null : loadCurrentUser(),
   ]);
 
-
   /* ── Derived data ── */
-  const regStatus = getRegistrationStatus(event);
-  // Until it ends; then the page reads as any past event's.
-  const canceled = isCanceledEvent(event);
-  const ended = !canceled && hasEnded(event);
+  const now = new Date();
   // Held offers count as taken (docs/event-states.md, "Seats"). `null`: no
   // capacity, so no limit.
   const spotsLeft = seatCounts.get(event.id)?.seatsLeft ?? event.max_capacity;
-  // An application event takes applicants, not a first-come count, so it is
-  // never Full (as on the portal event page).
-  const full = !event.requires_application && spotsLeft !== null && spotsLeft <= 0;
-  // A past event is over whatever its registration dates say, so the button
-  // agrees with the "Past" badge.
-  const canRegister = !ended && regStatus === "open" && !full;
-  const registerLabel = ended
-    ? "Event ended"
-    : regStatus === "upcoming"
-      ? event.requires_application ? "Applications Open Soon" : "Registration Opens Soon"
-      : full
-        ? "Event Full"
-        : event.requires_application ? "Applications Closed" : "Registration Closed";
+  // The event's own state, as a signed-out visitor sees it, decided by the
+  // portal's rules (`eventStateFor`), so the two pages always agree. The facts
+  // describe the event; the button follows the viewer.
+  const eventState = eventStateFor(event, { ticket: null, application: null, seatsLeft: spotsLeft }, now);
+  const viewerState = current?.status === "authenticated"
+    ? (await loadEventStates(supabase, current.user.id, [event], now))[event.id]
+    : eventState;
+  // Until it ends; then the page reads as any past event's.
+  const canceled = eventState.kind === "canceled";
+  const ended = eventState.kind === "reg-past";
 
   const startDateFormatted = formatEventDate(event.starts_at, {
     weekday: "long",
@@ -190,10 +225,11 @@ export default async function EventDetailPage({
     },
     { key: "price", icon: Tag, term: "Price", ...priceFact(event.regular_price, event.member_price) },
   ];
-  const registration = canceled || ended ? null : registrationFact({
-    window: regStatus === "open" && full ? "full" : regStatus,
+  const registrationWindow = registrationWindowFor(eventState);
+  const registration = registrationWindow && registrationFact({
+    window: registrationWindow,
     opensAt: event.registration_opens_at,
-    closesAt: event.registration_closes_at,
+    closesAt: "closesAt" in eventState ? eventState.closesAt : null,
     spotsLeft,
     capacity: event.max_capacity,
     requiresApplication: event.requires_application,
@@ -247,13 +283,9 @@ export default async function EventDetailPage({
             <EventFactList facts={facts} />
 
             {/* Register Button */}
-            {preview ? <Button disabled className="self-start">Registration unavailable in draft preview</Button> : canceled ? <Button disabled className="self-start">Event canceled</Button> : <EventRegistrationAction
-              eventId={event.id}
-              eventSlug={event.slug ?? slug}
-              registrationAvailable={canRegister}
-              requiresApplication={event.requires_application}
-              unavailableLabel={registerLabel}
-            />}
+            {preview
+              ? <Button disabled className="self-start">Registration unavailable in draft preview</Button>
+              : <EventRegistrationAction action={publicEventActionFor(viewerState, event.slug ?? slug)} />}
           </div>
         </section>
 
@@ -288,90 +320,13 @@ export default async function EventDetailPage({
           {/* ────────────────────── AGENDA ────────────────────── */}
           {participant.agenda.length > 0 && <EventAgendaTable eventName={event.name} agenda={participant.agenda} />}
 
-          {/* ────────────────────── MENTORS ────────────────────── */}
-          {!unfinished && event.mentors_enabled && mentors.length > 0 && (
-            <PageSection title="Mentors">
-              <div className="grid max-w-2xl grid-cols-2 gap-4 sm:grid-cols-3">
-                {mentors.map((mentor, i) => (
-                  <div key={i} className="group relative">
-                    {/* Mentor photo */}
-                    <div className="aspect-square cursor-pointer overflow-hidden rounded-xl bg-muted">
-                      {mentor.profile_image_path ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={mentor.profile_image_path}
-                          alt={mentor.full_name}
-                          className="size-full object-cover"
-                        />
-                      ) : (
-                        <div className="flex size-full items-center justify-center bg-muted text-h1 text-muted-foreground">
-                          {mentor.full_name.charAt(0)}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Hover card */}
-                    <Card className="pointer-events-none absolute inset-x-0 bottom-0 z-20 translate-y-2 gap-0 p-4 opacity-0 shadow-lg transition-opacity duration-200 group-hover:pointer-events-auto group-hover:opacity-100 group-focus-within:pointer-events-auto group-focus-within:opacity-100">
-                      <div className="mb-2 flex items-start justify-between gap-2">
-                        <div>
-                          <p className="text-table">
-                            {mentor.full_name}
-                          </p>
-                          {mentor.position && (
-                            <p className="text-small text-muted-foreground">
-                              {mentor.position}
-                            </p>
-                          )}
-                        </div>
-                        {mentor.linkedin_url && (
-                          <a
-                            href={mentor.linkedin_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="shrink-0 text-primary hover:text-primary-hover"
-                          >
-                            <FaLinkedin size={24} />
-                          </a>
-                        )}
-                      </div>
-                      {mentor.description && (
-                        <p className="line-clamp-3 text-small text-muted-foreground">
-                          {mentor.description}
-                        </p>
-                      )}
-                    </Card>
-                  </div>
-                ))}
-              </div>
-            </PageSection>
-          )}
-
-          {/* ────────────────────── SPONSORS ────────────────────── */}
-          {!unfinished && event.sponsors_enabled && sponsors.length > 0 && (
-            <PageSection title="Sponsors">
-              <div className="flex flex-wrap items-center gap-6">
-                {sponsors.map((sponsor, i) => (
-                  <div
-                    key={i}
-                    className="flex size-24 items-center justify-center overflow-hidden rounded-xl bg-muted p-2"
-                  >
-                    {sponsor.brand_logo_path ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={sponsor.brand_logo_path}
-                        alt={sponsor.name}
-                        className="size-full object-contain"
-                      />
-                    ) : (
-                      <span className="text-small text-muted-foreground">
-                        {sponsor.name}
-                      </span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </PageSection>
-          )}
+          {/* ────────────────────── PEOPLE AND SPONSORS ────────────────────── */}
+          {/* One card per people section (Judges, Mentors, Speakers, Panelists
+              or a custom title), in the builder's order, as on the portal. */}
+          {peopleSections.map((section) => (
+            <EventPeopleCard key={section.id} type="people" title={section.title} people={section.people} headingAs="h2" />
+          ))}
+          <EventPeopleCard type="sponsors" people={sponsors} headingAs="h2" />
 
           {/* ────────────────────── LOCATION ────────────────────── */}
           {showLocationSection && (

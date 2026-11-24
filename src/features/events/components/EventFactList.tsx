@@ -56,7 +56,7 @@ export function priceFact(
   };
 }
 
-/** The page's registration window, as `getRegistrationStatus` and the seat count decide it. */
+/** The page's registration window, from the event's state (`eventStateFor`). */
 export type RegistrationWindow = "upcoming" | "open" | "closed" | "full";
 
 /** "Sat, Dec 6", in Pacific time. */

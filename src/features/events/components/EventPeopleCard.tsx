@@ -7,9 +7,13 @@ import type { MentorRow, SponsorRow } from "@/lib/supabase/models";
  * One card is one people section (titled by the event's builder: Judges,
  * Mentors, Speakers, Panelists or a custom name) or the sponsors list.
  */
-type EventPeopleCardProps =
+type EventPeopleCardProps = (
   | { type: "people"; title: string; people: MentorRow[] }
-  | { type: "sponsors"; people: SponsorRow[] };
+  | { type: "sponsors"; people: SponsorRow[] }
+) & {
+  /** The title's level: "h2" where the cards sit right under the page's own heading. */
+  headingAs?: "h2" | "h3";
+};
 
 /** What a row renders, whichever table it came from. */
 interface PersonItem {
@@ -79,6 +83,7 @@ function sponsorItem(sponsor: SponsorRow): PersonItem {
 export function EventPeopleCard(props: EventPeopleCardProps) {
   if (props.people.length === 0) return null;
 
+  const Heading = props.headingAs ?? "h3";
   const { title, noun, items } =
     props.type === "people"
       ? { title: props.title, noun: sectionNoun(props.title), items: props.people.map(mentorItem) }
@@ -88,7 +93,7 @@ export function EventPeopleCard(props: EventPeopleCardProps) {
     <section className="flex flex-col gap-5 rounded-md border border-border-subtle p-6">
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-3">
-          <h3 className="text-h3">{title}</h3>
+          <Heading className="text-h3">{title}</Heading>
           <p className="text-muted-foreground">
             Displaying {items.length} {items.length === 1 ? noun.singular : noun.plural}
           </p>
