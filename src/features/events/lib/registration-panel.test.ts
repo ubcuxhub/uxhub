@@ -109,6 +109,15 @@ describe("getPanelSpec", () => {
     expect(spec("reg-checked-in").props).toMatchObject({ ticketState: "used" });
   });
 
+  it("shows an expired ticket once the event ends, checked in or not", () => {
+    expect(spec("reg-past-attended").props).toMatchObject({
+      badge: { status: "past", label: "Ticket expired" },
+      description: "This event has ended.",
+      ticketState: "expired",
+      ticketNote: "No longer valid",
+    });
+  });
+
   it("sends Register and Confirm to the checkout, Apply and Continue to the form", () => {
     const checkout = { kind: "flow", href: "/portal/events/design-sprint/checkout" };
     const form = { kind: "link", href: "/portal/events/design-sprint/apply" };

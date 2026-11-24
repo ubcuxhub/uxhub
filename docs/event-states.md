@@ -443,7 +443,7 @@ register.
 | `reg-going` | Going | They have a ticket |
 | `reg-checked-in` | Checked in | A check-in on their ticket is active ([below](#multi-day-check-in)) |
 | `reg-past` | Past | The event has ended and they had no ticket |
-| `reg-past-attended` | Past | The event has ended and they had a ticket |
+| `reg-past-attended` | Past | The event has ended and they had a ticket, checked in or not. It shows the expired ticket |
 | `app-upcoming` | Opens Oct 12 | Before `registration_opens_at`, for an application event |
 | `app-open` | Applications open | Applications are open and they haven't started one |
 | `app-draft` | Draft | Their application is a `draft`, and applications are open |
