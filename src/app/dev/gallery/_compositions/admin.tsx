@@ -46,6 +46,8 @@ import {
 import { TabNav, TabNavLink } from "@/components/ui/tab-nav";
 import { useRowSelection } from "@/hooks/use-row-selection";
 
+import { EventRegistrationsCard } from "@/features/admin/components/EventRegistrationsCard";
+
 import { HERE, USERS } from "../_fixtures";
 import { LIFT, Panel } from "./frame";
 import type { Components } from "./types";
@@ -62,7 +64,7 @@ function AdminStats() {
       />
       <StatCard
         className={LIFT}
-        label="Show-up rate"
+        label="Checked in"
         kind="rate"
         count={96}
         total={128}
@@ -90,6 +92,38 @@ function ReportingStatistics() {
       })),
     }} />
   </div>;
+}
+
+/**
+ * The event manager's Overview and the event drawer share this card. The
+ * second is an event whose first acceptance hasn't bought a ticket yet: no
+ * one going, one seat held by the offer.
+ */
+function EventRegistrations() {
+  return (
+    <div className="flex flex-col gap-3">
+      <EventRegistrationsCard
+        className={LIFT}
+        eventId="uxathon"
+        capacity={120}
+        tickets={96}
+        heldOffers={10}
+        seatsLeft={14}
+        checkedIn={41}
+        applications={{ submitted: 12, accepted: 106, waitlisted: 18, rejected: 31, total: 167 }}
+      />
+      <EventRegistrationsCard
+        className={LIFT}
+        eventId="design-jam"
+        capacity={100}
+        tickets={0}
+        heldOffers={1}
+        seatsLeft={99}
+        checkedIn={0}
+        applications={{ submitted: 5, accepted: 1, waitlisted: 0, rejected: 0, total: 6 }}
+      />
+    </div>
+  );
 }
 
 const STATUS_FILTERS: { status: Status; label: string }[] = [
@@ -170,7 +204,7 @@ function Attendees() {
           }
           selectedCount={selection.selected.size}
           bulkActions={
-            <Button variant="secondary" size="sm">
+            <Button variant="secondary">
               <Download aria-hidden />
               CSV
             </Button>
@@ -416,6 +450,7 @@ function CheckIn() {
 export const ADMIN_COMPONENTS = {
   "admin-stats": AdminStats,
   "reporting-statistics": ReportingStatistics,
+  "event-registrations": EventRegistrations,
   "attendee-table": Attendees,
   "admin-event-header": EventHeader,
   "mentors": Mentors,

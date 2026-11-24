@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { datetimeLocalToTimestamptz, formatTimestamp } from "@/lib/date";
@@ -158,6 +158,72 @@ describe("ApplicationDecisionCard", () => {
           "Priya will see “Not selected” on the event page once decisions are released. You can change this until then.",
         ),
       ).toBeTruthy();
+    });
+  });
+
+  describe("notes and buttons", () => {
+    function renderWith(props: Partial<Parameters<typeof ApplicationDecisionCard>[0]>) {
+      render(
+        <ApplicationDecisionCard
+          state="submitted"
+          firstName="Priya"
+          offerExpiresAt={null}
+          defaultDeadline={defaultDeadline}
+          onDecide={vi.fn().mockResolvedValue(undefined)}
+          {...props}
+        />,
+      );
+    }
+    const notes = () => screen.getAllByRole("note");
+    const actions = () =>
+      within(screen.getByRole("group", { name: "Decide" }))
+        .getAllByRole("button")
+        .map((button) => button.textContent);
+
+    it("puts the secondary actions first and the accept last", () => {
+      renderWith({});
+      expect(actions()).toEqual(["Reject", "Waitlist", "Accept"]);
+    });
+
+    it("offers a waitlisted applicant a spot once decisions are out, with their place", () => {
+      renderWith({
+        state: "waitlisted",
+        waitlist: { position: 3, appliedAt: "2026-10-29T18:00:00Z" },
+        capacity: 60,
+        openSeats: 2,
+      });
+      expect(actions()).toEqual(["Reject", "Offer spot"]);
+      expect(notes()[0].textContent).toBe(
+        "Priya is #3 on the waitlist (applied Oct 29). 2 spots are open.",
+      );
+      expect(notes()[0].getAttribute("data-tone")).toBe("info");
+      expect(notes()).toHaveLength(1);
+    });
+
+    it("keeps Accept for a waitlisted applicant before release", () => {
+      renderWith({ state: "waitlisted", releaseAt: "2031-01-04T17:00:00Z" });
+      expect(actions()).toEqual(["Reject", "Accept"]);
+      expect(notes()[0].getAttribute("data-tone")).toBe("neutral");
+    });
+
+    it("warns before an accept the event has no seat for, and still allows it", () => {
+      renderWith({ capacity: 60, openSeats: 0 });
+      expect(notes()[1].textContent).toBe(
+        "All 60 spots are held, so accepting Priya goes over capacity. Take back an offer or raise the capacity in the event builder to make room.",
+      );
+      expect(screen.getByRole("button", { name: "Accept" }).hasAttribute("disabled")).toBe(false);
+    });
+
+    it("doesn't warn when the accept keeps a seat already held", () => {
+      renderWith({ state: "accepted", offerExpiresAt: "2031-11-12T07:45:00Z", capacity: 60, openSeats: 0 });
+      expect(notes()).toHaveLength(1);
+    });
+
+    it("locks the note once nothing can change", () => {
+      renderWith({ state: "registered" });
+      expect(screen.queryByRole("button")).toBeNull();
+      expect(notes()[0].getAttribute("data-tone")).toBe("locked");
+      expect(notes()[0].textContent).toBe("Priya registered, so the decision is final.");
     });
   });
 });

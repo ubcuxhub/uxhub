@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { SquareError } from "square";
 import {
   completedRefundCents,
+  emailableRefunds,
   formatReservationFailure,
+  REFUND_EMAIL_WINDOW_MS,
   getSquareErrorDiagnostic,
   getSquareErrorMessage,
   isDefinitiveSquareFailure,
@@ -289,5 +291,56 @@ describe("completedRefundCents", () => {
     expect(
       completedRefundCents(payment(), [{ status: "COMPLETED", amountMoney: { amount: BigInt(900), currency: "USD" } }])
     ).toBe(0);
+  });
+});
+
+describe("emailableRefunds", () => {
+  const now = Date.parse("2026-11-21T12:00:00Z");
+  const payment = { amountMoney: { amount: BigInt(2000), currency: "CAD" } };
+  const refund = (overrides: Record<string, unknown> = {}) => ({
+    id: "refund-1",
+    status: "COMPLETED",
+    amountMoney: { amount: BigInt(500), currency: "CAD" },
+    updatedAt: "2026-11-21T11:00:00Z",
+    ...overrides,
+  });
+
+  it("lists each completed refund in the payment's currency", () => {
+    expect(
+      emailableRefunds(
+        payment,
+        [refund(), refund({ id: "refund-2", amountMoney: { amount: BigInt(700), currency: "CAD" } })],
+        now
+      )
+    ).toEqual([
+      { id: "refund-1", amountCents: 500, currency: "CAD" },
+      { id: "refund-2", amountCents: 700, currency: "CAD" },
+    ]);
+  });
+
+  it("skips refunds that aren't completed, in another currency, empty or unnamed", () => {
+    expect(
+      emailableRefunds(
+        payment,
+        [
+          refund({ status: "PENDING" }),
+          refund({ status: "FAILED" }),
+          refund({ status: "REJECTED" }),
+          refund({ amountMoney: { amount: BigInt(500), currency: "USD" } }),
+          refund({ amountMoney: { amount: BigInt(0), currency: "CAD" } }),
+          refund({ id: undefined }),
+          undefined,
+        ],
+        now
+      )
+    ).toEqual([]);
+  });
+
+  it("skips a refund that last changed outside the window", () => {
+    const old = new Date(now - REFUND_EMAIL_WINDOW_MS - 1000).toISOString();
+    const recent = new Date(now - REFUND_EMAIL_WINDOW_MS + 1000).toISOString();
+    expect(emailableRefunds(payment, [refund({ updatedAt: old })], now)).toEqual([]);
+    expect(emailableRefunds(payment, [refund({ updatedAt: recent })], now)).toHaveLength(1);
+    expect(emailableRefunds(payment, [refund({ updatedAt: undefined })], now)).toHaveLength(1);
   });
 });

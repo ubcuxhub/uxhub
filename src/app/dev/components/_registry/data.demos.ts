@@ -37,4 +37,5 @@ export const dataDemos: Record<string, DemoLoader> = {
   "sponsor-logo-grid": () => import("../_demos/sponsor-logo-grid"),
   ticket: () => import("../_demos/ticket"),
   "registration-ticket": () => import("../_demos/registration-ticket"),
+  "event-teams-view": () => import("../_demos/event-teams-view"),
 };

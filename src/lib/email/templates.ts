@@ -20,6 +20,14 @@ export function detailRow(label: string, value: string | null | undefined) {
   </tr>`;
 }
 
+/** "Orchard Commons 1001": a building and room, either of which may be blank. */
+export function formatEventLocation(
+  building: string | null | undefined,
+  room: string | null | undefined,
+) {
+  return [building, room].filter(Boolean).join(" ");
+}
+
 export function renderMembershipConfirmationEmail({
   expiresAt,
   membershipType,
@@ -51,6 +59,7 @@ export function renderMembershipConfirmationEmail({
   return {
     html: renderEmailLayout({
       heading: "Your UX Hub membership is active",
+      hubbo: "proud",
       intro: `Hi ${userName}, thanks for joining. Your ${membershipType.name} membership is confirmed and active ${
         expiryDate ? `until ${expiryDate}` : "for the next year"
       }.`,
@@ -83,6 +92,7 @@ export function renderEventConfirmationEmail({
   return {
     html: renderEmailLayout({
       heading: "You’re registered",
+      hubbo: "excited",
       intro: `Hi ${userName}, your ticket for ${event.name} is confirmed. Here are the details.`,
       body: `<table role="presentation" cellpadding="0" cellspacing="0">${renderEventDetailRows(
         event,
@@ -114,9 +124,7 @@ function renderEventDetailRows(
   ]
     .filter(Boolean)
     .join(" – ");
-  const location = [event.location_building, event.location_room]
-    .filter(Boolean)
-    .join(" ");
+  const location = formatEventLocation(event.location_building, event.location_room);
 
   return [
     detailRow("Date", formatEventDate(event.starts_at)),

@@ -21,14 +21,21 @@ const db = createIntegrationClient();
 const hour = 60 * 60 * 1000;
 const at = (offsetMs: number) => new Date(Date.now() + offsetMs).toISOString();
 
-/** A published event taking applications, with decisions released at `releaseAt`. */
+/**
+ * An event taking applications, published unless `status` says otherwise,
+ * with decisions released at `releaseAt`.
+ */
 let events = 0;
-async function applicationEvent(fixtures: Fixtures, releaseAt: string | null = at(-hour)) {
+async function applicationEvent(
+  fixtures: Fixtures,
+  releaseAt: string | null = at(-hour),
+  status: "active" | "draft" = "active"
+) {
   events += 1;
   const event = await fixtures.createEvent({
     name: `Integration emails ${fixtures.tag} ${events}`,
     slug: `integration-emails-${fixtures.tag}-${events}`,
-    status: "active",
+    status,
     requires_application: true,
     starts_at: at(10 * 24 * hour),
     ends_at: at(10 * 24 * hour + 2 * hour),
@@ -52,9 +59,10 @@ async function applyAs(
   fixtures: Fixtures,
   eventId: string,
   status: "submitted" | "accepted" | "waitlisted" | "rejected",
-  offerExpiresAt: string | null = status === "accepted" ? at(5 * 24 * hour) : null
+  offerExpiresAt: string | null = status === "accepted" ? at(5 * 24 * hour) : null,
+  roleAccess: "basic" | "manager" | "admin" = "basic"
 ) {
-  const member = await fixtures.createUser({ first_name: "Avery" });
+  const member = await fixtures.createUser({ first_name: "Avery", role_access: roleAccess });
   const { data, error } = await db
     .from("event_applications")
     .insert({
@@ -146,25 +154,17 @@ describe("claim_application_emails", () => {
       expect(await claim(event.id)).toEqual([]);
     }));
 
-  it("skips canceled and unpublished events, deleted applicants and ticket holders", () =>
+  it("skips canceled events, deleted applicants and ticket holders", () =>
     withFixtures(async (fixtures) => {
       const canceled = await applicationEvent(fixtures);
       await applyAs(fixtures, canceled.id, "rejected");
+      await applyAs(fixtures, canceled.id, "waitlisted", null, "admin");
       const { error: cancelError } = await db
         .from("events")
         .update({ canceled_at: new Date().toISOString() })
         .eq("id", canceled.id);
       if (cancelError) throw cancelError;
       expect(await claim(canceled.id)).toEqual([]);
-
-      const unpublished = await applicationEvent(fixtures);
-      await applyAs(fixtures, unpublished.id, "waitlisted");
-      const { error: draftError } = await db
-        .from("events")
-        .update({ status: "draft" })
-        .eq("id", unpublished.id);
-      if (draftError) throw draftError;
-      expect(await claim(unpublished.id)).toEqual([]);
 
       const event = await applicationEvent(fixtures);
       const deleted = await applyAs(fixtures, event.id, "rejected");
@@ -179,6 +179,55 @@ describe("claim_application_emails", () => {
         .insert({ event_id: event.id, user_id: registered.member.id });
       if (ticketError) throw ticketError;
       expect(await claim(event.id)).toEqual([]);
+    }));
+
+  it("emails staff on a draft event until it ends", () =>
+    withFixtures(async (fixtures) => {
+      // Execs testing the flow on an unpublished event get their decisions.
+      const draft = await applicationEvent(fixtures, at(-hour), "draft");
+      const admin = await applyAs(fixtures, draft.id, "accepted", at(5 * 24 * hour), "admin");
+      const manager = await applyAs(fixtures, draft.id, "waitlisted", null, "manager");
+      const claims = await claim(draft.id);
+      expect(claims.map((row) => `${row.applicationId}:${row.kind}`).sort()).toEqual(
+        [`${admin.applicationId}:accepted`, `${manager.applicationId}:waitlisted`].sort()
+      );
+      expect(claims.find((row) => row.kind === "accepted")?.offerExpiresAt).not.toBeNull();
+
+      // Not before release, as on a published event.
+      const hidden = await applicationEvent(fixtures, at(24 * hour), "draft");
+      await applyAs(fixtures, hidden.id, "rejected", null, "admin");
+      expect(await claim(hidden.id)).toEqual([]);
+
+      // A published event that went back to Draft can still hold members'
+      // decisions. Its page is a 404 to them, so only staff are emailed.
+      const unpublished = await applicationEvent(fixtures);
+      await applyAs(fixtures, unpublished.id, "waitlisted");
+      await applyAs(fixtures, unpublished.id, "rejected");
+      const staff = await applyAs(fixtures, unpublished.id, "rejected", null, "manager");
+      const { error: draftError } = await db
+        .from("events")
+        .update({ status: "draft" })
+        .eq("id", unpublished.id);
+      if (draftError) throw draftError;
+      expect((await claim(unpublished.id)).map((row) => row.applicationId)).toEqual([
+        staff.applicationId,
+      ]);
+
+      // A finished draft sends nothing. (A canceled event can't be a draft:
+      // only a published one can be canceled, and canceling freezes it.)
+      const ended = await applicationEvent(fixtures, at(-hour), "draft");
+      await applyAs(fixtures, ended.id, "rejected", null, "admin");
+      const { error: endError } = await db
+        .from("events")
+        .update({
+          registration_opens_at: at(-5 * 24 * hour),
+          registration_closes_at: at(-4 * 24 * hour),
+          starts_at: at(-3 * 24 * hour),
+          ends_at: at(-2 * 24 * hour),
+        })
+        .eq("id", ended.id);
+      if (endError) throw endError;
+      expect(await claim(ended.id)).toEqual([]);
     }));
 
   it("never claims an email recorded as sent, as the backfill records them", () =>

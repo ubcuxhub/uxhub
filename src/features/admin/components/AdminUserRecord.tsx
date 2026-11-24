@@ -7,7 +7,6 @@ import { BadgeCheck, Pencil } from "lucide-react";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { CopyCode } from "@/components/shared/CopyCode";
 import { RecordField, RecordSection, RecordView } from "@/components/shared/RecordDrawer";
-import { Avatar } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -15,6 +14,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatMembershipTypeName } from "@/features/memberships/lib/display";
+import { MemberAvatar } from "@/features/setup/components/MemberAvatar";
+import type { AvatarPreset } from "@/features/setup/lib/options";
 import { useUser } from "@/lib/auth/user-context";
 import { formatEventDate } from "@/lib/date";
 import type { RoleAccess, UserInfoRow } from "@/lib/supabase/models";
@@ -212,6 +213,9 @@ export function AdminUserRecord({
 
   const name = formatUserName(user);
   const photoUrl = displayedPhotoUrl(user.profile_photo_path, draft?.photo);
+  // Shown behind the photo, as setup and Settings do (`resolveAvatar`). An
+  // upload clears it and a removal keeps it, so the preview matches the save.
+  const preset = user.avatar_preset as AvatarPreset | null;
   const tierName = user.membership_type_name ? formatMembershipTypeName(user.membership_type_name) : null;
   const schoolEditable = draft !== null && canEditUserSchool(user, draft.fields.membership_type_id, membershipTypes);
   const verifiedBy =
@@ -256,7 +260,7 @@ export function AdminUserRecord({
           </>
         }
         subtitle={user.created_at ? `User since ${formatEventDate(user.created_at)}` : undefined}
-        media={<Avatar key={photoUrl ?? "none"} name={name} src={photoUrl} size={64} decorative />}
+        media={<MemberAvatar name={name} photoUrl={photoUrl} preset={preset} size={64} decorative />}
         status={
           tierName ? <Badge variant="info">{tierName}</Badge> : <Badge variant="neutral">No membership</Badge>
         }
@@ -284,6 +288,7 @@ export function AdminUserRecord({
                   <UserAvatarField
                     name={name}
                     photoUrl={photoUrl}
+                    preset={preset}
                     disabled={saving}
                     onChange={(photo) => update({ photo })}
                   />
@@ -305,7 +310,13 @@ export function AdminUserRecord({
             </RecordSection>
 
             <RecordSection title="Contact">
-              {textField("email", "Email", user.email, { type: "email", autoComplete: "off" })}
+              {/* A linked account's email is its sign-in address, so only an unlinked profile's can be corrected. */}
+              {textField("email", "Email", user.email, {
+                type: "email",
+                autoComplete: "off",
+                readOnly: Boolean(user.auth_user_id),
+                title: user.auth_user_id ? "This member signs in with this email" : undefined,
+              })}
               {textField("phone", "Phone", user.phone, { type: "tel", autoComplete: "off" })}
               <RecordField label="Newsletter" value={user.newsletter ? "Subscribed" : "Not subscribed"}>
                 {draft ? (

@@ -2,13 +2,12 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
-import { Clock } from "lucide-react";
+import { ArrowUpRight, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableRowButton } from "@/components/ui/table";
 import { agendaDayLabel, agendaTimeRange } from "@/lib/event-agenda";
 import { cn } from "@/lib/utils";
-import { formatEventTime } from "@/lib/date";
 import type { ParticipantLocation } from "@/lib/location";
 
 export interface AgendaTableItem {
@@ -17,6 +16,8 @@ export interface AgendaTableItem {
   starts_at: string | null;
   ends_at: string | null;
   location: ParticipantLocation | null;
+  /** Opens in a new tab from the item's title (participant rows only). */
+  link?: { url: string } | null;
 }
 export interface AgendaTableAction {
   label: string;
@@ -50,7 +51,7 @@ function AgendaRow({ item, actions, children }: { item: AgendaTableItem; actions
   return <Popover open={open} onOpenChange={setOpen}>
     <PopoverAnchor asChild><TableRow ref={row}>
       {children}
-      <TableCell className="hidden px-4 py-3.5 align-top @min-[48rem]/agenda:table-cell"><div className="flex flex-col items-start gap-2"><ActionButtons actions={actions} /></div></TableCell>
+      <TableCell className="hidden px-4 py-3.5 align-top @min-[48rem]/agenda:table-cell"><div data-agenda-actions className="flex flex-row items-center justify-end gap-2 whitespace-nowrap"><ActionButtons actions={actions} /></div></TableCell>
     </TableRow></PopoverAnchor>
     <PopoverContent align="end" aria-label={`Actions for ${item.title}`} className="flex w-auto flex-col gap-2" onCloseAutoFocus={event => {
       // A chosen action may have opened a dialog; do not pull focus out of it.
@@ -65,41 +66,51 @@ function AgendaRow({ item, actions, children }: { item: AgendaTableItem; actions
   </Popover>;
 }
 
+/** A location's building column: the public summary for a restricted viewer, "Online" for an online-only place. */
+function buildingLabel(location: ParticipantLocation | null | undefined): string | null {
+  if (!location) return null;
+  return location.restricted
+    ? location.public_summary ?? null
+    : location.building || (location.type === "online" ? "Online" : null);
+}
+
 export function AgendaDayTable<T extends AgendaTableItem>({ day, actions }: {
-  day: { id: string; date: string; title: string | null; items: T[] };
+  /** `location` shows in the heading only when the day set its own (`location_overridden`). */
+  day: { id: string; date: string; title: string | null; items: T[]; location?: ParticipantLocation | null; location_overridden?: boolean };
   actions?: (item: T) => AgendaTableAction[];
 }) {
+  const dayLocation = day.location_overridden ? buildingLabel(day.location) : null;
+  const headingDetails = [day.title, dayLocation].filter(Boolean);
   return <div key={day.id} className="overflow-hidden rounded-lg border border-border-subtle">
     <div className="bg-secondary px-4 py-3">
-      <h3 className="text-small font-medium">{agendaDayLabel(day.date)}<span className="font-normal text-muted-foreground"> · {day.title}</span></h3>
+      <h3 className="text-small font-medium">{agendaDayLabel(day.date)}{headingDetails.map(detail => <span key={detail} className="font-normal text-muted-foreground"> · {detail}</span>)}</h3>
     </div>
     <Table aria-label={`${day.title ?? "Agenda"} on ${day.date}`} className="min-w-80 table-fixed" scrollerLabel={`${day.title ?? "Agenda"} schedule, scroll for locations`} scrollerClassName="focus-visible:focus-ring" >
       <colgroup>
-        <col className={cn("w-48", actions ? "@min-[48rem]/agenda:w-[24%]" : "@min-[48rem]/agenda:w-56")} />
-        <col className={actions ? "@min-[48rem]/agenda:w-[24%]" : undefined} />
-        <col className={cn("hidden @min-[48rem]/agenda:table-column", actions ? "@min-[48rem]/agenda:w-[20%]" : "w-40")} />
-        <col className={cn("hidden @min-[48rem]/agenda:table-column", actions ? "@min-[48rem]/agenda:w-[12%]" : "w-24")} />
-        {actions && <col className="hidden @min-[48rem]/agenda:w-[20%] @min-[48rem]/agenda:table-column" />}
+        <col className={cn("w-48", actions ? "@min-[48rem]/agenda:w-[20%]" : "@min-[48rem]/agenda:w-56")} />
+        <col className={actions ? "@min-[48rem]/agenda:w-[30%]" : undefined} />
+        <col className={cn("hidden @min-[48rem]/agenda:table-column", actions ? "@min-[48rem]/agenda:w-[16%]" : "w-40")} />
+        <col className={cn("hidden @min-[48rem]/agenda:table-column", actions ? "@min-[48rem]/agenda:w-[14%]" : "w-24")} />
+        {actions && <col className="hidden @min-[48rem]/agenda:w-[17rem] @min-[48rem]/agenda:table-column" />}
       </colgroup>
       <TableHeader className="sr-only"><TableRow><TableHead>Time</TableHead><TableHead>Item</TableHead><TableHead className="hidden @min-[48rem]/agenda:table-cell">Building or online location</TableHead><TableHead className="hidden @min-[48rem]/agenda:table-cell">Room</TableHead>{actions && <TableHead className="hidden @min-[48rem]/agenda:table-cell">Actions</TableHead>}</TableRow></TableHeader>
       <TableBody>{[...day.items].sort((a, b) => (a.starts_at ?? "").localeCompare(b.starts_at ?? "")).map(item => {
-        const building = item.location?.restricted
-          ? item.location.public_summary
-          : item.location?.building || (item.location?.type === "online" ? "Online" : null);
+        const building = buildingLabel(item.location);
         const room = item.location?.restricted ? null : item.location?.room;
         const location = [building, room].filter(Boolean).join(", ");
         return <AgendaRow key={item.id} item={item} actions={actions?.(item)}>
           <TableCell className="px-4 py-3.5 align-top">
             <div className="flex items-start gap-2 text-small">
               <Clock className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
-              {item.starts_at && item.ends_at ? <span className="flex flex-col gap-x-1 @min-[48rem]/agenda:flex-row @min-[48rem]/agenda:flex-wrap">
-                <span className="whitespace-nowrap">{formatEventTime(item.starts_at)} –</span>{" "}
-                <span className="whitespace-nowrap">{formatEventTime(item.ends_at)}</span>
-              </span> : <span>{agendaTimeRange(item)}</span>}
+              <span className={item.starts_at && item.ends_at ? "whitespace-nowrap" : undefined}>{agendaTimeRange(item)}</span>
             </div>
           </TableCell>
           <TableCell className="px-4 py-3.5 align-top text-small wrap-anywhere">
-            {actions ? <AgendaRowTrigger title={item.title} /> : <p className="font-medium">{item.title}</p>}
+            {actions ? <AgendaRowTrigger title={item.title} /> : item.link ? <p className="font-medium">
+              <a href={item.link.url} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 underline-offset-2 hover:underline focus-visible:focus-ring rounded-sm">
+                {item.title}<ArrowUpRight className="size-4 shrink-0" aria-hidden /><span className="sr-only"> (opens in a new tab)</span>
+              </a>
+            </p> : <p className="font-medium">{item.title}</p>}
             {location && <p className="mt-1 font-normal text-muted-foreground @min-[48rem]/agenda:hidden">{location}</p>}
           </TableCell>
           <TableCell className="hidden px-4 py-3.5 align-top text-small text-muted-foreground wrap-anywhere @min-[48rem]/agenda:table-cell">{building}</TableCell>

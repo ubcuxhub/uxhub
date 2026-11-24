@@ -18,6 +18,21 @@ export const EVENT_IMAGE_MAX_BYTES = 4 * 1024 * 1024;
  */
 export const EVENT_IMAGE_MAX_MB = EVENT_IMAGE_MAX_BYTES / (1024 * 1024);
 
+/**
+ * The largest file the picker accepts. Anything over `EVENT_IMAGE_MAX_BYTES`
+ * is shrunk in the browser before it is uploaded (`event-image-optimize.ts`),
+ * so this cap only keeps the browser from decoding something huge.
+ */
+export const EVENT_IMAGE_SOURCE_MAX_BYTES = 20 * 1024 * 1024;
+export const EVENT_IMAGE_SOURCE_MAX_MB =
+  EVENT_IMAGE_SOURCE_MAX_BYTES / (1024 * 1024);
+
+/**
+ * The longest edge, in px, an image keeps after the picker optimizes it. Twice
+ * the widest the event pages draw a header, which is plenty for retina screens.
+ */
+export const EVENT_IMAGE_MAX_EDGE = 2560;
+
 export const ALLOWED_EVENT_IMAGE_TYPES = [
   "image/jpeg",
   "image/jpg",
@@ -31,14 +46,21 @@ export function isAllowedEventImageType(fileType: string): boolean {
 export const EVENT_IMAGE_ERRORS = {
   type: "Only JPG and PNG images are allowed.",
   size: `Image size must be less than ${EVENT_IMAGE_MAX_MB}MB.`,
+  sourceSize: `Image size must be less than ${EVENT_IMAGE_SOURCE_MAX_MB}MB.`,
+  optimize: `Couldn\u2019t shrink this image under ${EVENT_IMAGE_MAX_MB}MB. Try a smaller one.`,
   dimensions: "Unable to read image dimensions.",
   square: "Event thumbnails must be square (same width and height).",
 } as const;
 
 /** What a picker accepts and enforces on the client; see `ImageUpload`. */
 export interface EventImageRequirements {
-  /** Width must equal height. */
+  /** Width must equal height; the picker crops anything else to a square. */
   square?: boolean;
+  /**
+   * Width over height the picker crops to (`square` means 1). An image of
+   * another shape opens the crop dialog.
+   */
+  aspect?: number;
   /** Smallest accepted size, in px. */
   minWidth?: number;
   minHeight?: number;
@@ -80,7 +102,8 @@ export function describeMinSize(minWidth: number, minHeight: number): string {
 
 /**
  * The requirements line under "Upload image":
- * "JPG or PNG, 1600 × 400 px or larger, up to 4 MB".
+ * "JPG or PNG, 1600 × 400 px or larger, up to 20 MB". The picker shrinks a
+ * file over the upload limit, so the line names the source cap.
  */
 export function describeImageRequirements({
   square = false,
@@ -91,8 +114,45 @@ export function describeImageRequirements({
   if (minWidth || minHeight) {
     parts.push(`${minWidth ?? 1} \u00d7 ${minHeight ?? 1} px or larger`);
   }
-  parts.push(`up to ${EVENT_IMAGE_MAX_MB} MB`);
+  parts.push(`up to ${EVENT_IMAGE_SOURCE_MAX_MB} MB`);
   return parts.join(", ");
+}
+
+/**
+ * Whether the picker re-encodes a file before handing it on: when it is over
+ * the upload limit, or larger than any page draws it.
+ */
+export function needsEventImageOptimization(
+  size: number,
+  { width, height }: ImageDimensions,
+): boolean {
+  return size > EVENT_IMAGE_MAX_BYTES || Math.max(width, height) > EVENT_IMAGE_MAX_EDGE;
+}
+
+/**
+ * The size to draw `source` at: its longest edge brought down to `maxEdge`,
+ * then by `shrink` (a further factor below 1 when the first try is still too
+ * big), never below the picker's minimum size and never upscaled.
+ */
+export function scaledImageSize(
+  source: ImageDimensions,
+  {
+    maxEdge = EVENT_IMAGE_MAX_EDGE,
+    minWidth = 1,
+    minHeight = 1,
+  }: { maxEdge?: number; minWidth?: number; minHeight?: number } = {},
+  shrink = 1,
+): ImageDimensions {
+  const floor = Math.min(
+    1,
+    Math.max(minWidth / source.width, minHeight / source.height),
+  );
+  const fit = Math.min(1, maxEdge / Math.max(source.width, source.height));
+  const scale = Math.max(floor, fit * shrink);
+  return {
+    width: Math.max(Math.round(source.width * scale), Math.min(minWidth, source.width)),
+    height: Math.max(Math.round(source.height * scale), Math.min(minHeight, source.height)),
+  };
 }
 
 const STORAGE_PUBLIC_PREFIX = "/storage/v1/object/public/";

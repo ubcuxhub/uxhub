@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { CircleAlert, PencilLine } from "lucide-react";
 
 import { BackPill } from "@/components/shared/BackButton";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import {
   SectionNavigator,
   type NavigatorSection,
@@ -27,7 +26,6 @@ import {
 import { cn } from "@/lib/utils";
 
 import {
-  deleteApplication,
   saveApplicationDraft,
   startApplicationDraft,
   submitApplication,
@@ -62,7 +60,6 @@ export interface ApplicationFormProps {
   event: { id: string; slug: string; name: string };
   /** `new` until the member first saves. */
   status: "new" | "draft" | "submitted";
-  applicationId: string | null;
   window: ApplicationWindow;
   /** Preformatted: "December 13, 2026 at 3:59 PM". */
   opensAt: string | null;
@@ -78,9 +75,10 @@ export interface ApplicationFormProps {
 const SECTION = {
   about: "about-you",
   answers: "your-answers",
-  review: "review-and-submit",
-  settings: "other-settings",
 } as const;
+
+/** The submit area at the end of the form; not a numbered section. */
+const SUBMIT_AREA_ID = "submit-application";
 
 /** Scrolls a question into view and focuses its first control. */
 function focusQuestion(questionId: string) {
@@ -102,16 +100,17 @@ const TYPED = new Set<ApplicationQuestion["response_type"]>(["short_text", "long
 
 /**
  * The member's application to one event (Figma A.1 to A.9): About you, the
- * questions, a review that lists what is left, and Delete for a draft.
- * Answers save as they change (`useAutosave`; the first save starts the
- * draft), and file answers when their upload finishes. Submit saves anything
- * waiting, then submits through the RPC. Once submitted, the answers are
- * read-only and the page says it is Pending.
+ * questions, then a submit area that lists what is left to answer. There is
+ * no Delete: execs never see a draft and it holds no spot, so a member who
+ * changes their mind just leaves it. Answers save as they change
+ * (`useAutosave`; the first save starts the draft), and file answers when
+ * their upload finishes. Submit (in the sticky header and in the submit area,
+ * sharing one state) saves anything waiting, then submits through the RPC.
+ * Once submitted, the answers are read-only and the page says it is Pending.
  */
 export function ApplicationForm({
   event,
   status,
-  applicationId: initialApplicationId,
   window: applicationWindow,
   opensAt,
   closesAt,
@@ -130,14 +129,11 @@ export function ApplicationForm({
   const answersRef = useRef(initialAnswers);
   const savedRef = useRef(initialAnswers);
   const [errors, setErrors] = useState<AnswerErrors>({});
-  const [applicationId, setApplicationId] = useState(initialApplicationId);
   const [submitting, setSubmitting] = useState(false);
   const [submittedNow, setSubmittedNow] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [fileSizes, setFileSizes] = useState<Record<string, number>>({});
+  // Nothing on this page navigates away on purpose, so the guard never stands down.
   const bypassGuard = useRef(false);
 
   const readOnly = status === "submitted" || submittedNow;
@@ -165,11 +161,9 @@ export function ApplicationForm({
   const writeDraft = async (values: ApplicationAnswers): Promise<WriteOutcome> => {
     const result = await saveApplicationDraft(event.id, values);
     if (result.ok) {
-      setApplicationId(result.applicationId);
       markSaved(values);
       return "saved";
     }
-    if (result.applicationId) setApplicationId(result.applicationId);
     if (result.reason === "invalid") {
       const fieldErrors = result.fieldErrors;
       if (fieldErrors) setErrors((current) => ({ ...current, ...fieldErrors }));
@@ -196,32 +190,20 @@ export function ApplicationForm({
     .filter((question) => errors[question.id] || unanswered.includes(question.id))
     .map((question) => question.id);
   const answersComplete = toFix.length === 0;
-  const hasDraft = applicationId !== null && !readOnly;
 
-  const sectionIds: string[] = readOnly
-    ? [SECTION.about, SECTION.answers]
-    : [SECTION.about, SECTION.answers, SECTION.review, ...(hasDraft ? [SECTION.settings] : [])];
-  const currentId = useCurrentSection(sectionIds);
+  const currentId = useCurrentSection([SECTION.about, SECTION.answers]);
   const answersState: NavigatorSection["state"] =
     readOnly || answersComplete ? "complete" : errorIds.length > 0 ? "attention" : "not-started";
-  const titles: Record<string, string> = {
-    [SECTION.about]: "About you",
-    [SECTION.answers]: "Your answers",
-    [SECTION.review]: "Review and submit",
-    [SECTION.settings]: "Other settings",
-  };
-  const navigatorSections: NavigatorSection[] = sectionIds.map((id) => ({
-    id,
-    title: titles[id],
-    required: id !== SECTION.settings,
-    state:
-      id === SECTION.about
-        ? "complete"
-        : id === SECTION.settings
-          ? "optional"
-          : answersState,
-    issues: id === SECTION.answers && errorIds.length > 0 ? errorIds.length : undefined,
-  }));
+  const navigatorSections: NavigatorSection[] = [
+    { id: SECTION.about, title: "About you", required: true, state: "complete" },
+    {
+      id: SECTION.answers,
+      title: "Your answers",
+      required: true,
+      state: answersState,
+      issues: errorIds.length > 0 ? errorIds.length : undefined,
+    },
+  ];
 
   const setAnswer = (question: ApplicationQuestion, value: AnswerValue) => {
     const next = { ...answersRef.current, [question.id]: value };
@@ -255,7 +237,6 @@ export function ApplicationForm({
         router.refresh();
         return;
       }
-      if (result.applicationId) setApplicationId(result.applicationId);
       if (result.saved) {
         markSaved(snapshot);
         autosave.schedule(0);
@@ -263,7 +244,7 @@ export function ApplicationForm({
       if (result.fieldErrors && Object.keys(result.fieldErrors).length > 0) {
         setErrors(result.fieldErrors);
         document
-          .getElementById(SECTION.review)
+          .getElementById(SUBMIT_AREA_ID)
           ?.scrollIntoView({ block: "start", behavior: "smooth" });
         return;
       }
@@ -281,7 +262,6 @@ export function ApplicationForm({
   const upload = async (question: ApplicationQuestion, file: File) => {
     const draft = await startApplicationDraft(event.id);
     if (!draft.ok) return draft.error;
-    setApplicationId(draft.applicationId);
 
     const supabase = createClient();
     const saved = savedRef.current[question.id];
@@ -316,36 +296,11 @@ export function ApplicationForm({
     const result = await saveApplicationDraft(event.id, { [question.id]: "" });
     if (!result.ok) return result.error;
     // The answer no longer names the file, so a failed removal only leaves an
-    // orphan, which deleting the draft cleans up.
+    // orphan that nothing reads.
     if (path) await removeApplicationFiles(createClient(), [path]).catch(() => undefined);
     setAnswer(question, "");
     markSaved({ [question.id]: "" });
     return null;
-  };
-
-  const confirmDelete = async () => {
-    if (!applicationId) return;
-    setDeleting(true);
-    setDeleteError(null);
-    // No save may land after the delete, where it would start a new draft.
-    await autosave.pause();
-    try {
-      const result = await deleteApplication(applicationId);
-      if (!result.ok) {
-        setDeleteError(result.error);
-        autosave.resume();
-        return;
-      }
-      autosave.stop();
-      bypassGuard.current = true;
-      toast.success("Application deleted");
-      router.push(eventHref);
-    } catch {
-      setDeleteError("Your application couldn't be deleted. Try again.");
-      autosave.resume();
-    } finally {
-      setDeleting(false);
-    }
   };
 
   const intro = readOnly
@@ -489,54 +444,18 @@ export function ApplicationForm({
           </ApplicationSection>
 
           {readOnly ? null : (
-            <ApplicationSection
-              id={SECTION.review}
-              number={3}
-              title="Review and submit"
-              description="Once you submit, you can’t edit your answers."
-              complete={editable && answersComplete}
-            >
-              <ReviewSummary
-                window={applicationWindow}
-                opensAt={opensAt}
-                closesAt={closesAt}
-                toFix={toFix}
-                hasErrors={errorIds.length > 0}
-                questions={questions}
-              />
-            </ApplicationSection>
+            <SubmitArea
+              window={applicationWindow}
+              opensAt={opensAt}
+              closesAt={closesAt}
+              toFix={toFix}
+              hasErrors={errorIds.length > 0}
+              questions={questions}
+              submitting={submitting}
+              canSubmit={editable && !submitting}
+              onSubmit={() => void submit()}
+            />
           )}
-
-          {hasDraft ? (
-            <ApplicationSection
-              id={SECTION.settings}
-              number={4}
-              title="Other settings"
-              description="Actions that affect your whole application."
-            >
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:gap-6">
-                <div className="min-w-0 flex-1">
-                  <p className="text-small font-semibold">Delete application</p>
-                  <p className="pt-0.5 text-small text-muted-foreground">
-                    Deletes your draft and all your answers. Once you submit, your
-                    application can’t be deleted.
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="destructive"
-                  className="self-start sm:self-auto"
-                  disabled={submitting || deleting}
-                  onClick={() => {
-                    setDeleteError(null);
-                    setDeleteOpen(true);
-                  }}
-                >
-                  Delete application
-                </Button>
-              </div>
-            </ApplicationSection>
-          ) : null}
         </div>
       </div>
 
@@ -544,19 +463,6 @@ export function ApplicationForm({
         title={`${event.name} application`}
         sections={navigatorSections}
         currentId={currentId}
-      />
-
-      <ConfirmDialog
-        open={deleteOpen}
-        onOpenChange={setDeleteOpen}
-        title="Delete application?"
-        description="This deletes your draft, your answers and any files you uploaded. You can’t undo this."
-        confirmLabel="Delete application"
-        pendingLabel="Deleting…"
-        cancelLabel="Keep draft"
-        pending={deleting}
-        error={deleteError}
-        onConfirm={() => void confirmDelete()}
       />
 
       <ApplicationSubmittedDialog
@@ -569,13 +475,21 @@ export function ApplicationForm({
   );
 }
 
-function ReviewSummary({
+/**
+ * The end of a draft: what is left to answer (each a button that jumps to the
+ * question), or why it can't be submitted yet, then Submit. It shares the
+ * header Submit's handler and state, so both disable and spin together.
+ */
+function SubmitArea({
   window: applicationWindow,
   opensAt,
   closesAt,
   toFix,
   hasErrors,
   questions,
+  submitting,
+  canSubmit,
+  onSubmit,
 }: {
   window: ApplicationWindow;
   opensAt: string | null;
@@ -583,47 +497,64 @@ function ReviewSummary({
   toFix: string[];
   hasErrors: boolean;
   questions: readonly ApplicationQuestion[];
+  submitting: boolean;
+  canSubmit: boolean;
+  onSubmit: () => void;
 }) {
-  if (applicationWindow !== "open") {
-    return (
-      <div className="flex flex-col gap-3">
-        <h3 className="text-subheading">
-          {applicationWindow === "not_open" ? "Applications aren’t open yet" : "Applications closed"}
-        </h3>
-        <p className="text-body text-muted-foreground">
-          {applicationWindow === "not_open"
-            ? `You can submit once applications open${opensAt ? ` ${opensAt}` : ""}.`
-            : `Applications closed${closesAt ? ` ${closesAt}` : ""}, so this draft can’t be submitted.`}
-        </p>
-      </div>
-    );
-  }
-
-  if (toFix.length === 0) {
-    return (
-      <div className="flex flex-col gap-3">
-        <h3 className="text-subheading">Ready to submit</h3>
-        <p className="text-body text-muted-foreground">
-          Everything required is answered. Press Submit at the top when you’re ready.
-        </p>
-      </div>
-    );
-  }
-
+  const headingId = `${SUBMIT_AREA_ID}-heading`;
   const numberOf = new Map(questions.map((question, index) => [question.id, index + 1]));
+  const left = toFix.length;
+
   return (
-    <div className="flex flex-col gap-3">
-      <h3 className="text-subheading">{hasErrors ? "A few things to fix" : "Almost ready"}</h3>
-      <p className="text-body text-muted-foreground">Answer these, then press Submit at the top.</p>
-      <ul className="flex flex-wrap gap-2 pt-1">
-        {toFix.map((id) => (
-          <li key={id}>
-            <Button type="button" variant="secondary" onClick={() => focusQuestion(id)}>
-              Question {numberOf.get(id)}
-            </Button>
-          </li>
-        ))}
-      </ul>
-    </div>
+    <section
+      id={SUBMIT_AREA_ID}
+      aria-labelledby={headingId}
+      className="flex scroll-mt-40 flex-col gap-4 border-t border-border pt-10 sm:pt-14"
+    >
+      <h2 id={headingId} className="sr-only">
+        Submit your application
+      </h2>
+      {applicationWindow !== "open" ? (
+        <div className="flex flex-col gap-1">
+          <p className="text-subheading">
+            {applicationWindow === "not_open" ? "Applications aren’t open yet" : "Applications closed"}
+          </p>
+          <p className="text-body text-muted-foreground">
+            {applicationWindow === "not_open"
+              ? `You can submit once applications open${opensAt ? ` ${opensAt}` : ""}.`
+              : `Applications closed${closesAt ? ` ${closesAt}` : ""}, so this draft can’t be submitted.`}
+          </p>
+        </div>
+      ) : left > 0 ? (
+        <div className="flex flex-col gap-3">
+          <p className="text-subheading">
+            {left} {hasErrors ? "to fix" : "left to answer"}
+          </p>
+          <ul className="flex flex-wrap gap-2" aria-label="Questions to answer">
+            {toFix.map((id) => (
+              <li key={id}>
+                <Button type="button" variant="secondary" onClick={() => focusQuestion(id)}>
+                  Question {numberOf.get(id)}
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+        <Button
+          type="button"
+          className="self-start"
+          onClick={onSubmit}
+          loading={submitting}
+          disabled={!canSubmit}
+        >
+          {submitting ? "Submitting…" : "Submit"}
+        </Button>
+        <p className="text-small text-muted-foreground">
+          Once you submit, you can’t edit your answers.
+        </p>
+      </div>
+    </section>
   );
 }

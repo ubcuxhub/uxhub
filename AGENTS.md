@@ -60,7 +60,8 @@ deletes seed-owned rows the data no longer describes, so a ticket bought through
 the UI is undone by re-running it. Pass `--no-prune` to keep those rows,
 `--dry-run` to preview. Pruning deletes any event or membership tier whose slug
 is not in the seed data, including one created through the admin UI, unless a
-row owned by a hand-made account (a purchase, say) still references it.
+hand-made account holds a purchase, ticket, application, team membership or
+reviewer note on it.
 Purchases, tickets and applications are pruned only when they belong to one of
 the fixture accounts, never to an account created by hand.
 
@@ -72,7 +73,9 @@ in admin screens. Pruning deletes a crowd account the data no longer lists, so
 never sign up with one of those domains.
 
 `pnpm seed --target=prod` writes demo events for admins while the student-facing
-events feature is unlaunched. It never deletes, never writes user fixtures or
+events feature is unlaunched. It never deletes, only updates an event it can
+tell it wrote and nobody has touched since (see `scripts/seed/README.md`,
+"Which events prod writes"), never writes user fixtures or
 membership tiers (admins edit the live tiers in Club Settings), and forces every
 event to `draft` so nothing fabricated is reachable through the
 public API. It reads `SEED_PROD_SUPABASE_URL` and `SEED_PROD_SUPABASE_SECRET_KEY`
@@ -108,7 +111,10 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
 ## Important Patterns
 
 - `src/proxy.ts` refreshes sessions for `/portal/*`, `/admin/*`, `/join/*`
-  (team invite links), and `/api/*`; it does not authorize users.
+  (team invite links), `/api/*`, `/auth/*` (except the callback) and
+  `/events/*`; it does not authorize users. Any route that reads the session
+  with the cookie client belongs in its matcher, since a Server Component
+  can't save a refreshed token.
 - `src/app/(app)/layout.tsx` calls `requireAuth()` and provides the current user.
   `src/app/(app)/(shell)/admin/layout.tsx` adds `requireAdmin()`. Keep access
   control in these server-side guards rather than relying on client UI.
@@ -129,9 +135,20 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
   `children`; each record is a child route (`users/[userId]/page.tsx`,
   `events/(browse)/[event]/page.tsx`) whose content (`RecordView`) opens in a
   side peek drawer over the list, on a row click and on a refresh alike. The
-  `(browse)` group keeps the event builder (`events/[event]/edit`),
-  `check-in`, `review-applications` and `create-new` out of the list layout,
-  as full pages; the builder wears the drawer's top bar (`RecordPageTopBar`).
+  `(browse)` group keeps the event builder (`events/[event]/edit`), the
+  event manager and `create-new` out of the list layout, as full pages. The
+  event manager is a route group, `events/[event]/(manager)/`, whose layout
+  wears the drawer's top bar on every tab (`RecordPage`: close to the list,
+  collapse back into the drawer, and the expand/collapse morph) and renders
+  the event's header and tabs (`TabNav`) around each tab's page: `overview`,
+  `agenda`, `check-in`, `teams` (shown when the event has teams) and
+  `review-applications` (the Applications tab, shown when the event takes
+  applications). The tabs are listed in
+  `src/features/admin/lib/event-manager.ts`; a new tab is a line there plus its
+  page in the group. The builder and the phone scanner
+  (`(scanner)/…/check-in/scan`) stay outside it; the builder opens with a
+  "Back to event" link to the manager's Overview ("Back to Manage Events" on
+  `create-new`).
   Record route components still call `requireAdmin()` before they fetch
   (layouts and pages render in parallel). Every `@flow` page has a canonical
   twin, and no `@flow/(.)admin` route exists; `src/app/flow-routes.test.ts`
@@ -148,9 +165,10 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
   handlers for callbacks, webhooks, uploads, and flows that require an HTTP
   endpoint.
 - Student-facing event and checkout routes use slugs. Admin event routes use
-  event IDs (a slug redirects to the ID): `/admin/events/<id>` is the event's
-  overview (the record drawer, with a quick edit of its status and dates) and
-  `/admin/events/<id>/edit` is the full builder.
+  event IDs (a slug redirects to the ID): `/admin/events/<id>` is the quick
+  peek (the record drawer, with a quick edit of its status and dates), whose
+  expand button opens `/admin/events/<id>/overview`, the event manager's
+  Overview tab; `/admin/events/<id>/edit` is the full builder.
 - Settings are a hash-driven dialog (`#settings/<tab>`), not standalone portal
   pages. Use `openSettings(tab)` from
   `src/features/settings/components/SettingsDialog`.
@@ -228,15 +246,21 @@ Local values belong in the git-ignored `.env.local`.
   production build pushes migrations through. Never put it in `.env.local`
 - Application emails: secret `APPLICATION_EMAILS_SECRET`, set in Vercel's
   Production environment only, matching the `application_emails_secret` Vault
-  secret the pg_cron job signs with (`supabase/README.md`, "Application
-  emails")
+  secret the pg_cron jobs sign with. It also verifies event reminders, whose
+  job signs its own message with it (`supabase/README.md`, "Application
+  emails" and "Event reminder emails")
+- Publication watchdog: secret `EVENT_PUBLICATION_HEALTH_SECRET`, matching the
+  `event_publication_health_secret` Vault secret the `check-event-publication`
+  job signs `/api/internal/event-publication` with (`supabase/README.md`,
+  "Publication watchdog"). Every `/api/internal/*` route checks its job's
+  signature with `verifyCronSignature` from `src/lib/http/cron-signature.ts`
 
 `SQUARE_ENV` is optional and defaults to the sandbox; set it to `production`
 only for production credentials.
 
 Never expose the Supabase secret keys, migrations database URL, Square access
-token, webhook signature key, Resend API key, Sentry auth token, or
-application-emails secret to client components.
+token, webhook signature key, Resend API key, Sentry auth token,
+application-emails secret, or publication health secret to client components.
 
 ## Quality
 
@@ -269,6 +293,11 @@ shadcn bridge). CSS variable names follow `docs/design-system.md` (the Figma
 variable name with the slash turned into a hyphen). Dark mode is
 `data-theme="dark"` on `<html>` (`src/lib/theme.ts`), and density is
 `data-density="compact"`.
+
+Motion tokens live in `src/styles/tokens/motion.css` (durations and easings
+from the Portal Motion handoff in Notion, which is the motion spec). Use the
+`duration-*` and `ease-*` classes or `var(--duration-base)`, never a typed
+millisecond value; `docs/design-system.md` §2.8 has the tables and rules.
 
 Colour classes use one shadcn-style vocabulary. Every shadcn slot keeps
 shadcn's meaning: `bg-background`, `bg-card`, `bg-popover`, `bg-primary`,
@@ -308,6 +337,11 @@ gh pr merge <number> --admin --merge --delete-branch
 - Merge only when the user asked for that pull request (or batch), it has been
   reviewed for correctness, and its CI checks are green.
 - Use a merge commit (`--merge`), not squash or rebase.
+- Before an admin merge of a pull request that adds a migration, check its
+  order against the current `main`, since CI checked it against the `main` of
+  its last run:
+  `git fetch origin main "pull/<n>/head:refs/remotes/origin/pr/<n>"`, then
+  `bash scripts/check-migration-order.sh origin/main origin/pr/<n>`.
 - For stacked pull requests, retarget each dependent one to `main`
   (`gh pr edit <n> --base main`) before deleting the branch it's based on.
 - Other accounts follow the normal review flow.
@@ -315,3 +349,13 @@ gh pr merge <number> --admin --merge --delete-branch
 ## Epics, responsiblity, and timeline
 
 @docs/epics.md
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

@@ -2,6 +2,7 @@
 @import "tw-animate-css";
 @import "../styles/tokens/primitives.css";
 @import "../styles/tokens/semantic.css";
+@import "../styles/tokens/motion.css";
 @import "../styles/marketing.css";
 
 /* Dark mode via `data-theme="dark"` on <html> (see src/lib/theme.ts) */
@@ -140,10 +141,90 @@
   --color-brand-purple-700: var(--colour-purple-700);
 }
 
-/* Every `transition-*` utility uses the design-system curve (§2.8). Tailwind's
-   `ease-out` is the same curve. */
+/* A bare `transition-*` utility enters on `ease-out` at `fast` (§2.8); pick
+   another token with `ease-*` and `duration-*`. Both match Tailwind's own
+   defaults, so this names them rather than changing them. */
 @theme {
-  --default-transition-timing-function: cubic-bezier(0, 0, 0.2, 1);
+  --default-transition-timing-function: var(--ease-out);
+  --default-transition-duration: var(--duration-fast);
+
+  /* Ticket motion (Figma "Ticket motion · Reference"). The 1600ms spin, 6000ms
+     sway and 5000ms sheen are the motion handoff's approved one-off values
+     (section 2e), not tokens. */
+
+  /* The pop-up spins in once, then sways for as long as it's open. */
+  --animate-ticket-enter:
+    ticket-spin 1600ms var(--ease-expressive) both,
+    ticket-sway 6000ms var(--ease-in-out) 1600ms infinite;
+  /* Reduced motion: a plain fade instead of the spin, and no sway. */
+  --animate-ticket-fade: ticket-fade var(--duration-base) var(--ease-out) both;
+  /* A white band sweeps across in the first 40% of the cycle, then rests off
+     the ticket. The band is 45% of the ticket wide, so its -70% → 130% path
+     is -155.56% → 288.89% of its own width. */
+  --animate-ticket-sheen: ticket-sheen 5000ms var(--ease-in-out) infinite both;
+
+  @keyframes ticket-spin {
+    from {
+      transform: rotateY(-720deg) rotateX(10deg) scale(0.9);
+    }
+    to {
+      transform: rotateY(0) rotateX(0) scale(1);
+    }
+  }
+  @keyframes ticket-sway {
+    0%,
+    100% {
+      transform: rotateY(0) rotateX(0);
+    }
+    25% {
+      transform: rotateY(-10deg) rotateX(3deg);
+    }
+    75% {
+      transform: rotateY(10deg) rotateX(-3deg);
+    }
+  }
+  @keyframes ticket-fade {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes ticket-sheen {
+    0% {
+      transform: translateX(-155.56%) rotate(18deg);
+    }
+    40%,
+    100% {
+      transform: translateX(288.89%) rotate(18deg);
+    }
+  }
+}
+
+/* Motion duration tokens as classes (`duration-base`), beside Tailwind's
+   numeric `duration-200`. Prefer the tokens; a number needs the motion guide's
+   "other (explain)" reason. */
+@utility duration-instant {
+  --tw-duration: var(--duration-instant);
+  transition-duration: var(--duration-instant);
+}
+@utility duration-fast {
+  --tw-duration: var(--duration-fast);
+  transition-duration: var(--duration-fast);
+}
+@utility duration-base {
+  --tw-duration: var(--duration-base);
+  transition-duration: var(--duration-base);
+}
+@utility duration-slow {
+  --tw-duration: var(--duration-slow);
+  transition-duration: var(--duration-slow);
+}
+@utility duration-expressive {
+  --tw-duration: var(--duration-expressive);
+  transition-duration: var(--duration-expressive);
+}
+@utility duration-loop {
+  --tw-duration: var(--duration-loop);
+  transition-duration: var(--duration-loop);
 }
 
 /* ── shadcn bridge ──────────────────────────────────────────────────────

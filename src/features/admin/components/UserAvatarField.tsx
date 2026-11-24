@@ -4,8 +4,9 @@ import { useId, useRef, useState } from "react";
 import { ImageUp, Trash2 } from "lucide-react";
 
 import { RecordField } from "@/components/shared/RecordDrawer";
-import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
+import { MemberAvatar } from "@/features/setup/components/MemberAvatar";
+import type { AvatarPreset } from "@/features/setup/lib/options";
 import { createClient } from "@/lib/supabase/client";
 import { BUCKETS } from "@/lib/supabase-helpers/buckets";
 
@@ -32,8 +33,10 @@ export function displayedPhotoUrl(savedPath: string | null | undefined, draft: P
 
 interface UserAvatarFieldProps {
   name: string;
-  /** What the record shows now (see `displayedPhotoUrl`). */
+  /** The photo the record shows now (see `displayedPhotoUrl`). */
   photoUrl: string | null;
+  /** The member's avatar preset, shown when there's no photo. */
+  preset?: AvatarPreset | null;
   disabled?: boolean;
   /** A new file to upload on save (`{ file, preview }`), or `null` to remove the photo on save. */
   onChange: (photo: NonNullable<PhotoDraft> | null) => void;
@@ -42,9 +45,10 @@ interface UserAvatarFieldProps {
 /**
  * The profile photo row while editing a user. Nothing is uploaded until the
  * record is saved: choosing a file stages a preview, and Remove stages the
- * removal.
+ * removal. The preview is `MemberAvatar`'s photo, else preset, else
+ * initials, so a staged removal shows what the record will show once saved.
  */
-export function UserAvatarField({ name, photoUrl, disabled, onChange }: UserAvatarFieldProps) {
+export function UserAvatarField({ name, photoUrl, preset, disabled, onChange }: UserAvatarFieldProps) {
   const inputId = useId();
   const fileInput = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +60,7 @@ export function UserAvatarField({ name, photoUrl, disabled, onChange }: UserAvat
       error={error}
     >
       <div className="flex flex-wrap items-center gap-3">
-        <Avatar key={photoUrl ?? "none"} name={name} src={photoUrl} size={40} decorative />
+        <MemberAvatar name={name} photoUrl={photoUrl} preset={preset} size={40} decorative />
         <Button
           type="button"
           variant="secondary"

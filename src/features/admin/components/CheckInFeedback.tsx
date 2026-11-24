@@ -9,7 +9,7 @@ import type { useItemCheckIn } from "@/features/admin/hooks/use-item-check-in";
 export function CheckInFeedback({ state, eventId }: { state: ReturnType<typeof useItemCheckIn>; eventId: string }) {
   const last = state.lastRefresh ? formatEventTime(state.lastRefresh) : "not refreshed yet";
   if (!state.snapshot.items.length)
-    return <EmptyState title="No check-in items" description="Enable check-in for an agenda item in the event editor." actions={<Button asChild variant="secondary">
+    return <EmptyState title="No check-in items" description="Turn on Check attendees in for an agenda item in the event editor." actions={<Button asChild variant="secondary">
       <Link href={`/admin/events/${eventId}/edit#builder-agenda`}>Open event editor</Link>
     </Button>} />;
   return <>

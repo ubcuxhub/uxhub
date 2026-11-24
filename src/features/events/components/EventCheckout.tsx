@@ -1,17 +1,16 @@
 "use client";
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Alert } from "@/components/ui/alert";
 import {
-  STAFF_TEST_REGISTRATION_LABEL,
-  STAFF_TEST_REGISTRATION_WARNING,
-  allowsStaffTestRegistration,
+  PAID_DRAFT_REGISTRATION_REASON,
+  draftTakesRegistrations,
   isDraftEvent,
 } from "@/features/events/lib/event-visibility";
 import { CheckoutLayout } from "@/components/shared/CheckoutLayout";
 import { useFlowDialog } from "@/components/shared/FlowDialog";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/lib/auth/user-context";
-import { hasActiveMembership } from "@/features/memberships/lib/expiry";
+import { eventPriceFor } from "@/features/events/lib/event-rules";
 import { withReturnTo } from "@/lib/auth/paths";
 import type { EventRow, UserInfoRow } from "@/lib/supabase/models";
 
@@ -34,18 +33,15 @@ export function EventCheckout({
 }: EventCheckoutProps) {
   const { close } = useFlowDialog();
   const { membershipTermEndsAt } = useUser();
-  const isMember = event.pricing_policy === "figma"
-    ? hasActiveMembership(user, membershipTermEndsAt)
-    : Boolean(user.membership_type_id);
-  const price = isMember ? event.member_price : event.regular_price;
+  const { amount: price, isMember } = eventPriceFor(event, user, membershipTermEndsAt);
 
   if (price === null) return <Alert>Registration is unavailable until event pricing is configured.</Alert>;
-  // Only staff can see a draft (RLS). They may test-register on a free one;
-  // a paid draft shows no button, since the database refuses it.
-  const staffTest = isDraftEvent(event);
-  if (staffTest && !allowsStaffTestRegistration(event)) {
-    return <Alert>Paid drafts can’t be test-registered. Make the event free to test registration, or publish it.</Alert>;
-  }
+  // Only admins and managers can see a draft (RLS), and they get the same
+  // checkout a member gets on the published event. The database refuses a
+  // paid draft, so its checkout shows disabled and never loads the card form.
+  const blockedMessage =
+    disabledMessage ??
+    (isDraftEvent(event) && !draftTakesRegistrations(event) ? PAID_DRAFT_REGISTRATION_REASON : null);
 
   const confirmationHref = (purchaseId: string) =>
     withReturnTo(
@@ -69,21 +65,14 @@ export function EventCheckout({
         </Button>
       }
       description={`Review your ticket for ${event.name}.`}
-      notice={staffTest ? (
-        <Alert>
-          <AlertTitle>{STAFF_TEST_REGISTRATION_LABEL}</AlertTitle>
-          <AlertDescription>{STAFF_TEST_REGISTRATION_WARNING}</AlertDescription>
-        </Alert>
-      ) : undefined}
       item={{
         name: event.name,
         details: eventDetails.join(" · "),
         description: event.description,
       }}
       payment={{
-        disabled: disabledMessage !== null,
-        disabledMessage,
-        freeButtonLabel: staffTest ? STAFF_TEST_REGISTRATION_LABEL : undefined,
+        disabled: blockedMessage !== null,
+        disabledMessage: blockedMessage,
         kind: "event_ticket",
         slug,
         successHref: confirmationHref,

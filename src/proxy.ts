@@ -9,6 +9,11 @@ export async function proxy(req: NextRequest) {
   );
   const res = NextResponse.next({ request: { headers: requestHeaders } });
 
+  // The callback exchanges a code for a new session and sets those cookies
+  // itself. Refreshing the old session here too would race it with a second
+  // set of the same cookies.
+  if (req.nextUrl.pathname.startsWith("/auth/callback")) return res;
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -38,11 +43,19 @@ export async function proxy(req: NextRequest) {
   return res;
 }
 
+// Every route that reads the session with the cookie client, so a refresh
+// there can persist its rotated token. A Server Component can't set cookies,
+// so on an unmatched page (the public event page, the auth pages through
+// redirectIfAuthenticated) a refresh would rotate the refresh token without
+// saving it, and the browser's next request would replay a used one, which
+// Supabase answers by revoking the session.
 export const config = {
   matcher: [
     "/admin/:path*",
     "/portal/:path*",
     "/join/:path*",
     "/api/:path*",
+    "/auth/:path*",
+    "/events/:path*",
   ],
 };

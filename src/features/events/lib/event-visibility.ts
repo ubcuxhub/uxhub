@@ -36,22 +36,46 @@ export function showsDraftEventsNote(
 }
 
 /**
- * Whether staff may test-register on this draft: free events only, as
- * `event_ticket_eligibility` enforces (docs/event-states.md, "Drafts for
- * admins"). A paid draft takes no registrations, so no card is ever held.
+ * Whether the database takes registrations on this draft: free events only,
+ * as `event_ticket_eligibility` enforces (docs/event-states.md, "Drafts for
+ * admins"). A paid draft takes none, so no card is ever charged on an
+ * unpublished event. Applying needs no payment, so any draft takes applications.
  */
-export function allowsStaffTestRegistration(
+export function draftTakesRegistrations(
   event: Pick<EventRow, "status" | "regular_price" | "member_price">
 ): boolean {
   return isDraftEvent(event) && event.regular_price === 0 && (event.member_price ?? 0) === 0;
 }
 
-/** The staff test registration button on a draft. */
-export const STAFF_TEST_REGISTRATION_LABEL = "Test registration (staff only)";
+/** Why Register and Confirm are off on a paid draft. */
+export const PAID_DRAFT_REGISTRATION_REASON = "Paid events take registrations once they’re published.";
 
-/** Shown beside every staff test registration control. */
-export const STAFF_TEST_REGISTRATION_WARNING =
-  "This creates a real registration, ticket and $0 purchase. Delete the event or keep it in Draft afterwards; members never see a draft.";
+/** Why Register is off on a draft while the checkout is behind `FLAGS.studentEvents`. */
+export const DRAFT_REGISTRATION_UNLAUNCHED_REASON = "Registration opens once student events launch.";
+
+/** Why Apply is off on a draft while the form is behind `FLAGS.studentEvents`. */
+export const DRAFT_APPLICATION_UNLAUNCHED_REASON = "Applications open once student events launch.";
+
+/**
+ * Which of the registration panel's buttons can't work on this event, and
+ * why: nothing for a published event. A draft shows the same panel a member
+ * sees on the published event, but the checkout and the application form are
+ * behind `studentEvents`, and the database refuses registrations on a paid
+ * draft, so those buttons show disabled with the reason.
+ */
+export function draftRegistrationBlocks(
+  event: Pick<EventRow, "status" | "regular_price" | "member_price">,
+  studentEvents: boolean
+): { register?: string; apply?: string } | undefined {
+  if (!isDraftEvent(event)) return undefined;
+  if (!studentEvents) {
+    return {
+      register: DRAFT_REGISTRATION_UNLAUNCHED_REASON,
+      apply: DRAFT_APPLICATION_UNLAUNCHED_REASON,
+    };
+  }
+  return draftTakesRegistrations(event) ? undefined : { register: PAID_DRAFT_REGISTRATION_REASON };
+}
 
 /** The note shown to staff on the timeline and on a draft's event page. */
 export const DRAFT_EVENTS_NOTE = "Draft events are only visible to admins and managers.";

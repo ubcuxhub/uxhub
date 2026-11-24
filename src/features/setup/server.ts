@@ -2,14 +2,8 @@ import "server-only";
 
 import { redirect } from "next/navigation";
 
-import { requireAuth } from "@/lib/auth/guards";
 import type { UserInfoRow } from "@/lib/supabase/models";
-import { getSetupRedirect, toSetupState, type SetupState } from "./lib/state";
-
-/** The signed-in member's setup state, for the setup page's server component. */
-export async function loadSetupState(): Promise<SetupState> {
-  return toSetupState(await requireAuth());
-}
+import { getSetupRedirect } from "./lib/state";
 
 /**
  * The setup gate's hook. Call it from a gated page (only the portal home, see

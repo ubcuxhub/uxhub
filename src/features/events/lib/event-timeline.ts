@@ -1,8 +1,16 @@
-import type { EventGroup } from "@/features/events/types";
+import type { EventGroup, TimelineEvent } from "@/features/events/types";
 import { formatEventDate, pacificDate } from "@/lib/date";
 import type { EventRow } from "@/lib/supabase/models";
 
-export function groupEventsByMonth(events: EventRow[]): EventGroup[] {
+import { hasEventEnded } from "./event-rules";
+
+/** Just the fields the timeline shows, for passing rows to the client. */
+export function toTimelineEvent(event: TimelineEvent): TimelineEvent {
+  const { id, slug, name, starts_at, ends_at, location_building, location_room, image_url } = event;
+  return { id, slug, name, starts_at, ends_at, location_building, location_room, image_url };
+}
+
+export function groupEventsByMonth(events: TimelineEvent[]): EventGroup[] {
   const groups = new Map<string, EventGroup>();
 
   for (const event of events) {
@@ -25,9 +33,12 @@ export function groupEventsByMonth(events: EventRow[]): EventGroup[] {
   return [...groups.values()];
 }
 
-/** An event is past once it ends, or once it starts if it has no end. */
-export function splitEventsByTime(events: EventRow[], now: Date) {
-  const isPast = (e: EventRow) => Date.parse(e.ends_at ?? e.starts_at!) < now.getTime();
+/**
+ * Dated events split into upcoming (soonest first, as given) and past (most
+ * recent first). An event is past once it ends (`hasEventEnded`).
+ */
+export function splitEventsByTime<E extends Pick<EventRow, "starts_at" | "ends_at">>(events: E[], now: Date) {
+  const isPast = (e: E) => hasEventEnded(e, now);
   const dated = events.filter((e) => e.starts_at);
   return {
     upcomingEvents: dated.filter((e) => !isPast(e)),

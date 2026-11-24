@@ -109,6 +109,15 @@ describe("getPanelSpec", () => {
     expect(spec("reg-checked-in").props).toMatchObject({ ticketState: "used" });
   });
 
+  it("shows an expired ticket once the event ends, checked in or not", () => {
+    expect(spec("reg-past-attended").props).toMatchObject({
+      badge: { status: "past", label: "Ticket expired" },
+      description: "This event has ended.",
+      ticketState: "expired",
+      ticketNote: "No longer valid",
+    });
+  });
+
   it("sends Register and Confirm to the checkout, Apply and Continue to the form", () => {
     const checkout = { kind: "flow", href: "/portal/events/design-sprint/checkout" };
     const form = { kind: "link", href: "/portal/events/design-sprint/apply" };
@@ -118,6 +127,23 @@ describe("getPanelSpec", () => {
     expect(spec("app-draft").props).toMatchObject({
       action: { ...form, label: "Continue application" },
     });
+  });
+
+  it("disables the buttons it's told can't work, with the reason", () => {
+    const unavailable = { register: "No checkout here.", apply: "No form here." };
+    expect(spec("reg-open", { unavailable }).props).toMatchObject({
+      action: { label: "Register", disabledReason: "No checkout here." },
+    });
+    expect(spec("app-accepted", { unavailable }).props).toMatchObject({
+      primary: { label: "Confirm", disabledReason: "No checkout here." },
+    });
+    expect(spec("app-open", { unavailable }).props).toMatchObject({
+      action: { label: "Apply", disabledReason: "No form here." },
+    });
+    expect(spec("app-draft", { unavailable: { register: "No checkout here." } }).props).not.toHaveProperty(
+      "action.disabledReason"
+    );
+    expect(spec("reg-open").props).not.toHaveProperty("action.disabledReason");
   });
 
   it("offers the participant package only when the event has one", () => {

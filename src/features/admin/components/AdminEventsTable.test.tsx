@@ -44,6 +44,7 @@ function row(id: string, name: string, starts_at: string | null, status: EventSt
     event: {
       id, name, starts_at, status,
       max_capacity: 30,
+      reminder_schedule: "off",
       regular_price: 15,
       member_price: 5,
       working_document: null, working_revision: 0, legacy_draft_ids: [], canceled_at: null, cancellation_note: null,

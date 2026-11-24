@@ -3,13 +3,16 @@
 import { revalidatePath } from "next/cache";
 import { requireAuth } from "@/lib/auth/guards";
 import { errorFields, log } from "@/lib/log";
-import { adminUpdateUserInfoById } from "@/lib/supabase-helpers/admin-server";
 import { fetchMembershipTermEndsAt } from "@/lib/supabase-helpers/app-settings";
+import { updateUserTypeIfMembershipUnchanged } from "@/lib/supabase-helpers/setup";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { FACULTIES, YEAR_LEVELS } from "@/lib/constants";
 import type {
   StudentStatus,
   UniversityYear,
+  UserInfoRow,
+  UserInfoUpdate,
   UserType,
 } from "@/lib/supabase/models";
 import { validateFacultyEmail, validateStudentNumber } from "./lib/validation";
@@ -26,6 +29,32 @@ interface UpdateEligibilityInput {
   facultyEmail?: string | null;
 }
 
+const CLASSIFICATION_LOCKED_MESSAGE =
+  "Your membership classification cannot be changed while a membership is active or pending.";
+
+function isFaculty(value: string) {
+  return FACULTIES.includes(value as (typeof FACULTIES)[number]);
+}
+
+/**
+ * Writes eligibility columns only while the membership the caller checked is
+ * still the one on the row (see `updateUserTypeIfMembershipUnchanged`), so a
+ * checkout or webhook landing between the check and the write can't leave a
+ * membership sold for one `user_type` on a row that says another. False when
+ * the membership changed in between.
+ */
+async function writeEligibility(
+  user: UserInfoRow,
+  patch: UserInfoUpdate,
+): Promise<boolean> {
+  return (
+    (await updateUserTypeIfMembershipUnchanged(supabaseAdmin, user, {
+      ...patch,
+      ...userTypeConfirmation(),
+    })) !== null
+  );
+}
+
 export async function updateEligibilityProfileAction(
   input: UpdateEligibilityInput
 ) {
@@ -36,13 +65,24 @@ export async function updateEligibilityProfileAction(
       "Eligibility details cannot be changed while a membership is active."
     );
   }
-  if (!["ubcStudent", "faculty", "nonUbc"].includes(input.userType)) {
+  if (!["ubcStudent", "faculty", "nonUbc"].includes(input?.userType)) {
     throw new Error("Invalid user type.");
+  }
+  // The same faculty list membership join checks; Settings offers it as a
+  // select, so anything else didn't come from the form.
+  const faculty = input.faculty;
+  if (
+    faculty != null &&
+    (typeof faculty !== "string" ||
+      (faculty.trim() !== "" && !isFaculty(faculty.trim())))
+  ) {
+    throw new Error("Select a valid faculty.");
   }
 
   let studentNumber: number | null = null;
   if (input.userType === "ubcStudent") {
-    const rawStudentNumber = input.studentNumber?.trim() ?? "";
+    const rawStudentNumber =
+      typeof input.studentNumber === "string" ? input.studentNumber.trim() : "";
     const error = validateStudentNumber(rawStudentNumber);
     if (error) throw new Error(error);
     studentNumber = Number(rawStudentNumber);
@@ -52,7 +92,10 @@ export async function updateEligibilityProfileAction(
   // profile as incomplete.
   let facultyEmail: string | undefined;
   if (input.userType === "faculty") {
-    const normalized = input.facultyEmail?.trim().toLowerCase() ?? "";
+    const normalized =
+      typeof input.facultyEmail === "string"
+        ? input.facultyEmail.trim().toLowerCase()
+        : "";
     if (
       validateFacultyEmail(normalized) ||
       normalized !== user.email.toLowerCase()
@@ -64,15 +107,16 @@ export async function updateEligibilityProfileAction(
     facultyEmail = normalized;
   }
 
-  await adminUpdateUserInfoById(user.id, {
-    ...buildEligibilityUpdate({
+  const saved = await writeEligibility(
+    user,
+    buildEligibilityUpdate({
       userType: input.userType,
       studentNumber,
-      faculty: input.faculty,
+      faculty,
       facultyEmail,
     }),
-    ...userTypeConfirmation(),
-  });
+  );
+  if (!saved) throw new Error(CLASSIFICATION_LOCKED_MESSAGE);
 }
 
 export type MembershipProfileInput =
@@ -112,12 +156,10 @@ export async function saveMembershipProfileAction(
   try {
     const termEndsAt = await fetchMembershipTermEndsAt(await createClient());
     if (!canEditMembershipClassification(user, termEndsAt)) {
-      return {
-        ok: false,
-        error:
-          "Your membership classification cannot be changed while a membership is active or pending.",
-      };
+      return { ok: false, error: CLASSIFICATION_LOCKED_MESSAGE };
     }
+
+    let saved: boolean;
 
     if (input.audience === "student") {
       const numberError = validateStudentNumber(input.studentNumber);
@@ -131,7 +173,7 @@ export async function saveMembershipProfileAction(
       if (!input.major.trim()) {
         return { ok: false, error: "Enter your major." };
       }
-      await adminUpdateUserInfoById(user.id, {
+      saved = await writeEligibility(user, {
         user_type: "ubcStudent",
         student_number: Number(input.studentNumber),
         faculty: input.faculty,
@@ -140,7 +182,6 @@ export async function saveMembershipProfileAction(
         faculty_email: null,
         school_institution: null,
         student_status: null,
-        ...userTypeConfirmation(),
       });
     } else if (input.audience === "faculty") {
       const normalizedEmail = input.facultyEmail.trim().toLowerCase();
@@ -159,7 +200,7 @@ export async function saveMembershipProfileAction(
       ) {
         return { ok: false, error: "Select a valid faculty." };
       }
-      await adminUpdateUserInfoById(user.id, {
+      saved = await writeEligibility(user, {
         user_type: "faculty",
         faculty_email: normalizedEmail,
         faculty: optionalText(input.faculty),
@@ -168,7 +209,6 @@ export async function saveMembershipProfileAction(
         year: null,
         school_institution: null,
         student_status: null,
-        ...userTypeConfirmation(),
       });
     } else if (input.audience === "non-ubc") {
       const validStatuses: StudentStatus[] = [
@@ -185,7 +225,7 @@ export async function saveMembershipProfileAction(
       if (input.year && !YEAR_LEVELS.includes(input.year)) {
         return { ok: false, error: "Select a valid year." };
       }
-      await adminUpdateUserInfoById(user.id, {
+      saved = await writeEligibility(user, {
         user_type: "nonUbc",
         school_institution: optionalText(input.schoolInstitution),
         student_status: input.studentStatus || null,
@@ -194,10 +234,13 @@ export async function saveMembershipProfileAction(
         student_number: null,
         faculty: null,
         major: null,
-        ...userTypeConfirmation(),
       });
     } else {
       return { ok: false, error: "Select a valid membership classification." };
+    }
+    if (!saved) {
+      log.warn("membership.profile_save_refused", { userId: user.id });
+      return { ok: false, error: CLASSIFICATION_LOCKED_MESSAGE };
     }
 
     revalidatePath("/portal/membership");

@@ -5,7 +5,9 @@ import { Ticket } from "@/components/shared/Ticket";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { StatusBadge } from "@/components/ui/status-badge";
 import type { EventState } from "@/features/events/lib/event-states";
+import { eventEndsAt, eventPriceFor } from "@/features/events/lib/event-rules";
 import {
   getPanelSpec,
   type ActionLayoutProps,
@@ -14,19 +16,16 @@ import {
   type PanelContext,
   type TicketLayoutProps,
 } from "@/features/events/lib/registration-panel";
-import { hasActiveMembership } from "@/features/memberships/lib/expiry";
 import { getMembershipTermEndsAt } from "@/features/memberships/lib/term";
 import { hasApplicationAnswer } from "@/lib/application-response";
 import { formatEventDateLabel, pacificDate } from "@/lib/date";
 import { createClient } from "@/lib/supabase/server";
-import type { EventRow, PurchaseRow, UserInfoRow } from "@/lib/supabase/models";
+import type { EventLinkRow, EventRow, EventTicketRow, PurchaseRow, UserInfoRow } from "@/lib/supabase/models";
 import {
   fetchApplicationQuestions,
   fetchApplicationResponses,
   fetchUserEventApplication,
 } from "@/lib/supabase-helpers/event-applications";
-import { fetchEventLinks } from "@/lib/supabase-helpers/event-links";
-import { fetchUserEventTicket } from "@/lib/supabase-helpers/event-tickets";
 import { fetchPurchaseById } from "@/lib/supabase-helpers/purchases";
 import type { DbClient } from "@/lib/supabase-helpers/types";
 import { cn } from "@/lib/utils";
@@ -52,6 +51,15 @@ interface RegistrationPanelProps {
   event: PanelEvent & { slug: string };
   user: UserInfoRow;
   state: EventState;
+  /** Buttons that can't work here, and why (`draftRegistrationBlocks`). */
+  unavailable?: PanelContext["unavailable"];
+  /**
+   * The event's links the viewer may see (`fetchEventLinks`), which the page
+   * already read; only a ticket holder's participant packages are shown.
+   */
+  links: EventLinkRow[];
+  /** The student's ticket, which the page already read; `null` without one. */
+  ticket: EventTicketRow | null;
 }
 
 /** What the ticket layout draws, beyond its copy. */
@@ -69,39 +77,35 @@ interface TicketView {
  * The Registration card on the portal event page: one of three layouts (an
  * alert, an action, or the ticket) chosen and worded by `getPanelSpec` from
  * the student's event state. A server component, so it draws the ticket's
- * check-in code itself and fetches only what the state needs: the ticket's
- * `qr_token` and participant package for a ticket holder, and a draft's
- * progress.
+ * check-in code itself. The page passes the ticket and links it already read;
+ * the panel fetches only a draft's progress and the club term.
  */
-export async function RegistrationPanel({ event, user, state }: RegistrationPanelProps) {
+export async function RegistrationPanel({ event, user, state, unavailable, links: eventLinks, ticket: ticketRow }: RegistrationPanelProps) {
   const supabase = await createClient();
   const holdsTicket = state.kind === "reg-going" || state.kind === "reg-checked-in";
+  const links = holdsTicket ? eventLinks : [];
 
-  const [links, draftProgress, membershipTermEndsAt, ticketRow] = await Promise.all([
-    holdsTicket ? fetchEventLinks(supabase, event.id) : [],
+  const [draftProgress, membershipTermEndsAt] = await Promise.all([
     state.kind === "app-draft" ? loadDraftProgress(supabase, event.id, user.id) : null,
     event.pricing_policy === "figma" ? getMembershipTermEndsAt() : null,
-    "ticketId" in state && state.ticketId ? fetchUserEventTicket(supabase, event.id, user.id) : null,
   ]);
   // A canceled event's panel says whether their payment came back.
   const refund = state.kind === "canceled" && ticketRow?.purchase_id
     ? refundStatus(await fetchPurchaseById(supabase, ticketRow.purchase_id))
     : null;
 
-  const isMember = event.pricing_policy === "figma"
-    ? hasActiveMembership(user, membershipTermEndsAt)
-    : Boolean(user.membership_type_id);
-  const amount = isMember ? event.member_price : event.regular_price;
+  // The checkout's rule too (EventCheckout), so the two never disagree.
+  const { amount, isMember } = eventPriceFor(event, user, membershipTermEndsAt);
   if (amount === null) return <Alert>Registration is unavailable until event pricing is configured.</Alert>;
   const context: PanelContext = {
     eventName: event.name,
     eventSlug: event.slug,
-    endsAt: event.ends_at ?? event.starts_at,
-    // The checkout's own rule (EventCheckout), so the two never disagree.
+    endsAt: eventEndsAt(event),
     price: { amount, isMember },
     participantPackageUrl: links.find((link) => link.type === "participant_package")?.url ?? null,
     draftProgress,
     refund,
+    unavailable,
   };
   const spec = getPanelSpec(state, context);
 
@@ -157,6 +161,7 @@ function ActionLayout({ title, description, action }: ActionLayoutProps) {
       <div className="flex min-w-0 flex-col gap-1">
         <p className="text-body font-medium">{title}</p>
         {description ? <p className="text-small text-muted-foreground">{description}</p> : null}
+        {action.disabledReason ? <p className="text-small text-muted-foreground">{action.disabledReason}</p> : null}
       </div>
       <PanelButton action={action} className="@max-xl:w-full" />
     </div>
@@ -171,10 +176,12 @@ function ActionLayout({ title, description, action }: ActionLayoutProps) {
  * (Figma "RegistrationTicket").
  */
 function TicketLayout({
+  badge,
   title,
   description,
   priceLine,
   ticketState,
+  ticketNote,
   primary,
   secondary,
   ticket,
@@ -186,19 +193,23 @@ function TicketLayout({
   return (
     <div className="grid gap-4 @4xl:grid-cols-[minmax(0,480px)_444px] @4xl:items-center @4xl:gap-x-10">
       <div className={cn("flex min-w-0 flex-col gap-1 text-body", hasActions && "@4xl:self-end")}>
+        {badge ? <StatusBadge {...badge} className="mb-2 self-start" /> : null}
         {title ? <p className="text-foreground">{title}</p> : null}
         <p className={title ? "text-muted-foreground" : "text-foreground"}>{description}</p>
         {priceLine ? <p className="mt-2 text-small text-muted-foreground">{priceLine}</p> : null}
+        {primary?.disabledReason ? <p className="text-small text-muted-foreground">{primary.disabledReason}</p> : null}
       </div>
 
-      <Ticket
-        className="@4xl:col-start-2 @4xl:row-span-2 @4xl:row-start-1"
-        eventName={ticket.eventName}
-        holderName={ticket.holderName}
-        eventColour={ticket.eventColour ?? undefined}
-        state={ticketState}
-        code={ticket.qrToken ? <QrCode token={ticket.qrToken} className="size-full" /> : null}
-      />
+      <div className="flex flex-col gap-2 @4xl:col-start-2 @4xl:row-span-2 @4xl:row-start-1">
+        <Ticket
+          eventName={ticket.eventName}
+          holderName={ticket.holderName}
+          eventColour={ticket.eventColour ?? undefined}
+          state={ticketState}
+          code={ticket.qrToken ? <QrCode token={ticket.qrToken} className="size-full" /> : null}
+        />
+        {ticketNote ? <p className="text-small text-muted-foreground">{ticketNote}</p> : null}
+      </div>
 
       {hasActions ? (
         <div className="flex flex-col gap-3 @4xl:flex-row @4xl:flex-wrap @4xl:self-start">
@@ -224,6 +235,7 @@ function PanelButton({
   ticket?: TicketView;
 }) {
   const props = { variant, size, className } as const;
+  if (action.disabledReason) return <Button {...props} disabled>{action.label}</Button>;
 
   switch (action.kind) {
     case "flow":

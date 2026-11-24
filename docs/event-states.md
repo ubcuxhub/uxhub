@@ -161,14 +161,14 @@ published.
 - **Portal event page:** admins and managers can open a draft's
   `/portal/events/[slug]` page, even while `FLAGS.studentEvents` is off. It
   shows a "This is a draft event" banner and the saved unfinished sections, and
-  replaces the registration panel with staff test registration
-  (`DraftTestRegistration`): on a free draft, a warning that it creates a real
-  registration and a **Test registration (staff only)** button that opens
-  checkout; on a paid draft, a disabled "Paid drafts can’t be test-registered"
-  button and no way to pay. Once they hold a ticket, the ordinary panel shows
-  it. Checkout is behind `FLAGS.studentEvents`, so while the flag is off the
-  page keeps the disabled "Registration unavailable in draft preview" button
-  (see "Unified saved drafts and staff previews").
+  the same registration panel a member sees on the published event: **Apply**
+  on an event that takes applications, **Register** otherwise, and the ticket
+  once they hold one. Where a button can't work on a draft, it shows disabled
+  with a short reason (`draftRegistrationBlocks`): Register and Confirm on a
+  paid draft ("Paid events take registrations once they’re published"), and
+  Register and Apply while `FLAGS.studentEvents` is off, since the checkout and
+  the application form are behind it (see "Unified saved drafts and staff
+  previews").
 - **Portal timeline:** `/portal/events` lists drafts to admins and managers
   only (`portalEventStatuses`), each with a "Draft event" badge in place of the
   state badge, under a note that only admins and managers see drafts. Search
@@ -180,12 +180,20 @@ published.
 - **Not on the public site:** the public `/events` pages stay active-only. The
   public `/events/[slug]` page is cached and uses the anon client, so it never
   shows a draft; staff preview one at `/events/<slug>?preview=draft`.
-- **Free drafts only:** staff test registration is for free events. On a
-  draft or scheduled event, `event_ticket_eligibility` lets only admins and
-  managers register, and only when the event is free (regular and member
-  price 0) and the amount is $0. Anything else is `EVENT_NOT_ACTIVE`, so a
-  paid draft never gets a purchase or a card hold. The checkout dialog shows
-  the same warning and labels its button **Test registration (staff only)**.
+- **Registering: free drafts only.** On a draft or scheduled event,
+  `event_ticket_eligibility` lets only admins and managers register, and only
+  when the event is free (regular and member price 0) and the amount is $0.
+  Anything else is `EVENT_NOT_ACTIVE`, so a paid draft never gets a purchase or
+  a card hold. The checkout is the one members get; on a paid draft its button
+  is disabled with the same reason, and the card form never loads. On an event
+  that takes applications, registering also needs an accepted, released offer,
+  as on a published one.
+- **Applying: any draft.** The "applications: insert own draft" policy and
+  `submit_event_application` take an application on a draft from
+  `is_admin()` alone, inside the event's application window. Applying costs
+  nothing, so a paid draft takes applications too. Admins review them as any
+  other; an admin's application doesn't stop the draft from being deleted
+  (`event_member_commitments` counts members only).
 - **Enforced on the server:** fulfillment reads events with the service-role
   client, which bypasses RLS. It has to check the buyer's role itself before it
   sells a draft ticket. `initialize_event_checkout` and `reserve_event_ticket`
@@ -193,9 +201,10 @@ published.
 
 Preview deploys share the production database (the free plan has no branching),
 so registrations and check-ins made on a test draft are real production rows.
-Keep the event in Draft afterwards, or delete it: a staff member's $0 test
-purchase on a draft is not a live purchase, so a draft with only staff test
-registrations deletes, taking its tickets and dead purchases with it.
+Keep the event in Draft afterwards, or delete it: a staff member's $0
+purchase on a draft is not a live purchase, so a draft with only staff
+registrations and applications deletes, taking its tickets, applications and
+dead purchases with it.
 
 The portal event page and checkout read the event under the viewer's RLS, so
 staff reach drafts and members get a 404. Fulfillment
@@ -274,6 +283,19 @@ out-of-order deliveries change nothing. `purchases.status` stays `completed`.
   refuses its ticket, so no ticket is ever issued for it.
 
 Purchase history shows "Refunded" or "Partially refunded" from the amount.
+
+**Refund email.** Once the amount is recorded, the buyer gets one email per
+`COMPLETED` refund (ticket or membership, full or partial; never a pending,
+failed or rejected one): the amount, whether it was full or partial, the 5–10
+business days a bank takes, "Your ticket … is no longer valid" when the ticket
+is gone, and a link to their purchase history. `purchase_refund_emails` keys
+each send on Square's refund ID: every webhook pass that sees the refund tries,
+an atomic claim on `email_attempted_at` lets one send, a failed send releases
+the claim for the next delivery, and `email_sent_at` ends it. The send runs
+after the response and never fails the webhook (`payment.refund_email_failed`
+at `warn`). Refunds that last changed more than seven days ago are not
+emailed, so a refund from before these emails existed stays quiet when a later
+refund on the same payment arrives.
 
 ## Admin: application
 
@@ -370,10 +392,14 @@ supabase/README.md, "Application emails"):
   changes after release (waitlisted to accepted, accepted to rejected) sends
   the new one. A new deadline on the same offer sends no new acceptance, but
   gets its own reminder.
-- Nothing is sent for a canceled event, a draft (unpublished) event, an event
-  that has ended, an event that no longer requires applications, a deleted
-  account, or an applicant who already has a ticket. Before release nothing is
-  sent, so decisions changed before then send only the final one.
+- Nothing is sent for a canceled event, an event that has ended, an event that
+  no longer requires applications, a deleted account, or an applicant who
+  already has a ticket. Before release nothing is sent, so decisions changed
+  before then send only the final one.
+- A draft (unpublished) event emails staff (admins and managers) only, so
+  execs can test the whole flow before publishing. A member's decision on an
+  event that went back to Draft isn't sent: the page it links to is a 404 to
+  them.
 - No email when an offer expires, and none when an application is submitted.
 - Decisions released before the job shipped were marked sent when it
   deployed, so nobody got an email for them.
@@ -387,8 +413,10 @@ Drafts belong to the applicant alone:
   names one of their uploads). It records `submitted_at`, which the review
   list sorts by.
 - Answers and uploaded files can change only while the application is a
-  draft. The applicant may delete their draft; nobody can delete a submitted
-  one.
+  draft. The apply page offers no way to delete a draft: it holds no spot and
+  admins never see it, so an applicant who changes their mind just leaves it.
+  RLS still lets the applicant delete their own draft; nobody can delete a
+  submitted one.
 - Admins never see drafts: RLS hides them and their answers and files, the
   review list and its counts leave them out, and no decision can move one.
   Drafts hold no seat.
@@ -415,7 +443,7 @@ register.
 | `reg-going` | Going | They have a ticket |
 | `reg-checked-in` | Checked in | A check-in on their ticket is active ([below](#multi-day-check-in)) |
 | `reg-past` | Past | The event has ended and they had no ticket |
-| `reg-past-attended` | Past | The event has ended and they had a ticket |
+| `reg-past-attended` | Past | The event has ended and they had a ticket, checked in or not. It shows the expired ticket |
 | `app-upcoming` | Opens Oct 12 | Before `registration_opens_at`, for an application event |
 | `app-open` | Applications open | Applications are open and they haven't started one |
 | `app-draft` | Draft | Their application is a `draft`, and applications are open |
@@ -425,7 +453,7 @@ register.
 | `app-rejected` | Not selected | Their application is `rejected` |
 | `app-missed` | Applications closed | Applications closed and they never started one |
 | `app-draft-expired` | Applications closed | Applications closed before their draft was submitted |
-| `app-offer-expired` | Applications open, or Applications closed | Accepted, but the deadline passed without registering; the badge follows the window |
+| `app-offer-expired` | Offer expired | Accepted, but the deadline passed without registering. They can't reapply, so the badge doesn't follow the window |
 
 - **The close** is `registration_closes_at`. When it's empty, registration for
   an event without applications stays open until the event starts (a UI rule:
@@ -531,6 +559,19 @@ The server makes these changes through `create_team`, `join_team`,
 `leave_team` and `delete_team`, which return why a change was refused
 (`NO_TICKET`, `TEAMS_LOCKED`, `TEAM_FULL`, ...) instead of failing.
 
+### Admins: teams
+
+The event's Teams view (`fetchEventTeamsOverview`, `EventTeamsView`) counts:
+
+- **Going**: everyone holding a ticket. **On a team**: the going people on a
+  team, so it never exceeds Going. **To place**: going people on no team.
+- **Full**: a team at `max_team_size`. With no limit, no team is full.
+- **Checked in**: a ticket holder with a check-in time on any of the event's
+  check-in items, whichever and however many. A team is "Everyone checked in"
+  when it has a member holding a ticket and every member holding one is
+  checked in; a member without a ticket doesn't count either way.
+- **Locked**: from `team_deadline` on; with no deadline, never.
+
 ## Seats
 
 Seats taken = tickets + accepted offers that haven't expired and have no ticket
@@ -575,7 +616,7 @@ Active membership requires both personal expiry and club-term checks. Existing
 legacy events retain their policy/amounts on unrelated saves; explicitly changing
 pricing configuration converts an eligible event. The temporary pricing
 publication/scheduling/registration blockers have been removed. Staff may still
-test-register on free drafts (see "Drafts for admins"); ordinary required-field,
+register on free drafts (see "Drafts for admins"); ordinary required-field,
 authorization and pricing locks remain.
 
 `initialize_event_checkout` snapshots paid prices under the event lock. A zero

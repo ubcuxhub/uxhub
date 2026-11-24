@@ -39,7 +39,7 @@ export function TicketDialog({ trigger, dateLabel, ...ticket }: TicketDialogProp
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col items-center gap-14 px-6 pt-14 pb-9 sm:px-12 sm:pb-10">
-          <EventTicket {...ticket} />
+          <EventTicket {...ticket} entrance />
           <p className="text-center text-small text-muted-foreground">
             Show this code at check-in.
           </p>

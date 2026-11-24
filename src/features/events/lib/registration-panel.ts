@@ -1,5 +1,6 @@
 import { CalendarX, CircleMinus, Hourglass, Lock, type LucideIcon } from "lucide-react";
 
+import type { StatusBadgeSpec } from "@/components/ui/status-badge";
 import { formatEventDate, formatEventTime } from "@/lib/date";
 
 import type { EventState } from "./event-states";
@@ -11,8 +12,11 @@ import type { EventState } from "./event-states";
  * state's copy is tested without rendering; `RegistrationPanel` draws it.
  */
 
-/** A button the panel shows, and where it goes. */
-export type PanelAction = { label: string } & (
+/**
+ * A button the panel shows, and where it goes. With a `disabledReason` the
+ * button shows disabled, and the panel says why.
+ */
+export type PanelAction = { label: string; disabledReason?: string } & (
   /** The checkout dialog, opened over the page. */
   | { kind: "flow"; href: string }
   /** An in-app page. */
@@ -39,13 +43,17 @@ export interface ActionLayoutProps {
 }
 
 export interface TicketLayoutProps {
+  /** A status badge above the copy: "Ticket expired" once the event ends. */
+  badge?: StatusBadgeSpec;
   /** Left out when the copy has no title: the description stands alone. */
   title?: string;
   description: string;
   /** What the price will be, before they've paid: "CA$15.00 for non-members". */
   priceLine?: string;
-  /** `locked` until they register; `used` once checked in. */
-  ticketState: "active" | "used" | "locked";
+  /** `locked` until they register; `used` once checked in; `expired` once the event ends. */
+  ticketState: "active" | "used" | "locked" | "expired";
+  /** A line under the ticket: "No longer valid" on an expired one. */
+  ticketNote?: string;
   primary?: PanelAction;
   secondary?: PanelAction;
 }
@@ -79,6 +87,13 @@ export interface PanelContext {
    * nothing or hold no ticket.
    */
   refund?: "refunded" | "not-refunded" | null;
+  /**
+   * Why the checkout (`register`: Register and Confirm) or the application
+   * form (`apply`: Apply and Continue) can't be opened here, when it can't:
+   * a draft's, from `draftRegistrationBlocks`. Their buttons show disabled,
+   * with the reason.
+   */
+  unavailable?: { register?: string; apply?: string };
 }
 
 /** The canceled panel's copy (docs/event-states.md, "Canceled events"). */
@@ -113,11 +128,13 @@ export function getPanelSpec(state: EventState, context: PanelContext): PanelSpe
     kind: "flow",
     label: "Register",
     href: `/portal/events/${eventSlug}/checkout`,
+    ...(context.unavailable?.register ? { disabledReason: context.unavailable.register } : {}),
   };
   const apply = (label: string): PanelAction => ({
     kind: "link",
     label,
     href: `/portal/events/${eventSlug}/apply`,
+    ...(context.unavailable?.apply ? { disabledReason: context.unavailable.apply } : {}),
   });
   const ticketActions = {
     primary: { kind: "view-ticket", label: "View ticket" } as PanelAction,
@@ -230,9 +247,12 @@ export function getPanelSpec(state: EventState, context: PanelContext): PanelSpe
         subheading: "1 ticket",
         layout: "ticket",
         props: {
+          // Everyone with a ticket sees this once the event ends, checked in or not.
+          badge: { status: "past", label: "Ticket expired" },
           title: `Thanks for coming to ${eventName}`,
-          description: "The event has ended",
-          ticketState: "active",
+          description: "This event has ended.",
+          ticketState: "expired",
+          ticketNote: "No longer valid",
         },
       };
     case "app-upcoming":

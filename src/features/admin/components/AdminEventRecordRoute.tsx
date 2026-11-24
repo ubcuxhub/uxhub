@@ -1,9 +1,11 @@
 import { RecordNotFound } from "@/components/shared/RecordDrawer";
 import { AdminEventRecord } from "@/features/admin/components/AdminEventRecord";
+import { countCheckedInTickets } from "@/features/admin/lib/event-registrations";
 import { findAdminEventId } from "@/features/admin/lib/resolve-event-param";
 import { requireAdmin } from "@/lib/auth/guards";
 import { FLAGS } from "@/lib/flags";
 import { createClient } from "@/lib/supabase/server";
+import { fetchCheckInStatuses } from "@/lib/supabase-helpers/check-ins";
 import { fetchEventApplicationStatusCounts } from "@/lib/supabase-helpers/event-applications";
 import { fetchEventSeatCounts } from "@/lib/supabase-helpers/event-tickets";
 import { fetchEventById } from "@/lib/supabase-helpers/events";
@@ -25,10 +27,11 @@ export async function AdminEventRecordRoute({ eventParam }: { eventParam: string
   const eventId = await findAdminEventId(supabase, eventParam);
   if (!eventId) return <RecordNotFound noun="event" />;
 
-  const [event, seatCounts, applications] = await Promise.all([
+  const [event, seatCounts, applications, checkIns] = await Promise.all([
     fetchEventById(supabase, eventId),
     fetchEventSeatCounts(supabase, [eventId]),
     fetchEventApplicationStatusCounts(supabase, eventId),
+    fetchCheckInStatuses(supabase, eventId),
   ]);
   if (!event) return <RecordNotFound noun="event" />;
 
@@ -39,9 +42,11 @@ export async function AdminEventRecordRoute({ eventParam }: { eventParam: string
       event={event}
       seats={{
         tickets: seats?.tickets ?? 0,
-        seatsLeft: seats?.seatsLeft ?? event.max_capacity ?? 0,
+        heldOffers: seats?.heldOffers ?? 0,
+        seatsLeft: seats?.seatsLeft ?? event.max_capacity,
       }}
-      applications={applications}
+      checkedIn={countCheckedInTickets(checkIns)}
+      applications={event.requires_application ? applications : null}
       now={new Date().toISOString()}
       publicPages={FLAGS.studentEvents}
     />

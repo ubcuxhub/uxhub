@@ -34,7 +34,7 @@ import {
 } from "@/components/ui/segmented-toggle";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
-import { ApplicantInfoCard } from "@/features/admin/components/ApplicantInfoCard";
+import { ApplicantProfileCard } from "@/features/admin/components/ApplicantProfileCard";
 import { ApplicantPager } from "@/features/admin/components/ApplicantPager";
 import { ApplicationResponseCard } from "@/features/admin/components/ApplicationResponseCard";
 import { ReviewStateBadge } from "@/features/admin/components/ReviewStateBadge";
@@ -61,15 +61,20 @@ import {
 import { LIFT, Panel } from "./frame";
 import type { Components } from "./types";
 
+/** A long name and email that wrap, and a profile with gaps ("—"). */
 function Applicant() {
   return (
     <div className={`rounded-xl ${LIFT} [&>[data-slot=card]]:border-border-subtle`}>
-      <ApplicantInfoCard
-        name="Priya Raman"
-        email="priya.raman@student.ubc.ca"
-        applicationDate="2026-10-28T19:42:00Z"
-        state="accepted"
-        offerExpiresAt="2026-11-14T23:59:00-08:00"
+      <ApplicantProfileCard
+        applicant={{
+          name: "Maximiliano Fernández-Castellanos",
+          email: "maximiliano.fernandez-castellanos@alumni.ubc.ca",
+          program: null,
+          year: null,
+          studentStatus: null,
+          membership: null,
+        }}
+        submittedAt="2026-11-06T22:14:00Z"
       />
     </div>
   );

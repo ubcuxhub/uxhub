@@ -539,6 +539,7 @@ export function useEventForm({
           member_price: state.pricing_mode === "legacy" ? Number(state.member_price) : 0,
         } : {}),
         max_capacity: Number(state.max_capacity),
+        reminder_schedule: state.reminder_schedule,
         created_at: state.created_at || new Date().toISOString(),
         location_building: state.location_building || undefined,
         location_room: state.location_room || undefined,

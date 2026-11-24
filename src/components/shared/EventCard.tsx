@@ -40,8 +40,10 @@ export interface EventCardProps
  * Tab stop. The title names the link and the dates and status describe it, so
  * three "Portfolio Review" sessions are told apart when a screen reader reads
  * the link (the name stays the title, so headings and link lists stay short). It
- * never lifts: hover only changes the fill. On phones the thumbnail moves above
- * the text. A thumbnail that fails to load falls back to the calendar tile.
+ * never lifts: hover only changes the fill. From `sm` up the thumbnail is a
+ * square beside the text; on phones it stacks above the text as a full-width
+ * square, so the whole square crop shows. A thumbnail that fails to load falls
+ * back to the calendar tile, in the same shape.
  */
 function EventCard({
   title,
@@ -72,6 +74,7 @@ function EventCard({
     <article
       data-slot="event-card"
       className={cn(
+        // Phones: the thumbnail (last in the DOM, after the link) shows on top.
         "relative flex flex-col-reverse gap-4 rounded-lg border bg-card p-4 transition-colors duration-150 hover:bg-section has-[a:focus-visible]:focus-ring sm:flex-row sm:items-center sm:gap-6 sm:p-5",
         className,
       )}
@@ -104,7 +107,7 @@ function EventCard({
       <div
         data-slot="event-card-thumbnail"
         aria-hidden
-        className="flex h-35 w-full shrink-0 items-center justify-center overflow-hidden rounded-3xl bg-muted sm:size-40"
+        className="flex aspect-square w-full shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-muted sm:size-40 sm:rounded-3xl"
       >
         {image && showImage ? (
           // eslint-disable-next-line @next/next/no-img-element

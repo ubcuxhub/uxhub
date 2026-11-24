@@ -1,5 +1,7 @@
 import type { User } from "@supabase/supabase-js";
 
+import { AUTH_ERROR_MESSAGES } from "@/lib/auth/auth-error";
+import { log } from "@/lib/log";
 import { createClient } from "@/lib/supabase/server";
 import {
   adminFindUserInfoByEmail,
@@ -7,14 +9,34 @@ import {
   adminUpdateUserInfoById,
 } from "@/lib/supabase-helpers/admin-server";
 import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";
-import { getUserNameFromMetadata } from "@/lib/user-name";
+import { getPartialUserNameFromMetadata } from "@/lib/user-name";
 
 export type EnsureUserInfoResult =
   | { status: "ok" }
-  | { status: "conflict"; message: string };
+  /**
+   * Neither the caller nor the auth metadata supplied both names, e.g. a
+   * Google account with a one-word name. Recoverable: the caller sends the
+   * user to `/auth/complete-profile` to type them.
+   */
+  | { status: "missing_name" }
+  | { status: "conflict"; reason: ProfileConflictReason; message: string };
 
-const LINKED_ELSEWHERE_MESSAGE =
-  "An account with this email is already linked to another sign-in method.";
+export type ProfileConflictReason = "missing_email" | "linked_elsewhere";
+
+/**
+ * Stable log events for a conflict, so callers can log the cause without the
+ * member-facing message. Each caller logs it once, with its own context.
+ */
+export const PROFILE_CONFLICT_EVENTS: Record<ProfileConflictReason, string> = {
+  missing_email: "auth.profile_missing_email",
+  linked_elsewhere: "auth.profile_linked_elsewhere",
+};
+
+const LINKED_ELSEWHERE: EnsureUserInfoResult = {
+  status: "conflict",
+  reason: "linked_elsewhere",
+  message: AUTH_ERROR_MESSAGES.linked_elsewhere,
+};
 
 /**
  * Guarantees the signed-in auth user has a `user_info` profile row.
@@ -26,7 +48,7 @@ const LINKED_ELSEWHERE_MESSAGE =
  * belongs to a different auth user is a conflict the caller must surface.
  *
  * Callers get a result instead of an exception because each entry point has a
- * different destination for the conflict case.
+ * different destination for the conflict and missing-name cases.
  */
 export async function ensureUserInfo(
   authUser: User,
@@ -48,19 +70,21 @@ export async function ensureUserInfo(
   if (!normalizedEmail) {
     return {
       status: "conflict",
-      message: "Your account is missing an email address.",
+      reason: "missing_email",
+      message: AUTH_ERROR_MESSAGES.missing_email,
     };
   }
 
-  const metadataName = getUserNameFromMetadata(authUser.user_metadata ?? {});
-  const firstName = overrides?.firstName?.trim() || metadataName?.first_name;
-  const lastName = overrides?.lastName?.trim() || metadataName?.last_name;
+  const metadataName = getPartialUserNameFromMetadata(
+    authUser.user_metadata ?? {},
+  );
+  const firstName = overrides?.firstName?.trim() || metadataName.first_name;
+  const lastName = overrides?.lastName?.trim() || metadataName.last_name;
 
   if (!firstName || !lastName) {
-    return {
-      status: "conflict",
-      message: "Your account is missing a first or last name.",
-    };
+    // Expected for some OAuth accounts, so `warn`: the user can fix it.
+    log.warn("auth.profile_name_missing", { authUserId: authUser.id });
+    return { status: "missing_name" };
   }
 
   const payload = {
@@ -77,7 +101,7 @@ export async function ensureUserInfo(
       existingByEmail.auth_user_id &&
       existingByEmail.auth_user_id !== authUser.id
     ) {
-      return { status: "conflict", message: LINKED_ELSEWHERE_MESSAGE };
+      return LINKED_ELSEWHERE;
     }
 
     await adminUpdateUserInfoById(existingByEmail.id, payload);
@@ -110,7 +134,7 @@ export async function ensureUserInfo(
       racedByEmail.auth_user_id &&
       racedByEmail.auth_user_id !== authUser.id
     ) {
-      return { status: "conflict", message: LINKED_ELSEWHERE_MESSAGE };
+      return LINKED_ELSEWHERE;
     }
 
     if (!racedByEmail.auth_user_id) {

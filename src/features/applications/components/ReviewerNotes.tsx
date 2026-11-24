@@ -58,6 +58,7 @@ export interface ReviewerNoteAuthor {
   id: string;
   /** Full name. Ignored when `deleted`. */
   name: string;
+  /** Their photo, else their avatar preset's art; none shows initials. */
   avatarUrl?: string | null;
   /** The account was deleted (`user_info.deleted_at` is set). */
   deleted?: boolean;

@@ -107,6 +107,8 @@ describe("updateManagerUserAction: the column allowlist", () => {
     "membership_pre_ordered_type_id",
     "square_customer_id",
     "created_at",
+    // Only saveManagerUserDetailsAction writes it, with its own checks.
+    "email",
   ])("refuses to write the unlisted column %s", async (field) => {
     await expect(
       updateManagerUserAction("user-1", field, "anything"),
@@ -121,7 +123,6 @@ describe("updateManagerUserAction: the column allowlist", () => {
   it.each([
     "first_name",
     "last_name",
-    "email",
     "phone",
     "newsletter",
     "student_number",
@@ -1079,6 +1080,28 @@ describe("saveManagerUserDetailsAction", () => {
     expect(saveAdminProfile).toHaveBeenCalledWith(expect.anything(), "user-1", { first_name: "Jamie" });
   });
 
+  it("normalizes a corrected email on a profile nobody signs in to yet", async () => {
+    fetchActiveProfile.mockResolvedValue({ auth_user_id: null, email: "typo@exmaple.com" });
+    await saveManagerUserDetailsAction("user-1", { email: "  Member@Example.com " });
+    expect(saveAdminProfile).toHaveBeenCalledWith(expect.anything(), "user-1", { email: "member@example.com" });
+  });
+
+  it.each([
+    [{ auth_user_id: "auth-1", email: "member@example.com" }, "someone@example.com", "signs in with this email"],
+    [{ auth_user_id: null, email: "member@example.com" }, "not an email", "valid email"],
+    [{ auth_user_id: null, email: "member@example.com" }, 42, "valid email"],
+  ])("refuses an email change on %j to %j", async (profile, email, message) => {
+    fetchActiveProfile.mockResolvedValue(profile);
+    await expect(saveManagerUserDetailsAction("user-1", { first_name: "Jamie", email })).rejects.toThrow(message);
+    expect(saveAdminProfile).not.toHaveBeenCalled();
+  });
+
+  it("ignores an unchanged sign-in email", async () => {
+    fetchActiveProfile.mockResolvedValue({ auth_user_id: "auth-1", email: "member@example.com" });
+    await saveManagerUserDetailsAction("user-1", { first_name: "Jamie", email: "Member@example.com" });
+    expect(saveAdminProfile).toHaveBeenCalledWith(expect.anything(), "user-1", { first_name: "Jamie" });
+  });
+
   it("requires manager access before any write", async () => {
     guards.requireManager.mockRejectedValueOnce(new Error("Forbidden"));
     await expect(saveManagerUserDetailsAction("user-1", { first_name: "Jamie" })).rejects.toThrow("Forbidden");
@@ -1088,7 +1111,7 @@ describe("saveManagerUserDetailsAction", () => {
 
 
 describe("overview write validation", () => {
-  it.each([{ short_description: "x".repeat(51) }, { description: "x".repeat(3001) }])("enforces the same limits on the server", fields => expect(saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, ...fields } })).rejects.toThrow(/character limit/));
+  it.each([{ short_description: "x".repeat(121) }, { description: "x".repeat(3001) }])("enforces the same limits on the server", fields => expect(saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, ...fields } })).rejects.toThrow(/character limit/));
   it("rejects unsafe rich links before persistence", async () => {
     await expect(saveAdminEventAction({ ...saveInput, event: { description: "Link", description_rich: [{ type: "paragraph", spans: [{ text: "Link", href: "javascript:alert(1)" }] }] } })).rejects.toThrow(/formatting/);
     expect(adminRpc).not.toHaveBeenCalled();

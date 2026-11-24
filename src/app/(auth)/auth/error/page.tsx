@@ -1,10 +1,11 @@
 import { AuthMessage } from "@/features/auth/components/AuthMessage";
+import { authErrorMessage } from "@/lib/auth/auth-error";
 import { getSafeInternalPath } from "@/lib/auth/paths";
 
 export default async function Page({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string; next?: string }>;
+  searchParams: Promise<{ code?: string; next?: string }>;
 }) {
   const params = await searchParams;
   const nextPath = getSafeInternalPath(params.next);
@@ -19,10 +20,8 @@ export default async function Page({
   return (
     <AuthMessage
       title="Sorry, something went wrong."
-      description={
-        params.error ||
-        "We couldn't complete authentication. Please try signing in again."
-      }
+      // Fixed copy chosen by code, never URL text (see auth-error.ts).
+      description={authErrorMessage(params.code)}
       backLink={backLink}
     />
   );

@@ -30,10 +30,14 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 import { POST } from "@/app/api/profile-photo/route";
-import { saveMembershipProfileAction } from "@/features/memberships/actions";
+import {
+  saveMembershipProfileAction,
+  updateEligibilityProfileAction,
+} from "@/features/memberships/actions";
 import { USER_TYPE_LOCKED_MESSAGE } from "./lib/state";
 import {
   finishSetupAction,
+  saveBirthDateAction,
   saveSetupAboutAction,
   saveSetupDietaryAction,
   saveSetupPhotoAction,
@@ -176,13 +180,41 @@ describe("member setup against local Supabase", () => {
     expect((await fetchUserSetup(db, other.id)).diets).toEqual([]);
   }));
 
+  it("saves, clears and refuses birthdays on the member's own row only", () => withFixtures(async (fixtures) => {
+    const other = await fixtures.createUser();
+    const member = await signUp(fixtures);
+
+    // Saving a birthday leaves the step where it was.
+    expect(await saveBirthDateAction({ birthDate: "2000-02-29" })).toMatchObject({
+      step: "about",
+      birthDate: "2000-02-29",
+    });
+    expect(await fetchUserSetup(db, member.id)).toMatchObject({ birth_date: "2000-02-29", setup_step: "about" });
+
+    // Refused dates change nothing, with the admin record's messages.
+    await expect(saveBirthDateAction({ birthDate: "2999-01-01" })).rejects.toThrow("Birth date cannot be in the future.");
+    await expect(saveBirthDateAction({ birthDate: "2001-02-29" })).rejects.toThrow("Enter a valid birth date.");
+    await expect(saveBirthDateAction({ birthDate: "incomplete" })).rejects.toThrow("Enter a valid birth date.");
+    expect((await fetchUserSetup(db, member.id)).birth_date).toBe("2000-02-29");
+
+    // The step it reports is what's stored, and later saves read it afresh.
+    await nextRequest(member.id);
+    await saveSetupAboutAction({ userType: "ubcStudent" });
+    expect((await saveBirthDateAction({ birthDate: "" })).birthDate).toBeNull();
+    expect(await fetchUserSetup(db, member.id)).toMatchObject({ birth_date: null, setup_step: "dietary" });
+
+    // Members still can't write it themselves, and nobody else's row moved.
+    await expect(updateUserSetup(clientAs(member), member.id, { birth_date: "2000-01-01" })).rejects.toBeTruthy();
+    expect((await fetchUserSetup(db, other.id)).birth_date).toBeNull();
+  }));
+
   it("changes the user type without a membership, clearing the old type's details", () => withFixtures(async (fixtures) => {
     // Its own tier, made before the member who references it: CI's database is unseeded.
     const tier = (await fixtures.createMembershipType()).id;
     const member = await signUp(fixtures);
     // A lapsed membership no longer holds the type.
     await setColumns(member.id, {
-      student_number: 12345678,
+      student_number: 37201946,
       faculty: "Faculty of Arts",
       major: "Design",
       year: "2",
@@ -243,10 +275,57 @@ describe("member setup against local Supabase", () => {
     expect(saved.user_type_confirmed_at).not.toBeNull();
   }));
 
+  it("doesn't change eligibility in Settings or membership join after a membership lands mid-request", () => withFixtures(async (fixtures) => {
+    const tier = await fixtures.createMembershipType();
+    const member = await signUp(fixtures);
+    await setColumns(member.id, { student_number: 37201946, faculty: "Faculty of Science" });
+    await nextRequest(member.id);
+    // A checkout completes after this request loaded the row.
+    await setColumns(member.id, { membership_pre_ordered_type_id: tier.id });
+
+    await expect(updateEligibilityProfileAction({
+      userType: "nonUbc",
+    })).rejects.toThrow("cannot be changed while a membership is active or pending");
+    expect(await saveMembershipProfileAction({
+      audience: "non-ubc",
+      schoolInstitution: "SFU",
+      studentStatus: "",
+      year: "",
+    })).toMatchObject({ ok: false });
+
+    const { data: row } = await db.from("user_info").select("*").eq("id", member.id).single();
+    expect(row).toMatchObject({ user_type: "ubcStudent", student_number: 37201946, faculty: "Faculty of Science" });
+  }));
+
+  it("only stores a faculty from the list when Settings saves eligibility", () => withFixtures(async (fixtures) => {
+    const member = await signUp(fixtures);
+    for (const faculty of ["x".repeat(5000), 42 as unknown as string]) {
+      await expect(updateEligibilityProfileAction({
+        userType: "ubcStudent",
+        studentNumber: "37201946",
+        faculty,
+      })).rejects.toThrow("Select a valid faculty.");
+    }
+    await updateEligibilityProfileAction({ userType: "ubcStudent", studentNumber: "37201946", faculty: "Faculty of Science" });
+    const { data: row } = await db.from("user_info").select("student_number, faculty").eq("id", member.id).single();
+    expect(row).toEqual({ student_number: 37201946, faculty: "Faculty of Science" });
+  }));
+
+  it("keeps the free tags execs added when the member finishes setup", () => withFixtures(async (fixtures) => {
+    const member = await signUp(fixtures);
+    await setColumns(member.id, { interests: ["Figma whiz", "uxathon"] });
+    await nextRequest(member.id);
+
+    const done = await finishSetupAction({ interests: ["ux-research"] });
+    expect(done.interests).toEqual(["Figma whiz", "ux-research"]);
+    expect((await fetchUserSetup(db, member.id)).interests).toEqual(["Figma whiz", "ux-research"]);
+  }));
+
   it("requires a signed-in member", () => withFixtures(async () => {
     session.member = null;
     await expect(skipSetupStepAction("dietary")).rejects.toThrow("No member signed in");
     await expect(finishSetupAction({ interests: [] })).rejects.toThrow("No member signed in");
     await expect(saveSetupAboutAction({ userType: "faculty" })).rejects.toThrow("No member signed in");
+    await expect(saveBirthDateAction({ birthDate: "2000-01-01" })).rejects.toThrow("No member signed in");
   }));
 });

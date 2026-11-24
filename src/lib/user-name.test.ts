@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   formatUserName,
+  getPartialUserNameFromMetadata,
   getUserNameFromMetadata,
   splitUserName,
 } from "./user-name";
@@ -51,5 +52,27 @@ describe("user names", () => {
 
   it("rejects metadata that cannot supply both required names", () => {
     expect(getUserNameFromMetadata({ given_name: "Prince" })).toBeNull();
+  });
+
+  it("rejects a one-word provider name", () => {
+    expect(getUserNameFromMetadata({ name: "Prince" })).toBeNull();
+  });
+
+  it("keeps the names metadata does supply for the add-your-name form", () => {
+    expect(getPartialUserNameFromMetadata({ name: "Prince" })).toEqual({
+      first_name: "Prince",
+      last_name: "",
+    });
+    expect(
+      getPartialUserNameFromMetadata({ given_name: "Grace", name: "Grace" })
+    ).toEqual({ first_name: "Grace", last_name: "" });
+    expect(getPartialUserNameFromMetadata({ family_name: "Hopper" })).toEqual({
+      first_name: "",
+      last_name: "Hopper",
+    });
+    expect(getPartialUserNameFromMetadata({})).toEqual({
+      first_name: "",
+      last_name: "",
+    });
   });
 });

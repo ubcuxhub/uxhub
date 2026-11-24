@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowLeft, Info, Lock } from "lucide-react";
+import { ArrowLeft, Ellipsis, Info, Lock, Trash2, Undo2 } from "lucide-react";
 import { Hubbo } from "@/components/shared/Hubbo";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import type { EventHistoryInfo } from "@/lib/supabase-helpers/event-mutations";
@@ -17,7 +17,6 @@ import { EventPricing } from "./event-form/EventPricing";
 import { EventFeatured } from "./event-form/EventMarketing";
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { BackButton } from "@/components/shared/BackButton";
 import { SectionNavigator, type NavigatorSection } from "@/components/shared/SectionNavigator";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { EventBranding } from "./event-form/EventBranding";
@@ -33,6 +32,8 @@ import type {
   SponsorRow,
 } from "@/lib/supabase/models";
 import { Button } from "@/components/ui/button";
+import { IconButton } from "@/components/ui/icon-button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
   FieldValidation,
@@ -48,6 +49,7 @@ import { EventPeopleEditor, EventResourcesEditor } from "./event-form/EventPeopl
 import { emptyContent, type EventContent } from "../lib/event-content";
 import { ApplicationQuestionsSection } from "./event-form/ApplicationQuestionsSection";
 import { DeleteEventModal } from "./DeleteEventModal";
+import { EventBuilderBackPill } from "./EventBuilderBackPill";
 
 interface EventCreateModifyProps {
   historyInfo?: EventHistoryInfo;
@@ -58,8 +60,6 @@ interface EventCreateModifyProps {
   pricingLocked?: boolean;
   teamInfo?: EventTeamSettingsInfo;
   eventId?: string;
-  /** Hide when the surrounding record page supplies navigation. */
-  showBackButton?: boolean;
   initialDraft?: { id: string; revision: number; document: EventWorkingDocument } | null;
   initialEvent?: EventRow | null;
   initialCheckInSessions?: CheckInSessionRow[];
@@ -75,7 +75,6 @@ export const EventCreateModify = ({
   eventId,
   historyInfo,
   initialContent,
-  showBackButton = true,
   pricingLocked = false,
   teamInfo = { teamCount: 0, largestTeam: 0 },
   initialDateLocation,
@@ -95,8 +94,8 @@ export const EventCreateModify = ({
   const nativeFrame = useRef<number | null>(null);
   const [inputIssues, setInputIssues] = useState<EventFormIssue[]>([]);
   const collectInputIssues = (draft = false): EventFormIssue[] => Array.from(formElement.current?.querySelectorAll<HTMLInputElement>("input:invalid, textarea:invalid, select:invalid") ?? []).filter(control => !draft || !control.validity.valueMissing).map(control => ({
-    section: (control.closest("[data-builder-section]")?.id.replace("builder-", "") ?? "summary") as EventFormIssue["section"],
-    target: control.id || control.closest("[data-builder-section]")?.id || "builder-summary",
+    section: (control.closest("[data-builder-section]")?.id.replace("builder-", "") ?? "publish") as EventFormIssue["section"],
+    target: control.id || control.closest("[data-builder-section]")?.id || "builder-publish",
     message: control.validationMessage,
     required: control.validity.valueMissing,
   }));
@@ -125,15 +124,23 @@ export const EventCreateModify = ({
   // any are registered (docs/event-states.md, "Unpublishing").
   const [revertOpen, setRevertOpen] = useState(false);
   const [revertError, setRevertError] = useState<string | null>(null);
+  // The "More actions" menu hands focus to a dialog, so it skips its own focus
+  // return and the dialog gives focus back to the trigger once it closes.
+  const moreActions = useRef<HTMLButtonElement>(null);
+  const menuOpensDialog = useRef(false);
+  const returnFocusToMoreActions = () => setTimeout(() => moreActions.current?.focus(), 0);
   const [offset, setOffset] = useState(86);
   const [currentId, setCurrentId] = useState("builder-basics");
   const published = form.publication.status === "active";
   const scheduled = !!form.publication.publish_at;
   const draft = !published && !scheduled;
-  const issueSections = ["basics", "description", "dates", "registration", "teams", "schedule", "people", "resources", "summary", "settings"];
+  // Revert hides a live event again; an ended or canceled one stays as it was.
+  const canRevert = published && !form.past;
+  const issueSections: EventFormIssue["section"][] = ["basics", "description", "agenda", "registration", "teams", "people", "resources", "publish"];
   const issues = [...new Map([...form.validation.issues, ...form.serverIssues, ...inputIssues].map(issue => [`${issue.section}:${issue.target}`, issue])).values()].filter(issue => !form.past || issue.section === "resources").sort((a, b) => issueSections.indexOf(a.section) - issueSections.indexOf(b.section));
   const publicationReady = issues.length === 0;
   const visibleIssues = issues.filter(issue => form.publishAttempted || !issue.required);
+  const publishIssues = issues.filter(issue => issue.section === "publish");
   const focusIssue = (issue: EventFormIssue) => {
     if (issue.section === "people") window.dispatchEvent(new Event("event-content-invalid"));
     const target = document.getElementById(issue.target);
@@ -160,8 +167,6 @@ export const EventCreateModify = ({
     "builder-teams": { number: 5, description: "Team events show a Your Team card with an invite link on the event page." },
     "builder-people": { number: 6 },
     "builder-resources": { number: 7, description: "Community links, files and the event recap for this event." },
-    "builder-summary": { number: 8, description: "What’s left before the event can go live. Drafts are only visible to staff." },
-    "builder-settings": { number: 9, description: "Actions that affect the whole event." },
   };
   const sections: NavigatorSection[] = [
     { id: "builder-basics", number: 1, title: "Basics", state: "complete", required: true },
@@ -171,14 +176,13 @@ export const EventCreateModify = ({
     { id: "builder-teams", number: 5, title: "Teams", state: form.formState.teams_enabled ? "complete" : "optional", required: false },
     { id: "builder-people", number: 6, title: "People and sponsors", state: form.formState.content?.sections.length ? "complete" : "optional", required: false },
     { id: "builder-resources", number: 7, title: "Links and resources", state: form.formState.content?.links.length ? "complete" : "optional", required: false },
-    { id: "builder-summary", number: 8, title: "Summary", state: "optional", required: false },
-    { id: "builder-settings", number: 9, title: "Other settings", state: "optional", required: false },
   ].map((section): NavigatorSection => {
     const key = section.id.replace("builder-", "");
     const all = issues.filter(issue => issue.section === key);
     const visible = visibleIssues.filter(issue => issue.section === key);
     return { ...section, state: visible.length ? "attention" : all.length ? "not-started" : section.state as NavigatorSection["state"], issues: visible.length || undefined };
   });
+  const sectionsWithIssues = sections.filter(item => issues.some(issue => `builder-${issue.section}` === item.id));
   useEffect(() => {
     if (!header.current) return;
     const observer = new ResizeObserver(entries => setOffset(Math.max(0, entries[0].contentRect.height - 40) + 24));
@@ -202,7 +206,7 @@ export const EventCreateModify = ({
         <h2 tabIndex={-1} className="pt-1 text-h3 outline-none focus-visible:focus-ring">{title}</h2>
         {sectionDetails[id].description && <p className="pt-0.5 text-muted-foreground">{sectionDetails[id].description}</p>}
       </div>{status.issues ? <StatusBadge label={`${status.issues} to fix`} tone="error" /> : status.state === "complete" ? <StatusBadge label="Complete" tone="success" /> : !status.required ? <StatusBadge label="Optional" tone="neutral" /> : null}</div>
-      {form.past && !["builder-resources", "builder-summary", "builder-settings"].includes(id) ? <fieldset disabled onDragStartCapture={event => event.preventDefault()} className="min-w-0 space-y-4"><legend className="mb-3 flex items-center gap-2 text-small text-muted-foreground"><Lock aria-hidden className="size-4" />Locked</legend>{children}</fieldset> : children}
+      {form.past && id !== "builder-resources" ? <fieldset disabled onDragStartCapture={event => event.preventDefault()} className="min-w-0 space-y-4"><legend className="mb-3 flex items-center gap-2 text-small text-muted-foreground"><Lock aria-hidden className="size-4" />Locked</legend>{children}</fieldset> : children}
     </section>
     );
   };
@@ -210,7 +214,9 @@ export const EventCreateModify = ({
   return (
     <FieldValidation errors={visibleIssues}><div className="event-builder flex w-full min-w-0 flex-col gap-6 pb-50">
       <div id="event-builder-header" ref={header} className="sticky top-4 z-20 -mx-5 space-y-2 border-b border-border-subtle bg-background px-5 pb-3.5 sm:-top-10 sm:-mx-6 sm:px-6 min-[821px]:-mx-12 min-[821px]:px-12">
-        {showBackButton && <BackButton link="/admin/events" label="Back to Manage Events" className="h-8 w-fit px-4 text-small" />}
+        {/* When the header sticks on sm+, this row (h-8 and the gap under it)
+            scrolls out under the top edge (`sm:-top-10`). */}
+        <EventBuilderBackPill eventId={eventId} className="h-8 px-4 text-small" />
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-2.5">
             <h1 className="break-words text-h2">{form.formState.name || "Untitled event"}</h1>
@@ -222,6 +228,14 @@ export const EventCreateModify = ({
             {(scheduled || published) && form.hasUnsavedChanges && <Button type="button" size="sm" variant="outline" disabled={form.isSubmitting || form.unresolvedSave} onClick={() => { form.handleDiscardChanges(); setInputIssues([]); }}>Discard changes</Button>}
             {(scheduled || published) && <Button disabled={!form.hasUnsavedChanges || form.isDeleting} type="button" size="sm" loading={form.isSubmitting} onClick={() => void form.handlePublication("save")}>{scheduled ? "Save changes" : "Update"}</Button>}
             {!published && <EventPublishMenu form={form} size="sm" disabled={!publicationReady} />}
+            {(canRevert || form.eventId) && <DropdownMenu>
+              <DropdownMenuTrigger asChild><IconButton ref={moreActions} label="More actions" className="shrink-0"><Ellipsis aria-hidden /></IconButton></DropdownMenuTrigger>
+              <DropdownMenuContent align="end" collisionPadding={20} className="z-40 min-w-48" onCloseAutoFocus={event => { if (menuOpensDialog.current) event.preventDefault(); menuOpensDialog.current = false; }}>
+                {canRevert && <DropdownMenuItem disabled={form.isSubmitting || form.isDeleting} onSelect={() => { menuOpensDialog.current = true; setRevertError(null); setRevertOpen(true); }}><Undo2 aria-hidden />Revert to draft</DropdownMenuItem>}
+                {canRevert && form.eventId && <DropdownMenuSeparator />}
+                {form.eventId && <DropdownMenuItem variant="destructive" disabled={form.isSubmitting || form.isDeleting} onSelect={() => { menuOpensDialog.current = true; form.setShowDeleteModal(true); }}><Trash2 aria-hidden />Delete event</DropdownMenuItem>}
+              </DropdownMenuContent>
+            </DropdownMenu>}
           </div>
         </div>
       </div>
@@ -234,26 +248,6 @@ export const EventCreateModify = ({
           {section("builder-teams", "Teams", <EventTeams state={form.formState} info={teamInfo} showErrors={form.publishAttempted || visibleIssues.some(issue => issue.section === "teams")} onChange={form.handleFieldChange} />)}
           {section("builder-people", "People and sponsors", <EventPeopleEditor content={form.formState.content ?? emptyContent()} onChange={content => form.handleFieldChange("content", content)} people={mentorOptions} sponsors={sponsorOptions} showErrors={form.showConfigurationErrors} />)}
           {section("builder-resources", "Links and resources", <EventResourcesEditor content={form.formState.content ?? emptyContent()} onChange={content => form.handleFieldChange("content", content)} showErrors={form.showConfigurationErrors} />)}
-          {section("builder-summary", "Summary", <div className="space-y-4 rounded-xl border border-border bg-card p-5">
-            <div className="flex flex-wrap items-center justify-between gap-4"><h3 className="text-subheading">{form.canceled ? "Event canceled" : form.past ? "Event ended" : published ? "Published" : scheduled ? "Scheduled" : issues.length ? form.publishAttempted ? "A few things to fix" : "Almost ready" : "Ready to publish"}</h3>{!published && <EventPublishMenu form={form} disabled={!publicationReady} />}</div>
-            <p className="text-muted-foreground">{form.canceled ? `${historyInfo?.registered ?? 0} registered. Refunds are issued in Square.` : form.past ? `${historyInfo?.registered ?? 0} registered, ${historyInfo?.checkedIn ?? 0} checked in. Add an event recap link in Links and resources.` : published ? "Members can find this event in the portal. Registration follows its own dates." : scheduled ? `It goes live ${publicationTimeLabel(form.publication.publish_at!)}. You can keep editing until then.` : issues.length ? "Complete the required details before the event goes live." : "Everything required is filled in. Choose Publish to go live now or schedule it."}</p>
-            {!!issues.length && <ul className="space-y-2">{sections.filter(item => issues.some(issue => `builder-${issue.section}` === item.id)).map(item => <li key={item.id}><Button type="button" variant="link" className="h-auto whitespace-normal p-0 text-left" onClick={() => focusIssue(issues.find(issue => `builder-${issue.section}` === item.id)!)}>{item.title}{form.publishAttempted ? ` · ${issues.filter(issue => `builder-${issue.section}` === item.id).length} to fix` : ""}</Button></li>)}</ul>}
-            {form.publishAttempted && !!issues.length && <ul className="space-y-1 text-small text-destructive">{issues.map((issue, index) => <li key={`${issue.target}-${index}`}><Button type="button" variant="link" className="h-auto whitespace-normal p-0 text-left text-destructive" onClick={() => focusIssue(issue)}>{issue.message}</Button></li>)}</ul>}
-          </div>)}
-          {section("builder-settings", "Other settings", <div className="space-y-4 rounded-xl border border-border bg-card p-5">
-            {draft && <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="min-w-0 space-y-0.5"><h3 className="text-small font-semibold">Save changes</h3><p className="text-small text-muted-foreground">{saveStatus}. Drafts are only visible to staff.</p></div>
-              <Button type="button" variant="outline" disabled={!form.hasUnsavedChanges || form.isDeleting} loading={form.isSubmitting} onClick={() => void form.handleSaveDraft()}>Save</Button>
-            </div>}
-            {published && !form.past && <div className="flex flex-wrap items-center justify-between gap-4">
-              <div className="min-w-0 space-y-0.5"><h3 className="text-small font-semibold">Revert to draft</h3><p className="text-small text-muted-foreground">Save your changes and hide this event from members. Only staff can see it until you publish again.</p></div>
-              <Button type="button" variant="outline" loading={form.isSubmitting} disabled={form.isDeleting} onClick={() => { setRevertError(null); setRevertOpen(true); }}>Revert to draft</Button>
-            </div>}
-            {form.eventId && <div className={`flex flex-wrap items-center justify-between gap-4${draft || (published && !form.past) ? " border-t border-border-subtle pt-4" : ""}`}>
-              <div className="min-w-0 space-y-0.5"><h3 className="text-small font-semibold">Delete event</h3><p className="text-small text-muted-foreground">Payment protections apply. Deletion can’t be undone.</p></div>
-              <Button type="button" variant="outline" disabled={form.isSubmitting || form.isDeleting} onClick={() => form.setShowDeleteModal(true)}>Delete event</Button>
-            </div>}
-          </div>)}
           {form.error && (
             <Field data-invalid>
               <FieldError>{form.error}</FieldError>
@@ -266,21 +260,40 @@ export const EventCreateModify = ({
               </FieldDescription>
             </Field>
           )}
+          <section id="builder-publish" aria-labelledby="builder-publish-heading" style={{ scrollMarginTop: offset + (typeof window !== "undefined" && window.innerWidth < 640 ? 56 : 0) }} className="space-y-4 rounded-xl border border-border bg-card p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0 flex-1 basis-72 space-y-1">
+                <h2 id="builder-publish-heading" tabIndex={-1} className="text-subheading outline-none focus-visible:focus-ring">{form.canceled ? "Event canceled" : form.past ? "Event ended" : published ? "Published" : scheduled ? "Scheduled" : issues.length ? form.publishAttempted ? "A few things to fix" : "Almost ready" : "Ready to publish"}</h2>
+                <p className="text-muted-foreground">{form.canceled ? `${historyInfo?.registered ?? 0} registered. Refunds are issued in Square.` : form.past ? `${historyInfo?.registered ?? 0} registered, ${historyInfo?.checkedIn ?? 0} checked in. Add an event recap link in Links and resources.` : published ? "Members can find this event in the portal. Registration follows its own dates." : scheduled ? `It goes live ${publicationTimeLabel(form.publication.publish_at!)}. You can keep editing until then.` : issues.length ? "Complete the required details before the event goes live. Drafts are only visible to UX Hub execs." : "Everything required is filled in. Choose Publish to go live now or schedule it."}</p>
+              </div>
+              <div className="flex shrink-0 flex-wrap items-center gap-3">
+                {(scheduled || published) && <Button disabled={!form.hasUnsavedChanges || form.isDeleting} type="button" loading={form.isSubmitting} onClick={() => void form.handlePublication("save")}>{scheduled ? "Save changes" : "Update"}</Button>}
+                {!published && <EventPublishMenu form={form} disabled={!publicationReady} />}
+              </div>
+            </div>
+            {!!issues.length && <div className="space-y-2 border-t border-border-subtle pt-4">
+              <h3 className="text-small font-semibold">What’s left</h3>
+              {sectionsWithIssues.length > 0 && <ul className="space-y-2">{sectionsWithIssues.map(item => <li key={item.id}><Button type="button" variant="link" className="h-auto whitespace-normal p-0 text-left" onClick={() => focusIssue(issues.find(issue => `builder-${issue.section}` === item.id)!)}>{item.title}{form.publishAttempted ? ` · ${issues.filter(issue => `builder-${issue.section}` === item.id).length} to fix` : ""}</Button></li>)}</ul>}
+              {/* Publication timing has no section of its own: it is fixed from the Publish menu beside it. */}
+              {publishIssues.length > 0 && <ul className="space-y-1 text-small text-destructive">{publishIssues.map(issue => <li key={issue.message}>{issue.message}</li>)}</ul>}
+              {form.publishAttempted && <ul className="space-y-1 text-small text-destructive">{issues.filter(issue => issue.section !== "publish").map((issue, index) => <li key={`${issue.target}-${index}`}><Button type="button" variant="link" className="h-auto whitespace-normal p-0 text-left text-destructive" onClick={() => focusIssue(issue)}>{issue.message}</Button></li>)}</ul>}
+            </div>}
+          </section>
           </fieldset>
         </form>
 
       <SectionNavigator title="Event sections" sections={sections} currentId={currentId} numberFormat="plain" placement="bottom-right" className="z-40" />
       <EventPublicationSuccess form={form} />
       {form.eventId && <EventUnpublishDialog eventId={form.eventId} open={revertOpen} pending={form.isSubmitting} error={revertError}
-        onOpenChange={open => { if (!form.isSubmitting) setRevertOpen(open); }}
-        onConfirm={() => void form.handlePublication("revert").then(saved => { if (saved) setRevertOpen(false); else setRevertError("The event wasn’t reverted. Your edits are still here."); })} />}
+        onOpenChange={open => { if (form.isSubmitting) return; setRevertOpen(open); if (!open) returnFocusToMoreActions(); }}
+        onConfirm={() => void form.handlePublication("revert").then(saved => { if (saved) { setRevertOpen(false); returnFocusToMoreActions(); } else setRevertError("The event wasn’t reverted. Your edits are still here."); })} />}
       <EventLeaveDialog eventName={form.formState.name || "Untitled event"} navigation={form.navigation} draft={draft} pending={form.isSubmitting} error={form.error} save={() => form.handleSaveDraft(false)} />
       <Dialog open={form.showDraftSaved} onOpenChange={form.setShowDraftSaved}>
         <DialogContent showCloseButton={false} className="max-w-[482px] gap-4 px-7 pt-11 pb-8">
           <Hubbo emotion="proud" size="hero" className="mx-auto h-50" />
           <DialogHeader className="items-center gap-4 space-y-0 pr-0 text-center sm:text-center">
             <DialogTitle className="pt-2 text-h2">Draft saved</DialogTitle>
-            <DialogDescription className="text-body">{form.formState.name || "Untitled event"} is saved as a draft. Only staff can see it until you publish.</DialogDescription>
+            <DialogDescription className="text-body">{form.formState.name || "Untitled event"} is saved as a draft. Only UX Hub execs can see it until you publish.</DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex-wrap gap-3 pt-2 sm:justify-center">
             <Button variant="outline" asChild>
@@ -298,6 +311,7 @@ export const EventCreateModify = ({
           onClose={() => {
             form.setShowDeleteModal(false);
             form.setError(null);
+            returnFocusToMoreActions();
           }}
           onConfirm={form.handleDeleteEvent}
           isDeleting={form.isDeleting}
