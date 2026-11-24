@@ -72,7 +72,7 @@ function EventCard({
     <article
       data-slot="event-card"
       className={cn(
-        "relative flex flex-col-reverse gap-4 rounded-lg border bg-card p-4 transition-colors duration-150 hover:bg-section has-[a:focus-visible]:focus-ring sm:flex-row sm:items-center sm:gap-6 sm:p-5",
+        "relative flex flex-col-reverse gap-4 rounded-3xl border bg-card p-4 transition-colors duration-150 hover:bg-section has-[a:focus-visible]:focus-ring sm:flex-row sm:items-center sm:gap-6 sm:p-5",
         className,
       )}
       {...props}
@@ -104,7 +104,7 @@ function EventCard({
       <div
         data-slot="event-card-thumbnail"
         aria-hidden
-        className="flex h-35 w-full shrink-0 items-center justify-center overflow-hidden rounded-3xl bg-muted sm:size-40"
+        className="flex h-35 w-full shrink-0 items-center justify-center overflow-hidden rounded-xl bg-muted sm:size-40"
       >
         {image && showImage ? (
           // eslint-disable-next-line @next/next/no-img-element
