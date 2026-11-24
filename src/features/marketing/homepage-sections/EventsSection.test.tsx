@@ -39,7 +39,7 @@ it("previews the next three upcoming events and links to /events once launched",
   render(await EventsSection());
   expect(screen.queryByText("Events are coming soon.")).toBeNull();
   expect(screen.getAllByText(/^Event /).map((node) => node.textContent)).toEqual(["Event a", "Event b", "Event c"]);
-  expect(screen.getByRole("link", { name: /ALL EVENTS/ }).getAttribute("href")).toMatch(/^\/events/);
+  expect(screen.getByRole("link", { name: /ALL EVENTS/ }).getAttribute("href")).toBe("/events");
 });
 
 it("still links to /events when the events can't be read", async () => {

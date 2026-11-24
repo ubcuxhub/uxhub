@@ -57,7 +57,7 @@ export default async function EventsSection() {
             </p>
           )}
 
-          <Button href="/events">ALL EVENTS</Button>
+          <Button href="/events" returnTo={false}>ALL EVENTS</Button>
         </div>
       ) : (
         <div className="flex flex-col items-center gap-8 py-16 text-center">
