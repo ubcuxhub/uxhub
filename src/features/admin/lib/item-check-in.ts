@@ -1,4 +1,5 @@
 import type { CheckInAttendee, CheckInResult } from "@/features/admin/types";
+import { getSafeInternalPath } from "@/lib/auth/paths";
 
 export interface CheckInItem {
   id: string;
@@ -32,16 +33,11 @@ export function selectedCheckInItem(items: CheckInItem[], explicit: string | und
     ?? sorted.find(item => item.starts_at && Date.parse(item.starts_at) > at)
     ?? sorted.at(-1))?.id ?? null;
 }
-/** Only root-relative internal destinations are accepted, including after URL decoding. */
+/** A safe internal destination (`getSafeInternalPath`) that isn't a check-in page itself. */
 export function checkInReturnTo(value?: string): string {
-  if (!value) return "/admin/events";
-  try {
-    const decoded = decodeURIComponent(value);
-    if (!decoded.startsWith("/") || decoded.startsWith("//") || (decoded.includes("\\") || Array.from(decoded).some(char => char.charCodeAt(0) <= 32))) return "/admin/events";
-    const url = new URL(value, "https://internal.invalid");
-    if (url.origin !== "https://internal.invalid" || url.pathname.startsWith("//") || url.pathname.includes("/check-in")) return "/admin/events";
-    return `${url.pathname}${url.search}${url.hash}`;
-  } catch { return "/admin/events"; }
+  const fallback = "/admin/events";
+  const path = getSafeInternalPath(value, fallback);
+  return path.split(/[?#]/, 1)[0].includes("/check-in") ? fallback : path;
 }
 export function checkInBackLabel(returnTo: string): string {
   const path = returnTo.split(/[?#]/)[0];
