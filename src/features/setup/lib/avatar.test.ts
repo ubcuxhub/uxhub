@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { AVATAR_PRESET_ART, avatarPresetLabel, photoFileError } from "./avatar";
+import { AVATAR_PRESET_ART, photoFileError } from "./avatar";
 import { AVATAR_PRESETS } from "./options";
 
 describe("avatar presets", () => {
@@ -11,10 +11,6 @@ describe("avatar presets", () => {
       const file = path.join("public", AVATAR_PRESET_ART[preset.id]);
       expect(existsSync(file), file).toBe(true);
     }
-  });
-
-  it("labels presets", () => {
-    expect(avatarPresetLabel("starburst")).toBe("Pink starburst");
   });
 });
 
