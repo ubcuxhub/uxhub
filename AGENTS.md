@@ -246,13 +246,18 @@ Local values belong in the git-ignored `.env.local`.
   secret the pg_cron jobs sign with. It also verifies event reminders, whose
   job signs its own message with it (`supabase/README.md`, "Application
   emails" and "Event reminder emails")
+- Publication watchdog: secret `EVENT_PUBLICATION_HEALTH_SECRET`, matching the
+  `event_publication_health_secret` Vault secret the `check-event-publication`
+  job signs `/api/internal/event-publication` with (`supabase/README.md`,
+  "Publication watchdog"). Every `/api/internal/*` route checks its job's
+  signature with `verifyCronSignature` from `src/lib/http/cron-signature.ts`
 
 `SQUARE_ENV` is optional and defaults to the sandbox; set it to `production`
 only for production credentials.
 
 Never expose the Supabase secret keys, migrations database URL, Square access
-token, webhook signature key, Resend API key, Sentry auth token, or
-application-emails secret to client components.
+token, webhook signature key, Resend API key, Sentry auth token,
+application-emails secret, or publication health secret to client components.
 
 ## Quality
 
