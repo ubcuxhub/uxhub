@@ -1,30 +1,23 @@
 export type PurchaseKind = "event_ticket" | "membership";
 
-export type PurchaseStatus =
-  | "pending"
-  | "authorized"
-  | "completed"
-  | "canceled"
-  | "failed";
-
+/**
+ * What the checkout form sends. The buyer's name, email and phone are not
+ * part of it: the server reads them from the signed-in profile.
+ */
 export interface CheckoutRequestInput {
   kind: PurchaseKind;
   slug: string;
+  /** The card token; absent for a free ticket or membership. */
   token?: string | null;
+  /** The amount the buyer saw and verified, checked against the server's. */
   expectedAmountCents?: number;
   idempotencyKey: string;
-  buyerFirstName: string;
-  buyerLastName: string;
-  buyerEmail: string;
-  buyerPhone?: string | null;
-  billingPostalCode?: string | null;
   verificationToken?: string | null;
 }
 
 export interface CheckoutActionSuccess {
   ok: true;
   purchaseId: string;
-  redirectTo: string;
   resolution: "completed" | "processing";
 }
 

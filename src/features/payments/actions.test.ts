@@ -25,22 +25,23 @@ const validRequest = {
   slug: "annual-membership",
   token: "cnon:card-nonce-ok",
   idempotencyKey: "idem-1",
-  buyerFirstName: "Jamie",
-  buyerLastName: "Lee",
-  buyerEmail: "jamie@example.com",
+  expectedAmountCents: 2000,
   verificationToken: "verify-1",
 };
 
 let consoleError: ReturnType<typeof vi.spyOn>;
+let consoleLog: ReturnType<typeof vi.spyOn>;
 
 beforeEach(() => {
   vi.clearAllMocks();
   guardMocks.requireAuth.mockResolvedValue(user);
   consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+  consoleLog = vi.spyOn(console, "log").mockImplementation(() => {});
 });
 
 afterEach(() => {
   consoleError.mockRestore();
+  consoleLog.mockRestore();
 });
 
 describe("submitCheckoutAction", () => {
@@ -48,7 +49,6 @@ describe("submitCheckoutAction", () => {
     const success = {
       ok: true as const,
       purchaseId: "purchase-1",
-      redirectTo: "/portal/membership/confirmation/purchase-1",
       resolution: "completed" as const,
     };
     fulfillmentMocks.executeCheckoutForUser.mockResolvedValue(success);
@@ -63,7 +63,6 @@ describe("submitCheckoutAction", () => {
         slug: "annual-membership",
         token: "cnon:card-nonce-ok",
         idempotencyKey: "idem-1",
-        buyerEmail: "jamie@example.com",
         verificationToken: "verify-1",
       })
     );
@@ -71,21 +70,17 @@ describe("submitCheckoutAction", () => {
   });
 
   it.each([
-    ["a malformed email", { ...validRequest, buyerEmail: "not-an-email" }],
-    ["a missing payment token", { ...validRequest, token: "  " }],
-    ["an unknown purchase kind", { ...validRequest, kind: "donation" }],
-    ["a non-object payload", "nonsense"],
-    ["null", null],
-  ])("rejects %s without reaching Square", async (_label, input) => {
+    ["an unknown purchase kind", { ...validRequest, kind: "donation" }, "Invalid purchase kind."],
+    ["a missing slug", { ...validRequest, slug: " " }, "Product slug is required."],
+    ["a non-object payload", "nonsense", "Invalid checkout payload."],
+    ["null", null, "Invalid checkout payload."],
+  ])("refuses %s as final, without reaching Square or alerting", async (_label, input, message) => {
     const result = await submitCheckoutAction(input);
 
-    expect(result).toEqual({
-      ok: false,
-      error:
-        "Checkout could not be confirmed. Check your purchases before trying again.",
-      terminal: false,
-    });
+    expect(result).toEqual({ ok: false, error: message, terminal: true });
     expect(fulfillmentMocks.executeCheckoutForUser).not.toHaveBeenCalled();
+    expect(consoleError).not.toHaveBeenCalled();
+    expect(String(consoleLog.mock.calls[0]?.[0])).toContain("checkout.request_invalid");
   });
 
   // An error thrown mid-flight tells us nothing about whether Square took the

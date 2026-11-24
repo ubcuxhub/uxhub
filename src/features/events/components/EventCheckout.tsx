@@ -11,14 +11,12 @@ import { useFlowDialog } from "@/components/shared/FlowDialog";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/lib/auth/user-context";
 import { eventPriceFor } from "@/features/events/lib/event-rules";
-import { withReturnTo } from "@/lib/auth/paths";
 import type { EventRow, UserInfoRow } from "@/lib/supabase/models";
 
 interface EventCheckoutProps {
   disabledMessage: string | null;
   event: EventRow;
   formattedDate: string | null;
-  returnTo?: string;
   slug: string;
   user: UserInfoRow;
 }
@@ -27,7 +25,6 @@ export function EventCheckout({
   disabledMessage,
   event,
   formattedDate,
-  returnTo,
   slug,
   user,
 }: EventCheckoutProps) {
@@ -43,11 +40,9 @@ export function EventCheckout({
     disabledMessage ??
     (isDraftEvent(event) && !draftTakesRegistrations(event) ? PAID_DRAFT_REGISTRATION_REASON : null);
 
+  // The confirmation page's buttons are fixed, so it takes no returnTo.
   const confirmationHref = (purchaseId: string) =>
-    withReturnTo(
-      `/portal/events/${slug}/confirmation/${purchaseId}`,
-      returnTo ?? "/portal",
-    );
+    `/portal/events/${slug}/confirmation/${purchaseId}`;
 
   const eventDetails = [
     formattedDate,
