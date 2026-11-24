@@ -1,5 +1,6 @@
 import type { User } from "@supabase/supabase-js";
 
+import { AUTH_ERROR_MESSAGES } from "@/lib/auth/auth-error";
 import { log } from "@/lib/log";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -34,8 +35,7 @@ export const PROFILE_CONFLICT_EVENTS: Record<ProfileConflictReason, string> = {
 const LINKED_ELSEWHERE: EnsureUserInfoResult = {
   status: "conflict",
   reason: "linked_elsewhere",
-  message:
-    "An account with this email is already linked to another sign-in method.",
+  message: AUTH_ERROR_MESSAGES.linked_elsewhere,
 };
 
 /**
@@ -71,7 +71,7 @@ export async function ensureUserInfo(
     return {
       status: "conflict",
       reason: "missing_email",
-      message: "Your account is missing an email address.",
+      message: AUTH_ERROR_MESSAGES.missing_email,
     };
   }
 

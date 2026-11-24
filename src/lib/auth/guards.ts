@@ -1,13 +1,10 @@
 import { redirect } from "next/navigation";
 
 import type { UserInfoRow } from "@/lib/supabase/models";
+import { authErrorPath } from "@/lib/auth/auth-error";
 import { loadCurrentUser } from "@/lib/auth/current-user";
 import { completeProfilePath, getSafeInternalPath } from "@/lib/auth/paths";
 import { hasAdminAccess, hasManagerAccess } from "@/lib/auth/roles";
-
-function authErrorPath(message: string) {
-  return `/auth/error?error=${encodeURIComponent(message)}`;
-}
 
 /**
  * Uncached wrappers over `loadCurrentUser()`.
@@ -29,7 +26,7 @@ export async function requireAuth(nextPath?: string): Promise<UserInfoRow> {
   }
 
   if (result.status === "error") {
-    redirect(authErrorPath(result.message));
+    redirect(authErrorPath(result.code));
   }
 
   return result.user;
@@ -52,7 +49,7 @@ export async function redirectIfAuthenticated(redirectTo = "/portal") {
   // profile row, so any other missing one is a repairable leftover the loader
   // has already dealt with, not a reason to ask for the details again.
   if (result.status === "error") {
-    redirect(authErrorPath(result.message));
+    redirect(authErrorPath(result.code));
   }
 
   redirect(safeRedirectTo);

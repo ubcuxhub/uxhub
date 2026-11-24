@@ -1,5 +1,6 @@
 import { cache } from "react";
 
+import type { AuthErrorCode } from "@/lib/auth/auth-error";
 import type { UserInfoRow } from "@/lib/supabase/models";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -8,8 +9,6 @@ import {
 } from "@/lib/auth/ensure-user-info";
 import { errorFields, log } from "@/lib/log";
 import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";
-
-const PROFILE_LOAD_ERROR = "Unable to load your profile.";
 
 export type CurrentUserResult =
   | { status: "authenticated"; user: UserInfoRow }
@@ -20,7 +19,8 @@ export type CurrentUserResult =
    * `/auth/complete-profile`.
    */
   | { status: "needs_profile" }
-  | { status: "error"; message: string };
+  /** The guards send it to `/auth/error` with this code. */
+  | { status: "error"; code: AuthErrorCode };
 
 /**
  * Resolves the signed-in user once per request.
@@ -62,7 +62,7 @@ export const loadCurrentUser = cache(async (): Promise<CurrentUserResult> => {
       ...errorFields(error),
       authUserId: authUser.id,
     });
-    return { status: "error", message: PROFILE_LOAD_ERROR };
+    return { status: "error", code: "profile_unavailable" };
   }
 
   if (existing) {
@@ -87,7 +87,7 @@ export const loadCurrentUser = cache(async (): Promise<CurrentUserResult> => {
       authUserId: authUser.id,
       source: "current_user",
     });
-    return { status: "error", message: ensured.message };
+    return { status: "error", code: ensured.reason };
   }
 
   let repaired: UserInfoRow | null;
@@ -98,12 +98,12 @@ export const loadCurrentUser = cache(async (): Promise<CurrentUserResult> => {
       ...errorFields(error),
       authUserId: authUser.id,
     });
-    return { status: "error", message: PROFILE_LOAD_ERROR };
+    return { status: "error", code: "profile_unavailable" };
   }
 
   if (!repaired) {
     log.warn("auth.profile_repair_missing", { authUserId: authUser.id });
-    return { status: "error", message: PROFILE_LOAD_ERROR };
+    return { status: "error", code: "profile_unavailable" };
   }
 
   return { status: "authenticated", user: repaired };
