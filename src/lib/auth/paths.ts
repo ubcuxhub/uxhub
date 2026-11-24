@@ -21,7 +21,19 @@ export function getSafeInternalPath(
   try {
     const url = new URL(value, INTERNAL_ORIGIN);
 
-    if (url.origin !== INTERNAL_ORIGIN) {
+    // Check the resolved path, not just the input: dot segments collapse, so
+    // `/.//evil.com` and `/%2e//evil.com` resolve to `//evil.com`, which a
+    // router treats as protocol-relative. Also check it after one decode
+    // (and resolve that too), so `/%2fevil.com` or `/.%2f/evil.com` can't
+    // become one in a layer that decodes before it navigates. A malformed
+    // escape (`/%`) throws and falls back.
+    const decoded = decodeURIComponent(url.pathname);
+    if (
+      url.origin !== INTERNAL_ORIGIN ||
+      isProtocolRelative(url.pathname) ||
+      isProtocolRelative(decoded) ||
+      isProtocolRelative(new URL(decoded, INTERNAL_ORIGIN).pathname)
+    ) {
       return fallback;
     }
 
@@ -29,6 +41,11 @@ export function getSafeInternalPath(
   } catch {
     return fallback;
   }
+}
+
+/** `//host` or `/\host`: a path a browser resolves to another origin. */
+function isProtocolRelative(pathname: string) {
+  return /^[/\\]{2}/.test(pathname);
 }
 
 export function withReturnTo(path: string, returnTo?: string | null) {
