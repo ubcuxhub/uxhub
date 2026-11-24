@@ -22,6 +22,7 @@ export type EventLinkRow = Tables<"event_links">;
 export type EventPrivateDetailsRow = Tables<"event_private_details">;
 
 export type UserInfoRow = Tables<"user_info">;
+export type UserInfoInsert = TablesInsert<"user_info">;
 export type UserInfoUpdate = TablesUpdate<"user_info">;
 
 export type MembershipTypeRow = Tables<"membership_types">;

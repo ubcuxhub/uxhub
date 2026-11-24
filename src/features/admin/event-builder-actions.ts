@@ -272,17 +272,19 @@ export async function saveAdminEventAction(
     if (state.date_location && !input.dateLocation) return { error: "Reload saved dates and locations before publishing." };
     if ((state.decisions_release_at || state.confirmation_deadline) && !input.applicationTiming) return { error: "Reload saved application timing before publishing." };
   }
+  // The generator omits SQL argument nullability: `(x ?? null)!` still sends
+  // null for a new event, a missing draft, or no expected image.
   const { data, error } = await supabaseAdmin.rpc(
     "save_admin_event_builder",
     {
-      p_event_id: input.eventId ?? null,
-      p_draft_id: input.draftId ?? null,
+      p_event_id: (input.eventId ?? null)!,
+      p_draft_id: (input.draftId ?? null)!,
       p_draft_revision: input.draftRevision ?? 0,
-      p_expected_header_image_url: input.expectedHeaderImageUrl ?? null,
-      p_event: { ...input.event, ...datePayload, ...(input.operationId ? { _operation_id: input.operationId } : {}), ...(input.expectedRevision !== undefined ? { _expected_revision: input.expectedRevision } : {}), ...(input.expectedPublication ? { _expected_publication: input.expectedPublication } : {}), ...(input.content ? { _content: input.content } : {}), ...(input.applicationTiming ? { _application_timing: input.applicationTiming } : {}) },
-      p_slug: slug,
-      p_expected_image_url: input.expectedImageUrl,
-      p_check_in_sessions: input.checkInSessions,
+      p_expected_header_image_url: (input.expectedHeaderImageUrl ?? null)!,
+      p_event: { ...input.event, ...datePayload, ...(input.operationId ? { _operation_id: input.operationId } : {}), ...(input.expectedRevision !== undefined ? { _expected_revision: input.expectedRevision } : {}), ...(input.expectedPublication ? { _expected_publication: input.expectedPublication } : {}), ...(input.content ? { _content: input.content } : {}), ...(input.applicationTiming ? { _application_timing: input.applicationTiming } : {}) } as unknown as Json,
+      p_slug: slug!,
+      p_expected_image_url: input.expectedImageUrl!,
+      p_check_in_sessions: input.checkInSessions as unknown as Json,
       p_application_questions: input.applicationQuestions,
       p_mentors: input.mentorIds,
       p_sponsors: input.sponsorIds,
