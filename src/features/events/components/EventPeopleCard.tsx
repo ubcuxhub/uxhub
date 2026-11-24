@@ -109,11 +109,11 @@ export function EventPeopleCard(props: EventPeopleCardProps) {
         {items.map((person) => (
           <li
             key={person.id}
-            className="flex items-center gap-4 rounded-sm border bg-(--background-secondary) p-4"
+            className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-sm border bg-(--background-secondary) p-4"
           >
             <PersonAvatar name={person.name} imageUrl={person.imageUrl} />
 
-            <div className="flex min-w-0 flex-1 flex-col gap-1">
+            <div className="flex min-w-40 flex-1 flex-col gap-1">
               <p className="text-subheading">{person.name}</p>
               {person.subtitle && <p className="text-muted-foreground">{person.subtitle}</p>}
               {person.description && (
