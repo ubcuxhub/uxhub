@@ -31,7 +31,7 @@ import { applyTheme, getStoredTheme, subscribeTheme, type Theme } from "@/lib/th
 import { cn } from "@/lib/utils";
 
 import { DocsContext } from "./context";
-import { filterNav, INDEX_PATH, TOP_LINKS, type NavGroup } from "./nav";
+import { filterNav, INDEX_PATH, isServedPage, TOP_LINKS, type NavGroup } from "./nav";
 import { OnThisPage } from "./OnThisPage";
 import { docsHref, parseDisplayParams, type DisplayParams } from "./params";
 import { isCanvasPath } from "./standalone";
@@ -87,7 +87,8 @@ export function DocsShell({
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const contentRef = useRef<HTMLElement>(null);
-  const canvas = isCanvasPath(pathname);
+  // Where the gallery isn't served, its address is an ordinary not-found page.
+  const canvas = isServedPage(pathname) && isCanvasPath(pathname);
 
   // Side by side only exists on wide screens; elsewhere it falls back to its
   // light column.

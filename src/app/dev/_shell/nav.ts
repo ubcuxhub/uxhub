@@ -27,6 +27,11 @@ const UNLAUNCHED_PAGES = new Set(["/dev/gallery", "/dev/templates"]);
 /** Whether the gallery and templates are served on this deploy. */
 export const showUnlaunchedPages = FLAGS.studentEvents;
 
+/** Whether the docs page at `href` is served here (not an unlaunched one in production). */
+export function isServedPage(href: string) {
+  return showUnlaunchedPages || !UNLAUNCHED_PAGES.has(href);
+}
+
 /** Pages listed above the categories, in order. Searchable like entries. */
 const ALL_TOP_LINKS: readonly NavEntry[] = [
   { href: INDEX_PATH, title: "Components", keywords: ["index", "all", "library"] },
@@ -59,8 +64,8 @@ const ALL_TOP_LINKS: readonly NavEntry[] = [
   },
 ];
 
-export const TOP_LINKS: readonly NavEntry[] = ALL_TOP_LINKS.filter(
-  (link) => showUnlaunchedPages || !UNLAUNCHED_PAGES.has(link.href),
+export const TOP_LINKS: readonly NavEntry[] = ALL_TOP_LINKS.filter((link) =>
+  isServedPage(link.href),
 );
 
 /** Whether the sidebar search `query` finds `entry`. An empty query finds everything. */
