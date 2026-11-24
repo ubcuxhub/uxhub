@@ -12,6 +12,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { formatTimestamp } from "@/lib/date";
+import { formatCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { purchaseStatusLabel } from "@/features/payments/purchase-status";
 
@@ -19,13 +20,6 @@ const supabase = createClient();
 
 /** Statuses that deserve to read as a problem rather than as a footnote. */
 const PROBLEM_STATUSES = new Set(["failed", "canceled", "cancelled"]);
-
-function formatCurrency(amountCents: number, currency: string) {
-  return new Intl.NumberFormat("en-CA", {
-    style: "currency",
-    currency,
-  }).format(amountCents / 100);
-}
 
 /** What a purchase was for: its name, and the kind of thing it bought. */
 function describePurchase(purchase: PurchaseWithDetails) {
@@ -113,7 +107,7 @@ function PurchaseRow({ purchase }: { purchase: PurchaseWithDetails }) {
       </div>
       <div className="flex w-full shrink-0 items-center justify-between gap-2 sm:w-auto sm:block sm:space-y-0.5 sm:text-right">
         <p className="text-button">
-          {formatCurrency(purchase.amount_cents, purchase.currency)}
+          {formatCents(purchase.amount_cents, { currency: purchase.currency })}
         </p>
         <p
           className={cn(

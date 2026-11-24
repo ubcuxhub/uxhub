@@ -10,9 +10,9 @@ import { IconButton } from "@/components/ui/icon-button";
 import { toast } from "@/components/ui/toast";
 import {
   STUDENT_STATUS_LABELS,
-  YEAR_LABELS,
   membershipLabel,
 } from "@/features/admin/lib/application-review";
+import { YEAR_LABELS } from "@/lib/constants";
 import { formatEventDate, formatTimestamp } from "@/lib/date";
 import type { StudentStatus, UniversityYear } from "@/lib/supabase/models";
 

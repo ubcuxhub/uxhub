@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { formatEventTime } from "@/lib/date";
 import type { useItemCheckIn } from "@/features/admin/hooks/use-item-check-in";
 
@@ -31,6 +31,6 @@ export function CheckInFeedback({ state, eventId }: { state: ReturnType<typeof u
       <AlertDescription>Last refreshed: {last}. <Button variant="secondary" size="sm" onClick={() => void state.refresh()}>Try again</Button>
       </AlertDescription>
     </Alert> : null}
-    {state.loading ? <div aria-busy="true" aria-label="Loading check-in" className="flex flex-col gap-3">{[0, 1, 2].map(i => <Skeleton key={i} className="h-16 w-full rounded-xl" />)}</div> : null}
+    {state.loading ? <div className="flex justify-center py-16"><Spinner size="lg" label="Loading check-in" /></div> : null}
   </>;
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useState } from "react";
 
 import {
   Field,
@@ -11,7 +11,7 @@ import {
 } from "@/components/ui/field";
 import { PasswordInput } from "@/components/ui/password-input";
 import { withDeadline } from "@/lib/async/deadline";
-import { useNavigationRecovery } from "@/hooks/use-navigation-recovery";
+import { NAVIGATED, useGuardedSubmit } from "@/hooks/use-guarded-submit";
 import { createClient } from "@/lib/supabase/client";
 
 import {
@@ -37,33 +37,15 @@ export function UpdatePasswordForm({
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const submittingRef = useRef(false);
   const router = useRouter();
-  const recoverStalledNavigation = useNavigationRecovery(() => {
-    submittingRef.current = false;
-    setIsLoading(false);
+  const { pending: isLoading, run } = useGuardedSubmit(() =>
     setError(
       "Your password was updated, but the portal did not load. Try signing in with your new password.",
-    );
-  });
+    ),
+  );
 
-  const handleUpdatePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (submittingRef.current) return;
-
-    setError(null);
-
-    if (!isPasswordLongEnough(password)) {
-      setPasswordError(PASSWORD_TOO_SHORT_ERROR);
-      return;
-    }
-    setPasswordError(null);
-
+  const updatePassword = async () => {
     const supabase = createClient();
-    submittingRef.current = true;
-    setIsLoading(true);
-    let navigationStarted = false;
 
     try {
       const { error } = await withDeadline(
@@ -72,8 +54,7 @@ export function UpdatePasswordForm({
       );
       if (error) throw error;
       router.push("/portal");
-      navigationStarted = true;
-      recoverStalledNavigation();
+      return NAVIGATED;
     } catch (error: unknown) {
       if ((error as { code?: unknown } | null)?.code === "weak_password") {
         setPasswordError(PASSWORD_TOO_SHORT_ERROR);
@@ -82,12 +63,20 @@ export function UpdatePasswordForm({
           getAuthActionErrorMessage(error, AUTH_ACTION_ERRORS.passwordUpdate),
         );
       }
-    } finally {
-      if (!navigationStarted) {
-        submittingRef.current = false;
-        setIsLoading(false);
-      }
     }
+  };
+
+  const handleUpdatePassword = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    if (!isPasswordLongEnough(password)) {
+      setPasswordError(PASSWORD_TOO_SHORT_ERROR);
+      return;
+    }
+    setPasswordError(null);
+
+    void run(updatePassword);
   };
 
   return (

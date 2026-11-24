@@ -24,6 +24,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 
 /*
@@ -68,21 +69,6 @@ const LIST_EXIT = { [RECORD_EXPAND]: "record-fade", default: "none" };
  */
 const MORPH_QUERY = "(min-width: 640px) and (prefers-reduced-motion: no-preference)";
 
-function subscribeMorph(onChange: () => void) {
-  if (typeof window.matchMedia !== "function") return () => {};
-  const query = window.matchMedia(MORPH_QUERY);
-  query.addEventListener("change", onChange);
-  return () => query.removeEventListener("change", onChange);
-}
-
-function getMorphSnapshot() {
-  return (
-    typeof window.matchMedia === "function" &&
-    window.matchMedia(MORPH_QUERY).matches &&
-    "startViewTransition" in document
-  );
-}
-
 /**
  * The `transitionTypes` for a link from a record's drawer to its full page
  * (`expand`) or back (`collapse`), so the panel morphs between them. None on
@@ -90,7 +76,7 @@ function getMorphSnapshot() {
  * swaps instantly, as any other navigation does.
  */
 export function useRecordMorphTypes(direction: "expand" | "collapse"): string[] | undefined {
-  const morph = React.useSyncExternalStore(subscribeMorph, getMorphSnapshot, () => false);
+  const morph = useMediaQuery(MORPH_QUERY) && "startViewTransition" in document;
   if (!morph) return undefined;
   return [direction === "expand" ? RECORD_EXPAND : RECORD_COLLAPSE];
 }

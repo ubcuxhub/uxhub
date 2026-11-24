@@ -2,6 +2,7 @@ import { CalendarX, CircleMinus, Hourglass, Lock, type LucideIcon } from "lucide
 
 import type { StatusBadgeSpec } from "@/components/ui/status-badge";
 import { formatEventDate, formatEventTime } from "@/lib/date";
+import { formatDollars } from "@/lib/money";
 
 import type { EventState } from "./event-states";
 
@@ -111,15 +112,13 @@ const releaseMoment = (value: string) => {
   return time ? `${longDate(value)} at ${time}` : longDate(value);
 };
 
-const currency = new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" });
-
 const KEEP_AN_EYE_OUT =
   "Keep an eye out for upcoming events. We’d love to see you at the next one.";
 
 /** The price line before registering; nothing when it's free. */
 function priceLine({ amount, isMember }: PanelContext["price"]): string | undefined {
   if (amount <= 0) return undefined;
-  return `CA${currency.format(amount)} for ${isMember ? "members" : "non-members"}`;
+  return `CA${formatDollars(amount)} for ${isMember ? "members" : "non-members"}`;
 }
 
 export function getPanelSpec(state: EventState, context: PanelContext): PanelSpec {

@@ -3,11 +3,9 @@
 import { act, cleanup, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  BrandMotion,
-  FINE_POINTER_QUERY,
-  REDUCED_MOTION_QUERY,
-} from "./BrandMotion";
+import { FINE_POINTER_QUERY, REDUCED_MOTION_QUERY } from "@/hooks/use-media-query";
+
+import { BrandMotion } from "./BrandMotion";
 import { BRAND_SHAPES } from "./brand-shapes";
 
 type Listener = () => void;

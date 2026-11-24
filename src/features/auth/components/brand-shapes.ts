@@ -22,12 +22,6 @@ export interface BrandShape {
   drift: number;
 }
 
-/** Figma tiles are 128px on the 480px panel. */
-export const BRAND_SHAPE_SIZE = 128;
-export const BRAND_PANEL_WIDTH = 480;
-/** Each tile's fall; the last one lands at 1050 + 900 ≈ 2s. */
-export const BRAND_SHAPE_FALL_MS = 900;
-
 export const BRAND_SHAPES: readonly BrandShape[] = [
   { name: "flower", src: "/auth/shapes/flower.png", left: 143, bottom: 126.8, tilt: -20, delay: 870, drift: 11_000 },
   { name: "burst", src: "/auth/shapes/burst.png", left: 281, bottom: 0, tilt: -10, delay: 510, drift: 13_000 },

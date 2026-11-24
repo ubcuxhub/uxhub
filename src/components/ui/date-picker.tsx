@@ -3,46 +3,19 @@
 import * as React from "react"
 import { type DayButton } from "react-day-picker"
 
-import { Calendar } from "@/components/ui/calendar"
-import { type IsoDate } from "@/lib/date-input"
+import { Calendar, CalendarDayButton } from "@/components/ui/calendar"
+import { isoToLocalDate, localDateToIso, type IsoDate } from "@/lib/date-input"
 import { usePacificNow } from "@/hooks/use-pacific-now"
 import { cn } from "@/lib/utils"
 
-/** `IsoDate` to a local-midnight `Date`, which is what react-day-picker wants. */
-function isoToLocalDate(iso: IsoDate) {
-  const [year, month, day] = iso.split("-").map(Number)
-  return new Date(year, month - 1, day)
-}
-
-function localDateToIso(date: Date): IsoDate {
-  const pad = (n: number) => String(n).padStart(2, "0")
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` as IsoDate
-}
-
-/** The calendar's own day button: a 40px circle (`DatePicker/Day`, §3.11). */
+/** The calendar's day button at the picker's 40px (`DatePicker/Day`, §3.11). */
 function PickerDayButton({
   className,
-  day,
-  modifiers,
   ...props
 }: React.ComponentProps<typeof DayButton>) {
-  const ref = React.useRef<HTMLButtonElement>(null)
-  React.useEffect(() => {
-    if (modifiers.focused) ref.current?.focus()
-  }, [modifiers.focused])
-
   return (
-    <button
-      ref={ref}
-      type="button"
-      // ISO, not toLocaleDateString(): the same on the server and every browser.
-      data-day={localDateToIso(day.date)}
-      data-selected={modifiers.selected || undefined}
-      data-today={(modifiers.today && !modifiers.selected) || undefined}
-      className={cn(
-        "flex size-10 cursor-pointer items-center justify-center rounded-full border border-transparent text-small text-foreground transition-colors duration-150 select-none hover:bg-muted focus-visible:focus-ring disabled:pointer-events-none disabled:text-disabled-foreground data-[today]:border-border data-[selected]:bg-primary data-[selected]:font-medium data-[selected]:text-primary-foreground data-[selected]:hover:bg-primary-hover",
-        className
-      )}
+    <CalendarDayButton
+      className={cn("size-10 min-w-10 data-[selected-single=true]:font-medium", className)}
       {...props}
     />
   )

@@ -33,7 +33,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { IconButton } from "@/components/ui/icon-button";
 import { Separator } from "@/components/ui/separator";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import {
   formatEventDate,
@@ -198,7 +198,9 @@ export function ReviewerNotes({
       </CardHeader>
       <CardContent className="flex flex-col gap-5">
         {status === "loading" ? (
-          <NotesSkeleton />
+          <div className="flex justify-center py-6">
+            <Spinner label="Loading notes" />
+          </div>
         ) : status === "error" ? (
           <EmptyState
             size="inline"
@@ -260,24 +262,6 @@ export function ReviewerNotes({
         </p>
       </CardContent>
     </Card>
-  );
-}
-
-function NotesSkeleton() {
-  return (
-    <div aria-busy className="flex flex-col gap-5">
-      <span className="sr-only">Loading notes</span>
-      {["w-24", "w-32", "w-20"].map((width) => (
-        <div key={width} className="flex gap-3">
-          <Skeleton className="size-8 shrink-0 rounded-full" />
-          <div className="flex flex-1 flex-col gap-2 pt-1">
-            <Skeleton className={cn("h-3.5 rounded-full", width)} />
-            <Skeleton className="h-3 w-full rounded-full" />
-            <Skeleton className="h-3 w-3/4 rounded-full" />
-          </div>
-        </div>
-      ))}
-    </div>
   );
 }
 

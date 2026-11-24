@@ -3,6 +3,7 @@ import {
   encodeCheckboxResponse,
   hasApplicationAnswer,
 } from "@/lib/application-response";
+import { isYearLevel, YEAR_LABELS } from "@/lib/constants";
 import type { EventApplicationQuestionRow, EventRow } from "@/lib/supabase/models";
 
 /**
@@ -218,16 +219,8 @@ function isStringArray(value: unknown): value is string[] {
   return Array.isArray(value) && value.every((item) => typeof item === "string");
 }
 
-const YEAR_LEVELS: Record<string, string> = {
-  "1": "1st year",
-  "2": "2nd year",
-  "3": "3rd year",
-  "4": "4th year",
-  "5+": "5th year or later",
-};
-
 /** "3rd year" for a profile's `year`; "Not set" when it is empty. */
 export function formatYearLevel(year: string | null | undefined): string {
   if (!year) return "Not set";
-  return YEAR_LEVELS[year] ?? year;
+  return isYearLevel(year) ? YEAR_LABELS[year] : year;
 }

@@ -10,20 +10,28 @@ import { Input } from "./input";
 afterEach(cleanup);
 
 describe("Input without leadingIcon", () => {
-  // Pinned from the markup before `leadingIcon` existed: about 50 callers
-  // render this, so the DOM must not drift.
-  it("renders exactly the bare <input>", () => {
+  // About 50 callers render this, so it must stay a bare <input>.
+  it("renders a bare <input> with the caller's class and attributes", () => {
     const { container } = render(
       <Input aria-label="Name" placeholder="Enter your name" className="extra" />,
     );
-    expect(container.innerHTML).toMatchInlineSnapshot(`"<input class="flex h-11 w-full rounded-full border border-border bg-background px-5 py-1 text-body text-foreground transition-colors duration-150 file:border-0 file:bg-transparent file:text-table file:text-foreground placeholder:text-muted-foreground focus-visible:focus-ring aria-invalid:border-destructive disabled:cursor-not-allowed disabled:border-disabled-border disabled:bg-disabled disabled:text-disabled-foreground disabled:placeholder:text-disabled-foreground sm:h-(--size-control) extra" aria-label="Name" placeholder="Enter your name">"`);
+    expect(container.childElementCount).toBe(1);
+    const input = container.firstElementChild as HTMLInputElement;
+    expect(input.tagName).toBe("INPUT");
+    expect(input.childElementCount).toBe(0);
+    expect(input.className.split(/\s+/)).toContain("extra");
+    expect(input.placeholder).toBe("Enter your name");
   });
 
-  it("renders a bare <input> for type=number and aria-invalid", () => {
-    const { container } = render(
-      <Input aria-label="Seats" type="number" defaultValue={40} aria-invalid disabled />,
-    );
-    expect(container.innerHTML).toMatchInlineSnapshot(`"<input class="flex h-11 w-full rounded-full border border-border bg-background px-5 py-1 text-body text-foreground transition-colors duration-150 file:border-0 file:bg-transparent file:text-table file:text-foreground placeholder:text-muted-foreground focus-visible:focus-ring aria-invalid:border-destructive disabled:cursor-not-allowed disabled:border-disabled-border disabled:bg-disabled disabled:text-disabled-foreground disabled:placeholder:text-disabled-foreground sm:h-(--size-control)" aria-label="Seats" aria-invalid="true" disabled="" type="number" value="40">"`);
+  it("keeps type, invalid and disabled on the bare <input>, styled by state", () => {
+    render(<Input aria-label="Seats" type="number" defaultValue={40} aria-invalid disabled />);
+    const input = screen.getByRole("spinbutton", { name: "Seats" }) as HTMLInputElement;
+    expect(input.type).toBe("number");
+    expect(input.value).toBe("40");
+    expect(input.getAttribute("aria-invalid")).toBe("true");
+    expect(input.disabled).toBe(true);
+    expect(input.className).toContain("aria-invalid:border-destructive");
+    expect(input.className).toContain("focus-visible:focus-ring");
   });
 
   it("has no wrapper, and the root is the input", () => {

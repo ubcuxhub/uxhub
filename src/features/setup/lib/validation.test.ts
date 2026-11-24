@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-import { ALLERGY_OPTIONS, AVATAR_PRESETS, DIET_OPTIONS, interestLabel } from "./options";
+import { ALLERGY_OPTIONS, AVATAR_PRESETS, DIET_OPTIONS } from "./options";
 import {
   isSetupStep,
   normalizeOtherAllergies,
@@ -48,11 +48,6 @@ describe("parseInterests", () => {
     expect(parseInterests([])).toEqual([]);
     expect(() => parseInterests(["UX research"])).toThrow("interests");
     expect(() => parseInterests(undefined)).toThrow();
-  });
-
-  it("labels taxonomy ids and passes managers' free tags through", () => {
-    expect(interestLabel("internships-and-co-op")).toBe("Internships and co-op");
-    expect(interestLabel("Typography")).toBe("Typography");
   });
 });
 

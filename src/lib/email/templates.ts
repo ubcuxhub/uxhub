@@ -1,14 +1,8 @@
 import { formatEventDate, formatEventTime } from "@/lib/date";
+import { formatCents } from "@/lib/money";
 import type { EventRow, MembershipTypeRow, PurchaseRow } from "@/lib/supabase/models";
 
 import { escapeHtml, renderEmailLayout } from "./layout";
-
-function formatAmount(amountCents: number, currency: string) {
-  return new Intl.NumberFormat("en-CA", {
-    style: "currency",
-    currency,
-  }).format(amountCents / 100);
-}
 
 /** One label/value line inside the details block. Skipped when value is empty. */
 export function detailRow(label: string, value: string | null | undefined) {
@@ -64,7 +58,7 @@ export function renderMembershipConfirmationEmail({
   const expiryDate = formatEventDate(expiresAt);
   const details = [
     detailRow("Membership", membershipType.name),
-    detailRow("Amount paid", formatAmount(purchase.amount_cents, purchase.currency)),
+    detailRow("Amount paid", formatCents(purchase.amount_cents, { currency: purchase.currency })),
     detailRow("Purchased on", formatEventDate(purchase.created_at)),
     detailRow("Expires on", expiryDate),
     detailRow("Order ID", purchase.id),
@@ -147,7 +141,7 @@ function renderEventDetailRows(
     detailRow("Time", timeRange),
     detailRow("Location", location),
     addressRow(event.location_address, event.location_address_url),
-    detailRow("Amount paid", formatAmount(purchase.amount_cents, purchase.currency)),
+    detailRow("Amount paid", formatCents(purchase.amount_cents, { currency: purchase.currency })),
     detailRow("Order ID", purchase.id),
   ].join("");
 }

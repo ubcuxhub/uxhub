@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Field, FieldContent, FieldDescription, FieldError, FieldLabel, FieldSet, FieldLegend, FieldTitle } from "@/components/ui/field";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { formatDollars } from "@/lib/money";
 import { priceError } from "../../lib/event-configuration";
 import type { EventFormState } from "./event-form-schema";
 
@@ -19,7 +20,7 @@ interface Props {
 
 export function EventPricing({ state, locked, effectivePrices, onChange, showErrors = false }: Props) {
   const error = showErrors && state.pricing_mode === "paid" ? priceError(state.pricing_amount) : null;
-  const summary = effectivePrices && `Non-members: $${effectivePrices.regular.toFixed(2)} CAD · Members: $${effectivePrices.member.toFixed(2)} CAD`;
+  const summary = effectivePrices && `Non-members: ${formatDollars(effectivePrices.regular)} CAD · Members: ${formatDollars(effectivePrices.member)} CAD`;
   return <div data-slot="card" className="@container/pricing space-y-4 rounded-xl border border-border bg-card p-5">
     <div className="space-y-0.5 border-b border-border-subtle pb-4">
       <h3 className="text-subheading">Pricing</h3>
@@ -28,9 +29,9 @@ export function EventPricing({ state, locked, effectivePrices, onChange, showErr
     {locked ? <Alert variant="neutral" aria-label="Pricing is locked" icon={<Lock aria-hidden strokeWidth={1.5} className="text-muted-foreground" />} className="gap-2.5 py-3.5">
       <AlertTitle className="font-semibold">{summary}</AlertTitle>
       <AlertDescription className="mt-0.5 text-muted-foreground">Locked because registrations or payments exist. A new price would treat people differently for the same event.</AlertDescription>
-      {state.pricing_mode !== "legacy" && <p className="mt-2 text-small text-muted-foreground">Saved configuration: {state.pricing_mode === "free" ? "Free" : `$${Number(state.pricing_amount).toFixed(2)} CAD for non-members`}.</p>}
+      {state.pricing_mode !== "legacy" && <p className="mt-2 text-small text-muted-foreground">Saved configuration: {state.pricing_mode === "free" ? "Free" : `${formatDollars(Number(state.pricing_amount))} CAD for non-members`}.</p>}
     </Alert>
-      : state.pricing_mode === "legacy" ? <div className="space-y-3"><p>{summary || `Non-members: ${state.regular_price ? `$${state.regular_price} CAD` : "Not set"} · Members: ${state.member_price ? `$${state.member_price} CAD` : "Not set"}`}</p><p className="text-small text-muted-foreground">Existing prices are preserved. Choose Free or Paid to configure the new pricing policy.</p><Button type="button" variant="outline" onClick={() => { onChange("pricing_mode", state.regular_price.trim() !== "" && Number(state.regular_price) === 0 ? "free" : "paid"); onChange("pricing_amount", state.regular_price); }}>Configure Free/Paid pricing</Button></div>
+      : state.pricing_mode === "legacy" ? <div className="space-y-3"><p>{summary || `Non-members: ${state.regular_price ? `${formatDollars(Number(state.regular_price))} CAD` : "Not set"} · Members: ${state.member_price ? `${formatDollars(Number(state.member_price))} CAD` : "Not set"}`}</p><p className="text-small text-muted-foreground">Existing prices are preserved. Choose Free or Paid to configure the new pricing policy.</p><Button type="button" variant="outline" onClick={() => { onChange("pricing_mode", state.regular_price.trim() !== "" && Number(state.regular_price) === 0 ? "free" : "paid"); onChange("pricing_amount", state.regular_price); }}>Configure Free/Paid pricing</Button></div>
       : <>
         <FieldSet className="gap-4">
           <FieldLegend className="sr-only">Ticket pricing</FieldLegend>

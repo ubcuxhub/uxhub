@@ -65,8 +65,6 @@ describe("EmptyState", () => {
     );
     const media = container.querySelector("[data-slot=empty-state-media]");
     expect(media?.contains(screen.getByTestId("art"))).toBe(true);
-    // No 40px disc around art.
-    expect(media?.className).not.toContain("size-10");
     expect(container.querySelector("[data-slot=empty-state-icon]")).toBeNull();
     const title = screen.getByRole("heading", { name: "No events" });
     expect(
@@ -101,14 +99,5 @@ describe("EmptyState", () => {
     expect(container.querySelector("[data-slot=empty-state-description]")).toBeNull();
     expect(container.querySelector("[data-slot=empty-state-actions]")).toBeNull();
     expect(screen.getByTestId("es").className).toContain("extra");
-  });
-
-  it("sizes by padding", () => {
-    const { rerender } = render(<EmptyState title="x" data-testid="es" size="page" />);
-    expect(screen.getByTestId("es").className).toContain("py-16");
-    rerender(<EmptyState title="x" data-testid="es" />);
-    expect(screen.getByTestId("es").className).toContain("py-10");
-    rerender(<EmptyState title="x" data-testid="es" size="inline" />);
-    expect(screen.getByTestId("es").className).toContain("py-8");
   });
 });

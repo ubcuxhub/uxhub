@@ -1,3 +1,4 @@
+import { isYearLevel } from "@/lib/constants";
 import type { UserInfoUpdate } from "@/lib/supabase/models";
 
 /**
@@ -68,7 +69,7 @@ export function managerUserUpdate(field: string, value: unknown): UserInfoUpdate
     throw new UserEditRefusal("Choose a newsletter preference.");
   }
 
-  if (databaseField === "year" && value !== null && !["1", "2", "3", "4", "5+"].includes(String(value))) {
+  if (databaseField === "year" && value !== null && !isYearLevel(value)) {
     throw new UserEditRefusal("Invalid university year.");
   }
 

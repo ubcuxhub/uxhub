@@ -48,7 +48,6 @@ import {
   REVIEW_SORTS,
   REVIEW_STATE_QUEUE,
   STUDENT_STATUS_LABELS,
-  YEAR_LABELS,
   countReviewFilters,
   countReviewStates,
   filterReviewItems,
@@ -62,6 +61,7 @@ import {
   type ReviewListQuery,
   type ReviewSort,
 } from "@/features/admin/lib/application-review";
+import { YEAR_LABELS } from "@/lib/constants";
 import { formatEventDate } from "@/lib/date";
 
 interface ReviewApplicationsClientProps {

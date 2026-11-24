@@ -24,6 +24,9 @@ interface SuccessOverlayProps {
  *
  * It stays in the page flow (`fixed inset-0`, no portal) so the gallery can
  * draw it inside a transformed frame.
+ *
+ * Kept as a documented design-system part (`/dev/components/success-overlay`);
+ * no product screen uses it yet.
  */
 export function SuccessOverlay({ message, onClose }: SuccessOverlayProps) {
   const titleId = useId();
