@@ -214,7 +214,7 @@ describe("member setup against local Supabase", () => {
     const member = await signUp(fixtures);
     // A lapsed membership no longer holds the type.
     await setColumns(member.id, {
-      student_number: 12345678,
+      student_number: 37201946,
       faculty: "Faculty of Arts",
       major: "Design",
       year: "2",
@@ -278,7 +278,7 @@ describe("member setup against local Supabase", () => {
   it("doesn't change eligibility in Settings or membership join after a membership lands mid-request", () => withFixtures(async (fixtures) => {
     const tier = await fixtures.createMembershipType();
     const member = await signUp(fixtures);
-    await setColumns(member.id, { student_number: 12345678, faculty: "Faculty of Science" });
+    await setColumns(member.id, { student_number: 37201946, faculty: "Faculty of Science" });
     await nextRequest(member.id);
     // A checkout completes after this request loaded the row.
     await setColumns(member.id, { membership_pre_ordered_type_id: tier.id });
@@ -294,7 +294,7 @@ describe("member setup against local Supabase", () => {
     })).toMatchObject({ ok: false });
 
     const { data: row } = await db.from("user_info").select("*").eq("id", member.id).single();
-    expect(row).toMatchObject({ user_type: "ubcStudent", student_number: 12345678, faculty: "Faculty of Science" });
+    expect(row).toMatchObject({ user_type: "ubcStudent", student_number: 37201946, faculty: "Faculty of Science" });
   }));
 
   it("only stores a faculty from the list when Settings saves eligibility", () => withFixtures(async (fixtures) => {
@@ -302,13 +302,13 @@ describe("member setup against local Supabase", () => {
     for (const faculty of ["x".repeat(5000), 42 as unknown as string]) {
       await expect(updateEligibilityProfileAction({
         userType: "ubcStudent",
-        studentNumber: "12345678",
+        studentNumber: "37201946",
         faculty,
       })).rejects.toThrow("Select a valid faculty.");
     }
-    await updateEligibilityProfileAction({ userType: "ubcStudent", studentNumber: "12345678", faculty: "Faculty of Science" });
+    await updateEligibilityProfileAction({ userType: "ubcStudent", studentNumber: "37201946", faculty: "Faculty of Science" });
     const { data: row } = await db.from("user_info").select("student_number, faculty").eq("id", member.id).single();
-    expect(row).toEqual({ student_number: 12345678, faculty: "Faculty of Science" });
+    expect(row).toEqual({ student_number: 37201946, faculty: "Faculty of Science" });
   }));
 
   it("requires a signed-in member", () => withFixtures(async () => {
