@@ -2,6 +2,8 @@ import type { EventGroup } from "@/features/events/types";
 import { formatEventDate, pacificDate } from "@/lib/date";
 import type { EventRow } from "@/lib/supabase/models";
 
+import { hasEventEnded } from "./event-rules";
+
 export function groupEventsByMonth(events: EventRow[]): EventGroup[] {
   const groups = new Map<string, EventGroup>();
 
@@ -25,9 +27,12 @@ export function groupEventsByMonth(events: EventRow[]): EventGroup[] {
   return [...groups.values()];
 }
 
-/** An event is past once it ends, or once it starts if it has no end. */
-export function splitEventsByTime(events: EventRow[], now: Date) {
-  const isPast = (e: EventRow) => Date.parse(e.ends_at ?? e.starts_at!) < now.getTime();
+/**
+ * Dated events split into upcoming (soonest first, as given) and past (most
+ * recent first). An event is past once it ends (`hasEventEnded`).
+ */
+export function splitEventsByTime<E extends Pick<EventRow, "starts_at" | "ends_at">>(events: E[], now: Date) {
+  const isPast = (e: E) => hasEventEnded(e, now);
   const dated = events.filter((e) => e.starts_at);
   return {
     upcomingEvents: dated.filter((e) => !isPast(e)),

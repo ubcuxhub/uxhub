@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import type { EventState } from "@/features/events/lib/event-states";
+import { eventEndsAt, eventPriceFor } from "@/features/events/lib/event-rules";
 import {
   getPanelSpec,
   type ActionLayoutProps,
@@ -15,7 +16,6 @@ import {
   type PanelContext,
   type TicketLayoutProps,
 } from "@/features/events/lib/registration-panel";
-import { hasActiveMembership } from "@/features/memberships/lib/expiry";
 import { getMembershipTermEndsAt } from "@/features/memberships/lib/term";
 import { hasApplicationAnswer } from "@/lib/application-response";
 import { formatEventDateLabel, pacificDate } from "@/lib/date";
@@ -91,16 +91,13 @@ export async function RegistrationPanel({ event, user, state, unavailable }: Reg
     ? refundStatus(await fetchPurchaseById(supabase, ticketRow.purchase_id))
     : null;
 
-  const isMember = event.pricing_policy === "figma"
-    ? hasActiveMembership(user, membershipTermEndsAt)
-    : Boolean(user.membership_type_id);
-  const amount = isMember ? event.member_price : event.regular_price;
+  // The checkout's rule too (EventCheckout), so the two never disagree.
+  const { amount, isMember } = eventPriceFor(event, user, membershipTermEndsAt);
   if (amount === null) return <Alert>Registration is unavailable until event pricing is configured.</Alert>;
   const context: PanelContext = {
     eventName: event.name,
     eventSlug: event.slug,
-    endsAt: event.ends_at ?? event.starts_at,
-    // The checkout's own rule (EventCheckout), so the two never disagree.
+    endsAt: eventEndsAt(event),
     price: { amount, isMember },
     participantPackageUrl: links.find((link) => link.type === "participant_package")?.url ?? null,
     draftProgress,
