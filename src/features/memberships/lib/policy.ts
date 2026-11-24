@@ -21,12 +21,6 @@ export const MEMBERSHIP_AUDIENCES = [
 
 export type MembershipAudience = (typeof MEMBERSHIP_AUDIENCES)[number];
 
-const AUDIENCE_TO_USER_TYPE: Record<MembershipAudience, UserType> = {
-  student: "ubcStudent",
-  faculty: "faculty",
-  "non-ubc": "nonUbc",
-};
-
 const USER_TYPE_TO_AUDIENCE: Record<UserType, MembershipAudience> = {
   ubcStudent: "student",
   faculty: "faculty",
@@ -35,10 +29,6 @@ const USER_TYPE_TO_AUDIENCE: Record<UserType, MembershipAudience> = {
 
 export function isMembershipAudience(value: string): value is MembershipAudience {
   return MEMBERSHIP_AUDIENCES.includes(value as MembershipAudience);
-}
-
-export function audienceToUserType(audience: MembershipAudience): UserType {
-  return AUDIENCE_TO_USER_TYPE[audience];
 }
 
 export function userTypeToAudience(userType: UserType): MembershipAudience {
