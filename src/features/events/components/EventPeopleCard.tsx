@@ -20,6 +20,8 @@ interface PersonItem {
   id: string;
   name: string;
   subtitle: string | null;
+  /** A line or two about them, under the subtitle. */
+  description: string | null;
   imageUrl: string | null;
   link: { href: string; label: string; ariaLabel: string; icon: ReactNode } | null;
 }
@@ -52,6 +54,7 @@ function mentorItem(mentor: MentorRow): PersonItem {
     id: mentor.id,
     name: mentor.full_name,
     subtitle: mentor.position,
+    description: mentor.description,
     imageUrl: mentor.profile_image_path,
     link: mentor.linkedin_url
       ? {
@@ -74,6 +77,7 @@ function sponsorItem(sponsor: SponsorRow): PersonItem {
     id: sponsor.id,
     name: sponsor.name,
     subtitle: null,
+    description: null,
     imageUrl: sponsor.brand_logo_path,
     link: null,
   };
@@ -112,6 +116,9 @@ export function EventPeopleCard(props: EventPeopleCardProps) {
             <div className="flex min-w-0 flex-1 flex-col gap-1">
               <p className="text-subheading">{person.name}</p>
               {person.subtitle && <p className="text-muted-foreground">{person.subtitle}</p>}
+              {person.description && (
+                <p className="whitespace-pre-line text-small text-muted-foreground">{person.description}</p>
+              )}
             </div>
 
             {person.link && (
