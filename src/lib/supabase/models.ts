@@ -8,6 +8,8 @@ import type {
 export type AppSettingsRow = Tables<"app_settings">;
 export type AppSettingsUpdate = TablesUpdate<"app_settings">;
 
+export type AuditEventRow = Tables<"audit_events">;
+
 export type EventStaffVolunteerScheduleRow = Tables<"event_staff_volunteer_schedules">;
 export type EventContentSettingsRow = Tables<"event_content_settings">;
 
