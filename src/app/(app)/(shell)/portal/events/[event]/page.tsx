@@ -18,6 +18,7 @@ import { pacificDate } from "@/lib/date";
 import { resolveImagePreviewSrc } from "@/lib/event-image";
 import { fetchEventPeopleSections, fetchEventSponsors } from "@/lib/supabase-helpers/event-people";
 import { EventPeopleCard } from "@/features/events/components/EventPeopleCard";
+import { EventsBackPill } from "@/features/events/components/EventsBackPill";
 import { displayUrl, EventHeaderDetails, type EventWebsite } from "@/features/events/components/EventHeaderDetails";
 import { eventBadgeFor } from "@/features/events/lib/event-badge";
 import { loadEventStates } from "@/features/events/lib/event-states";
@@ -96,7 +97,9 @@ export default async function PortalEventPage({
         : null;
 
   return (
-    <PageContainer backHref="/portal/events" backLabel="Back to Events" className="space-y-6">
+    <PageContainer className="space-y-6">
+      {/* Back to the timeline view the student came from (Upcoming or Past). */}
+      <EventsBackPill />
       {/* RLS returns a draft to admins and managers only, so only they see this. */}
       {isDraftEvent(event) && (
         <Alert>This is a draft event. {DRAFT_EVENTS_NOTE}</Alert>

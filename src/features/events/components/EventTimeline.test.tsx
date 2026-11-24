@@ -41,6 +41,30 @@ const type = (text: string) => fireEvent.change(search(), { target: { value: tex
 const status = () => screen.queryByRole("status")?.textContent ?? null;
 
 describe("EventTimeline", () => {
+  it("titles this month Ongoing, with what started earlier and still runs", () => {
+    const series = event("studio", "Open Studio", "2026-05-19T17:00:00Z", { ends_at: "2028-11-19T18:30:00Z" });
+    const jam = event("jam", "Design Jam", "2026-11-20T02:00:00Z");
+    const tour = event("tour", "Office Tour", "2026-12-10T20:00:00Z");
+    render(<EventTimeline upcomingEvents={[series, jam, tour]} pastEvents={[]} currentMonth="2026-11" />);
+    expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual([
+      "Ongoing",
+      "December 2026",
+    ]);
+  });
+
+  it("leaves the next month its own name when nothing is on this month", () => {
+    const tour = event("tour", "Office Tour", "2026-12-10T20:00:00Z");
+    render(<EventTimeline upcomingEvents={[tour]} pastEvents={[]} currentMonth="2026-11" />);
+    expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual(["December 2026"]);
+  });
+
+  it("remembers the view for the event page's Back to Events", () => {
+    render(<EventTimeline upcomingEvents={UPCOMING} pastEvents={PAST} />);
+    expect(window.sessionStorage.getItem("uxhub:events-view")).toBe("upcoming");
+    fireEvent.click(screen.getByRole("radio", { name: "Past" }));
+    expect(window.sessionStorage.getItem("uxhub:events-view")).toBe("past");
+  });
+
   it("keeps the view in the URL, so coming back to the page keeps Past", () => {
     window.history.replaceState(null, "", "/portal/events");
     const first = render(<EventTimeline upcomingEvents={UPCOMING} pastEvents={PAST} />);

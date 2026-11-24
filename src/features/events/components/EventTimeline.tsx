@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,7 @@ import { SegmentedToggle, SegmentedToggleItem } from "@/components/ui/segmented-
 import type { EventBadge } from "@/features/events/types";
 import type { EventRow } from "@/lib/supabase/models";
 import { groupEventsByMonth, normalizeString } from "@/features/events/lib/event-timeline";
+import { writeEventsView } from "@/features/events/lib/events-view";
 import { EventTimelineRail } from "./EventTimelineRail";
 
 interface EventTimelineProps {
@@ -39,6 +40,9 @@ export function EventTimeline({
   // server round trip or a new history entry.
   const searchParams = useSearchParams();
   const [showPastEvents, setShowPastEvents] = useState(searchParams.get("view") === "past");
+  // Remember the view for this tab, so an event page's Back to Events returns
+  // to it (the back button gets it from the URL).
+  useEffect(() => writeEventsView(showPastEvents ? "past" : "upcoming"), [showPastEvents]);
   const showView = (view: string) => {
     const past = view === "past";
     setShowPastEvents(past);
@@ -67,10 +71,14 @@ export function EventTimeline({
   }) : displayedEvents;
 
   // group events by month
-  // Ongoing events sit under this month in Upcoming, not the month they began.
+  // Upcoming opens on this month, titled Ongoing: what's running now (started
+  // earlier, still on) and the rest of this month. Only this month is renamed;
+  // with nothing in it, the next month keeps its own name.
   const filteredGroups = groupEventsByMonth(filteredEvents, {
     from: showPastEvents ? undefined : currentMonth,
-  });
+  }).map((group) =>
+    !showPastEvents && group.key === currentMonth ? { ...group, label: "Ongoing" } : group
+  );
 
   const clearSearch = () => {
     setSearchQuery("");
