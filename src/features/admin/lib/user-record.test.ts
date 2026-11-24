@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { UserInfoRow } from "@/lib/supabase/models";
-import { mergeSavedUser, toUserRecord } from "./user-record";
+import { mergeSavedUser, toUserListRecord, toUserRecord } from "./user-record";
 
 const row = {
   id: "u1",
@@ -24,6 +24,26 @@ describe("toUserRecord", () => {
 
   it("exposes the deprecated order date as order_date", () => {
     expect(toUserRecord(row).order_date).toBe("2026-01-05");
+  });
+});
+
+describe("toUserListRecord", () => {
+  it("keeps only the listed columns, with the tier name", () => {
+    const listed = {
+      id: "u1",
+      first_name: "Dora",
+      last_name: "Lee",
+      email: "dora@example.test",
+      major: null,
+      role_access: "basic" as const,
+      membership_type_id: "tier-1",
+      created_at: "2026-01-05T00:00:00Z",
+    };
+    // A wider row (a stray `select("*")`) must not reach the browser.
+    expect(toUserListRecord({ ...listed, phone: "555", membership_types: [{ name: "Innovator" }] })).toEqual({
+      ...listed,
+      membership_type_name: "Innovator",
+    });
   });
 });
 

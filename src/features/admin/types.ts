@@ -62,6 +62,20 @@ export type UserRecord = UserInfoRow & {
   order_date?: string | null;
 };
 
+/** One row of the user directory: only what it shows, searches, sorts and filters on. */
+export type UserListRecord = Pick<
+  UserRecord,
+  | "id"
+  | "first_name"
+  | "last_name"
+  | "email"
+  | "major"
+  | "role_access"
+  | "membership_type_id"
+  | "created_at"
+  | "membership_type_name"
+>;
+
 export interface UserPurchaseSummary {
   id: string;
   title: string;
