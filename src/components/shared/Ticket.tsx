@@ -216,7 +216,18 @@ function Ticket({
         )}
         <div className="flex min-w-0 max-w-full flex-col gap-0.5">
           <p className="text-label">Ticket</p>
-          <p className="truncate text-subheading">{eventName}</p>
+          {/* The name wraps, and is cut short only when it would run out of
+              the 130px text column: 3 lines on its own, 2 under a caption,
+              1 beside an action. Long words break rather than overflow. */}
+          <p
+            data-slot="ticket-event-name"
+            className={cn(
+              "text-subheading wrap-anywhere",
+              action ? "line-clamp-1" : captionContent ? "line-clamp-2" : "line-clamp-3",
+            )}
+          >
+            {eventName}
+          </p>
           <p className="truncate text-small">{holderName}</p>
         </div>
       </div>
