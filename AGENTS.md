@@ -108,7 +108,10 @@ not match it, so a stale `.env.local` cannot silently redirect a run.
 ## Important Patterns
 
 - `src/proxy.ts` refreshes sessions for `/portal/*`, `/admin/*`, `/join/*`
-  (team invite links), and `/api/*`; it does not authorize users.
+  (team invite links), `/api/*`, `/auth/*` (except the callback) and
+  `/events/*`; it does not authorize users. Any route that reads the session
+  with the cookie client belongs in its matcher, since a Server Component
+  can't save a refreshed token.
 - `src/app/(app)/layout.tsx` calls `requireAuth()` and provides the current user.
   `src/app/(app)/(shell)/admin/layout.tsx` adds `requireAdmin()`. Keep access
   control in these server-side guards rather than relying on client UI.
