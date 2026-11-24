@@ -22,8 +22,8 @@ export function seedDateLocation(seed: SeedEvent): EventDateLocationDraft | null
   const location = {
     type: event.location_type ?? "in_person", building: event.location_building ?? "", room: event.location_room ?? "",
     address: event.location_address ?? "6133 University Boulevard, Vancouver, BC (demo)", map_url: event.location_address_url ?? "",
-    meeting_url: seed.privateDetails?.meeting_url ?? "", meeting_id: seed.privateDetails?.meeting_id ?? "",
-    meeting_passcode: seed.privateDetails?.meeting_passcode ?? "", public_summary: "UBC Vancouver — details after registration",
+    meeting_url: seed.meeting?.meeting_url ?? "", meeting_id: seed.meeting?.meeting_id ?? "",
+    meeting_passcode: seed.meeting?.meeting_passcode ?? "", public_summary: "UBC Vancouver — details after registration",
   };
   const dates: EventDateLocationDraft["dates"] = (seed.agendaDays ?? []).map((day, index) => {
     const date = day.date.toISOString().slice(0,10);

@@ -148,7 +148,7 @@ returning id \gset other_team_
 insert into public.team_members (event_id, team_id, user_id)
 values (:'event_id', :'team_a_id', :'user_a_id'), (:'event_id', :'team_a_id', :'user_b_id');
 
--- One link per visibility, and meeting details. The event has no dates, so it
+-- One link per visibility. The event has no dates, so it
 -- never ends and its after-event link stays hidden.
 insert into public.event_links (event_id, type, url, visibility)
 values
@@ -158,9 +158,6 @@ values
 
 insert into public.event_links (event_id, type, url)
 values (:'draft_event_id', 'slack_workspace', 'https://draft-slack.example.test');
-
-insert into public.event_private_details (event_id, meeting_url)
-values (:'event_id', 'https://zoom.example.test/j/1');
 
 set local role anon;
 do $$
@@ -277,15 +274,9 @@ begin
     raise exception 'anon can read a draft event link';
   end if;
 
-  if has_table_privilege('anon', 'public.event_private_details', 'SELECT') then
-    raise exception 'anon can read private event details';
-  end if;
-
   if has_table_privilege('anon', 'public.event_links', 'INSERT')
-     or has_table_privilege('authenticated', 'public.event_links', 'INSERT')
-     or has_table_privilege('authenticated', 'public.event_private_details', 'INSERT')
-     or has_table_privilege('authenticated', 'public.event_private_details', 'UPDATE') then
-    raise exception 'browser roles can write event links or private details';
+     or has_table_privilege('authenticated', 'public.event_links', 'INSERT') then
+    raise exception 'browser roles can write event links';
   end if;
 end;
 $$;
@@ -340,19 +331,12 @@ begin
   end if;
 
   -- User A holds a ticket: the going link too, but not the recap before the
-  -- event ends, and the meeting details.
+  -- event ends.
   select count(*) into visible_count
   from public.event_links
   where event_id = current_setting('rls.event_id')::uuid;
   if visible_count <> 2 then
     raise exception 'ticket holder should see the everyone and going links, saw %', visible_count;
-  end if;
-
-  select count(*) into visible_count
-  from public.event_private_details
-  where event_id = current_setting('rls.event_id')::uuid;
-  if visible_count <> 1 then
-    raise exception 'ticket holder cannot read the meeting details';
   end if;
 end;
 $$;
