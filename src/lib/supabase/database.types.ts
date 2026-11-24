@@ -1705,6 +1705,14 @@ export type Database = {
         Returns: boolean
       }
       admin_event_team_settings: { Args: { p_event_id: string }; Returns: Json }
+      admin_update_user_info: {
+        Args: { p_patch: Json; p_user_id: string }
+        Returns: undefined
+      }
+      admin_user_editable_columns: {
+        Args: Record<PropertyKey, never>
+        Returns: string[]
+      }
       agenda_draft_instant: {
         Args: { p_date: string; p_time: string }
         Returns: string
