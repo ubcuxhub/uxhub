@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   fetchSetupStepByAuthId: vi.fn(),
   requireAuth: vi.fn(),
   updateUserSetup: vi.fn(),
+  fetchUserSetup: vi.fn(),
   supabaseAdmin: { role: "service" },
 }));
 
@@ -18,11 +19,11 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 vi.mock("@/lib/supabase-helpers/setup", () => ({
   fetchSetupStepByAuthId: mocks.fetchSetupStepByAuthId,
-  fetchUserSetup: vi.fn(),
+  fetchUserSetup: mocks.fetchUserSetup,
   updateUserSetup: mocks.updateUserSetup,
 }));
 
-import { resolvePostSignInPath, saveBirthDateAction } from "./actions";
+import { finishSetupAction, resolvePostSignInPath, saveBirthDateAction } from "./actions";
 
 const SAVED_ROW = {
   setup_step: "dietary",
@@ -36,6 +37,24 @@ const SAVED_ROW = {
   interests: [],
   birth_date: "2000-02-29",
 };
+
+describe("finishSetupAction", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.requireAuth.mockResolvedValue({ id: "member-1", setup_step: "interests" });
+    mocks.updateUserSetup.mockImplementation(async (_db, _id, patch) => ({ ...SAVED_ROW, ...patch }));
+  });
+
+  it("replaces the member's chips but keeps the free tags execs added", async () => {
+    mocks.fetchUserSetup.mockResolvedValue({ ...SAVED_ROW, interests: ["Figma whiz", "uxathon"] });
+    await finishSetupAction({ interests: ["ux-research"] });
+    expect(mocks.fetchUserSetup).toHaveBeenCalledWith(mocks.supabaseAdmin, "member-1");
+    expect(mocks.updateUserSetup).toHaveBeenCalledWith(mocks.supabaseAdmin, "member-1", {
+      interests: ["Figma whiz", "ux-research"],
+      setup_step: "done",
+    });
+  });
+});
 
 describe("saveBirthDateAction", () => {
   beforeEach(() => {

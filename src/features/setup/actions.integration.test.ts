@@ -311,6 +311,16 @@ describe("member setup against local Supabase", () => {
     expect(row).toEqual({ student_number: 37201946, faculty: "Faculty of Science" });
   }));
 
+  it("keeps the free tags execs added when the member finishes setup", () => withFixtures(async (fixtures) => {
+    const member = await signUp(fixtures);
+    await setColumns(member.id, { interests: ["Figma whiz", "uxathon"] });
+    await nextRequest(member.id);
+
+    const done = await finishSetupAction({ interests: ["ux-research"] });
+    expect(done.interests).toEqual(["Figma whiz", "ux-research"]);
+    expect((await fetchUserSetup(db, member.id)).interests).toEqual(["Figma whiz", "ux-research"]);
+  }));
+
   it("requires a signed-in member", () => withFixtures(async () => {
     session.member = null;
     await expect(skipSetupStepAction("dietary")).rejects.toThrow("No member signed in");
