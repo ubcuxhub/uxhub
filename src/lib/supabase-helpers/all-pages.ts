@@ -1,6 +1,10 @@
-/** Staff check-in needs the complete population, beyond PostgREST's row cap.
- * Callers must order by a stable unique key and return at most this page size. */
-export async function fetchCheckInPages<T>(
+/**
+ * Every row a query matches, beyond PostgREST's `max_rows` cap (1000), which
+ * otherwise truncates a response without an error. `page` runs the query for
+ * one inclusive `range(from, to)`; it must order by a stable unique key (add
+ * `id` as a tiebreaker) so no row is skipped or repeated across pages.
+ */
+export async function fetchAllPages<T>(
   page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
 ): Promise<T[]> {
   const size = 500;

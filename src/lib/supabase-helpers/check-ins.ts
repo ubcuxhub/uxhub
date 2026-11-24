@@ -1,5 +1,5 @@
 import type { DbClient } from "./types";
-import { fetchCheckInPages } from "./check-in-pages";
+import { fetchAllPages } from "./all-pages";
 import { TABLES } from "./tables";
 import type {
   CheckInSessionInsert,
@@ -52,7 +52,7 @@ export async function fetchCheckInAttendees(
   supabase: DbClient,
   eventId: string
 ): Promise<CheckInAttendee[]> {
-  const data = await fetchCheckInPages<CheckInAttendeeQueryRow>((from, to) => supabase
+  const data = await fetchAllPages<CheckInAttendeeQueryRow>((from, to) => supabase
     .from(TABLES.eventTickets)
     .select("id,user_id,user_info!user_id(first_name,last_name,email)")
     .eq("event_id", eventId)

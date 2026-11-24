@@ -1,5 +1,5 @@
 import type { DbClient } from "./types";
-import { fetchCheckInPages } from "./check-in-pages";
+import { fetchAllPages } from "./all-pages";
 import { TABLES } from "./tables";
 import { fetchCheckInAttendees } from "./check-ins";
 import type { ItemCheckInSnapshot, ItemCheckInResult } from "@/features/admin/lib/item-check-in";
@@ -8,7 +8,7 @@ import { formatUserName } from "@/lib/user-name";
 /** Use a staff viewer client: activity and operator information are staff-only. */
 export async function fetchItemCheckInSnapshot(client: DbClient, eventId: string, itemId: string | null): Promise<ItemCheckInSnapshot> {
   const [agenda, attendees] = await Promise.all([
-    fetchCheckInPages((from, to) => client.from(TABLES.eventAgendaItems)
+    fetchAllPages((from, to) => client.from(TABLES.eventAgendaItems)
       .select("id,title,starts_at,ends_at,event_agenda_days!inner(event_id)")
       .eq("event_agenda_days.event_id", eventId).eq("check_in", true)
       .order("id").range(from, to)),
@@ -24,8 +24,8 @@ export async function fetchItemCheckInSnapshot(client: DbClient, eventId: string
   if (!sessions.data)
     return { refreshedAt: new Date().toISOString(), items, attendees, attendance: [] };
   const [rows, activity] = await Promise.all([
-    fetchCheckInPages((from, to) => client.from(TABLES.checkIns).select("ticket_id,attendance_version,checked_in_at").eq("check_in_session_id", sessions.data!.id).not("checked_in_at", "is", null).order("id").range(from, to)),
-    fetchCheckInPages((from, to) => client.from(TABLES.checkInActivity).select("attendance_version,method,user_info!operator_id(first_name,last_name)").eq("event_id", eventId).eq("item_id", itemId).is("undone_at", null).order("attendance_version").range(from, to)),
+    fetchAllPages((from, to) => client.from(TABLES.checkIns).select("ticket_id,attendance_version,checked_in_at").eq("check_in_session_id", sessions.data!.id).not("checked_in_at", "is", null).order("id").range(from, to)),
+    fetchAllPages((from, to) => client.from(TABLES.checkInActivity).select("attendance_version,method,user_info!operator_id(first_name,last_name)").eq("event_id", eventId).eq("item_id", itemId).is("undone_at", null).order("attendance_version").range(from, to)),
   ]);
   const byVersion = new Map(activity.map(a => [a.attendance_version, a]));
   const validTickets = new Set(attendees.map(a => a.id));

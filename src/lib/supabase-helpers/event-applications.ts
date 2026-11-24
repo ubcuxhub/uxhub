@@ -1,5 +1,6 @@
 import { hasActiveMembership } from "@/features/memberships/lib/expiry";
 
+import { fetchAllPages } from "./all-pages";
 import { fetchMembershipTermEndsAt } from "./app-settings";
 import type { DbClient } from "./types";
 import { TABLES } from "./tables";
@@ -184,49 +185,40 @@ export async function fetchEventApplicationSummaries(
   supabase: DbClient,
   eventId: string
 ): Promise<ApplicationSummary[]> {
-  const [applicationsResult, ticketsResult] = await Promise.all([
-    supabase
-      .from(TABLES.eventApplications)
-      .select("*")
-      .eq("event_id", eventId)
-      .neq("status", "draft")
-      .order("submitted_at", { ascending: false, nullsFirst: false })
-      .order("created_at", { ascending: false }),
-    supabase
-      .from(TABLES.eventTickets)
-      .select("user_id")
-      .eq("event_id", eventId),
-  ]);
-
-  if (applicationsResult.error) throw applicationsResult.error;
-  if (ticketsResult.error) throw ticketsResult.error;
-
-  const applications = (applicationsResult.data ?? []).filter(
-    isSubmittedApplication
-  );
-  if (applications.length === 0) return [];
-
-  const ticketHolders = new Set(
-    (ticketsResult.data ?? []).map((ticket) => ticket.user_id)
-  );
-  const [usersResult, termEndsAt] = await Promise.all([
-    supabase
-      .from(TABLES.userInfo)
-      .select(
-        "id, first_name, last_name, email, major, faculty, year, student_status, membership_type_id, membership_expires_at, membership_types!membership_type_id(name)"
-      )
-      .in(
-        "id",
-        applications.map((application) => application.user_id)
-      ),
+  // The applicant is embedded through the foreign key rather than read by a
+  // second `.in("id", ...)` query, whose id list would travel in the URL and
+  // outgrow the gateway's limit at a few hundred applicants. Both lists are
+  // paged past PostgREST's row cap.
+  const [rows, tickets, termEndsAt] = await Promise.all([
+    fetchAllPages((from, to) =>
+      supabase
+        .from(TABLES.eventApplications)
+        .select(
+          "*, applicant:user_info!user_id(first_name, last_name, email, major, faculty, year, student_status, membership_type_id, membership_expires_at, membership_types!membership_type_id(name))"
+        )
+        .eq("event_id", eventId)
+        .neq("status", "draft")
+        .order("submitted_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to)
+    ),
+    fetchAllPages((from, to) =>
+      supabase
+        .from(TABLES.eventTickets)
+        .select("user_id")
+        .eq("event_id", eventId)
+        .order("id")
+        .range(from, to)
+    ),
     fetchMembershipTermEndsAt(supabase),
   ]);
-  if (usersResult.error) throw usersResult.error;
-  const userById = new Map((usersResult.data ?? []).map((user) => [user.id, user]));
 
-  return applications.map((application) => {
-    const user = userById.get(application.user_id);
-    return {
+  const ticketHolders = new Set(tickets.map((ticket) => ticket.user_id));
+
+  return rows.flatMap(({ applicant: user, ...application }) => {
+    if (!isSubmittedApplication(application)) return [];
+    return [{
       applicationId: application.id,
       userId: application.user_id,
       name: user ? formatUserName(user) : "Unknown User",
@@ -239,7 +231,7 @@ export async function fetchEventApplicationSummaries(
       status: application.status,
       offerExpiresAt: application.offer_expires_at,
       hasTicket: ticketHolders.has(application.user_id),
-    };
+    }];
   });
 }
 
