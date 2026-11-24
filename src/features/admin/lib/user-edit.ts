@@ -53,8 +53,11 @@ export function userEditChanges(user: UserRecord, draft: UserEditDraft, membersh
   for (const field of USER_EDIT_FIELDS) {
     if (draft.fields[field] === original.fields[field]) continue;
     const value = draft.fields[field];
-    if (field === "first_name" || field === "last_name") {
-      if (!value.trim()) throw new Error(`${field === "first_name" ? "First" : "Last"} name is required.`);
+    if (field === "first_name") {
+      if (!value.trim()) throw new Error("First name is required.");
+      changes[field] = value.trim();
+    } else if (field === "last_name") {
+      // Optional: a member with one name has an empty last name.
       changes[field] = value.trim();
     } else if (field === "email") {
       // Mirrors saveManagerUserDetailsAction: a linked account's address is its sign-in email.

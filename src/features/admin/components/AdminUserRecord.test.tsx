@@ -340,6 +340,21 @@ describe("AdminUserRecord: editing", () => {
     expect(mocks.verifyStudent).not.toHaveBeenCalled();
   });
 
+  it("clears the last name of a member with one name, and refuses a blank first name", async () => {
+    renderRecord();
+    edit();
+    fireEvent.change(textbox("First name"), { target: { value: " " } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(screen.getByRole("alert").textContent).toContain("First name is required.");
+    expect(mocks.saveDetails).not.toHaveBeenCalled();
+
+    fireEvent.change(textbox("First name"), { target: { value: "Dora" } });
+    fireEvent.change(textbox("Last name"), { target: { value: "  " } });
+    await saveAndFinish();
+    expect(mocks.saveDetails).toHaveBeenCalledWith("dora", { last_name: "" });
+    expect(screen.getByRole("heading", { level: 2, name: "Dora" })).toBeTruthy();
+  });
+
   it("saves nothing when nothing changed", async () => {
     renderRecord();
     edit();

@@ -51,10 +51,13 @@ export function managerUserUpdate(field: string, value: unknown): UserInfoUpdate
 
   if (databaseField === "first_name" || databaseField === "last_name") {
     const normalizedName = typeof value === "string" ? value.trim() : "";
-    if (!normalizedName) {
-      throw new UserEditRefusal(
-        databaseField === "first_name" ? "First name is required." : "Last name is required."
-      );
+    // The last name is optional, for members with one name, and is stored
+    // as the empty string rather than null.
+    if (databaseField === "first_name" && !normalizedName) {
+      throw new UserEditRefusal("First name is required.");
+    }
+    if (databaseField === "last_name" && value !== null && typeof value !== "string") {
+      throw new UserEditRefusal("Invalid user field value.");
     }
     return { [databaseField]: normalizedName };
   }
