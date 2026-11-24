@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 const MAX_TILT_DEG = 4;
 
 /**
- * The membership card's fill (the UX Hub gradient under the shared dither
+ * The membership card's fill (its diagonal gradient under the shared dither
  * texture) and its hover tilt (Portal Motion handoff, Home, "Membership
  * card"): with a mouse, it tilts up to 4° toward the pointer and settles back
  * when the pointer leaves (`expressive`, `ease-expressive`). The approved
@@ -75,12 +75,14 @@ export function MembershipCardSurface({
         ref={cardRef}
         className={cn(
           // `isolate` keeps the dither's overlay blend to the card's own fill.
-          "relative isolate overflow-hidden rounded-2xl bg-ux-hub text-white shadow-sm",
+          "relative isolate overflow-hidden rounded-xl bg-membership-card text-white shadow-sm",
+          // Figma's 492 × 309, growing taller if the content needs it.
+          "flex aspect-[492/309] flex-col",
           "transform-[rotateX(var(--tilt-x,0deg))_rotateY(var(--tilt-y,0deg))] transition-transform duration-expressive ease-expressive",
         )}
       >
         <DitherOverlay />
-        <div className="relative">{children}</div>
+        <div className="relative flex flex-1 flex-col">{children}</div>
       </section>
     </div>
   );
