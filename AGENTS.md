@@ -283,6 +283,11 @@ variable name with the slash turned into a hyphen). Dark mode is
 `data-theme="dark"` on `<html>` (`src/lib/theme.ts`), and density is
 `data-density="compact"`.
 
+Motion tokens live in `src/styles/tokens/motion.css` (durations and easings
+from the Portal Motion handoff in Notion, which is the motion spec). Use the
+`duration-*` and `ease-*` classes or `var(--duration-base)`, never a typed
+millisecond value; `docs/design-system.md` §2.8 has the tables and rules.
+
 Colour classes use one shadcn-style vocabulary. Every shadcn slot keeps
 shadcn's meaning: `bg-background`, `bg-card`, `bg-popover`, `bg-primary`,
 `bg-secondary` (subtle grey fill), `bg-muted`, `bg-accent` (hover highlight),
