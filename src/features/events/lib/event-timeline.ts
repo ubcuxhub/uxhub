@@ -2,14 +2,26 @@ import type { EventGroup } from "@/features/events/types";
 import { formatEventDate, pacificDate } from "@/lib/date";
 import type { EventRow } from "@/lib/supabase/models";
 
-export function groupEventsByMonth(events: EventRow[]): EventGroup[] {
+/**
+ * Groups events under the Pacific month they start in. Pass `from` (a
+ * `YYYY-MM` month, the current one for the upcoming list) to file anything
+ * that started earlier, an event that's still running, under that month
+ * instead, so the list starts at this month rather than at May for an
+ * ongoing series. Events keep their order, so ongoing ones lead the month.
+ */
+export function groupEventsByMonth(
+  events: EventRow[],
+  { from }: { from?: string } = {}
+): EventGroup[] {
   const groups = new Map<string, EventGroup>();
 
   for (const event of events) {
     if (!event.starts_at) continue;
 
-    const key = pacificDate(event.starts_at).slice(0, 7);
-    const label = formatEventDate(event.starts_at, { day: undefined }) ?? key;
+    const startMonth = pacificDate(event.starts_at).slice(0, 7);
+    const key = from && startMonth < from ? from : startMonth;
+    const label =
+      formatEventDate(key === startMonth ? event.starts_at : `${key}-01`, { day: undefined }) ?? key;
 
     if (!groups.has(key)) {
       groups.set(key, {

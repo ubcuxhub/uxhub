@@ -56,6 +56,30 @@ describe("groupEventsByMonth", () => {
   });
 });
 
+describe("groupEventsByMonth with a from month", () => {
+  const ongoing = event("series", "2026-05-19T17:00:00Z");
+  const thisMonth = event("jam", "2026-11-20T02:00:00Z");
+  const later = event("tour", "2026-12-10T20:00:00Z");
+
+  it("files events that started earlier under that month, ahead of its own", () => {
+    const groups = groupEventsByMonth([ongoing, thisMonth, later], { from: "2026-11" });
+    expect(groups.map((group) => [group.key, group.label])).toEqual([
+      ["2026-11", "November 2026"],
+      ["2026-12", "December 2026"],
+    ]);
+    expect(groups[0].events.map((e) => e.id)).toEqual(["series", "jam"]);
+  });
+
+  it("makes the month even when only ongoing events are in it", () => {
+    const [group] = groupEventsByMonth([ongoing, later], { from: "2026-11" });
+    expect(group).toMatchObject({ key: "2026-11", label: "November 2026" });
+  });
+
+  it("groups by start month without one, as the past list does", () => {
+    expect(groupEventsByMonth([ongoing, later]).map((group) => group.key)).toEqual(["2026-05", "2026-12"]);
+  });
+});
+
 describe("normalizeString", () => {
   it("normalizes strings by trimming whitespace, lowercasing, and removing diacritics", async () => {
     const { normalizeString } = await import("./event-timeline");

@@ -20,12 +20,18 @@ interface EventTimelineProps {
    * An event without one shows "past" in the past list and no badge otherwise.
    */
   badges?: Record<string, EventBadge>;
+  /**
+   * This Pacific month, `YYYY-MM`, from the server (so the server and browser
+   * agree). Upcoming events that are already running are listed under it.
+   */
+  currentMonth?: string;
 }
 
 export function EventTimeline({
   upcomingEvents,
   pastEvents,
   badges = {},
+  currentMonth,
 }: EventTimelineProps) {
   const searchRef = useRef<HTMLInputElement>(null);
   // The view lives in the URL (`?view=past`), so coming back from an event
@@ -61,7 +67,10 @@ export function EventTimeline({
   }) : displayedEvents;
 
   // group events by month
-  const filteredGroups = groupEventsByMonth(filteredEvents);
+  // Ongoing events sit under this month in Upcoming, not the month they began.
+  const filteredGroups = groupEventsByMonth(filteredEvents, {
+    from: showPastEvents ? undefined : currentMonth,
+  });
 
   const clearSearch = () => {
     setSearchQuery("");
