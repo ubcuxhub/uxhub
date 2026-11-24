@@ -207,6 +207,26 @@ describe("user seed fixtures", () => {
     ).toThrow("Duplicate purchase idempotency key");
   });
 
+  it("needs a first name, and allows an empty but not an untrimmed last name", () => {
+    const noFirstName = structuredClone(seedUsers);
+    noFirstName[0].profile.first_name = " ";
+    expect(() =>
+      validateUserFixtures(noFirstName, seedEvents, membershipTypes, fixedNow)
+    ).toThrow("needs a first name");
+
+    const oneName = structuredClone(seedUsers);
+    oneName[0].profile.last_name = "";
+    expect(() =>
+      validateUserFixtures(oneName, seedEvents, membershipTypes, fixedNow)
+    ).not.toThrow();
+
+    const untrimmed = structuredClone(seedUsers);
+    untrimmed[0].profile.last_name = " Chen ";
+    expect(() =>
+      validateUserFixtures(untrimmed, seedEvents, membershipTypes, fixedNow)
+    ).toThrow("has an untrimmed last name");
+  });
+
   it("rejects invalid membership and registration relationships", () => {
     const nonMemberPurchase = structuredClone(seedUsers);
     nonMemberPurchase[1].purchases.push({
@@ -321,6 +341,11 @@ describe("the crowd", () => {
     }
     for (const user of seedUsers) expect(isCrowdEmail(user.email)).toBe(false);
     expect(getUserFixtureTotals(crowd).authUsers).toBe(0);
+  });
+
+  it("has someone with one name", () => {
+    const kai = crowd.find((user) => user.email === "kai@crowd.uxhub.test");
+    expect(kai?.profile).toMatchObject({ first_name: "Kai", last_name: "" });
   });
 
   it("builds the same people with the same answers every time", () => {

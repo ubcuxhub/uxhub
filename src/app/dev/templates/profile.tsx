@@ -266,7 +266,6 @@ export function ProfileTemplate({ scenario }: { scenario: ProfileScenarioId }) {
   const errors = errorsFor(form);
   const shown = {
     first_name: touched.has("first_name") ? errors.first_name : null,
-    last_name: touched.has("last_name") ? errors.last_name : null,
     student_number: touched.has("student_number") ? errors.student_number : null,
     birth_date: touched.has("birth_date") ? errors.birth_date : null,
   };

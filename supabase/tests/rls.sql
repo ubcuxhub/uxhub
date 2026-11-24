@@ -371,6 +371,40 @@ begin
     raise exception 'user A could not update a safe profile field';
   end if;
 
+  -- A member with one name stores an empty last name; it must still be
+  -- trimmed, and the first name stays required.
+  update public.user_info
+  set last_name = ''
+  where auth_user_id = auth.uid();
+  get diagnostics changed_count = row_count;
+  if changed_count <> 1 then
+    raise exception 'user A could not clear their last name';
+  end if;
+
+  begin
+    update public.user_info
+    set last_name = '  x '
+    where auth_user_id = auth.uid();
+    raise exception 'user A saved an untrimmed last name';
+  exception
+    when check_violation then
+      null;
+  end;
+
+  begin
+    update public.user_info
+    set first_name = ''
+    where auth_user_id = auth.uid();
+    raise exception 'user A cleared their first name';
+  exception
+    when check_violation then
+      null;
+  end;
+
+  update public.user_info
+  set last_name = 'User A'
+  where auth_user_id = auth.uid();
+
   begin
     update public.user_info
     set user_type = 'nonUbc'

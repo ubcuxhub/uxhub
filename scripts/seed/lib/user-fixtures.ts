@@ -172,8 +172,13 @@ export function validateUserFixtures(
     if (user.email !== user.email.trim().toLowerCase()) {
       throw new Error(`Seed user email must be normalized: "${user.email}"`);
     }
-    if (!user.profile.first_name.trim() || !user.profile.last_name.trim()) {
-      throw new Error(`"${user.email}" needs both a first and last name`);
+    // The last name is optional, for people with one name, but stored
+    // trimmed: `user_info` refuses surrounding spaces.
+    if (!user.profile.first_name.trim()) {
+      throw new Error(`"${user.email}" needs a first name`);
+    }
+    if (user.profile.last_name !== user.profile.last_name.trim()) {
+      throw new Error(`"${user.email}" has an untrimmed last name`);
     }
     // Login fixtures have a password and an ordinary address; the crowd has
     // neither, and its reserved domains are how the prune recognises it.

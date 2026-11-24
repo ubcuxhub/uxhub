@@ -9,8 +9,8 @@ import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";
 import { getPartialUserNameFromMetadata } from "@/lib/user-name";
 
 /**
- * Where a signed-in user lands when their sign-in provider didn't supply both
- * names (see `ensureUserInfo`). It reads the session directly rather than
+ * Where a signed-in user lands when their sign-in provider didn't supply a
+ * first name (see `ensureUserInfo`). It reads the session directly rather than
  * through `requireAuth` or `redirectIfAuthenticated`: both send a user without
  * a profile here, so calling either would loop.
  */

@@ -59,8 +59,11 @@ export function toProfileForm(user: UserInfoRow): ProfileFormData {
   };
 }
 
-/** The fields whose errors wait for blur (§3.2). */
-export type CheckedField = "first_name" | "last_name" | "student_number" | "birth_date";
+/**
+ * The fields whose errors wait for blur (§3.2). The last name is optional,
+ * for members with one name, so it has no error to wait for.
+ */
+export type CheckedField = "first_name" | "student_number" | "birth_date";
 
 export type ProfileErrors = Record<CheckedField, string | null>;
 
@@ -131,7 +134,6 @@ export function profileErrors(
 ): ProfileErrors {
   return {
     first_name: form.first_name.trim() ? null : "Enter your first name.",
-    last_name: form.last_name.trim() ? null : "Enter your last name.",
     student_number:
       context.userType === "ubcStudent" &&
       context.canEditEligibility &&
@@ -145,7 +147,7 @@ export function profileErrors(
 /** Whether the section can save as typed. Invalid input holds only its own section. */
 export function sectionBlocked(section: "about" | "studies", errors: ProfileErrors): boolean {
   return section === "about"
-    ? Boolean(errors.first_name || errors.last_name || errors.birth_date)
+    ? Boolean(errors.first_name || errors.birth_date)
     : Boolean(errors.student_number);
 }
 

@@ -173,18 +173,31 @@ describe("saveManagerUserDetailsAction: the column allowlist", () => {
     });
   });
 
-  it.each([
-    ["first_name", "First name is required."],
-    ["last_name", "Last name is required."],
-  ])("rejects a blank %s", async (field, message) => {
-    await expect(saveManagerUserDetailsAction("user-1", { [field]: "   " })).resolves.toEqual({ ok: false, error: message });
+  it("rejects a blank first name", async () => {
+    await expect(saveManagerUserDetailsAction("user-1", { first_name: "   " })).resolves.toEqual({
+      ok: false,
+      error: "First name is required.",
+    });
     expect(saveAdminProfile).not.toHaveBeenCalled();
+  });
+
+  it.each(["   ", null])("clears the last name of a member with one name (%j)", async (lastName) => {
+    await saveManagerUserDetailsAction("user-1", { last_name: lastName });
+    expect(saveAdminProfile).toHaveBeenCalledWith(expect.anything(), "user-1", { last_name: "" });
+  });
+
+  it("trims a last name", async () => {
+    await saveManagerUserDetailsAction("user-1", { last_name: "  Lovelace " });
+    expect(saveAdminProfile).toHaveBeenCalledWith(expect.anything(), "user-1", { last_name: "Lovelace" });
   });
 
   it("rejects a name that is not a string", async () => {
     await expect(
       saveManagerUserDetailsAction("user-1", { first_name: 7 }),
     ).resolves.toEqual({ ok: false, error: "First name is required." });
+    await expect(
+      saveManagerUserDetailsAction("user-1", { last_name: 7 }),
+    ).resolves.toEqual({ ok: false, error: "Invalid user field value." });
     expect(saveAdminProfile).not.toHaveBeenCalled();
   });
 

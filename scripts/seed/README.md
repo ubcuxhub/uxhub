@@ -294,6 +294,8 @@ index, so every run builds the same people. Addresses are on
 a ubc.ca address matching their own); those domains are how the prune
 recognises the crowd, so never sign up with one. They cover:
 
+- Someone with one name: `kai@crowd.uxhub.test` has an empty last name, as
+  sign-up allows.
 - Every user type, every tier, and no membership; two lapsed members
   (`membership_expires_at` in the past, for the renewal flow), one of them with
   a renewal pending (`membership_pre_ordered_type_id` and a `pending` purchase,

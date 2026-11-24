@@ -23,13 +23,14 @@ type AttendeeNameFields = {
   last_name: string | null;
 } | null;
 
-function attendeeName(userInfo: AttendeeNameFields): string {
-  return userInfo?.first_name && userInfo.last_name
-    ? formatUserName({
-        first_name: userInfo.first_name,
-        last_name: userInfo.last_name,
-      })
-    : "Unknown User";
+/** A member with one name has an empty last name, and is named by it alone. */
+export function attendeeName(userInfo: AttendeeNameFields): string {
+  return (
+    formatUserName({
+      first_name: userInfo?.first_name ?? "",
+      last_name: userInfo?.last_name ?? "",
+    }) || "Unknown User"
+  );
 }
 
 export async function fetchCheckInSessions(

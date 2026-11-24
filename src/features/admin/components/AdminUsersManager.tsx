@@ -64,8 +64,11 @@ const COLUMNS = 6;
 
 const userHref = (user: UserListRecord) => `${LIST_HREF}/${user.id}`;
 
+/** A member with one name has no last name, and files under the one they have. */
+const surname = (user: UserListRecord) => user.last_name || user.first_name;
+
 function compareNames(a: UserListRecord, b: UserListRecord) {
-  return a.last_name.localeCompare(b.last_name) || a.first_name.localeCompare(b.first_name);
+  return surname(a).localeCompare(surname(b)) || a.first_name.localeCompare(b.first_name);
 }
 
 /** Sorts in place. Users without a creation date come last either way. */

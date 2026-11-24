@@ -112,8 +112,7 @@ export async function GET(request: NextRequest) {
       operation: "Profile setup",
     });
 
-    // The provider didn't send both names (a one-word Google name, say), so
-    // ask for them. The form returns to `next`, and the portal home keeps its
+    // The provider didn't send a first name, so ask for it. The form returns to `next`, and the portal home keeps its
     // own setup gate.
     if (result.status === "missing_name") {
       return NextResponse.redirect(
