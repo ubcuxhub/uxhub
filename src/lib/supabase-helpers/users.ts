@@ -60,21 +60,6 @@ export async function fetchUserMembershipExpiryById(
   return data;
 }
 
-export async function fetchUserInfoContactsByIds(
-  supabase: DbClient,
-  ids: string[]
-): Promise<UserInfoContact[]> {
-  if (ids.length === 0) return [];
-
-  const { data, error } = await supabase
-    .from(TABLES.userInfo)
-    .select("id, first_name, last_name, email")
-    .in("id", ids);
-
-  if (error) throw error;
-  return data ?? [];
-}
-
 export async function updateUserInfoById(
   supabase: DbClient,
   id: string,

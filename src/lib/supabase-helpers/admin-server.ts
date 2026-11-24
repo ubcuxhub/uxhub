@@ -47,22 +47,6 @@ export async function adminGetPublicationHealth(before: string): Promise<Publica
 }
 
 /**
- * The overdue count alone, as the watchdog endpoint read it before
- * `event_publication_health` existed. The migration leaves what it reads
- * unchanged, so the deployment serving that endpoint (or a rollback to it)
- * keeps working.
- */
-export async function adminFindOverduePublications(before: string) {
-  const { count, error } = await supabaseAdmin
-    .from(TABLES.events)
-    .select("id", { count: "exact", head: true })
-    .eq("status", "draft")
-    .lte("publish_at", before);
-  if (error) throw error;
-  return count ?? 0;
-}
-
-/**
  * Whether `slug` belongs to an event that was published and has since gone
  * back to draft. Members can't read drafts (RLS), so the portal event page
  * asks this to tell an unpublished event from one that never existed. It

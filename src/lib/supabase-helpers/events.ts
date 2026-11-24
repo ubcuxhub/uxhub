@@ -3,7 +3,6 @@ import { TABLES } from "./tables";
 import { eventPresentation } from "@/features/admin/lib/event-presentation";
 import { isUuid } from "@/lib/uuid";
 import type {
-  EventInsert,
   EventRow,
   EventStatus,
   EventUpdate,
@@ -152,38 +151,6 @@ export async function fetchEventSlugsByPrefix(
     .map((row: { slug: string | null }) => row.slug)
     .filter((slug): slug is string => slug !== null);
   return [...new Set(slugs)];
-}
-
-export async function insertEvent(
-  supabase: DbClient,
-  payload: EventInsert
-): Promise<{ id: string }> {
-  const { data, error } = await supabase
-    .from(TABLES.events)
-    .insert(payload)
-    .select("id")
-    .maybeSingle();
-
-  if (error) throw error;
-  if (!data?.id) throw new Error("No event id returned from Supabase.");
-  return data;
-}
-
-export async function updateEvent(
-  supabase: DbClient,
-  id: string,
-  payload: EventUpdate
-): Promise<{ id: string }> {
-  const { data, error } = await supabase
-    .from(TABLES.events)
-    .update(payload)
-    .eq("id", id)
-    .select("id")
-    .maybeSingle();
-
-  if (error) throw error;
-  if (!data?.id) throw new Error("No event id returned from Supabase.");
-  return data;
 }
 
 /** The columns the admin overview's quick edit changes. */

@@ -5,7 +5,6 @@ import { fetchMembershipTermEndsAt } from "./app-settings";
 import type { DbClient } from "./types";
 import { TABLES } from "./tables";
 import type {
-  EventApplicationQuestionInsert,
   EventApplicationQuestionRow,
   EventApplicationResponseInsert,
   EventApplicationRow,
@@ -46,29 +45,6 @@ export async function fetchApplicationQuestions(
 
   if (error) throw error;
   return data ?? [];
-}
-
-export async function insertApplicationQuestions(
-  supabase: DbClient,
-  questions: EventApplicationQuestionInsert[]
-): Promise<void> {
-  const { error } = await supabase
-    .from(TABLES.eventApplicationQuestions)
-    .insert(questions);
-
-  if (error) throw error;
-}
-
-export async function deleteApplicationQuestionsForEvent(
-  supabase: DbClient,
-  eventId: string
-): Promise<void> {
-  const { error } = await supabase
-    .from(TABLES.eventApplicationQuestions)
-    .delete()
-    .eq("event_id", eventId);
-
-  if (error) throw error;
 }
 
 /** Narrows an application to one its applicant has submitted. */
