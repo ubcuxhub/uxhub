@@ -116,7 +116,7 @@ export class SupabasePaymentSmokeStore implements PaymentSmokeStore {
         const { data, error } = await this.supabase
           .from("square_webhook_events")
           .select("event_id")
-          .eq("payload->data->object->payment->>id", paymentId)
+          .eq("square_payment_id", paymentId)
           .limit(1);
         if (error) throw error;
         if ((data ?? []).length > 0) found.add(paymentId);

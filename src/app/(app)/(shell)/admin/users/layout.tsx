@@ -1,6 +1,6 @@
 import { RecordFrame } from "@/components/shared/RecordDrawer";
 import { AdminUsersManager } from "@/features/admin/components/AdminUsersManager";
-import { toUserRecord } from "@/features/admin/lib/user-record";
+import { toUserListRecord } from "@/features/admin/lib/user-record";
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { fetchMembershipTypeOptions } from "@/lib/supabase-helpers/memberships";
@@ -21,7 +21,7 @@ export default async function AdminUsersLayout({ children }: { children: React.R
 
   return (
     <>
-      <AdminUsersManager users={rows.map(toUserRecord)} membershipTypes={membershipTypes} />
+      <AdminUsersManager users={rows.map(toUserListRecord)} membershipTypes={membershipTypes} />
       <RecordFrame listHref="/admin/users">{children}</RecordFrame>
     </>
   );

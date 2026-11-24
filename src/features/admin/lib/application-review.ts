@@ -1,6 +1,6 @@
 import type { DateTimeValue } from "@/components/ui/date-time-field";
 import { formatMembershipTypeName } from "@/features/memberships/lib/display";
-import { STUDENT_STATUSES } from "@/lib/constants";
+import { STUDENT_STATUSES, YEAR_LABELS } from "@/lib/constants";
 import { pacificDate, timestamptzToDatetimeLocal } from "@/lib/date";
 import type { IsoDate, WallTime } from "@/lib/date-input";
 import type {
@@ -233,14 +233,6 @@ export function waitlistPosition(
 }
 
 // --- How an applicant's profile reads ----------------------------------------
-
-export const YEAR_LABELS: Record<UniversityYear, string> = {
-  "1": "1st year",
-  "2": "2nd year",
-  "3": "3rd year",
-  "4": "4th year",
-  "5+": "5th year or later",
-};
 
 export const STUDENT_STATUS_LABELS = Object.fromEntries(
   STUDENT_STATUSES.map((status) => [status.value, status.label])

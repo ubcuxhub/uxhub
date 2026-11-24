@@ -24,6 +24,9 @@ export interface ActionBannerProps
  * A labelled region, not `role="alert"`: it is present at load and must not
  * interrupt. No dismiss button. Never put a StatusBadge inside; the banner
  * carries the words.
+ *
+ * Kept as a documented design-system part (`/dev/components/action-banner`);
+ * no product screen uses it yet.
  */
 function ActionBanner({
   title,

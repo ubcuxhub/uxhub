@@ -101,12 +101,17 @@ const form = {
 describe("profileErrors", () => {
   const context = { userType: "ubcStudent" as const, canEditEligibility: true, savedStudentNumber: "" };
 
-  it("requires both names", () => {
+  it("requires a first name", () => {
     const errors = profileErrors({ ...form, first_name: "  " }, context);
     expect(errors.first_name).toBe("Enter your first name.");
-    expect(errors.last_name).toBeNull();
     expect(sectionBlocked("about", errors)).toBe(true);
     expect(sectionBlocked("studies", errors)).toBe(false);
+  });
+
+  it("lets a member with one name leave the last name blank", () => {
+    const errors = profileErrors({ ...form, last_name: "  " }, context);
+    expect(errors).not.toHaveProperty("last_name");
+    expect(sectionBlocked("about", errors)).toBe(false);
   });
 
   it("says what's wrong with a student number, holding only studies", () => {

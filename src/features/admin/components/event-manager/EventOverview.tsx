@@ -14,6 +14,7 @@ import { formatTimestamp } from "@/lib/date";
 import type { EventRow } from "@/lib/supabase/models";
 import type { EventApplicationStatusCounts } from "@/lib/supabase-helpers/event-applications";
 import type { EventSeatCount } from "@/lib/supabase-helpers/event-tickets";
+import { describeEventPrice } from "../../lib/event-facts";
 import type { NeedsActionItem } from "../../lib/event-needs-action";
 import { EventRegistrationsCard } from "../EventRegistrationsCard";
 import { EventScheduleSection, useEventScheduleEditor } from "../EventScheduleEditor";
@@ -41,22 +42,6 @@ export interface EventOverviewProps {
 
 const plural = (value: number, one: string, many: string) =>
   `${value} ${value === 1 ? one : many}`;
-
-const currency = new Intl.NumberFormat("en-CA", { style: "currency", currency: "CAD" });
-
-function formatPrice(value: number | null) {
-  if (value === null) return null;
-  return Number(value) === 0 ? "Free" : currency.format(Number(value));
-}
-
-/** "Free", or "$15.00 · $10.00 for members". */
-function describePrice(event: Pick<EventRow, "regular_price" | "member_price">) {
-  const regular = formatPrice(event.regular_price);
-  const member = formatPrice(event.member_price);
-  if (!regular) return "Not set";
-  if (!member || member === regular) return regular;
-  return `${regular} · ${member} for members`;
-}
 
 function NeedsActionRow({ item, eventId }: { item: NeedsActionItem; eventId: string }) {
   const Icon = item.type === "todo" ? CircleAlert : CalendarClock;
@@ -188,7 +173,7 @@ function EventDetailsCard({ event: loaded, now }: { event: EventRow; now: string
               {event.requires_application ? "Application required" : "Open registration"}
             </DetailRow>
             <DetailRow label="Location">{location || null}</DetailRow>
-            <DetailRow label="Price">{describePrice(event)}</DetailRow>
+            <DetailRow label="Price">{describeEventPrice(event)}</DetailRow>
           </DetailList>
           <EventScheduleSection editor={schedule} now={now} />
           {schedule.editing ? (

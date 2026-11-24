@@ -12,12 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { formatMembershipTypeName } from "@/features/memberships/lib/display";
 import { parseMembershipPrice } from "@/features/admin/lib/membership-type";
 import { updateMembershipTypeAction } from "@/features/admin/actions";
+import { formatDollars } from "@/lib/money";
 import type { MembershipTypeRow } from "@/lib/supabase/models";
-
-const currency = new Intl.NumberFormat("en-CA", {
-  style: "currency",
-  currency: "CAD",
-});
 
 /** The two-decimal string the price input edits. */
 function toPriceInput(price: number) {
@@ -66,11 +62,16 @@ function TierEditor({ tier }: { tier: MembershipTypeRow }) {
     setPending(true);
     setError(null);
     try {
-      const next = await updateMembershipTypeAction(tier.id, {
+      const result = await updateMembershipTypeAction(tier.id, {
         active: draft.active,
         description: draft.description,
         price: parsedPrice,
       });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      const next = result.tier;
       const applied = {
         active: next.active,
         description: next.description,
@@ -176,7 +177,7 @@ function TierEditor({ tier }: { tier: MembershipTypeRow }) {
         description={
           parsedPrice === null
             ? "Enter a valid price before confirming."
-            : `New purchases will be charged ${currency.format(parsedPrice)} instead of ${currency.format(Number(saved.price))}. The amount is read when the payment is taken, so anyone part-way through checkout right now is charged the new price even though their summary shows the old one.`
+            : `New purchases will be charged ${formatDollars(parsedPrice)} instead of ${formatDollars(Number(saved.price))}. The amount is read when the payment is taken, so anyone part-way through checkout right now is charged the new price even though their summary shows the old one.`
         }
         confirmation={{
           label: "Confirm the price",

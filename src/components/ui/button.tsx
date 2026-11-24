@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Slot } from "@radix-ui/react-slot";
+import { Slot } from "radix-ui";
 import { cva, type VariantProps } from "class-variance-authority";
 
 import { Spinner } from "@/components/ui/spinner";
@@ -123,7 +123,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     },
     ref,
   ) => {
-    const Comp = asChild ? Slot : "button";
+    const Comp = asChild ? Slot.Root : "button";
     const busy = loading && !asChild;
     // An anchor ignores `disabled`, so a disabled link button is made inert by
     // hand: out of the tab order, announced as disabled, and its click (from a

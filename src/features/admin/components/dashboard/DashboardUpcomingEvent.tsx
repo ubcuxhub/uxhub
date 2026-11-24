@@ -11,7 +11,7 @@ import { publicMarketingDestination } from "@/lib/event-marketing";
 import { safeContentUrl } from "@/features/admin/lib/event-content";
 import { eventStateFor } from "@/features/events/lib/event-states";
 import { eventBadgeFor } from "@/features/events/lib/event-badge";
-import { formatPrice } from "@/features/events/components/EventFactList";
+import { formatPrice } from "@/lib/money";
 import type { DashboardEvent } from "@/lib/supabase-helpers/admin-dashboard";
 import type { EventSeatCount } from "@/lib/supabase-helpers/event-tickets";
 import { DashboardEventPages } from "./DashboardEventPages";

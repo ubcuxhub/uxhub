@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
-import { requireManager } from "@/lib/auth/guards";
+import { loadCurrentUser } from "@/lib/auth/current-user";
+import { hasManagerAccess } from "@/lib/auth/roles";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { ProfilePhotoConflictError, replaceProfilePhoto } from "@/lib/supabase-helpers/admin-user-profile";
 import { parseProfilePhoto, PROFILE_PHOTO_MAX_BYTES } from "@/features/admin/lib/user-profile";
 import { errorFields, log } from "@/lib/log";
 
 export async function POST(req: NextRequest, context: { params: Promise<{ userId: string }> }) {
-  await requireManager();
+  // A route handler answers in JSON: the guards redirect, and the client would
+  // follow that to an HTML page and fail to parse it.
+  const current = await loadCurrentUser();
+  if (current.status !== "authenticated" || !hasManagerAccess(current.user.role_access)) {
+    return NextResponse.json({ error: "Only managers can change profile photos. Reload the page to check your access." }, { status: 403 });
+  }
   const { userId } = await context.params;
   const form = await req.formData();
   const file = form.get("file");

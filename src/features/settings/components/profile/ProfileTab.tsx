@@ -192,11 +192,9 @@ export function ProfileTab({
           />
           <TextField
             label="Last name"
+            optional
             value={form.last_name}
             onChange={(last_name) => onFormChange({ last_name })}
-            onBlur={() => onFieldBlur?.("last_name")}
-            error={errors.last_name}
-            required
             autoComplete="family-name"
           />
           <TextField

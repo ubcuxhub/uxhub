@@ -2,16 +2,31 @@ import type { DbClient } from "./types";
 import { TABLES } from "./tables";
 import type { Json } from "@/lib/supabase/database.types";
 import { parseWorkingDocument, type EventWorkingDocument } from "@/features/admin/lib/event-working-document";
-import { eventWorkingDocument } from "@/features/admin/lib/event-presentation";
+import { eventPresentation, eventWorkingDocument } from "@/features/admin/lib/event-presentation";
+import type { EventRow } from "@/lib/supabase/models";
+import { fetchEventRowByIdOrLegacyDraftId } from "./events";
 
+/** An event's working document, by its id or a legacy draft id. */
 export async function fetchEventDraft(supabase: DbClient, id: string) {
-  const { data, error } = await supabase.from(TABLES.events).select("*").or(`id.eq.${id},legacy_draft_ids.cs.{${id}}`).maybeSingle();
-  if (error) throw error;
-  const document = data ? eventWorkingDocument(data) : null;
-  return data && document ? { id: data.id, event_id: data.id, revision: data.working_revision, event_revision: data.revision, document } : null;
+  const row = await fetchEventRowByIdOrLegacyDraftId(supabase, id);
+  return row ? eventDraftFromRow(row) : null;
 }
-export async function fetchEventDraftForEvent(supabase: DbClient, eventId: string) {
-  return fetchEventDraft(supabase, eventId);
+
+/** The working document a stored event row carries: an unscheduled draft's only. */
+function eventDraftFromRow(row: EventRow) {
+  const document = eventWorkingDocument(row);
+  return document ? { id: row.id, event_id: row.id, revision: row.working_revision, event_revision: row.revision, document } : null;
+}
+
+/**
+ * The builder's event and its working document from one read: the event as
+ * the admin pages present it, and the draft from the stored row (presenting
+ * it first would change what the draft reads). Null for an unknown id.
+ */
+export async function fetchEventWithDraft(supabase: DbClient, eventId: string) {
+  const { data, error } = await supabase.from(TABLES.events).select("*").eq("id", eventId).maybeSingle();
+  if (error) throw error;
+  return data ? { event: eventPresentation(data), draft: eventDraftFromRow(data) } : null;
 }
 export async function saveEventDraft(supabase: DbClient, id: string, eventId: string | null, revision: number, input: EventWorkingDocument, eventRevision?: number, operationId?: string) {
   const document = parseWorkingDocument(input);

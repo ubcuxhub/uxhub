@@ -5,7 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Payment, PaymentUpdatedEvent } from "square";
 import type { PurchaseRow, UserInfoRow } from "@/lib/supabase/models";
 import type { CheckoutActionResult, CheckoutRequestInput } from "./types";
-import type { Database, Json } from "@/lib/supabase/database.types";
+import type { Database } from "@/lib/supabase/database.types";
 import type { SquareRefundEvent } from "@/lib/square/webhook";
 import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
 import { errorFields, log } from "@/lib/log";
@@ -18,14 +18,19 @@ import {
 } from "@/lib/supabase-helpers/event-tickets";
 import { fetchMembershipTypeBySlug } from "@/lib/supabase-helpers/memberships";
 import {
+  applySquarePaymentStatus,
+  claimSquareWebhookEvent,
   createPurchase,
-  fetchNonterminalMembershipPurchase,
+  failAbandonedPurchase,
+  fetchLiveMembershipPurchase,
   fetchPurchaseById,
   fetchPurchaseByIdempotencyKey,
   fetchPurchaseBySquarePaymentId,
   forgetSquareWebhookEvent,
   applyPurchaseRefund,
-  recordSquareWebhookEvent,
+  isUniqueViolation,
+  markPurchaseFulfilled,
+  markSquareWebhookEventProcessed,
   updatePurchase,
 } from "@/lib/supabase-helpers/purchases";
 import { fulfillMembershipGrant } from "@/lib/supabase-helpers/membership-history";
@@ -37,14 +42,19 @@ import {
   SQUARE_CURRENCY,
 } from "@/lib/square/client";
 import {
+  ABANDONED_PURCHASE_AFTER_MS,
+  ABANDONED_PURCHASE_REASON,
   completedRefundCents,
   emailableRefunds,
   formatReservationFailure,
+  FREE_MEMBERSHIP_UNAVAILABLE,
+  getRejectedPaymentMessage,
   getSquareErrorDiagnostic,
-  getSquareErrorMessage,
-  getPurchaseRedirectPath,
   isDefinitiveSquareFailure,
+  isRejectedSquareRequest,
   matchesReferencedPurchase,
+  MEMBERSHIP_PRICE_CHANGED,
+  MEMBERSHIP_PURCHASE_IN_PROGRESS,
   normalizeSquareStatus,
 } from "./fulfillment-rules";
 import { isEligibleForMembership } from "@/features/memberships/lib/policy";
@@ -92,8 +102,10 @@ async function fulfillMembershipPurchase(purchaseId: string) {
   }
 
   const termEndsAt = await fetchMembershipTermEndsAt(adminDb);
+  const purchasedAt = purchase.created_at ? new Date(purchase.created_at) : undefined;
+  // Grant, fulfillment marker and membership history commit atomically.
   const updatedPurchase = await fulfillMembershipGrant(
-    adminDb, purchase.id, resolveMembershipExpiry(termEndsAt),
+    adminDb, purchase.id, resolveMembershipExpiry(termEndsAt, purchasedAt),
   );
 
   await revalidatePurchasePaths(adminDb, purchase.id);
@@ -140,9 +152,7 @@ async function fulfillEventTicketPurchase(purchaseId: string) {
     }
   }
 
-  const updatedPurchase = await updatePurchase(adminDb, purchase.id, {
-    fulfilled_at: new Date().toISOString(),
-  });
+  const updatedPurchase = await markPurchaseFulfilled(adminDb, purchase.id);
 
   await revalidatePurchasePaths(adminDb, purchase.id);
   return updatedPurchase;
@@ -177,12 +187,26 @@ async function fulfillCompletedPurchase(purchaseId: string) {
 }
 
 async function applyPaymentStateToPurchase(purchaseId: string, payment: Payment) {
-  const updatedPurchase = await updatePurchase(adminDb, purchaseId, {
-    failure_reason: null,
-    square_customer_id: payment.customerId ?? null,
-    square_payment_id: payment.id ?? null,
-    status: normalizeSquareStatus(payment.status),
-  });
+  const status = normalizeSquareStatus(payment.status);
+  const { purchase: updatedPurchase, applied } = await applySquarePaymentStatus(
+    adminDb,
+    purchaseId,
+    {
+      status,
+      squareCustomerId: payment.customerId ?? null,
+      squarePaymentId: payment.id ?? null,
+    },
+  );
+
+  // An older payload delivered after a newer one: Square doesn't promise
+  // order, and a completed purchase must never go back to authorized.
+  if (!applied) {
+    log.info("payment.stale_status_ignored", {
+      purchaseId,
+      status,
+      currentStatus: updatedPurchase.status,
+    });
+  }
 
   if (updatedPurchase.status === "completed") {
     await fulfillCompletedPurchase(updatedPurchase.id);
@@ -204,13 +228,47 @@ async function applyPaymentStateToPurchase(purchaseId: string, payment: Payment)
   return updatedPurchase;
 }
 
+/**
+ * Fails a purchase pending with no Square payment ID once it is old enough
+ * to be abandoned (see ABANDONED_PURCHASE_AFTER_MS), so the buyer can try
+ * again. pg_cron does the same on a schedule (`fail_abandoned_purchases`);
+ * this settles it the moment the buyer comes back.
+ */
+async function failPurchaseIfAbandoned(
+  purchase: PurchaseRow,
+  now = Date.now(),
+): Promise<PurchaseRow> {
+  if (purchase.status !== "pending" || purchase.square_payment_id) {
+    return purchase;
+  }
+
+  const cutoff = now - ABANDONED_PURCHASE_AFTER_MS;
+  const createdAt = purchase.created_at ? Date.parse(purchase.created_at) : Number.NaN;
+  if (!Number.isFinite(createdAt) || createdAt >= cutoff) {
+    return purchase;
+  }
+  const createdBefore = new Date(cutoff).toISOString();
+
+  const failed = await failAbandonedPurchase(
+    adminDb,
+    purchase.id,
+    createdBefore,
+    ABANDONED_PURCHASE_REASON,
+  );
+  if (!failed) return (await fetchPurchaseById(adminDb, purchase.id)) ?? purchase;
+
+  log.warn("payment.abandoned_purchase_failed", { purchaseId: purchase.id });
+  return failed;
+}
+
 async function reconcilePurchaseIfPossible(
   purchase: PurchaseRow,
 ): Promise<PurchaseRow> {
-  if (
-    !purchase.square_payment_id ||
-    (purchase.status !== "pending" && purchase.status !== "authorized")
-  ) {
+  if (!purchase.square_payment_id) {
+    return await failPurchaseIfAbandoned(purchase);
+  }
+
+  if (purchase.status !== "pending" && purchase.status !== "authorized") {
     return purchase;
   }
 
@@ -264,14 +322,68 @@ async function handleExistingCheckoutAttempt(
   return getExistingCheckoutResult(reconciledPurchase, user.id);
 }
 
+type MembershipCheckoutOutcome =
+  | { purchaseId: string; resolution: "completed" | "processing" }
+  | { error: string; terminal: boolean };
+
+function toOutcome(result: CheckoutActionResult): MembershipCheckoutOutcome {
+  return result.ok
+    ? { purchaseId: result.purchaseId, resolution: result.resolution }
+    : { error: result.error, terminal: result.terminal };
+}
+
+/**
+ * The user's membership purchase still in flight, settled with Square first
+ * (or failed, if it was abandoned). Null when none is left live: the user is
+ * free to buy.
+ */
+async function settleLiveMembershipPurchase(userId: string) {
+  const live = await fetchLiveMembershipPurchase(adminDb, userId);
+  if (!live) return null;
+
+  const settled = await reconcilePurchaseIfPossible(live);
+  return settled.status === "failed" || settled.status === "canceled"
+    ? null
+    : settled;
+}
+
+/**
+ * What a new checkout for `membershipTypeId` answers while another purchase
+ * of the user's is live or just completed: that purchase's own result for the
+ * same tier, otherwise a refusal (only one membership is bought at a time).
+ */
+function existingMembershipOutcome(
+  purchase: PurchaseRow,
+  membershipTypeId: string,
+  userId: string,
+): MembershipCheckoutOutcome {
+  if (purchase.membership_type_id === membershipTypeId) {
+    return toOutcome(getExistingCheckoutResult(purchase, userId));
+  }
+
+  return purchase.status === "completed"
+    ? { error: "This membership tier is not available for your account.", terminal: true }
+    : { error: MEMBERSHIP_PURCHASE_IN_PROGRESS, terminal: true };
+}
+
 async function createSquarePaymentForMembership(
   user: UserInfoRow,
   input: CheckoutRequestInput
-) {
+): Promise<MembershipCheckoutOutcome> {
   const membershipType = await fetchMembershipTypeBySlug(adminDb, input.slug);
 
   if (!membershipType) {
-    return { error: "Membership plan not found.", terminal: true } as const;
+    return { error: "Membership plan not found.", terminal: true };
+  }
+
+  // A purchase already in flight, for this tier or another, settles before
+  // anything new is charged. `purchases_one_live_membership_per_user` backs
+  // this up for two checkouts racing past it.
+  const live = await settleLiveMembershipPurchase(user.id);
+
+  if (live) {
+    if (live.status === "completed") await fulfillCompletedPurchase(live.id);
+    return existingMembershipOutcome(live, membershipType.id, user.id);
   }
 
   const termEndsAt = await fetchMembershipTermEndsAt(adminDb);
@@ -280,46 +392,45 @@ async function createSquarePaymentForMembership(
     return {
       error: "This membership tier is not available for your account.",
       terminal: true,
-    } as const;
+    };
   }
 
-  const nonterminalPurchase = await fetchNonterminalMembershipPurchase(
-    adminDb,
-    user.id,
-    membershipType.id,
-  );
+  // The buyer verified (and their bank may have challenged) this amount.
+  // A price changed in Club Settings since checkout loaded is refused, not
+  // charged.
+  const amountCents = Math.round(membershipType.price * 100);
 
-  if (nonterminalPurchase) {
-    const reconciledPurchase =
-      await reconcilePurchaseIfPossible(nonterminalPurchase);
-    const existingResult = getExistingCheckoutResult(
-      reconciledPurchase,
-      user.id,
-    );
-
-    return existingResult.ok
-      ? {
-          purchaseId: existingResult.purchaseId,
-          resolution: existingResult.resolution,
-        } as const
-      : {
-          error: existingResult.error,
-          terminal: existingResult.terminal,
-        } as const;
+  if (input.expectedAmountCents !== amountCents) {
+    log.warn("payment.membership_price_changed", { membershipTypeId: membershipType.id });
+    return { error: MEMBERSHIP_PRICE_CHANGED, terminal: true };
   }
 
-  const customerId = await ensureSquareCustomerId(user, input);
+  if (amountCents === 0) {
+    return await grantFreeMembership(user, input, membershipType.id);
+  }
 
-  const purchase = await createPurchase(adminDb, {
-    amount_cents: Math.round(membershipType.price * 100),
-    currency: SQUARE_CURRENCY,
-    idempotency_key: input.idempotencyKey,
-    kind: "membership",
-    membership_type_id: membershipType.id,
-    square_customer_id: customerId,
-    status: "pending",
-    user_id: user.id,
-  });
+  if (!input.token) {
+    return { error: "Enter your card details to pay.", terminal: true };
+  }
+
+  const customerId = await ensureSquareCustomerId(user);
+
+  let purchase: PurchaseRow;
+  try {
+    purchase = await createPurchase(adminDb, {
+      amount_cents: amountCents,
+      currency: SQUARE_CURRENCY,
+      idempotency_key: input.idempotencyKey,
+      kind: "membership",
+      membership_type_id: membershipType.id,
+      square_customer_id: customerId,
+      status: "pending",
+      user_id: user.id,
+    });
+  } catch (error) {
+    if (!isUniqueViolation(error)) throw error;
+    return await racedMembershipOutcome(user.id, input, membershipType.id);
+  }
 
   try {
     const paymentResponse = await squareClient.payments.create({
@@ -328,13 +439,13 @@ async function createSquarePaymentForMembership(
         currency: SQUARE_CURRENCY,
       },
       autocomplete: true,
-      buyerEmailAddress: input.buyerEmail,
+      buyerEmailAddress: user.email,
       customerId,
       idempotencyKey: purchase.idempotency_key,
       locationId: getSquareLocationId(),
       note: `UX Hub membership purchase: ${membershipType.name}`,
       referenceId: purchase.id,
-      sourceId: input.token!,
+      sourceId: input.token,
       verificationToken: input.verificationToken ?? undefined,
     });
 
@@ -350,7 +461,7 @@ async function createSquarePaymentForMembership(
       purchaseId: purchase.id,
       resolution:
         updatedPurchase.status === "completed" ? "completed" : "processing",
-    } as const;
+    };
   } catch (error) {
     const chargeFields = {
       purchaseId: purchase.id,
@@ -364,23 +475,74 @@ async function createSquarePaymentForMembership(
       log.error("payment.membership_charge_failed", chargeFields);
     }
 
-    if (isDefinitiveSquareFailure(error)) {
+    // The create call failed, so the purchase has no payment ID: a request
+    // Square refused created nothing, and the attempt is over.
+    if (isDefinitiveSquareFailure(error) || isRejectedSquareRequest(error)) {
+      const message = getRejectedPaymentMessage(error);
       await updatePurchase(adminDb, purchase.id, {
-        failure_reason: getSquareErrorMessage(error),
+        failure_reason: message,
         status: "failed",
       });
 
-      return {
-        error: getSquareErrorMessage(error),
-        terminal: true,
-      } as const;
+      return { error: message, terminal: true };
     }
 
     return {
       purchaseId: purchase.id,
       resolution: "processing",
-    } as const;
+    };
   }
+}
+
+/**
+ * Another request inserted first: the same attempt submitted twice (its
+ * idempotency key), or a second checkout while one was live (the one-live
+ * index). Either way, answer with the purchase that won.
+ */
+async function racedMembershipOutcome(
+  userId: string,
+  input: CheckoutRequestInput,
+  membershipTypeId: string,
+): Promise<MembershipCheckoutOutcome> {
+  const sameAttempt = await fetchPurchaseByIdempotencyKey(adminDb, input.idempotencyKey);
+  if (sameAttempt) return toOutcome(getExistingCheckoutResult(sameAttempt, userId));
+
+  const live = await fetchLiveMembershipPurchase(adminDb, userId);
+  if (live) return existingMembershipOutcome(live, membershipTypeId, userId);
+
+  // The winner settled already; this attempt charged nothing.
+  return { error: MEMBERSHIP_PURCHASE_IN_PROGRESS, terminal: true };
+}
+
+/**
+ * A $0 tier (Club Settings allows one): recorded as a completed purchase and
+ * granted at once, with no card and no Square call, like a free event ticket.
+ */
+async function grantFreeMembership(
+  user: UserInfoRow,
+  input: CheckoutRequestInput,
+  membershipTypeId: string,
+): Promise<MembershipCheckoutOutcome> {
+  let purchase: PurchaseRow;
+  try {
+    purchase = await createPurchase(adminDb, {
+      amount_cents: 0,
+      currency: SQUARE_CURRENCY,
+      idempotency_key: input.idempotencyKey,
+      kind: "membership",
+      membership_type_id: membershipTypeId,
+      status: "completed",
+      user_id: user.id,
+    });
+  } catch (error) {
+    if (!isUniqueViolation(error)) throw error;
+    const existing = await fetchPurchaseByIdempotencyKey(adminDb, input.idempotencyKey);
+    if (!existing) return { error: FREE_MEMBERSHIP_UNAVAILABLE, terminal: true };
+    return toOutcome(getExistingCheckoutResult(existing, user.id));
+  }
+
+  await fulfillCompletedPurchase(purchase.id);
+  return { purchaseId: purchase.id, resolution: "completed" };
 }
 
 async function checkoutEventTicket(
@@ -442,7 +604,7 @@ async function checkoutEventTicket(
   // Free registration never creates a Square customer or touches a card.
   let customerId: string;
   try {
-    customerId = await ensureSquareCustomerId(user, input);
+    customerId = await ensureSquareCustomerId(user);
   } catch (error) {
     log.error("payment.ticket_customer_failed", { purchaseId: purchase.id, ...errorFields(error) });
     await updatePurchase(adminDb, purchase.id, { status: "failed", failure_reason: "Payment could not be initialized. Please try again." });
@@ -456,7 +618,7 @@ async function checkoutEventTicket(
         currency: SQUARE_CURRENCY,
       },
       autocomplete: false,
-      buyerEmailAddress: input.buyerEmail,
+      buyerEmailAddress: user.email,
       customerId,
       delayAction: "CANCEL",
       delayDuration: EVENT_TICKET_HOLD_DURATION,
@@ -534,19 +696,27 @@ async function checkoutEventTicket(
     const purchaseRecord = await fetchPurchaseById(adminDb, purchase.id);
     const paymentId = purchaseRecord?.square_payment_id ?? null;
 
-    if (paymentId && isDefinitiveSquareFailure(error)) {
+    // A decline is final wherever it happened. A refused request is final
+    // only before a payment exists: one refused later (the capture) says
+    // nothing about whether money moved, so the webhook settles that.
+    const attemptOver =
+      isDefinitiveSquareFailure(error) ||
+      (!paymentId && isRejectedSquareRequest(error));
+
+    if (paymentId && attemptOver) {
       await cancelSquarePaymentIfPossible(paymentId);
     }
 
-    if (isDefinitiveSquareFailure(error)) {
+    if (attemptOver) {
+      const message = getRejectedPaymentMessage(error);
       await releaseEventTicket(adminDb, purchase.id).catch(() => undefined);
       await updatePurchase(adminDb, purchase.id, {
-        failure_reason: getSquareErrorMessage(error),
+        failure_reason: message,
         status: "failed",
       });
 
       return {
-        error: getSquareErrorMessage(error),
+        error: message,
         terminal: true,
       } as const;
     }
@@ -595,9 +765,21 @@ export async function executeCheckoutForUser(
   return {
     ok: true,
     purchaseId: result.purchaseId,
-    redirectTo: getPurchaseRedirectPath(),
     resolution: result.resolution,
   };
+}
+
+/**
+ * Thrown when another delivery of the same webhook event is still being
+ * handled. The route answers it with a retryable status, so Square sends the
+ * event again later instead of treating this delivery as done.
+ */
+export class SquareWebhookInProgressError extends Error {
+  override name = "SquareWebhookInProgressError";
+
+  constructor() {
+    super("Another delivery of this Square event is still being processed.");
+  }
 }
 
 /**
@@ -606,7 +788,6 @@ export async function executeCheckoutForUser(
  */
 export async function processSquarePaymentEvent(
   event: PaymentUpdatedEvent,
-  rawPayload: NonNullable<Json> = event as NonNullable<Json>,
   origin: string | null = null
 ) {
   const eventId = event.eventId;
@@ -617,7 +798,7 @@ export async function processSquarePaymentEvent(
     return;
   }
 
-  await processOnce(eventId, eventType, rawPayload, () =>
+  await processOnce(eventId, eventType, payment.id, () =>
     applySquarePayment(payment.id!, payment, origin)
   );
 }
@@ -631,7 +812,6 @@ export async function processSquarePaymentEvent(
  */
 export async function processSquareRefundEvent(
   event: SquareRefundEvent,
-  rawPayload: NonNullable<Json> = event as NonNullable<Json>,
   origin: string | null = null
 ) {
   const eventId = event.eventId;
@@ -642,7 +822,7 @@ export async function processSquareRefundEvent(
     return;
   }
 
-  await processOnce(eventId, eventType, rawPayload, async () => {
+  await processOnce(eventId, eventType, paymentId, async () => {
     const { payment } = await squareClient.payments.get({ paymentId });
     if (!payment?.id) {
       throw new Error("Square did not return the refunded payment.");
@@ -654,25 +834,27 @@ export async function processSquareRefundEvent(
 
 /**
  * Runs `handle` for a webhook event unless another delivery of it already
- * ran. The event is recorded before processing so concurrent deliveries are
- * handled once, and forgotten again on failure, or Square's retry would be
- * dropped as a duplicate and the purchase would never settle.
+ * ran. The event is claimed before processing so concurrent deliveries are
+ * handled once, stamped processed after, and forgotten again on failure, or
+ * Square's retry would be dropped as a duplicate and the purchase would never
+ * settle. A delivery that finds the event claimed but not yet processed
+ * throws `SquareWebhookInProgressError`, so Square keeps retrying it until
+ * the first one finishes (or its claim goes stale and is taken over).
  */
 async function processOnce(
   eventId: string,
   eventType: string,
-  rawPayload: NonNullable<Json>,
+  squarePaymentId: string,
   handle: () => Promise<void>
 ) {
-  const wasRecorded = await recordSquareWebhookEvent(adminDb, {
+  const claim = await claimSquareWebhookEvent(adminDb, {
     event_id: eventId,
     event_type: eventType,
-    payload: rawPayload,
+    square_payment_id: squarePaymentId,
   });
 
-  if (!wasRecorded) {
-    return;
-  }
+  if (claim === "processed") return;
+  if (claim === "in_progress") throw new SquareWebhookInProgressError();
 
   try {
     await handle();
@@ -685,6 +867,16 @@ async function processOnce(
     });
     throw error;
   }
+
+  // The work is done, so this delivery succeeded either way. An unstamped
+  // claim only makes a duplicate wait for it to go stale, then run again,
+  // which every handler tolerates.
+  await markSquareWebhookEventProcessed(adminDb, eventId).catch((markError) => {
+    log.error("webhook.square_event_mark_failed", {
+      eventId,
+      ...errorFields(markError),
+    });
+  });
 }
 
 /**

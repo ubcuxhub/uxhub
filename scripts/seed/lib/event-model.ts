@@ -7,7 +7,7 @@ import type { ReconcileOptions } from "./reconcile.ts";
 /** Validate fixtures before storage, database or Auth writes, including --only runs. */
 export function validateSeedEvents(events: SeedEvent[]): void {
   const slugs = new Set<string>();
-  for (const { event, privateDetails, checkInSessions, links, bannerKey } of events) {
+  for (const { event, meeting, checkInSessions, links, bannerKey } of events) {
     const fail = (message: string): never => { throw new Error(`Event "${event.slug}": ${message}`); };
     if (slugs.has(event.slug)) fail("duplicate slug");
     slugs.add(event.slug);
@@ -34,8 +34,8 @@ export function validateSeedEvents(events: SeedEvent[]): void {
       if (!session.name || !session.start_time || !session.end_time || !Number.isFinite(Date.parse(session.start_time)) || !Number.isFinite(Date.parse(session.end_time)) || Date.parse(session.start_time) >= Date.parse(session.end_time)) fail("invalid check-in window");
     }
     if (links?.some(link => !safeContentUrl(link.url))) fail("invalid resource URL");
-    if (privateDetails?.meeting_url && !safeContentUrl(privateDetails.meeting_url)) fail("invalid meeting URL");
-    if (event.location_type !== "in_person" && event.location_type !== undefined && !privateDetails?.meeting_url) fail("online/hybrid meeting details are required");
+    if (meeting?.meeting_url && !safeContentUrl(meeting.meeting_url)) fail("invalid meeting URL");
+    if (event.location_type !== "in_person" && event.location_type !== undefined && !meeting?.meeting_url) fail("online/hybrid meeting details are required");
   }
 }
 

@@ -80,18 +80,26 @@ export function useItemCheckIn(eventId: string, initialItemId: string | null, in
       void refresh();
     window.addEventListener("online", connected);
     window.addEventListener("offline", disconnected);
-    const supabase = createClient();
-    const channel = supabase.channel(`item-check-in-${eventId}`).on("postgres_changes", { event: "*", schema: "public", table: TABLES.checkIns }, () => void refresh())
-      .on("postgres_changes", { event: "*", schema: "public", table: TABLES.eventTickets, filter: `event_id=eq.${eventId}` }, () => void refresh())
-      .on("postgres_changes", { event: "*", schema: "public", table: TABLES.eventAgendaItems }, () => void refresh()).subscribe();
     return () => {
       lifecycle.active = false;
       lifecycle.generation++;
       window.removeEventListener("online", connected);
       window.removeEventListener("offline", disconnected);
-      void supabase.removeChannel(channel);
     };
   }, [eventId, refresh, initialItemId, scan, returnTo]);
+  // Only changes this screen shows: check-ins at the selected item's session,
+  // and this event's tickets. An unfiltered check_ins listener refetched the
+  // whole snapshot on every check-in at every event.
+  const sessionId = snapshot.sessionId ?? null;
+  useEffect(() => {
+    const supabase = createClient();
+    let channel = supabase.channel(`item-check-in-${eventId}-${sessionId ?? "none"}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: TABLES.eventTickets, filter: `event_id=eq.${eventId}` }, () => void refresh());
+    if (sessionId)
+      channel = channel.on("postgres_changes", { event: "*", schema: "public", table: TABLES.checkIns, filter: `check_in_session_id=eq.${sessionId}` }, () => void refresh());
+    channel.subscribe();
+    return () => { void supabase.removeChannel(channel); };
+  }, [eventId, sessionId, refresh]);
   const selectItem = (id: string) => {
     current.current.generation++;
     current.current.ready = false;

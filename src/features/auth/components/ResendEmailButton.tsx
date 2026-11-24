@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { toast } from "@/components/ui/toast";
 import { withDeadline } from "@/lib/async/deadline";
-import { useNavigationRecovery } from "@/hooks/use-navigation-recovery";
+import { NAVIGATED, useGuardedSubmit } from "@/hooks/use-guarded-submit";
 
 import {
   AUTH_ACTION_ERRORS,
@@ -25,17 +25,13 @@ interface ResendEmailButtonProps {
 
 export function ResendEmailButton({ onResend, email }: ResendEmailButtonProps) {
   const [status, setStatus] = useState<string | null>(null);
-  const [isResending, setIsResending] = useState(false);
   const [cooldownEndsAt, setCooldownEndsAt] = useState<number | null>(null);
   const [cooldownSeconds, setCooldownSeconds] = useState<number | null>(null);
-  const resendingRef = useRef(false);
-  const recoverStalledNavigation = useNavigationRecovery(() => {
-    resendingRef.current = false;
-    setIsResending(false);
+  const { pending: isResending, run } = useGuardedSubmit(() =>
     setStatus(
       "You are signed in, but the next page did not load. Return to sign in and try again.",
-    );
-  });
+    ),
+  );
 
   useEffect(() => {
     if (cooldownEndsAt === null) return;
@@ -61,21 +57,15 @@ export function ResendEmailButton({ onResend, email }: ResendEmailButtonProps) {
     return () => window.clearInterval(interval);
   }, [cooldownEndsAt]);
 
-  const handleResend = async () => {
-    if (resendingRef.current || cooldownSeconds !== null) return;
-
-    resendingRef.current = true;
-    setIsResending(true);
+  const resend = async () => {
     setStatus(null);
-    let navigationStarted = false;
 
     try {
       const result = await withDeadline(() => onResend(), {
         operation: "Email resend",
       });
-      navigationStarted = result === "navigating";
-      if (navigationStarted) recoverStalledNavigation();
-      else toast.success(`Email sent to ${email}`, { id: "auth-email-sent" });
+      if (result === "navigating") return NAVIGATED;
+      toast.success(`Email sent to ${email}`, { id: "auth-email-sent" });
     } catch (error: unknown) {
       const retryAfterSeconds = getResendCooldownSeconds(error);
 
@@ -88,12 +78,12 @@ export function ResendEmailButton({ onResend, email }: ResendEmailButtonProps) {
       } else {
         setStatus(getAuthActionErrorMessage(error, AUTH_ACTION_ERRORS.resend));
       }
-    } finally {
-      if (!navigationStarted) {
-        resendingRef.current = false;
-        setIsResending(false);
-      }
     }
+  };
+
+  const handleResend = () => {
+    if (cooldownSeconds !== null) return;
+    void run(resend);
   };
 
   const isCoolingDown = cooldownSeconds !== null;

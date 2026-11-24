@@ -1,4 +1,4 @@
-import { AVATAR_PRESETS, type AvatarPreset } from "./options";
+import type { AvatarPreset } from "./options";
 
 /**
  * The art for each avatar preset: the brand panel's shape tiles
@@ -14,10 +14,6 @@ export const AVATAR_PRESET_ART: Record<AvatarPreset, string> = {
   sparkle: "/auth/shapes/sparkle.png",
   starburst: "/auth/shapes/burst.png",
 };
-
-export function avatarPresetLabel(preset: AvatarPreset): string {
-  return AVATAR_PRESETS.find((option) => option.id === preset)?.label ?? preset;
-}
 
 /**
  * Files the photo picker accepts before cropping. The crop re-encodes to a

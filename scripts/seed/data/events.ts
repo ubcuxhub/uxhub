@@ -114,8 +114,8 @@ export interface SeedEvent {
   sponsors?: SeedSponsor[];
   links?: SeedLink[];
   staffVolunteerSchedule?: string;
-  /** Online meeting details, readable only by ticket holders and admins. */
-  privateDetails?: Omit<TablesInsert<"event_private_details">, "event_id">;
+  /** Online meeting details, seeded into the event's date and location settings. */
+  meeting?: { meeting_url: string; meeting_id?: string | null; meeting_passcode?: string | null };
   agendaDays?: SeedAgendaDay[];
   checkInSessions: Omit<TablesInsert<"check_in_sessions">, "event_id">[];
   applicationQuestions: Omit<
@@ -1011,7 +1011,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
         visibility: "after_event",
       },
     ],
-    privateDetails: {
+    meeting: {
       meeting_url: "https://ubc.zoom.us/j/1234567890",
       meeting_id: "123 456 7890",
       meeting_passcode: "uxhub",
@@ -1417,7 +1417,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
     },
     imageKey: "3.png",
     peopleSections: [{ title: "Mentors", people: panelMentors }],
-    privateDetails: {
+    meeting: {
       meeting_url: "https://meet.google.com/abc-defg-hij",
     },
     agendaDays: [
@@ -1465,7 +1465,7 @@ export function buildSeedEvents(now: Date): SeedEvent[] {
     },
     imageKey: "1.png",
     links: [slackLink("design-systems")],
-    privateDetails: {
+    meeting: {
       meeting_url: "https://ubc.zoom.us/j/9876543210",
       meeting_id: "987 654 3210",
       meeting_passcode: "systems",

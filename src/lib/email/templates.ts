@@ -1,14 +1,8 @@
 import { formatEventDate, formatEventTime } from "@/lib/date";
+import { formatCents } from "@/lib/money";
 import type { EventRow, MembershipTypeRow, PurchaseRow } from "@/lib/supabase/models";
 
 import { escapeHtml, renderEmailLayout } from "./layout";
-
-function formatAmount(amountCents: number, currency: string) {
-  return new Intl.NumberFormat("en-CA", {
-    style: "currency",
-    currency,
-  }).format(amountCents / 100);
-}
 
 /** One label/value line inside the details block. Skipped when value is empty. */
 export function detailRow(label: string, value: string | null | undefined) {
@@ -17,6 +11,20 @@ export function detailRow(label: string, value: string | null | undefined) {
   return `<tr>
     <td style="padding:6px 16px 6px 0;color:#6b7280;font-size:14px;">${escapeHtml(label)}</td>
     <td style="padding:6px 0;color:#111827;font-size:14px;font-weight:500;">${escapeHtml(value)}</td>
+  </tr>`;
+}
+
+/**
+ * The street address, linked to its map when the event has an http(s) map
+ * link. No address, no row: the map link alone is not an address.
+ */
+function addressRow(address: string | null | undefined, mapUrl: string | null | undefined) {
+  if (!address?.trim()) return "";
+  if (!mapUrl || !/^https?:\/\//i.test(mapUrl)) return detailRow("Address", address);
+
+  return `<tr>
+    <td style="padding:6px 16px 6px 0;color:#6b7280;font-size:14px;">Address</td>
+    <td style="padding:6px 0;color:#111827;font-size:14px;font-weight:500;"><a href="${escapeHtml(mapUrl)}" style="color:#111827;">${escapeHtml(address)}</a></td>
   </tr>`;
 }
 
@@ -50,7 +58,7 @@ export function renderMembershipConfirmationEmail({
   const expiryDate = formatEventDate(expiresAt);
   const details = [
     detailRow("Membership", membershipType.name),
-    detailRow("Amount paid", formatAmount(purchase.amount_cents, purchase.currency)),
+    detailRow("Amount paid", formatCents(purchase.amount_cents, { currency: purchase.currency })),
     detailRow("Purchased on", formatEventDate(purchase.created_at)),
     detailRow("Expires on", expiryDate),
     detailRow("Order ID", purchase.id),
@@ -77,6 +85,7 @@ export function renderEventConfirmationEmail({
   event: Pick<
     EventRow,
     | "ends_at"
+    | "location_address"
     | "location_address_url"
     | "location_building"
     | "location_room"
@@ -107,6 +116,7 @@ function renderEventDetailRows(
   event: Pick<
     EventRow,
     | "ends_at"
+    | "location_address"
     | "location_address_url"
     | "location_building"
     | "location_room"
@@ -130,8 +140,8 @@ function renderEventDetailRows(
     detailRow("Date", formatEventDate(event.starts_at)),
     detailRow("Time", timeRange),
     detailRow("Location", location),
-    detailRow("Address", event.location_address_url),
-    detailRow("Amount paid", formatAmount(purchase.amount_cents, purchase.currency)),
+    addressRow(event.location_address, event.location_address_url),
+    detailRow("Amount paid", formatCents(purchase.amount_cents, { currency: purchase.currency })),
     detailRow("Order ID", purchase.id),
   ].join("");
 }

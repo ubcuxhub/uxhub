@@ -11,7 +11,12 @@ interface SponsorLogoGridProps
   }[];
 }
 
-/** Responsive linked sponsor tiles. Logos remain on white in every theme. */
+/**
+ * Responsive linked sponsor tiles. Logos remain on white in every theme.
+ *
+ * Kept as a documented design-system part (`/dev/components/sponsor-logo-grid`);
+ * no product screen uses it yet.
+ */
 function SponsorLogoGrid({
   sponsors,
   className,

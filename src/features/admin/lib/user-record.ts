@@ -1,5 +1,5 @@
 import type { UserInfoRow } from "@/lib/supabase/models";
-import type { UserRecord } from "../types";
+import type { UserListRecord, UserRecord } from "../types";
 
 /** A `user_info` row with its membership tier embedded, as the admin queries return it. */
 export type UserRowWithMembership = UserInfoRow & {
@@ -20,6 +20,28 @@ export function toUserRecord(row: UserRowWithMembership): UserRecord {
     ...user,
     membership_type_name: membershipTypeName,
     order_date: user.order_date_deprecated,
+  };
+}
+
+/** A directory row from its listed columns, with the embedded tier as `membership_type_name`. */
+export function toUserListRecord<
+  T extends Omit<UserListRecord, "membership_type_name"> & {
+    membership_types?: { name: string } | { name: string }[] | null;
+  },
+>(row: T): UserListRecord {
+  const { membership_types: membership, ...user } = row;
+  return {
+    id: user.id,
+    first_name: user.first_name,
+    last_name: user.last_name,
+    email: user.email,
+    major: user.major,
+    role_access: user.role_access,
+    membership_type_id: user.membership_type_id,
+    created_at: user.created_at,
+    membership_type_name: Array.isArray(membership)
+      ? membership[0]?.name ?? null
+      : membership?.name ?? null,
   };
 }
 

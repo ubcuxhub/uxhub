@@ -16,6 +16,8 @@ export interface ItemAttendance {
 }
 export interface ItemCheckInSnapshot {
   refreshedAt?: string;
+  /** The selected item's check-in session, whose `check_ins` the screen listens to. */
+  sessionId?: string | null;
   items: CheckInItem[];
   attendees: CheckInAttendee[];
   attendance: ItemAttendance[];

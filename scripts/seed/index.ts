@@ -126,7 +126,6 @@ const TABLE = {
   eventPeopleSections: "event_people_sections",
   eventSponsors: "event_sponsors",
   eventLinks: "event_links",
-  eventPrivateDetails: "event_private_details",
   eventAgendaDays: "event_agenda_days",
   eventAgendaItems: "event_agenda_items",
   teams: "teams",
@@ -731,37 +730,6 @@ async function reconcileEventLinks(
   );
 }
 
-/** The event's online meeting details: one row, or none. */
-async function reconcilePrivateDetails(
-  supabase: SupabaseClient,
-  eventId: string,
-  seed: SeedEvent,
-  options: Options
-): Promise<Counts> {
-  const counts = emptyCounts();
-  if (seed.privateDetails) {
-    counts.updated += 1;
-    if (options.dryRun) return counts;
-    const { error } = await supabase.from(TABLE.eventPrivateDetails).upsert({
-      event_id: eventId,
-      meeting_id: null,
-      meeting_passcode: null,
-      ...seed.privateDetails,
-    });
-    if (error) throw error;
-    return counts;
-  }
-
-  if (!options.prune || options.dryRun) return counts;
-  const { count, error } = await supabase
-    .from(TABLE.eventPrivateDetails)
-    .delete({ count: "exact" })
-    .eq("event_id", eventId);
-  if (error) throw error;
-  counts.pruned += count ?? 0;
-  return counts;
-}
-
 /** The event's agenda days, keyed by date, and each day's items, keyed by title. */
 async function reconcileAgenda(
   supabase: SupabaseClient,
@@ -1156,7 +1124,6 @@ async function main(): Promise<void> {
     const questionCounts = emptyCounts();
     const sectionCounts = emptyCounts();
     const linkCounts = emptyCounts();
-    const privateDetailCounts = emptyCounts();
     const agendaCounts = emptyCounts();
 
     for (const seed of eventSeeds) {
@@ -1209,10 +1176,6 @@ async function main(): Promise<void> {
       // The agenda first: a link can name one of its items.
       addCounts(agendaCounts, await reconcileAgenda(supabase, eventId, seed, options));
       addCounts(linkCounts, await reconcileEventLinks(supabase, eventId, seed, options));
-      addCounts(
-        privateDetailCounts,
-        await reconcilePrivateDetails(supabase, eventId, seed, options)
-      );
       if (!options.dryRun) await reconcileBuilderSettings(supabase, eventId, seed);
     }
 
@@ -1229,7 +1192,6 @@ async function main(): Promise<void> {
     summary.push(format("Application questions", questionCounts));
     summary.push(format("People sections", sectionCounts));
     summary.push(format("Event links", linkCounts));
-    summary.push(format("Meeting details", privateDetailCounts));
     summary.push(format("Agenda days", agendaCounts));
   }
 

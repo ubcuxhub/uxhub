@@ -1,18 +1,15 @@
 import type { ComponentProps, ReactNode } from "react";
 
+import { formatCents } from "@/lib/money";
 import { cn } from "@/lib/utils";
 
 export function formatSignedAmount(cents: number, currency = "CAD") {
   const tone = cents < 0 ? "negative" : "positive";
-  const amount = new Intl.NumberFormat("en-CA", {
-    style: "currency",
-    currency,
-    currencyDisplay: "narrowSymbol",
-  }).format(Math.abs(cents) / 100);
+  const amount = Math.abs(cents);
   return {
-    text: `${tone === "negative" ? "−" : "+"}${amount}`,
+    text: `${tone === "negative" ? "−" : "+"}${formatCents(amount, { currency })}`,
     tone,
-    spoken: `${tone === "negative" ? "Charge" : "Credit"} ${amount} ${currency}`,
+    spoken: `${tone === "negative" ? "Charge" : "Credit"} ${formatCents(amount, { currency, withCode: true })}`,
   } as const;
 }
 

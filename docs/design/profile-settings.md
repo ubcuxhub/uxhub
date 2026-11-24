@@ -89,7 +89,8 @@ you go."
 
 **Sections, in this order.**
 
-1. About you: first and last name, pronouns and phone (both "Optional").
+1. About you: first and last name, pronouns and phone (the last three
+   "Optional": a member with one name leaves the last name empty).
 2. Studies / At UBC / School (by account type): faculty and major full width,
    year and student number side by side. Locked values are disabled inputs
    with "Locked while your membership is active. Ask an exec to change it."

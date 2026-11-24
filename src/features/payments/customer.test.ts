@@ -22,27 +22,23 @@ vi.mock("@/lib/supabase-helpers/users", () => ({
 
 const { ensureSquareCustomerId } = await import("./customer");
 
+const profile = {
+  id: "user-1",
+  email: "ada@example.com",
+  first_name: "Ada Byron",
+  last_name: "Lovelace",
+  phone: "+16045550100",
+  square_customer_id: null,
+} as UserInfoRow;
+
 describe("ensureSquareCustomerId", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     createCustomer.mockResolvedValue({ customer: { id: "square-customer" } });
   });
 
-  it("passes first and last names to Square without parsing", async () => {
-    const user = {
-      id: "user-1",
-      square_customer_id: null,
-    } as UserInfoRow;
-
-    await expect(
-      ensureSquareCustomerId(user, {
-        buyerEmail: "ada@example.com",
-        buyerFirstName: "Ada Byron",
-        buyerLastName: "Lovelace",
-        buyerPhone: "+16045550100",
-        idempotencyKey: "checkout-key",
-      })
-    ).resolves.toBe("square-customer");
+  it("creates the customer from the server's profile, names unparsed", async () => {
+    await expect(ensureSquareCustomerId(profile)).resolves.toBe("square-customer");
 
     expect(createCustomer).toHaveBeenCalledWith({
       emailAddress: "ada@example.com",
@@ -57,19 +53,17 @@ describe("ensureSquareCustomerId", () => {
     });
   });
 
-  it("reuses an existing Square customer", async () => {
-    const user = {
-      id: "user-1",
-      square_customer_id: "existing-customer",
-    } as UserInfoRow;
+  it("leaves out a missing last name and phone rather than sending blanks", async () => {
+    await ensureSquareCustomerId({ ...profile, last_name: "", phone: null });
 
+    expect(createCustomer).toHaveBeenCalledWith(
+      expect.objectContaining({ familyName: undefined, phoneNumber: undefined })
+    );
+  });
+
+  it("reuses an existing Square customer", async () => {
     await expect(
-      ensureSquareCustomerId(user, {
-        buyerEmail: "ada@example.com",
-        buyerFirstName: "Ada",
-        buyerLastName: "Lovelace",
-        idempotencyKey: "checkout-key",
-      })
+      ensureSquareCustomerId({ ...profile, square_customer_id: "existing-customer" })
     ).resolves.toBe("existing-customer");
 
     expect(createCustomer).not.toHaveBeenCalled();

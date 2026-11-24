@@ -110,6 +110,11 @@ describe("AdminUsersManager", () => {
     expect(within(alfred).getByText("No membership")).toBeTruthy();
   });
 
+  it("files a member with one name under it, named without a trailing space", () => {
+    renderManager([...users, user({ id: "prince", first_name: "Prince", last_name: "", email: "p@example.com" })]);
+    expect(rowNames()).toEqual(["Alfred Austin", "Iris Chan", "Dora Hu", "Prince", "Bob Zed"]);
+  });
+
   it("searches names and emails as you type", () => {
     renderManager();
     search(" DORA ");

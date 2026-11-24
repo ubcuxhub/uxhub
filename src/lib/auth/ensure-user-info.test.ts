@@ -95,6 +95,19 @@ describe("ensureUserInfo", () => {
   it.each([
     ["a one-word provider name", { name: "Prince" }],
     ["a given name alone", { given_name: "Prince" }],
+    ["a password sign-up with no last name", { first_name: "Prince", last_name: "" }],
+  ])("creates the profile of someone with one name from %s", async (_label, metadata) => {
+    await expect(
+      ensureUserInfo({ ...authUser, user_metadata: metadata } as User),
+    ).resolves.toEqual({ status: "ok" });
+    expect(helperMocks.adminInsertUserInfo).toHaveBeenCalledWith(
+      expect.objectContaining({ first_name: "Prince", last_name: "" }),
+    );
+    expect(logMocks.warn).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["a family name alone", { family_name: "Hopper" }],
     ["no name at all", {}],
   ])("reports %s as a missing name without writing", async (_label, metadata) => {
     await expect(
@@ -118,5 +131,28 @@ describe("ensureUserInfo", () => {
       expect.objectContaining({ first_name: "Prince", last_name: "Nelson" }),
     );
     expect(logMocks.warn).not.toHaveBeenCalled();
+  });
+
+  it("keeps a last name the caller left blank over the metadata's", async () => {
+    await expect(
+      ensureUserInfo(
+        { ...authUser, user_metadata: { given_name: "Prince", family_name: "Nelson" } } as User,
+        { firstName: "Prince", lastName: "  " },
+      ),
+    ).resolves.toEqual({ status: "ok" });
+    expect(helperMocks.adminInsertUserInfo).toHaveBeenCalledWith(
+      expect.objectContaining({ first_name: "Prince", last_name: "" }),
+    );
+  });
+
+  it("completes a missing first name from the caller's overrides", async () => {
+    await expect(
+      ensureUserInfo({ ...authUser, user_metadata: { family_name: "Hopper" } } as User, {
+        firstName: " Grace ",
+      }),
+    ).resolves.toEqual({ status: "ok" });
+    expect(helperMocks.adminInsertUserInfo).toHaveBeenCalledWith(
+      expect.objectContaining({ first_name: "Grace", last_name: "Hopper" }),
+    );
   });
 });

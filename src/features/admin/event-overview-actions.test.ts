@@ -134,13 +134,12 @@ describe("updateEventScheduleAction", () => {
     expect(revalidatePath).toHaveBeenCalledWith("/events", "layout");
   });
 
-  it("writes a manager's change through the service role, which the events UPDATE policy needs", async () => {
+  it("writes a manager's change through their own session, so the audit log knows who made it", async () => {
     guards.requireAdmin.mockResolvedValue(manager);
 
     await updateEventScheduleAction(EVENT_ID, input);
 
-    expect(events.updateEventSchedule).toHaveBeenCalledWith(serviceClient, EVENT_ID, expect.any(Object), 0, undefined);
-    // Reads still go through the session.
+    expect(events.updateEventSchedule).toHaveBeenCalledWith(sessionClient, EVENT_ID, expect.any(Object), 0, undefined);
     expect(events.fetchEventById).toHaveBeenCalledWith(sessionClient, EVENT_ID);
   });
 

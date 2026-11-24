@@ -144,11 +144,6 @@ export const MANIFEST = [
     uses: ["card", "avatar", "icon-button", "tooltip", "toast"],
   },
   {
-    id: "application-response",
-    column: 4,
-    uses: ["card"],
-  },
-  {
     id: "reviewer-notes",
     column: 4,
     uses: ["card", "avatar", "dropdown-menu", "icon-button", "confirm-dialog", "separator", "field", "textarea", "button"],
@@ -156,12 +151,7 @@ export const MANIFEST = [
   {
     id: "reviewer-notes-states",
     column: 4,
-    uses: ["segmented-toggle", "card", "empty-state", "skeleton", "button"],
-  },
-  {
-    id: "application-decision",
-    column: 4,
-    uses: ["card", "field", "input", "button", "spinner", "confirm-dialog", "success-overlay", "toast"],
+    uses: ["segmented-toggle", "card", "empty-state", "spinner", "button"],
   },
   {
     id: "application-form",

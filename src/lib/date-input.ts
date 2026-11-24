@@ -8,6 +8,18 @@
 export type IsoDate = `${number}-${number}-${number}`;
 export type WallTime = `${number}:${number}`;
 
+/** `IsoDate` to a local-midnight `Date`, which is what react-day-picker wants. */
+export function isoToLocalDate(iso: IsoDate): Date {
+  const [year, month, day] = iso.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
+/** A `Date`'s local calendar day as `IsoDate`: the same on the server and every browser. */
+export function localDateToIso(date: Date): IsoDate {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}` as IsoDate;
+}
+
 export const DATE_INPUT_ERROR = "Use a real date, like Nov 14.";
 export const END_TIME_ERROR = "End time is before the start time.";
 

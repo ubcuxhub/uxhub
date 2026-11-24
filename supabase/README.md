@@ -595,8 +595,8 @@ including inactive location-type values and per-date whole-location overrides.
 Never include this table in member/public payloads. The atomic save synchronizes
 one check-in session per date, retains session IDs, derives the events envelope,
 and writes only the audience-approved summary/physical fields to `events`.
-Exact restricted physical details stay in the editor document; default meeting
-details also use the existing Going/staff `event_private_details` boundary.
+Exact restricted physical details and the meeting details stay in the editor
+document.
 Member per-date/physical-private rendering and broader audience integration remain
 deferred under the form-first spec. Registration capacity and mode are guarded
 on all event writes using the same event row lock as reservations.

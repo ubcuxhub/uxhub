@@ -39,6 +39,21 @@ describe("fetchAdminUserRecordById against local Supabase", () => {
       expect((await fetchAdminUserRecordById(clientAs(admin), admin.id))?.verifier).toBeNull();
     }));
 
+  it("keeps a member with one name, whose last name is empty but still trimmed", () =>
+    withFixtures(async (fixtures) => {
+      const admin = await fixtures.createUser({ role_access: "admin" });
+      const member = await fixtures.createUser({ first_name: "Prince", last_name: "" });
+
+      const result = await fetchAdminUserRecordById(clientAs(admin), member.id);
+      expect(result?.row).toMatchObject({ first_name: "Prince", last_name: "" });
+
+      const { error } = await clientAs(member)
+        .from("user_info")
+        .update({ last_name: "  x " })
+        .eq("id", member.id);
+      expect(error?.code).toBe("23514");
+    }));
+
   it("drops a verifier whose account was deleted", () =>
     withFixtures(async (fixtures) => {
       const manager = await fixtures.createUser({ role_access: "manager" });

@@ -17,6 +17,7 @@ import { formatMembershipTypeName } from "@/features/memberships/lib/display";
 import { MemberAvatar } from "@/features/setup/components/MemberAvatar";
 import type { AvatarPreset } from "@/features/setup/lib/options";
 import { useUser } from "@/lib/auth/user-context";
+import { YEAR_LEVELS } from "@/lib/constants";
 import { formatEventDate } from "@/lib/date";
 import type { RoleAccess, UserInfoRow } from "@/lib/supabase/models";
 import { formatUserName } from "@/lib/user-name";
@@ -43,7 +44,6 @@ const ROLES: { value: RoleAccess; label: string }[] = [
   { value: "admin", label: "Admin" },
   { value: "manager", label: "Manager" },
 ];
-const YEARS = ["1", "2", "3", "4", "5+"];
 const NO_YEAR = "__none__";
 const SCHOOL_LOCKED =
   "Only Non-UBC members can change their school. Select a Non-UBC membership to edit this field.";
@@ -149,7 +149,9 @@ export function AdminUserRecord({
     try {
       const changes = userEditChanges(updated, draft, membershipTypes);
       if (Object.keys(changes).length) {
-        commit(await saveManagerUserDetailsAction(updated.id, changes));
+        const saved = await saveManagerUserDetailsAction(updated.id, changes);
+        if (!saved.ok) throw new Error(saved.error);
+        commit(saved.user);
         const savedDraft = createUserEditDraft(updated);
         setDraft((current) => current && {
           ...current,
@@ -168,7 +170,8 @@ export function AdminUserRecord({
           form.set("file", draft.photo.file);
           form.set("expectedPath", updated.profile_photo_path ?? "");
           const response = await fetch(`/api/admin/users/${updated.id}/photo`, { method: "POST", body: form });
-          const data = await response.json();
+          // A response that is not JSON (a gateway error page, say) reads as a plain failure.
+          const data = await response.json().catch(() => ({}));
           if (!response.ok) throw new Error(data.error || "Unable to upload photo.");
           commit(data.user);
         } else if (updated.profile_photo_path) {
@@ -180,7 +183,8 @@ export function AdminUserRecord({
       const roleChanged = draft.role !== updated.role_access;
       if (roleChanged) {
         const role = await updateUserRoleAction(updated.id, draft.role);
-        updated = { ...updated, role_access: role };
+        if (!role.ok) throw new Error(role.error);
+        updated = { ...updated, role_access: role.role };
         setUser(updated);
         savedAny = true;
       }
@@ -385,7 +389,7 @@ export function AdminUserRecord({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value={NO_YEAR}>Not set</SelectItem>
-                      {YEARS.map((year) => (
+                      {YEAR_LEVELS.map((year) => (
                         <SelectItem key={year} value={year}>
                           {year}
                         </SelectItem>

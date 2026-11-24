@@ -6,9 +6,6 @@
  * the check that matters.
  */
 
-/** Domain the `delete_account` migration rewrites deleted addresses to. */
-export const DELETED_EMAIL_DOMAIN = "deleted.uxhub.invalid";
-
 /**
  * True when the typed confirmation names the signed-in account. Case and
  * surrounding whitespace are forgiven — the point is deliberate intent, not a

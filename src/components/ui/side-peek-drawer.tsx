@@ -9,6 +9,7 @@ import { Dialog as DialogPrimitive } from "radix-ui";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { useNavigationGuard } from "@/hooks/use-navigation-guard";
 import { cn } from "@/lib/utils";
 
@@ -68,21 +69,6 @@ function useSidePeekDrawerControls() {
 /** Matches the `sm:` breakpoint the panel's width switches at. */
 const PHONE_QUERY = "(max-width: 639px)";
 
-function subscribePhone(onChange: () => void) {
-  if (typeof window.matchMedia !== "function") return () => {};
-  const query = window.matchMedia(PHONE_QUERY);
-  query.addEventListener("change", onChange);
-  return () => query.removeEventListener("change", onChange);
-}
-
-function getPhoneSnapshot() {
-  return typeof window.matchMedia === "function" && window.matchMedia(PHONE_QUERY).matches;
-}
-
-function usePhone() {
-  return React.useSyncExternalStore(subscribePhone, getPhoneSnapshot, () => false);
-}
-
 function subscribeNothing() {
   return () => {};
 }
@@ -114,7 +100,7 @@ function SidePeekDrawer({
   children,
 }: SidePeekDrawerProps) {
   const router = useRouter();
-  const phone = usePhone();
+  const phone = useMediaQuery(PHONE_QUERY);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [pending, setPending] = React.useState<string | null>(null);
   const openerRef = React.useRef<HTMLElement | null>(null);

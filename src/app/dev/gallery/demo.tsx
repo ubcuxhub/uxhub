@@ -1,29 +1,16 @@
 "use client";
 
-import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowUpLeft } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 import { COLUMNS, columnOf } from "./_compositions";
 import { scrollBehavior, useAxisLockedScroll } from "./use-axis-lock";
 
 /** At and above this width the canvas scrolls both ways; below it is one column. */
 const CANVAS_QUERY = "(min-width: 768px)";
-
-function subscribeCanvas(onChange: () => void) {
-  const query = window.matchMedia(CANVAS_QUERY);
-  query.addEventListener("change", onChange);
-  return () => query.removeEventListener("change", onChange);
-}
-
-function useCanvas() {
-  return useSyncExternalStore(
-    subscribeCanvas,
-    () => window.matchMedia(CANVAS_QUERY).matches,
-    () => false,
-  );
-}
 
 /**
  * The Gallery: six fixed-width columns of compositions on a plain canvas. It
@@ -32,7 +19,7 @@ function useCanvas() {
  */
 function Gallery() {
   const canvasRef = useRef<HTMLDivElement>(null);
-  const canvas = useCanvas();
+  const canvas = useMediaQuery(CANVAS_QUERY);
   const [away, setAway] = useState(false);
   useAxisLockedScroll(canvasRef, canvas);
 

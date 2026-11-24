@@ -1,6 +1,5 @@
 import type { PurchaseRow } from "@/lib/supabase/models";
 import type { CheckoutActionResult } from "./types";
-import { getPurchaseRedirectPath } from "./fulfillment-rules";
 
 type ExistingCheckoutPurchase = Pick<
   PurchaseRow,
@@ -32,7 +31,6 @@ export function getExistingCheckoutResult(
   return {
     ok: true,
     purchaseId: purchase.id,
-    redirectTo: getPurchaseRedirectPath(),
     resolution:
       purchase.status === "completed" ? "completed" : "processing",
   };

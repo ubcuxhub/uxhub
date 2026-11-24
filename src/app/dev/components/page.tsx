@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 
 import { DocsLink } from "@/app/dev/_shell/context";
+import { isServedPage } from "@/app/dev/_shell/nav";
 import { STANDALONE } from "@/app/dev/_shell/standalone";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -71,12 +72,12 @@ export default async function ComponentsIndexPage({
   );
 }
 
-/** Foundations, Gallery and Templates, which the categories below leave out. */
+/** Foundations, Gallery and Templates (where served), which the categories below leave out. */
 function PageLinks() {
   return (
     <nav aria-label="Other docs pages">
       <ul className="grid gap-x-6 gap-y-4 sm:grid-cols-3">
-        {Object.values(STANDALONE).map((page) => (
+        {Object.values(STANDALONE).filter((page) => isServedPage(page.path)).map((page) => (
           <li key={page.path} className="flex flex-col gap-1">
             <DocsLink
               href={page.path}

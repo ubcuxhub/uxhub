@@ -14,7 +14,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * Visual-check docs for the shared UI: `/dev/components` (index and one page
- * per component), `/dev/foundations` and `/dev/templates`. Reads no data and
+ * per component), `/dev/foundations`, `/dev/gallery` and `/dev/templates`
+ * (the last two only where `FLAGS.studentEvents` is on). Reads no data and
  * needs no sign-in, so a reviewer (or a session that must not sign in) can
  * look at every component state.
  */

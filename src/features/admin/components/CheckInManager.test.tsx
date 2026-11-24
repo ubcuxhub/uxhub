@@ -11,10 +11,11 @@ vi.mock("@/features/admin/check-in-actions", () => actions);
 vi.mock("./CheckInTicketMenu", () => ({
   CheckInTicketMenu: ({ onVoided }: { onVoided: (id: string) => void }) => <button onClick={() => onVoided("ticket")}>Void attendee ticket</button>,
 }));
+const realtime = vi.hoisted(() => ({ subscriptions: [] as { table: string; filter?: string }[] }));
 vi.mock("@/lib/supabase/client", () => ({
   createClient: () => ({
     channel: () => {
-      const ch = { on: () => ch, subscribe: () => ch };
+      const ch = { on: (_kind: string, options: { table: string; filter?: string }) => { realtime.subscriptions.push(options); return ch; }, subscribe: () => ch };
 
       return ch;
     }, removeChannel: vi.fn()
@@ -38,6 +39,16 @@ afterEach(cleanup);
 function mount(initial = snapshot, item: string | null = "a") {
   return render(<CheckInManager eventId="event" event={event} initialItemId={item} initialSnapshot={initial} phoneLinks={{ a: <svg aria-label="Phone scanner QR" /> }} />);
 }
+it("listens only to check-ins at the selected item's session and to this event's tickets", async () => {
+  realtime.subscriptions.length = 0;
+  mount({ ...snapshot, sessionId: "session-a" });
+
+  await act(async () => { });
+
+  expect(realtime.subscriptions).toContainEqual(expect.objectContaining({ table: "check_ins", filter: "check_in_session_id=eq.session-a" }));
+  expect(realtime.subscriptions).toContainEqual(expect.objectContaining({ table: "event_tickets", filter: "event_id=eq.event" }));
+  expect(realtime.subscriptions.every(subscription => subscription.filter)).toBe(true);
+});
 it("retains selected target in scanner and phone QR paths", async () => {
   mount();
 

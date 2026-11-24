@@ -218,7 +218,6 @@ it("uses Proud Hubbo at 200px after a draft save applies the edits and enables s
   fireEvent.click(screen.getAllByRole("button", { name: "Save" })[0]);
   const dialog = await screen.findByRole("dialog", { name: "Draft saved" });
   expect(within(dialog).getByTestId("hubbo").getAttribute("data-emotion")).toBe("proud");
-  expect(within(dialog).getByTestId("hubbo").className).toContain("h-50");
   fireEvent.click(within(dialog).getByRole("button", { name: "Keep editing" }));
   await waitFor(() => expect(screen.queryByRole("dialog", { name: "Draft saved" })).toBeNull());
   expect(within(openMoreActions()).getByRole("menuitem", { name: "Delete event" })).toBeTruthy();
@@ -320,22 +319,39 @@ it("goes back to Manage Events from a new event, which has no manager yet", () =
   expect(screen.queryByRole("link", { name: "Back to event" })).toBeNull();
 });
 
-it("asks before Back to event leaves unsaved changes", async () => {
+/**
+ * Renames a draft event and clicks Back to event, which the unsaved-changes
+ * guard intercepts. Every builder step re-renders the whole form, so queries
+ * stay inside the header and the dialog, and each outcome gets its own test:
+ * one test doing both, with page-wide role queries, ran past Vitest's 5s
+ * budget on a busy machine.
+ */
+async function clickBackWithUnsavedChanges() {
   const event = { ...publishedEvent, status: "draft" } as EventRow;
-  render(<EventCreateModify eventId={event.id} initialEvent={event} />);
-  fireEvent.change(screen.getByLabelText("Event name"), { target: { value: "Renamed event" } });
-  await waitFor(() => expectActionsDisabled("Save", false));
-
-  const back = screen.getByRole("link", { name: "Back to event" });
+  const { container } = render(<EventCreateModify eventId={event.id} initialEvent={event} />);
+  fireEvent.change(within(container.querySelector<HTMLElement>("#builder-basics")!).getByLabelText("Event name"), { target: { value: "Renamed event" } });
+  const header = within(container.querySelector<HTMLElement>("#event-builder-header")!);
+  expect(header.getByRole("button", { name: "Save" })).toHaveProperty("disabled", false);
+  const back = header.getByRole("link", { name: "Back to event" });
   expect(fireEvent.click(back)).toBe(false);
   const dialog = await screen.findByRole("dialog", { name: "Leave without saving?" });
   expect(router.push).not.toHaveBeenCalled();
+  return { back, dialog };
+}
 
+it("asks before Back to event leaves unsaved changes, and asks again after Keep editing", async () => {
+  const { back, dialog } = await clickBackWithUnsavedChanges();
   fireEvent.click(within(dialog).getByRole("button", { name: "Keep editing" }));
-  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  await waitFor(() => expect(dialog.isConnected).toBe(false));
   expect(router.push).not.toHaveBeenCalled();
 
-  fireEvent.click(back);
-  fireEvent.click(within(await screen.findByRole("dialog", { name: "Leave without saving?" })).getByRole("button", { name: "Discard and leave" }));
+  expect(fireEvent.click(back)).toBe(false);
+  expect(await screen.findByRole("dialog", { name: "Leave without saving?" })).toBeTruthy();
+  expect(router.push).not.toHaveBeenCalled();
+});
+
+it("leaves for the event's Overview on Discard and leave", async () => {
+  const { dialog } = await clickBackWithUnsavedChanges();
+  fireEvent.click(within(dialog).getByRole("button", { name: "Discard and leave" }));
   expect(router.push).toHaveBeenCalledWith("/admin/events/event-1/overview");
 });

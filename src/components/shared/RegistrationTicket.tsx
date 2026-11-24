@@ -11,7 +11,12 @@ interface RegistrationTicketProps {
   className?: string;
 }
 
-/** Figma 4619:149. Container width, rather than viewport width, selects the layout. */
+/**
+ * Figma 4619:149. Container width, rather than viewport width, selects the layout.
+ *
+ * Kept as a documented design-system part (`/dev/components/registration-ticket`);
+ * no product screen uses it yet.
+ */
 export function RegistrationTicket({ title, description, ticket, actions, className }: RegistrationTicketProps) {
   return <Card className={cn("@container/registration gap-0 py-0", className)}>
     <CardHeader className="gap-0 border-b px-5 pt-5 [.border-b]:pb-4">

@@ -27,11 +27,10 @@ export function MembershipCheckout({
   returnTo?: string;
   user: UserInfoRow;
 }) {
+  // The confirmation page's buttons lead to the portal and purchases, so it
+  // takes no returnTo.
   const confirmationHref = (purchaseId: string) =>
-    withReturnTo(
-      `/portal/membership/confirmation/${purchaseId}`,
-      returnTo ?? "/portal",
-    );
+    `/portal/membership/confirmation/${purchaseId}`;
 
   return (
     <CheckoutLayout
@@ -72,6 +71,7 @@ export function MembershipCheckout({
         kind: "membership",
         slug: membershipType.slug,
         successHref: confirmationHref,
+        freeButtonLabel: "Confirm membership",
       }}
       price={membershipType.price}
       processingMessage="Please don’t close or refresh this page. We’re confirming your payment, eligibility, and membership details."

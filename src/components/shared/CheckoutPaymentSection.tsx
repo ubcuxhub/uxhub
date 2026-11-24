@@ -14,10 +14,9 @@ import type { PurchaseKind } from "@/features/payments/types";
 interface CheckoutPaymentSectionProps {
   amount: string;
   amountCents: number;
-  collectBuyerDetails?: boolean;
   description?: string;
   buttonLabel?: string;
-  /** The submit label for a free event ticket, which takes no card. */
+  /** The submit label for a free ticket or membership, which takes no card. */
   freeButtonLabel?: string;
   disabled?: boolean;
   disabledMessage?: string | null;
@@ -39,7 +38,6 @@ interface CheckoutPaymentSectionProps {
 export function CheckoutPaymentSection({
   amount,
   amountCents,
-  collectBuyerDetails = true,
   description,
   buttonLabel = "Secure Checkout",
   freeButtonLabel,
@@ -59,17 +57,18 @@ export function CheckoutPaymentSection({
   title = "Secure Checkout",
   userId,
 }: CheckoutPaymentSectionProps) {
-  const freeEvent = kind === "event_ticket" && amountCents === 0;
-  const securityMessage = freeEvent
+  const free = amountCents === 0;
+  const securityMessage = free && kind === "event_ticket"
     ? "Your eligibility and available capacity are checked before your ticket is confirmed."
-    : "Square securely processes your payment details. UX Hub confirms pricing, eligibility, and fulfillment before purchase.";
+    : free
+      ? "Your eligibility is checked before your membership starts."
+      : "Square securely processes your payment details. UX Hub confirms pricing, eligibility, and fulfillment before purchase.";
   const form = (
     <SquareCheckoutForm
       amountCents={amountCents}
       amountLabel={amount}
       buttonLabel={buttonLabel}
       freeButtonLabel={freeButtonLabel}
-      collectBuyerDetails={collectBuyerDetails}
       disabled={disabled}
       disabledMessage={disabledMessage}
       initialEmail={initialEmail}

@@ -129,7 +129,3 @@ export const AVATAR_PRESETS = [
 ] as const;
 export type AvatarPreset = (typeof AVATAR_PRESETS)[number]["id"];
 
-/** The label for a stored interest, or the value itself for a manager's free tag. */
-export function interestLabel(value: string): string {
-  return INTEREST_OPTIONS.find((option) => option.id === value)?.label ?? value;
-}

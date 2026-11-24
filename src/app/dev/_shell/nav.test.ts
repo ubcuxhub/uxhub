@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { filterNav, TOP_LINKS, type NavGroup } from "./nav";
 
@@ -51,5 +51,37 @@ describe("filterNav", () => {
   it("finds nothing for a query nothing matches", () => {
     const result = filterNav(TOP_LINKS, GROUPS, "zzz");
     expect(result).toEqual({ topLinks: [], groups: [], count: 0 });
+  });
+});
+
+describe("unlaunched pages", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+  });
+
+  // FLAGS resolves at module load, so each case needs a fresh import.
+  async function topLinksOn(vercelEnv: string | undefined) {
+    vi.resetModules();
+    vi.stubEnv("NEXT_PUBLIC_VERCEL_ENV", vercelEnv);
+    vi.stubEnv("NEXT_PUBLIC_FEATURE_STUDENT_EVENTS", undefined);
+    const nav = await import("./nav");
+    return { shown: nav.showUnlaunchedPages, titles: nav.TOP_LINKS.map((link) => link.title) };
+  }
+
+  it("drops Gallery and Templates in production, keeping the design-system docs", async () => {
+    expect(await topLinksOn("production")).toEqual({
+      shown: false,
+      titles: ["Components", "Foundations"],
+    });
+  });
+
+  it("lists them locally and on previews", async () => {
+    for (const env of [undefined, "preview"]) {
+      expect(await topLinksOn(env)).toEqual({
+        shown: true,
+        titles: ["Components", "Foundations", "Gallery", "Templates"],
+      });
+    }
   });
 });

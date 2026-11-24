@@ -21,7 +21,7 @@ function firstName() {
 }
 
 function lastName() {
-  return screen.getByLabelText("Last name") as HTMLInputElement;
+  return screen.getByLabelText(/^Last name/) as HTMLInputElement;
 }
 
 function submit() {
@@ -50,10 +50,14 @@ describe("CompleteProfileForm", () => {
     expect(
       screen.getByRole("heading", { name: "What should we call you?" }),
     ).toBeTruthy();
-    expect(screen.getByText(/Google didn't share your full name/)).toBeTruthy();
+    expect(screen.getByText(/Google didn't share your name/)).toBeTruthy();
     expect(screen.getByText("prince@gmail.com")).toBeTruthy();
     expect(firstName().value).toBe("Prince");
     expect(lastName().value).toBe("");
+    // The last name is optional, for people with one name.
+    expect(firstName().required).toBe(true);
+    expect(lastName().required).toBe(false);
+    expect(lastName().labels?.[0]?.textContent).toContain("Optional");
   });
 
   it("saves the trimmed names and continues to next", async () => {
@@ -73,15 +77,31 @@ describe("CompleteProfileForm", () => {
     expect(routerMocks.replace).toHaveBeenCalledWith("/portal/membership/join");
   });
 
-  it("names a blank field on the field without calling the action", async () => {
-    render(<CompleteProfileForm defaultFirstName="Prince" />);
+  it("saves a single name with an empty last name", async () => {
+    render(<CompleteProfileForm defaultLastName="Nelson" />);
+    fireEvent.change(firstName(), { target: { value: " Prince " } });
     fireEvent.change(lastName(), { target: { value: "   " } });
     await submit();
 
-    expect(screen.getByText("Enter your last name.")).toBeTruthy();
-    expect(lastName().getAttribute("aria-invalid")).toBe("true");
-    expect(document.activeElement).toBe(lastName());
+    expect(completeProfileAction).toHaveBeenCalledWith({
+      firstName: "Prince",
+      lastName: "",
+    });
+    expect(screen.queryByText(/Enter your/)).toBeNull();
+  });
+
+  it("names a blank first name on the field without calling the action", async () => {
+    render(<CompleteProfileForm defaultLastName="Nelson" />);
+    fireEvent.change(firstName(), { target: { value: "   " } });
+    await submit();
+
+    expect(screen.getByText("Enter your first name.")).toBeTruthy();
+    expect(firstName().getAttribute("aria-invalid")).toBe("true");
+    expect(document.activeElement).toBe(firstName());
     expect(completeProfileAction).not.toHaveBeenCalled();
+
+    fireEvent.change(firstName(), { target: { value: "Prince" } });
+    expect(screen.queryByText("Enter your first name.")).toBeNull();
   });
 
   it("shows the action's error and stays put", async () => {

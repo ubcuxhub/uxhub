@@ -19,11 +19,16 @@ describe("checkout composites", () => {
     expect(screen.queryByText(/Square securely/)).toBeNull();
     expect(screen.queryByLabelText("First name")).toBeNull();
   });
-  it("preserves the membership payment form even at zero dollars", () => {
-    render(<CheckoutPaymentSection {...buyer} amount="$0.00" amountCents={0} kind="membership" />);
-    expect(screen.getByLabelText("First name")).toBeTruthy();
+  it("takes no card for a free membership tier", () => {
+    render(<CheckoutPaymentSection {...buyer} amount="$0.00" amountCents={0} kind="membership" freeButtonLabel="Confirm membership" />);
+    expect(screen.getByRole("button", { name: "Confirm membership" })).toBeTruthy();
+    expect(screen.getByText(/Confirm to start your membership/)).toBeTruthy();
+    expect(screen.queryByText(/Square securely/)).toBeNull();
+  });
+  it("never asks for buyer details: the server uses the profile", () => {
+    render(<CheckoutPaymentSection {...buyer} amount="$20.00" amountCents={2000} kind="membership" />);
+    expect(screen.queryByLabelText("First name")).toBeNull();
     expect(screen.getByText(/Square securely/)).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Confirm spot" })).toBeNull();
   });
   it("keeps the free registration summary and action in the checkout layout", () => {
     const user = { id: "user-1", email: buyer.initialEmail, first_name: "Demo", last_name: "Member" } as UserInfoRow;

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -10,7 +10,7 @@ import {
   isAsyncTimeoutError,
   withDeadline,
 } from "@/lib/async/deadline";
-import { useNavigationRecovery } from "@/hooks/use-navigation-recovery";
+import { NAVIGATED, useGuardedSubmit } from "@/hooks/use-guarded-submit";
 import { createClient } from "@/lib/supabase/client";
 
 import {
@@ -43,33 +43,16 @@ export function ForgotPasswordForm({
   const email = typedEmail ?? carriedEmail;
   const [emailError, setEmailError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const submittingRef = useRef(false);
   const router = useRouter();
-  const recoverStalledNavigation = useNavigationRecovery(() => {
-    submittingRef.current = false;
-    setIsLoading(false);
+  const { pending: isLoading, run } = useGuardedSubmit(() =>
     setError(
       "The reset email was requested, but the next page did not load. Check your inbox before trying again.",
-    );
-  });
+    ),
+  );
 
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (submittingRef.current) return;
-
-    if (!isPlausibleEmail(email)) {
-      setError(null);
-      setEmailError(INVALID_EMAIL_MESSAGE);
-      return;
-    }
-    setEmailError(null);
-
+  const sendResetEmail = async () => {
     const supabase = createClient();
-    submittingRef.current = true;
-    setIsLoading(true);
     setError(null);
-    let navigationStarted = false;
 
     try {
       const normalizedEmail = email.trim().toLowerCase();
@@ -90,20 +73,27 @@ export function ForgotPasswordForm({
       setPendingEmail(normalizedEmail);
 
       router.push("/auth/check-email");
-      navigationStarted = true;
-      recoverStalledNavigation();
+      return NAVIGATED;
     } catch (error: unknown) {
       setError(
         isAsyncTimeoutError(error)
           ? "We could not confirm whether the reset email was sent. Check your inbox before requesting another."
           : getAuthActionErrorMessage(error, AUTH_ACTION_ERRORS.passwordReset),
       );
-    } finally {
-      if (!navigationStarted) {
-        submittingRef.current = false;
-        setIsLoading(false);
-      }
     }
+  };
+
+  const handleForgotPassword = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!isPlausibleEmail(email)) {
+      setError(null);
+      setEmailError(INVALID_EMAIL_MESSAGE);
+      return;
+    }
+    setEmailError(null);
+
+    void run(sendResetEmail);
   };
 
   return (

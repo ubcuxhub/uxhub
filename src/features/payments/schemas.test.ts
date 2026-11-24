@@ -1,14 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { parseCheckoutRequest } from "./schemas";
+import { CheckoutRequestError, parseCheckoutRequest } from "./schemas";
 
 const validPayload = {
   kind: "membership",
   slug: "student",
   token: "payment-token",
   idempotencyKey: "checkout-key",
-  buyerFirstName: "Ada",
-  buyerLastName: "Lovelace",
-  buyerEmail: "ada@example.com",
+  expectedAmountCents: 2000,
 };
 
 describe("parseCheckoutRequest", () => {
@@ -24,41 +22,30 @@ describe("parseCheckoutRequest", () => {
   it.each([
     ["kind", { kind: "donation" }, "Invalid purchase kind."],
     ["slug", { slug: " " }, "Product slug is required."],
-    ["token", { token: null }, "Payment token is required."],
     [
       "idempotency key",
       { idempotencyKey: "" },
       "Checkout idempotency key is required.",
     ],
-    ["buyer first name", { buyerFirstName: 12 }, "First name is required."],
-    ["buyer last name", { buyerLastName: " " }, "Last name is required."],
-    ["buyer email", { buyerEmail: "" }, "Email is required."],
-    [
-      "email shape",
-      { buyerEmail: "not-an-email" },
-      "Enter a valid email address.",
-    ],
   ])("rejects an invalid %s", (_field, change, message) => {
     expect(() =>
       parseCheckoutRequest({ ...validPayload, ...change })
-    ).toThrow(message);
+    ).toThrow(new CheckoutRequestError(message));
   });
 
-  it("trims required fields and normalizes optional strings", () => {
+  it("trims required fields and drops the buyer details older clients send", () => {
     expect(
       parseCheckoutRequest({
         ...validPayload,
         slug: " student ",
-        buyerFirstName: " Ada ",
-        buyerLastName: " Lovelace ",
+        buyerFirstName: "Mallory",
+        buyerEmail: "someone-else@example.com",
         buyerPhone: " 604-555-0100 ",
         billingPostalCode: " ",
       })
     ).toEqual({
       ...validPayload,
       slug: "student",
-      buyerPhone: "604-555-0100",
-      billingPostalCode: null,
       verificationToken: null,
     });
   });
@@ -77,9 +64,9 @@ describe("parseCheckoutRequest", () => {
   });
 });
 
-it("accepts a cardless event request but still requires a token for membership", () => {
+it("accepts a cardless request, leaving checkout to decide whether the price needs a card", () => {
   expect(parseCheckoutRequest({ ...validPayload, kind: "event_ticket", token: null, expectedAmountCents: 0 })).toMatchObject({ token: null, expectedAmountCents: 0 });
-  expect(() => parseCheckoutRequest({ ...validPayload, token: null })).toThrow("Payment token is required");
+  expect(parseCheckoutRequest({ ...validPayload, token: null })).toMatchObject({ token: null });
   for (const expectedAmountCents of [-1, 0.1, "0", NaN, Infinity]) {
     expect(() => parseCheckoutRequest({ ...validPayload, expectedAmountCents })).toThrow("Invalid expected amount");
   }

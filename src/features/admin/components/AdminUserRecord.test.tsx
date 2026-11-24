@@ -69,9 +69,9 @@ beforeEach(() => {
     const saved = { ...savedUsers.get(id)!, ...changes };
     if ("student_number" in changes) { saved.student_verified_at = null; saved.student_verified_by = null; }
     savedUsers.set(id, saved);
-    return saved;
+    return { ok: true, user: saved };
   });
-  mocks.updateRole.mockImplementation(async (_id: string, role: string) => role);
+  mocks.updateRole.mockImplementation(async (_id: string, role: string) => ({ ok: true, role }));
   mocks.verifyStudent.mockImplementation(async (id: string, verified: boolean) => {
     const saved = { ...savedUsers.get(id)!, student_verified_at: verified ? "2026-10-14T19:00:00Z" : null, student_verified_by: verified ? "me" : null };
     savedUsers.set(id, saved);
@@ -302,7 +302,7 @@ describe("AdminUserRecord: editing", () => {
 
   it("disables the form while saving and shows the saved values after", async () => {
     let finish!: (saved: UserRecord) => void;
-    mocks.saveDetails.mockReturnValue(new Promise<UserRecord>((resolve) => { finish = resolve; }));
+    mocks.saveDetails.mockReturnValue(new Promise((resolve) => { finish = (saved) => resolve({ ok: true, user: saved }); }));
     renderRecord();
     edit();
     fireEvent.change(textbox("First name"), { target: { value: "  Dorothy  " } });
@@ -317,12 +317,12 @@ describe("AdminUserRecord: editing", () => {
   });
 
   it("keeps the draft after a failed save and retries it", async () => {
-    mocks.saveDetails.mockRejectedValueOnce(new Error("Unable to save user information."));
+    mocks.saveDetails.mockResolvedValueOnce({ ok: false, error: "This user no longer exists. Reload the user directory." });
     renderRecord();
     edit();
     fireEvent.change(textbox("First name"), { target: { value: "Dorothy" } });
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Unable to save user information."));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("This user no longer exists."));
     expect(textbox("First name").value).toBe("Dorothy");
     expect(mocks.router.refresh).not.toHaveBeenCalled();
     await saveAndFinish();
@@ -338,6 +338,21 @@ describe("AdminUserRecord: editing", () => {
     expect(screen.getByRole("alert").textContent).toContain("future");
     expect(mocks.saveDetails).not.toHaveBeenCalled();
     expect(mocks.verifyStudent).not.toHaveBeenCalled();
+  });
+
+  it("clears the last name of a member with one name, and refuses a blank first name", async () => {
+    renderRecord();
+    edit();
+    fireEvent.change(textbox("First name"), { target: { value: " " } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(screen.getByRole("alert").textContent).toContain("First name is required.");
+    expect(mocks.saveDetails).not.toHaveBeenCalled();
+
+    fireEvent.change(textbox("First name"), { target: { value: "Dora" } });
+    fireEvent.change(textbox("Last name"), { target: { value: "  " } });
+    await saveAndFinish();
+    expect(mocks.saveDetails).toHaveBeenCalledWith("dora", { last_name: "" });
+    expect(screen.getByRole("heading", { level: 2, name: "Dora" })).toBeTruthy();
   });
 
   it("saves nothing when nothing changed", async () => {
@@ -376,7 +391,7 @@ describe("AdminUserRecord: role changes", () => {
   });
 
   it("shows a failed role change in the confirmation, after the rest saved", async () => {
-    mocks.updateRole.mockRejectedValueOnce(new Error("You can't remove the last manager."));
+    mocks.updateRole.mockResolvedValueOnce({ ok: false, error: "You can't remove the last manager." });
     renderRecord({ record: savedUsers.get("iris")! });
     edit();
     fireEvent.change(textbox("First name"), { target: { value: "Irene" } });

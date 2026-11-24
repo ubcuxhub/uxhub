@@ -1,3 +1,5 @@
+import { formatCents } from "@/lib/money";
+
 import { ctaButton, escapeHtml, renderEmailLayout } from "./layout";
 import { detailRow } from "./templates";
 
@@ -35,12 +37,7 @@ export interface RefundIssuedEmailInput {
 
 /** "$12.50 CAD": the receipts' amount, with the currency spelled out. */
 export function formatRefundAmount(amountCents: number, currency: string) {
-  const amount = new Intl.NumberFormat("en-CA", {
-    style: "currency",
-    currency,
-    currencyDisplay: "narrowSymbol",
-  }).format(amountCents / 100);
-  return `${amount} ${currency}`;
+  return formatCents(amountCents, { currency, withCode: true });
 }
 
 /** The buyer's purchase history: the Purchases tab of the settings dialog. */

@@ -1,12 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { FcGoogle } from "react-icons/fc";
 
 import { Button } from "@/components/ui/button";
 import { FieldError } from "@/components/ui/field";
 import { withDeadline } from "@/lib/async/deadline";
-import { useNavigationRecovery } from "@/hooks/use-navigation-recovery";
+import { NAVIGATED, useGuardedSubmit } from "@/hooks/use-guarded-submit";
 import { createClient } from "@/lib/supabase/client";
 
 import {
@@ -26,24 +26,15 @@ export function GoogleOAuthButton({
   dividerLabel,
 }: GoogleOAuthButtonProps) {
   const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const submittingRef = useRef(false);
-  const recoverStalledNavigation = useNavigationRecovery(() => {
-    submittingRef.current = false;
-    setIsLoading(false);
+  const { pending: isLoading, run } = useGuardedSubmit(() =>
     setError(
       "Google sign-in did not redirect. Check your connection and try again.",
-    );
-  });
+    ),
+  );
 
-  const handleGoogleOAuth = async () => {
-    if (submittingRef.current) return;
-
+  const signInWithGoogle = async () => {
     const supabase = createClient();
-    submittingRef.current = true;
-    setIsLoading(true);
     setError(null);
-    let navigationStarted = false;
 
     try {
       const redirectTo = new URL("/auth/callback", window.location.origin);
@@ -61,17 +52,13 @@ export function GoogleOAuthButton({
       );
 
       if (error) throw error;
-      navigationStarted = true;
-      recoverStalledNavigation();
+      return NAVIGATED;
     } catch (error: unknown) {
       setError(getAuthActionErrorMessage(error, AUTH_ACTION_ERRORS.google));
-    } finally {
-      if (!navigationStarted) {
-        submittingRef.current = false;
-        setIsLoading(false);
-      }
     }
   };
+
+  const handleGoogleOAuth = () => void run(signInWithGoogle);
 
   return (
     <div className="flex flex-col gap-6">

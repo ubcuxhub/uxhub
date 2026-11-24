@@ -794,42 +794,6 @@ export type Database = {
           },
         ]
       }
-      event_private_details: {
-        Row: {
-          created_at: string
-          event_id: string
-          meeting_id: string | null
-          meeting_passcode: string | null
-          meeting_url: string
-          updated_at: string
-        }
-        ComputedFields: never
-        Insert: {
-          created_at?: string
-          event_id: string
-          meeting_id?: string | null
-          meeting_passcode?: string | null
-          meeting_url: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          event_id?: string
-          meeting_id?: string | null
-          meeting_passcode?: string | null
-          meeting_url?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "event_private_details_event_id_fkey"
-            columns: ["event_id"]
-            isOneToOne: true
-            referencedRelation: "events"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       event_sponsors: {
         Row: {
           event_id: string
@@ -1461,23 +1425,26 @@ export type Database = {
           created_at: string | null
           event_id: string
           event_type: string
-          payload: NonNullable<Json>
+          payload: Json | null
           processed_at: string | null
+          square_payment_id: string | null
         }
         ComputedFields: never
         Insert: {
           created_at?: string | null
           event_id: string
           event_type: string
-          payload: NonNullable<Json>
+          payload?: Json | null
           processed_at?: string | null
+          square_payment_id?: string | null
         }
         Update: {
           created_at?: string | null
           event_id?: string
           event_type?: string
-          payload?: NonNullable<Json>
+          payload?: Json | null
           processed_at?: string | null
+          square_payment_id?: string | null
         }
         Relationships: []
       }
@@ -1812,6 +1779,10 @@ export type Database = {
         Args: { p_error_code?: string; p_send_id: string; p_sent: boolean }
         Returns: number
       }
+      create_one_live_membership_index: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       create_staff_volunteer_schedule: {
         Args: { p_event_id: string; p_operation_id: string; p_url: string }
         Returns: Json
@@ -1862,10 +1833,6 @@ export type Database = {
         Args: { target_event_id: string }
         Returns: undefined
       }
-      delete_event_before_safe_mutations: {
-        Args: { target_event_id: string }
-        Returns: undefined
-      }
       delete_team: {
         Args: { p_team_id: string; p_user_id: string }
         Returns: string
@@ -1877,6 +1844,10 @@ export type Database = {
       draft_event_number: { Args: { value: string }; Returns: number }
       draft_event_timestamp: { Args: { value: string }; Returns: string }
       draft_event_wall_time: { Args: { value: string }; Returns: string }
+      end_event_offer: {
+        Args: { p_event_id: string; p_user_id: string }
+        Returns: undefined
+      }
       event_checkout_amount: {
         Args: { p_event_id: string; p_user_id: string }
         Returns: number
@@ -1947,6 +1918,10 @@ export type Database = {
       event_ticket_eligibility: {
         Args: { p_amount_cents?: number; p_event_id: string; p_user_id: string }
         Returns: string
+      }
+      fail_abandoned_purchases: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       fulfill_membership_purchase: {
         Args: { p_expires_at: string; p_purchase_id: string }
@@ -2100,58 +2075,6 @@ export type Database = {
         }
         Returns: Json
       }
-      save_admin_event_before_agenda: {
-        Args: {
-          p_application_questions: Json
-          p_check_in_sessions: Json
-          p_event: Json
-          p_event_id: string
-          p_expected_image_url: string
-          p_mentors: Json
-          p_slug: string
-          p_sponsors: Json
-        }
-        Returns: Json
-      }
-      save_admin_event_before_application_settings: {
-        Args: {
-          p_application_questions: Json
-          p_check_in_sessions: Json
-          p_event: Json
-          p_event_id: string
-          p_expected_image_url: string
-          p_mentors: Json
-          p_slug: string
-          p_sponsors: Json
-        }
-        Returns: Json
-      }
-      save_admin_event_before_content: {
-        Args: {
-          p_application_questions: Json
-          p_check_in_sessions: Json
-          p_event: Json
-          p_event_id: string
-          p_expected_image_url: string
-          p_mentors: Json
-          p_slug: string
-          p_sponsors: Json
-        }
-        Returns: Json
-      }
-      save_admin_event_before_date_locations: {
-        Args: {
-          p_application_questions: Json
-          p_check_in_sessions: Json
-          p_event: Json
-          p_event_id: string
-          p_expected_image_url: string
-          p_mentors: Json
-          p_slug: string
-          p_sponsors: Json
-        }
-        Returns: Json
-      }
       save_admin_event_builder: {
         Args: {
           p_application_questions: Json
@@ -2168,96 +2091,7 @@ export type Database = {
         }
         Returns: Json
       }
-      save_admin_event_builder_before_agenda_timing: {
-        Args: {
-          p_application_questions: Json
-          p_check_in_sessions: Json
-          p_draft_id: string
-          p_draft_revision: number
-          p_event: Json
-          p_event_id: string
-          p_expected_header_image_url: string
-          p_expected_image_url: string
-          p_mentors: Json
-          p_slug: string
-          p_sponsors: Json
-        }
-        Returns: Json
-      }
-      save_admin_event_builder_before_cancellation: {
-        Args: {
-          p_application_questions: Json
-          p_check_in_sessions: Json
-          p_draft_id: string
-          p_draft_revision: number
-          p_event: Json
-          p_event_id: string
-          p_expected_header_image_url: string
-          p_expected_image_url: string
-          p_mentors: Json
-          p_slug: string
-          p_sponsors: Json
-        }
-        Returns: Json
-      }
-      save_admin_event_builder_before_publication: {
-        Args: {
-          p_application_questions: Json
-          p_check_in_sessions: Json
-          p_draft_id: string
-          p_draft_revision: number
-          p_event: Json
-          p_event_id: string
-          p_expected_header_image_url: string
-          p_expected_image_url: string
-          p_mentors: Json
-          p_slug: string
-          p_sponsors: Json
-        }
-        Returns: Json
-      }
-      save_admin_event_builder_before_safe_mutations: {
-        Args: {
-          p_application_questions: Json
-          p_check_in_sessions: Json
-          p_draft_id: string
-          p_draft_revision: number
-          p_event: Json
-          p_event_id: string
-          p_expected_header_image_url: string
-          p_expected_image_url: string
-          p_mentors: Json
-          p_slug: string
-          p_sponsors: Json
-        }
-        Returns: Json
-      }
-      save_admin_event_builder_before_unified_drafts: {
-        Args: {
-          p_application_questions: Json
-          p_check_in_sessions: Json
-          p_draft_id: string
-          p_draft_revision: number
-          p_event: Json
-          p_event_id: string
-          p_expected_header_image_url: string
-          p_expected_image_url: string
-          p_mentors: Json
-          p_slug: string
-          p_sponsors: Json
-        }
-        Returns: Json
-      }
       save_admin_event_draft: {
-        Args: {
-          p_document: Json
-          p_event_id: string
-          p_id: string
-          p_revision: number
-        }
-        Returns: Json
-      }
-      save_admin_event_draft_before_url_activation: {
         Args: {
           p_document: Json
           p_event_id: string

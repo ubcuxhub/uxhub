@@ -1,12 +1,12 @@
 /**
- * Event links and private meeting details against the local database, read
- * with each viewer's own client the way the event page reads them: RLS gives
- * each viewer only what their visibility allows.
+ * Event links against the local database, read with each viewer's own client
+ * the way the event page reads them: RLS gives each viewer only what their
+ * visibility allows.
  */
 import { describe, expect, it } from "vitest";
 
 import type { Database } from "@/lib/supabase/database.types";
-import { fetchEventLinks, fetchEventPrivateDetails } from "@/lib/supabase-helpers/event-links";
+import { fetchEventLinks } from "@/lib/supabase-helpers/event-links";
 import { clientAs, createIntegrationClient, withFixtures, type Fixtures } from "@/test/integration";
 
 const db = createIntegrationClient();
@@ -31,13 +31,6 @@ async function eventWithLinks(fixtures: Fixtures, overrides: EventInsert = {}) {
     { event_id: event.id, type: "event_recap", url: "https://recap.example.test", visibility: "after_event", sort_order: 2 },
   ]);
   if (error) throw error;
-  const details = await db.from("event_private_details").insert({
-    event_id: event.id,
-    meeting_url: "https://zoom.example.test/j/123",
-    meeting_id: "123 456 789",
-    meeting_passcode: "uxhub",
-  });
-  if (details.error) throw details.error;
   return event;
 }
 
@@ -124,32 +117,5 @@ describe("event_links", () => {
         .select("visibility")
         .single();
       expect(labelled.data).toEqual({ visibility: "everyone" });
-    }));
-});
-
-describe("fetchEventPrivateDetails", () => {
-  it("gives the meeting details to ticket holders and admins only", () =>
-    withFixtures(async (fixtures) => {
-      const event = await eventWithLinks(fixtures);
-      const holder = await withTicket(fixtures, event.id);
-      const student = await fixtures.createUser();
-      const admin = await fixtures.createUser({ role_access: "admin" });
-
-      const details = {
-        event_id: event.id,
-        meeting_url: "https://zoom.example.test/j/123",
-        meeting_id: "123 456 789",
-        meeting_passcode: "uxhub",
-      };
-      expect(await fetchEventPrivateDetails(clientAs(holder), event.id)).toMatchObject(details);
-      expect(await fetchEventPrivateDetails(clientAs(admin), event.id)).toMatchObject(details);
-      expect(await fetchEventPrivateDetails(clientAs(student), event.id)).toBeNull();
-
-      // Visitors who aren't signed in can't read the table at all.
-      const { error } = await clientAs(null)
-        .from("event_private_details")
-        .select("*")
-        .eq("event_id", event.id);
-      expect(error).not.toBeNull();
     }));
 });

@@ -2,40 +2,17 @@ import type { MentorRow, SponsorRow } from "@/lib/supabase/models";
 import { TABLES } from "./tables";
 import type { DbClient } from "./types";
 
-/** Compatibility reader for the existing Mentors card. Other groups remain
- * in the editor until section-aware attendee rendering is delivered. */
+/** Compatibility reader for the existing Mentors card: the people in the
+ * event's sections titled "Mentors", in page order. Other groups remain in
+ * the editor until section-aware attendee rendering is delivered. */
 export async function fetchEventMentors(
   supabase: DbClient,
   eventId: string
 ): Promise<MentorRow[]> {
-  const { data: sections, error: sectionError } = await supabase
-    .from(TABLES.eventPeopleSections).select("id, title").eq("event_id", eventId);
-  if (sectionError) throw sectionError;
-  const mentorSections = (sections ?? []).filter(section => section.title.trim().toLowerCase() === "mentors");
-  if (!mentorSections.length) return [];
-  const { data: links, error: linksError } = await supabase
-    .from(TABLES.eventMentors)
-    .select("mentor_id, sort_order")
-    .eq("event_id", eventId)
-    .in("section_id", mentorSections.map(section => section.id))
-    .order("sort_order", { ascending: true });
-
-  if (linksError) throw linksError;
-  if (!links?.length) return [];
-
-  const { data: mentors, error } = await supabase
-    .from(TABLES.mentors)
-    .select("*")
-    .in(
-      "id",
-      links.map((link) => link.mentor_id)
-    );
-
-  if (error) throw error;
-  const byId = new Map((mentors ?? []).map((mentor) => [mentor.id, mentor]));
-  return links
-    .map((link) => byId.get(link.mentor_id))
-    .filter((mentor): mentor is MentorRow => Boolean(mentor));
+  const sections = await fetchEventPeopleSections(supabase, eventId);
+  return sections
+    .filter((section) => section.title.trim().toLowerCase() === "mentors")
+    .flatMap((section) => section.people);
 }
 
 /** One people section on an event page: its title, and its people in order. */
@@ -49,76 +26,46 @@ export interface EventPeopleSection {
  * The event's people sections (Judges, Mentors, Speakers, Panelists, or a
  * custom title) in their page order, each with its people in order. A person
  * can sit in several sections. Sections with nobody in them are left out.
+ * One round trip: each section embeds its links and their people.
  */
 export async function fetchEventPeopleSections(
   supabase: DbClient,
   eventId: string
 ): Promise<EventPeopleSection[]> {
-  const [sectionsResult, linksResult] = await Promise.all([
-    supabase
-      .from(TABLES.eventPeopleSections)
-      .select("id, title")
-      .eq("event_id", eventId)
-      .order("sort_order", { ascending: true })
-      .order("created_at", { ascending: true }),
-    supabase
-      .from(TABLES.eventMentors)
-      .select("section_id, mentor_id, sort_order")
-      .eq("event_id", eventId)
-      .order("sort_order", { ascending: true }),
-  ]);
-
-  if (sectionsResult.error) throw sectionsResult.error;
-  if (linksResult.error) throw linksResult.error;
-  const sections = sectionsResult.data ?? [];
-  const links = linksResult.data ?? [];
-  if (!sections.length || !links.length) return [];
-
-  const { data: mentors, error } = await supabase
-    .from(TABLES.mentors)
-    .select("*")
-    .in("id", [...new Set(links.map((link) => link.mentor_id))]);
+  const { data, error } = await supabase
+    .from(TABLES.eventPeopleSections)
+    .select("id, title, event_mentors!event_mentors_section_id_fkey(sort_order, mentors(*))")
+    .eq("event_id", eventId)
+    .order("sort_order", { ascending: true })
+    .order("created_at", { ascending: true })
+    .order("sort_order", { referencedTable: "event_mentors", ascending: true });
 
   if (error) throw error;
-  const byId = new Map((mentors ?? []).map((mentor) => [mentor.id, mentor]));
-
-  return sections
+  return (data ?? [])
     .map((section) => ({
       id: section.id,
       title: section.title,
-      people: links
-        .filter((link) => link.section_id === section.id)
-        .map((link) => byId.get(link.mentor_id))
+      people: section.event_mentors
+        .map((link) => link.mentors)
         .filter((mentor): mentor is MentorRow => Boolean(mentor)),
     }))
     .filter((section) => section.people.length > 0);
 }
 
+/** The event's sponsors in page order, in one round trip. */
 export async function fetchEventSponsors(
   supabase: DbClient,
   eventId: string
 ): Promise<SponsorRow[]> {
-  const { data: links, error: linksError } = await supabase
+  const { data, error } = await supabase
     .from(TABLES.eventSponsors)
-    .select("sponsor_id, sort_order")
+    .select("sort_order, sponsors(*)")
     .eq("event_id", eventId)
     .order("sort_order", { ascending: true });
 
-  if (linksError) throw linksError;
-  if (!links?.length) return [];
-
-  const { data: sponsors, error } = await supabase
-    .from(TABLES.sponsors)
-    .select("*")
-    .in(
-      "id",
-      links.map((link) => link.sponsor_id)
-    );
-
   if (error) throw error;
-  const byId = new Map((sponsors ?? []).map((sponsor) => [sponsor.id, sponsor]));
-  return links
-    .map((link) => byId.get(link.sponsor_id))
+  return (data ?? [])
+    .map((link) => link.sponsors)
     .filter((sponsor): sponsor is SponsorRow => Boolean(sponsor));
 }
 

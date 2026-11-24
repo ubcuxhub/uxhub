@@ -4,7 +4,7 @@ import { useState } from "react";
 import { DateField, DateTimeFieldPair, TimeField } from "@/components/ui/date-time-field";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { strictPacificTimestamp } from "@/lib/date";
+import { momentEndsTooEarly, pacificMomentProblem } from "../../lib/pacific-moment";
 import type { IsoDate, WallTime } from "@/lib/date-input";
 
 interface RegistrationTimesState {
@@ -17,7 +17,7 @@ function RegistrationMoment({ id, label, value, after, onChange }: { id: string;
   const [dateError, setDateError] = useState<string | null>(null);
   const [timeError, setTimeError] = useState<string | null>(null);
   const update = (date: string, time: string) => onChange(!date && !time ? "" : `${date}T${time}`);
-  const clockError = date && time && !strictPacificTimestamp(value) ? "Use an unambiguous, valid Pacific date and time." : null;
+  const clockError = date && time ? pacificMomentProblem(value) : null;
   const error = dateError ?? timeError ?? clockError;
   return <Field data-invalid={!!error}>
     <FieldLabel htmlFor={`${id}-date`}>{label}</FieldLabel>
@@ -32,6 +32,6 @@ export function RegistrationTimes({ registration_opens_at: opens, registration_c
   return <FieldGroup className="grid gap-4 @min-[36rem]/field-group:grid-cols-2">
     <RegistrationMoment id="registration_opens_at" label="Registration Opens" value={opens} onChange={value => onFieldChange("registration_opens_at", value)} />
     <RegistrationMoment id="registration_closes_at" label="Registration Closes" value={closes} after={sameDate ? opens.split("T")[1] : undefined} onChange={value => onFieldChange("registration_closes_at", value)} />
-    {opens && closes && opens >= closes && <FieldError className="@min-[36rem]/field-group:col-span-2">Registration end time must be after the start time.</FieldError>}
+    {momentEndsTooEarly(opens, closes) && <FieldError className="@min-[36rem]/field-group:col-span-2">Registration end time must be after the start time.</FieldError>}
   </FieldGroup>;
 }
