@@ -13,7 +13,7 @@ import {
 } from "@/features/auth/link-expired";
 import { resolveSetupDestination } from "@/features/setup/lib/state";
 import { ensureUserInfo } from "@/lib/auth/ensure-user-info";
-import { getSafeInternalPath } from "@/lib/auth/paths";
+import { completeProfilePath, getSafeInternalPath } from "@/lib/auth/paths";
 import { getRequestOrigin } from "@/lib/http/request-origin";
 import { createClient } from "@/lib/supabase/server";
 import { fetchSetupStepByAuthId } from "@/lib/supabase-helpers/setup";
@@ -102,6 +102,15 @@ export async function GET(request: NextRequest) {
     const result = await withDeadline(() => ensureUserInfo(authUser), {
       operation: "Profile setup",
     });
+
+    // The provider didn't send both names (a one-word Google name, say), so
+    // ask for them. The form returns to `next`, and the portal home keeps its
+    // own setup gate.
+    if (result.status === "missing_name") {
+      return NextResponse.redirect(
+        new URL(completeProfilePath(nextPath), origin),
+      );
+    }
 
     if (result.status === "conflict") {
       return redirectToAuthError(origin, result.message, nextPath);

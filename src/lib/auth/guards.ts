@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 
 import type { UserInfoRow } from "@/lib/supabase/models";
 import { loadCurrentUser } from "@/lib/auth/current-user";
-import { getSafeInternalPath } from "@/lib/auth/paths";
+import { completeProfilePath, getSafeInternalPath } from "@/lib/auth/paths";
 import { hasAdminAccess, hasManagerAccess } from "@/lib/auth/roles";
 
 function authErrorPath(message: string) {
@@ -24,6 +24,10 @@ export async function requireAuth(nextPath?: string): Promise<UserInfoRow> {
     redirect(`/auth/login?next=${encodeURIComponent(safeNextPath)}`);
   }
 
+  if (result.status === "needs_profile") {
+    redirect(completeProfilePath(nextPath));
+  }
+
   if (result.status === "error") {
     redirect(authErrorPath(result.message));
   }
@@ -39,9 +43,14 @@ export async function redirectIfAuthenticated(redirectTo = "/portal") {
 
   if (result.status === "unauthenticated") return;
 
+  // Signed in without a profile: ask for the missing name, then carry on.
+  if (result.status === "needs_profile") {
+    redirect(completeProfilePath(safeRedirectTo));
+  }
+
   // Auth pages should send signed-in users to the portal. Sign-up creates the
-  // profile row, so a missing one is a repairable leftover the loader has
-  // already dealt with, not a reason to ask for the details again.
+  // profile row, so any other missing one is a repairable leftover the loader
+  // has already dealt with, not a reason to ask for the details again.
   if (result.status === "error") {
     redirect(authErrorPath(result.message));
   }

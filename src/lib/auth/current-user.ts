@@ -8,6 +8,12 @@ import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";
 export type CurrentUserResult =
   | { status: "authenticated"; user: UserInfoRow }
   | { status: "unauthenticated" }
+  /**
+   * Signed in, but no profile row and no name to build one from (an OAuth
+   * account with a one-word name). The guards send them to
+   * `/auth/complete-profile`.
+   */
+  | { status: "needs_profile" }
   | { status: "error"; message: string };
 
 /**
@@ -54,6 +60,10 @@ export const loadCurrentUser = cache(async (): Promise<CurrentUserResult> => {
   // Being inside the cache also means the repair — which writes — runs at most
   // once per request instead of once per guard call.
   const ensured = await ensureUserInfo(authUser);
+
+  if (ensured.status === "missing_name") {
+    return { status: "needs_profile" };
+  }
 
   if (ensured.status === "conflict") {
     return { status: "error", message: ensured.message };

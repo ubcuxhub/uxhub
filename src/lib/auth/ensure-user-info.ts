@@ -1,5 +1,6 @@
 import type { User } from "@supabase/supabase-js";
 
+import { log } from "@/lib/log";
 import { createClient } from "@/lib/supabase/server";
 import {
   adminFindUserInfoByEmail,
@@ -7,10 +8,16 @@ import {
   adminUpdateUserInfoById,
 } from "@/lib/supabase-helpers/admin-server";
 import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";
-import { getUserNameFromMetadata } from "@/lib/user-name";
+import { getPartialUserNameFromMetadata } from "@/lib/user-name";
 
 export type EnsureUserInfoResult =
   | { status: "ok" }
+  /**
+   * Neither the caller nor the auth metadata supplied both names, e.g. a
+   * Google account with a one-word name. Recoverable: the caller sends the
+   * user to `/auth/complete-profile` to type them.
+   */
+  | { status: "missing_name" }
   | { status: "conflict"; message: string };
 
 const LINKED_ELSEWHERE_MESSAGE =
@@ -26,7 +33,7 @@ const LINKED_ELSEWHERE_MESSAGE =
  * belongs to a different auth user is a conflict the caller must surface.
  *
  * Callers get a result instead of an exception because each entry point has a
- * different destination for the conflict case.
+ * different destination for the conflict and missing-name cases.
  */
 export async function ensureUserInfo(
   authUser: User,
@@ -52,15 +59,16 @@ export async function ensureUserInfo(
     };
   }
 
-  const metadataName = getUserNameFromMetadata(authUser.user_metadata ?? {});
-  const firstName = overrides?.firstName?.trim() || metadataName?.first_name;
-  const lastName = overrides?.lastName?.trim() || metadataName?.last_name;
+  const metadataName = getPartialUserNameFromMetadata(
+    authUser.user_metadata ?? {},
+  );
+  const firstName = overrides?.firstName?.trim() || metadataName.first_name;
+  const lastName = overrides?.lastName?.trim() || metadataName.last_name;
 
   if (!firstName || !lastName) {
-    return {
-      status: "conflict",
-      message: "Your account is missing a first or last name.",
-    };
+    // Expected for some OAuth accounts, so `warn`: the user can fix it.
+    log.warn("auth.profile_name_missing", { authUserId: authUser.id });
+    return { status: "missing_name" };
   }
 
   const payload = {

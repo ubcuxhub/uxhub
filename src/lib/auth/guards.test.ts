@@ -94,6 +94,28 @@ describe("requireAuth", () => {
     );
   });
 
+  it("asks a signed-in user without a name to add one, keeping the path", async () => {
+    currentUserMocks.loadCurrentUser.mockResolvedValue({
+      status: "needs_profile",
+    });
+
+    await expectRedirect(
+      () => requireAuth("/portal/membership/join"),
+      "/auth/complete-profile?next=%2Fportal%2Fmembership%2Fjoin"
+    );
+  });
+
+  it("sanitizes the path it carries to the add-your-name form", async () => {
+    currentUserMocks.loadCurrentUser.mockResolvedValue({
+      status: "needs_profile",
+    });
+
+    await expectRedirect(
+      () => requireAuth("//evil.example"),
+      "/auth/complete-profile?next=%2Fportal"
+    );
+  });
+
   it("surfaces a profile-loading error on the auth error page", async () => {
     currentUserMocks.loadCurrentUser.mockResolvedValue({
       status: "error",
@@ -195,6 +217,17 @@ describe("redirectIfAuthenticated", () => {
     await expectRedirect(
       () => redirectIfAuthenticated(destination),
       "/portal"
+    );
+  });
+
+  it("sends a signed-in user without a name to add one first", async () => {
+    currentUserMocks.loadCurrentUser.mockResolvedValue({
+      status: "needs_profile",
+    });
+
+    await expectRedirect(
+      () => redirectIfAuthenticated("/portal/events/x/checkout"),
+      "/auth/complete-profile?next=%2Fportal%2Fevents%2Fx%2Fcheckout"
     );
   });
 

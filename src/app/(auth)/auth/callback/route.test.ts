@@ -71,6 +71,27 @@ describe("GET /auth/callback", () => {
     expect(response.headers.get("location")).toBe("https://example.com/portal");
   });
 
+  it("asks for a missing name instead of failing, keeping next", async () => {
+    ensureUserInfo.mockResolvedValue({ status: "missing_name" });
+    const response = await callback("/portal/membership/join");
+    expect(response.headers.get("location")).toBe(
+      "https://example.com/auth/complete-profile?next=%2Fportal%2Fmembership%2Fjoin",
+    );
+    expect(fetchSetupStepByAuthId).not.toHaveBeenCalled();
+  });
+
+  it("still reports a real conflict on the error page", async () => {
+    ensureUserInfo.mockResolvedValue({
+      status: "conflict",
+      message: "An account with this email is already linked to another sign-in method.",
+    });
+    const location = new URL((await callback()).headers.get("location")!);
+    expect(location.pathname).toBe("/auth/error");
+    expect(location.searchParams.get("error")).toBe(
+      "An account with this email is already linked to another sign-in method.",
+    );
+  });
+
   it("exchanges recovery codes before reaching the password update form", async () => {
     const response = await GET(
       new NextRequest(
