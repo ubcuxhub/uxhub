@@ -94,14 +94,10 @@ export function UserProvider({
   }, [initialTermEndsAt]);
 
   useEffect(() => {
-    // `loading` already starts true here, so this skips loadUser's reset.
-    if (!initialUser) {
-      void fetchCurrentUser().then((nextUser) => {
-        setUser(nextUser);
-        setLoading(false);
-      });
-    }
-
+    // Subscribing emits INITIAL_SESSION with the current session (or none),
+    // which is the provider's first load: a separate fetch on mount would read
+    // the row twice. When the server already supplied this session's row, the
+    // first event has nothing to add, so it reads nothing.
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
@@ -110,6 +106,13 @@ export function UserProvider({
       if (!session?.user) {
         setUser(null);
         setLoading(false);
+        return;
+      }
+
+      if (
+        event === "INITIAL_SESSION" &&
+        initialUser?.auth_user_id === session.user.id
+      ) {
         return;
       }
 
