@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { formatEventDate } from "@/lib/date";
 import { formatMembershipTypeName } from "@/features/memberships/lib/display";
 import type { MembershipTypeRow } from "@/lib/supabase/models";
+import { MembershipCardSurface } from "./MembershipCardSurface";
 
 /**
  * The member-facing membership card on the portal home page.
@@ -29,7 +30,7 @@ export function MembershipCard({
   const expiryDate = formatEventDate(expiresAt);
 
   return (
-    <section className="max-w-[490px] overflow-hidden rounded-2xl bg-[image:var(--gradient-ux-hub)] text-white shadow-sm">
+    <MembershipCardSurface className="max-w-[490px]">
       <div className="p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -60,7 +61,7 @@ export function MembershipCard({
         <p>Show this card at the door. You still need to register for each event.</p>
         {expiryDate && <p className="mt-1">Valid until {expiryDate}</p>}
       </div>
-    </section>
+    </MembershipCardSurface>
   );
 }
 
