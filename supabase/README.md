@@ -55,16 +55,18 @@ Deletion is scoped by ownership, not by table:
 | --------------------------------------------------------- | ------------------------------------------------------ |
 | Events and membership tiers whose slug is not in the data\* | Auth users and profiles created by hand                |
 | Mentors, sponsors, check-in sessions, application questions | Purchases, tickets and applications belonging to any other account |
-| Purchases, tickets and applications belonging to the fixture accounts | Covers uploaded through the admin UI (`covers/`)       |
-| Cover images under the `seed/covers/` storage prefix       |                                                        |
+| Purchases, tickets and applications belonging to the fixture accounts | Teams and reviewer notes of any other account          |
+| Cover images under the `seed/covers/` storage prefix       | Covers uploaded through the admin UI (`covers/`)       |
 
 \* This includes events created through the admin UI. Such an event survives
-only if a non-fixture purchase points at it — `purchases.event_id` is
-`on delete restrict`, so somebody else's ticket keeps the event alive and the run
-says so instead of forcing it.
+if an account created by hand holds anything on it: a purchase, ticket,
+application, team membership or reviewer note. Those would cascade away with
+the event, so the run checks first, keeps the event and says which records kept
+it.
 
 Pass `--no-prune` to sync without deleting anything. The `prod` target never
-deletes at all.
+deletes at all, and it only writes a demo event it created that nobody has
+touched since (`scripts/seed/README.md`, "Targets").
 
 Cover images come from `scripts/seed/data/images` (square PNGs) and are uploaded
 into the `event-images` bucket; fixtures reference them by file name through
