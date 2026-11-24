@@ -103,10 +103,10 @@ describe("getPanelSpec", () => {
     expect(spec("app-accepted").props).toMatchObject({ title: "You’re accepted to Design Sprint" });
   });
 
-  it("shows the ticket locked until they register, and used once checked in", () => {
+  it("shows the ticket locked until they register, and live once checked in", () => {
     expect(spec("app-accepted").props).toMatchObject({ ticketState: "locked" });
     expect(spec("reg-going").props).toMatchObject({ ticketState: "active" });
-    expect(spec("reg-checked-in").props).toMatchObject({ ticketState: "used" });
+    expect(spec("reg-checked-in").props).toMatchObject({ ticketState: "active" });
   });
 
   it("shows an expired ticket once the event ends, checked in or not", () => {

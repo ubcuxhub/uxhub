@@ -48,7 +48,7 @@ export interface TicketLayoutProps {
   description: string;
   /** What the price will be, before they've paid: "CA$15.00 for non-members". */
   priceLine?: string;
-  /** `locked` until they register; `used` once checked in; `expired` once the event ends. */
+  /** `locked` until they register; `expired` once the event ends; live otherwise, checked in included. */
   ticketState: "active" | "used" | "locked" | "expired";
   /** A line under the ticket: "No longer valid" on an expired one. */
   ticketNote?: string;
@@ -193,7 +193,9 @@ export function getPanelSpec(state: EventState, context: PanelContext): PanelSpe
         layout: "ticket",
         props: {
           description: "You’re checked in",
-          ticketState: "used",
+          // Still live (Figma 6.1, 6.3): the copy and the header badge say
+          // checked in, and a multi-day event scans the same code again.
+          ticketState: "active",
           ...ticketActions,
         },
       };
