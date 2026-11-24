@@ -1,5 +1,5 @@
 /**
- * Agenda item links (20261119073211) against the local database: a link names
+ * Agenda item links (20261124011401) against the local database: a link names
  * at most one agenda item of its own event and goes when the item does,
  * builder resource saves keep it, and the participant agenda says which days
  * set their own location.
