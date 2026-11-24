@@ -17,6 +17,7 @@ import { formatMembershipTypeName } from "@/features/memberships/lib/display";
 import { MemberAvatar } from "@/features/setup/components/MemberAvatar";
 import type { AvatarPreset } from "@/features/setup/lib/options";
 import { useUser } from "@/lib/auth/user-context";
+import { YEAR_LEVELS } from "@/lib/constants";
 import { formatEventDate } from "@/lib/date";
 import type { RoleAccess, UserInfoRow } from "@/lib/supabase/models";
 import { formatUserName } from "@/lib/user-name";
@@ -43,7 +44,6 @@ const ROLES: { value: RoleAccess; label: string }[] = [
   { value: "admin", label: "Admin" },
   { value: "manager", label: "Manager" },
 ];
-const YEARS = ["1", "2", "3", "4", "5+"];
 const NO_YEAR = "__none__";
 const SCHOOL_LOCKED =
   "Only Non-UBC members can change their school. Select a Non-UBC membership to edit this field.";
@@ -389,7 +389,7 @@ export function AdminUserRecord({
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value={NO_YEAR}>Not set</SelectItem>
-                      {YEARS.map((year) => (
+                      {YEAR_LEVELS.map((year) => (
                         <SelectItem key={year} value={year}>
                           {year}
                         </SelectItem>

@@ -1,3 +1,4 @@
+import { isYearLevel } from "@/lib/constants";
 import type { RoleAccess } from "@/lib/supabase/models";
 import type { MembershipTypeOption, UserRecord } from "../types";
 import { normalizeInterests, validateBirthDate } from "./user-profile";
@@ -68,7 +69,7 @@ export function userEditChanges(user: UserRecord, draft: UserEditDraft, membersh
       changes[field] = value ? Number(value) : null;
     } else if (field === "membership_type_id") changes[field] = value || null;
     else if (field === "year") {
-      if (value && !["1", "2", "3", "4", "5+"].includes(value)) throw new Error("Invalid university year.");
+      if (value && !isYearLevel(value)) throw new Error("Invalid university year.");
       changes[field] = value || null;
     } else if (field === "school_institution") {
       // A school draft may remain after switching away from Non-UBC; omit the locked field.
