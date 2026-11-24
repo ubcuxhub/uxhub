@@ -51,16 +51,14 @@ const SAVE_FAILED = "Couldn’t save the schedule. Try again.";
  *
  * The write goes through the signed-in admin's own client rather than the
  * service role, so RLS still applies and the database knows who made the
- * change (the audit log trigger reads `auth.uid()`). The events UPDATE policy
- * admits the `admin` role only, though, not `manager` (which arrived later and
- * passes `requireAdmin()`), so a manager's change goes through the service
- * role as the builder's save does, and isn't attributed.
+ * change (the audit log trigger reads `auth.uid()`). `update_admin_event_schedule`
+ * is SECURITY DEFINER and gates on `is_admin()`, which admits managers too.
  */
 export async function updateEventScheduleAction(
   eventId: string,
   input: EventScheduleInput
 ): Promise<UpdateEventScheduleResult> {
-  const user = await requireAdmin();
+  await requireAdmin();
 
   if (typeof eventId !== "string" || !isUuid(eventId)) {
     return { ok: false, error: NOT_FOUND };
@@ -112,8 +110,7 @@ export async function updateEventScheduleAction(
       if (notReady) return { ok: false, error: notReady };
     }
 
-    const writer = user.role_access === "admin" ? supabase : supabaseAdmin;
-    const saved = await updateEventSchedule(writer, eventId, patch, input.expectedRevision ?? current.revision, input.operationId);
+    const saved = await updateEventSchedule(supabase, eventId, patch, input.expectedRevision ?? current.revision, input.operationId);
     if (!saved) return { ok: false, error: NOT_FOUND };
 
     // The list and this event's overview (drawer and page), and the public
