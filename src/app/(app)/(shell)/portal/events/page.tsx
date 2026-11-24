@@ -14,7 +14,6 @@ import { requireAuth } from "@/lib/auth/guards";
 import { FLAGS } from "@/lib/flags";
 import { createClient } from "@/lib/supabase/server";
 import { fetchEvents } from "@/lib/supabase-helpers/events";
-import { pacificDate } from "@/lib/date";
 
 export default async function PortalEvents() {
   if (!FLAGS.studentEvents) return <EventsComingSoon />;
@@ -50,7 +49,7 @@ export default async function PortalEvents() {
         upcomingEvents={upcomingEvents}
         pastEvents={pastEvents}
         badges={badges}
-        currentMonth={pacificDate(now.toISOString()).slice(0, 7)}
+        now={now.toISOString()}
       />
     </PageContainer>
   );

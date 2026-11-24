@@ -41,20 +41,24 @@ const type = (text: string) => fireEvent.change(search(), { target: { value: tex
 const status = () => screen.queryByRole("status")?.textContent ?? null;
 
 describe("EventTimeline", () => {
-  it("titles this month Ongoing, with what started earlier and still runs", () => {
+  it("lists what's running under Ongoing, and the rest of this month under its month", () => {
     const series = event("studio", "Open Studio", "2026-05-19T17:00:00Z", { ends_at: "2028-11-19T18:30:00Z" });
-    const jam = event("jam", "Design Jam", "2026-11-20T02:00:00Z");
+    const sprint = event("sprint", "Design Sprint", "2026-11-13T17:00:00Z", { ends_at: "2026-11-18T23:00:00Z" });
+    const jam = event("jam", "Design Jam", "2026-11-29T17:00:00Z");
     const tour = event("tour", "Office Tour", "2026-12-10T20:00:00Z");
-    render(<EventTimeline upcomingEvents={[series, jam, tour]} pastEvents={[]} currentMonth="2026-11" />);
+    render(
+      <EventTimeline upcomingEvents={[series, sprint, jam, tour]} pastEvents={[]} now="2026-11-16T19:00:00Z" />
+    );
     expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual([
       "Ongoing",
+      "November 2026",
       "December 2026",
     ]);
   });
 
-  it("leaves the next month its own name when nothing is on this month", () => {
+  it("shows no Ongoing heading when nothing is running", () => {
     const tour = event("tour", "Office Tour", "2026-12-10T20:00:00Z");
-    render(<EventTimeline upcomingEvents={[tour]} pastEvents={[]} currentMonth="2026-11" />);
+    render(<EventTimeline upcomingEvents={[tour]} pastEvents={[]} now="2026-11-16T19:00:00Z" />);
     expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual(["December 2026"]);
   });
 

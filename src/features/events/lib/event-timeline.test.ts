@@ -56,27 +56,30 @@ describe("groupEventsByMonth", () => {
   });
 });
 
-describe("groupEventsByMonth with a from month", () => {
-  const ongoing = event("series", "2026-05-19T17:00:00Z");
-  const thisMonth = event("jam", "2026-11-20T02:00:00Z");
-  const later = event("tour", "2026-12-10T20:00:00Z");
+describe("groupEventsByMonth with an ongoing cutoff", () => {
+  // Monday, November 16, 2026, noon in Vancouver.
+  const now = "2026-11-16T12:00:00-07:00";
+  const series = event("series", "2026-05-19T17:00:00Z", "2028-11-19T18:30:00Z");
+  const running = event("sprint", "2026-11-13T17:00:00Z", "2026-11-18T23:00:00Z");
+  const laterThisMonth = event("jam", "2026-11-29T17:00:00Z");
+  const nextMonth = event("tour", "2026-12-10T20:00:00Z");
 
-  it("files events that started earlier under that month, ahead of its own", () => {
-    const groups = groupEventsByMonth([ongoing, thisMonth, later], { from: "2026-11" });
-    expect(groups.map((group) => [group.key, group.label])).toEqual([
-      ["2026-11", "November 2026"],
-      ["2026-12", "December 2026"],
+  it("puts what has started under Ongoing, and later events under their own month", () => {
+    const groups = groupEventsByMonth([series, running, laterThisMonth, nextMonth], { ongoingAt: now });
+    expect(groups.map((group) => [group.label, group.events.map((e) => e.id)])).toEqual([
+      ["Ongoing", ["series", "sprint"]],
+      ["November 2026", ["jam"]],
+      ["December 2026", ["tour"]],
     ]);
-    expect(groups[0].events.map((e) => e.id)).toEqual(["series", "jam"]);
   });
 
-  it("makes the month even when only ongoing events are in it", () => {
-    const [group] = groupEventsByMonth([ongoing, later], { from: "2026-11" });
-    expect(group).toMatchObject({ key: "2026-11", label: "November 2026" });
+  it("has no Ongoing group when nothing has started yet", () => {
+    const groups = groupEventsByMonth([laterThisMonth, nextMonth], { ongoingAt: now });
+    expect(groups.map((group) => group.label)).toEqual(["November 2026", "December 2026"]);
   });
 
-  it("groups by start month without one, as the past list does", () => {
-    expect(groupEventsByMonth([ongoing, later]).map((group) => group.key)).toEqual(["2026-05", "2026-12"]);
+  it("groups by start month without a cutoff, as the past list does", () => {
+    expect(groupEventsByMonth([series, nextMonth]).map((group) => group.key)).toEqual(["2026-05", "2026-12"]);
   });
 });
 

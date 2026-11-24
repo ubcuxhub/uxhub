@@ -2,26 +2,33 @@ import type { EventGroup } from "@/features/events/types";
 import { formatEventDate, pacificDate } from "@/lib/date";
 import type { EventRow } from "@/lib/supabase/models";
 
+/** The key of the Ongoing group, which sorts ahead of the months. */
+export const ONGOING_GROUP_KEY = "ongoing";
+
 /**
- * Groups events under the Pacific month they start in. Pass `from` (a
- * `YYYY-MM` month, the current one for the upcoming list) to file anything
- * that started earlier, an event that's still running, under that month
- * instead, so the list starts at this month rather than at May for an
- * ongoing series. Events keep their order, so ongoing ones lead the month.
+ * Groups events under the Pacific month they start in. Pass `ongoingAt` (an
+ * ISO instant, now, for the upcoming list) to gather the events that have
+ * already started by then under "Ongoing" at the top instead: an event that
+ * runs Nov 13–18 is Ongoing on Nov 16, while one on Nov 29 stays under
+ * November. The upcoming list holds no ended events, so started means
+ * running. Events keep their order within each group.
  */
 export function groupEventsByMonth(
   events: EventRow[],
-  { from }: { from?: string } = {}
+  { ongoingAt }: { ongoingAt?: string } = {}
 ): EventGroup[] {
   const groups = new Map<string, EventGroup>();
+  const cutoff = ongoingAt ? Date.parse(ongoingAt) : null;
+  if (cutoff !== null && events.some((event) => event.starts_at && Date.parse(event.starts_at) <= cutoff)) {
+    groups.set(ONGOING_GROUP_KEY, { key: ONGOING_GROUP_KEY, label: "Ongoing", events: [] });
+  }
 
   for (const event of events) {
     if (!event.starts_at) continue;
 
-    const startMonth = pacificDate(event.starts_at).slice(0, 7);
-    const key = from && startMonth < from ? from : startMonth;
-    const label =
-      formatEventDate(key === startMonth ? event.starts_at : `${key}-01`, { day: undefined }) ?? key;
+    const ongoing = cutoff !== null && Date.parse(event.starts_at) <= cutoff;
+    const key = ongoing ? ONGOING_GROUP_KEY : pacificDate(event.starts_at).slice(0, 7);
+    const label = ongoing ? "Ongoing" : formatEventDate(event.starts_at, { day: undefined }) ?? key;
 
     if (!groups.has(key)) {
       groups.set(key, {

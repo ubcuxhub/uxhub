@@ -22,17 +22,17 @@ interface EventTimelineProps {
    */
   badges?: Record<string, EventBadge>;
   /**
-   * This Pacific month, `YYYY-MM`, from the server (so the server and browser
-   * agree). Upcoming events that are already running are listed under it.
+   * Now, as an ISO instant from the server (so the server and browser agree).
+   * Upcoming events that have started by then are listed under Ongoing.
    */
-  currentMonth?: string;
+  now?: string;
 }
 
 export function EventTimeline({
   upcomingEvents,
   pastEvents,
   badges = {},
-  currentMonth,
+  now,
 }: EventTimelineProps) {
   const searchRef = useRef<HTMLInputElement>(null);
   // The view lives in the URL (`?view=past`), so coming back from an event
@@ -71,14 +71,11 @@ export function EventTimeline({
   }) : displayedEvents;
 
   // group events by month
-  // Upcoming opens on this month, titled Ongoing: what's running now (started
-  // earlier, still on) and the rest of this month. Only this month is renamed;
-  // with nothing in it, the next month keeps its own name.
+  // Upcoming opens with Ongoing, the events already running, then each month
+  // by start date. Past groups everything by the month it started.
   const filteredGroups = groupEventsByMonth(filteredEvents, {
-    from: showPastEvents ? undefined : currentMonth,
-  }).map((group) =>
-    !showPastEvents && group.key === currentMonth ? { ...group, label: "Ongoing" } : group
-  );
+    ongoingAt: showPastEvents ? undefined : now,
+  });
 
   const clearSearch = () => {
     setSearchQuery("");
