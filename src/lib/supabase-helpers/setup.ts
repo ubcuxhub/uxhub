@@ -8,12 +8,12 @@ import type { UserInfoRow, UserInfoUpdate } from "@/lib/supabase/models";
  *
  * With a member's own client, RLS limits these to their row and the column
  * grants to `setup_step`, `diets`, `allergies`, `other_allergies`,
- * `avatar_preset` and `user_type_confirmed_at`. `interests`,
+ * `avatar_preset` and `user_type_confirmed_at`. `interests`, `birth_date`,
  * `profile_photo_path` and `user_type` need the service-role client, which
  * the setup actions use only for the signed-in member's id.
  */
 export const USER_SETUP_COLUMNS =
-  "setup_step, user_type, user_type_confirmed_at, diets, allergies, other_allergies, avatar_preset, profile_photo_path, interests";
+  "setup_step, user_type, user_type_confirmed_at, diets, allergies, other_allergies, avatar_preset, profile_photo_path, interests, birth_date";
 
 export type UserSetupRow = Pick<
   UserInfoRow,
@@ -26,6 +26,7 @@ export type UserSetupRow = Pick<
   | "avatar_preset"
   | "profile_photo_path"
   | "interests"
+  | "birth_date"
 >;
 
 export type UserSetupUpdate = Pick<
@@ -37,6 +38,7 @@ export type UserSetupUpdate = Pick<
   | "other_allergies"
   | "avatar_preset"
   | "interests"
+  | "birth_date"
 >;
 
 /** The setup columns of an active (not deleted) profile. Throws when there is none. */

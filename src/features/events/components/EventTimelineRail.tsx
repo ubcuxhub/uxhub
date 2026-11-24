@@ -16,6 +16,8 @@ interface EventTimelineRailProps {
   statusFor: (event: EventRow) => Status | StatusBadgeSpec | null;
   /** Where a card links. Defaults to the portal event page. */
   hrefFor?: (event: EventRow) => string;
+  /** The month headings' level; a rail under its own section heading uses "h3". */
+  monthHeadingAs?: "h2" | "h3";
   className?: string;
 }
 
@@ -31,13 +33,14 @@ export function EventTimelineRail({
   groups,
   statusFor,
   hrefFor = portalHref,
+  monthHeadingAs: MonthHeading = "h2",
   className,
 }: EventTimelineRailProps) {
   return (
     <div className={cn("flex flex-col gap-10", className)}>
       {groups.map((group) => (
         <section key={group.key}>
-          <h2 className="mb-4 text-h2">{group.label}</h2>
+          <MonthHeading className="mb-4 text-h2">{group.label}</MonthHeading>
           <ol>
             {group.events.map((event, index) => (
               <EventTimelineRow

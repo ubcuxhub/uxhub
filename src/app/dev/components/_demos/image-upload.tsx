@@ -20,7 +20,7 @@ const SQUARE_IMAGE = gradient(600, 600);
 const HEADER_IMAGE = gradient(1600, 400);
 
 const THUMBNAIL = { square: true, minWidth: 600, minHeight: 600 };
-const HEADER = { minWidth: 1600, minHeight: 400 };
+const HEADER = { aspect: 4, minWidth: 1600, minHeight: 400 };
 
 const GIF_ERROR = "That file is a GIF. Upload a JPG or PNG.";
 

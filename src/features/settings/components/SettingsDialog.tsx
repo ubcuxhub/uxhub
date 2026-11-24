@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ChevronRight,
@@ -68,11 +69,36 @@ function parseHash(): { tab: SettingsTab; showMenu: boolean } | null {
  * On mobile, the root hash opens a minimal section list before drilling into a
  * tab. Renders nothing until the hash matches, which keeps its heavier subtree
  * unmounted while closed.
+ *
+ * Pages behind it render the profile on the server (an application's "About
+ * you", say), so once the dialog closes after a profile change it refreshes
+ * the route. Not before: refreshing while the member types would re-render the
+ * page under them for nothing.
  */
 export function SettingsDialog() {
+  const router = useRouter();
   // `null` means closed; a tab id means open on that tab.
   const [tab, setTab] = useState<SettingsTab | null>(null);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const open = tab !== null;
+
+  // Whether the dialog is open, for a save that lands after it closed (the
+  // profile flushes a pending change as it unmounts), and whether a save made
+  // the page behind stale.
+  const openRef = useRef(open);
+  const staleRef = useRef(false);
+  const onProfileSaved = useCallback(() => {
+    if (openRef.current) staleRef.current = true;
+    else router.refresh();
+  }, [router]);
+
+  // Every way of closing (the close button, Escape, Back, a hash change) ends here.
+  useEffect(() => {
+    openRef.current = open;
+    if (open || !staleRef.current) return;
+    staleRef.current = false;
+    router.refresh();
+  }, [open, router]);
 
   useEffect(() => {
     const sync = () => {
@@ -110,7 +136,7 @@ export function SettingsDialog() {
   };
 
   return (
-    <Dialog open={tab !== null} onOpenChange={handleOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent
         size="large"
         className="flex overflow-hidden p-0"
@@ -201,7 +227,7 @@ export function SettingsDialog() {
 
             <div className="flex-1 overflow-y-auto px-4 py-5 sm:p-6 sm:pt-0">
               {tab === "general" && <GeneralSettings />}
-              {tab === "profile" && <ProfileSettings />}
+              {tab === "profile" && <ProfileSettings onSaved={onProfileSaved} />}
               {tab === "purchases" && <PurchaseHistorySettings />}
             </div>
           </main>

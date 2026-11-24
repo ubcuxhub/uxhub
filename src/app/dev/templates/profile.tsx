@@ -73,7 +73,7 @@ const BASE: UserInfoRow = {
   avatar_preset: null,
   profile_photo_path: "/people/cherry.jpg",
   newsletter: true,
-  birth_date: null,
+  birth_date: "2004-03-14",
   dietary_restrictions: null,
   order_date_deprecated: null,
   square_customer_id: null,
@@ -102,6 +102,7 @@ const NEW_MEMBER: UserInfoRow = {
   other_allergies: [],
   interests: [],
   profile_photo_path: null,
+  birth_date: null,
 };
 
 /** An admin with a preset avatar, mid-save. */
@@ -174,9 +175,9 @@ export const PROFILE_SCENARIOS = {
   "profile-error": {
     user: NON_MEMBER,
     membershipName: null,
-    edits: { phone: "604 555 0199", student_number: "1234567" },
+    edits: { phone: "604 555 0199", student_number: "1234567", birth_date: "2099-01-01" },
     saveStates: { about: { kind: "failed" } },
-    touched: ["student_number"],
+    touched: ["student_number", "birth_date"],
   },
   "profile-pending": { user: PRE_ORDER, membershipName: null },
 } satisfies Record<string, Scenario>;
@@ -267,6 +268,7 @@ export function ProfileTemplate({ scenario }: { scenario: ProfileScenarioId }) {
     first_name: touched.has("first_name") ? errors.first_name : null,
     last_name: touched.has("last_name") ? errors.last_name : null,
     student_number: touched.has("student_number") ? errors.student_number : null,
+    birth_date: touched.has("birth_date") ? errors.birth_date : null,
   };
 
   return (

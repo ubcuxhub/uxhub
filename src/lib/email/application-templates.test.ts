@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   formatOfferDeadline,
+  portalApplicationUrl,
   portalEventUrl,
   renderApplicationEmail,
 } from "./application-templates";
@@ -26,6 +27,14 @@ describe("portalEventUrl", () => {
   it("encodes the slug", () => {
     expect(portalEventUrl("https://www.ubcuxhub.ca", "a b\"<c>")).toBe(
       "https://www.ubcuxhub.ca/portal/events/a%20b%22%3Cc%3E"
+    );
+  });
+});
+
+describe("portalApplicationUrl", () => {
+  it("is the event's apply page, with the slug encoded", () => {
+    expect(portalApplicationUrl("https://www.ubcuxhub.ca", "a/b")).toBe(
+      "https://www.ubcuxhub.ca/portal/events/a%2Fb/apply"
     );
   });
 });
@@ -74,6 +83,50 @@ describe("renderApplicationEmail", () => {
     expect(html).toContain("Hi there,");
     expect(html).not.toContain("<script>");
     expect(html).toContain("&lt;script&gt;");
+  });
+
+  describe("received", () => {
+    const received = {
+      ...base,
+      kind: "received" as const,
+      eventUrl: "https://www.ubcuxhub.ca/portal/events/uxathon-2027/apply",
+      offerExpiresAt: null,
+    };
+
+    it("thanks the applicant and names the release date", () => {
+      const { subject, html } = renderApplicationEmail({
+        ...received,
+        decisionsReleaseAt: base.offerExpiresAt,
+      });
+      expect(subject).toBe("We received your application to UXathon 2027");
+      expect(html).toContain("Hi Priya, thanks for applying to UXathon 2027. We’ve received your application.");
+      expect(html).toContain("UX Hub execs will review it, and you’ll hear from us by Wed, Nov 25, 2026.");
+      expect(html).toContain("You can’t edit your answers now that you’ve submitted");
+      expect(html).toContain(`href="${received.eventUrl}"`);
+      expect(html).toContain(">View your application</a>");
+      expect(html.match(/<a /g)).toHaveLength(1);
+      expect(html).not.toMatch(/staff/i);
+    });
+
+    it("promises no date when none is set", () => {
+      for (const decisionsReleaseAt of [null, undefined]) {
+        const { html } = renderApplicationEmail({ ...received, decisionsReleaseAt });
+        expect(html).toContain("UX Hub execs will review it and let you know.");
+        expect(html).not.toContain("hear from us by");
+        expect(html).toContain(">View your application</a>");
+      }
+    });
+
+    it("escapes the event name in the subject's HTML and the body", () => {
+      const { subject, html } = renderApplicationEmail({
+        ...received,
+        eventName: `<b>"Jam" & 'Co'</b>`,
+      });
+      // The subject is plain text, not HTML.
+      expect(subject).toBe(`We received your application to <b>"Jam" & 'Co'</b>`);
+      expect(html).not.toContain("<b>");
+      expect(html).toContain("&lt;b&gt;&quot;Jam&quot; &amp; &#39;Co&#39;&lt;/b&gt;");
+    });
   });
 
   it("escapes the button URL", () => {

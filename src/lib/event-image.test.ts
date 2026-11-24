@@ -8,13 +8,16 @@ import {
   describeWrongFileType,
   EVENT_IMAGE_ERRORS,
   EVENT_IMAGE_MAX_BYTES,
+  EVENT_IMAGE_MAX_EDGE,
   getImageDimensions,
   getJpegDimensions,
   getPngDimensions,
+  needsEventImageOptimization,
   parseEventImageObjectKey,
   parseEventImageUpload,
   resolveEventImageType,
   resolveImagePreviewSrc,
+  scaledImageSize,
 } from "./event-image";
 
 const PNG_SIGNATURE = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a];
@@ -367,22 +370,22 @@ describe("describeMinSize", () => {
 
 describe("describeImageRequirements", () => {
   it("defaults to any JPG or PNG within the size limit", () => {
-    expect(describeImageRequirements()).toBe("JPG or PNG, up to 4 MB");
+    expect(describeImageRequirements()).toBe("JPG or PNG, up to 20 MB");
   });
 
   it("says square", () => {
     expect(describeImageRequirements({ square: true })).toBe(
-      "Square JPG or PNG, up to 4 MB"
+      "Square JPG or PNG, up to 20 MB"
     );
   });
 
   it("adds a minimum size", () => {
     expect(
       describeImageRequirements({ minWidth: 1600, minHeight: 400 })
-    ).toBe("JPG or PNG, 1600 \u00d7 400 px or larger, up to 4 MB");
+    ).toBe("JPG or PNG, 1600 \u00d7 400 px or larger, up to 20 MB");
     expect(
       describeImageRequirements({ square: true, minWidth: 600, minHeight: 600 })
-    ).toBe("Square JPG or PNG, 600 \u00d7 600 px or larger, up to 4 MB");
+    ).toBe("Square JPG or PNG, 600 \u00d7 600 px or larger, up to 20 MB");
   });
 });
 
@@ -402,4 +405,40 @@ describe("separate event image kinds", () => {
 it("accepts nonsquare entry logos without cover/header minimums while retaining file safety", () => {
   expect(parseEventImageUpload({ kind: "entry", fileType: "image/png", size: 100, buffer: pngHeader(120, 48) }).dimensions).toEqual({ width: 120, height: 48 });
   expect(() => parseEventImageUpload({ kind: "entry", fileType: "image/svg+xml", size: 100, buffer: pngHeader(120, 48) })).toThrow();
+});
+
+describe("needsEventImageOptimization", () => {
+  it("leaves a file that fits and is drawn at full size", () => {
+    expect(needsEventImageOptimization(EVENT_IMAGE_MAX_BYTES, { width: EVENT_IMAGE_MAX_EDGE, height: 600 })).toBe(false);
+  });
+
+  it("shrinks a file over the upload limit", () => {
+    expect(needsEventImageOptimization(EVENT_IMAGE_MAX_BYTES + 1, { width: 1600, height: 400 })).toBe(true);
+  });
+
+  it("shrinks an image larger than any page draws it", () => {
+    expect(needsEventImageOptimization(1000, { width: 600, height: EVENT_IMAGE_MAX_EDGE + 1 })).toBe(true);
+  });
+});
+
+describe("scaledImageSize", () => {
+  it("brings the longest edge down to the maximum, keeping the ratio", () => {
+    expect(scaledImageSize({ width: 6000, height: 1500 })).toEqual({ width: 2560, height: 640 });
+    expect(scaledImageSize({ width: 3000, height: 4000 })).toEqual({ width: 1920, height: 2560 });
+  });
+
+  it("never upscales", () => {
+    expect(scaledImageSize({ width: 1800, height: 450 })).toEqual({ width: 1800, height: 450 });
+  });
+
+  it("applies a further shrink factor", () => {
+    expect(scaledImageSize({ width: 5120, height: 2560 }, {}, 0.8)).toEqual({ width: 2048, height: 1024 });
+  });
+
+  it("stops at the minimum size", () => {
+    expect(scaledImageSize({ width: 6400, height: 1600 }, { minWidth: 1600, minHeight: 400 }, 0.1)).toEqual({ width: 1600, height: 400 });
+    // A very wide banner reaches the minimum height first.
+    expect(scaledImageSize({ width: 12000, height: 1000 }, { minWidth: 1600, minHeight: 400 }, 0.64)).toEqual({ width: 4800, height: 400 });
+    expect(scaledImageSize({ width: 4000, height: 4000 }, { minWidth: 600, minHeight: 600 }, 0.1)).toEqual({ width: 600, height: 600 });
+  });
 });

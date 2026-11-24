@@ -31,15 +31,52 @@ const PAST = [event("mixer", "Spring Mixer", "2026-03-18T18:00:00Z")];
 
 const search = () => screen.getByRole("searchbox", { name: "Search events" }) as HTMLInputElement;
 const type = (text: string) => fireEvent.change(search(), { target: { value: text } });
+const toggle = () => screen.getByRole("switch", { name: "Show past events" });
+const links = () => screen.queryAllByRole("link");
 const status = () => screen.queryByRole("status")?.textContent ?? null;
 
 describe("EventTimeline", () => {
-  it("lists upcoming events, and past ones behind the switch", () => {
+  it("lists only upcoming events until the switch is on", () => {
     render(<EventTimeline upcomingEvents={UPCOMING} pastEvents={PAST} />);
-    expect(screen.getAllByRole("link")).toHaveLength(3);
+    expect(links()).toHaveLength(3);
+    expect(screen.queryByRole("heading", { name: "Past events" })).toBeNull();
+    expect(screen.queryByText("Spring Mixer")).toBeNull();
+  });
 
-    fireEvent.click(screen.getByRole("switch", { name: "Show past events" }));
-    expect(screen.getAllByRole("link").map((link) => link.textContent)).toEqual(["Spring Mixer"]);
+  it("adds past events after the upcoming ones, most recent first", () => {
+    const past = [
+      event("recent", "Recent Talk", "2026-09-10T18:00:00Z"),
+      event("mid", "Mid Talk", "2026-09-02T18:00:00Z"),
+      event("old", "Old Mixer", "2026-03-18T18:00:00Z"),
+    ];
+    render(<EventTimeline upcomingEvents={UPCOMING} pastEvents={past} />);
+    fireEvent.click(toggle());
+
+    const order = Array.from(
+      document.querySelectorAll("a, section > h2, section > h3"),
+      (node) => node.textContent
+    ).filter((text) => /Kickoff|Workshop|Café|Past events|Talk|Mixer|2027|2026/.test(text ?? ""));
+    expect(order.map((t) => t?.replace(/\s+/g, " ").slice(0, 14))).toEqual([
+      "January 2027",
+      "Kickoff",
+      "Figma Workshop",
+      "February 2027",
+      "Café Chat",
+      "Past events",
+      "September 2026",
+      "Recent Talk",
+      "Mid Talk",
+      "March 2026",
+      "Old Mixer",
+    ]);
+    expect(screen.getAllByRole("heading", { name: "Past events" })).toHaveLength(1);
+  });
+
+  it("turning the switch off again hides the past section", () => {
+    render(<EventTimeline upcomingEvents={UPCOMING} pastEvents={PAST} />);
+    fireEvent.click(toggle());
+    fireEvent.click(toggle());
+    expect(links()).toHaveLength(3);
   });
 
   it("shows each event's badge, including dated ones", () => {
@@ -68,7 +105,7 @@ describe("EventTimeline", () => {
         badges={{ mixer: { status: "checked_in" } }}
       />
     );
-    fireEvent.click(screen.getByRole("switch", { name: "Show past events" }));
+    fireEvent.click(toggle());
     expect(screen.getByText("Checked in")).toBeTruthy();
     expect(screen.getByText("Past")).toBeTruthy();
   });
@@ -107,13 +144,66 @@ describe("EventTimeline", () => {
     expect(screen.getAllByRole("link")).toHaveLength(3);
   });
 
-  it.each([
-    [false, "Events coming soon"],
-    [true, "No past events"],
-  ])("says so when there are no events (past: %s), with no clear action", (past, title) => {
-    render(<EventTimeline upcomingEvents={[]} pastEvents={[]} />);
-    if (past) fireEvent.click(screen.getByRole("switch", { name: "Show past events" }));
-    expect(screen.getByRole("heading", { name: title })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Clear search" })).toBeNull();
+  it("searches both sections, and drops a section with no match", () => {
+    render(<EventTimeline upcomingEvents={UPCOMING} pastEvents={PAST} />);
+    fireEvent.click(toggle());
+
+    type("i");
+    expect(links().map((l) => l.textContent)).toEqual(
+      expect.arrayContaining(["Kickoff", "Figma Workshop", "Spring Mixer"])
+    );
+    expect(screen.getByRole("heading", { name: "Past events" })).toBeTruthy();
+
+    type("mixer");
+    expect(links()).toHaveLength(1);
+    expect(screen.getByRole("heading", { name: "Past events" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "No upcoming events" })).toBeNull();
+    expect(status()).toBe("1 result");
+
+    type("kickoff");
+    expect(links()).toHaveLength(1);
+    expect(screen.queryByRole("heading", { name: "Past events" })).toBeNull();
+  });
+
+  it("does not search past events while the switch is off", () => {
+    render(<EventTimeline upcomingEvents={UPCOMING} pastEvents={PAST} />);
+    type("mixer");
+    expect(screen.getByRole("heading", { name: "No events match “mixer”" })).toBeTruthy();
+  });
+
+  it("shows no match when neither section has one", () => {
+    render(<EventTimeline upcomingEvents={UPCOMING} pastEvents={PAST} />);
+    fireEvent.click(toggle());
+    type("zzz");
+    expect(screen.getByRole("heading", { name: "No events match “zzz”" })).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "Past events" })).toBeNull();
+  });
+
+  describe("empty states", () => {
+    it("says events are coming soon with nothing at all, with no clear action", () => {
+      render(<EventTimeline upcomingEvents={[]} pastEvents={[]} />);
+      expect(screen.getByRole("heading", { name: "Events coming soon" })).toBeTruthy();
+      fireEvent.click(toggle());
+      expect(screen.getByRole("heading", { name: "Events coming soon" })).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Clear search" })).toBeNull();
+    });
+
+    it("says there is nothing upcoming when only past events exist", () => {
+      render(<EventTimeline upcomingEvents={[]} pastEvents={PAST} />);
+      expect(screen.getByRole("heading", { name: "Events coming soon" })).toBeTruthy();
+
+      fireEvent.click(toggle());
+      expect(screen.getByRole("heading", { name: "No upcoming events" })).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "Past events" })).toBeTruthy();
+      expect(links().map((l) => l.textContent)).toEqual(["Spring Mixer"]);
+    });
+
+    it("says there are no past events when only upcoming ones exist", () => {
+      render(<EventTimeline upcomingEvents={UPCOMING} pastEvents={[]} />);
+      fireEvent.click(toggle());
+      expect(links()).toHaveLength(3);
+      expect(screen.getByRole("heading", { name: "Past events" })).toBeTruthy();
+      expect(screen.getByRole("heading", { name: "No past events" })).toBeTruthy();
+    });
   });
 });

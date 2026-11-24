@@ -16,7 +16,7 @@ function SelectedToolbar() {
       search={<SearchField label="Search users" placeholder="Search users" />}
       selectedCount={2}
       bulkActions={
-        <Button variant="secondary" size="sm">
+        <Button variant="secondary">
           <Download aria-hidden />
           Export to CSV
         </Button>
@@ -37,7 +37,7 @@ function CountedToolbar() {
     <TableToolbar
       search={<SearchField label="Search users" placeholder="Search users" value={query} onValueChange={setQuery} />}
       actions={
-        <Button variant="secondary" size="sm">
+        <Button variant="secondary">
           <ListFilter aria-hidden />
           Sort and filter
         </Button>
@@ -80,14 +80,14 @@ function TableToolbarDemo() {
       <SpecimenGroup
         title="TableToolbar"
         spec="§3.16"
-        description="Search fills the row; Sort and filter sits on the right until rows are selected."
+        description="Search fills the row; Sort and filter sits on the right until rows are selected. Buttons in the toolbar match the search field’s height: 44px on phones, then --size-control (40, or 32 compact)."
       >
         <Specimen label="Default" wide>
           <TableToolbar
             className="w-full"
             search={<SearchField label="Search users" placeholder="Search users" />}
             actions={
-              <Button variant="secondary" size="sm">
+              <Button variant="secondary">
                 <ListFilter aria-hidden />
                 Sort and filter
               </Button>
@@ -105,7 +105,7 @@ function TableToolbarDemo() {
               />
             }
             actions={
-              <Button variant="secondary" size="sm">
+              <Button variant="secondary">
                 <ListFilter aria-hidden />
                 Sort and filter
               </Button>
@@ -127,7 +127,7 @@ function TableToolbarDemo() {
             <TableToolbar
               search={<SearchField label="Search users" placeholder="Search users" />}
               actions={
-                <Button variant="secondary" size="sm">
+                <Button variant="secondary">
                   <ListFilter aria-hidden />
                   Sort and filter
                 </Button>

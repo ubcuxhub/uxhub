@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { MoreHorizontal, ScanLine } from "lucide-react";
+import { MoreHorizontal, Scan } from "lucide-react";
 import type { ReactNode } from "react";
 import { PageContainer } from "@/components/shared/PageContainer";
 import { ListRow } from "@/components/shared/ListRow";
@@ -16,16 +16,17 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { toast } from "@/components/ui/toast";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from "@/components/ui/dialog";
-import { CheckInTarget } from "./CheckInTarget";
+import { CheckInTarget, checkInItemContext } from "./CheckInTarget";
 import { CheckInTicketMenu } from "./CheckInTicketMenu";
 import { CheckInFeedback } from "./CheckInFeedback";
+import { ScanTicketsCard } from "./ScanTicketsCard";
 import { useItemCheckIn } from "@/features/admin/hooks/use-item-check-in";
 import { checkInBackLabel, checkInReturnTo, checkInPath, type ItemCheckInSnapshot, type ItemAttendance } from "@/features/admin/lib/item-check-in";
 import { searchCheckInAttendees } from "@/features/admin/lib/check-in-search";
 import type { EventRow } from "@/lib/supabase/models";
-import { formatEventDate, formatEventTime } from "@/lib/date";
+import { formatEventTime } from "@/lib/date";
 
-export function CheckInManager({ eventId, event, initialItemId, initialSnapshot, phoneLinks, returnTo }: { eventId: string; event: EventRow; initialItemId: string | null; initialSnapshot: ItemCheckInSnapshot; phoneLinks: Record<string, ReactNode>; returnTo?: string }) {
+export function CheckInManager({ eventId, initialItemId, initialSnapshot, phoneLinks, returnTo }: { eventId: string; /** Named by the event manager's header. */ event: EventRow; initialItemId: string | null; initialSnapshot: ItemCheckInSnapshot; phoneLinks: Record<string, ReactNode>; returnTo?: string }) {
   const state = useItemCheckIn(eventId, initialItemId, initialSnapshot, false, returnTo);
   const { snapshot, itemId } = state;
   const [filter, setFilter] = useState<"not" | "checked" | "all">("not");
@@ -72,11 +73,11 @@ export function CheckInManager({ eventId, event, initialItemId, initialSnapshot,
   }}>
     <MoreHorizontal />
   </IconButton>;
-  return <PageContainer backHref={checkInReturnTo(returnTo)} backLabel={checkInBackLabel(checkInReturnTo(returnTo))} className="@container/checkin flex flex-col gap-6">
-    <div>
-      <h1 className="text-h2">{event.name}</h1>
-      <p className="mt-1 text-small text-muted-foreground">{event.starts_at ? formatEventDate(event.starts_at, { month: "short" }) : "Date not set"}{event.location_building ? ` · ${event.location_building}` : ""}</p>
-    </div>
+  // The event manager's header names the event and links back to the list,
+  // so only a page this one was opened from (the agenda) gets a back link.
+  const backHref = returnTo === undefined ? null : checkInReturnTo(returnTo);
+  const back = backHref && backHref !== "/admin/events" ? backHref : undefined;
+  return <PageContainer backHref={back} backLabel={back && checkInBackLabel(back)} className="@container/checkin flex flex-col gap-6">
     <h2 className="text-h3">Check-in</h2>
     {snapshot.items.length ? <CheckInTarget items={snapshot.items} itemId={itemId} onChange={id => {
       setUndoRow(null);
@@ -88,24 +89,24 @@ export function CheckInManager({ eventId, event, initialItemId, initialSnapshot,
         <StatCard label="Checked in" {...(state.loading ? { kind: "loading" as const } : { kind: "count" as const, count, total, noun: "going", showRate: true })} />
         <StatCard label="Not checked in" {...(state.loading ? { kind: "loading" as const } : { kind: "count" as const, count: total - count, total, noun: "going" })} />
       </div>
-      <div className="flex items-center gap-3">
-      <Button className="min-w-0 flex-1" asChild={state.enabled} disabled={!state.enabled}>{state.enabled ? <Link href={checkInPath(eventId, itemId, true, returnTo)}>
-        <ScanLine aria-hidden />Scan tickets</Link> : <>
-        <ScanLine aria-hidden />Scan tickets</>}</Button>
-      {itemId && phoneLinks[itemId] ? <Dialog>
-        <DialogTrigger asChild>
-          <Button variant="secondary" className="hidden w-fit shrink-0 sm:inline-flex">Open scanner on phone</Button>
-        </DialogTrigger>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Open scanner on phone</DialogTitle>
-            <DialogDescription>Scan this link to check tickets into {target.label}.</DialogDescription>
-          </DialogHeader>{phoneLinks[itemId]}<Button asChild>
-            <Link href={checkInPath(eventId, itemId, true, returnTo)}>Open scanner</Link>
-          </Button>
-        </DialogContent>
-      </Dialog> : null}
-      </div>
+      <ScanTicketsCard description={`${target.label} · ${checkInItemContext(target)}`}>
+        <Button asChild={state.enabled} disabled={!state.enabled}>{state.enabled ? <Link href={checkInPath(eventId, itemId, true, returnTo)}>
+          <Scan aria-hidden />Scan tickets</Link> : <>
+          <Scan aria-hidden />Scan tickets</>}</Button>
+        {itemId && phoneLinks[itemId] ? <Dialog>
+          <DialogTrigger asChild>
+            <Button variant="secondary" className="hidden sm:inline-flex">Open scanner on phone</Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Open scanner on phone</DialogTitle>
+              <DialogDescription>Scan this link to check tickets into {target.label}.</DialogDescription>
+            </DialogHeader>{phoneLinks[itemId]}<Button asChild>
+              <Link href={checkInPath(eventId, itemId, true, returnTo)}>Open scanner</Link>
+            </Button>
+          </DialogContent>
+        </Dialog> : null}
+      </ScanTicketsCard>
       <div className="grid min-w-0 gap-8 @[56rem]/checkin:grid-cols-2">
         <section className="flex min-w-0 flex-col gap-4" aria-label="Recent check-ins">
           <div className="flex items-center justify-between gap-3">

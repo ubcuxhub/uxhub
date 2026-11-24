@@ -62,6 +62,25 @@ export async function adminFindOverduePublications(before: string) {
   return count ?? 0;
 }
 
+/**
+ * Whether `slug` belongs to an event that was published and has since gone
+ * back to draft. Members can't read drafts (RLS), so the portal event page
+ * asks this to tell an unpublished event from one that never existed. It
+ * returns a boolean only, so no draft content reaches the member. Published
+ * URLs are locked, so the slug still matches after unpublishing.
+ */
+export async function adminIsUnpublishedEvent(slug: string): Promise<boolean> {
+  const { data, error } = await supabaseAdmin
+    .from(TABLES.events)
+    .select("id")
+    .eq("slug", slug)
+    .eq("status", "draft")
+    .not("first_published_at", "is", null)
+    .maybeSingle();
+  if (error) throw error;
+  return data !== null;
+}
+
 export interface AdminUserInfoLookup {
   id: string;
   auth_user_id: string | null;

@@ -44,6 +44,7 @@ it("retains selected target in scanner and phone QR paths", async () => {
   await act(async () => { });
 
   expect(screen.getByRole("link", { name: "Scan tickets" }).getAttribute("href")).toBe("/admin/events/event/check-in/scan?item=a");
+  expect(screen.getByRole("region", { name: "Scan tickets" }).textContent).toContain("Opening · ");
 
   fireEvent.click(screen.getByRole("button", { name: "Open scanner on phone" }));
 
@@ -163,10 +164,10 @@ it("retains agenda origin in Back and scanner links after a refresh", async () =
   await act(async () => {});
   expect(screen.getByRole("link", { name: "Back to Agenda" }).getAttribute("href")).toBe(returnTo);
 });
-it("uses Manage Events for direct links and unsafe destinations", async () => {
+it("leaves the way back to the manager header for direct links and unsafe destinations", async () => {
   render(<CheckInManager eventId="event" event={event} initialItemId="a" initialSnapshot={snapshot} phoneLinks={{}} returnTo="//evil.test" />);
   await act(async () => {});
-  expect(screen.getByRole("link", { name: "Back to Manage Events" }).getAttribute("href")).toBe("/admin/events");
+  expect(screen.queryByRole("link", { name: /^Back to/ })).toBeNull();
 });
 
 it("refreshes the item attendee list and counts after a ticket is voided", async () => {

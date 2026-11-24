@@ -33,7 +33,7 @@ export function workingDocumentSaveInput(event: EventRow, schedule: EventSchedul
       requires_application: s.requires_application, agenda_enabled: s.agenda_enabled,
       teams_enabled: s.teams_enabled, min_team_size: s.min_team_size ? Number(s.min_team_size) : null,
       max_team_size: s.max_team_size ? Number(s.max_team_size) : null, team_deadline: datetimeLocalToTimestamptz(s.team_deadline),
-      max_capacity: s.max_capacity ? Number(s.max_capacity) : null,
+      max_capacity: s.max_capacity ? Number(s.max_capacity) : null, reminder_schedule: s.reminder_schedule,
       configured_marketing_mode: s.marketing_mode, configured_marketing_url: s.marketing_url || null,
       configured_slug: s.page_slug, configured_slug_edited: s.slug_edited, is_featured: s.is_featured,
       ...(s.pricing_mode === "legacy" ? { regular_price: s.regular_price ? Number(s.regular_price) : null, member_price: s.member_price ? Number(s.member_price) : null } : {

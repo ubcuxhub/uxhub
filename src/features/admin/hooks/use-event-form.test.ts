@@ -273,7 +273,7 @@ describe("event form publishing schedule", () => {
       "configured_marketing_mode", "configured_marketing_url", "configured_slug", "configured_slug_edited", "created_at", "description", "description_rich", "ends_at", "event_colour", "event_type", "header_colour", "header_image_url", "image_url", "is_featured",
       "location_address_url", "location_building", "location_room",
       "max_capacity", "max_team_size", "mentors_enabled", "min_team_size", "name", "publish_at",
-      "registration_closes_at", "registration_opens_at",
+      "registration_closes_at", "registration_opens_at", "reminder_schedule",
       "requires_application", "short_description", "sponsors_enabled",
       "starts_at", "status", "team_deadline", "teams_enabled",
     ]);

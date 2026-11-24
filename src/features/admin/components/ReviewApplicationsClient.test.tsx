@@ -36,7 +36,10 @@ const items: ReviewListItem[] = Array.from({ length: 30 }, (_, index) => {
     applicationId: `app-${n}`,
     name: `Applicant ${n}`,
     email: `applicant${n}@example.com`,
-    program: "2nd year · Design",
+    program: "Design",
+    year: "2",
+    studentStatus: "undergraduate",
+    membership: index % 2 ? "explorer" : null,
     appliedAt: `2026-10-${n}T18:00:00Z`,
     state:
       index < 26
@@ -63,8 +66,8 @@ const chip = (label: RegExp) => screen.getByRole("button", { name: label });
 describe("ReviewApplicationsClient", () => {
   it("opens on Submitted, with counts, 25 to a page, oldest first", () => {
     renderList();
-    expect(screen.getByRole("heading", { level: 1, name: "Applications" })).toBeTruthy();
-    expect(screen.getByText("UXathon · Applications closed Nov 3")).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Applications" })).toBeTruthy();
+    expect(screen.getByText("Applications closed Nov 3")).toBeTruthy();
     expect(chip(/^Submitted/).getAttribute("aria-pressed")).toBe("true");
     expect(chip(/^Submitted/).textContent).toContain("26");
     expect(chip(/^Rejected/).textContent).toContain("1");
@@ -129,6 +132,43 @@ describe("ReviewApplicationsClient", () => {
     expect(rowLinks()[0].textContent).toBe("Applicant 26");
   });
 
+  it("filters from the panel, keeps the filters in the URL, and clears them", () => {
+    renderList();
+    fireEvent.click(screen.getByRole("button", { name: "Sort and filter" }));
+    const panel = screen.getByRole("dialog", { name: "Sort and filter" });
+    // The fieldset and its chip group share the name.
+    const group = (name: string) => within(panel).getAllByRole("group", { name })[0];
+    const membership = group("Membership");
+    // Tiers applicants hold, then Non-member; Program options come from the data.
+    expect(within(membership).getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "Explorer",
+      "Non-member",
+    ]);
+    expect(
+      within(group("Program")).getAllByRole("button").map((b) => b.textContent)
+    ).toEqual(["Design"]);
+
+    fireEvent.click(within(membership).getByRole("button", { name: "Explorer" }));
+    expect(window.location.search).toBe("?membership=explorer");
+    // Even-numbered applicants are Explorers: 13 of the 26 submitted.
+    expect(rowLinks()).toHaveLength(13);
+    expect(rowLinks()[0].getAttribute("href")).toBe(
+      "/admin/events/e1/review-applications/app-02?membership=explorer",
+    );
+    expect(screen.getByRole("button", { name: "Sort and filter, 1 active" })).toBeTruthy();
+
+    fireEvent.click(within(panel).getByRole("button", { name: "Clear all" }));
+    expect(window.location.search).toBe("");
+    expect(rowLinks()).toHaveLength(25);
+  });
+
+  it("sorts by name, Z to A", () => {
+    window.history.replaceState(null, "", "/admin/events/e1/review-applications?sort=name-desc");
+    renderList();
+    expect(rowLinks()[0].textContent).toBe("Applicant 26");
+    expect(screen.getByRole("button", { name: "Sort and filter, 1 active" })).toBeTruthy();
+  });
+
   it("hides the Notes column until counts are provided", () => {
     const { unmount } = renderList();
     expect(screen.queryByRole("columnheader", { name: "Notes" })).toBeNull();
@@ -140,7 +180,9 @@ describe("ReviewApplicationsClient", () => {
   it("counts held seats: tickets and offers out", () => {
     const { unmount } = renderList();
     // Without seat counts, the list's own Going and Accepted stand in.
-    expect(screen.getByText("2 of 60 seats · 1 going, 1 offer out")).toBeTruthy();
+    const first = screen.getByRole("group", { name: "Seats held" });
+    expect(first.textContent).toContain("2 / 60 seats");
+    expect(within(first).getByText("1 going, 1 offer out")).toBeTruthy();
     unmount();
     render(
       <ReviewApplicationsClient
@@ -152,7 +194,8 @@ describe("ReviewApplicationsClient", () => {
       />,
     );
     const card = screen.getByRole("group", { name: "Seats held" });
-    expect(within(card).getByText("52 of 60 seats · 40 going, 12 offers out")).toBeTruthy();
+    expect(card.textContent).toContain("52 / 60 seats");
+    expect(within(card).getByText("40 going, 12 offers out")).toBeTruthy();
   });
 
   it("says so when nobody has applied", () => {

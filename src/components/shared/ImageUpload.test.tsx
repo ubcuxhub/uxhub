@@ -5,6 +5,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ImageUpload } from "./ImageUpload";
 
+const { optimizeEventImage } = vi.hoisted(() => ({ optimizeEventImage: vi.fn() }));
+vi.mock("@/lib/event-image-optimize", () => ({ optimizeEventImage }));
+
 afterEach(cleanup);
 
 const noop = () => {};
@@ -13,9 +16,11 @@ const noop = () => {};
 const input = (name = "Image cover for the event") =>
   screen.getByLabelText<HTMLInputElement>(name, { selector: "input" });
 
-function file(name: string, type: string) {
-  return new File(["x"], name, { type });
+function file(name: string, type: string, size = 1) {
+  return new File([new Uint8Array(size)], name, { type });
 }
+
+const MB = 1024 * 1024;
 
 describe("ImageUpload", () => {
   it("points the label at the file input", () => {
@@ -48,18 +53,18 @@ describe("ImageUpload", () => {
     expect(click).toHaveBeenCalled();
   });
 
-  it("opens the header picker from its named button and retains the 4 MB guidance", () => {
+  it("opens the header picker from its named button and states the size guidance", () => {
     render(<ImageUpload presentation="header" label="Header image" requirements={{ minWidth: 1600, minHeight: 400 }} onChange={noop} />);
     const click = vi.fn();
     input("Header image").addEventListener("click", click);
     fireEvent.click(screen.getByRole("button", { name: "Upload header image" }));
     expect(click).toHaveBeenCalledOnce();
-    expect(screen.getByText(/1600 × 400 px or larger, up to 4 MB/)).toBeTruthy();
+    expect(screen.getByText(/1600 × 400 px or larger, up to 20 MB/)).toBeTruthy();
   });
 
   it("builds the requirements line from props", () => {
     const { rerender } = render(<ImageUpload onChange={noop} />);
-    expect(screen.getByText(/Square JPG or PNG, up to 4 MB/)).toBeTruthy();
+    expect(screen.getByText(/Square JPG or PNG, up to 20 MB/)).toBeTruthy();
 
     rerender(
       <ImageUpload
@@ -68,7 +73,7 @@ describe("ImageUpload", () => {
       />,
     );
     expect(
-      screen.getByText(/JPG or PNG, 1600 × 400 px or larger, up to 4 MB/),
+      screen.getByText(/JPG or PNG, 1600 × 400 px or larger, up to 20 MB/),
     ).toBeTruthy();
 
     rerender(<ImageUpload onChange={noop} hint="Drop a banner." />);
@@ -231,6 +236,7 @@ describe("ImageUpload picks", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    optimizeEventImage.mockReset();
     Reflect.deleteProperty(URL, "createObjectURL");
     Reflect.deleteProperty(URL, "revokeObjectURL");
   });
@@ -261,13 +267,129 @@ describe("ImageUpload picks", () => {
     );
   });
 
-  it("rejects a non-square pick", async () => {
+  it("shrinks a pick over the upload limit and reports the smaller file", async () => {
+    const onFileChange = vi.fn();
+    const small = file("banner.jpg", "image/jpeg", 2 * MB);
+    let finish: (value: File) => void = () => {};
+    optimizeEventImage.mockReturnValueOnce(new Promise<File>((resolve) => (finish = resolve)));
+    render(<ImageUpload presentation="header" label="Header image" requirements={{ minWidth: 1600, minHeight: 400 }} onChange={noop} onFileChange={onFileChange} />);
+    fireEvent.change(input("Header image"), { target: { files: [file("banner.png", "image/png", 9 * MB)] } });
+    decode(0, 6000, 1500);
+
+    await waitFor(() => expect(screen.getByRole("status").textContent).toBe("Optimizing image"));
+    expect(screen.getByText("Optimizing…")).toBeTruthy();
+    expect(optimizeEventImage).toHaveBeenCalledWith(expect.any(File), { width: 6000, height: 1500 }, { minWidth: 1600, minHeight: 400 });
+    expect(onFileChange).not.toHaveBeenCalled();
+
+    await act(async () => finish(small));
+    await waitFor(() => expect(onFileChange).toHaveBeenCalledExactlyOnceWith(small));
+    expect(screen.getByRole("status").textContent).toBe("Image selected");
+  });
+
+  it("says so when a large pick can't be shrunk enough", async () => {
+    const onFileChange = vi.fn();
+    optimizeEventImage.mockResolvedValueOnce(null);
+    render(<ImageUpload onChange={noop} onFileChange={onFileChange} />);
+    pick(file("huge.png", "image/png", 9 * MB));
+    decode(0, 4000);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toMatch(/Couldn’t shrink this image under 4MB/);
+    expect(onFileChange).not.toHaveBeenCalled();
+  });
+
+  it("rejects a file over the source cap without decoding it", async () => {
+    render(<ImageUpload onChange={noop} />);
+    pick(file("raw.jpg", "image/jpeg", 21 * MB));
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe("Image size must be less than 20MB.");
+    expect(pending).toHaveLength(0);
+  });
+
+  it("leaves a small pick alone", async () => {
+    const onFileChange = vi.fn();
+    render(<ImageUpload onChange={noop} onFileChange={onFileChange} />);
+    pick(file("icon.png", "image/png"));
+    decode(0, 800);
+    await waitFor(() => expect(onFileChange).toHaveBeenCalled());
+    expect(optimizeEventImage).not.toHaveBeenCalled();
+  });
+
+  /** jsdom never decodes images; report the crop dialog's image as loaded. */
+  function loadCropImage(width: number, height: number) {
+    const image = document.querySelector<HTMLImageElement>("[data-slot=crop-stage] img")!;
+    Object.defineProperty(image, "naturalWidth", { value: width });
+    Object.defineProperty(image, "naturalHeight", { value: height });
+    fireEvent.load(image);
+  }
+
+  it("crops a non-square pick to a square before reporting it", async () => {
+    const onFileChange = vi.fn();
+    const cropped = file("wide.jpg", "image/jpeg", 100);
+    optimizeEventImage.mockResolvedValueOnce(cropped);
+    render(<ImageUpload onChange={noop} onFileChange={onFileChange} />);
+    pick(file("wide.png", "image/png"));
+    decode(0, 800, 400);
+
+    await screen.findByRole("dialog", { name: "Crop image" });
+    expect(onFileChange).not.toHaveBeenCalled();
+    loadCropImage(800, 400);
+    fireEvent.click(screen.getByRole("button", { name: "Use image" }));
+
+    await waitFor(() => expect(onFileChange).toHaveBeenCalledExactlyOnceWith(cropped));
+    expect(optimizeEventImage).toHaveBeenCalledWith(expect.any(File), { width: 800, height: 400 }, {
+      minWidth: undefined,
+      minHeight: undefined,
+      crop: { x: 200, y: 0, width: 400, height: 400 },
+    });
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    // The name shows with the preview, which FileReader loads asynchronously.
+    expect(await screen.findByText("wide.jpg")).toBeTruthy();
+  });
+
+  it("crops a header to 4:1 and keeps it above the minimum", async () => {
+    optimizeEventImage.mockResolvedValueOnce(file("banner.jpg", "image/jpeg", 100));
+    render(<ImageUpload presentation="header" label="Header image" requirements={{ aspect: 4, minWidth: 1600, minHeight: 400 }} onChange={noop} />);
+    fireEvent.change(input("Header image"), { target: { files: [file("banner.jpg", "image/jpeg")] } });
+    decode(0, 3000, 2000);
+    await screen.findByRole("dialog", { name: "Crop image" });
+    loadCropImage(3000, 2000);
+    // Zoom is capped where the kept region would drop under 1600 px wide.
+    const slider = screen.getByRole("slider", { name: "Zoom" });
+    expect(slider.getAttribute("max")).toBe("187");
+    fireEvent.click(screen.getByRole("button", { name: "Use image" }));
+    await waitFor(() => expect(optimizeEventImage).toHaveBeenCalledOnce());
+    expect(optimizeEventImage.mock.calls[0][2].crop).toEqual({ x: 0, y: 625, width: 3000, height: 750 });
+  });
+
+  it("skips the crop for a header already close to 4:1", async () => {
+    const onFileChange = vi.fn();
+    render(<ImageUpload presentation="header" label="Header image" requirements={{ aspect: 4, minWidth: 1600, minHeight: 400 }} onChange={noop} onFileChange={onFileChange} />);
+    fireEvent.change(input("Header image"), { target: { files: [file("banner.jpg", "image/jpeg")] } });
+    decode(0, 1610, 400);
+    await waitFor(() => expect(onFileChange).toHaveBeenCalledOnce());
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("rejects a pick whose crop would be under the minimum", async () => {
+    render(<ImageUpload presentation="header" label="Header image" requirements={{ aspect: 4, minWidth: 1600, minHeight: 400 }} onChange={noop} />);
+    fireEvent.change(input("Header image"), { target: { files: [file("tall.jpg", "image/jpeg")] } });
+    // Wide enough, but a 4:1 crop of it is only 1500 x 375.
+    decode(0, 1500, 2000);
+    const alert = await screen.findByRole("alert");
+    expect(alert.textContent).toBe("Image must be at least 1600 × 400 px.");
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("drops the pick when the crop is cancelled", async () => {
     const onFileChange = vi.fn();
     render(<ImageUpload onChange={noop} onFileChange={onFileChange} />);
     pick(file("wide.png", "image/png"));
     decode(0, 800, 400);
-    await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
+    await screen.findByRole("dialog", { name: "Crop image" });
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(onFileChange).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: "Upload image" })).toBeTruthy();
   });
 
   it("lets a later file win when an earlier one finishes decoding last", async () => {
