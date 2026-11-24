@@ -143,7 +143,7 @@ export const MANIFEST = [
   {
     id: "reviewer-notes-states",
     column: 4,
-    uses: ["segmented-toggle", "card", "empty-state", "skeleton", "button"],
+    uses: ["segmented-toggle", "card", "empty-state", "spinner", "button"],
   },
   {
     id: "application-form",
