@@ -11,7 +11,9 @@ import { CheckInPanel } from "./CheckInPanel";
 export const AUTO_RETURN_SECONDS = 4;
 
 export function rejectionTitle(result: Extract<ItemCheckInResult, { status: "rejected" }>) {
-  return result.reason === "event_canceled" ? "This event is canceled" : "Ticket not recognized";
+  if (result.reason === "event_canceled") return "This event is canceled";
+  if (result.reason === "payment_pending") return "Payment still processing";
+  return "Ticket not recognized";
 }
 
 interface CheckInResultCardProps {
@@ -68,7 +70,7 @@ export function CheckInResultCard({ result, eventName, disabled, holding = false
       {canceled ? null : <Button variant="secondary" onClick={onSearch}><Search aria-hidden />Search attendees</Button>}{scanNext}
     </>}>
       <p className="max-w-sm text-small text-muted-foreground [overflow-wrap:anywhere]">
-        {canceled ? "Canceled events don’t take check-ins." : `This QR code isn’t a ticket for ${eventName}. Ask the attendee to open their ticket in the portal, or find them by name.`}
+        {canceled ? "Canceled events don’t take check-ins." : result.reason === "payment_pending" ? "This ticket’s payment hasn’t gone through yet, so it can’t be checked in. Ask the attendee to check their purchases, or try again in a few minutes." : `This QR code isn’t a ticket for ${eventName}. Ask the attendee to open their ticket in the portal, or find them by name.`}
       </p>
     </CheckInPanel>;
   }

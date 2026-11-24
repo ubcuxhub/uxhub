@@ -72,7 +72,6 @@ export async function EventCheckoutRoute({
       disabledMessage={disabledMessage}
       event={event}
       formattedDate={formatEventDate(event.starts_at)}
-      returnTo={returnTo}
       slug={event.slug ?? slug}
       user={user}
     />

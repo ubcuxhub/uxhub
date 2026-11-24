@@ -80,12 +80,14 @@ export function createServerProfileClient(): ProfileClient {
     saveAbout: (user, values) => updateUserInfoById(supabase, user.id, aboutUpdate(values)),
     async saveStudies(user, values, studentNumberChanged) {
       if (studentNumberChanged) {
-        await updateEligibilityProfileAction({
+        const result = await updateEligibilityProfileAction({
           userType: user.user_type,
           studentNumber: values.student_number?.trim() || null,
           faculty: orNull(values.faculty),
           facultyEmail: user.user_type === "faculty" ? user.email : null,
         });
+        // Thrown here, on the client, so production keeps the message.
+        if (!result.ok) throw new Error(result.error);
       }
       await updateUserInfoById(supabase, user.id, studiesUpdate(user.user_type, values));
     },

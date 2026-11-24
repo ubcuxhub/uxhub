@@ -62,7 +62,8 @@ export function CheckoutLayout({
   const { setBusy } = useFlowDialog();
   const [processing, setProcessing] = useState(false);
   const formattedPrice = currency.format(price);
-  const freeEvent = payment.kind === "event_ticket" && price === 0;
+  const free = price === 0;
+  const freeEvent = free && payment.kind === "event_ticket";
 
   const handleSubmittingChange = (submitting: boolean) => {
     setProcessing(submitting);
@@ -75,7 +76,7 @@ export function CheckoutLayout({
         <div className="flex flex-1 items-center justify-center text-center">
           <div className="max-w-md">
             <LoaderCircle className="mx-auto size-12 animate-spin text-primary" />
-            <h1 className="mt-6 text-h2">{freeEvent ? "Confirming your registration" : "Processing your payment"}</h1>
+            <h1 className="mt-6 text-h2">{freeEvent ? "Confirming your registration" : free ? "Confirming your membership" : "Processing your payment"}</h1>
             <p className="mt-2 text-small text-muted-foreground">
               {processingMessage}
             </p>
@@ -96,7 +97,6 @@ export function CheckoutLayout({
           <CheckoutPaymentSection
             amount={formattedPrice}
             amountCents={Math.round(price * 100)}
-            collectBuyerDetails={false}
             buttonLabel="Pay now"
             disabled={payment.disabled}
             disabledMessage={payment.disabledMessage}
@@ -112,7 +112,7 @@ export function CheckoutLayout({
             onSubmittingChange={handleSubmittingChange}
             showAmount={false}
             showSecurityMessage={false}
-            title={freeEvent ? "Confirm registration" : "Payment details"}
+            title={freeEvent ? "Confirm registration" : free ? "Confirm membership" : "Payment details"}
             userId={user.id}
           />
 

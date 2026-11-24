@@ -612,12 +612,14 @@ export function buildSeedCrowd(events: SeedEvent[], now: Date): SeedUser[] {
   const renewal = userAt(RENEWAL_PENDING);
   renewal.membershipPreOrderedSlug = renewal.membershipSlug!;
   renewal.purchases.push({
-    // Created before the card is charged, so no Square payment yet.
+    // Square has the payment but hasn't settled it. A pending purchase with
+    // no Square payment is abandoned, and fail_abandoned_purchases fails it.
     amountCents: MEMBERSHIP_PRICE_CENTS[renewal.membershipSlug as MembershipSlug],
     createdAt: timestamp(addDays(today, -1), 18, 5),
     idempotencyKey: `seed:crowd:membership:${handleAt(RENEWAL_PENDING)}:renewal`,
     kind: "membership",
     membershipSlug: renewal.membershipSlug!,
+    squarePaymentId: `seed:crowd:payment:${handleAt(RENEWAL_PENDING)}:renewal`,
     status: "pending",
   });
 

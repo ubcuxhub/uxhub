@@ -1404,23 +1404,26 @@ export type Database = {
           created_at: string | null
           event_id: string
           event_type: string
-          payload: NonNullable<Json>
+          payload: Json | null
           processed_at: string | null
+          square_payment_id: string | null
         }
         ComputedFields: never
         Insert: {
           created_at?: string | null
           event_id: string
           event_type: string
-          payload: NonNullable<Json>
+          payload?: Json | null
           processed_at?: string | null
+          square_payment_id?: string | null
         }
         Update: {
           created_at?: string | null
           event_id?: string
           event_type?: string
-          payload?: NonNullable<Json>
+          payload?: Json | null
           processed_at?: string | null
+          square_payment_id?: string | null
         }
         Relationships: []
       }
@@ -1741,6 +1744,10 @@ export type Database = {
         Args: { p_error_code?: string; p_send_id: string; p_sent: boolean }
         Returns: number
       }
+      create_one_live_membership_index: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       create_staff_volunteer_schedule: {
         Args: { p_event_id: string; p_operation_id: string; p_url: string }
         Returns: Json
@@ -1806,6 +1813,10 @@ export type Database = {
       draft_event_number: { Args: { value: string }; Returns: number }
       draft_event_timestamp: { Args: { value: string }; Returns: string }
       draft_event_wall_time: { Args: { value: string }; Returns: string }
+      end_event_offer: {
+        Args: { p_event_id: string; p_user_id: string }
+        Returns: undefined
+      }
       event_checkout_amount: {
         Args: { p_event_id: string; p_user_id: string }
         Returns: number
@@ -1876,6 +1887,10 @@ export type Database = {
       event_ticket_eligibility: {
         Args: { p_amount_cents?: number; p_event_id: string; p_user_id: string }
         Returns: string
+      }
+      fail_abandoned_purchases: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       get_my_event_applications: {
         Args: { p_event_ids: string[] }

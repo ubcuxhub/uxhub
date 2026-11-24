@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import type { PurchaseWithDetails } from "@/lib/supabase-helpers/purchases";
 import { useUser } from "@/lib/auth/user-context";
 import { useConfirmationPolling } from "@/features/payments/use-confirmation-polling";
+import { isFullyRefunded } from "@/features/payments/purchase-status";
 
 export function MembershipConfirmation({
   purchase,
@@ -18,9 +19,12 @@ export function MembershipConfirmation({
   const router = useRouter();
   const { refreshUser } = useUser();
   const refreshedUser = useRef(false);
-  const completed = purchase.status === "completed";
+  // A refund leaves the status completed (it mirrors Square's payment), so a
+  // revisit after a full refund must not still read "now active".
+  const refunded = purchase.status === "completed" && isFullyRefunded(purchase);
+  const completed = purchase.status === "completed" && !refunded;
   const failed = purchase.status === "failed" || purchase.status === "canceled";
-  const pending = !completed && !failed;
+  const pending = !completed && !failed && !refunded;
   const refresh = useCallback(() => router.refresh(), [router]);
   const pollingCutoffReached = useConfirmationPolling(pending, refresh);
 
@@ -36,6 +40,8 @@ export function MembershipConfirmation({
       <div className="max-w-lg">
         {completed ? (
           <Check className="mx-auto size-16 rounded-full bg-success-foreground/10 p-3 text-success-foreground" />
+        ) : refunded ? (
+          <CircleAlert className="mx-auto size-16 rounded-full bg-muted p-3 text-muted-foreground" />
         ) : failed ? (
           <CircleAlert className="mx-auto size-16 rounded-full bg-destructive/10 p-3 text-destructive" />
         ) : (
@@ -44,7 +50,9 @@ export function MembershipConfirmation({
         <h1 className="mt-6 text-h1">
           {completed
             ? "Membership confirmed"
-            : failed
+            : refunded
+              ? "Payment refunded"
+              : failed
               ? "Payment wasn’t completed"
               : pollingCutoffReached
                 ? "Membership is still processing"
@@ -55,7 +63,9 @@ export function MembershipConfirmation({
             ? purchase.confirmation_email_sent_at
               ? `Your ${purchase.membership_types?.name ?? "UX Hub"} membership is now active. A confirmation email has been sent to your inbox.`
               : `Your ${purchase.membership_types?.name ?? "UX Hub"} membership is now active.`
-            : failed
+            : refunded
+              ? `This ${purchase.membership_types?.name ?? "UX Hub"} membership payment was refunded in full. Check your purchases for details.`
+              : failed
               ? purchase.failure_reason ?? "Your payment could not be completed."
               : pollingCutoffReached
                 ? "This is taking longer than expected. You can leave this page and check your purchases later; we won’t submit another charge."
@@ -72,14 +82,14 @@ export function MembershipConfirmation({
             href={
               completed
                 ? "/portal"
-                : pollingCutoffReached
+                : pollingCutoffReached || refunded
                   ? "/portal#settings/purchases"
                   : "/portal/membership"
             }
           >
             {completed
               ? "Go to portal"
-              : pollingCutoffReached
+              : pollingCutoffReached || refunded
                 ? "View purchases"
                 : "Back to membership"}
           </Link>
