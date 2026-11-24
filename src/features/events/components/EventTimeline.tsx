@@ -65,6 +65,7 @@ export function EventTimeline({
         {/* Upcoming or Past (Figma 3759:15793): two views of the same list. */}
         <SegmentedToggle
           aria-label="Which events"
+          size="lg"
           className="shrink-0"
           value={showPastEvents ? "past" : "upcoming"}
           onValueChange={(view) => setShowPastEvents(view === "past")}
