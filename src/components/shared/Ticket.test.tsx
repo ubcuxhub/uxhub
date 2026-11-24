@@ -117,7 +117,7 @@ describe("Ticket", () => {
     ).toBeTruthy();
   });
 
-  it("cuts the notches out instead of painting them over the surface", () => {
+  it("cuts the six punches out instead of painting them over the surface", () => {
     const { container } = render(<Ticket {...base} />);
     const shape = container.querySelector(
       "[data-slot='ticket-shape']",
@@ -126,7 +126,9 @@ describe("Ticket", () => {
     expect(container.innerHTML).not.toContain("bg-background");
     const mask =
       shape.style.maskImage || shape.style.getPropertyValue("-webkit-mask-image");
-    expect(mask.match(/radial-gradient/g)).toHaveLength(2);
+    // The four corners and the two perforation stubs.
+    expect(mask.match(/radial-gradient/g)).toHaveLength(6);
+    expect(shape.className).not.toMatch(/\brounded-/);
   });
 
   it("says Checked in when used and keeps a dimmed code", () => {
@@ -162,5 +164,24 @@ describe("Ticket", () => {
       <Ticket {...base} action={<button type="button">View ticket</button>} />,
     );
     expect(screen.getByRole("button", { name: "View ticket" })).toBeTruthy();
+  });
+
+  it("lays the dither under the sheen on a live ticket, and keeps a greyed or checked-in one still", () => {
+    for (const state of ["active", "locked", "pending", "used"] as const) {
+      const { container } = render(<Ticket {...base} state={state} />);
+      const shape = container.querySelector("[data-slot='ticket-shape']") as HTMLElement;
+      const dither = shape.querySelector("[data-slot='dither-overlay']");
+      const sheen = shape.querySelector("[data-slot='ticket-sheen']");
+
+      expect(dither, state).not.toBeNull();
+      if (state === "active" || state === "locked") {
+        expect(sheen, state).not.toBeNull();
+        // Sheen over the dither, both under the code and text.
+        expect(dither!.compareDocumentPosition(sheen!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      } else {
+        expect(sheen, state).toBeNull();
+      }
+      cleanup();
+    }
   });
 });
