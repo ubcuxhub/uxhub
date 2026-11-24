@@ -51,8 +51,18 @@ export interface EventBadge {
   label?: string;
 }
 
+/**
+ * The event fields a timeline card shows. The portal narrows its rows to these
+ * on the server (`toTimelineEvent`), so the client timeline never receives a
+ * rich description, an agenda or a draft's working document.
+ */
+export type TimelineEvent = Pick<
+  EventRow,
+  "id" | "slug" | "name" | "starts_at" | "ends_at" | "location_building" | "location_room" | "image_url"
+>;
+
 export interface EventGroup {
   key: string;
   label: string;
-  events: EventRow[];
+  events: TimelineEvent[];
 }

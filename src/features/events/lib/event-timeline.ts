@@ -1,10 +1,16 @@
-import type { EventGroup } from "@/features/events/types";
+import type { EventGroup, TimelineEvent } from "@/features/events/types";
 import { formatEventDate, pacificDate } from "@/lib/date";
 import type { EventRow } from "@/lib/supabase/models";
 
 import { hasEventEnded } from "./event-rules";
 
-export function groupEventsByMonth(events: EventRow[]): EventGroup[] {
+/** Just the fields the timeline shows, for passing rows to the client. */
+export function toTimelineEvent(event: TimelineEvent): TimelineEvent {
+  const { id, slug, name, starts_at, ends_at, location_building, location_room, image_url } = event;
+  return { id, slug, name, starts_at, ends_at, location_building, location_room, image_url };
+}
+
+export function groupEventsByMonth(events: TimelineEvent[]): EventGroup[] {
   const groups = new Map<string, EventGroup>();
 
   for (const event of events) {
