@@ -22,7 +22,15 @@ if [ "${VERCEL_ENV:-}" = "production" ]; then
   # A no-op when nothing is pending. Fails on a migration that sorts before the
   # hosted history, and when the hosted history has a migration this commit
   # lacks (redeploying an older commit; use Instant Rollback instead).
-  pnpm exec supabase db push --db-url "$SUPABASE_MIGRATIONS_DB_URL" --yes
+  if ! pnpm exec supabase db push --db-url "$SUPABASE_MIGRATIONS_DB_URL" --yes; then
+    # The out-of-order case lands here when a stale pull request was merged
+    # after a newer migration (CI's "Check migration order" on the push to main
+    # names the file). Every production deploy stays blocked until it is fixed.
+    echo "supabase db push failed. If it found local migrations to insert before the" >&2
+    echo "last one applied, rename that migration with a current timestamp in a new" >&2
+    echo "pull request. Do not rerun with --include-all: it would apply it out of order." >&2
+    exit 1
+  fi
 fi
 
 pnpm build

@@ -60,7 +60,8 @@ deletes seed-owned rows the data no longer describes, so a ticket bought through
 the UI is undone by re-running it. Pass `--no-prune` to keep those rows,
 `--dry-run` to preview. Pruning deletes any event or membership tier whose slug
 is not in the seed data, including one created through the admin UI, unless a
-row owned by a hand-made account (a purchase, say) still references it.
+hand-made account holds a purchase, ticket, application, team membership or
+reviewer note on it.
 Purchases, tickets and applications are pruned only when they belong to one of
 the fixture accounts, never to an account created by hand.
 
@@ -72,7 +73,9 @@ in admin screens. Pruning deletes a crowd account the data no longer lists, so
 never sign up with one of those domains.
 
 `pnpm seed --target=prod` writes demo events for admins while the student-facing
-events feature is unlaunched. It never deletes, never writes user fixtures or
+events feature is unlaunched. It never deletes, only updates an event it can
+tell it wrote and nobody has touched since (see `scripts/seed/README.md`,
+"Which events prod writes"), never writes user fixtures or
 membership tiers (admins edit the live tiers in Club Settings), and forces every
 event to `draft` so nothing fabricated is reachable through the
 public API. It reads `SEED_PROD_SUPABASE_URL` and `SEED_PROD_SUPABASE_SECRET_KEY`
@@ -326,6 +329,11 @@ gh pr merge <number> --admin --merge --delete-branch
 - Merge only when the user asked for that pull request (or batch), it has been
   reviewed for correctness, and its CI checks are green.
 - Use a merge commit (`--merge`), not squash or rebase.
+- Before an admin merge of a pull request that adds a migration, check its
+  order against the current `main`, since CI checked it against the `main` of
+  its last run:
+  `git fetch origin main "pull/<n>/head:refs/remotes/origin/pr/<n>"`, then
+  `bash scripts/check-migration-order.sh origin/main origin/pr/<n>`.
 - For stacked pull requests, retarget each dependent one to `main`
   (`gh pr edit <n> --base main`) before deleting the branch it's based on.
 - Other accounts follow the normal review flow.

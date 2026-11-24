@@ -1,11 +1,22 @@
 #!/usr/bin/env bash
-# Fails when a migration that HEAD adds sorts at or before the newest migration
-# on the base ref. The production build's `supabase db push` refuses a migration
-# older than the hosted history, so an out-of-order file would block the deploy
-# that follows the merge. Usage: check-migration-order.sh <base-ref>
+# Fails when a migration that <head-ref> adds sorts at or before the newest
+# migration on <base-ref>. The production build's `supabase db push` refuses a
+# migration older than the hosted history, so an out-of-order file would block
+# the deploy that follows the merge.
+#
+# Usage: check-migration-order.sh <base-ref> [<head-ref>]   (head defaults to HEAD)
+#
+# CI runs it on every pull request against the base branch, and on every push to
+# main against the main it replaced, which catches a stale branch merged with
+# the admin bypass. Before such a merge, check the pull request against the
+# current main:
+#
+#   git fetch origin main "pull/<number>/head:refs/remotes/origin/pr/<number>"
+#   bash scripts/check-migration-order.sh origin/main origin/pr/<number>
 set -euo pipefail
 
-base="${1:?usage: check-migration-order.sh <base-ref>}"
+base="${1:?usage: check-migration-order.sh <base-ref> [<head-ref>]}"
+head="${2:-HEAD}"
 dir=supabase/migrations
 
 list_migrations() {
@@ -14,7 +25,7 @@ list_migrations() {
 
 base_files="$(list_migrations "$base")"
 latest="$(tail -n 1 <<<"$base_files" | cut -d_ -f1)"
-added="$(comm -13 <(echo "$base_files") <(list_migrations HEAD))"
+added="$(comm -13 <(echo "$base_files") <(list_migrations "$head"))"
 
 status=0
 while IFS= read -r file; do

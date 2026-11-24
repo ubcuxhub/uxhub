@@ -12,9 +12,11 @@
  *
  * - `local` is disposable, so the seed reconciles it fully — it deletes rows the
  *   seed data no longer describes.
- * - `prod` holds real data, so the seed only ever adds and updates. It writes
- *   demo events for admins to work with while the student-facing events feature
- *   is unlaunched, and it never writes user fixtures or membership tiers.
+ * - `prod` holds real data, so the seed never deletes, and it only updates an
+ *   event it can tell it wrote and nobody has touched since (see
+ *   `lib/event-ownership.ts`). It writes demo events for admins to work with
+ *   while the student-facing events feature is unlaunched, and it never writes
+ *   user fixtures or membership tiers.
  */
 
 export type SeedTarget = "local" | "prod";
@@ -47,11 +49,20 @@ export interface TargetPolicy {
    * the seed keeps out of the builder's document and mirror tables there.
    */
   workingDrafts: boolean;
+  /**
+   * Treat an existing row whose natural key matches the seed data as the
+   * seed's, and overwrite it: an event by slug, a mentor by name, a sponsor by
+   * logo. Local only. On prod a slug is not proof of ownership, so an event is
+   * written only while it still looks as the seed left it
+   * (`planProdEvents`), and a mentor or sponsor that already exists is linked
+   * as it is, never rewritten.
+   */
+  claimsByKey: boolean;
 }
 
 export const TARGET_POLICIES: Record<SeedTarget, TargetPolicy> = {
-  local: { prune: true, users: true, memberships: true, forceDraft: false, workingDrafts: true },
-  prod: { prune: false, users: false, memberships: false, forceDraft: true, workingDrafts: false },
+  local: { prune: true, users: true, memberships: true, forceDraft: false, workingDrafts: true, claimsByKey: true },
+  prod: { prune: false, users: false, memberships: false, forceDraft: true, workingDrafts: false, claimsByKey: false },
 };
 
 /** Env var names each target reads its connection from. */
