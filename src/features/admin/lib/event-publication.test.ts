@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import type { EventRow } from "@/lib/supabase/models";
 import {
-  assertPublishAt,
   eventScheduleProblem,
   FINISH_IN_EDIT,
   isPublishing,
@@ -99,13 +98,6 @@ describe("publishAtProblem", () => {
     expect(publishAtProblem("draft", PAST, NOW)).toBe(
       "Publish date must be in the future."
     );
-  });
-
-  it("throws the same message from assertPublishAt", () => {
-    expect(() => assertPublishAt("draft", PAST, NOW)).toThrow(
-      "Publish date must be in the future."
-    );
-    expect(() => assertPublishAt("draft", FUTURE, NOW)).not.toThrow();
   });
 });
 

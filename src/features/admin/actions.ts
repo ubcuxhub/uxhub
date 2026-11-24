@@ -28,7 +28,7 @@ import {
   adminUpdateMembershipTypeById,
 } from "@/lib/supabase-helpers/admin-server";
 import { datetimeLocalToTimestamptz, formatTimestamp } from "@/lib/date";
-import { assertPublishAt, isTimestamptz, builderPublicationProblem, publicationClosingProblem } from "@/features/admin/lib/event-publication";
+import { publishAtProblem, isTimestamptz, builderPublicationProblem, publicationClosingProblem } from "@/features/admin/lib/event-publication";
 import {
   validateMembershipTypeInput,
   type MembershipTypeInput,
@@ -222,9 +222,11 @@ export type SaveAdminEventResult =
   | { revision?: number; pageSlug?: string; id: string; checkInSessionIds: string[]; questionIds: string[]; dateLocationRevision?: number; content?: EventContent; publication?: SavedEventPublication }
   | { error: string };
 
-// Not exported: a "use server" module may only export async functions, and the
-// form surfaces this by displaying the thrown error's message.
-// Raised by save_admin_event_atomically when the cover-image precondition fails.
+// Not exported: a "use server" module may only export async functions.
+// Raised by save_admin_event_atomically when the cover-image precondition
+// fails, and returned to the form as SAVE_CONFLICT_ERROR. Every refusal here is
+// returned rather than thrown, since production builds withhold a thrown
+// error's message from the client.
 const IMAGE_CONFLICT_SENTINEL = "EVENT_IMAGE_CONFLICT";
 
 const SAVE_CONFLICT_ERROR =
@@ -293,7 +295,7 @@ export async function saveAdminEventDraftAction(input: { id: string; eventId: st
   // Live edits remain local until the deliberate Update action.
   if (input.eventId) {
     const event = await fetchEventById(supabaseAdmin, input.eventId);
-    if (!event || event.status !== "draft" || event.publish_at) throw new Error("Only unscheduled drafts can save working documents.");
+    if (!event || event.status !== "draft" || event.publish_at) return { error: "This event was published or scheduled since this page loaded. Reload it to keep editing." };
   }
   const previous = await fetchEventDraft(supabaseAdmin, input.id);
   let saved: Awaited<ReturnType<typeof saveEventDraft>>;
@@ -339,7 +341,7 @@ export async function saveAdminEventAction(
 
   if (input.eventId && (!Number.isSafeInteger(input.expectedRevision) || input.expectedRevision! < 0)) return { error: "Reload this event before updating; its saved revision is missing." };
   if (input.content) { const problem = eventContentProblem(input.content); if (problem) return { error: problem }; }
-  assertPublishAt(input.event.status, input.event.publish_at);
+  { const problem = publishAtProblem(input.event.status, input.event.publish_at); if (problem) return { error: problem }; }
   if ("agenda_enabled" in input.event && typeof input.event.agenda_enabled !== "boolean") return { error: "Schedule visibility must be on or off." };
   if ("reminder_schedule" in input.event && !isReminderSchedule(input.event.reminder_schedule)) return { error: "Choose when reminder emails go out." };
   const { min_team_size: min, max_team_size: max, team_deadline: deadline } = input.event;
@@ -365,10 +367,10 @@ export async function saveAdminEventAction(
     datePayload = { _date_revision: input.dateLocationRevision ?? 0, _date_location: { ...config, dates: config.version === 2 ? config.dates : config.dates.map((row, index) => ({ ...row, start_time: sessions[index].start_time, end_time: sessions[index].end_time })) } };
   }
 
-  if (shortOverviewTooLong(input.event.short_description) || (input.event.description?.length ?? 0) > 3000) throw new Error("Overview exceeds its character limit.");
+  if (shortOverviewTooLong(input.event.short_description) || (input.event.description?.length ?? 0) > 3000) return { error: "Overview exceeds its character limit." };
   if (input.event.description_rich != null) {
     const rich = parseEventDescription(input.event.description_rich);
-    if (!rich || descriptionText(rich) !== input.event.description) throw new Error("Invalid long overview formatting.");
+    if (!rich || descriptionText(rich) !== input.event.description) return { error: "Invalid long overview formatting." };
   }
   if (input.event.configured_slug_edited === false) {
     const configuredSlug = await automaticPageSlug(input.eventId ?? null, input.event.name, input.event.configured_slug);
@@ -376,18 +378,18 @@ export async function saveAdminEventAction(
   }
   if (input.event.configured_slug != null) {
     const error = eventSlugError(input.event.configured_slug);
-    if (error) throw new Error(error);
+    if (error) return { error };
   }
   if (input.event.configured_marketing_mode === "external") {
     const error = websiteUrlError(input.event.configured_marketing_url ?? "");
-    if (error) throw new Error(error);
+    if (error) return { error };
     // Normalize hostnames (including international domains) consistently with
     // URL parsing before the database's protocol/host safety constraint.
     input = { ...input, event: { ...input.event, configured_marketing_url: new URL(input.event.configured_marketing_url!).href } };
   }
   if (input.event.configured_pricing_mode != null) {
     const error = priceError(String(input.event.configured_price ?? ""));
-    if (error) throw new Error(error);
+    if (error) return { error };
   }
   const publicationProblem = publicationClosingProblem(input.event) ?? builderPublicationProblem(input);
   if (publicationProblem) return { error: publicationProblem };
@@ -439,7 +441,7 @@ export async function saveAdminEventAction(
     if (["EVENT_REVISION_CONFLICT", "EVENT_HISTORY_LOCKED"].includes(error.hint ?? "")) return { error: error.message };
     if (error.hint === "EVENT_PUBLICATION_CONFLICT" || error.hint === "EVENT_PUBLICATION_INVALID") return { error: error.message };
     if (error.message.includes(IMAGE_CONFLICT_SENTINEL)) {
-      throw new Error(SAVE_CONFLICT_ERROR);
+      return { error: SAVE_CONFLICT_ERROR };
     }
     const refusal = REFUSAL_EVENTS.get(error.hint);
     if (refusal) {
@@ -453,7 +455,7 @@ export async function saveAdminEventAction(
     ];
     if (configurationMessages.includes(error.message)) return { error: error.message };
     if (error.code === "23505" && /events_slug|idx_events_slug|event_url_claims/.test(error.message)) return { error: "This page URL is already in use." };
-    if (error.code === "23514" && /events_configured_/.test(error.message)) throw new Error("Review the marketing destination and pricing before saving.");
+    if (error.code === "23514" && /events_configured_/.test(error.message)) return { error: "Review the marketing destination and pricing before saving." };
     if (error.code === "23514" && /events_(min_team_size|max_team_size|team_size_range)_check/.test(error.message)) return { error: "Team sizes must be positive whole numbers with minimum no greater than maximum." };
     if (error.hint === "EVENT_CONTENT_INVALID") return { error: error.message };
     if (error.hint === "EVENT_SETTINGS_CONFLICT") return { error: error.message };
@@ -711,23 +713,24 @@ export async function setMembershipTermEndsAtAction(date: string | null) {
  * Edits one membership tier from Club Settings.
  *
  * The update is built here from three named columns rather than from the
- * caller's payload, in the spirit of `MANAGER_USER_FIELDS` above: `slug` is
- * absent because checkout URLs are `/portal/membership/<slug>/checkout` and a
- * rename breaks live links; `name` because it is already printed on sent
+ * caller's payload, in the spirit of `managerUserUpdate`'s allowlist: `slug`
+ * is absent because checkout URLs are `/portal/membership/<slug>/checkout` and
+ * a rename breaks live links; `name` because it is already printed on sent
  * receipts; `eligible_user_types` because emptying it would silently make a
- * tier unpurchasable for everyone.
+ * tier unpurchasable for everyone. An invalid tier or a missing one comes back
+ * as a refusal.
  */
 export async function updateMembershipTypeAction(
   id: string,
   input: MembershipTypeInput
-) {
+): Promise<{ ok: true; tier: { active: boolean; description: string; price: number } } | { ok: false; error: string }> {
   await requireManager();
 
-  if (!id) throw new Error("Membership tier not found.");
+  if (!id) return { ok: false, error: "Membership tier not found." };
 
   const description = input.description.trim();
   const problem = validateMembershipTypeInput({ ...input, description });
-  if (problem) throw new Error(problem);
+  if (problem) return { ok: false, error: problem };
 
   const updated = await adminUpdateMembershipTypeById(id, {
     active: input.active,
@@ -743,12 +746,15 @@ export async function updateMembershipTypeAction(
     | { active: boolean; description: string; price: number }
     | undefined;
 
-  if (!row) throw new Error("Membership tier not found.");
+  if (!row) return { ok: false, error: "Membership tier not found." };
 
   return {
-    active: row.active,
-    description: row.description,
-    price: Number(row.price),
+    ok: true,
+    tier: {
+      active: row.active,
+      description: row.description,
+      price: Number(row.price),
+    },
   };
 }
 

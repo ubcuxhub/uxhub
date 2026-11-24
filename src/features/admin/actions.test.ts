@@ -406,7 +406,7 @@ describe("saveAdminEventAction", () => {
 
   it.each(["invalid", "2027-08-01T18:00", ""])("rejects invalid publish timestamps: %s", async (publish_at) => {
     await expect(saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, status: "draft", publish_at } }))
-      .rejects.toThrow("Publish date must be a valid timestamp with a timezone.");
+      .resolves.toEqual({ error: "Publish date must be a valid timestamp with a timezone." });
     expect(adminRpc).not.toHaveBeenCalled();
   });
 
@@ -414,7 +414,7 @@ describe("saveAdminEventAction", () => {
     await expect(saveAdminEventAction({
       ...saveInput,
       event: { ...saveInput.event, status: "active", publish_at: "2099-08-01T18:00:00Z" },
-    })).rejects.toThrow("Only draft events can have a publish date.");
+    })).resolves.toEqual({ error: "Only draft events can have a publish date." });
     expect(adminRpc).not.toHaveBeenCalled();
   });
 
@@ -422,7 +422,7 @@ describe("saveAdminEventAction", () => {
     await expect(saveAdminEventAction({
       ...saveInput,
       event: { ...saveInput.event, status: "draft", publish_at: "2020-01-01T18:00:00Z" },
-    })).rejects.toThrow("Publish date must be in the future.");
+    })).resolves.toEqual({ error: "Publish date must be in the future." });
     expect(adminRpc).not.toHaveBeenCalled();
   });
 
@@ -509,7 +509,7 @@ describe("saveAdminEventAction", () => {
 
     await expect(
       saveAdminEventAction({ ...saveInput, eventId: "event-1" }),
-    ).rejects.toThrow(/cover image was changed somewhere else/);
+    ).resolves.toEqual({ error: expect.stringMatching(/cover image was changed somewhere else/) });
   });
 
   it("returns the session and question ids the save gave, in the order sent", async () => {
@@ -957,9 +957,15 @@ describe("updateMembershipTypeAction", () => {
   });
 
   it("requires a tier id", async () => {
-    await expect(updateMembershipTypeAction("", tier as never)).rejects.toThrow(
-      "Membership tier not found.",
-    );
+    await expect(updateMembershipTypeAction("", tier as never)).resolves.toEqual({
+      ok: false,
+      error: "Membership tier not found.",
+    });
+    expect(adminServer.adminUpdateMembershipTypeById).not.toHaveBeenCalled();
+  });
+
+  it("returns a tier the server-side check refuses, writing nothing", async () => {
+    await expect(updateMembershipTypeAction("tier-1", { ...tier, description: "" } as never)).resolves.toMatchObject({ ok: false });
     expect(adminServer.adminUpdateMembershipTypeById).not.toHaveBeenCalled();
   });
 
@@ -968,7 +974,7 @@ describe("updateMembershipTypeAction", () => {
 
     await expect(
       updateMembershipTypeAction("tier-1", tier as never),
-    ).rejects.toThrow("Membership tier not found.");
+    ).resolves.toEqual({ ok: false, error: "Membership tier not found." });
   });
 
   it("returns the price as a number", async () => {
@@ -979,9 +985,8 @@ describe("updateMembershipTypeAction", () => {
     await expect(
       updateMembershipTypeAction("tier-1", tier as never),
     ).resolves.toEqual({
-      active: true,
-      description: "Full year access",
-      price: 15,
+      ok: true,
+      tier: { active: true, description: "Full year access", price: 15 },
     });
   });
 });
@@ -1078,9 +1083,9 @@ describe("saveManagerUserDetailsAction", () => {
 
 
 describe("overview write validation", () => {
-  it.each([{ short_description: "x".repeat(121) }, { description: "x".repeat(3001) }])("enforces the same limits on the server", fields => expect(saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, ...fields } })).rejects.toThrow(/character limit/));
+  it.each([{ short_description: "x".repeat(121) }, { description: "x".repeat(3001) }])("enforces the same limits on the server", fields => expect(saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, ...fields } })).resolves.toEqual({ error: expect.stringMatching(/character limit/) }));
   it("rejects unsafe rich links before persistence", async () => {
-    await expect(saveAdminEventAction({ ...saveInput, event: { description: "Link", description_rich: [{ type: "paragraph", spans: [{ text: "Link", href: "javascript:alert(1)" }] }] } })).rejects.toThrow(/formatting/);
+    await expect(saveAdminEventAction({ ...saveInput, event: { description: "Link", description_rich: [{ type: "paragraph", spans: [{ text: "Link", href: "javascript:alert(1)" }] }] } })).resolves.toEqual({ error: expect.stringMatching(/formatting/) });
     expect(adminRpc).not.toHaveBeenCalled();
   });
 });
@@ -1094,7 +1099,7 @@ describe("event configuration server validation", () => {
     { configured_pricing_mode: "paid", configured_price: -1 },
     { configured_pricing_mode: "paid", configured_price: 1.001 },
   ])("rejects invalid configuration before the mutation: %j", async fields => {
-    await expect(saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, ...fields } })).rejects.toThrow();
+    await expect(saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, ...fields } })).resolves.toEqual({ error: expect.any(String) });
     expect(adminRpc).not.toHaveBeenCalled();
   });
   it("normalizes international external hostnames without changing the effective destination", async () => {
