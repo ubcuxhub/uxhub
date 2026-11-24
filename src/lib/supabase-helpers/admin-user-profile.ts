@@ -19,15 +19,31 @@ export class ProfilePhotoConflictError extends Error {
   }
 }
 
+/**
+ * The user is unknown or their account was deleted. Expected when a record
+ * stays open while the account goes, so callers report it to the manager
+ * rather than alerting on it.
+ */
+export class ActiveProfileNotFoundError extends Error {
+  constructor() {
+    super("This user no longer exists. Reload the user directory.");
+    this.name = "ActiveProfileNotFoundError";
+  }
+}
+
+/** A user's row, unless their account was deleted. A database failure throws as itself. */
 export async function fetchActiveProfile(db: SupabaseClient<Database>, userId: string) {
-  const { data, error } = await db.from(TABLES.userInfo).select("*").eq("id", userId).is("deleted_at", null).single();
-  if (error || !data) throw new Error("Active user not found.");
+  const { data, error } = await db.from(TABLES.userInfo).select("*").eq("id", userId).is("deleted_at", null).maybeSingle();
+  if (error) throw error;
+  if (!data) throw new ActiveProfileNotFoundError();
   return data;
 }
 
+/** Writes a patch to a user's row, unless their account was deleted. A database failure throws as itself. */
 export async function saveAdminProfile(db: SupabaseClient<Database>, userId: string, patch: UserInfoUpdate) {
-  const { data, error } = await db.from(TABLES.userInfo).update(patch).eq("id", userId).is("deleted_at", null).select("*").single();
-  if (error || !data) throw new Error("Unable to save user information.");
+  const { data, error } = await db.from(TABLES.userInfo).update(patch).eq("id", userId).is("deleted_at", null).select("*").maybeSingle();
+  if (error) throw error;
+  if (!data) throw new ActiveProfileNotFoundError();
   return data;
 }
 

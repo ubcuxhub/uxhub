@@ -154,8 +154,19 @@ export async function listApplicationFiles(
 }
 
 /**
+ * Whether Storage answered "Object not found", which it also says for an
+ * object the caller's policies don't let them read. It replies 400 with the
+ * 404 in the body, so both are checked.
+ */
+function isObjectNotFound(error: unknown): boolean {
+  const { status, statusCode } = (error ?? {}) as { status?: unknown; statusCode?: unknown };
+  return status === 404 || statusCode === "404" || statusCode === 404;
+}
+
+/**
  * A short-lived download link for an uploaded file, or null when the caller
- * cannot read it (or it is gone).
+ * cannot read it (or it is gone). Any other failure throws, so an outage
+ * doesn't read as a missing file.
  */
 export async function createApplicationFileUrl(
   supabase: DbClient,
@@ -168,6 +179,9 @@ export async function createApplicationFileUrl(
       download: path.slice(path.lastIndexOf("/") + 1),
     });
 
-  if (error) return null;
+  if (error) {
+    if (isObjectNotFound(error)) return null;
+    throw error;
+  }
   return data.signedUrl;
 }
