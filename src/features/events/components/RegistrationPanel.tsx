@@ -53,6 +53,8 @@ interface RegistrationPanelProps {
   event: PanelEvent & { slug: string };
   user: UserInfoRow;
   state: EventState;
+  /** Buttons that can't work here, and why (`draftRegistrationBlocks`). */
+  unavailable?: PanelContext["unavailable"];
 }
 
 /** What the ticket layout draws, beyond its copy. */
@@ -74,7 +76,7 @@ interface TicketView {
  * `qr_token` and participant package for a ticket holder, and a draft's
  * progress.
  */
-export async function RegistrationPanel({ event, user, state }: RegistrationPanelProps) {
+export async function RegistrationPanel({ event, user, state, unavailable }: RegistrationPanelProps) {
   const supabase = await createClient();
   const holdsTicket = state.kind === "reg-going" || state.kind === "reg-checked-in";
 
@@ -103,6 +105,7 @@ export async function RegistrationPanel({ event, user, state }: RegistrationPane
     participantPackageUrl: links.find((link) => link.type === "participant_package")?.url ?? null,
     draftProgress,
     refund,
+    unavailable,
   };
   const spec = getPanelSpec(state, context);
 
@@ -158,6 +161,7 @@ function ActionLayout({ title, description, action }: ActionLayoutProps) {
       <div className="flex min-w-0 flex-col gap-1">
         <p className="text-body font-medium">{title}</p>
         {description ? <p className="text-small text-muted-foreground">{description}</p> : null}
+        {action.disabledReason ? <p className="text-small text-muted-foreground">{action.disabledReason}</p> : null}
       </div>
       <PanelButton action={action} className="@max-xl:w-full" />
     </div>
@@ -193,6 +197,7 @@ function TicketLayout({
         {title ? <p className="text-foreground">{title}</p> : null}
         <p className={title ? "text-muted-foreground" : "text-foreground"}>{description}</p>
         {priceLine ? <p className="mt-2 text-small text-muted-foreground">{priceLine}</p> : null}
+        {primary?.disabledReason ? <p className="text-small text-muted-foreground">{primary.disabledReason}</p> : null}
       </div>
 
       <div className="flex flex-col gap-2 @4xl:col-start-2 @4xl:row-span-2 @4xl:row-start-1">
@@ -230,6 +235,7 @@ function PanelButton({
   ticket?: TicketView;
 }) {
   const props = { variant, size, className } as const;
+  if (action.disabledReason) return <Button {...props} disabled>{action.label}</Button>;
 
   switch (action.kind) {
     case "flow":

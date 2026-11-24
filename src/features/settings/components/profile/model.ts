@@ -9,6 +9,7 @@ import type { AvatarChoice } from "@/features/setup/components/AvatarPicker";
 import type { AvatarPreset, InterestId } from "@/features/setup/lib/options";
 import { toSetupStep } from "@/features/setup/lib/state";
 import type { DietaryNeeds } from "@/features/setup/lib/validation";
+import { birthDateError } from "@/lib/birth-date";
 import { formatEventDate } from "@/lib/date";
 import type {
   StudentStatus,
@@ -38,6 +39,8 @@ export interface ProfileFormData {
   school_institution: string;
   student_status: StudentStatus | "";
   year: UniversityYear | "";
+  /** `YYYY-MM-DD`, "", or `INCOMPLETE_BIRTH_DATE` while half-typed. */
+  birth_date: string;
 }
 
 export function toProfileForm(user: UserInfoRow): ProfileFormData {
@@ -52,16 +55,27 @@ export function toProfileForm(user: UserInfoRow): ProfileFormData {
     school_institution: user.school_institution ?? "",
     student_status: user.student_status ?? "",
     year: user.year ?? "",
+    birth_date: user.birth_date ?? "",
   };
 }
 
 /** The fields whose errors wait for blur (§3.2). */
-export type CheckedField = "first_name" | "last_name" | "student_number";
+export type CheckedField = "first_name" | "last_name" | "student_number" | "birth_date";
 
 export type ProfileErrors = Record<CheckedField, string | null>;
 
-/** About you: the fields `updateUserInfoById` writes for every account type. */
-export const ABOUT_FIELDS = ["first_name", "last_name", "preferred_pronouns", "phone"] as const;
+/**
+ * About you, for every account type: the details `updateUserInfoById` writes,
+ * and the birthday, which `saveBirthDateAction` writes (members have no grant
+ * on `birth_date`). They save together, under one status.
+ */
+export const ABOUT_FIELDS = [
+  "first_name",
+  "last_name",
+  "preferred_pronouns",
+  "phone",
+  "birth_date",
+] as const;
 
 /** Studies: the eligibility columns each account type owns and edits here. */
 export const STUDIES_FIELDS: Record<UserType, ReadonlyArray<keyof ProfileFormData>> = {
@@ -71,6 +85,8 @@ export const STUDIES_FIELDS: Record<UserType, ReadonlyArray<keyof ProfileFormDat
 };
 
 export type AboutValues = Pick<ProfileFormData, (typeof ABOUT_FIELDS)[number]>;
+/** About you without the birthday: what `updateUserInfoById` writes. */
+export type AboutDetails = Omit<AboutValues, "birth_date">;
 export type StudiesValues = Partial<ProfileFormData>;
 
 export function pickFields<K extends keyof ProfileFormData>(
@@ -122,13 +138,14 @@ export function profileErrors(
       form.student_number !== context.savedStudentNumber
         ? studentNumberError(form.student_number)
         : null,
+    birth_date: birthDateError(form.birth_date),
   };
 }
 
 /** Whether the section can save as typed. Invalid input holds only its own section. */
 export function sectionBlocked(section: "about" | "studies", errors: ProfileErrors): boolean {
   return section === "about"
-    ? Boolean(errors.first_name || errors.last_name)
+    ? Boolean(errors.first_name || errors.last_name || errors.birth_date)
     : Boolean(errors.student_number);
 }
 

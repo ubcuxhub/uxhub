@@ -187,6 +187,7 @@ helper file, and fix it in one place.
 | `mentors` / `event_mentors`   | `src/lib/supabase-helpers/event-people.ts`        |
 | `sponsors` / `event_sponsors` | `src/lib/supabase-helpers/event-people.ts`        |
 | `application_emails.deliveries` (private, RPCs only) | `src/lib/supabase-helpers/application-emails.ts` |
+| `event_reminders.sends` (private, RPCs only) | `src/lib/supabase-helpers/event-reminders.ts` |
 | `user_info`                   | `src/lib/supabase-helpers/users.ts`               |
 | `membership_types`            | `src/lib/supabase-helpers/memberships.ts`         |
 | `purchases`                   | `src/lib/supabase-helpers/purchases.ts`           |
@@ -302,8 +303,9 @@ upload and remove these themselves with their own session, so this bucket
 own draft, under a file question of its event, and remove only while it is a
 draft; they read their own files, and admins read those of submitted
 applications. Downloads use short-lived signed URLs
-(`createApplicationFileUrl`). Deleting a draft removes its files first
-(`deleteDraftApplication`), since the database cannot reach Storage.
+(`createApplicationFileUrl`). The app never deletes a member's draft (the
+apply page has no Delete), and the database cannot reach Storage, so anything
+that deletes one must remove its files first.
 
 ## Type-safety gaps to watch (these do NOT fail `tsc`)
 
@@ -444,6 +446,13 @@ migration `*_application_emails.sql` adds:
   the timestamp in `x-application-emails-timestamp`. Without either secret it
   does nothing.
 
+`application_emails.due_work` decides what is due. It emailed published events
+only until `*_draft_event_application_emails.sql`, which adds draft events for
+staff applicants (admins and managers), so execs can test the flow on an
+unpublished event; members on an event that went back to Draft still get
+nothing. That migration has no backfill: decisions already released to staff
+on a draft send on the job's next run.
+
 Preview deploys share the production database, so the job calls only the URL in
 Vault, and only production has it. `/api/internal/application-emails` checks
 the signature within five minutes of server time, returns `{"skipped":"flag"}`
@@ -488,6 +497,78 @@ limit 10;
 
 To send an abandoned email again, reset its row (`attempts = 0,
 last_error_code = null`); it goes out on the next run.
+
+### Event reminder emails
+
+Ticket holders get a reminder before an event starts, as its admins choose in
+the builder's Registration section ("Reminder email"). The migration
+`*_event_reminder_emails.sql` adds:
+
+- `events.reminder_schedule`: `off`, `1d` (a day before), `2h` (two hours
+  before) or `both`. The column defaults to `off`, so every event that existed
+  when it shipped sends nothing; the builder starts a new event at `1d`
+  (`getInitialFormState`), and a working draft saved before the field existed
+  reads as `off`. The builder's save writes it like any other events column
+  (`save_admin_event_builder` copies every payload key that names one);
+- the private `event_reminders` schema, whose `sends` table records one row
+  per ticket and kind (`1d` or `2h`), unique on `(ticket_id, kind)`, so nobody
+  gets the same reminder twice. Voiding or fully refunding a ticket deletes
+  it, and its rows with it. No application role, the service role included,
+  can reach it directly;
+- `claim_event_reminders(p_limit, p_event_ids)`,
+  `complete_event_reminder(p_send_id, p_sent, p_error_code)` and
+  `release_event_reminders(p_send_ids, p_reason)`, service role only, with the
+  same retries as the application emails: five attempts, releases don't
+  count, a claim the route never completed is retried after 15 minutes;
+- the `send-event-reminders` pg_cron job, every 15 minutes. When a reminder is
+  due and both Vault secrets below exist, it POSTs to the stored URL with a
+  SHA-256 HMAC over `event-reminders:<unix-seconds>` in
+  `x-event-reminders-signature` and the timestamp in
+  `x-event-reminders-timestamp`. It signs with `application_emails_secret`:
+  the message differs, so neither job's signature opens the other's route.
+
+A reminder is due (`event_reminders.due_work`) for each ticket of an active,
+uncanceled event whose setting includes its kind, held by an account that
+isn't deleted, whose ticket existed at the send time (someone who registers
+after it doesn't get that reminder), and whose purchase isn't refunded in
+full. The send time is 24 or 2 hours before `starts_at`, which is the first
+day of a multi-day event. A reminder stays due until it would read wrong: six
+hours after its send time for the day-before one ("See you tomorrow"), the
+start for the two-hour one. After that it is dropped, so a quota or an outage
+can cost a reminder but never sends a stale one. Turning the setting off
+stops reminders not yet sent; sent ones stay sent, and turning it on again
+doesn't repeat them.
+
+`/api/internal/event-reminders` checks the signature with
+`APPLICATION_EMAILS_SECRET` within five minutes of server time, returns
+`{"skipped":"flag"}` while `FLAGS.studentEvents` is off, and otherwise sends
+up to 50 reminders, 600 ms apart, through `sendEmail`, stopping on Resend's
+rate limit or quota like the application emails. The free tier's ~100 emails
+a day are shared with every other email the app sends.
+
+To turn it on in production, once the application emails are set up (it
+needs `APPLICATION_EMAILS_SECRET` in Vercel and `application_emails_secret`
+in Vault):
+
+1. In the hosted SQL editor, store the endpoint in Vault as
+   `event_reminders_url`: `https://www.ubcuxhub.ca/api/internal/event-reminders`
+   (the `www` host, as above). Use Vault's UI or parameterized SQL.
+2. Nothing to redeploy: the route reads the variable the application emails
+   already use.
+
+Never store these secrets in a preview or local database's Vault. Logs carry
+ids and codes only: `event.reminder_sent` (info), `event.reminder_failed` and
+`event.reminder_paused` (warn), and `event.reminder_abandoned`,
+`event.reminder_claim_failed` and `event.reminder_record_failed` (error).
+Inspect sends from a privileged SQL connection:
+
+```sql
+select s.kind, s.claimed_at, s.sent_at, s.attempts, s.last_error_code,
+       s.ticket_id
+from event_reminders.sends s
+order by s.created_at desc
+limit 50;
+```
 
 ### General rules
 

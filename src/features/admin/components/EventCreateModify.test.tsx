@@ -11,7 +11,8 @@ import { toast } from "@/components/ui/toast";
 vi.mock("@/components/ui/toast", () => ({ toast: { error: vi.fn(), success: vi.fn(), dismiss: vi.fn() } }));
 
 vi.mock("@/components/shared/Hubbo", () => ({ Hubbo: ({ emotion, className }: { emotion: string; className: string }) => <span data-testid="hubbo" data-emotion={emotion} className={className}>Hubbo</span> }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }) }));
+const router = vi.hoisted(() => ({ push: vi.fn(), refresh: vi.fn(), replace: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => router }));
 vi.mock("@/features/admin/event-overview-actions", () => ({ loadEventLifecycleCountsAction: vi.fn(async () => ({ registered: 0, memberApplications: 2, paidTickets: 0 })) }));
 vi.mock("@/features/admin/actions", () => ({ recoverAdminEventDraftAction: vi.fn(async () => null), recoverAdminEventMutationAction: vi.fn(async () => null), savePastEventResourcesAction: vi.fn(), loadAdminEventDeletionInfoAction: vi.fn(async () => null), saveAdminEventDraftAction: vi.fn(), saveAdminEventAction: vi.fn(), deleteAdminEventAction: vi.fn(), discardUnusedEventImageAction: vi.fn(), searchAdminEventPeopleAction: vi.fn(async () => []) }));
 
@@ -36,13 +37,97 @@ const completeDraft = {
   },
 };
 
+/** Publish, Save changes and Update sit in the header and the Publish footer; Save only in the header. */
 function expectActionsDisabled(name: string, disabled: boolean) {
   const buttons = screen.getAllByRole("button", { name });
-  expect(buttons).toHaveLength(2);
+  expect(buttons).toHaveLength(name === "Save" ? 1 : 2);
   buttons.forEach(button => expect(button).toHaveProperty("disabled", disabled));
 }
 
-it("disables unavailable actions on an untouched form and keeps Summary links available", () => {
+const publishedEvent = { id: "event-1", name: "Published event", slug: "published-event", status: "active", publish_at: null, ends_at: "2099-08-01T19:00:00Z", starts_at: "2099-08-01T18:00:00Z", short_description: "Overview", description: "Description", regular_price: 0, member_price: 0, max_capacity: 10, canceled_at: null } as EventRow;
+
+function openMoreActions() {
+  fireEvent.keyDown(screen.getByRole("button", { name: "More actions" }), { key: "Enter" });
+  return screen.getByRole("menu");
+}
+
+it("ends at Links and resources, with no Summary or Other settings section", () => {
+  const { container } = render(<EventCreateModify />);
+  const sections = [...container.querySelectorAll("[data-builder-section]")].map(section => section.id);
+  expect(sections.at(-1)).toBe("builder-resources");
+  expect(sections).toHaveLength(7);
+  expect(container.querySelector("#builder-summary, #builder-settings")).toBeNull();
+  expect(screen.queryByRole("heading", { name: "Summary" })).toBeNull();
+  expect(screen.queryByRole("heading", { name: "Other settings" })).toBeNull();
+  const navigator = screen.getByRole("button", { name: /section 1 of 7/ });
+  fireEvent.keyDown(navigator, { key: "Enter" });
+  const items = within(screen.getByRole("menu")).getAllByRole("menuitem");
+  expect(items).toHaveLength(7);
+  expect(items.at(-1)?.textContent).toMatch(/Links and resources/);
+  // The footer is unnumbered and stays out of the navigator.
+  const footer = container.querySelector<HTMLElement>("#builder-publish")!;
+  expect(footer.hasAttribute("data-builder-section")).toBe(false);
+  expect(within(footer).queryByText(/^Section/)).toBeNull();
+  expect(container.querySelector("#builder-resources")!.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+it("lists what's left in the Publish footer and jumps to each section", async () => {
+  const { container } = render(<EventCreateModify />);
+  const footer = within(container.querySelector<HTMLElement>("#builder-publish")!);
+  expect(footer.getByRole("heading", { name: "Almost ready" })).toBeTruthy();
+  expect(footer.getByRole("heading", { name: "What’s left" })).toBeTruthy();
+  fireEvent.click(footer.getByRole("button", { name: "Basics" }));
+  expect(document.activeElement).toBe(screen.getByLabelText("Event name"));
+  fireEvent.click(footer.getByRole("button", { name: "Description" }));
+  expect(document.activeElement).toBe(screen.getByLabelText("Short overview"));
+  expect(footer.getByRole("button", { name: "Publish" })).toHaveProperty("disabled", true);
+});
+
+it("shows the ready state without a list once nothing is left", () => {
+  const { container } = render(<EventCreateModify initialDraft={completeDraft} />);
+  const footer = within(container.querySelector<HTMLElement>("#builder-publish")!);
+  expect(footer.getByRole("heading", { name: "Ready to publish" })).toBeTruthy();
+  expect(footer.queryByRole("heading", { name: "What’s left" })).toBeNull();
+  expect(footer.getByRole("button", { name: "Publish" })).toHaveProperty("disabled", false);
+});
+
+it("shows a publish-date issue in the Publish footer and blocks publishing", () => {
+  const draft = { ...completeDraft, document: { ...completeDraft.document, formState: { ...completeDraft.document.formState, publish_at: "2099-07-01T10:00", registration_closes_at: "2099-07-01T10:00" } } };
+  const { container } = render(<EventCreateModify initialDraft={draft} />);
+  const footer = within(container.querySelector<HTMLElement>("#builder-publish")!);
+  expect(footer.getByText("Publish time must be before registration closes.")).toBeTruthy();
+  expect(footer.getByRole("heading", { name: "Almost ready" })).toBeTruthy();
+  expectActionsDisabled("Publish", true);
+});
+
+it("has one Save, in the header, and Update in the header and footer of a published event", () => {
+  const { container, unmount } = render(<EventCreateModify initialDraft={completeDraft} />);
+  const save = screen.getByRole("button", { name: "Save" });
+  expect(container.querySelector("#event-builder-header")!.contains(save)).toBe(true);
+  unmount();
+  const published = render(<EventCreateModify eventId={publishedEvent.id} initialEvent={publishedEvent} />);
+  expect(screen.queryByRole("button", { name: "Save" })).toBeNull();
+  expect(screen.getAllByRole("button", { name: "Update" })).toHaveLength(2);
+  expect(within(published.container.querySelector<HTMLElement>("#builder-publish")!).getByRole("heading", { name: "Published" })).toBeTruthy();
+});
+
+it("opens the delete modal from the More actions menu", async () => {
+  const { loadAdminEventDeletionInfoAction } = await import("../actions");
+  const event = { ...publishedEvent, status: "draft" } as EventRow;
+  render(<EventCreateModify eventId={event.id} initialEvent={event} />);
+  const menu = openMoreActions();
+  expect(within(menu).queryByRole("menuitem", { name: "Revert to draft" })).toBeNull();
+  fireEvent.click(within(menu).getByRole("menuitem", { name: "Delete event" }));
+  expect(await screen.findByRole("dialog")).toBeTruthy();
+  expect(loadAdminEventDeletionInfoAction).toHaveBeenCalledWith("event-1");
+});
+
+it("hides More actions on a new event that has nothing to delete", () => {
+  render(<EventCreateModify />);
+  expect(screen.queryByRole("button", { name: "More actions" })).toBeNull();
+});
+
+it("disables unavailable actions on an untouched form and keeps the footer's links available", () => {
   render(<EventCreateModify />);
   const name = screen.getByLabelText("Event name");
   expect(name.hasAttribute("aria-invalid")).toBe(false);
@@ -136,7 +221,8 @@ it("uses Proud Hubbo at 200px after a draft save applies the edits and enables s
   expect(within(dialog).getByTestId("hubbo").className).toContain("h-50");
   fireEvent.click(within(dialog).getByRole("button", { name: "Keep editing" }));
   await waitFor(() => expect(screen.queryByRole("dialog", { name: "Draft saved" })).toBeNull());
-  expect(screen.getByRole("button", { name: "Delete event" })).toBeTruthy();
+  expect(within(openMoreActions()).getByRole("menuitem", { name: "Delete event" })).toBeTruthy();
+  fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
   expectActionsDisabled("Save", true);
   expect(saveAdminEventDraftAction).not.toHaveBeenCalled();
   expect(saveAdminEventAction).toHaveBeenCalledWith(expect.objectContaining({ event: expect.objectContaining({ short_description: "Changed overview", status: "draft", publish_at: null }) }));
@@ -175,42 +261,81 @@ it.each([
   ["active", null, "2020-08-01T19:00:00Z", false],
 ] as const)("offers Revert to draft only for a current published event (%s, %s, %s)", async (status, publish_at, ends_at, visible) => {
   const event = { id: "event-1", name: "Published event", slug: "published-event", status, publish_at, ends_at, starts_at: "2099-08-01T18:00:00Z", short_description: "Overview", description: "Description", regular_price: 0, member_price: 0, max_capacity: 10 } as import("@/lib/supabase/models").EventRow;
-  const { container } = render(<EventCreateModify eventId={event.id} initialEvent={event} />);
-  const settings = within(container.querySelector("#builder-settings")! as HTMLElement);
-  const action = settings.queryByRole("button", { name: "Revert to draft" });
-  expect(!!action).toBe(visible);
-  if (visible) {
-    expect(settings.getByText(/Save your changes and hide this event from members/)).toBeTruthy();
-    expect(settings.getByRole("button", { name: "Delete event" }).parentElement?.className).toContain("border-t");
-  }
+  render(<EventCreateModify eventId={event.id} initialEvent={event} />);
+  const menu = openMoreActions();
+  expect(!!within(menu).queryByRole("menuitem", { name: "Revert to draft" })).toBe(visible);
+  expect(within(menu).getByRole("menuitem", { name: "Delete event" })).toBeTruthy();
 });
 
 it("confirms Revert to draft before saving, naming the applications that lose access", async () => {
   const { saveAdminEventAction } = await import("../actions");
   vi.mocked(saveAdminEventAction).mockClear();
   const event = { id: "event-1", name: "Published event", slug: "published-event", status: "active", publish_at: null, ends_at: "2099-08-01T19:00:00Z", starts_at: "2099-08-01T18:00:00Z", short_description: "Overview", description: "Description", regular_price: 0, member_price: 0, max_capacity: 10, canceled_at: null } as import("@/lib/supabase/models").EventRow;
-  const { container } = render(<EventCreateModify eventId={event.id} initialEvent={event} />);
-  fireEvent.click(within(container.querySelector("#builder-settings")! as HTMLElement).getByRole("button", { name: "Revert to draft" }));
+  render(<EventCreateModify eventId={event.id} initialEvent={event} />);
+  fireEvent.click(within(openMoreActions()).getByRole("menuitem", { name: "Revert to draft" }));
   expect(await screen.findByText(/2 member applications \(submitted, waitlisted or draft\) will lose access/)).toBeTruthy();
   expect(saveAdminEventAction).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByRole("button", { name: "Keep published" }));
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "More actions" })));
 });
 
 it("locks a canceled event like an ended one, without Revert", () => {
   const event = { id: "event-1", name: "Canceled event", slug: "canceled-event", status: "active", publish_at: null, ends_at: "2099-08-01T19:00:00Z", starts_at: "2099-08-01T18:00:00Z", short_description: "Overview", description: "Description", regular_price: 0, member_price: 0, max_capacity: 10, canceled_at: "2099-07-01T18:00:00Z" } as import("@/lib/supabase/models").EventRow;
   const { container } = render(<EventCreateModify eventId={event.id} initialEvent={event} />);
   expect(screen.getByText("This event is canceled")).toBeTruthy();
-  expect(within(container.querySelector("#builder-settings")! as HTMLElement).queryByRole("button", { name: "Revert to draft" })).toBeNull();
+  expect(within(container.querySelector<HTMLElement>("#builder-publish")!).getByRole("heading", { name: "Event canceled" })).toBeTruthy();
+  const menu = openMoreActions();
+  expect(within(menu).queryByRole("menuitem", { name: "Revert to draft" })).toBeNull();
+  expect(within(menu).getByRole("menuitem", { name: "Delete event" })).toBeTruthy();
 });
 
-it("keeps failed draft saves retryable from either button", async () => {
+it("keeps failed draft saves retryable", async () => {
   const { saveAdminEventAction } = await import("../actions");
   vi.mocked(saveAdminEventAction).mockResolvedValue({ error: "Could not save draft" });
   render(<EventCreateModify initialDraft={completeDraft} />);
   fireEvent.change(screen.getByLabelText("Short overview"), { target: { value: "Changed overview" } });
-  for (const index of [0, 1]) {
-    fireEvent.click(screen.getAllByRole("button", { name: "Save" })[index]);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expectActionsDisabled("Save", false));
   }
   expect(saveAdminEventAction).toHaveBeenCalledTimes(2);
   expect(screen.getByLabelText("Short overview")).toHaveProperty("value", "Changed overview");
+});
+
+it("starts the header with Back to event, to the event manager's Overview", () => {
+  const event = { ...publishedEvent, status: "draft" } as EventRow;
+  const { container } = render(<EventCreateModify eventId={event.id} initialEvent={event} />);
+  const back = screen.getByRole("link", { name: "Back to event" });
+  expect(back.getAttribute("href")).toBe("/admin/events/event-1/overview");
+  const header = container.querySelector<HTMLElement>("#event-builder-header")!;
+  expect(header.firstElementChild).toBe(back);
+  expect(screen.queryByRole("link", { name: "Back to Manage Events" })).toBeNull();
+  // The drawer's top bar belongs to the manager now, not the builder.
+  expect(screen.queryByRole("link", { name: "Collapse to drawer" })).toBeNull();
+});
+
+it("goes back to Manage Events from a new event, which has no manager yet", () => {
+  render(<EventCreateModify />);
+  expect(screen.getByRole("link", { name: "Back to Manage Events" }).getAttribute("href")).toBe("/admin/events");
+  expect(screen.queryByRole("link", { name: "Back to event" })).toBeNull();
+});
+
+it("asks before Back to event leaves unsaved changes", async () => {
+  const event = { ...publishedEvent, status: "draft" } as EventRow;
+  render(<EventCreateModify eventId={event.id} initialEvent={event} />);
+  fireEvent.change(screen.getByLabelText("Event name"), { target: { value: "Renamed event" } });
+  await waitFor(() => expectActionsDisabled("Save", false));
+
+  const back = screen.getByRole("link", { name: "Back to event" });
+  expect(fireEvent.click(back)).toBe(false);
+  const dialog = await screen.findByRole("dialog", { name: "Leave without saving?" });
+  expect(router.push).not.toHaveBeenCalled();
+
+  fireEvent.click(within(dialog).getByRole("button", { name: "Keep editing" }));
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(router.push).not.toHaveBeenCalled();
+
+  fireEvent.click(back);
+  fireEvent.click(within(await screen.findByRole("dialog", { name: "Leave without saving?" })).getByRole("button", { name: "Discard and leave" }));
+  expect(router.push).toHaveBeenCalledWith("/admin/events/event-1/overview");
 });

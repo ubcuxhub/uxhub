@@ -25,8 +25,9 @@ const CREATE_EVENT_HREF = "/admin/events/create-new";
  * swapped; a refresh of an event's URL shows the list with its drawer too.
  *
  * In the `(browse)` group so it wraps the overview but not the pages beside
- * it (`[event]/edit`, `check-in`, `review-applications`, `create-new`), which
- * are full pages. An event's builder is its full page: `RecordList` fades the
+ * it (`[event]/edit`, the event manager's tabs in `[event]/(manager)`,
+ * `create-new`), which are full pages. The drawer expands to the manager's
+ * Overview; "Edit event" grows it into the builder: `RecordList` fades the
  * list out as the drawer grows into it, and back in as it collapses.
  */
 export default async function AdminEventsLayout({ children }: { children: React.ReactNode }) {

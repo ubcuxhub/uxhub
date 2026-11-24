@@ -19,11 +19,16 @@ import type { DateTimeValue } from "@/components/ui/date-time-field";
 import { toast } from "@/components/ui/toast";
 import { updateApplicationDecisionAction } from "@/features/admin/actions";
 import { ApplicantPager, type PagerTarget } from "@/features/admin/components/ApplicantPager";
+import {
+  ApplicantProfileCard,
+  type ApplicantProfile,
+} from "@/features/admin/components/ApplicantProfileCard";
 import { ApplicationDecisionCard } from "@/features/admin/components/ApplicationDecisionCard";
 import { ReviewStateBadge } from "@/features/admin/components/ReviewStateBadge";
 import {
   decisionsReleased,
   getApplicationReviewState,
+  openSeats,
   type ApplicationDecision,
 } from "@/features/admin/lib/application-review";
 import { ApplicationAnswersReadOnly } from "@/features/applications/components/ApplicationAnswersReadOnly";
@@ -31,15 +36,11 @@ import type {
   ApplicationAnswers,
   ApplicationQuestion,
 } from "@/features/applications/lib/application-form";
-import { formatTimestamp } from "@/lib/date";
+import { formatEventDate, formatTimestamp } from "@/lib/date";
 import type { SubmittedApplicationRow } from "@/lib/supabase/models";
 import type { DecisionSeats } from "@/lib/supabase-helpers/event-applications";
 
-export interface AdminApplicant {
-  name: string;
-  email: string;
-  program: string | null;
-}
+export type AdminApplicant = ApplicantProfile;
 
 interface ApplicationReviewClientProps {
   eventName: string;
@@ -62,6 +63,12 @@ interface ApplicationReviewClientProps {
   defaultDeadline: DateTimeValue;
   /** The event's "Release decisions on", null when none is set. */
   decisionsReleaseAt?: string | null;
+  /** The event's capacity, null when it has none. */
+  capacity?: number | null;
+  /** What holds seats when the page loaded: tickets and unexpired offers. */
+  seats?: { tickets: number; heldOffers: number } | null;
+  /** Their place on the waitlist when the page loaded, if waitlisted. */
+  waitlistPosition?: number | null;
   /**
    * The reviewer-notes thread. It sits in the aside under the decision (and
    * after it on one column), where the notes inform the decision and are read
@@ -83,9 +90,10 @@ export function describeHeldSeats(seats: DecisionSeats): string {
 
 /**
  * One application (docs/design/application-review.md, §3): the applicant, the
- * answers, the decision, and room for reviewer notes. Two columns when the
- * content area is wide enough (container query, since the admin shell has a
- * sidebar); DOM order equals visual order at every width.
+ * answers, and an aside with their profile, the decision and room for reviewer
+ * notes. Two columns when the content area is wide enough (container query,
+ * since the admin shell has a sidebar); DOM order equals visual order at every
+ * width.
  */
 export function ApplicationReviewClient({
   eventName,
@@ -99,6 +107,9 @@ export function ApplicationReviewClient({
   pager,
   defaultDeadline,
   decisionsReleaseAt = null,
+  capacity = null,
+  seats = null,
+  waitlistPosition = null,
   notes,
 }: ApplicationReviewClientProps) {
   const router = useRouter();
@@ -108,6 +119,20 @@ export function ApplicationReviewClient({
   const state = getApplicationReviewState(application, hasTicket);
   const name = firstName(applicant.name);
   const releaseAt = decisionsReleased(decisionsReleaseAt) ? null : decisionsReleaseAt;
+  // The seat counts are from the page load. This applicant's own decisions
+  // move them: an unexpired offer holds a seat, taking it back frees one.
+  const heldAtLoad = getApplicationReviewState(initialApplication, hasTicket) === "accepted";
+  const holdsSeat = state === "accepted";
+  const open = openSeats(
+    capacity,
+    seats
+      ? {
+          tickets: seats.tickets,
+          heldOffers: seats.heldOffers + Number(holdsSeat) - Number(heldAtLoad),
+        }
+      : null
+  );
+  const waitlistedAtLoad = initialApplication.status === "waitlisted";
   // An accept the event has no seat for, waiting on "Accept anyway".
   const [overCapacity, setOverCapacity] = useState<{
     offerExpiresAt: string | null;
@@ -196,27 +221,21 @@ export function ApplicationReviewClient({
           <Avatar name={applicant.name} size={56} decorative />
           <div className="flex min-w-0 flex-col gap-1.5">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
-              <h1
+              {/* Under the event manager's h1, the event's name. */}
+              <h2
                 ref={headingRef}
                 tabIndex={-1}
                 className="text-h2 outline-none"
               >
                 {applicant.name}
-              </h1>
+              </h2>
               <ReviewStateBadge state={state} />
             </div>
             <p className="text-small text-muted-foreground">
-              {applicant.program ? `${applicant.program} · ` : null}
-              <a
-                href={`mailto:${applicant.email}`}
-                className="text-info-foreground underline-offset-4 hover:underline focus-visible:focus-ring"
-              >
-                {applicant.email}
-              </a>
-            </p>
-            <p className="text-small text-muted-foreground">
               Submitted{" "}
-              {formatTimestamp(application.submitted_at ?? application.created_at)}
+              {formatEventDate(application.submitted_at ?? application.created_at, {
+                month: "short",
+              })}
             </p>
           </div>
         </div>
@@ -257,6 +276,11 @@ export function ApplicationReviewClient({
         </Card>
 
         <div className="flex flex-col gap-6">
+          <ApplicantProfileCard
+            applicant={applicant}
+            submittedAt={application.submitted_at ?? application.created_at}
+            showIdentity={false}
+          />
           <ApplicationDecisionCard
             key={state}
             state={state}
@@ -264,6 +288,16 @@ export function ApplicationReviewClient({
             offerExpiresAt={application.offer_expires_at}
             defaultDeadline={defaultDeadline}
             releaseAt={releaseAt}
+            waitlist={
+              state === "waitlisted" && waitlistedAtLoad && waitlistPosition
+                ? {
+                    position: waitlistPosition,
+                    appliedAt: application.submitted_at ?? application.created_at,
+                  }
+                : null
+            }
+            capacity={capacity}
+            openSeats={open}
             onDecide={(decision, offerExpiresAt) => decide(decision, offerExpiresAt)}
           />
           {notes}

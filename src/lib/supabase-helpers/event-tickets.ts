@@ -20,8 +20,11 @@ export type EventTicketWithCheckIns = EventTicketRow & {
 export interface EventSeatCount {
   tickets: number;
   heldOffers: number;
-  /** Seats nobody holds: capacity minus tickets and unexpired offers. */
-  seatsLeft: number;
+  /**
+   * Seats nobody holds: capacity minus tickets and unexpired offers. `null`
+   * when the event has no capacity, which means no limit, never Full.
+   */
+  seatsLeft: number | null;
 }
 
 export async function fetchEventTicketByPurchaseId(
@@ -77,9 +80,13 @@ export async function fetchUserEventTickets(
 }
 
 /**
- * Seat counts for many events in one round trip, through `event_seat_counts`,
- * which counts every ticket and held offer but only for events the caller can
- * see. An event the caller cannot see is absent from the result.
+ * Seat counts for many events, through `event_seat_counts`, which counts every
+ * ticket and held offer but only for events the caller can see. An event the
+ * caller cannot see is absent from the result.
+ *
+ * The function reports 0 seats left for an event without a capacity (Postgres
+ * `greatest` skips the null), the same as for a full one, so the capacities
+ * are read alongside it to tell the two apart.
  */
 export async function fetchEventSeatCounts(
   supabase: DbClient,
@@ -87,19 +94,25 @@ export async function fetchEventSeatCounts(
 ): Promise<Map<string, EventSeatCount>> {
   if (eventIds.length === 0) return new Map();
 
-  const { data, error } = await supabase.rpc("event_seat_counts", {
-    p_event_ids: eventIds,
-  });
+  const [counts, capacities] = await Promise.all([
+    supabase.rpc("event_seat_counts", { p_event_ids: eventIds }),
+    supabase.from(TABLES.events).select("id, max_capacity").in("id", eventIds),
+  ]);
 
-  if (error) throw error;
+  if (counts.error) throw counts.error;
+  if (capacities.error) throw capacities.error;
+
+  const uncapped = new Set(
+    (capacities.data ?? []).filter((event) => event.max_capacity == null).map((event) => event.id)
+  );
 
   return new Map(
-    (data ?? []).map((row) => [
+    (counts.data ?? []).map((row) => [
       row.event_id,
       {
         tickets: Number(row.tickets),
         heldOffers: Number(row.held_offers),
-        seatsLeft: Number(row.seats_left),
+        seatsLeft: uncapped.has(row.event_id) ? null : Number(row.seats_left),
       },
     ])
   );

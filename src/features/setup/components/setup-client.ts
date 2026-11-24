@@ -3,6 +3,7 @@ import { BUCKETS } from "@/lib/supabase-helpers/buckets";
 
 import {
   finishSetupAction,
+  saveBirthDateAction,
   saveSetupAboutAction,
   saveSetupDietaryAction,
   saveSetupPhotoAction,
@@ -20,6 +21,8 @@ import type { DietaryNeeds } from "../lib/validation";
 export interface SetupClient {
   /** Resolves `{ ok: false }`, with copy to show, when the type can't change. */
   saveAbout: (input: { userType: UserTypeId }) => Promise<SetupAboutResult>;
+  /** Saves or clears the birthday (`saveBirthDateAction`). Leaves the step alone. */
+  saveBirthDate: (birthDate: string | null) => Promise<SetupState>;
   saveDietary: (input: DietaryNeeds) => Promise<SetupState>;
   savePhoto: (input: { avatarPreset: AvatarPreset | null }) => Promise<SetupState>;
   finish: (input: { interests: InterestId[] }) => Promise<SetupState>;
@@ -64,6 +67,7 @@ export function profilePhotoUrl(path: string | null): string | null {
 
 export const serverSetupClient: SetupClient = {
   saveAbout: saveSetupAboutAction,
+  saveBirthDate: (birthDate) => saveBirthDateAction({ birthDate }),
   saveDietary: saveSetupDietaryAction,
   savePhoto: saveSetupPhotoAction,
   finish: finishSetupAction,

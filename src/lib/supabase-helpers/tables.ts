@@ -29,6 +29,7 @@ export const TABLES = {
   eventSponsors: "event_sponsors",
   membershipTypes: "membership_types",
   purchases: "purchases",
+  purchaseRefundEmails: "purchase_refund_emails",
   squareWebhookEvents: "square_webhook_events",
   eventAgendaDays: "event_agenda_days",
   eventAgendaItems: "event_agenda_items",

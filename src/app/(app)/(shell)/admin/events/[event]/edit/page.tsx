@@ -7,7 +7,6 @@ import { fetchEventDraftForEvent } from "@/lib/supabase-helpers/event-drafts";
 import { notFound } from "next/navigation";
 
 import { PageContainer } from "@/components/shared/PageContainer";
-import { RecordPage } from "@/components/shared/RecordDrawer";
 import { EventCreateModify } from "@/features/admin/components/EventCreateModify";
 import { resolveAdminEventId } from "@/features/admin/lib/resolve-event-param";
 import { requireAdmin } from "@/lib/auth/guards";
@@ -28,10 +27,11 @@ interface EditEventPageProps {
 
 /**
  * The event builder: every section of the event, for editing. A page of its
- * own beside the list (outside `(browse)`), reached from the overview
- * drawer's "Edit event". It wears the drawer's top bar: close returns to the
- * list, collapse to the list with this event's drawer open. `RecordPage` makes
- * it the drawer's panel grown to full size, so expand and collapse morph.
+ * own beside the list (outside `(browse)`) and the manager (outside
+ * `(manager)`), reached from "Edit event" in the drawer or the manager. Its
+ * header starts with "Back to event", a plain link to the manager's Overview
+ * that the builder's unsaved-changes guard asks before following. The manager,
+ * not the builder, wears the drawer's top bar and morphs with the drawer.
  */
 export default async function EditEventPage({ params }: EditEventPageProps) {
   await requireAdmin();
@@ -63,32 +63,25 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
   const workingDraft = event.status === "draft" && !event.publish_at ? await fetchEventDraftForEvent(supabase, eventId) : null;
 
   return (
-    <RecordPage
-      listHref="/admin/events"
-      listLabel="Back to Manage Events"
-      recordHref={`/admin/events/${eventId}`}
-    >
-      <PageContainer className="max-w-none min-[821px]:px-12 lg:px-12">
-        <EventCreateModify
-          historyInfo={historyInfo}
-          initialContent={content}
-          teamInfo={teamInfo}
-          initialApplicationSettings={applicationSettings}
-          initialDateLocation={dateLocation}
-          registrationInfo={registrationInfo}
-          pricingLocked={pricingLocked}
-          eventId={eventId}
-          initialDraft={workingDraft}
-          showBackButton={false}
-          initialEvent={event}
-          initialCheckInSessions={checkInSessions}
-          initialApplicationQuestions={applicationQuestions}
-          initialMentors={mentors}
-          initialSponsors={sponsors}
-          mentorOptions={mentorOptions}
-          sponsorOptions={sponsorOptions}
-        />
-      </PageContainer>
-    </RecordPage>
+    <PageContainer className="max-w-none min-[821px]:px-12 lg:px-12">
+      <EventCreateModify
+        historyInfo={historyInfo}
+        initialContent={content}
+        teamInfo={teamInfo}
+        initialApplicationSettings={applicationSettings}
+        initialDateLocation={dateLocation}
+        registrationInfo={registrationInfo}
+        pricingLocked={pricingLocked}
+        eventId={eventId}
+        initialDraft={workingDraft}
+        initialEvent={event}
+        initialCheckInSessions={checkInSessions}
+        initialApplicationQuestions={applicationQuestions}
+        initialMentors={mentors}
+        initialSponsors={sponsors}
+        mentorOptions={mentorOptions}
+        sponsorOptions={sponsorOptions}
+      />
+    </PageContainer>
   );
 }

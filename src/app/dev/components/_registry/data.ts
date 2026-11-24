@@ -121,7 +121,7 @@ export const dataEntries: readonly RegistryEntry[] = [
   },
   {
     slug: "scanner-frame", title: "Scanner frame", category: "Data display", tier: "composite",
-    description: "A full-viewport dark camera surface with a wrapping header, centred controls and a 264px viewfinder. Capture and permission handling belong to callers.",
+    description: "A full-viewport dark camera surface with a wrapping header, centred controls and a 264px viewfinder, shown here in every scanner state with the check-in result panel and the Scan tickets card. Capture and permission handling belong to callers.",
     importPath: "@/components/shared/ScannerFrame", importNames: ["ScannerFrame", "ScannerViewfinder"],
     source: "src/components/shared/ScannerFrame.tsx", spec: "Check-in presentation", layout: "page",
   },
@@ -346,8 +346,21 @@ export const dataEntries: readonly RegistryEntry[] = [
   },
   {
     slug: "agenda-day-table", title: "Agenda day table", category: "Data display", tier: "composite",
-    description: "Shared agenda with container-responsive locations, proportional staff columns (24/24/20/12/20%) and row action popovers.",
+    description: "Shared agenda with container-responsive locations, proportional staff columns (20/30/16/14% plus a fixed one-row actions column) and row action popovers.",
     importPath: "@/components/shared/AgendaDayTable", importNames: ["AgendaDayTable"],
     source: "src/components/shared/AgendaDayTable.tsx", spec: "Agenda presentation", layout: "page",
+  },
+  {
+    slug: "event-teams-view",
+    title: "Event teams view",
+    category: "Data display",
+    tier: "app",
+    description:
+      "An event's teams for UX Hub execs: team counts, who is still to place and the team deadline, then every team and its members, with search, sort, and size and check-in filters held in the URL.",
+    importPath: "@/features/admin/components/teams/EventTeamsView",
+    importNames: ["EventTeamsView"],
+    source: "src/features/admin/components/teams/EventTeamsView.tsx",
+    spec: "Manage Events, Teams tab",
+    layout: "page",
   },
 ];

@@ -166,9 +166,29 @@ describe("POST /api/square/webhook", () => {
           object: { refund: expect.objectContaining({ id: "refund-1", paymentId: "payment-1" }) },
         }),
       }),
-      expect.objectContaining({ event_id: "refund-event-1" })
+      expect.objectContaining({ event_id: "refund-event-1" }),
+      "https://request.example"
     );
     expect(processMocks.processSquarePaymentEvent).not.toHaveBeenCalled();
+  });
+
+  it("passes on the origin of the endpoint whose signature matched, for email links", async () => {
+    processMocks.getSquareWebhookEndpoints.mockReturnValue([
+      { notificationUrl: "https://a.example/webhook", signatureKey: "key-a" },
+      { notificationUrl: "https://www.site.example/api/square/webhook", signatureKey: "key-b" },
+    ]);
+    const body = JSON.stringify(refundPayload);
+    const response = await post(
+      body,
+      sign("https://www.site.example/api/square/webhook", body, "key-b")
+    );
+
+    expect(response.status).toBe(200);
+    expect(processMocks.processSquareRefundEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      "https://www.site.example"
+    );
   });
 
   it("rejects a refund event without a payment ID", async () => {
@@ -210,7 +230,8 @@ describe("POST /api/square/webhook", () => {
         eventId: "event-1",
         type: "payment.updated",
       }),
-      expect.objectContaining({ event_id: "event-1" })
+      expect.objectContaining({ event_id: "event-1" }),
+      "https://request.example"
     );
   });
 

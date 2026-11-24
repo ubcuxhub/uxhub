@@ -1,6 +1,6 @@
 import type { ReactElement } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-const mocks=vi.hoisted(()=>({current:vi.fn(),fetch:vi.fn(),noStore:vi.fn(),participant:vi.fn(),flags:{studentEvents:false}}));
+const mocks=vi.hoisted(()=>({current:vi.fn(),fetch:vi.fn(),noStore:vi.fn(),participant:vi.fn(),seats:vi.fn(),flags:{studentEvents:false}}));
 vi.mock("next/cache",()=>({unstable_noStore:mocks.noStore}));
 vi.mock("next/navigation",()=>({notFound:()=>{throw new Error("404")},redirect:(url:string)=>{throw new Error(`redirect:${url}`)}}));
 vi.mock("@/lib/flags",()=>({FLAGS:mocks.flags}));
@@ -10,13 +10,13 @@ vi.mock("@/lib/supabase-helpers/event-agenda",()=>({fetchEventParticipantContent
 vi.mock("@/features/marketing/homepage-sections/Navbar",()=>({default:()=>null}));
 vi.mock("@/features/marketing/homepage-sections/Footer",()=>({default:()=>null}));
 vi.mock("@/lib/supabase-helpers/events",()=>({fetchEventBySlug:mocks.fetch,fetchEvents:vi.fn()}));
-vi.mock("@/lib/supabase-helpers/event-tickets",()=>({fetchEventSeatCounts:async()=>new Map()}));
+vi.mock("@/lib/supabase-helpers/event-tickets",()=>({fetchEventSeatCounts:mocks.seats}));
 vi.mock("@/lib/supabase-helpers/event-people",()=>({fetchEventMentors:async()=>[],fetchEventSponsors:async()=>[]}));
 import Page, { dynamic } from "./page";
 import { EventRegistrationAction } from "@/features/events/components/EventRegistrationAction";
 const props={params:Promise.resolve({slug:"saved-draft"}),searchParams:Promise.resolve({preview:"draft"})};
 const row={id:"event-1",slug:"saved-draft",name:"Saved draft",status:"draft",publish_at:null,configured_marketing_mode:"hosted",working_document:null,description:"Saved description",max_capacity:null,regular_price:null};
-beforeEach(()=>{vi.clearAllMocks();mocks.flags.studentEvents=false;mocks.fetch.mockResolvedValue(row);mocks.participant.mockResolvedValue({location:null,agenda:[]})});
+beforeEach(()=>{vi.clearAllMocks();mocks.flags.studentEvents=false;mocks.fetch.mockResolvedValue(row);mocks.participant.mockResolvedValue({location:null,agenda:[]});mocks.seats.mockResolvedValue(new Map())});
 it.each(["basic",null])("returns 404 before reading draft content for %s",async role=>{
  mocks.current.mockResolvedValue(role?{status:"authenticated",user:{role_access:role}}:{status:"unauthenticated"});
  await expect(Page(props)).rejects.toThrow("404");expect(mocks.fetch).not.toHaveBeenCalled();expect(mocks.noStore).toHaveBeenCalled();
@@ -82,4 +82,94 @@ it("renders the normalized participant agenda through the viewer client instead 
 
 it("keeps viewer-specific participant content out of the shared page cache", () => {
  expect(dynamic).toBe("force-dynamic");
+});
+
+describe("layout", () => {
+ const publicProps={...props,searchParams:Promise.resolve({})};
+ const live={...row,status:"active",image_url:"https://example.com/icon.png",regular_price:10,member_price:0,max_capacity:25,starts_at:"2099-12-11T21:00:00Z",ends_at:"2099-12-12T00:00:00Z",registration_closes_at:"2099-12-06T20:00:00Z"};
+ beforeEach(()=>{mocks.flags.studentEvents=true});
+ /** Every element's props in the tree that `match` accepts. */
+ function find(node:unknown, match:(props:Record<string,unknown>)=>boolean): Record<string,unknown>[] {
+  if(Array.isArray(node))return node.flatMap(child=>find(child,match));
+  if(!node||typeof node!=="object"||!("props" in node))return [];
+  const elementProps=(node as ReactElement<Record<string,unknown>>).props;
+  return [...(match(elementProps)?[elementProps]:[]),...find(elementProps.children,match)];
+ }
+ const facts=(tree:unknown)=>find(tree,p=>Array.isArray(p.facts))[0].facts as {key:string;value:unknown;detail?:unknown}[];
+
+ it("draws the event image square", async () => {
+  mocks.fetch.mockResolvedValue(live);
+  const tree=await Page(publicProps);
+  const frame=find(tree,p=>typeof p.className==="string"&&p.className.includes("aspect-square"));
+  expect(frame).toHaveLength(1);
+  expect(JSON.stringify(frame[0].children)).toContain("https://example.com/icon.png");
+ });
+ it("lists each key fact once, with the member price and the registration deadline", async () => {
+  mocks.fetch.mockResolvedValue(live);
+  const list=facts(await Page(publicProps));
+  expect(list.map(f=>f.key)).toEqual(["date","location","price","registration"]);
+  expect(list[2]).toMatchObject({value:"$10.00",detail:"Free for UX Hub members"});
+  expect(list[3]).toMatchObject({value:"Register by Sun, Dec 6",detail:"25 of 25 spots left"});
+ });
+ it("marks a past event and drops the registration row", async () => {
+  mocks.fetch.mockResolvedValue({...live,starts_at:"2020-01-26T18:00:00Z",ends_at:"2020-01-27T01:00:00Z",registration_closes_at:"2020-01-21T20:00:00Z"});
+  const tree=await Page(publicProps);
+  expect(find(tree,p=>p.status==="past")).toHaveLength(1);
+  expect(facts(tree).map(f=>f.key)).not.toContain("registration");
+  expect(components(tree)).toContain(EventRegistrationAction);
+ });
+ it("shows a canceled event's note and a disabled button instead of registration", async () => {
+  mocks.fetch.mockResolvedValue({...live,canceled_at:"2099-11-01T00:00:00Z",cancellation_note:"Moved to spring."});
+  const tree=await Page(publicProps);
+  expect(find(tree,p=>p.status==="canceled")).toHaveLength(1);
+  expect(find(tree,p=>p.status==="past")).toHaveLength(0);
+  expect(JSON.stringify(tree)).toContain("Moved to spring.");
+  expect(JSON.stringify(tree)).toContain("Event canceled");
+  expect(components(tree)).not.toContain(EventRegistrationAction);
+ });
+ const action=(tree:unknown)=>find(tree,p=>typeof p.unavailableLabel==="string")[0];
+
+ it("ends registration once the event is past, even without a close date", async () => {
+  mocks.fetch.mockResolvedValue({...live,starts_at:"2020-01-26T18:00:00Z",ends_at:"2020-01-27T01:00:00Z",registration_opens_at:null,registration_closes_at:null});
+  const tree=await Page(publicProps);
+  expect(find(tree,p=>p.status==="past")).toHaveLength(1);
+  expect(action(tree)).toMatchObject({registrationAvailable:false,unavailableLabel:"Event ended"});
+ });
+ it("ends registration at the start of a past event without an end", async () => {
+  mocks.fetch.mockResolvedValue({...live,starts_at:"2020-01-26T18:00:00Z",ends_at:null,registration_closes_at:null});
+  const tree=await Page(publicProps);
+  expect(find(tree,p=>p.status==="past")).toHaveLength(1);
+  expect(action(tree)).toMatchObject({registrationAvailable:false,unavailableLabel:"Event ended"});
+ });
+ it.each([
+  ["no seat count",new Map()],
+  ["the uncapped seat count",new Map([["event-1",{tickets:3,heldOffers:0,seatsLeft:null}]])],
+ ])("treats an event without a capacity as unlimited, with %s", async (_,seats) => {
+  mocks.fetch.mockResolvedValue({...live,max_capacity:null});mocks.seats.mockResolvedValue(seats);
+  const tree=await Page(publicProps);
+  expect(action(tree)).toMatchObject({registrationAvailable:true});
+  expect(facts(tree)[3]).toEqual(expect.objectContaining({key:"registration",value:"Register by Sun, Dec 6",detail:undefined}));
+ });
+ it("still fills up an event with a capacity", async () => {
+  mocks.fetch.mockResolvedValue(live);mocks.seats.mockResolvedValue(new Map([["event-1",{tickets:25,heldOffers:0,seatsLeft:0}]]));
+  const tree=await Page(publicProps);
+  expect(action(tree)).toMatchObject({registrationAvailable:false,unavailableLabel:"Event Full"});
+  expect(facts(tree).map(f=>f.key)).not.toContain("registration");
+ });
+ it("asks for an application on an application event, full or not", async () => {
+  mocks.fetch.mockResolvedValue({...live,requires_application:true});mocks.seats.mockResolvedValue(new Map([["event-1",{tickets:25,heldOffers:0,seatsLeft:0}]]));
+  const tree=await Page(publicProps);
+  expect(action(tree)).toMatchObject({registrationAvailable:true,requiresApplication:true});
+  expect(facts(tree)[3]).toEqual(expect.objectContaining({key:"registration",value:"Apply by Sun, Dec 6",detail:"Application required"}));
+ });
+ it("speaks of applications when an application event's window is shut", async () => {
+  mocks.fetch.mockResolvedValue({...live,requires_application:true,registration_closes_at:"2020-01-21T20:00:00Z"});
+  expect(action(await Page(publicProps))).toMatchObject({registrationAvailable:false,unavailableLabel:"Applications Closed"});
+ });
+ it("keeps the draft preview's alert and disabled button", async () => {
+  mocks.current.mockResolvedValue({status:"authenticated",user:{role_access:"admin"}});
+  const tree=JSON.stringify(await Page(props));
+  expect(tree).toContain("Draft preview: only admins and managers can see this.");
+  expect(tree).toContain("Registration unavailable in draft preview");
+ });
 });

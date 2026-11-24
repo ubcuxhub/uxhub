@@ -60,6 +60,4 @@ export const BUILDER_SECTIONS: readonly NavigatorSection[] = [
   { id: "teams", number: 5, title: "Teams", state: "optional", required: false },
   { id: "people", number: 6, title: "People and sponsors", state: "optional", required: false },
   { id: "resources", number: 7, title: "Links and resources", state: "optional", required: false },
-  { id: "summary", number: 8, title: "Summary", state: "optional", required: false },
-  { id: "settings", number: 9, title: "Other settings", state: "optional", required: false },
 ];

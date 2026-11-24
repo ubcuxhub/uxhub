@@ -39,6 +39,7 @@ function note(text: string) {
 export function renderConfirmationEmail() {
   return renderEmailLayout({
     heading: "Confirm your email",
+    hubbo: "welcoming",
     intro:
       "Thanks for signing up for UX Hub. Confirm your email address to finish creating your account.",
     body: [

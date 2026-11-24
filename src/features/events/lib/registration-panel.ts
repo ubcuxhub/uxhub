@@ -12,8 +12,11 @@ import type { EventState } from "./event-states";
  * state's copy is tested without rendering; `RegistrationPanel` draws it.
  */
 
-/** A button the panel shows, and where it goes. */
-export type PanelAction = { label: string } & (
+/**
+ * A button the panel shows, and where it goes. With a `disabledReason` the
+ * button shows disabled, and the panel says why.
+ */
+export type PanelAction = { label: string; disabledReason?: string } & (
   /** The checkout dialog, opened over the page. */
   | { kind: "flow"; href: string }
   /** An in-app page. */
@@ -84,6 +87,13 @@ export interface PanelContext {
    * nothing or hold no ticket.
    */
   refund?: "refunded" | "not-refunded" | null;
+  /**
+   * Why the checkout (`register`: Register and Confirm) or the application
+   * form (`apply`: Apply and Continue) can't be opened here, when it can't:
+   * a draft's, from `draftRegistrationBlocks`. Their buttons show disabled,
+   * with the reason.
+   */
+  unavailable?: { register?: string; apply?: string };
 }
 
 /** The canceled panel's copy (docs/event-states.md, "Canceled events"). */
@@ -118,11 +128,13 @@ export function getPanelSpec(state: EventState, context: PanelContext): PanelSpe
     kind: "flow",
     label: "Register",
     href: `/portal/events/${eventSlug}/checkout`,
+    ...(context.unavailable?.register ? { disabledReason: context.unavailable.register } : {}),
   };
   const apply = (label: string): PanelAction => ({
     kind: "link",
     label,
     href: `/portal/events/${eventSlug}/apply`,
+    ...(context.unavailable?.apply ? { disabledReason: context.unavailable.apply } : {}),
   });
   const ticketActions = {
     primary: { kind: "view-ticket", label: "View ticket" } as PanelAction,

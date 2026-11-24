@@ -50,7 +50,7 @@ function AgendaRow({ item, actions, children }: { item: AgendaTableItem; actions
   return <Popover open={open} onOpenChange={setOpen}>
     <PopoverAnchor asChild><TableRow ref={row}>
       {children}
-      <TableCell className="hidden px-4 py-3.5 align-top @min-[48rem]/agenda:table-cell"><div className="flex flex-col items-start gap-2"><ActionButtons actions={actions} /></div></TableCell>
+      <TableCell className="hidden px-4 py-3.5 align-top @min-[48rem]/agenda:table-cell"><div data-agenda-actions className="flex flex-row items-center justify-end gap-2 whitespace-nowrap"><ActionButtons actions={actions} /></div></TableCell>
     </TableRow></PopoverAnchor>
     <PopoverContent align="end" aria-label={`Actions for ${item.title}`} className="flex w-auto flex-col gap-2" onCloseAutoFocus={event => {
       // A chosen action may have opened a dialog; do not pull focus out of it.
@@ -75,11 +75,11 @@ export function AgendaDayTable<T extends AgendaTableItem>({ day, actions }: {
     </div>
     <Table aria-label={`${day.title ?? "Agenda"} on ${day.date}`} className="min-w-80 table-fixed" scrollerLabel={`${day.title ?? "Agenda"} schedule, scroll for locations`} scrollerClassName="focus-visible:focus-ring" >
       <colgroup>
-        <col className={cn("w-48", actions ? "@min-[48rem]/agenda:w-[24%]" : "@min-[48rem]/agenda:w-56")} />
-        <col className={actions ? "@min-[48rem]/agenda:w-[24%]" : undefined} />
-        <col className={cn("hidden @min-[48rem]/agenda:table-column", actions ? "@min-[48rem]/agenda:w-[20%]" : "w-40")} />
-        <col className={cn("hidden @min-[48rem]/agenda:table-column", actions ? "@min-[48rem]/agenda:w-[12%]" : "w-24")} />
-        {actions && <col className="hidden @min-[48rem]/agenda:w-[20%] @min-[48rem]/agenda:table-column" />}
+        <col className={cn("w-48", actions ? "@min-[48rem]/agenda:w-[20%]" : "@min-[48rem]/agenda:w-56")} />
+        <col className={actions ? "@min-[48rem]/agenda:w-[30%]" : undefined} />
+        <col className={cn("hidden @min-[48rem]/agenda:table-column", actions ? "@min-[48rem]/agenda:w-[16%]" : "w-40")} />
+        <col className={cn("hidden @min-[48rem]/agenda:table-column", actions ? "@min-[48rem]/agenda:w-[14%]" : "w-24")} />
+        {actions && <col className="hidden @min-[48rem]/agenda:w-[17rem] @min-[48rem]/agenda:table-column" />}
       </colgroup>
       <TableHeader className="sr-only"><TableRow><TableHead>Time</TableHead><TableHead>Item</TableHead><TableHead className="hidden @min-[48rem]/agenda:table-cell">Building or online location</TableHead><TableHead className="hidden @min-[48rem]/agenda:table-cell">Room</TableHead>{actions && <TableHead className="hidden @min-[48rem]/agenda:table-cell">Actions</TableHead>}</TableRow></TableHeader>
       <TableBody>{[...day.items].sort((a, b) => (a.starts_at ?? "").localeCompare(b.starts_at ?? "")).map(item => {

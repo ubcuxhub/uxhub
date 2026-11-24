@@ -47,6 +47,31 @@ export async function fetchEvents(
   return (data ?? []).map(eventPresentation);
 }
 
+/**
+ * The event Home features: the soonest published, uncanceled event an admin
+ * marked "Feature on the portal home" that hasn't ended yet (one in progress
+ * still counts, as on the timeline). Null when none qualifies.
+ */
+export async function fetchFeaturedEvent(
+  supabase: DbClient,
+  now: Date = new Date()
+): Promise<EventRow | null> {
+  const at = now.toISOString();
+  const { data, error } = await supabase
+    .from(TABLES.events)
+    .select("*")
+    .eq("status", "active")
+    .eq("is_featured", true)
+    .is("canceled_at", null)
+    .or(`ends_at.gte.${at},and(ends_at.is.null,starts_at.gte.${at})`)
+    .order("starts_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ? eventPresentation(data) : null;
+}
+
 export async function fetchEventById(
   supabase: DbClient,
   id: string

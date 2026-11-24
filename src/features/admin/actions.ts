@@ -6,12 +6,14 @@ import { fetchEventMutationResult, eventMutationResult, fetchEventHistoryInfo, f
 
 import { eventContentProblem, type EventContent } from "./lib/event-content";
 import { searchMentors, searchSponsors } from "@/lib/supabase-helpers/event-people";
+import { isReminderSchedule } from "@/lib/supabase-helpers/event-reminders";
 
 import { agendaEnvelope, parseDateLocationDraft, dateLocationProblem, dateSessions, type EventDateLocationDraft } from "./lib/event-date-location";
 
 import { saveEventDraft, fetchEventDraft, eventImageIsReferenced, recoverEventDraftReceipt } from "@/lib/supabase-helpers/event-drafts";
 import { workingDocumentImageUrls, type EventWorkingDocument } from "./lib/event-working-document";
 import { parseEventDescription, descriptionText } from "@/lib/event-description";
+import { shortOverviewTooLong } from "./lib/event-overview";
 import { revalidatePath } from "next/cache";
 
 import { requireAdmin, requireManager } from "@/lib/auth/guards";
@@ -355,6 +357,7 @@ export async function saveAdminEventAction(
   if (input.content) { const problem = eventContentProblem(input.content); if (problem) return { error: problem }; }
   assertPublishAt(input.event.status, input.event.publish_at);
   if ("agenda_enabled" in input.event && typeof input.event.agenda_enabled !== "boolean") return { error: "Schedule visibility must be on or off." };
+  if ("reminder_schedule" in input.event && !isReminderSchedule(input.event.reminder_schedule)) return { error: "Choose when reminder emails go out." };
   const { min_team_size: min, max_team_size: max, team_deadline: deadline } = input.event;
   if ([min, max].some(value => value != null && (!Number.isSafeInteger(value) || value < 1 || value > 2147483647))) return { error: "Team sizes must be positive whole numbers no greater than 2,147,483,647." };
   if (min != null && max != null && min > max) return { error: "Minimum team size cannot exceed maximum team size." };
@@ -378,7 +381,7 @@ export async function saveAdminEventAction(
     datePayload = { _date_revision: input.dateLocationRevision ?? 0, _date_location: { ...config, dates: config.version === 2 ? config.dates : config.dates.map((row, index) => ({ ...row, start_time: sessions[index].start_time, end_time: sessions[index].end_time })) } };
   }
 
-  if ((input.event.short_description?.length ?? 0) > 50 || (input.event.description?.length ?? 0) > 3000) throw new Error("Overview exceeds its character limit.");
+  if (shortOverviewTooLong(input.event.short_description) || (input.event.description?.length ?? 0) > 3000) throw new Error("Overview exceeds its character limit.");
   if (input.event.description_rich != null) {
     const rich = parseEventDescription(input.event.description_rich);
     if (!rich || descriptionText(rich) !== input.event.description) throw new Error("Invalid long overview formatting.");

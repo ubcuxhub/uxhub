@@ -68,6 +68,6 @@ describe("event configuration controls", () => {
     expect(screen.getByLabelText("Website URL")).toHaveProperty("value", "https://devpost.com/design");
     fireEvent.click(screen.getByRole("switch", { name: "Feature on the portal home" }));
     expect(screen.getByRole("switch", { name: "Feature on the portal home" }).getAttribute("aria-checked")).toBe("true");
-    expect(screen.getByText(/does not add the event to Home yet/)).not.toBeNull();
+    expect(screen.getByText(/soonest featured event on their portal home/)).not.toBeNull();
   });
 });

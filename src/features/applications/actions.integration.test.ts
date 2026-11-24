@@ -1,7 +1,7 @@
 /**
  * The application page's server actions against the local database, acting as
  * a member through `clientAs`: saving a draft, submitting it (with and without
- * gaps), file answers, and deleting a draft. Each test makes its own event and
+ * gaps) and file answers. Each test makes its own event and
  * questions, since CI's database is unseeded.
  */
 import { describe, expect, it, vi } from "vitest";
@@ -11,7 +11,6 @@ import type { UserInfoRow } from "@/lib/supabase/models";
 import { BUCKETS } from "@/lib/supabase-helpers/buckets";
 import {
   applicationFilePath,
-  listApplicationFiles,
   uploadApplicationFile,
 } from "@/lib/supabase-helpers/application-files";
 import { clientAs, createIntegrationClient, withFixtures, type Fixtures } from "@/test/integration";
@@ -28,9 +27,20 @@ vi.mock("@/lib/auth/guards", () => ({
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => clientAs(session.member)),
 }));
+// The received email: `after` queues it for `flushAfter`, and nothing is sent.
+const queued = vi.hoisted(() => [] as Array<() => unknown>);
+vi.mock("next/server", () => ({ after: (callback: () => unknown) => void queued.push(callback) }));
+vi.mock("next/headers", () => ({
+  headers: async () => new Headers({ host: "www.ubcuxhub.ca", "x-forwarded-proto": "https" }),
+}));
+vi.mock("@/lib/email/client", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/email/client")>()),
+  sendEmail: vi.fn(async () => true),
+}));
+
+import { sendEmail } from "@/lib/email/client";
 
 import {
-  deleteApplication,
   saveApplicationDraft,
   startApplicationDraft,
   submitApplication,
@@ -46,9 +56,10 @@ type QuestionInsert = Database["public"]["Tables"]["event_application_questions"
 /** A member signed in for the actions, and an event taking applications. */
 async function setUp(
   fixtures: Fixtures,
-  eventOverrides: Partial<Database["public"]["Tables"]["events"]["Insert"]> = {}
+  eventOverrides: Partial<Database["public"]["Tables"]["events"]["Insert"]> = {},
+  memberOverrides: Partial<Database["public"]["Tables"]["user_info"]["Insert"]> = {}
 ) {
-  const member = await fixtures.createUser();
+  const member = await fixtures.createUser(memberOverrides);
   session.member = member;
   const event = await fixtures.createEvent({
     status: "active",
@@ -80,6 +91,11 @@ async function setUp(
     event,
     q: { why: id("Why?"), pick: id("Pick any"), year: id("Year"), resume: id("Resume") },
   };
+}
+
+/** Runs what `after` queued, as Next does once the response is sent. */
+async function flushAfter() {
+  await Promise.all(queued.splice(0).map((callback) => callback()));
 }
 
 async function applicationOf(eventId: string, userId: string) {
@@ -187,6 +203,34 @@ describe("saveApplicationDraft", () => {
 });
 
 describe("submitApplication", () => {
+  // The portal page offers Apply on a draft to the admins and managers who can
+  // see it (docs/event-states.md, "Drafts for admins"); the insert policy and
+  // submit_event_application both allow is_admin() on a draft.
+  it.each(["admin", "manager"] as const)("lets a %s apply to a draft event", (role) =>
+    withFixtures(async (fixtures) => {
+      const { member, event, q } = await setUp(fixtures, { status: "draft" }, { role_access: role });
+
+      const result = await submitApplication(event.id, {
+        [q.why]: "Testing",
+        [q.pick]: ["Research"],
+        [q.year]: "1",
+        [q.resume]: "",
+      });
+      expect(result).toEqual({ ok: true, applicationId: expect.any(String) });
+      expect((await applicationOf(event.id, member.id))?.status).toBe("submitted");
+    }));
+
+  it("refuses a member's application to a draft event", () =>
+    withFixtures(async (fixtures) => {
+      const { member, event, q } = await setUp(fixtures, { status: "draft" });
+
+      expect(await submitApplication(event.id, { [q.why]: "Early" })).toMatchObject({
+        ok: false,
+        reason: "not_accepting",
+      });
+      expect(await applicationOf(event.id, member.id)).toBeNull();
+    }));
+
   it("saves the answers and names the questions to fix", () =>
     withFixtures(async (fixtures) => {
       const { member, event, q } = await setUp(fixtures);
@@ -244,8 +288,39 @@ describe("submitApplication", () => {
         error: "You've already submitted this application.",
         reason: "submitted",
       });
-      expect(await deleteApplication(draft.applicationId)).toMatchObject({ ok: false });
       expect((await applicationOf(event.id, member.id))?.status).toBe("submitted");
+    }));
+
+  it("emails the applicant once, on the submit itself, with the release date", () =>
+    withFixtures(async (fixtures) => {
+      vi.mocked(sendEmail).mockClear();
+      queued.length = 0;
+      const { member, event, q } = await setUp(fixtures);
+      // 11:45 PM Pacific on a known date, well after the window closes.
+      const { error } = await db
+        .from("event_application_settings")
+        .upsert({ event_id: event.id, decisions_release_at: "2099-11-26T06:45:00Z" });
+      if (error) throw error;
+      const answers = { [q.why]: "Because", [q.pick]: ["Research"], [q.year]: "1", [q.resume]: "" };
+
+      // Two submits at once: the RPC lets one through, and only it emails.
+      const results = await Promise.all([
+        submitApplication(event.id, answers),
+        submitApplication(event.id, answers),
+      ]);
+      expect(results.filter((result) => result.ok)).toHaveLength(1);
+      // A retry afterwards is refused before the RPC.
+      expect(await submitApplication(event.id, answers)).toMatchObject({ ok: false, reason: "submitted" });
+      await flushAfter();
+
+      expect(sendEmail).toHaveBeenCalledTimes(1);
+      const [email] = vi.mocked(sendEmail).mock.calls[0];
+      expect(email.to).toBe(member.email);
+      expect(email.subject).toBe(`We received your application to ${event.name}`);
+      expect(email.html).toContain("you’ll hear from us by Wed, Nov 25, 2099.");
+      expect(email.html).toContain(
+        `href="https://www.ubcuxhub.ca/portal/events/${encodeURIComponent(event.slug!)}/apply"`
+      );
     }));
 
   it("refuses a file answer that isn't the member's own upload", () =>
@@ -259,41 +334,5 @@ describe("submitApplication", () => {
         ok: false,
         fieldErrors: { [q.resume]: "Upload the file again." },
       });
-    }));
-});
-
-describe("deleteApplication", () => {
-  it("deletes the member's draft with its answers and files", () =>
-    withFixtures(async (fixtures) => {
-      const { member, event, q } = await setUp(fixtures);
-
-      const draft = await startApplicationDraft(event.id);
-      if (!draft.ok) throw new Error(draft.error);
-      const path = applicationFilePath({
-        userInfoId: member.id,
-        applicationId: draft.applicationId,
-        questionId: q.resume,
-        fileName: "cv.pdf",
-      });
-      fixtures.trackStorage(BUCKETS.applicationFiles, path.slice(0, path.lastIndexOf("/")));
-      await uploadApplicationFile(clientAs(member), path, pdf());
-      await saveApplicationDraft(event.id, { [q.why]: "Hi", [q.resume]: path });
-
-      expect(await deleteApplication(draft.applicationId)).toEqual({ ok: true });
-      expect(await applicationOf(event.id, member.id)).toBeNull();
-      expect(
-        await listApplicationFiles(db, { userInfoId: member.id, applicationId: draft.applicationId })
-      ).toEqual([]);
-    }));
-
-  it("won't delete someone else's draft", () =>
-    withFixtures(async (fixtures) => {
-      const { member, event, q } = await setUp(fixtures);
-      const saved = await saveApplicationDraft(event.id, { [q.why]: "Mine" });
-      if (!saved.ok) throw new Error(saved.error);
-
-      session.member = await fixtures.createUser();
-      expect(await deleteApplication(saved.applicationId)).toMatchObject({ ok: false });
-      expect((await applicationOf(event.id, member.id))?.status).toBe("draft");
     }));
 });

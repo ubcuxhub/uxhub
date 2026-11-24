@@ -1007,6 +1007,7 @@ export type Database = {
           registration_closes_at: string | null
           registration_opens_at: string | null
           regular_price: number | null
+          reminder_schedule: string
           requires_application: boolean
           revision: number
           short_description: string | null
@@ -1064,6 +1065,7 @@ export type Database = {
           registration_closes_at?: string | null
           registration_opens_at?: string | null
           regular_price?: number | null
+          reminder_schedule?: string
           requires_application?: boolean
           revision?: number
           short_description?: string | null
@@ -1119,6 +1121,7 @@ export type Database = {
           registration_closes_at?: string | null
           registration_opens_at?: string | null
           regular_price?: number | null
+          reminder_schedule?: string
           requires_application?: boolean
           revision?: number
           short_description?: string | null
@@ -1212,6 +1215,45 @@ export type Database = {
             columns: ["owner_event_id"]
             isOneToOne: false
             referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_refund_emails: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          currency: string
+          email_attempted_at: string | null
+          email_sent_at: string | null
+          purchase_id: string
+          square_refund_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          currency: string
+          email_attempted_at?: string | null
+          email_sent_at?: string | null
+          purchase_id: string
+          square_refund_id: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          currency?: string
+          email_attempted_at?: string | null
+          email_sent_at?: string | null
+          purchase_id?: string
+          square_refund_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_refund_emails_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchases"
             referencedColumns: ["id"]
           },
         ]
@@ -1664,8 +1706,29 @@ export type Database = {
           starts_at: string
         }[]
       }
+      claim_event_reminders: {
+        Args: { p_event_ids?: string[]; p_limit?: number }
+        Returns: {
+          attempts: number
+          email: string
+          ends_at: string
+          event_id: string
+          event_name: string
+          event_slug: string
+          first_name: string
+          kind: string
+          location: Json
+          send_id: string
+          starts_at: string
+          ticket_id: string
+        }[]
+      }
       complete_application_email: {
         Args: { p_delivery_id: string; p_error_code?: string; p_sent: boolean }
+        Returns: number
+      }
+      complete_event_reminder: {
+        Args: { p_error_code?: string; p_send_id: string; p_sent: boolean }
         Returns: number
       }
       create_staff_volunteer_schedule: {
@@ -1875,6 +1938,10 @@ export type Database = {
       }
       release_application_emails: {
         Args: { p_delivery_ids: string[]; p_reason?: string }
+        Returns: number
+      }
+      release_event_reminders: {
+        Args: { p_reason?: string; p_send_ids: string[] }
         Returns: number
       }
       release_event_ticket: {
@@ -2182,6 +2249,7 @@ export type Database = {
           registration_closes_at: string | null
           registration_opens_at: string | null
           regular_price: number | null
+          reminder_schedule: string
           requires_application: boolean
           revision: number
           short_description: string | null

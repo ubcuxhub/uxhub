@@ -4,7 +4,9 @@ import {
   DEFAULT_EVENT_COLOUR,
   EVENT_COLOUR_PRESETS,
   contrastRatio,
+  eventColourShade,
   eventColourTint,
+  featuredCardFade,
   featuredCardGradient,
   normalizeHex,
   readableTextOn,
@@ -101,5 +103,29 @@ describe("gradients", () => {
   it("normalizes short hex and falls back to Blue for invalid input", () => {
     expect(ticketGradient("#abc")).toContain("#AABBCC");
     expect(featuredCardGradient("nope")).toContain(DEFAULT_EVENT_COLOUR);
+  });
+
+  it("featuredCardFade runs from clear at 22% to the colour at 98.6%", () => {
+    expect(featuredCardFade("#325DC4")).toBe(
+      "linear-gradient(179deg, rgb(50 93 196 / 0) 22%, rgb(50 93 196) 98.6%)",
+    );
+  });
+
+  it("featuredCardFade's hover copy is one shade darker", () => {
+    expect(featuredCardFade("#325DC4", { darker: true })).toContain(
+      `rgb(42 77 163)`,
+    );
+  });
+});
+
+describe("eventColourShade", () => {
+  it("mixes 17% black by default", () => {
+    // Figma's hover overlay for Blue is #2A4DA0; 17% black gives #2A4DA3.
+    expect(eventColourShade("#325DC4")).toBe("#2A4DA3");
+  });
+
+  it("clamps the mix", () => {
+    expect(eventColourShade("#325DC4", 0)).toBe("#325DC4");
+    expect(eventColourShade("#325DC4", 2)).toBe("#000000");
   });
 });

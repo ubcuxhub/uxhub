@@ -2,12 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import type QrScanner from "qr-scanner";
-import { CameraOff } from "lucide-react";
+import { CameraOff, Search } from "lucide-react";
 
 import { ScannerViewfinder } from "@/components/shared/ScannerFrame";
-import { EmptyState } from "@/components/ui/empty-state";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import { CheckInPanel } from "./CheckInPanel";
 
 export type CameraProblem = "blocked" | "missing" | "insecure" | "failed";
 
@@ -15,7 +15,7 @@ const PROBLEMS: Record<CameraProblem, { title: string; description: string; }> =
   blocked: {
     title: "Camera access is off",
     description:
-      "Allow camera access for this site in your browser settings, then reload the page.",
+      "The portal needs your camera to read tickets. Allow camera access for this site in your browser settings, then try again. You can still check people in by searching their name.",
   },
   missing: {
     title: "No camera found",
@@ -56,14 +56,28 @@ interface QrCameraViewProps {
   /** Called with each code the camera reads while not paused. */
   onScan: (code: string) => void;
   onSearch?: () => void;
+  /** Told when a camera problem replaces the preview, and when it clears. */
+  onProblemChange?: (problem: CameraProblem | null) => void;
+}
+
+/** A camera that can't start: what went wrong, and the ways forward. */
+export function CameraProblemPanel({ problem, onRetry, onSearch }: { problem: CameraProblem; onRetry: () => void; onSearch?: () => void; }) {
+  const { title, description } = PROBLEMS[problem];
+  return <CheckInPanel tone="neutral" icon={<CameraOff />} title={title} actions={<>
+    {onSearch ? <Button variant="secondary" onClick={onSearch}><Search aria-hidden />Search attendees</Button> : null}
+    <Button onClick={onRetry}>Try again</Button>
+  </>}>
+    <p className="max-w-sm text-small text-muted-foreground">{description}</p>
+  </CheckInPanel>;
 }
 
 /** The rear camera, reading QR codes. */
-export function QrCameraView({ paused, onScan, onSearch }: QrCameraViewProps) {
+export function QrCameraView({ paused, onScan, onSearch, onProblemChange }: QrCameraViewProps) {
   const [attempt, setAttempt] = useState(0);
   const videoRef = useRef<HTMLVideoElement>(null);
   const scannerRef = useRef<QrScanner | null>(null);
   const onScanRef = useRef(onScan);
+  const onProblemChangeRef = useRef(onProblemChange);
   const pausedRef = useRef(paused);
   const [state, setState] = useState<"starting" | "ready" | CameraProblem>(
     "starting"
@@ -71,6 +85,7 @@ export function QrCameraView({ paused, onScan, onSearch }: QrCameraViewProps) {
 
   useEffect(() => {
     onScanRef.current = onScan;
+    onProblemChangeRef.current = onProblemChange;
     pausedRef.current = paused;
   });
 
@@ -138,18 +153,19 @@ export function QrCameraView({ paused, onScan, onSearch }: QrCameraViewProps) {
       );
   }, [paused, state]);
 
-  const problem = state === "starting" || state === "ready" ? null : PROBLEMS[state];
+  const problem = state === "starting" || state === "ready" ? null : state;
+
+  useEffect(() => {
+    onProblemChangeRef.current?.(problem);
+  }, [problem]);
+  useEffect(() => () => onProblemChangeRef.current?.(null), []);
 
   if (problem)
-    return <EmptyState
-      icon={<CameraOff />} title={problem.title} description={problem.description}
-      actions={<>
-        <Button onClick={() => {
-          setState("starting");
+    return <CameraProblemPanel problem={problem} onSearch={onSearch} onRetry={() => {
+      setState("starting");
 
-          setAttempt(value => value + 1);
-        }}>Try again</Button>{onSearch ? <Button variant="secondary" onClick={onSearch}>Search attendees</Button> : null}</>}
-    />;
+      setAttempt(value => value + 1);
+    }} />;
   return <ScannerViewfinder>
     <div className="relative size-full bg-muted">
       <video ref={videoRef} muted playsInline aria-label="Camera preview" className="size-full object-cover" />
