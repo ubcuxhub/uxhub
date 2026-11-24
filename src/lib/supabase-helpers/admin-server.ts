@@ -2,6 +2,11 @@ import "server-only";
 
 import { parseEventImageObjectKey } from "@/lib/event-image";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import type {
+  MembershipTypeUpdate,
+  UserInfoInsert,
+  UserInfoUpdate,
+} from "@/lib/supabase/models";
 import { cleanupAccountProfilePhotos } from "./admin-user-profile";
 import { BUCKETS } from "./buckets";
 import { TABLES } from "./tables";
@@ -9,13 +14,7 @@ import { TABLES } from "./tables";
 /**
  * Service-role data-access helpers. These bypass Row Level Security and must
  * only be called from server-only code (route handlers, server actions).
- *
- * Payloads are intentionally permissive because the privileged client is
- * untyped (see `@/lib/supabase/admin`). Keep the raw column shapes at the call
- * sites so they remain easy to audit.
  */
-
-type UserInfoWritePayload = Record<string, unknown>;
 
 export interface PublicationHealth {
   /** Drafts still unpublished at `before`, blocked or not. */
@@ -34,15 +33,10 @@ export async function adminGetPublicationHealth(before: string): Promise<Publica
     .rpc("event_publication_health", { p_before: before })
     .single();
   if (error) throw error;
-  const row = data as {
-    overdue_count: number;
-    blocked_count: number;
-    blocked_event_ids: string[] | null;
-  };
   return {
-    overdue: row.overdue_count,
-    blocked: row.blocked_count,
-    blockedEventIds: row.blocked_event_ids ?? [],
+    overdue: data.overdue_count,
+    blocked: data.blocked_count,
+    blockedEventIds: data.blocked_event_ids ?? [],
   };
 }
 
@@ -81,12 +75,12 @@ export async function adminFindUserInfoByEmail(
     .maybeSingle();
 
   if (error) throw error;
-  return (data as AdminUserInfoLookup | null) ?? null;
+  return data;
 }
 
 export async function adminUpdateUserInfoById(
   id: string,
-  payload: UserInfoWritePayload
+  payload: UserInfoUpdate
 ) {
   const { data, error } = await supabaseAdmin
     .from(TABLES.userInfo)
@@ -148,7 +142,7 @@ export async function adminUpdateMembershipTermEndsAt(
  */
 export async function adminUpdateMembershipTypeById(
   id: string,
-  payload: Record<string, unknown>
+  payload: MembershipTypeUpdate
 ) {
   const { data, error } = await supabaseAdmin
     .from(TABLES.membershipTypes)
@@ -160,7 +154,7 @@ export async function adminUpdateMembershipTypeById(
   return data;
 }
 
-export async function adminInsertUserInfo(payload: UserInfoWritePayload) {
+export async function adminInsertUserInfo(payload: UserInfoInsert) {
   const { data, error } = await supabaseAdmin
     .from(TABLES.userInfo)
     .insert(payload)

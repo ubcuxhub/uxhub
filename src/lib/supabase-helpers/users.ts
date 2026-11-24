@@ -2,6 +2,7 @@ import type { DbClient } from "./types";
 import { fetchAllPages } from "./all-pages";
 import { TABLES } from "./tables";
 import type { UserInfoRow, UserInfoUpdate } from "@/lib/supabase/models";
+import { isUuid } from "@/lib/uuid";
 
 export interface UserInfoContact {
   id: string;
@@ -100,8 +101,6 @@ export async function fetchAdminUserRecords(supabase: DbClient) {
   );
 }
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
 /** Who marked a student verified, when that profile still exists. */
 export interface StudentVerifier {
   id: string;
@@ -118,7 +117,7 @@ export interface StudentVerifier {
  * behind by account deletion, which the directory doesn't list either.
  */
 export async function fetchAdminUserRecordById(supabase: DbClient, id: string) {
-  if (!UUID.test(id)) return null;
+  if (!isUuid(id)) return null;
 
   const { data: row, error } = await supabase
     .from(TABLES.userInfo)

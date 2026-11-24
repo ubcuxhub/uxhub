@@ -10,6 +10,6 @@ reset role;
 set local role anon;
 do $$ begin
   if has_table_privilege('anon','public.event_content_settings','select') then raise exception 'anonymous can read staff editor content'; end if;
-  if has_function_privilege('anon','public.save_admin_event_before_content(uuid,jsonb,text,text,jsonb,jsonb,jsonb,jsonb)','execute') then raise exception 'anonymous can invoke legacy content save'; end if;
+  if has_function_privilege('anon','public.save_admin_event_atomically(uuid,jsonb,text,text,jsonb,jsonb,jsonb,jsonb)','execute') then raise exception 'anonymous can invoke the content save'; end if;
 end $$;
 reset role;

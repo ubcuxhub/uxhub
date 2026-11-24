@@ -107,14 +107,20 @@ export async function fetchEventBySlug(
   return data ? eventPresentation(data) : null;
 }
 
-/** Canonical IDs and recorded legacy routes share the same permanent event.
- * The id goes into a PostgREST `.or()` filter string, so anything but a UUID
- * is unknown. */
-export async function fetchEventByLegacyDraftId(supabase: DbClient, id: string) {
+/** The stored event row by its id or a recorded legacy draft id: canonical IDs
+ * and legacy routes share the same permanent event. The id goes into a
+ * PostgREST `.or()` filter string, so anything but a UUID is unknown. */
+export async function fetchEventRowByIdOrLegacyDraftId(supabase: DbClient, id: string): Promise<EventRow | null> {
   if (!isUuid(id)) return null;
   const { data, error } = await supabase.from(TABLES.events).select("*").or(`id.eq.${id},legacy_draft_ids.cs.{${id}}`).maybeSingle();
   if (error) throw error;
-  return data ? eventPresentation(data) : null;
+  return data;
+}
+
+/** The event by its id or a legacy draft id, as the admin pages present it. */
+export async function fetchEventByLegacyDraftId(supabase: DbClient, id: string) {
+  const row = await fetchEventRowByIdOrLegacyDraftId(supabase, id);
+  return row ? eventPresentation(row) : null;
 }
 
 /**

@@ -1069,7 +1069,7 @@ begin
       'public.event_member_commitments(uuid)',
       'public.remove_event_ticket(uuid)',
       'public.event_ticket_eligibility(uuid, uuid, bigint)',
-      'public.delete_event_before_safe_mutations(uuid)'
+      'public.delete_event_atomically(uuid)'
     ] loop
       if has_function_privilege(role_name, fn, 'execute') then
         raise exception '% can execute %', role_name, fn;
