@@ -76,8 +76,10 @@ export function MembershipCardSurface({
         className={cn(
           // `isolate` keeps the dither's overlay blend to the card's own fill.
           "relative isolate overflow-hidden rounded-xl bg-membership-card text-white shadow-sm",
-          // Figma's 492 × 309, growing taller if the content needs it.
-          "flex aspect-[492/309] flex-col",
+          // Figma's 492 × 309, growing taller when the content needs it. The
+          // card clips its overflow (for the tilt and dither), which drops the
+          // usual aspect-ratio minimum, so `min-h-fit` puts it back.
+          "flex aspect-[492/309] min-h-fit flex-col",
           "transform-[rotateX(var(--tilt-x,0deg))_rotateY(var(--tilt-y,0deg))] transition-transform duration-expressive ease-expressive",
         )}
       >
