@@ -26,7 +26,6 @@ import {
   adminDeleteEventImageByUrl,
   adminUpdateMembershipTermEndsAt,
   adminUpdateMembershipTypeById,
-  adminUpdateUserInfoById,
 } from "@/lib/supabase-helpers/admin-server";
 import { datetimeLocalToTimestamptz, formatTimestamp } from "@/lib/date";
 import { assertPublishAt, isTimestamptz, builderPublicationProblem, publicationClosingProblem } from "@/features/admin/lib/event-publication";
@@ -136,7 +135,18 @@ export async function updateManagerUserAction(
   }
 
   const payload = assertManagerUserUpdate(field, value);
-  await adminUpdateUserInfoById(userId, payload);
+
+  // Through the manager's own session, not the service role: the audit
+  // trigger reads the actor from the transaction that writes the row, and a
+  // service-role request carries no session for it to read. The function is
+  // SECURITY DEFINER and re-checks both the caller and the columns.
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("admin_update_user_info", {
+    p_user_id: userId,
+    p_patch: payload as Json,
+  });
+  if (error) throw error;
+
   revalidatePath("/admin/users", "layout");
 }
 

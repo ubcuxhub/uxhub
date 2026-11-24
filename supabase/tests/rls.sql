@@ -2653,6 +2653,7 @@ $$;
 \ir event-cancellation.sql
 \ir application-emails.sql
 \ir event-reminders.sql
+\ir audit-events.sql
 
 do $$ begin
   if has_table_privilege('authenticated','public.check_in_activity','insert')
