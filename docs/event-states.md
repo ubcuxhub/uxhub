@@ -453,7 +453,7 @@ register.
 | `app-rejected` | Not selected | Their application is `rejected` |
 | `app-missed` | Applications closed | Applications closed and they never started one |
 | `app-draft-expired` | Applications closed | Applications closed before their draft was submitted |
-| `app-offer-expired` | Applications open, or Applications closed | Accepted, but the deadline passed without registering; the badge follows the window |
+| `app-offer-expired` | Offer expired | Accepted, but the deadline passed without registering. They can't reapply, so the badge doesn't follow the window |
 
 - **The close** is `registration_closes_at`. When it's empty, registration for
   an event without applications stays open until the event starts (a UI rule:

@@ -303,3 +303,22 @@ it("doesn't fetch links for agenda items when the event has no agenda", async ()
   expect(fixtures.fetchLinks).not.toHaveBeenCalled();
   expect(fixtures.agendaProps).toHaveBeenCalledWith(expect.objectContaining({ itemLinks: {} }));
 });
+
+it("dates an overnight event on its start day alone, as the timeline does", async () => {
+  const event = fixtures.event;
+  fixtures.fetchEvent.mockResolvedValue({ ...event, starts_at: "2099-12-05T03:00:00Z", ends_at: "2099-12-05T09:00:00Z" });
+  await renderPage();
+  expect(screen.getByText("Dec 4, 2099")).toBeTruthy();
+  expect(screen.queryByText(/Dec 5, 2099/)).toBeNull();
+});
+
+it("reads the links and the ticket once for a going student with an agenda", async () => {
+  fixtures.agenda = [{ id: "day-1", date: "2099-01-01", title: "Kickoff", location_overridden: false, location: null, items: [
+    { id: "item-1", title: "Talk", starts_at: null, ends_at: null, description: null, check_in: false, location_overridden: false, location: null },
+  ] }];
+  fixtures.fetchLinks.mockResolvedValue([slackLink]);
+  await renderPage();
+  expect(fixtures.fetchLinks).toHaveBeenCalledTimes(1);
+  expect(fixtures.fetchTicket).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole("link", { name: /^Open Slack/ })).toBeTruthy();
+});

@@ -10,7 +10,7 @@ import { CheckoutLayout } from "@/components/shared/CheckoutLayout";
 import { useFlowDialog } from "@/components/shared/FlowDialog";
 import { Button } from "@/components/ui/button";
 import { useUser } from "@/lib/auth/user-context";
-import { hasActiveMembership } from "@/features/memberships/lib/expiry";
+import { eventPriceFor } from "@/features/events/lib/event-rules";
 import { withReturnTo } from "@/lib/auth/paths";
 import type { EventRow, UserInfoRow } from "@/lib/supabase/models";
 
@@ -33,10 +33,7 @@ export function EventCheckout({
 }: EventCheckoutProps) {
   const { close } = useFlowDialog();
   const { membershipTermEndsAt } = useUser();
-  const isMember = event.pricing_policy === "figma"
-    ? hasActiveMembership(user, membershipTermEndsAt)
-    : Boolean(user.membership_type_id);
-  const price = isMember ? event.member_price : event.regular_price;
+  const { amount: price, isMember } = eventPriceFor(event, user, membershipTermEndsAt);
 
   if (price === null) return <Alert>Registration is unavailable until event pricing is configured.</Alert>;
   // Only admins and managers can see a draft (RLS), and they get the same

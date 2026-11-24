@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import {ArrowUpRight} from "lucide-react";
 import { FlowLink } from "@/components/shared/FlowLink";
 
@@ -13,6 +14,11 @@ interface ButtonProps {
   className?: string;
   href?: string;
   external?: boolean;
+  /**
+   * An internal link adds `?returnTo=<this page>` by default, for flows that
+   * come back here (sign-in, membership). False for a plain page link.
+   */
+  returnTo?: boolean;
 }
 
 const Button: React.FC<ButtonProps> = ({
@@ -24,6 +30,7 @@ const Button: React.FC<ButtonProps> = ({
   className = "",
   href,
   external = false,
+  returnTo = true,
 }) => {
   const baseStyles =
     "flex items-center justify-center gap-3 rounded-full px-6 transition-all duration-300 ease-in-out cursor-pointer";
@@ -60,6 +67,14 @@ const Button: React.FC<ButtonProps> = ({
       >
         {content}
       </a>
+    );
+  }
+
+  if (href && !returnTo) {
+    return (
+      <Link href={href} className={styles}>
+        {content}
+      </Link>
     );
   }
 

@@ -2,9 +2,7 @@ import "server-only";
 
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import type { EventRow } from "@/lib/supabase/models";
-import { fetchUserEventTicket } from "@/lib/supabase-helpers/event-tickets";
 import { fetchTeamByInviteCode, fetchUserTeam } from "@/lib/supabase-helpers/teams";
-import type { DbClient } from "@/lib/supabase-helpers/types";
 
 import type { TeamCardProps } from "../components/teams/TeamCard";
 import { TEAM_FAILURE_MESSAGES, parseInviteCode, teamsLocked } from "./teams";
@@ -22,21 +20,20 @@ export type TeamCardData =
  * `teams_enabled`.
  *
  * Team members' names live in `user_info`, which RLS keeps private, so the
- * teams are read with the service role. `supabase` is the student's own
- * client, for their ticket.
+ * teams are read with the service role. `hasTicket` comes from the student's
+ * event state, which the page already loaded.
  */
 export async function loadTeamCard(input: {
-  supabase: DbClient;
   event: Pick<EventRow, "id" | "name" | "max_team_size" | "team_deadline">;
   userId: string;
+  hasTicket: boolean;
   joinCode: string | null;
   origin: string;
 }): Promise<TeamCardData> {
-  const { supabase, event, userId, joinCode, origin } = input;
+  const { event, userId, hasTicket: ticket, joinCode, origin } = input;
   const inviteCode = joinCode ? parseInviteCode(joinCode) : null;
 
-  const [ticket, userTeam, invitedTeam] = await Promise.all([
-    fetchUserEventTicket(supabase, event.id, userId),
+  const [userTeam, invitedTeam] = await Promise.all([
     fetchUserTeam(supabaseAdmin, event.id, userId),
     inviteCode ? fetchTeamByInviteCode(supabaseAdmin, inviteCode) : null,
   ]);

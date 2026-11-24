@@ -24,24 +24,25 @@ export default function Footer() {
           />
         </div>
 
-        {/* Navigation */}
+        {/* Navigation. The anchors are homepage sections, so they name the
+            homepage: the footer also sits under /events pages. */}
         <nav className="flex flex-wrap justify-center gap-x-8 gap-y-2 text-sm">
-          <Link className="transition-colors hover:text-gray-600" href="#home">
+          <Link className="transition-colors hover:text-gray-600" href="/#home">
             Home
           </Link>
           <Link
             className="transition-colors hover:text-gray-600"
-            href="#about-us"
+            href="/#about-us"
           >
             About Us
           </Link>
           <Link
             className="transition-colors hover:text-gray-600"
-            href="#events"
+            href="/#events"
           >
             Events
           </Link>
-          <Link className="transition-colors hover:text-gray-600" href="#team">
+          <Link className="transition-colors hover:text-gray-600" href="/#team">
             Meet the Team
           </Link>
           <a
@@ -92,7 +93,9 @@ export default function Footer() {
             reflection, and action as part of our role in reconciliation. To
             further your understanding, we encourage you to explore{" "}
             <a
-              href="#"
+              href="https://guides.library.ubc.ca/xwi7xwaresearchguide"
+              target="_blank"
+              rel="noopener noreferrer"
               className="underline transition-colors hover:text-blue-800 text-blue-600"
             >
               xʷi7xʷa Library&apos;s Indigenous Research Guide

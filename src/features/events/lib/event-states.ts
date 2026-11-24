@@ -7,6 +7,7 @@ import type {
 } from "@/lib/supabase/models";
 import { applicationWindow } from "@/features/applications/lib/application-form";
 import { isCanceledEvent } from "./event-cancellation";
+import { eventEndsAt, hasEventEnded } from "./event-rules";
 import type { DbClient } from "@/lib/supabase-helpers/types";
 import { fetchUserEventApplications } from "@/lib/supabase-helpers/event-applications";
 import {
@@ -97,7 +98,10 @@ export type EventState =
   /** `closedAt`: when applications closed. */
   | { kind: "app-missed"; closedAt: string }
   | { kind: "app-draft-expired"; closedAt: string }
-  /** `windowOpen`: applications are still open, so they could reapply. */
+  /**
+   * `windowOpen`: applications are still open to others. They can't reapply:
+   * their accepted application stands, so the badge says Offer expired.
+   */
   | { kind: "app-offer-expired"; offerExpiredAt: string; windowOpen: boolean };
 
 export type EventStateKind = EventState["kind"];
@@ -151,8 +155,8 @@ export function eventStateFor(
   }
 
   // An event without an end ends when it starts.
-  const eventEnd = event.ends_at ?? event.starts_at;
-  if (eventEnd && t > time(eventEnd)) {
+  const eventEnd = eventEndsAt(event);
+  if (hasEventEnded(event, now)) {
     return ticket
       ? { kind: "reg-past-attended", ticketId: ticket.id }
       : { kind: "reg-past" };

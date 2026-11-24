@@ -7,14 +7,14 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Label } from "@/components/ui/label";
 import { SearchField } from "@/components/ui/search-field";
 import { Switch } from "@/components/ui/switch";
-import type { EventBadge } from "@/features/events/types";
-import type { EventRow } from "@/lib/supabase/models";
+import type { EventBadge, TimelineEvent } from "@/features/events/types";
 import { groupEventsByMonth, normalizeString } from "@/features/events/lib/event-timeline";
 import { EventTimelineRail } from "./EventTimelineRail";
 
 interface EventTimelineProps {
-  upcomingEvents: EventRow[];
-  pastEvents: EventRow[];
+  /** Narrow rows with `toTimelineEvent` on the server: this is a client component. */
+  upcomingEvents: TimelineEvent[];
+  pastEvents: TimelineEvent[];
   /**
    * Each event's badge, keyed by event id; build it with `eventBadgeFor`.
    * An event without one shows "past" in the past list and no badge otherwise.
@@ -35,7 +35,7 @@ export function EventTimeline({
 
   // Search filters both sections.
   const query = normalizeString(searchQuery);
-  const matches = (event: EventRow) =>
+  const matches = (event: TimelineEvent) =>
     !query ||
     normalizeString(event.name).includes(query) ||
     (event.location_building && normalizeString(event.location_building).includes(query)) ||

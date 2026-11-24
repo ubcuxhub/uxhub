@@ -34,7 +34,10 @@ import { Separator } from "@/components/ui/separator";
 import { StatusBadge, type Status } from "@/components/ui/status-badge";
 import { ToastView, toast } from "@/components/ui/toast";
 import { EventTicket } from "@/features/events/components/EventTicket";
-import { EventRegistrationTicket } from "@/features/events/components/EventRegistrationTicket";
+import { QrCode } from "@/features/events/components/QrCode";
+import { TicketDialog } from "@/features/events/components/TicketDialog";
+import { RegistrationTicket } from "@/components/shared/RegistrationTicket";
+import { Ticket } from "@/components/shared/Ticket";
 import { DRAFT_EVENT_BADGE } from "@/features/events/lib/event-badge";
 
 import { ART_BLUE, HERE, PEOPLE, QR_TOKEN } from "../_fixtures";
@@ -178,13 +181,14 @@ function ScannableTicket() {
   );
 }
 
+/** The portal registration panel's ticket layout, with its "Your ticket" dialog. */
 function RegisteredEvent() {
-  return <EventRegistrationTicket
-    eventName="Portfolio Review Night"
-    holderName="Aubrey Ventura"
-    checkedIn={false}
-    qrToken={QR_TOKEN}
-    participantPackages={[]}
+  const ticket = { eventName: "Portfolio Review Night", holderName: "Aubrey Ventura" };
+  return <RegistrationTicket
+    title={`You’re going to ${ticket.eventName}`}
+    description="Show your ticket at check-in."
+    ticket={<Ticket {...ticket} state="active" code={<QrCode token={QR_TOKEN} className="size-full" />} />}
+    actions={<TicketDialog {...ticket} qrToken={QR_TOKEN} trigger={<Button>View ticket</Button>} />}
   />;
 }
 

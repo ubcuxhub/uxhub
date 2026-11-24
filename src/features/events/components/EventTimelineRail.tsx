@@ -1,9 +1,8 @@
 import { EventCard, EventCardDates } from "@/components/shared/EventCard";
 import type { Status, StatusBadgeSpec } from "@/components/ui/status-badge";
-import type { EventGroup } from "@/features/events/types";
+import type { EventGroup, TimelineEvent } from "@/features/events/types";
 import { formatEventDateLabel, formatEventDateTimeLines } from "@/lib/date";
 import { resolveImagePreviewSrc } from "@/lib/event-image";
-import type { EventRow } from "@/lib/supabase/models";
 import { cn } from "@/lib/utils";
 
 interface EventTimelineRailProps {
@@ -13,15 +12,15 @@ interface EventTimelineRailProps {
    * The badge for an event's card: a status, or a spec for the dated labels
    * (`{ status: "opens", date: "Oct 12" }`). Return `null` for none.
    */
-  statusFor: (event: EventRow) => Status | StatusBadgeSpec | null;
+  statusFor: (event: TimelineEvent) => Status | StatusBadgeSpec | null;
   /** Where a card links. Defaults to the portal event page. */
-  hrefFor?: (event: EventRow) => string;
+  hrefFor?: (event: TimelineEvent) => string;
   /** The month headings' level; a rail under its own section heading uses "h3". */
   monthHeadingAs?: "h2" | "h3";
   className?: string;
 }
 
-const portalHref = (event: EventRow) => `/portal/events/${event.slug}`;
+const portalHref = (event: TimelineEvent) => `/portal/events/${event.slug}`;
 
 /**
  * The presentational half of the events timeline (§3.9): a heading per month,
@@ -68,7 +67,7 @@ function EventTimelineRow({
   status,
   isLast,
 }: {
-  event: EventRow;
+  event: TimelineEvent;
   href: string;
   status: Status | StatusBadgeSpec | null;
   isLast: boolean;

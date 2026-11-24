@@ -8,7 +8,9 @@ import {
   fetchPurchasesForUser,
   type PurchaseWithDetails,
 } from "@/lib/supabase-helpers/purchases";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { formatTimestamp } from "@/lib/date";
 import { cn } from "@/lib/utils";
 import { purchaseStatusLabel } from "@/features/payments/purchase-status";
@@ -38,25 +40,55 @@ function describePurchase(purchase: PurchaseWithDetails) {
       };
 }
 
+type PurchasesResult =
+  | { status: "loading" }
+  | { status: "error" }
+  | { status: "loaded"; purchases: PurchaseWithDetails[] };
+
 export function PurchaseHistorySettings() {
-  const { user } = useUser();
-  const [purchases, setPurchases] = useState<PurchaseWithDetails[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { user, loading: userLoading } = useUser();
+  const [result, setResult] = useState<PurchasesResult>({ status: "loading" });
+  // Bumped by Try again, to read the purchases afresh.
+  const [attempt, setAttempt] = useState(0);
+  const userId = user?.id;
 
   useEffect(() => {
-    if (!user) return;
-    fetchPurchasesForUser(supabase, user.id)
-      .then(setPurchases)
-      .catch((e) => console.error("Error loading purchases:", e))
-      .finally(() => setLoading(false));
-  }, [user]);
+    if (!userId) return;
+    let active = true;
+    fetchPurchasesForUser(supabase, userId).then(
+      (purchases) => {
+        if (active) setResult({ status: "loaded", purchases });
+      },
+      (error) => {
+        console.error("Error loading purchases:", error);
+        if (active) setResult({ status: "error" });
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [userId, attempt]);
 
-  if (loading) return <PurchaseListSkeleton />;
-  if (purchases.length === 0) return <EmptyPurchases />;
+  const retry = () => {
+    setResult({ status: "loading" });
+    setAttempt((n) => n + 1);
+  };
+
+  // Signed out (the dialog lives behind sign-in, so only briefly): nothing to list.
+  if (!user && !userLoading) return null;
+  if (!user || result.status === "loading") {
+    return (
+      <div className="flex justify-center py-8">
+        <Spinner label="Loading purchases" />
+      </div>
+    );
+  }
+  if (result.status === "error") return <PurchasesError onRetry={retry} />;
+  if (result.purchases.length === 0) return <EmptyPurchases />;
 
   return (
     <div className="flex flex-col">
-      {purchases.map((purchase) => (
+      {result.purchases.map((purchase) => (
         <PurchaseRow key={purchase.id} purchase={purchase} />
       ))}
     </div>
@@ -109,24 +141,17 @@ function EmptyPurchases() {
   );
 }
 
-function PurchaseListSkeleton() {
+/** A failed read, which must not pass for an empty history. */
+function PurchasesError({ onRetry }: { onRetry: () => void }) {
   return (
-    <div className="flex flex-col">
-      {[0, 1, 2].map((i) => (
-        <div
-          key={i}
-          className="flex items-start justify-between gap-4 py-4 first:pt-0 last:pb-0"
-        >
-          <div className="w-full max-w-56 space-y-2">
-            <Skeleton className="h-4 w-2/5" />
-            <Skeleton className="h-4 w-full" />
-          </div>
-          <div className="w-20 space-y-2">
-            <Skeleton className="ml-auto h-4 w-12" />
-            <Skeleton className="ml-auto h-4 w-16" />
-          </div>
-        </div>
-      ))}
+    <div className="flex flex-col items-start gap-3">
+      <Alert variant="destructive">
+        <AlertTitle>Your purchases couldn’t be loaded</AlertTitle>
+        <AlertDescription>Check your connection and try again.</AlertDescription>
+      </Alert>
+      <Button variant="secondary" size="sm" onClick={onRetry}>
+        Try again
+      </Button>
     </div>
   );
 }

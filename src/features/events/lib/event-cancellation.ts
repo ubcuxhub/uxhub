@@ -1,5 +1,7 @@
 import type { EventRow } from "@/lib/supabase/models";
 
+import { hasEventEnded } from "./event-rules";
+
 /** The fields that say whether an event reads as canceled right now. */
 export type CancelableEvent = Pick<EventRow, "canceled_at" | "starts_at" | "ends_at">;
 
@@ -11,7 +13,5 @@ export type CancelableEvent = Pick<EventRow, "canceled_at" | "starts_at" | "ends
  * `eventStateFor`.
  */
 export function isCanceledEvent(event: CancelableEvent, now: Date = new Date()): boolean {
-  if (!event.canceled_at) return false;
-  const end = event.ends_at ?? event.starts_at;
-  return !end || now.getTime() <= Date.parse(end);
+  return !!event.canceled_at && !hasEventEnded(event, now);
 }

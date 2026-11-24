@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { Card, CardTitle } from "@/components/ui/card";
@@ -5,11 +6,30 @@ import { FLAGS } from "@/lib/flags";
 import Navbar from "@/features/marketing/homepage-sections/Navbar";
 import Footer from "@/features/marketing/homepage-sections/Footer";
 import { MarketingEventCard } from "@/features/marketing/components/MarketingEventCard";
+import { listPublicEvents, type ListedEvent } from "@/features/marketing/lib/public-events";
 import { createPublicClient } from "@/lib/supabase/public";
-import { publicMarketingDestination } from "@/lib/event-marketing";
 import { fetchEvents } from "@/lib/supabase-helpers/events";
 
+// The upcoming/past split is computed at render, so it can lag by this long.
 export const revalidate = 300;
+
+export const metadata: Metadata = {
+  title: "Events · UBC UX Hub",
+  description: "Workshops, talks and socials from UBC UX Hub. Join us to learn, build, and connect.",
+};
+
+/** How many past events the page lists, most recent first. */
+const PAST_EVENTS_SHOWN = 6;
+
+function eventGrid(events: ListedEvent[]) {
+  return (
+    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      {events.map(({ event, href, external }) => (
+        <MarketingEventCard key={event.id} event={event} href={href} external={external} />
+      ))}
+    </div>
+  );
+}
 
 export default async function EventsPage() {
   // Redirect rather than 404: this URL is public and indexed, and the homepage
@@ -21,11 +41,8 @@ export default async function EventsPage() {
     orderBy: "starts_at",
     status: "active",
   });
-
-  const listed = events.flatMap((event) => {
-    const destination = publicMarketingDestination(event);
-    return destination.kind === "none" ? [] : [{ event, destination }];
-  });
+  const { upcoming, past } = listPublicEvents(events, new Date());
+  const recentPast = past.slice(0, PAST_EVENTS_SHOWN);
 
   return (
     <main className="min-h-screen">
@@ -43,21 +60,19 @@ export default async function EventsPage() {
             </p>
           </div>
 
-          {listed.length === 0 ? (
+          {upcoming.length === 0 ? (
             <Card className="border-dashed py-20 text-center">
               <CardTitle>Events coming soon</CardTitle>
             </Card>
           ) : (
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              {listed.map(({ event, destination }) => (
-                <MarketingEventCard
-                  key={event.id}
-                  event={event}
-                  href={destination.kind === "external" ? destination.url : `/events/${event.slug || event.id}`}
-                  external={destination.kind === "external"}
-                />
-              ))}
-            </div>
+            eventGrid(upcoming)
+          )}
+
+          {recentPast.length > 0 && (
+            <section aria-labelledby="past-events" className="mt-16">
+              <h2 id="past-events" className="mb-6 text-h2">Past Events</h2>
+              {eventGrid(recentPast)}
+            </section>
           )}
         </div>
       </div>
