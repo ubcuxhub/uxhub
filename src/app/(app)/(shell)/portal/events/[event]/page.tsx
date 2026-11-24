@@ -61,9 +61,13 @@ export default async function PortalEventPage({
   const joinCode = typeof join === "string" ? join : null;
   const origin = getHeadersOrigin(await headers()) ?? "";
   const [participant, peopleSections, sponsors, states, teams] = await Promise.all([
-    fetchEventParticipantContent(supabase, event.id),
-    // Admins switch these sections off per event, as the public event page
-    // does. `mentors_enabled` covers every people section but Sponsors.
+    // Agenda item links come from event_links, which RLS filters by each
+    // link's visibility. Only fetched when there's an agenda to put them on.
+    fetchEventParticipantContent(supabase, event.id).then(async (content) => ({
+      ...content,
+      links: content.agenda.some((day) => day.items.length > 0) ? await fetchEventLinks(supabase, event.id) : [],
+    })),
+    // Admins switch these sections off per event, as the public event page does.
     event.mentors_enabled ? fetchEventPeopleSections(supabase, event.id) : [],
     event.sponsors_enabled ? fetchEventSponsors(supabase, event.id) : [],
     loadEventStates(supabase, user.id, [event]),
@@ -189,7 +193,14 @@ export default async function PortalEventPage({
       {event.status === "draft" && <EventDraftSections event={event} />}
 
 
-      <EventAgendaTable eventName={event.name} agenda={participant.agenda} />
+      <EventAgendaTable
+        eventName={event.name}
+        agenda={participant.agenda}
+        today={pacificDate(new Date().toISOString())}
+        itemLinks={Object.fromEntries(
+          participant.links.flatMap((link) => (link.agenda_item_id ? [[link.agenda_item_id, link.url]] : []))
+        )}
+      />
 
       {/* One card per people section (Judges, Mentors, Speakers, Panelists or a
           custom title), in the builder's order. */}
