@@ -5,6 +5,8 @@ import {
   formatDuration,
   formatTimeInput,
   isEndBeforeStart,
+  isoToLocalDate,
+  localDateToIso,
   parseDateInput,
   parseTimeInput,
   timeOptions,
@@ -246,5 +248,14 @@ describe("isEndBeforeStart", () => {
     expect(isEndBeforeStart("08:00", "09:00")).toBe(true);
     expect(isEndBeforeStart("09:00", "09:00")).toBe(false);
     expect(isEndBeforeStart("10:00", "09:00")).toBe(false);
+  });
+});
+
+describe("isoToLocalDate and localDateToIso", () => {
+  it("round-trip a calendar day through local midnight", () => {
+    const date = isoToLocalDate("2026-03-08" as IsoDate);
+    expect([date.getFullYear(), date.getMonth(), date.getDate(), date.getHours()]).toEqual([2026, 2, 8, 0]);
+    expect(localDateToIso(date)).toBe("2026-03-08");
+    expect(localDateToIso(new Date(2026, 0, 5, 23, 59))).toBe("2026-01-05");
   });
 });

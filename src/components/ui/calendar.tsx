@@ -12,6 +12,7 @@ import {
   type DayButton,
 } from "react-day-picker"
 
+import { localDateToIso } from "@/lib/date-input"
 import { cn } from "@/lib/utils"
 
 const navButton =
@@ -192,7 +193,7 @@ function CalendarDayButton({
       ref={ref}
       type="button"
       // ISO, not toLocaleDateString(): the same on the server and every browser.
-      data-day={`${day.date.getFullYear()}-${String(day.date.getMonth() + 1).padStart(2, "0")}-${String(day.date.getDate()).padStart(2, "0")}`}
+      data-day={localDateToIso(day.date)}
       data-today={modifiers.today && !modifiers.selected}
       data-selected-single={
         modifiers.selected &&
