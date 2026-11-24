@@ -22,11 +22,6 @@ const events = vi.hoisted(() => ({
 const eventImageIsReferenced = vi.hoisted(() => vi.fn());
 const eventDrafts = vi.hoisted(() => ({ saveEventDraft: vi.fn(), fetchEventDraft: vi.fn() }));
 vi.mock("@/lib/supabase-helpers/event-drafts", () => ({ eventImageIsReferenced, ...eventDrafts }));
-const checkIns = vi.hoisted(() => ({
-  fetchCheckInAttendees: vi.fn(),
-  fetchCheckInSessions: vi.fn(),
-  fetchCheckInStatuses: vi.fn(),
-}));
 const applications = vi.hoisted(() => ({
   decideEventApplication: vi.fn(),
   fetchEventApplicationById: vi.fn(),
@@ -52,7 +47,6 @@ vi.mock("next/cache", () => ({ revalidatePath }));
 vi.mock("@/lib/auth/guards", () => guards);
 vi.mock("@/lib/supabase-helpers/admin-server", () => adminServer);
 vi.mock("@/lib/supabase-helpers/events", () => events);
-vi.mock("@/lib/supabase-helpers/check-ins", () => checkIns);
 vi.mock("@/lib/supabase-helpers/event-applications", () => applications);
 vi.mock("@/lib/supabase-helpers/application-files", () => applicationFiles);
 vi.mock("@/lib/supabase-helpers/event-people", () => eventPeople);
@@ -67,13 +61,11 @@ vi.mock("@/lib/supabase/server", () => ({
 import {
   deleteAdminEventAction,
   discardUnusedEventImageAction,
-  fetchAdminCheckInSnapshotAction,
   saveAdminEventAction,
   savePastEventResourcesAction,
   saveAdminEventDraftAction,
   setMembershipTermEndsAtAction,
   updateApplicationDecisionAction,
-  updateManagerUserAction,
   saveManagerUserDetailsAction,
   updateMembershipTypeAction,
   updateUserRoleAction,
@@ -94,11 +86,16 @@ beforeEach(() => {
   adminRpc.mockResolvedValue({ data: { id: "event-1" }, error: null });
 });
 
+
 // ---------------------------------------------------------------------------
 // The manager column allowlist
 // ---------------------------------------------------------------------------
 
-describe("updateManagerUserAction: the column allowlist", () => {
+describe("saveManagerUserDetailsAction: the column allowlist", () => {
+  beforeEach(() => {
+    saveAdminProfile.mockResolvedValue({ id: "user-1" });
+  });
+
   it.each([
     "role_access",
     "id",
@@ -111,46 +108,37 @@ describe("updateManagerUserAction: the column allowlist", () => {
     "email",
   ])("refuses to write the unlisted column %s", async (field) => {
     await expect(
-      updateManagerUserAction("user-1", field, "anything"),
+      saveManagerUserDetailsAction("user-1", { [field]: "anything" }),
     ).rejects.toThrow("This user field cannot be edited.");
 
     // This write goes through the service role, which bypasses RLS. The
     // allowlist is the only thing between a manager and a privilege
     // escalation, so nothing may reach the helper.
-    expect(adminServer.adminUpdateUserInfoById).not.toHaveBeenCalled();
+    expect(saveAdminProfile).not.toHaveBeenCalled();
   });
 
   it.each([
     "first_name",
     "last_name",
     "phone",
-    "newsletter",
     "student_number",
     "faculty",
     "major",
     "membership_type_id",
   ])("writes the allowlisted column %s", async (field) => {
-    await updateManagerUserAction("user-1", field, "value");
+    await saveManagerUserDetailsAction("user-1", { [field]: "value" });
 
-    expect(adminServer.adminUpdateUserInfoById).toHaveBeenCalledWith("user-1", {
+    expect(saveAdminProfile).toHaveBeenCalledWith(expect.anything(), "user-1", {
       [field]: "value",
     });
     expect(revalidatePath).toHaveBeenCalledWith("/admin/users", "layout");
   });
 
   it("maps the form's order_date onto the deprecated column", async () => {
-    await updateManagerUserAction("user-1", "order_date", "2026-01-05");
+    await saveManagerUserDetailsAction("user-1", { order_date: "2026-01-05" });
 
-    expect(adminServer.adminUpdateUserInfoById).toHaveBeenCalledWith("user-1", {
+    expect(saveAdminProfile).toHaveBeenCalledWith(expect.anything(), "user-1", {
       order_date_deprecated: "2026-01-05",
-    });
-  });
-
-  it("trims whitespace around a name", async () => {
-    await updateManagerUserAction("user-1", "first_name", "  Jamie  ");
-
-    expect(adminServer.adminUpdateUserInfoById).toHaveBeenCalledWith("user-1", {
-      first_name: "Jamie",
     });
   });
 
@@ -158,60 +146,38 @@ describe("updateManagerUserAction: the column allowlist", () => {
     ["first_name", "First name is required."],
     ["last_name", "Last name is required."],
   ])("rejects a blank %s", async (field, message) => {
-    await expect(updateManagerUserAction("user-1", field, "   ")).rejects.toThrow(
-      message,
-    );
-    expect(adminServer.adminUpdateUserInfoById).not.toHaveBeenCalled();
+    await expect(saveManagerUserDetailsAction("user-1", { [field]: "   " })).rejects.toThrow(message);
+    expect(saveAdminProfile).not.toHaveBeenCalled();
   });
 
   it("rejects a name that is not a string", async () => {
     await expect(
-      updateManagerUserAction("user-1", "first_name", 7),
+      saveManagerUserDetailsAction("user-1", { first_name: 7 }),
     ).rejects.toThrow("First name is required.");
-    expect(adminServer.adminUpdateUserInfoById).not.toHaveBeenCalled();
+    expect(saveAdminProfile).not.toHaveBeenCalled();
   });
 
   it.each(["6", "0", "first", ""])(
     "rejects the university year %s",
     async (year) => {
       await expect(
-        updateManagerUserAction("user-1", "year", year),
+        saveManagerUserDetailsAction("user-1", { year }),
       ).rejects.toThrow("Invalid university year.");
-      expect(adminServer.adminUpdateUserInfoById).not.toHaveBeenCalled();
+      expect(saveAdminProfile).not.toHaveBeenCalled();
     },
   );
 
-  it.each(["1", "2", "3", "4", "5+"])("accepts the year %s", async (year) => {
-    await updateManagerUserAction("user-1", "year", year);
+  it.each(["1", "2", "3", "4", "5+", null])("accepts the year %s", async (year) => {
+    await saveManagerUserDetailsAction("user-1", { year });
 
-    expect(adminServer.adminUpdateUserInfoById).toHaveBeenCalledWith("user-1", {
-      year,
-    });
-  });
-
-  it("allows clearing the year", async () => {
-    await updateManagerUserAction("user-1", "year", null);
-
-    expect(adminServer.adminUpdateUserInfoById).toHaveBeenCalledWith("user-1", {
-      year: null,
-    });
+    expect(saveAdminProfile).toHaveBeenCalledWith(expect.anything(), "user-1", { year });
   });
 
   it("requires a user id", async () => {
-    await expect(updateManagerUserAction("", "major", "Art")).rejects.toThrow(
+    await expect(saveManagerUserDetailsAction("", { major: "Art" })).rejects.toThrow(
       "A user id is required.",
     );
-    expect(adminServer.adminUpdateUserInfoById).not.toHaveBeenCalled();
-  });
-
-  it("checks the manager guard before validating anything", async () => {
-    const redirect = new Error("NEXT_REDIRECT");
-    guards.requireManager.mockRejectedValue(redirect);
-
-    await expect(updateManagerUserAction("user-1", "major", "Art")).rejects.toBe(
-      redirect,
-    );
-    expect(adminServer.adminUpdateUserInfoById).not.toHaveBeenCalled();
+    expect(saveAdminProfile).not.toHaveBeenCalled();
   });
 });
 
@@ -706,44 +672,34 @@ describe("saveAdminEventAction", () => {
 // ---------------------------------------------------------------------------
 
 describe("deleteAdminEventAction", () => {
-  it("deletes the event and then its cover image", async () => {
-    events.fetchEventById.mockResolvedValue({
-      id: "event-1",
-      image_url: "https://store/cover.png",
-    });
-    adminRpc.mockResolvedValue({ error: null });
+  it("deletes the event with its receipt, then the images and files it returns", async () => {
+    adminRpc.mockResolvedValue({ data: { images: ["https://store/cover.png"], files: ["u/a/q/cv.pdf"] }, error: null });
 
-    await deleteAdminEventAction("event-1");
+    await deleteAdminEventAction("event-1", "operation-1");
 
-    expect(adminRpc).toHaveBeenCalledWith("delete_event_atomically", {
-      target_event_id: "event-1",
+    expect(adminRpc).toHaveBeenCalledWith("delete_admin_event_safely", {
+      p_event_id: "event-1",
+      p_operation_id: "operation-1",
     });
     expect(adminServer.adminDeleteEventImageByUrl).toHaveBeenCalledWith(
       "https://store/cover.png",
     );
+    expect(applicationFiles.removeApplicationFiles).toHaveBeenCalledWith(expect.anything(), ["u/a/q/cv.pdf"]);
     expect(revalidatePath).toHaveBeenCalledWith("/admin/events", "layout");
   });
 
-  it("keeps the image when the delete fails", async () => {
+  it("keeps the images when the delete fails", async () => {
     const failure = new Error("foreign key violation");
-    events.fetchEventById.mockResolvedValue({
-      id: "event-1",
-      image_url: "https://store/cover.png",
-    });
-    adminRpc.mockResolvedValue({ error: failure });
+    adminRpc.mockResolvedValue({ data: null, error: failure });
 
-    await expect(deleteAdminEventAction("event-1")).rejects.toBe(failure);
+    await expect(deleteAdminEventAction("event-1", "operation-1")).rejects.toBe(failure);
     expect(adminServer.adminDeleteEventImageByUrl).not.toHaveBeenCalled();
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
   it("returns the database's refusal when members or live purchases protect the event", async () => {
-    events.fetchEventById.mockResolvedValue({ id: "event-1", image_url: "https://store/cover.png" });
-    adminRpc.mockResolvedValue({ error: { message: "refused", hint: "EVENT_DELETE_PROTECTED" } });
+    adminRpc.mockResolvedValue({ data: null, error: { message: "refused", hint: "EVENT_DELETE_PROTECTED" } });
 
-    await expect(deleteAdminEventAction("event-1")).resolves.toEqual({
-      error: expect.stringMatching(/can’t be deleted/),
-    });
     await expect(deleteAdminEventAction("event-1", "operation-1")).resolves.toEqual({
       error: expect.stringMatching(/can’t be deleted/),
     });
@@ -751,20 +707,10 @@ describe("deleteAdminEventAction", () => {
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
-  it("copes with an event that has no cover image", async () => {
-    events.fetchEventById.mockResolvedValue({ id: "event-1", image_url: null });
-    adminRpc.mockResolvedValue({ error: null });
+  it("copes with an event that had no images or files", async () => {
+    adminRpc.mockResolvedValue({ data: null, error: null });
 
-    await deleteAdminEventAction("event-1");
-
-    expect(adminServer.adminDeleteEventImageByUrl).not.toHaveBeenCalled();
-  });
-
-  it("copes with an event that no longer exists", async () => {
-    events.fetchEventById.mockResolvedValue(null);
-    adminRpc.mockResolvedValue({ error: null });
-
-    await expect(deleteAdminEventAction("event-1")).resolves.toBeUndefined();
+    await expect(deleteAdminEventAction("event-1", "operation-1")).resolves.toBeUndefined();
     expect(adminServer.adminDeleteEventImageByUrl).not.toHaveBeenCalled();
   });
 
@@ -772,31 +718,11 @@ describe("deleteAdminEventAction", () => {
     const redirect = new Error("NEXT_REDIRECT");
     guards.requireAdmin.mockRejectedValue(redirect);
 
-    await expect(deleteAdminEventAction("event-1")).rejects.toBe(redirect);
+    await expect(deleteAdminEventAction("event-1", "operation-1")).rejects.toBe(redirect);
     expect(adminRpc).not.toHaveBeenCalled();
   });
 });
 
-// ---------------------------------------------------------------------------
-// Check-in
-// ---------------------------------------------------------------------------
-
-describe("fetchAdminCheckInSnapshotAction", () => {
-  it("returns the three sources as one snapshot with statuses serialized", async () => {
-    checkIns.fetchCheckInSessions.mockResolvedValue([{ id: "session-1" }]);
-    checkIns.fetchCheckInAttendees.mockResolvedValue([{ id: "ticket-1" }]);
-    checkIns.fetchCheckInStatuses.mockResolvedValue(
-      new Map([["ticket-1_session-1", "2026-10-20T18:00:00.000Z"]]),
-    );
-
-    await expect(fetchAdminCheckInSnapshotAction("event-1")).resolves.toEqual({
-      sessions: [{ id: "session-1" }],
-      attendees: [{ id: "ticket-1" }],
-      // A Map cannot cross the server-action boundary, so it ships as entries.
-      statuses: [["ticket-1_session-1", "2026-10-20T18:00:00.000Z"]],
-    });
-  });
-});
 
 // ---------------------------------------------------------------------------
 // The rest of the file, so a rejection anywhere in it stops short of a write

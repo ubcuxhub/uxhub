@@ -26,7 +26,6 @@ import {
   adminDeleteEventImageByUrl,
   adminUpdateMembershipTermEndsAt,
   adminUpdateMembershipTypeById,
-  adminUpdateUserInfoById,
 } from "@/lib/supabase-helpers/admin-server";
 import { datetimeLocalToTimestamptz, formatTimestamp } from "@/lib/date";
 import { assertPublishAt, isTimestamptz, builderPublicationProblem, publicationClosingProblem } from "@/features/admin/lib/event-publication";
@@ -35,18 +34,11 @@ import {
   type MembershipTypeInput,
 } from "@/features/admin/lib/membership-type";
 import {
-  fetchCheckInAttendees,
-  fetchCheckInSessions,
-  fetchCheckInStatuses,
-} from "@/lib/supabase-helpers/check-ins";
-import { mutateItemCheckIn, fetchLegacyCheckInTarget } from "@/lib/supabase-helpers/item-check-in";
-import {
   regenerateEventTicketToken,
   voidEventTicket,
   type VoidEventTicketRefusal,
 } from "@/lib/supabase-helpers/event-tickets";
 import { isUuid } from "@/lib/uuid";
-import type { CheckInResult } from "./types";
 import { removeApplicationFiles } from "@/lib/supabase-helpers/application-files";
 import {
   decideEventApplication,
@@ -122,22 +114,6 @@ function assertManagerUserUpdate(
   }
 
   return { [databaseField]: value } as UserInfoUpdate;
-}
-
-export async function updateManagerUserAction(
-  userId: string,
-  field: string,
-  value: string | number | boolean | null
-) {
-  await requireManager();
-
-  if (!userId) {
-    throw new Error("A user id is required.");
-  }
-
-  const payload = assertManagerUserUpdate(field, value);
-  await adminUpdateUserInfoById(userId, payload);
-  revalidatePath("/admin/users", "layout");
 }
 
 /** Save the form's profile fields together; roles retain their separate RPC guard. */
@@ -541,31 +517,23 @@ export async function saveAdminEventAction(
 const EVENT_DELETE_PROTECTED = "EVENT_DELETE_PROTECTED";
 const EVENT_DELETE_PROTECTED_MESSAGE = "This event can’t be deleted because members are registered, hold offers, or have payments that aren’t failed, canceled or refunded. Nothing has been deleted.";
 
-export async function deleteAdminEventAction(eventId: string, operationId?: string): Promise<{ error: string } | undefined> {
+/**
+ * Deletes an event and its images and application files. `operationId` is
+ * the receipt that lets a retry after a lost response find the delete that
+ * already happened.
+ */
+export async function deleteAdminEventAction(eventId: string, operationId: string): Promise<{ error: string } | undefined> {
   await requireAdmin();
 
-  if (operationId) {
-    const { data, error } = await supabaseAdmin.rpc("delete_admin_event_safely", { p_event_id: eventId, p_operation_id: operationId });
-    if (error?.hint === EVENT_DELETE_PROTECTED) {
-      log.warn("admin.event_delete_refused", { eventId });
-      return { error: EVENT_DELETE_PROTECTED_MESSAGE };
-    }
-    if (error) throw error;
-    const assets = data as { images?: string[]; files?: string[] } | null;
-    await Promise.all((assets?.images ?? []).map(discardEventImage));
-    await discardApplicationFiles(assets?.files ?? []);
-  } else {
-    // Compatibility for existing server callers; the builder uses a receipt.
-    const existing = await fetchEventById(supabaseAdmin, eventId);
-    const { error } = await supabaseAdmin.rpc("delete_event_atomically", { target_event_id: eventId });
-    if (error?.hint === EVENT_DELETE_PROTECTED) {
-      log.warn("admin.event_delete_refused", { eventId });
-      return { error: EVENT_DELETE_PROTECTED_MESSAGE };
-    }
-    if (error) throw error;
-    await discardEventImage(existing?.image_url);
-    await discardEventImage(existing?.header_image_url);
+  const { data, error } = await supabaseAdmin.rpc("delete_admin_event_safely", { p_event_id: eventId, p_operation_id: operationId });
+  if (error?.hint === EVENT_DELETE_PROTECTED) {
+    log.warn("admin.event_delete_refused", { eventId });
+    return { error: EVENT_DELETE_PROTECTED_MESSAGE };
   }
+  if (error) throw error;
+  const assets = data as { images?: string[]; files?: string[] } | null;
+  await Promise.all((assets?.images ?? []).map(discardEventImage));
+  await discardApplicationFiles(assets?.files ?? []);
 
   revalidatePath("/admin/events", "layout");
 }
@@ -657,45 +625,6 @@ export async function updateApplicationDecisionAction(
     throw new Error("The decided application could not be read back.");
   }
   return { ok: true, application: { ...updated, status: updated.status }, overCapacity: decided.overCapacity };
-}
-
-/** Compatibility entry points resolve sessions to enabled items and use the same
- * authenticated transaction as the item routes. Unversioned undo is refused. */
-async function legacyCheckInTarget(sessionId: string) {
-  await requireAdmin();
-  if (!isUuid(sessionId)) throw new Error("Check-in item unavailable.");
-  const client = await createClient();
-  return { client, ...await fetchLegacyCheckInTarget(client, sessionId) };
-}
-export async function toggleCheckInAction(ticketId: string, sessionId: string, checked: boolean, attendanceVersion?: string): Promise<string | null> {
-  const { client, ...target } = await legacyCheckInTarget(sessionId);
-  if (!checked && !attendanceVersion) throw new Error("Refresh check-in before undoing attendance.");
-  const result = await mutateItemCheckIn(client, { ...target, ticketId, undoVersion: checked ? undefined : attendanceVersion });
-  if (result.status === "checked_in" || result.status === "already_checked_in") return result.checkedInAt;
-  if (result.status === "undone") return null;
-  throw new Error("Check-in changed or the ticket is unavailable. Refresh and try again.");
-}
-export async function checkInScannedTicketAction(sessionId: string, code: string): Promise<CheckInResult> {
-  const { client, ...target } = await legacyCheckInTarget(sessionId);
-  const result = await mutateItemCheckIn(client, { ...target, code });
-  if (result.status === "undone" || result.status === "stale_undo") throw new Error("Unexpected check-in result.");
-  return result;
-}
-export async function checkInTicketAction(sessionId: string, ticketId: string): Promise<CheckInResult> {
-  const { client, ...target } = await legacyCheckInTarget(sessionId);
-  const result = await mutateItemCheckIn(client, { ...target, ticketId });
-  if (result.status === "undone" || result.status === "stale_undo") throw new Error("Unexpected check-in result.");
-  return result;
-}
-
-export async function fetchAdminCheckInSnapshotAction(eventId: string) {
-  await requireAdmin();
-  const [sessions, attendees, statuses] = await Promise.all([
-    fetchCheckInSessions(supabaseAdmin, eventId),
-    fetchCheckInAttendees(supabaseAdmin, eventId),
-    fetchCheckInStatuses(supabaseAdmin, eventId),
-  ]);
-  return { sessions, attendees, statuses: Array.from(statuses.entries()) };
 }
 
 export type TicketAdminActionResult = { ok: true } | { ok: false; error: string };

@@ -50,13 +50,3 @@ export async function mutateItemCheckIn(client: DbClient, input: { eventId: stri
     throw error;
   return data as unknown as ItemCheckInResult | { status: "undone" } | { status: "stale_undo" };
 }
-
-/** Resolves compatibility sessions without accepting an unbound legacy target. */
-export async function fetchLegacyCheckInTarget(client: DbClient, sessionId: string) {
-  const { data, error } = await client.from(TABLES.checkInSessions).select("event_id,agenda_item_id").eq("id", sessionId).maybeSingle();
-  if (error)
-    throw error;
-  if (!data?.agenda_item_id)
-    throw new Error("Check-in item unavailable.");
-  return { eventId: data.event_id, itemId: data.agenda_item_id };
-}

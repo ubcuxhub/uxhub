@@ -7,7 +7,7 @@ const context = vi.hoisted(() => ({ requireAdmin: vi.fn(), createClient: vi.fn()
 vi.mock("@/lib/auth/guards", () => ({ requireAdmin: context.requireAdmin, requireManager: vi.fn() }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: context.createClient }));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-import { checkInScannedTicketAction, checkInTicketAction, toggleCheckInAction, regenerateTicketQrAction, voidTicketAction } from "@/features/admin/actions";
+import { regenerateTicketQrAction, voidTicketAction } from "@/features/admin/actions";
 
 async function setup(f: Fixtures, times = { start: "2026-01-01T18:00:00Z", end: "2026-01-01T19:00:00Z" }) {
   const db = f.supabase;
@@ -140,24 +140,6 @@ describe("atomic item check-in", () => {
   }));
 });
 
-it("legacy actions enforce the same item/role/version guards without a time lock", () => withFixtures(async f => {
-  const x = await setup(f);
-
-  context.requireAdmin.mockResolvedValue(x.admin);
-
-  context.createClient.mockResolvedValue(clientAs(x.admin));
-  const first = await checkInScannedTicketAction(x.session.id, x.ticket.qr_token);
-  expect(first.status).toBe("checked_in");
-  expect((await checkInTicketAction(x.session.id, x.ticket.id)).status).toBe("already_checked_in");
-  await expect(toggleCheckInAction(x.ticket.id, x.session.id, false)).rejects.toThrow("Refresh check-in");
-  const row = (await fetchItemCheckInSnapshot(clientAs(x.admin), x.event.id, x.item.id)).attendance[0];
-  await toggleCheckInAction(x.ticket.id, x.session.id, false, row.attendanceVersion);
-  expect((await checkInTicketAction(x.session.id, x.ticket.id)).status).toBe("checked_in");
-  await expect(toggleCheckInAction(x.ticket.id, x.session.id, false, row.attendanceVersion)).rejects.toThrow("Check-in changed");
-  context.requireAdmin.mockRejectedValue(new Error("Access denied"));
-  await expect(checkInTicketAction(x.session.id, x.ticket.id)).rejects.toThrow("Access denied");
-}));
-
 it("keeps two items independent and serializes undo against a simultaneous scan", () => withFixtures(async f => {
   const x = await setup(f);
 
@@ -184,7 +166,8 @@ async function ticketHolder(fixtures: Fixtures) {
   const x = await setup(fixtures);
   context.requireAdmin.mockResolvedValue(x.admin);
   context.createClient.mockResolvedValue(clientAs(x.admin));
-  return { sessionId: x.session.id, ticketId: x.ticket.id, qrToken: x.ticket.qr_token };
+  const scan = (code: string) => mutateItemCheckIn(clientAs(x.admin), { eventId: x.event.id, itemId: x.item.id, code });
+  return { scan, ticketId: x.ticket.id, qrToken: x.ticket.qr_token };
 }
 async function checkInRows(ticketId: string) {
   const { data, error } = await db.from("check_ins").select("checked_in_at").eq("ticket_id", ticketId);
@@ -233,18 +216,18 @@ describe("admin ticket actions", () => {
 
   it("regenerates a QR code so the old one, screenshots included, stops scanning", () =>
     withFixtures(async (fixtures) => {
-      const { sessionId, ticketId, qrToken } = await ticketHolder(fixtures);
+      const { scan, ticketId, qrToken } = await ticketHolder(fixtures);
 
       expect(await regenerateTicketQrAction(ticketId)).toEqual({ ok: true });
 
       const { data } = await db.from("event_tickets").select("qr_token").eq("id", ticketId).single();
       expect(data!.qr_token).toMatch(/^[0-9a-f]{32}$/);
       expect(data!.qr_token).not.toBe(qrToken);
-      expect(await checkInScannedTicketAction(sessionId, qrToken)).toEqual({
+      expect(await scan(qrToken)).toEqual({
         status: "rejected",
         reason: "not_found",
       });
-      expect(await checkInScannedTicketAction(sessionId, data!.qr_token)).toMatchObject({
+      expect(await scan(data!.qr_token)).toMatchObject({
         status: "checked_in",
         name: "Ada Lovelace",
       });
@@ -253,21 +236,21 @@ describe("admin ticket actions", () => {
 
   it("voids a free ticket and cancels its $0 registration", () =>
     withFixtures(async (fixtures) => {
-      const { sessionId, ticketId, qrToken } = await ticketHolder(fixtures);
+      const { scan, ticketId, qrToken } = await ticketHolder(fixtures);
       const purchaseId = await attachPurchase(fixtures, ticketId, { amount_cents: 0 });
 
       expect(await voidTicketAction(ticketId)).toEqual({ ok: true });
 
       expect(await ticketExists(ticketId)).toBe(false);
-      expect(await checkInScannedTicketAction(sessionId, qrToken)).toMatchObject({ status: "rejected" });
+      expect(await scan(qrToken)).toMatchObject({ status: "rejected" });
       const { data } = await db.from("purchases").select("status").eq("id", purchaseId).single();
       expect(data).toEqual({ status: "canceled" });
     }));
 
   it("refuses to void a checked-in ticket", () =>
     withFixtures(async (fixtures) => {
-      const { sessionId, ticketId, qrToken } = await ticketHolder(fixtures);
-      await checkInScannedTicketAction(sessionId, qrToken);
+      const { scan, ticketId, qrToken } = await ticketHolder(fixtures);
+      await scan(qrToken);
 
       expect(await voidTicketAction(ticketId)).toEqual({
         ok: false,

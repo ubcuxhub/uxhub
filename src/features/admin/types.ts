@@ -48,8 +48,8 @@ export interface CheckInAttendee {
   user_email: string;
 }
 
-/** Why a scan or a manual check-in was refused. */
-export type CheckInRejection = "invalid_code" | "not_found" | "wrong_event" | "event_canceled";
+/** Why a scan or a manual check-in was refused (`mutate_item_check_in`). */
+export type CheckInRejection = "not_found" | "event_canceled";
 
 /** What the door sees after a scan or a manual check-in. */
 export type CheckInResult =
