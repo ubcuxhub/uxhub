@@ -46,10 +46,13 @@ beforeEach(() => {
   window.history.replaceState(null, "", "/portal/events/uxathon/apply");
   profile.onSaved = undefined;
   refresh.mockClear();
+  // jsdom would navigate for real, later and into the next test.
+  vi.spyOn(window.history, "back").mockImplementation(() => {});
 });
 
 afterEach(() => {
   cleanup();
+  vi.restoreAllMocks();
 });
 
 describe("SettingsDialog refresh after a profile edit", () => {
@@ -101,5 +104,42 @@ describe("SettingsDialog refresh after a profile edit", () => {
 
     act(() => onSaved());
     expect(refresh).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("SettingsDialog history on close", () => {
+  it("goes back over the entry that opening it pushed, so Back then leaves the page", () => {
+    render(<SettingsDialog />);
+    openAt("#settings/general");
+    const replace = vi.spyOn(window.history, "replaceState");
+    close();
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(window.history.back).toHaveBeenCalledTimes(1);
+    expect(replace).not.toHaveBeenCalled();
+  });
+
+  it("keeps going back after a tab switch, which replaces rather than pushes", () => {
+    render(<SettingsDialog />);
+    openAt("#settings/general");
+    fireEvent.click(screen.getAllByRole("button", { name: "Profile" })[0]);
+    close();
+    expect(window.history.back).toHaveBeenCalledTimes(1);
+  });
+
+  it("strips the hash in place when it was open on load, with nothing of ours to go back over", () => {
+    window.history.replaceState(null, "", "/portal#settings/general");
+    render(<SettingsDialog />);
+    close();
+    expect(window.history.back).not.toHaveBeenCalled();
+    expect(window.location.hash).toBe("");
+  });
+
+  it("doesn't go back again once Back already closed it", () => {
+    render(<SettingsDialog />);
+    openAt("#settings/general");
+    openAt("");
+    openAt("#settings/general");
+    close();
+    expect(window.history.back).toHaveBeenCalledTimes(1);
   });
 });

@@ -100,15 +100,27 @@ export function SettingsDialog() {
     router.refresh();
   }, [open, router]);
 
+  // Whether a hash navigation opened it (`openSettings`, a link, Forward),
+  // pushing a history entry that closing should go back over. A deep link,
+  // open on load, has no entry of ours before it.
+  const pushedRef = useRef(false);
+
   useEffect(() => {
     const sync = () => {
       const state = parseHash();
       setTab(state?.tab ?? null);
       setShowMobileMenu(state?.showMenu ?? false);
+      return state !== null;
     };
     sync();
-    window.addEventListener("hashchange", sync);
-    return () => window.removeEventListener("hashchange", sync);
+    const onHashChange = () => {
+      const wasOpen = openRef.current;
+      const isOpen = sync();
+      if (isOpen && !wasOpen) pushedRef.current = true;
+      if (!isOpen) pushedRef.current = false;
+    };
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
 
   const selectTab = (next: SettingsTab) => {
@@ -127,11 +139,18 @@ export function SettingsDialog() {
     if (!open) {
       setTab(null);
       setShowMobileMenu(false);
-      window.history.replaceState(
-        null,
-        "",
-        window.location.pathname + window.location.search,
-      );
+      if (pushedRef.current) {
+        // Back over the entry opening it pushed, so the next Back leaves
+        // the page instead of landing on the same page again.
+        pushedRef.current = false;
+        window.history.back();
+      } else {
+        window.history.replaceState(
+          null,
+          "",
+          window.location.pathname + window.location.search,
+        );
+      }
     }
   };
 
