@@ -7,6 +7,7 @@ import type { EventApplicationSettingsRow } from "@/lib/supabase/models";
 
 import { asAgenda, agendaEnvelope, agendaProjection, withAgendaSessionIds, dateSessions, emptyEventDate, emptyLocation, type EventDateLocationDraft } from "../lib/event-date-location";
 
+import { eventHasEnded } from "../lib/event-facts";
 import { suggestedEventSlug } from "../lib/event-configuration";
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
@@ -75,10 +76,6 @@ interface UseEventFormOptions {
   onSuccess?: (id: string) => void;
 }
 
-function eventHasEnded(status: string, endsAt: string | null | undefined, startsAt?: string | null, now = Date.now()) {
-  const end = endsAt || startsAt;
-  return status === "active" && !!end && Date.parse(end) <= now;
-}
 
 function sameWorkingDocument(left: EventWorkingDocument, right: EventWorkingDocument) {
   const stable = (value: unknown) => JSON.stringify(value, (_key, item) => item && typeof item === "object" && !Array.isArray(item) ? Object.fromEntries(Object.entries(item).sort(([a], [b]) => a.localeCompare(b))) : item);
@@ -227,7 +224,7 @@ export function useEventForm({
   // A canceled event is read-only like an ended one: only links and resources
   // change (docs/event-states.md, "Canceled events").
   const canceled = Boolean(initialEvent?.canceled_at);
-  const past = eventHasEnded(publication.status, savedEnd, null, clock) || canceled;
+  const past = eventHasEnded({ status: publication.status, ends_at: savedEnd }, clock) || canceled;
   useEffect(() => {
     if (!savedEnd || past || publication.status !== "active") return;
     const timer = window.setTimeout(() => setClock(Date.now()), Math.min(2147483647, Math.max(1, Date.parse(savedEnd) - Date.now() + 1)));

@@ -204,12 +204,6 @@ function MomentField({
   );
 }
 
-/** As the database's `event_has_ended`: over once its end (or start, without one) has passed. */
-export function hasEnded(event: Pick<EventRow, "starts_at" | "ends_at">, now: Date) {
-  const end = event.ends_at ?? event.starts_at;
-  return Boolean(end && Date.parse(end) <= now.getTime());
-}
-
 export function RegistrationBadge({
   state,
   opensAt,
