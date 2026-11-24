@@ -51,7 +51,7 @@ async function resolveRegistrationPanel(node: ReactNode): Promise<ReactNode> {
   }
   if (node.props.children === undefined) return node;
   const children = await Promise.all(Children.toArray(node.props.children).map(resolveRegistrationPanel));
-  return cloneElement(node, {}, children);
+  return cloneElement(node, {}, ...children);
 }
 
 async function renderPage() {
