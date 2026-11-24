@@ -108,7 +108,7 @@ export default async function PortalEventPage({
         <div className="relative h-40 bg-muted" style={{ backgroundColor: event.header_colour || undefined }}>
           {event.header_image_url && <Image src={resolveImagePreviewSrc(event.header_image_url)} alt="" fill className="object-cover" unoptimized />}
         </div>
-        <div className="px-5 pb-8 sm:px-8">
+        <div className="px-8 pb-8">
           {/* Always there, with an image icon when the event has no image, so the header keeps its shape. */}
           <div className="relative -mt-12 flex size-24 items-center justify-center overflow-hidden rounded-xl border-4 border-card bg-muted text-muted-foreground">
             {event.image_url ? (
