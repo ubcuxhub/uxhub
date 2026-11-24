@@ -2,13 +2,13 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { withDeadline } from "@/lib/async/deadline";
-import { useNavigationRecovery } from "@/hooks/use-navigation-recovery";
+import { NAVIGATED, useGuardedSubmit } from "@/hooks/use-guarded-submit";
 import { resolvePostSignInPath } from "@/features/setup/actions";
 import { createClient } from "@/lib/supabase/client";
 
@@ -46,25 +46,15 @@ export function LoginForm({
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [passwordError, setPasswordError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const submittingRef = useRef(false);
   const router = useRouter();
-  const recoverStalledNavigation = useNavigationRecovery(() => {
-    submittingRef.current = false;
-    setIsLoading(false);
-    setError("You are signed in, but the next page did not load. Try again.");
-  });
+  const { pending: isLoading, run } = useGuardedSubmit(() =>
+    setError("You are signed in, but the next page did not load. Try again."),
+  );
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (submittingRef.current) return;
-
+  const signIn = async () => {
     const supabase = createClient();
-    submittingRef.current = true;
-    setIsLoading(true);
     setError(null);
     setPasswordError(null);
-    let navigationStarted = false;
 
     try {
       const normalizedEmail = email.trim().toLowerCase();
@@ -86,27 +76,25 @@ export function LoginForm({
       }).catch(() => nextPath);
 
       router.replace(destination);
-      navigationStarted = true;
-      recoverStalledNavigation();
+      return NAVIGATED;
     } catch (error: unknown) {
       if (isEmailNotConfirmedError(error)) {
         // Unverified accounts always go through Verify email before anything
         // else; the address travels out of band, as after sign-up.
         setPendingEmail(email.trim().toLowerCase());
         router.push(`/auth/verify-email?next=${encodeURIComponent(nextPath)}`);
-        navigationStarted = true;
-        recoverStalledNavigation();
+        return NAVIGATED;
       } else if (isInvalidCredentialsError(error)) {
         setPasswordError(INVALID_CREDENTIALS_MESSAGE);
       } else {
         setError(getAuthActionErrorMessage(error, AUTH_ACTION_ERRORS.signIn));
       }
-    } finally {
-      if (!navigationStarted) {
-        submittingRef.current = false;
-        setIsLoading(false);
-      }
     }
+  };
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    void run(signIn);
   };
 
   return (

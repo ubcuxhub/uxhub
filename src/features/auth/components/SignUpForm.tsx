@@ -16,7 +16,7 @@ import {
   isAsyncTimeoutError,
   withDeadline,
 } from "@/lib/async/deadline";
-import { useNavigationRecovery } from "@/hooks/use-navigation-recovery";
+import { NAVIGATED, useGuardedSubmit } from "@/hooks/use-guarded-submit";
 import { createClient } from "@/lib/supabase/client";
 
 import { completeProfileAction } from "../actions";
@@ -59,17 +59,13 @@ export function SignUpForm({
 
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<SignUpFieldErrors>({});
-  const [isLoading, setIsLoading] = useState(false);
-  const submittingRef = useRef(false);
   const emailRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
-  const recoverStalledNavigation = useNavigationRecovery(() => {
-    submittingRef.current = false;
-    setIsLoading(false);
+  const { pending: isLoading, run } = useGuardedSubmit(() =>
     setError(
       "Your account was created, but the next page did not load. Check your email or try signing in.",
-    );
-  });
+    ),
+  );
 
   // Validated on submit rather than gating the button, so a failing rule names
   // itself on the field it belongs to instead of leaving a dead control.
@@ -88,21 +84,8 @@ export function SignUpForm({
     emailRef.current?.focus();
   };
 
-  const handleSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (submittingRef.current) return;
-
-    setError(null);
-
-    const errors = validate();
-    setFieldErrors(errors);
-
-    if (Object.keys(errors).length > 0) return;
-
+  const signUp = async () => {
     const supabase = createClient();
-    submittingRef.current = true;
-    setIsLoading(true);
-    let navigationStarted = false;
 
     try {
       const normalizedEmail = formData.email.trim().toLowerCase();
@@ -158,8 +141,7 @@ export function SignUpForm({
       router.push(
         `/auth/verify-email?next=${encodeURIComponent(nextPath)}`,
       );
-      navigationStarted = true;
-      recoverStalledNavigation();
+      return NAVIGATED;
     } catch (error: unknown) {
       if (isUserAlreadyExistsError(error)) {
         showEmailTaken();
@@ -170,12 +152,19 @@ export function SignUpForm({
           ? "We could not confirm whether your account was created. Check your email or try signing in before submitting again."
           : getAuthActionErrorMessage(error, AUTH_ACTION_ERRORS.signUp),
       );
-    } finally {
-      if (!navigationStarted) {
-        submittingRef.current = false;
-        setIsLoading(false);
-      }
     }
+  };
+
+  const handleSignUp = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    const errors = validate();
+    setFieldErrors(errors);
+
+    if (Object.keys(errors).length > 0) return;
+
+    void run(signUp);
   };
 
   const handleChange = (field: keyof SignUpFormData, value: string) => {
