@@ -126,7 +126,7 @@ export function CheckInTicketMenu({
         onOpenChange={close}
         returnFocusRef={triggerRef}
         title={`Void ${attendee.user_name}’s ticket?`}
-        description="The ticket stops working and its seat and team spot are freed. This can’t be undone. A paid ticket must be refunded in Square first."
+        description="The ticket stops working and its seat and team spot are freed. On an application event, the holder’s offer ends too, so they can’t register again. This can’t be undone. A paid ticket must be refunded in Square first."
         confirmLabel="Void ticket"
         pendingLabel="Voiding…"
         cancelLabel="Keep ticket"
