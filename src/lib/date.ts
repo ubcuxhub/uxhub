@@ -321,6 +321,18 @@ export function formatEventDateLabel(
   return `${fromMonth} ${from.day}–${to.day}`;
 }
 
+/** Full calendar range for an event preview, e.g. "November 7–21, 2026". */
+export function formatEventDateRange(start: string | null | undefined, end?: string | null): string | null {
+  const from = pacificWall(start);
+  if (!from) return null;
+  const first = `${MONTHS_LONG[from.month - 1]} ${from.day}`;
+  const to = endAfter(from, end);
+  if (!to || endsSameDay(from, to)) return `${first}, ${from.year}`;
+  const last = `${MONTHS_LONG[to.month - 1]} ${to.day}`;
+  if (to.year !== from.year) return `${first}, ${from.year}–${last}, ${to.year}`;
+  return `${first}–${to.month === from.month ? to.day : last}, ${from.year}`;
+}
+
 /** One line of an event's schedule: the day ("Sat, Jan 9") and its time. */
 export interface EventDateLine {
   day: string;

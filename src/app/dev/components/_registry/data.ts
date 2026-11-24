@@ -5,6 +5,16 @@ import type { RegistryEntry } from "./types";
  * `forms.ts` for how shards work.
  */
 export const dataEntries: readonly RegistryEntry[] = [
+  ...[
+    { slug: "event-banner", title: "Event banner", name: "EventBanner" },
+    { slug: "event-preview", title: "Event preview", name: "EventPreview" },
+    { slug: "quick-link", title: "Quick link", name: "QuickLink" },
+  ].map(({ slug, title, name }) => ({
+    slug, title, category: "Data display" as const, tier: "composite" as const,
+    description: "Responsive event preview and service tiles with wrapping content, artwork fallbacks, loading, focus and disabled states.",
+    importPath: `@/components/shared/${name}`, importNames: [name],
+    source: `src/components/shared/${name}.tsx`, spec: "Dashboard presentation extensions", layout: "page" as const,
+  })),
   {
     slug: "metric-badge", title: "Metric badge", category: "Data display", tier: "primitive",
     description: "Neutral numeric context with optional trend icon. Shares and additions never imply a success/error state.",

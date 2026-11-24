@@ -3,26 +3,20 @@ import { TABLES } from "./tables";
 import type { EventRow } from "@/lib/supabase/models";
 
 export type DashboardEvent = Pick<EventRow,
-  "id" | "name" | "slug" | "image_url" | "short_description" |
-  "starts_at" | "location_building" | "location_room" | "location_address_url" | "regular_price" | "member_price"
+  "id" | "name" | "slug" | "image_url" | "header_image_url" | "header_colour" | "short_description" |
+  "starts_at" | "ends_at" | "location_type" | "location_building" | "location_room" | "location_address_url" |
+  "regular_price" | "member_price" | "max_capacity" | "registration_opens_at" | "registration_closes_at" |
+  "requires_application" | "canceled_at" | "cancellation_note" | "configured_marketing_mode" | "configured_marketing_url" | "marketing_url"
 >;
 
 export async function fetchNextDashboardEvent(db: DbClient, now: string): Promise<DashboardEvent | null> {
   const { data, error } = await db.from(TABLES.events)
-    .select("id, name, slug, image_url, short_description, starts_at, location_building, location_room, location_address_url, regular_price, member_price")
+    .select("id, name, slug, image_url, header_image_url, header_colour, short_description, starts_at, ends_at, location_type, location_building, location_room, location_address_url, regular_price, member_price, max_capacity, registration_opens_at, registration_closes_at, requires_application, canceled_at, cancellation_note, configured_marketing_mode, configured_marketing_url, marketing_url")
     .eq("status", "active").not("starts_at", "is", null)
     .or(`ends_at.gt.${now},and(ends_at.is.null,starts_at.gt.${now})`)
     .order("starts_at").order("id").limit(1).maybeSingle();
   if (error) throw error;
   return data;
-}
-
-export async function fetchConfirmedEventRegistrationCount(db: DbClient, eventId: string): Promise<number> {
-  const { count, error } = await db.from(TABLES.eventTickets)
-    .select("id", { count: "exact", head: true })
-    .eq("event_id", eventId);
-  if (error) throw error;
-  return count ?? 0;
 }
 
 /** Complete counts are exact as of the requested time; partial counts are lower

@@ -1199,3 +1199,25 @@ supplies academic years newest first. Feature code owns reporting semantics.
 See `/dev/components/statistics-card` for imports and narrow/wide, selection,
 Unknown, missing/partial/zero/future, loading and error examples. The gallery's
 theme/density controls apply; keyboard/touch work without hover or motion.
+
+### Event preview and quick links
+
+`EventBanner` supplies a fixed 200px decorative image frame with a configured
+header-colour or calendar fallback, including failed image URLs. Hover scales
+only the artwork by 5%; the functional `duration-slow` token keeps admin motion
+within the library budget. Reduced motion disables scaling and transitions.
+
+`EventPreview` composes that banner, a bordered Card, a wrapping linked title,
+StatusBadge slot, labelled icon facts and caller-owned actions. At phone widths
+actions stack; from `sm` they use two columns. Content grows without clipping.
+`EventPreviewSkeleton` reserves the banner, details and action shapes. Domain
+state, publication, destination availability and action behaviour stay with callers.
+The existing square EventCard remains the list/timeline component.
+
+`QuickLink` centres a service icon and left-aligned title/subtitle. Enabled links
+open externally; a missing URL disables navigation and exposes an availability
+tooltip on hover and keyboard focus. Phone tiles are at least 60px tall with a
+20px icon; wider tiles use a 30px icon and at least 68px height. Labels wrap.
+See `/dev/components/event-preview`, `/dev/components/event-banner` and
+`/dev/components/quick-link` for wide/narrow, loading, missing/broken image,
+empty/error and disabled examples under the gallery theme/density controls.

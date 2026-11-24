@@ -3,15 +3,21 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
+// Next supplies static-image dimensions in production; Vitest imports bare paths.
+vi.mock("@/assets/hubbo/resting.png", () => ({ default: { src: "/resting.png", width: 161, height: 120 } }));
+vi.mock("@/assets/hubbo/thinking.png", () => ({ default: { src: "/thinking.png", width: 113, height: 120 } }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({}) }));
 vi.mock("@/features/memberships/lib/term", () => ({ getMembershipTermEndsAt: async () => null }));
 vi.mock("@/lib/log", () => ({ log: { error: vi.fn(), info: vi.fn() }, errorFields: () => ({}) }));
 const reads = vi.hoisted(() => ({
   fetchMajorDistribution: vi.fn(), fetchMembershipHistory: vi.fn(), fetchRecentMembershipAdditions: vi.fn(),
   fetchNextDashboardEvent: vi.fn(),
-  fetchConfirmedEventRegistrationCount: vi.fn(),
+  fetchEventSeatCounts: vi.fn(),
 }));
 vi.mock("@/lib/supabase-helpers/admin-dashboard", () => reads);
+vi.mock("@/lib/supabase-helpers/event-tickets", () => ({ fetchEventSeatCounts: reads.fetchEventSeatCounts }));
+const refresh = vi.hoisted(() => vi.fn());
+vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh }) }));
 
 import { DashboardEventData, DashboardMajorData, DashboardMembershipData } from "./DashboardData";
 import { StatisticsCard } from "@/components/shared/StatisticsCard";
@@ -54,56 +60,94 @@ describe("dashboard states", () => {
     reads.fetchNextDashboardEvent.mockResolvedValueOnce(null).mockRejectedValueOnce(new Error("Unavailable"));
     const { unmount } = render(await DashboardEventData({ now: "2026-10-26T12:00:00Z" }));
     expect(screen.getByText("No upcoming events")).toBeTruthy();
-    expect(reads.fetchConfirmedEventRegistrationCount).not.toHaveBeenCalled();
+    expect(reads.fetchEventSeatCounts).not.toHaveBeenCalled();
+    expect(screen.getByRole("link", { name: "Create event" }).getAttribute("href")).toBe("/admin/events/create-new");
     unmount();
     render(await DashboardEventData({ now: "2026-10-26T12:00:00Z" }));
     expect(screen.queryByText("No upcoming events")).toBeNull();
-    expect(screen.getByText(/Upcoming event unavailable/)).toBeTruthy();
+    expect(screen.getByText("We couldn’t load the upcoming event")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(refresh).toHaveBeenCalledOnce();
   });
 
-  const event = { id: "event-id", slug: "design-sprint", name: "Design Sprint", image_url: null, short_description: "Design together.", starts_at: "2026-11-02T01:00:00Z", location_building: "AMS Nest", location_room: "Room 101", location_address_url: "https://maps.google.com/?q=AMS+Nest", regular_price: 12, member_price: 5 };
+  const now = "2026-10-26T12:00:00Z";
+  const event = { id: "event-id", slug: "design-sprint", name: "Design Sprint", image_url: null, header_image_url: null, header_colour: null, short_description: "Design together.", starts_at: "2026-11-02T01:00:00Z", ends_at: "2026-11-04T01:00:00Z", location_type: "in_person" as const, location_building: "AMS Nest", location_room: "Room 101", location_address_url: "https://maps.google.com/?q=AMS+Nest", regular_price: 12, member_price: 5, max_capacity: 50, registration_opens_at: null, registration_closes_at: null, requires_application: true, canceled_at: null, cancellation_note: null, configured_marketing_mode: null, configured_marketing_url: null, marketing_url: null };
+  const seats = { tickets: 40, heldOffers: 3, seatsLeft: 7 };
 
-  it("shows event details and quick action destinations, and respects student-event visibility", async () => {
-    const { rerender } = render(<DashboardUpcomingEvent event={event} rsvpCount={0} showStudentLink />);
-    expect(screen.getByText("Sunday, November 1, 2026")).toBeTruthy();
-    expect(screen.getByText("AMS Nest, Room 101")).toBeTruthy();
-    const locationLink = screen.getByRole("link", { name: "AMS Nest, Room 101" });
-    expect(locationLink.getAttribute("href")).toBe(event.location_address_url);
-    expect(locationLink.getAttribute("target")).toBe("_blank");
-    expect(locationLink.getAttribute("rel")).toBe("noopener noreferrer");
-    expect(screen.getByText("$12.00")).toBeTruthy();
-    expect(screen.getByText("$5.00")).toBeTruthy();
+  it("shows real event data and canonical action destinations", async () => {
+    render(<DashboardUpcomingEvent event={event} seats={seats} showStudentLink now={now} />);
+    expect(screen.getByText("November 1–3, 2026")).toBeTruthy();
+    expect(screen.getByText("Applications open")).toBeTruthy();
+    expect(screen.getByText("40/50 spots")).toBeTruthy();
+    expect(screen.getByText("$5.00 for members, $12.00 for non-members")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "Design Sprint" }).getAttribute("href")).toBe("/admin/events/event-id/overview");
+    const location = screen.getByRole("link", { name: "AMS Nest, Room 101" });
+    expect(location.getAttribute("href")).toBe(event.location_address_url);
+    expect(location.getAttribute("rel")).toBe("noopener noreferrer");
     const actions = within(screen.getByRole("region", { name: "Quick Actions" }));
-    expect(actions.getByRole("link", { name: "Edit Event Details" }).getAttribute("href")).toBe("/admin/events/event-id");
-    expect(actions.getByRole("link", { name: "Check-in Participants" }).getAttribute("href")).toBe("/admin/events/event-id/check-in");
-    expect(actions.getByRole("link", { name: "Review Applications" }).getAttribute("href")).toBe("/admin/events/event-id/review-applications");
-    const trigger = actions.getByRole("button", { name: "View Event Page" });
-    expect(screen.queryByRole("link", { name: "Marketing Page" })).toBeNull();
-    fireEvent.click(trigger);
-    expect(screen.getByRole("link", { name: "Marketing Page" }).getAttribute("href")).toBe("/events/design-sprint");
-    expect(screen.getByRole("link", { name: "Sign-up Page" }).getAttribute("href")).toBe("/portal/events/design-sprint");
-    fireEvent.keyDown(screen.getByRole("dialog", { name: "View Event Page" }), { key: "Escape" });
-    await waitFor(() => expect(screen.queryByRole("link", { name: "Marketing Page" })).toBeNull());
+    for (const [name, suffix] of [["Check-in", "check-in"], ["Applications", "review-applications"], ["Edit event", "edit"]]) {
+      expect(actions.getByRole("link", { name }).getAttribute("href")).toBe(`/admin/events/event-id/${suffix}`);
+    }
+    const trigger = actions.getByRole("button", { name: "View full page" });
+    fireEvent.keyDown(trigger, { key: "ArrowDown" });
+    expect(await screen.findByRole("menuitem", { name: "Marketing page" })).toBeTruthy();
+    expect(screen.getByRole("menuitem", { name: "Marketing page" }).getAttribute("href")).toBe("/events/design-sprint");
+    expect(screen.getByRole("menuitem", { name: "Sign-up page" }).getAttribute("href")).toBe("/portal/events/design-sprint");
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
     await waitFor(() => expect(document.activeElement).toBe(trigger));
-    expect(screen.getByText("0 RSVPs")).toBeTruthy();
-    rerender(<DashboardUpcomingEvent event={event} rsvpCount={null} showStudentLink={false} />);
-    expect(screen.queryByRole("button", { name: "View Event Page" })).toBeNull();
-    expect(screen.getByRole("link", { name: "Edit Event Details" })).toBeTruthy();
-    expect(screen.getByText("RSVPs unavailable")).toBeTruthy();
   });
 
-  it("handles free events, optional member pricing, and missing details", () => {
-    const { rerender } = render(<DashboardUpcomingEvent event={{ ...event, starts_at: null, location_building: null, location_room: null, regular_price: 0, member_price: 0 }} rsvpCount={0} showStudentLink />);
-    expect(screen.getAllByText("TBD")).toHaveLength(2);
-    expect(screen.getByText("Free")).toBeTruthy();
-    expect(screen.queryByText("Members:")).toBeNull();
-    rerender(<DashboardUpcomingEvent event={{ ...event, member_price: 0, location_address_url: null }} rsvpCount={0} showStudentLink />);
-    expect(screen.getByText("AMS Nest, Room 101")).toBeTruthy();
+  it("keeps event details when seat loading fails and never fabricates zero or Full", async () => {
+    reads.fetchNextDashboardEvent.mockResolvedValue(event);
+    reads.fetchEventSeatCounts.mockRejectedValue(new Error("Unavailable"));
+    render(await DashboardEventData({ now }));
+    expect(screen.getByText("Ticket count unavailable")).toBeTruthy();
+    expect(screen.getByText("Design Sprint")).toBeTruthy();
+    expect(screen.queryByText("Full")).toBeNull();
+    expect(screen.queryByText("0/50 spots")).toBeNull();
+  });
+
+  it("uses held offers for fullness while showing only confirmed tickets", () => {
+    const { rerender } = render(<DashboardUpcomingEvent event={{ ...event, requires_application: false }} seats={{ tickets: 40, heldOffers: 10, seatsLeft: 0 }} showStudentLink now={now} />);
+    expect(screen.getByText("Full")).toBeTruthy();
+    expect(screen.getByText("40/50 spots")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "Applications" })).toBeNull();
+    rerender(<DashboardUpcomingEvent event={{ ...event, requires_application: false, registration_closes_at: "2026-10-25T01:00:00Z" }} seats={seats} showStudentLink now={now} />);
+    expect(screen.getByText("Registration closed")).toBeTruthy();
+  });
+
+  it("renders a confirmed zero and derives upcoming/canceled state from the real event", () => {
+    const { rerender } = render(<DashboardUpcomingEvent event={{ ...event, requires_application: false, registration_opens_at: "2026-11-01T00:00:00Z" }} seats={{ tickets: 0, heldOffers: 0, seatsLeft: 50 }} showStudentLink now={now} />);
+    expect(screen.getByText("0/50 spots")).toBeTruthy();
+    expect(screen.getByText("Opens Oct 31")).toBeTruthy();
+    rerender(<DashboardUpcomingEvent event={{ ...event, canceled_at: "2026-10-25T00:00:00Z" }} seats={seats} showStudentLink now={now} />);
+    expect(screen.getByText("Canceled")).toBeTruthy();
+  });
+
+  it("handles unlimited capacity, missing price, online venues and unsafe map URLs", () => {
+    const { rerender } = render(<DashboardUpcomingEvent event={{ ...event, max_capacity: null, regular_price: null, location_type: "online" }} seats={{ ...seats, seatsLeft: null }} showStudentLink now={now} />);
+    expect(screen.getByText("40 tickets · Unlimited capacity")).toBeTruthy();
+    expect(screen.getByText("Price to be confirmed")).toBeTruthy();
+    expect(screen.getByText("Online")).toBeTruthy();
     expect(screen.queryByRole("link", { name: "AMS Nest, Room 101" })).toBeNull();
-    expect(screen.getByText("Free")).toBeTruthy();
-    expect(screen.getByText("Members:")).toBeTruthy();
-    rerender(<DashboardUpcomingEvent event={{ ...event, member_price: event.regular_price }} rsvpCount={0} showStudentLink />);
-    expect(screen.queryByText("Members:")).toBeNull();
+    rerender(<DashboardUpcomingEvent event={{ ...event, member_price: 0, location_address_url: "javascript:alert(1)" }} seats={seats} showStudentLink now={now} />);
+    expect(screen.getByText("Free for members, $12.00 for non-members")).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "AMS Nest, Room 101" })).toBeNull();
+  });
+
+  it("honours feature flags and configured marketing destinations", async () => {
+    const { rerender } = render(<DashboardUpcomingEvent event={event} seats={seats} showStudentLink={false} now={now} />);
+    expect(screen.queryByRole("button", { name: "View full page" })).toBeNull();
+    rerender(<DashboardUpcomingEvent event={{ ...event, configured_marketing_mode: "external", configured_marketing_url: "https://example.com/sprint" }} seats={seats} showStudentLink now={now} />);
+    fireEvent.keyDown(screen.getByRole("button", { name: "View full page" }), { key: "ArrowDown" });
+    expect((await screen.findByRole("menuitem", { name: "Marketing page" })).getAttribute("href")).toBe("https://example.com/sprint");
+    fireEvent.keyDown(screen.getByRole("menu"), { key: "Escape" });
+    await waitFor(() => expect(screen.queryByRole("menu")).toBeNull());
+    rerender(<DashboardUpcomingEvent event={{ ...event, configured_marketing_mode: "disabled" }} seats={seats} showStudentLink now={now} />);
+    fireEvent.keyDown(screen.getByRole("button", { name: "View full page" }), { key: "ArrowDown" });
+    expect(await screen.findByRole("menuitem", { name: "Sign-up page" })).toBeTruthy();
+    expect(screen.queryByRole("menuitem", { name: "Marketing page" })).toBeNull();
   });
 
   it("renders external quick links, a disabled Drive placeholder, and activity and loading states", () => {

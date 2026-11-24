@@ -3,6 +3,8 @@
 import { DashboardAreaOfStudy } from "@/features/admin/components/dashboard/DashboardAreaOfStudy";
 import { DashboardClubMembers } from "@/features/admin/components/dashboard/DashboardClubMembers";
 import { useState } from "react";
+import { EventPreview } from "@/components/shared/EventPreview";
+import { QuickLink } from "@/components/shared/QuickLink";
 import { Download, Eye, ScanLine } from "lucide-react";
 
 import { ScannerFrame, ScannerViewfinder } from "@/components/shared/ScannerFrame";
@@ -51,6 +53,19 @@ import { EventRegistrationsCard } from "@/features/admin/components/EventRegistr
 import { HERE, USERS } from "../_fixtures";
 import { LIFT, Panel } from "./frame";
 import type { Components } from "./types";
+
+function DashboardPreview() {
+  return <div className="space-y-6">
+    <EventPreview title="Design Sprint" href={HERE} description="A team-based design challenge with fellow creatives."
+      banner={{ colour: "#325DC4" }} status={<StatusBadge status="registration_open" />}
+      facts={[{ label: "Check-in", icon: ScanLine, value: "40/50 spots" }]}
+      actions={<><Button>Check-in</Button><Button variant="secondary">Edit event</Button></>} />
+    <div className="grid grid-cols-2 gap-4">
+      <QuickLink title="Website" description="Main Page" icon={<Eye />} href="https://www.ubcuxhub.ca/" />
+      <QuickLink title="Drive" description="Files" icon={<Download />} href={null} unavailable="Google Drive link coming soon" />
+    </div>
+  </div>;
+}
 
 function AdminStats() {
   return (
@@ -448,6 +463,7 @@ function CheckIn() {
 }
 
 export const ADMIN_COMPONENTS = {
+  "dashboard-preview": DashboardPreview,
   "admin-stats": AdminStats,
   "reporting-statistics": ReportingStatistics,
   "event-registrations": EventRegistrations,

@@ -10,22 +10,22 @@ export default async function AdminDashboard() {
   await requireAdmin();
   const now = new Date().toISOString();
   return (
-    <PageContainer className="admin-dashboard flex flex-col gap-10 lg:py-16">
+    <PageContainer className="admin-dashboard flex flex-col gap-10 max-w-none">
       <header className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
         <div className="space-y-2">
           <h1 className="text-h1">Dashboard</h1>
           <p className="text-muted-foreground">View events, users, and statistics at a glance.</p>
         </div>
       </header>
-      <div className="grid items-start gap-[30px] lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
-        <div className="space-y-7">
+      <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,10fr)_minmax(0,7fr)]">
+        <div className="min-w-0 space-y-6">
           <section aria-labelledby="upcoming-event-heading" className="space-y-5">
             <h2 id="upcoming-event-heading" className="text-h2">Upcoming Event</h2>
             <Suspense fallback={<DashboardEventSkeleton />}><DashboardEventData now={now} /></Suspense>
           </section>
           <DashboardActivityPlaceholder />
         </div>
-        <div className="space-y-7">
+        <div className="min-w-0 space-y-6">
           <DashboardQuickLinks />
           <section aria-labelledby="statistics-heading" className="space-y-5">
             <h2 id="statistics-heading" className="text-h2">Statistics</h2>

@@ -3,14 +3,14 @@ import { createClient } from "@/lib/supabase/server";
 import { errorFields, log } from "@/lib/log";
 import { FLAGS } from "@/lib/flags";
 import {
-  fetchConfirmedEventRegistrationCount, fetchNextDashboardEvent,
+  fetchNextDashboardEvent,
   fetchMembershipHistory, fetchMajorDistribution, fetchRecentMembershipAdditions,
 } from "@/lib/supabase-helpers/admin-dashboard";
 import { StatisticsCard } from "@/components/shared/StatisticsCard";
 import { DashboardAreaOfStudy } from "./DashboardAreaOfStudy";
 import { DashboardClubMembers } from "./DashboardClubMembers";
-import { DashboardUpcomingEvent } from "./DashboardUpcomingEvent";
-import { DashboardPanel } from "./DashboardPanel";
+import { DashboardEventUnavailable, DashboardUpcomingEvent } from "./DashboardUpcomingEvent";
+import { fetchEventSeatCounts } from "@/lib/supabase-helpers/event-tickets";
 
 async function readDashboardData<T>(metric: string, read: () => Promise<T>): Promise<T | null> {
   const started = performance.now();
@@ -50,10 +50,10 @@ export async function DashboardEventData({ now }: { now: string }) {
   const db = await createClient();
   // An envelope distinguishes an empty result from a failed query.
   const result = await readDashboardData("next_event", async () => ({ event: await fetchNextDashboardEvent(db, now) }));
-  if (!result) return <DashboardPanel className="min-h-64 items-center justify-center"><p className="text-small text-muted-foreground">Upcoming event unavailable. Please try again later.</p></DashboardPanel>;
+  if (!result) return <DashboardEventUnavailable failed />;
   const event = result.event;
-  const rsvpCount = event
-    ? await readDashboardData("event_rsvps", () => fetchConfirmedEventRegistrationCount(db, event.id))
+  const counts = event
+    ? await readDashboardData("event_seats", () => fetchEventSeatCounts(db, [event.id]))
     : null;
-  return <DashboardUpcomingEvent event={event} rsvpCount={rsvpCount} showStudentLink={FLAGS.studentEvents} />;
+  return <DashboardUpcomingEvent event={event} seats={event ? counts?.get(event.id) ?? null : null} showStudentLink={FLAGS.studentEvents} now={now} />;
 }

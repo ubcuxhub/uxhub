@@ -1,140 +1,63 @@
 import Link from "next/link";
-import { CalendarDays, ChevronDown, ClipboardList, DollarSign, ExternalLink, MapPin, Pencil, ScanLine } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { CalendarDays, ClipboardList, DollarSign, MapPin, Pencil, ScanLine, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Separator } from "@/components/ui/separator";
-import { formatEventDate } from "@/lib/date";
+import { Card } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { Hubbo } from "@/components/shared/Hubbo";
+import { EventPreview, EventPreviewSkeleton } from "@/components/shared/EventPreview";
+import { formatEventDateRange } from "@/lib/date";
+import { publicMarketingDestination } from "@/lib/event-marketing";
+import { safeContentUrl } from "@/features/admin/lib/event-content";
+import { eventStateFor } from "@/features/events/lib/event-states";
+import { eventBadgeFor } from "@/features/events/lib/event-badge";
+import { formatPrice } from "@/features/events/components/EventFactList";
 import type { DashboardEvent } from "@/lib/supabase-helpers/admin-dashboard";
-import { DashboardPanel } from "./DashboardPanel";
+import type { EventSeatCount } from "@/lib/supabase-helpers/event-tickets";
+import { DashboardEventPages } from "./DashboardEventPages";
+import { DashboardEventRetry } from "./DashboardEventRecovery";
 
-const actionClassName = "h-auto min-h-16 w-full min-w-0 justify-start whitespace-normal rounded-md px-4 py-3 text-left text-small sm:h-auto";
+export const DashboardEventSkeleton = EventPreviewSkeleton;
 
-function formatPrice(price: number) {
-  return price === 0 ? "Free" : `$${price.toFixed(2)}`;
+export function DashboardEventUnavailable({ failed = false }: { failed?: boolean }) {
+  return <Card className="justify-center gap-0 py-0 shadow-none lg:min-h-163">
+    <EmptyState className="px-4 py-8 sm:px-6 sm:py-12" media={<Hubbo emotion={failed ? "thinking" : "resting"} className="h-24 sm:h-30" />}
+      title={failed ? "We couldn’t load the upcoming event" : "No upcoming events"}
+      description={failed ? "Something went wrong on our side. Try again in a moment." : "Create an event and its date, location and spots will show up here."}
+      actions={failed ? <DashboardEventRetry /> : <Button asChild variant="secondary"><Link href="/admin/events/create-new">Create event</Link></Button>} />
+  </Card>;
 }
 
-export function DashboardEventSkeleton() {
-  return (
-    <div role="status" aria-label="Loading upcoming event">
-      <DashboardPanel className="min-h-64 justify-center gap-4">
-        <Skeleton className="h-8 w-2/3" />
-        <Skeleton className="h-28 w-full" />
-      </DashboardPanel>
-    </div>
-  );
-}
-
-export function DashboardUpcomingEvent({ event, rsvpCount, showStudentLink }: {
-  event: DashboardEvent | null;
-  rsvpCount: number | null;
-  showStudentLink: boolean;
+export function DashboardUpcomingEvent({ event, seats, showStudentLink, now }: {
+  event: DashboardEvent | null; seats: EventSeatCount | null; showStudentLink: boolean; now: string;
 }) {
-  if (!event) return (
-    <DashboardPanel className="min-h-64 items-center justify-center gap-3 text-center">
-      <CalendarDays aria-hidden="true" className="size-8 text-muted-foreground" />
-      <p className="text-h3">No upcoming events</p>
-      <p className="text-small text-muted-foreground">Published upcoming events will appear here.</p>
-    </DashboardPanel>
-  );
-  const location = [event.location_building, event.location_room].filter(Boolean).join(", ");
-  const hasMemberPrice = event.member_price != null && Number(event.member_price) !== Number(event.regular_price);
-  return (
-    <DashboardPanel className="p-6 xl:p-10">
-      <div className="flex flex-col gap-6 sm:flex-row lg:flex-col xl:flex-row xl:items-center">
-        {event.image_url ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={event.image_url} alt={event.name} className="aspect-square w-44 shrink-0 rounded border object-cover" />
-        ) : <div className="flex aspect-square w-44 shrink-0 items-center justify-center rounded border bg-background text-muted-foreground"><CalendarDays aria-label="No event image" className="size-10" /></div>}
-        <div className="min-w-0 space-y-4">
-          <Badge className="rounded-sm border-0 bg-success font-medium text-success-foreground hover:bg-success">{rsvpCount == null ? "RSVPs unavailable" : `${rsvpCount.toLocaleString("en-CA")} RSVPs`}</Badge>
-          <h3 className="text-h3 break-words">{event.name}</h3>
-          {event.short_description && <p className="line-clamp-3 text-small">{event.short_description}</p>}
-        </div>
-      </div>
-      <Separator className="my-6" />
-      <dl aria-label="Event details" className="flex flex-col gap-4 text-small">
-        <div className="flex items-center gap-3">
-          <dt className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
-            <CalendarDays aria-hidden="true" className="size-4 text-muted-foreground" />
-            <span className="sr-only">Date</span>
-          </dt>
-          <dd>{formatEventDate(event.starts_at, { weekday: "long" }) || "TBD"}</dd>
-        </div>
-        <div className="flex items-center gap-3">
-          <dt className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
-            <MapPin aria-hidden="true" className="size-4 text-muted-foreground" />
-            <span className="sr-only">Location</span>
-          </dt>
-          <dd className="min-w-0 break-words">
-            {location && event.location_address_url ? (
-              <a href={event.location_address_url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4 hover:text-primary">
-                {location}<ExternalLink aria-hidden="true" className="ml-1 inline size-3.5" />
-              </a>
-            ) : location || "TBD"}
-          </dd>
-        </div>
-        <div className="flex items-center gap-3">
-          <dt className="flex size-8 shrink-0 items-center justify-center rounded-md bg-muted">
-            <DollarSign aria-hidden="true" className="size-4 text-muted-foreground" />
-            <span className="sr-only">Price</span>
-          </dt>
-          <dd className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <span>{formatPrice(Number(event.regular_price))}</span>
-            {hasMemberPrice && (
-              <span className="text-muted-foreground">
-                Members: <span className="text-success-foreground">{formatPrice(Number(event.member_price))}</span>
-              </span>
-            )}
-          </dd>
-        </div>
-      </dl>
-      <Separator className="my-6" />
-      <section aria-label="Quick Actions" className="w-full space-y-4">
-        <h4 className="text-small font-semibold">Quick Actions</h4>
-        <div className="grid w-full grid-cols-2 gap-4">
-          <Button asChild className={actionClassName}>
-            <Link href={`/admin/events/${event.id}/check-in`}>
-              <ScanLine aria-hidden="true" />
-              <span className="min-w-0">Check-in Participants</span>
-            </Link>
-          </Button>
-          <Button asChild className={actionClassName}>
-            <Link href={`/admin/events/${event.id}/review-applications`}>
-              <ClipboardList aria-hidden="true" />
-              <span className="min-w-0">Review Applications</span>
-            </Link>
-          </Button>
-          <Button asChild className={actionClassName}>
-            <Link href={`/admin/events/${event.id}`}>
-              <Pencil aria-hidden="true" />
-              <span className="min-w-0">Edit Event Details</span>
-            </Link>
-          </Button>
-          {showStudentLink && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button className={actionClassName}>
-                  <ExternalLink aria-hidden="true" />
-                  <span className="min-w-0">View Event Page</span>
-                  <ChevronDown aria-hidden="true" className="ml-auto" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent align="start" aria-label="View Event Page" className="w-48 p-1">
-                <nav aria-label="Event pages" className="flex flex-col">
-                  <Button asChild variant="ghost" className="justify-start text-small">
-                    <Link href={`/events/${event.slug}`}>Marketing Page</Link>
-                  </Button>
-                  <Button asChild variant="ghost" className="justify-start text-small">
-                    <Link href={`/portal/events/${event.slug}`}>Sign-up Page</Link>
-                  </Button>
-                </nav>
-              </PopoverContent>
-            </Popover>
-          )}
-        </div>
-      </section>
-    </DashboardPanel>
-  );
+  if (!event) return <DashboardEventUnavailable />;
+  const state = eventStateFor(event, { ticket: null, application: null, seatsLeft: seats?.seatsLeft ?? null }, new Date(now));
+  const location = event.location_type === "online" ? "Online" : [event.location_building, event.location_room].filter(Boolean).join(", ");
+  const locationLabel = event.location_type === "hybrid" ? [location, "Online"].filter(Boolean).join(" and ") : location;
+  const map = event.location_type !== "online" && event.location_address_url && safeContentUrl(event.location_address_url) ? event.location_address_url : null;
+  const destination = publicMarketingDestination(event);
+  const marketingHref = !showStudentLink || destination.kind === "none" ? null : destination.kind === "external" ? destination.url : `/events/${event.slug}`;
+  const regular = event.regular_price;
+  const member = event.member_price;
+  const price = regular == null ? "Price to be confirmed" : member != null && member !== regular
+    ? `${formatPrice(member)} for members, ${formatPrice(regular)} for non-members` : formatPrice(regular);
+  const tickets = seats == null ? "Ticket count unavailable" : event.max_capacity == null
+    ? `${seats.tickets.toLocaleString("en-CA")} tickets · Unlimited capacity`
+    : `${seats.tickets.toLocaleString("en-CA")}/${event.max_capacity.toLocaleString("en-CA")} spots`;
+  return <EventPreview title={event.name} href={`/admin/events/${event.id}/overview`} description={event.short_description}
+    banner={{ src: event.header_image_url || (event.header_colour ? null : event.image_url), colour: event.header_colour }}
+    status={<StatusBadge {...eventBadgeFor(state)} />}
+    facts={[
+      { label: "Date", icon: CalendarDays, value: formatEventDateRange(event.starts_at, event.ends_at) || "TBD" },
+      { label: "Location", icon: MapPin, value: map ? <a href={map} target="_blank" rel="noopener noreferrer" className="rounded-sm underline underline-offset-4 transition-colors duration-fast hover:text-muted-foreground focus-visible:focus-ring">{locationLabel || "View on map"}</a> : locationLabel || "TBD" },
+      { label: "Tickets and capacity", icon: User, value: tickets },
+      { label: "Price", icon: DollarSign, value: price },
+    ]}
+    actions={<>
+      <Button asChild><Link href={`/admin/events/${event.id}/check-in`}><ScanLine aria-hidden="true" />Check-in</Link></Button>
+      {event.requires_application && <Button asChild variant="secondary"><Link href={`/admin/events/${event.id}/review-applications`}><ClipboardList aria-hidden="true" />Applications</Link></Button>}
+      <Button asChild variant="secondary"><Link href={`/admin/events/${event.id}/edit`}><Pencil aria-hidden="true" />Edit event</Link></Button>
+      <DashboardEventPages marketingHref={marketingHref} signupHref={showStudentLink ? `/portal/events/${event.slug}` : null} />
+    </>} />;
 }

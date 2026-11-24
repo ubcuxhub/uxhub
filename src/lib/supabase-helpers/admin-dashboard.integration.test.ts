@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { clientAs, withFixtures } from "@/test/integration";
-import { fetchMajorDistribution, fetchMembershipHistory, fetchNextDashboardEvent, fetchConfirmedEventRegistrationCount } from "./admin-dashboard";
+import { fetchMajorDistribution, fetchMembershipHistory, fetchNextDashboardEvent } from "./admin-dashboard";
+
+import { fetchEventSeatCounts } from "./event-tickets";
 
 const now = "2200-10-01T12:00:00.000Z";
 const future = "2200-11-01T12:00:00.000Z";
@@ -12,14 +14,14 @@ describe("admin dashboard data", () => {
     const admin = await fixtures.createUser({ role_access: "admin" });
     const manager = await fixtures.createUser({ role_access: "manager" });
     const attendee = await fixtures.createUser();
-    const event = await fixtures.createEvent({ status: "active", starts_at: now, ends_at: future, location_building: "AMS Nest", regular_price: 12, member_price: 5 });
+    const event = await fixtures.createEvent({ status: "active", starts_at: now, ends_at: future, location_building: "AMS Nest", regular_price: 12, member_price: 5, header_image_url: "https://example.com/banner.png", max_capacity: 50, registration_closes_at: future, requires_application: false });
     for (const user of [admin, manager]) {
       const db = clientAs(user);
-      expect(await fetchConfirmedEventRegistrationCount(db, event.id)).toBe(0);
-      expect(await fetchNextDashboardEvent(db, now)).toMatchObject({ id: event.id, location_building: "AMS Nest", regular_price: 12, member_price: 5 });
+      expect((await fetchEventSeatCounts(db, [event.id])).get(event.id)).toEqual({ tickets: 0, heldOffers: 0, seatsLeft: 50 });
+      expect(await fetchNextDashboardEvent(db, now)).toMatchObject({ id: event.id, location_building: "AMS Nest", regular_price: 12, member_price: 5, ends_at: event.ends_at, header_image_url: "https://example.com/banner.png", max_capacity: 50, registration_closes_at: event.registration_closes_at, requires_application: false });
     }
     check((await fixtures.supabase.from("event_tickets").insert({ event_id: event.id, user_id: attendee.id })).error);
-    for (const user of [admin, manager]) expect(await fetchConfirmedEventRegistrationCount(clientAs(user), event.id)).toBe(1);
+    for (const user of [admin, manager]) expect((await fetchEventSeatCounts(clientAs(user), [event.id])).get(event.id)?.tickets).toBe(1);
   }));
 
   it("keeps ongoing events until their end and advances the preview at the boundary", () => withFixtures(async (fixtures) => {
