@@ -1,13 +1,20 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { EventRow } from "@/lib/supabase/models";
 
 import { EventTimeline } from "./EventTimeline";
 
-afterEach(cleanup);
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(window.location.search),
+}));
+
+afterEach(() => {
+  cleanup();
+  window.history.replaceState(null, "", "/portal/events");
+});
 
 const event = (slug: string, name: string, starts_at: string, extra: Partial<EventRow> = {}) =>
   ({
@@ -34,6 +41,22 @@ const type = (text: string) => fireEvent.change(search(), { target: { value: tex
 const status = () => screen.queryByRole("status")?.textContent ?? null;
 
 describe("EventTimeline", () => {
+  it("keeps the view in the URL, so coming back to the page keeps Past", () => {
+    window.history.replaceState(null, "", "/portal/events");
+    const first = render(<EventTimeline upcomingEvents={UPCOMING} pastEvents={PAST} />);
+    fireEvent.click(screen.getByRole("radio", { name: "Past" }));
+    expect(window.location.search).toBe("?view=past");
+    first.unmount();
+
+    // Back from an event page: the page renders again with ?view=past.
+    render(<EventTimeline upcomingEvents={UPCOMING} pastEvents={PAST} />);
+    expect(screen.getByRole("radio", { name: "Past" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByText("Spring Mixer")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("radio", { name: "Upcoming" }));
+    expect(window.location.search).toBe("");
+  });
+
   it("lists upcoming events, and past ones behind the Past toggle", () => {
     render(<EventTimeline upcomingEvents={UPCOMING} pastEvents={PAST} />);
     expect(screen.getAllByRole("link")).toHaveLength(3);

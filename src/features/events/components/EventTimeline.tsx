@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -27,7 +28,24 @@ export function EventTimeline({
   badges = {},
 }: EventTimelineProps) {
   const searchRef = useRef<HTMLInputElement>(null);
-  const [showPastEvents, setShowPastEvents] = useState(false);
+  // The view lives in the URL (`?view=past`), so coming back from an event
+  // opened from Past lands on Past again. `replaceState` updates it without a
+  // server round trip or a new history entry.
+  const searchParams = useSearchParams();
+  const [showPastEvents, setShowPastEvents] = useState(searchParams.get("view") === "past");
+  const showView = (view: string) => {
+    const past = view === "past";
+    setShowPastEvents(past);
+    const params = new URLSearchParams(window.location.search);
+    if (past) params.set("view", "past");
+    else params.delete("view");
+    const search = params.toString();
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${window.location.pathname}${search ? `?${search}` : ""}`
+    );
+  };
   const [searchQuery, setSearchQuery] = useState("");
 
   const displayedEvents = showPastEvents ? pastEvents : upcomingEvents;
@@ -68,7 +86,7 @@ export function EventTimeline({
           size="lg"
           className="shrink-0"
           value={showPastEvents ? "past" : "upcoming"}
-          onValueChange={(view) => setShowPastEvents(view === "past")}
+          onValueChange={showView}
         >
           <SegmentedToggleItem value="upcoming">Upcoming</SegmentedToggleItem>
           <SegmentedToggleItem value="past">Past</SegmentedToggleItem>
