@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { UserInfoRow } from "@/lib/supabase/models";
 import { defaultFormState } from "./components/event-form/event-form-schema";
+import { ActiveProfileNotFoundError } from "@/lib/supabase-helpers/admin-user-profile";
 
 vi.mock("server-only", () => ({}));
 
@@ -37,7 +38,7 @@ const saveAdminProfile = vi.hoisted(() => vi.fn());
 const fetchMembershipTypeById = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/supabase-helpers/memberships", () => ({ fetchMembershipTypeById }));
 const fetchActiveProfile = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/supabase-helpers/admin-user-profile", () => ({ saveAdminProfile, fetchActiveProfile }));
+vi.mock("@/lib/supabase-helpers/admin-user-profile", async (importOriginal) => ({ ...(await importOriginal<object>()), saveAdminProfile, fetchActiveProfile }));
 
 const adminRpc = vi.hoisted(() => vi.fn());
 const serverRpc = vi.hoisted(() => vi.fn());
@@ -104,12 +105,10 @@ describe("saveManagerUserDetailsAction: the column allowlist", () => {
     "membership_pre_ordered_type_id",
     "square_customer_id",
     "created_at",
-    // Only saveManagerUserDetailsAction writes it, with its own checks.
-    "email",
   ])("refuses to write the unlisted column %s", async (field) => {
     await expect(
       saveManagerUserDetailsAction("user-1", { [field]: "anything" }),
-    ).rejects.toThrow("This user field cannot be edited.");
+    ).resolves.toEqual({ ok: false, error: "This user field cannot be edited." });
 
     // This write goes through the service role, which bypasses RLS. The
     // allowlist is the only thing between a manager and a privilege
@@ -126,12 +125,44 @@ describe("saveManagerUserDetailsAction: the column allowlist", () => {
     "major",
     "membership_type_id",
   ])("writes the allowlisted column %s", async (field) => {
-    await saveManagerUserDetailsAction("user-1", { [field]: "value" });
+    await expect(saveManagerUserDetailsAction("user-1", { [field]: "value" })).resolves.toEqual({ ok: true, user: { id: "user-1" } });
 
     expect(saveAdminProfile).toHaveBeenCalledWith(expect.anything(), "user-1", {
       [field]: "value",
     });
     expect(revalidatePath).toHaveBeenCalledWith("/admin/users", "layout");
+  });
+
+  it("refuses an email another account already uses", async () => {
+    fetchActiveProfile.mockResolvedValue({ auth_user_id: null, email: "typo@exmaple.com" });
+    saveAdminProfile.mockRejectedValue({ code: "23505", message: 'duplicate key value violates unique constraint "user_info_old_email_key"' });
+
+    await expect(saveManagerUserDetailsAction("user-1", { email: "taken@example.com" })).resolves.toEqual({ ok: false, error: "Another account already uses this email." });
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it.each([["  604 555 0100 ", "604 555 0100"], ["  ", null], [null, null]])("stores the phone %j as %j", async (phone, stored) => {
+    await saveManagerUserDetailsAction("user-1", { phone });
+
+    expect(saveAdminProfile).toHaveBeenCalledWith(expect.anything(), "user-1", { phone: stored });
+  });
+
+  it("refuses an overlong phone number", async () => {
+    await expect(saveManagerUserDetailsAction("user-1", { phone: "1".repeat(41) })).resolves.toEqual({ ok: false, error: "Enter a valid phone number." });
+    expect(saveAdminProfile).not.toHaveBeenCalled();
+  });
+
+  it("refuses a save for a user whose account was deleted", async () => {
+    saveAdminProfile.mockRejectedValue(new ActiveProfileNotFoundError());
+
+    await expect(saveManagerUserDetailsAction("user-1", { major: "Art" })).resolves.toEqual({ ok: false, error: "This user no longer exists. Reload the user directory." });
+  });
+
+  it("lets a database fault through as itself", async () => {
+    const fault = { code: "57014", message: "canceling statement due to statement timeout" };
+    saveAdminProfile.mockRejectedValue(fault);
+
+    await expect(saveManagerUserDetailsAction("user-1", { major: "Art" })).rejects.toBe(fault);
   });
 
   it("maps the form's order_date onto the deprecated column", async () => {
@@ -146,14 +177,14 @@ describe("saveManagerUserDetailsAction: the column allowlist", () => {
     ["first_name", "First name is required."],
     ["last_name", "Last name is required."],
   ])("rejects a blank %s", async (field, message) => {
-    await expect(saveManagerUserDetailsAction("user-1", { [field]: "   " })).rejects.toThrow(message);
+    await expect(saveManagerUserDetailsAction("user-1", { [field]: "   " })).resolves.toEqual({ ok: false, error: message });
     expect(saveAdminProfile).not.toHaveBeenCalled();
   });
 
   it("rejects a name that is not a string", async () => {
     await expect(
       saveManagerUserDetailsAction("user-1", { first_name: 7 }),
-    ).rejects.toThrow("First name is required.");
+    ).resolves.toEqual({ ok: false, error: "First name is required." });
     expect(saveAdminProfile).not.toHaveBeenCalled();
   });
 
@@ -162,7 +193,7 @@ describe("saveManagerUserDetailsAction: the column allowlist", () => {
     async (year) => {
       await expect(
         saveManagerUserDetailsAction("user-1", { year }),
-      ).rejects.toThrow("Invalid university year.");
+      ).resolves.toEqual({ ok: false, error: "Invalid university year." });
       expect(saveAdminProfile).not.toHaveBeenCalled();
     },
   );
@@ -191,7 +222,7 @@ describe("updateUserRoleAction: the role check", () => {
     async (role) => {
       serverRpc.mockResolvedValue({ data: role, error: null });
 
-      await expect(updateUserRoleAction("user-1", role)).resolves.toBe(role);
+      await expect(updateUserRoleAction("user-1", role)).resolves.toEqual({ ok: true, role });
 
       expect(serverRpc).toHaveBeenCalledWith("set_user_role", {
         p_target_user_id: "user-1",
@@ -223,6 +254,16 @@ describe("updateUserRoleAction: the role check", () => {
     serverRpc.mockResolvedValue({ data: null, error: failure });
 
     await expect(updateUserRoleAction("user-1", "admin")).rejects.toBe(failure);
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("returns the last manager's demotion as a refusal the manager can read", async () => {
+    serverRpc.mockResolvedValue({ data: null, error: { code: "P0001", message: "The final manager cannot be demoted" } });
+
+    await expect(updateUserRoleAction("user-1", "admin")).resolves.toEqual({
+      ok: false,
+      error: expect.stringMatching(/only manager/),
+    });
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
@@ -953,7 +994,7 @@ describe("saveManagerUserDetailsAction", () => {
     expect(guards.requireManager).toHaveBeenCalledOnce();
     expect(saveAdminProfile).toHaveBeenCalledOnce();
     expect(saveAdminProfile).toHaveBeenCalledWith(expect.anything(), "user-1", { first_name: "Jamie", newsletter: false, birth_date: "2000-02-29", interests: ["Design"], order_date_deprecated: "2026-01-01" });
-    expect(saved).toEqual({ id: "user-1", first_name: "Jamie" });
+    expect(saved).toEqual({ ok: true, user: { id: "user-1", first_name: "Jamie" } });
   });
 
   it.each([
@@ -965,13 +1006,13 @@ describe("saveManagerUserDetailsAction", () => {
     { first_name: "Jamie", interests: [""] },
     { first_name: "Jamie", year: "6" },
   ])("rejects the entire patch before writing if any field is invalid: %j", async (patch) => {
-    await expect(saveManagerUserDetailsAction("user-1", patch)).rejects.toThrow();
+    await expect(saveManagerUserDetailsAction("user-1", patch)).resolves.toMatchObject({ ok: false });
     expect(saveAdminProfile).not.toHaveBeenCalled();
   });
 
   it.each(["ubcStudent", "faculty", null])("rejects school changes for %s accounts before saving any fields", async (user_type) => {
     fetchActiveProfile.mockResolvedValue({ user_type, membership_type_id: "ubc-tier", school_institution: null });
-    await expect(saveManagerUserDetailsAction("user-1", { first_name: "Jamie", school_institution: "Another school" })).rejects.toThrow("School can only be changed for Non-UBC members.");
+    await expect(saveManagerUserDetailsAction("user-1", { first_name: "Jamie", school_institution: "Another school" })).resolves.toEqual({ ok: false, error: "School can only be changed for Non-UBC members." });
     expect(saveAdminProfile).not.toHaveBeenCalled();
   });
 
@@ -995,7 +1036,7 @@ describe("saveManagerUserDetailsAction", () => {
   it.each([null, "ubc-tier"])("rejects changed schools when the resulting membership is %s", async (membership_type_id) => {
     fetchActiveProfile.mockResolvedValue({ user_type: "nonUbc", membership_type_id: "non-ubc", school_institution: "Old school" });
     fetchMembershipTypeById.mockResolvedValue({ name: "explorer" });
-    await expect(saveManagerUserDetailsAction("user-1", { membership_type_id, school_institution: "SFU" })).rejects.toThrow("School can only be changed for Non-UBC members.");
+    await expect(saveManagerUserDetailsAction("user-1", { membership_type_id, school_institution: "SFU" })).resolves.toEqual({ ok: false, error: "School can only be changed for Non-UBC members." });
     expect(saveAdminProfile).not.toHaveBeenCalled();
   });
 
@@ -1018,7 +1059,7 @@ describe("saveManagerUserDetailsAction", () => {
     [{ auth_user_id: null, email: "member@example.com" }, 42, "valid email"],
   ])("refuses an email change on %j to %j", async (profile, email, message) => {
     fetchActiveProfile.mockResolvedValue(profile);
-    await expect(saveManagerUserDetailsAction("user-1", { first_name: "Jamie", email })).rejects.toThrow(message);
+    await expect(saveManagerUserDetailsAction("user-1", { first_name: "Jamie", email })).resolves.toEqual({ ok: false, error: expect.stringMatching(message) });
     expect(saveAdminProfile).not.toHaveBeenCalled();
   });
 

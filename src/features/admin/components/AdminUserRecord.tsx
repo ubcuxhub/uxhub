@@ -149,7 +149,9 @@ export function AdminUserRecord({
     try {
       const changes = userEditChanges(updated, draft, membershipTypes);
       if (Object.keys(changes).length) {
-        commit(await saveManagerUserDetailsAction(updated.id, changes));
+        const saved = await saveManagerUserDetailsAction(updated.id, changes);
+        if (!saved.ok) throw new Error(saved.error);
+        commit(saved.user);
         const savedDraft = createUserEditDraft(updated);
         setDraft((current) => current && {
           ...current,
@@ -180,7 +182,8 @@ export function AdminUserRecord({
       const roleChanged = draft.role !== updated.role_access;
       if (roleChanged) {
         const role = await updateUserRoleAction(updated.id, draft.role);
-        updated = { ...updated, role_access: role };
+        if (!role.ok) throw new Error(role.error);
+        updated = { ...updated, role_access: role.role };
         setUser(updated);
         savedAny = true;
       }

@@ -58,74 +58,29 @@ import type {
   EventUpdate,
   UserInfoUpdate,
 } from "@/lib/supabase/models";
-import type { RoleAccess, SubmittedApplicationRow } from "@/lib/supabase/models";
-import { fetchActiveProfile, saveAdminProfile } from "@/lib/supabase-helpers/admin-user-profile";
+import type { RoleAccess, SubmittedApplicationRow, UserInfoRow } from "@/lib/supabase/models";
+import { ActiveProfileNotFoundError, fetchActiveProfile, saveAdminProfile } from "@/lib/supabase-helpers/admin-user-profile";
 import { fetchMembershipTypeById } from "@/lib/supabase-helpers/memberships";
 import { normalizeInterests, validateBirthDate } from "./lib/user-profile";
+import { managerUserUpdate, refusing, UserEditRefusal } from "./lib/manager-user-update";
 import {
   buildApplicationDecisionUpdate,
   type ApplicationDecision,
 } from "./lib/application-review";
 
-// `email` is handled on its own in saveManagerUserDetailsAction: it's the
-// sign-in address for a linked account, so it can't take the generic path.
-const MANAGER_USER_FIELDS = new Set([
-  "first_name",
-  "last_name",
-  "phone",
-  "newsletter",
-  "student_number",
-  "faculty",
-  "major",
-  "year",
-  "membership_type_id",
-  "order_date_deprecated",
-]);
+/** A user edit's outcome: the saved row, or why it was refused, for the manager. */
+export type ManagerUserSaveResult =
+  | { ok: true; user: UserInfoRow }
+  | { ok: false; error: string };
 
-function assertManagerUserUpdate(
-  field: string,
-  value: string | number | boolean | null
-): UserInfoUpdate {
-  const databaseField =
-    field === "order_date" ? "order_date_deprecated" : field;
-
-  if (!MANAGER_USER_FIELDS.has(databaseField)) {
-    throw new Error("This user field cannot be edited.");
-  }
-
-  if (databaseField === "first_name" || databaseField === "last_name") {
-    const normalizedName = typeof value === "string" ? value.trim() : "";
-    if (!normalizedName) {
-      throw new Error(
-        databaseField === "first_name"
-          ? "First name is required."
-          : "Last name is required."
-      );
-    }
-    return { [databaseField]: normalizedName } as UserInfoUpdate;
-  }
-
-  if (
-    databaseField === "year" &&
-    value !== null &&
-    !["1", "2", "3", "4", "5+"].includes(String(value))
-  ) {
-    throw new Error("Invalid university year.");
-  }
-
-  return { [databaseField]: value } as UserInfoUpdate;
-}
-
-/** Save the form's profile fields together; roles retain their separate RPC guard. */
-export async function saveManagerUserDetailsAction(userId: string, changes: Record<string, unknown>) {
-  await requireManager();
-  if (!userId) throw new Error("A user id is required.");
+/** The update a manager's edit makes, validated as a whole before anything is written. */
+async function managerUserPatch(userId: string, changes: Record<string, unknown>): Promise<UserInfoUpdate> {
   const patch: UserInfoUpdate = {};
   for (const [field, value] of Object.entries(changes)) {
-    if (field === "birth_date") patch.birth_date = validateBirthDate(value);
-    else if (field === "interests") patch.interests = normalizeInterests(value);
+    if (field === "birth_date") patch.birth_date = refusing(() => validateBirthDate(value));
+    else if (field === "interests") patch.interests = refusing(() => normalizeInterests(value));
     else if (field === "school_institution") {
-      if (value !== null && typeof value !== "string") throw new Error("Enter a valid school or institution.");
+      if (value !== null && typeof value !== "string") throw new UserEditRefusal("Enter a valid school or institution.");
       const user = await fetchActiveProfile(supabaseAdmin, userId);
       const school = typeof value === "string" ? value.trim() || null : null;
       if (school === user.school_institution) continue;
@@ -133,7 +88,7 @@ export async function saveManagerUserDetailsAction(userId: string, changes: Reco
       const membershipId = Object.hasOwn(changes, "membership_type_id") ? changes.membership_type_id : user.membership_type_id;
       const membership = typeof membershipId === "string" && membershipId
         ? await fetchMembershipTypeById(supabaseAdmin, membershipId) : null;
-      if (membership?.name !== "nonUbc") throw new Error("School can only be changed for Non-UBC members.");
+      if (membership?.name !== "nonUbc") throw new UserEditRefusal("School can only be changed for Non-UBC members.");
       patch.school_institution = school;
     }
     else if (field === "email") {
@@ -145,25 +100,59 @@ export async function saveManagerUserDetailsAction(userId: string, changes: Reco
       const email = typeof value === "string" ? value.trim().toLowerCase() : "";
       const user = await fetchActiveProfile(supabaseAdmin, userId);
       if (email === user.email) continue;
-      if (user.auth_user_id) throw new Error("This member signs in with this email, so it can't be changed here.");
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email address.");
+      if (user.auth_user_id) throw new UserEditRefusal("This member signs in with this email, so it can't be changed here.");
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new UserEditRefusal("Enter a valid email address.");
       patch.email = email;
     }
-    else {
-      if (value !== null && !["string", "number", "boolean"].includes(typeof value)) throw new Error("Invalid user field value.");
-      if (field === "newsletter" && typeof value !== "boolean") throw new Error("Choose a newsletter preference.");
-      Object.assign(patch, assertManagerUserUpdate(field, value as string | number | boolean | null));
-    }
+    else Object.assign(patch, managerUserUpdate(field, value));
   }
-  const user = await saveAdminProfile(supabaseAdmin, userId, patch);
-  revalidatePath("/admin/users", "layout");
-  return user;
+  return patch;
+}
+
+/**
+ * Saves the form's profile fields together; roles keep their separate RPC
+ * guard. An invalid field, an email another account uses, or a deleted user
+ * comes back as a refusal, and nothing is written.
+ */
+export async function saveManagerUserDetailsAction(userId: string, changes: Record<string, unknown>): Promise<ManagerUserSaveResult> {
+  await requireManager();
+  if (!userId) throw new Error("A user id is required.");
+  try {
+    const user = await saveAdminProfile(supabaseAdmin, userId, await managerUserPatch(userId, changes));
+    revalidatePath("/admin/users", "layout");
+    return { ok: true, user };
+  } catch (error) {
+    const refusal =
+      error instanceof UserEditRefusal || error instanceof ActiveProfileNotFoundError ? error.message
+      : isPostgrestError(error) && error.code === "23505" && /email/.test(error.message) ? "Another account already uses this email."
+      : null;
+    if (!refusal) throw error;
+    log.warn("admin.user_edit_refused", { userId, fields: Object.keys(changes).join(",") });
+    return { ok: false, error: refusal };
+  }
+}
+
+function isPostgrestError(error: unknown): error is { code: string; message: string } {
+  return typeof error === "object" && error !== null && typeof (error as { code?: unknown }).code === "string" && typeof (error as { message?: unknown }).message === "string";
+}
+
+/** A role change's outcome: the role now held, or why `set_user_role` refused it. */
+export type UserRoleResult = { ok: true; role: RoleAccess } | { ok: false; error: string };
+
+/** What `set_user_role` raises for an expected refusal, in words a manager can act on. */
+function roleRefusal(error: { code?: string; message: string }): string | null {
+  if (error.message.includes("The final manager cannot be demoted")) {
+    return "This is the only manager. Make someone else a manager before changing this role.";
+  }
+  if (error.code === "42501") return "Only managers can change role access.";
+  if (error.code === "P0002") return "This user no longer exists. Reload the user directory.";
+  return null;
 }
 
 export async function updateUserRoleAction(
   userId: string,
   role: RoleAccess
-): Promise<RoleAccess> {
+): Promise<UserRoleResult> {
   await requireManager();
 
   if (!userId) {
@@ -179,11 +168,16 @@ export async function updateUserRoleAction(
     p_role: role,
   });
 
-  if (error) throw error;
+  if (error) {
+    const refusal = roleRefusal(error);
+    if (!refusal) throw error;
+    log.warn("admin.user_role_refused", { userId, role });
+    return { ok: false, error: refusal };
+  }
   if (!data) throw new Error("The role update returned no role.");
 
   revalidatePath("/admin/users", "layout");
-  return data;
+  return { ok: true, role: data };
 }
 
 export interface SavedEventPublication {
