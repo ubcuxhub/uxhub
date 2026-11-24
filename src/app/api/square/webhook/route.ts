@@ -3,10 +3,10 @@ import { WebhooksHelper } from "square";
 import {
   processSquarePaymentEvent,
   processSquareRefundEvent,
+  SquareWebhookInProgressError,
 } from "@/features/payments/fulfillment";
 import { errorFields, log } from "@/lib/log";
 import { getSquareWebhookEndpoints } from "@/lib/square/client";
-import type { Json } from "@/lib/supabase/database.types";
 import {
   isSquareRefundEventType,
   parseSquarePaymentUpdatedEvent,
@@ -68,10 +68,10 @@ export async function POST(request: Request) {
   try {
     if (isRefund) {
       const event = parseSquareRefundEvent(rawPayload);
-      handle = () => processSquareRefundEvent(event, rawPayload as NonNullable<Json>, origin);
+      handle = () => processSquareRefundEvent(event, origin);
     } else {
       const event = parseSquarePaymentUpdatedEvent(rawPayload);
-      handle = () => processSquarePaymentEvent(event, rawPayload as NonNullable<Json>, origin);
+      handle = () => processSquarePaymentEvent(event, origin);
     }
   } catch (error) {
     log.error("webhook.square_payload_invalid", errorFields(error));
@@ -83,6 +83,14 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (error) {
+    // Not done yet, not failed: a non-2xx makes Square deliver it again.
+    if (error instanceof SquareWebhookInProgressError) {
+      log.warn("webhook.square_event_in_progress");
+      return NextResponse.json(
+        { error: "Event is still being processed" },
+        { status: 503, headers: { "Retry-After": "60" } }
+      );
+    }
     log.error("webhook.square_handling_failed", errorFields(error));
     return NextResponse.json({ error: "Webhook processing failed" }, { status: 500 });
   }

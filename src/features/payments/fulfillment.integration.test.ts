@@ -52,9 +52,6 @@ function checkoutInput(slug: string): CheckoutRequestInput {
     slug,
     token: "cnon:card-nonce-ok",
     idempotencyKey: `it-${randomUUID()}`,
-    buyerFirstName: "Integration",
-    buyerLastName: "Test",
-    buyerEmail: "integration@example.test",
   };
 }
 

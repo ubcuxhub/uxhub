@@ -70,17 +70,20 @@ export async function fetchPurchaseBySquarePaymentId(
   return data;
 }
 
-export async function fetchNonterminalMembershipPurchase(
+/**
+ * The user's membership purchase that may still take money (pending or
+ * authorized), whatever the tier. At most one exists:
+ * `purchases_one_live_membership_per_user` refuses a second.
+ */
+export async function fetchLiveMembershipPurchase(
   supabase: DbClient,
   userId: string,
-  membershipTypeId: string,
 ): Promise<PurchaseRow | null> {
   const { data, error } = await supabase
     .from(TABLES.purchases)
     .select("*")
     .eq("user_id", userId)
     .eq("kind", "membership")
-    .eq("membership_type_id", membershipTypeId)
     .in("status", ["pending", "authorized"])
     .order("created_at", { ascending: false })
     .limit(1)
@@ -88,6 +91,15 @@ export async function fetchNonterminalMembershipPurchase(
 
   if (error) throw error;
   return data;
+}
+
+/** A Postgres unique violation, as PostgREST reports it. */
+export function isUniqueViolation(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    (error as { code?: unknown }).code === "23505"
+  );
 }
 
 export async function updatePurchase(
@@ -104,6 +116,112 @@ export async function updatePurchase(
 
   if (error) throw error;
   return data;
+}
+
+/** The values `purchases.status` allows (a check constraint, so typed as text). */
+type PurchaseStatus = "pending" | "authorized" | "completed" | "canceled" | "failed";
+
+/**
+ * The stored statuses a Square payment status may replace. Square does not
+ * promise to deliver webhooks in order, so an older `payment.updated` can
+ * arrive after a newer one: a status only moves forward. Completed is final,
+ * and only a completion moves a purchase out of canceled or failed, because
+ * the app also fails attempts Square never saw (`fail_abandoned_purchases`)
+ * and Square's completed payment must still win then.
+ */
+const SQUARE_STATUS_FROM: Record<PurchaseStatus, PurchaseStatus[]> = {
+  pending: ["pending"],
+  authorized: ["pending", "authorized"],
+  completed: ["pending", "authorized", "completed", "canceled", "failed"],
+  canceled: ["pending", "authorized", "canceled", "failed"],
+  failed: ["pending", "authorized", "canceled", "failed"],
+};
+
+/**
+ * Records a Square payment's state on its purchase, unless the purchase has
+ * already moved past it (see `SQUARE_STATUS_FROM`). The guard is part of the
+ * UPDATE, so two deliveries racing can't undo each other. Returns the row as
+ * it now stands and whether this call changed it.
+ */
+export async function applySquarePaymentStatus(
+  supabase: DbClient,
+  purchaseId: string,
+  payment: {
+    status: PurchaseStatus;
+    squarePaymentId: string | null;
+    squareCustomerId: string | null;
+  },
+): Promise<{ purchase: PurchaseRow; applied: boolean }> {
+  const update: PurchaseUpdate = { status: payment.status };
+  if (payment.squarePaymentId) update.square_payment_id = payment.squarePaymentId;
+  if (payment.squareCustomerId) update.square_customer_id = payment.squareCustomerId;
+  // A failure keeps the reason the app recorded; anything else clears it.
+  if (payment.status !== "canceled" && payment.status !== "failed") {
+    update.failure_reason = null;
+  }
+
+  const { data, error } = await supabase
+    .from(TABLES.purchases)
+    .update(update)
+    .eq("id", purchaseId)
+    .in("status", SQUARE_STATUS_FROM[payment.status])
+    .select("*")
+    .maybeSingle();
+
+  if (error) throw error;
+  if (data) return { purchase: data, applied: true };
+  const current = await fetchPurchaseById(supabase, purchaseId);
+  if (!current) throw new Error("Purchase not found while recording its payment.");
+  return { purchase: current, applied: false };
+}
+
+/**
+ * Fails a purchase still pending with no Square payment ID once it is older
+ * than `createdBefore`, so the buyer can try again and an event no longer
+ * counts it as a payment in flight. Null when it no longer qualifies (a
+ * webhook recorded its payment meanwhile, or it settled).
+ */
+export async function failAbandonedPurchase(
+  supabase: DbClient,
+  purchaseId: string,
+  createdBefore: string,
+  reason: string,
+): Promise<PurchaseRow | null> {
+  const { data, error } = await supabase
+    .from(TABLES.purchases)
+    .update({ status: "failed", failure_reason: reason })
+    .eq("id", purchaseId)
+    .eq("status", "pending")
+    .is("square_payment_id", null)
+    .lt("created_at", createdBefore)
+    .select("*")
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
+}
+
+/**
+ * Stamps `fulfilled_at` on a purchase whose entitlement was just granted.
+ * Scoped to an unfulfilled row, so a concurrent pass never moves the stamp.
+ */
+export async function markPurchaseFulfilled(
+  supabase: DbClient,
+  purchaseId: string,
+): Promise<PurchaseRow> {
+  const { data, error } = await supabase
+    .from(TABLES.purchases)
+    .update({ fulfilled_at: new Date().toISOString() })
+    .eq("id", purchaseId)
+    .is("fulfilled_at", null)
+    .select("*")
+    .maybeSingle();
+
+  if (error) throw error;
+  if (data) return data;
+  const current = await fetchPurchaseById(supabase, purchaseId);
+  if (!current) throw new Error("Purchase not found while marking it fulfilled.");
+  return current;
 }
 
 /**
@@ -248,11 +366,21 @@ export async function fetchPurchasesForUser(
   return (data ?? []) as PurchaseWithDetails[];
 }
 
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * The user's purchase with its event or tier, or null. An ID that isn't a
+ * UUID (a mangled confirmation link) is null too, rather than the error
+ * Postgres raises comparing it with a uuid column.
+ */
 export async function fetchPurchaseForUser(
   supabase: DbClient,
   userId: string,
   purchaseId: string
 ): Promise<PurchaseWithDetails | null> {
+  if (!UUID_PATTERN.test(purchaseId)) return null;
+
   const { data, error } = await supabase
     .from(TABLES.purchases)
     .select(
@@ -311,28 +439,104 @@ export async function applyPurchaseRefund(
   };
 }
 
-export async function recordSquareWebhookEvent(
+/**
+ * How long a claimed webhook event may go unprocessed before another delivery
+ * takes it over: the handler that claimed it was killed (a timeout, a crash)
+ * without forgetting it. Comfortably longer than a request may run.
+ */
+export const SQUARE_WEBHOOK_CLAIM_STALE_MS = 5 * 60 * 1000;
+
+/**
+ * `claimed`: this delivery handles the event. `processed`: an earlier one
+ * already did. `in_progress`: another delivery is handling it right now, so
+ * this one should ask Square to retry rather than acknowledge it.
+ */
+export type SquareWebhookClaim = "claimed" | "processed" | "in_progress";
+
+type SquareWebhookEventClaimInput = Pick<
+  SquareWebhookEventInsert,
+  "event_id" | "event_type" | "square_payment_id"
+>;
+
+async function insertSquareWebhookClaim(
   supabase: DbClient,
-  payload: SquareWebhookEventInsert
+  event: SquareWebhookEventClaimInput
 ): Promise<boolean> {
   const { error } = await supabase
     .from(TABLES.squareWebhookEvents)
-    .insert(payload);
+    .insert({ ...event, processed_at: null });
 
-  if (!error) {
-    return true;
-  }
-
-  if (error.code === "23505") {
-    return false;
-  }
-
+  if (!error) return true;
+  if (isUniqueViolation(error)) return false;
   throw error;
 }
 
 /**
- * Undoes `recordSquareWebhookEvent` after processing fails, so Square's retry
- * of the same event is processed instead of discarded as a duplicate.
+ * Claims a webhook event for processing. The row is written before handling
+ * so concurrent deliveries are handled once; it is stamped processed by
+ * `markSquareWebhookEventProcessed`, or deleted by `forgetSquareWebhookEvent`
+ * when handling fails. Only the event ID, type and payment ID are kept, never
+ * the payload. A claim left unprocessed for `SQUARE_WEBHOOK_CLAIM_STALE_MS`
+ * is taken over.
+ */
+export async function claimSquareWebhookEvent(
+  supabase: DbClient,
+  event: SquareWebhookEventClaimInput,
+  now = Date.now()
+): Promise<SquareWebhookClaim> {
+  if (await insertSquareWebhookClaim(supabase, event)) return "claimed";
+
+  const { data: existing, error } = await supabase
+    .from(TABLES.squareWebhookEvents)
+    .select("processed_at, created_at")
+    .eq("event_id", event.event_id)
+    .maybeSingle();
+
+  if (error) throw error;
+  // Forgotten in between: the delivery that held it failed.
+  if (!existing) {
+    return (await insertSquareWebhookClaim(supabase, event)) ? "claimed" : "in_progress";
+  }
+  if (existing.processed_at) return "processed";
+
+  const claimedAt = existing.created_at ? Date.parse(existing.created_at) : Number.NaN;
+  if (Number.isFinite(claimedAt) && now - claimedAt < SQUARE_WEBHOOK_CLAIM_STALE_MS) {
+    return "in_progress";
+  }
+
+  // A stale claim: drop it (only if it is still that same claim) and race
+  // any other delivery for a fresh one.
+  let stale = supabase
+    .from(TABLES.squareWebhookEvents)
+    .delete()
+    .eq("event_id", event.event_id)
+    .is("processed_at", null);
+  stale = existing.created_at
+    ? stale.eq("created_at", existing.created_at)
+    : stale.is("created_at", null);
+  const { error: deleteError } = await stale;
+  if (deleteError) throw deleteError;
+
+  return (await insertSquareWebhookClaim(supabase, event)) ? "claimed" : "in_progress";
+}
+
+/** Marks a claimed webhook event as handled, so later deliveries skip it. */
+export async function markSquareWebhookEventProcessed(
+  supabase: DbClient,
+  eventId: string
+): Promise<void> {
+  const { error } = await supabase
+    .from(TABLES.squareWebhookEvents)
+    .update({ processed_at: new Date().toISOString() })
+    .eq("event_id", eventId);
+
+  if (error) throw error;
+}
+
+/**
+ * Releases a claim after processing fails, so Square's retry of the same
+ * event is processed instead of discarded as a duplicate. Never removes an
+ * event already processed.
  */
 export async function forgetSquareWebhookEvent(
   supabase: DbClient,
@@ -341,7 +545,8 @@ export async function forgetSquareWebhookEvent(
   const { error } = await supabase
     .from(TABLES.squareWebhookEvents)
     .delete()
-    .eq("event_id", eventId);
+    .eq("event_id", eventId)
+    .is("processed_at", null);
 
   if (error) throw error;
 }
