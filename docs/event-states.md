@@ -343,12 +343,14 @@ does and returns why it refused instead of failing:
   Two accepts for the last seat serialize on the lock, so only one takes it.
 - **Deadline.** `offer_expires_at` must be after now and after the release
   (`DEADLINE_TOO_EARLY`). The review page starts from `defaultOfferDeadline`:
-  the event's Confirm by when that's after the later of now and the release.
-  Otherwise it repeats the event's last offer window: each accept records how
-  many Pacific calendar days its deadline fell after that moment, and the time
-  of day (`event_application_settings.offer_window_days`,
-  `offer_deadline_time`), so offers made before the release all land together
-  and rolling offers each get the same number of days. Before any accept it is
+  the event's Confirm by when that's after the later of now and the release,
+  then the exact deadline of the event's last offer
+  (`event_application_settings.last_offer_expires_at`) while that's after it,
+  so a batch of accepts shares one deadline. Once that has passed it repeats
+  the last offer's window: each accept also records how many Pacific calendar
+  days its deadline fell after that moment, and the time of day
+  (`offer_window_days`, `offer_deadline_time`), so rolling offers each get the
+  same number of days. Before any accept it is
   a week after that moment at 11:45 PM Pacific. Changing Confirm by never moves
   offers already made.
 - Other refusals: `NOT_FOUND`, `NOT_SUBMITTED` (a draft), `HAS_TICKET` (the

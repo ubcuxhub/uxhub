@@ -16,15 +16,24 @@ export interface OfferWindow {
 }
 
 /**
- * Remembers the window of the event's latest offer, the next accept's default
- * (`defaultOfferDeadline`). Touches only the window columns, so the builder's
- * timing settings stay as they are. Service role only.
+ * Remembers the event's latest offer, the next accept's default
+ * (`defaultOfferDeadline`): its exact deadline and, when it has one, its
+ * window. Touches only those columns, so the builder's timing settings stay
+ * as they are. Service role only.
  */
-export async function recordOfferWindow(serviceClient: DbClient, eventId: string, window: OfferWindow) {
+export async function recordLastOffer(
+  serviceClient: DbClient,
+  eventId: string,
+  offer: { expiresAt: string; window: OfferWindow | null }
+) {
   const { error } = await serviceClient
     .from(TABLES.eventApplicationSettings)
     .upsert(
-      { event_id: eventId, offer_window_days: window.days, offer_deadline_time: window.time },
+      {
+        event_id: eventId,
+        last_offer_expires_at: offer.expiresAt,
+        ...(offer.window && { offer_window_days: offer.window.days, offer_deadline_time: offer.window.time }),
+      },
       { onConflict: "event_id" }
     );
   if (error) throw error;

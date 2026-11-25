@@ -4,7 +4,7 @@ import { requireAdmin } from "@/lib/auth/guards";
 import { errorFields, log } from "@/lib/log";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { formatTimestamp } from "@/lib/date";
-import { recordOfferWindow } from "@/lib/supabase-helpers/event-application-settings";
+import { recordLastOffer } from "@/lib/supabase-helpers/event-application-settings";
 import {
   decideEventApplication,
   fetchEventApplicationById,
@@ -48,14 +48,15 @@ function decisionRefusal(reason: ApplicationDecisionFailure, decisionsReleaseAt:
 }
 
 /**
- * Keeps the accept's window as the event's next default deadline. The
+ * Keeps the accept's deadline and window as the event's next default. The
  * decision is already saved, so a failure here only loses the default.
  */
-async function rememberOfferWindow(eventId: string, offerExpiresAt: string, decisionsReleaseAt: string | null) {
-  const window = offerWindowFor(offerExpiresAt, decisionsReleaseAt);
-  if (!window) return;
+async function rememberOffer(eventId: string, offerExpiresAt: string, decisionsReleaseAt: string | null) {
   try {
-    await recordOfferWindow(supabaseAdmin, eventId, window);
+    await recordLastOffer(supabaseAdmin, eventId, {
+      expiresAt: offerExpiresAt,
+      window: offerWindowFor(offerExpiresAt, decisionsReleaseAt),
+    });
   } catch (error) {
     log.error("application.offer_window_not_saved", { eventId, ...errorFields(error) });
   }
@@ -104,7 +105,7 @@ export async function updateApplicationDecisionAction(
     overCapacity: decided.overCapacity,
   });
   if (decision === "accept" && decided.eventId && result.update.offer_expires_at) {
-    await rememberOfferWindow(decided.eventId, result.update.offer_expires_at, decided.decisionsReleaseAt);
+    await rememberOffer(decided.eventId, result.update.offer_expires_at, decided.decisionsReleaseAt);
   }
   if (decided.overCapacity) {
     log.warn("application.accepted_over_capacity", {
