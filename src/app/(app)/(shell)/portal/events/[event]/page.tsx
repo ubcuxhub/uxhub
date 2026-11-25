@@ -137,7 +137,7 @@ export default async function PortalEventPage({
           <div className="flex flex-col items-start gap-5 pt-5 sm:flex-row sm:items-end sm:justify-between">
             <div className="flex flex-col items-start gap-3">
               <h1 className="text-h2">{event.name}</h1>
-              {badge && <StatusBadge {...badge} />}
+              {badge && <StatusBadge {...badge} size="large" />}
             </div>
             {slackUrl && (
               <Button asChild variant="secondary" className="px-5">
