@@ -79,8 +79,10 @@ const purchasesMocks = vi.hoisted(() => ({
 }));
 vi.mock("@/lib/supabase-helpers/purchases", () => purchasesMocks);
 
+const grantMocks = vi.hoisted(() => ({ fulfillMembershipGrant: vi.fn() }));
+vi.mock("@/lib/supabase-helpers/membership-history", () => grantMocks);
+
 const usersMocks = vi.hoisted(() => ({
-  updateUserInfoById: vi.fn(),
   fetchUserInfoContactById: vi.fn(),
 }));
 vi.mock("@/lib/supabase-helpers/users", () => usersMocks);
@@ -226,6 +228,7 @@ beforeEach(() => {
   customerMocks.ensureSquareCustomerId.mockResolvedValue("customer-1");
   appSettingsMocks.fetchMembershipTermEndsAt.mockResolvedValue(null);
   policyMocks.isEligibleForMembership.mockReturnValue(true);
+  grantMocks.fulfillMembershipGrant.mockResolvedValue(purchase({ kind: "membership", status: "completed" }));
   expiryMocks.resolveMembershipExpiry.mockReturnValue("2027-06-01T00:00:00.000Z");
   revalidationMocks.revalidatePurchasePaths.mockResolvedValue(undefined);
   confirmationEmailMocks.sendPurchaseConfirmationEmail.mockResolvedValue(undefined);
@@ -575,7 +578,7 @@ describe("membership checkout guards", () => {
     expect(purchasesMocks.createPurchase).toHaveBeenCalledWith(adminDb, expect.objectContaining({ amount_cents: 0, status: "completed" }));
     expect(customerMocks.ensureSquareCustomerId).not.toHaveBeenCalled();
     expect(squareMocks.create).not.toHaveBeenCalled();
-    expect(usersMocks.updateUserInfoById).toHaveBeenCalled();
+    expect(grantMocks.fulfillMembershipGrant).toHaveBeenCalled();
   });
 
   it("answers with the purchase that won when a concurrent checkout inserted first", async () => {
@@ -635,6 +638,7 @@ describe("membership fulfillment", () => {
     });
     purchasesMocks.fetchPurchaseById.mockResolvedValue(
       purchase({
+        created_at: "2026-11-01T00:00:00.000Z",
         kind: "membership",
         membership_type_id: "membership-type-1",
         square_customer_id: "customer-1",
@@ -644,36 +648,28 @@ describe("membership fulfillment", () => {
     const result = await executeCheckoutForUser(user, membershipInput);
 
     expect(result).toMatchObject({ ok: true, resolution: "completed" });
-    expect(usersMocks.updateUserInfoById).toHaveBeenCalledWith(
-      adminDb,
-      "user-1",
-      {
-        membership_expires_at: "2027-06-01T00:00:00.000Z",
-        membership_pre_ordered_type_id: null,
-        membership_type_id: "membership-type-1",
-        square_customer_id: "customer-1",
-      }
+    expect(grantMocks.fulfillMembershipGrant).toHaveBeenCalledWith(
+      adminDb, "purchase-1", "2027-06-01T00:00:00.000Z",
+    );
+    expect(expiryMocks.resolveMembershipExpiry).toHaveBeenCalledWith(
+      null, new Date("2026-11-01T00:00:00.000Z"),
     );
   });
 
-  it("grants the membership before marking the purchase fulfilled, so a failed grant is retried", async () => {
+  it("retries a failed atomic membership grant on a later webhook", async () => {
     squareMocks.create.mockResolvedValue({
       payment: { id: "payment-1", customerId: "customer-1", status: "COMPLETED" },
     });
     purchasesMocks.fetchPurchaseById.mockResolvedValue(
       purchase({ kind: "membership", membership_type_id: "membership-type-1" })
     );
-    usersMocks.updateUserInfoById.mockRejectedValueOnce(new Error("connection reset"));
+    grantMocks.fulfillMembershipGrant.mockRejectedValueOnce(new Error("connection reset"));
 
     // The grant fails: the purchase must not be stamped, so a retry grants it.
     await executeCheckoutForUser(user, membershipInput);
-    expect(purchasesMocks.markPurchaseFulfilled).not.toHaveBeenCalled();
-
-    await processSquarePaymentEvent({
-      eventId: "event-retry",
-      type: "payment.updated",
-      data: { object: { payment: { id: "payment-1", status: "COMPLETED" } } },
-    } as never);
+    expect(grantMocks.fulfillMembershipGrant).toHaveBeenCalledTimes(1);
+    expect(revalidationMocks.revalidatePurchasePaths).not.toHaveBeenCalled();
+    expect(afterMocks.after).not.toHaveBeenCalled();
     purchasesMocks.fetchPurchaseBySquarePaymentId.mockResolvedValue(
       purchase({ kind: "membership", membership_type_id: "membership-type-1", square_payment_id: "payment-1" })
     );
@@ -683,15 +679,12 @@ describe("membership fulfillment", () => {
       data: { object: { payment: { id: "payment-1", status: "COMPLETED" } } },
     } as never);
 
-    expect(usersMocks.updateUserInfoById).toHaveBeenLastCalledWith(
-      adminDb,
-      "user-1",
-      expect.objectContaining({ membership_type_id: "membership-type-1" })
+    expect(grantMocks.fulfillMembershipGrant).toHaveBeenCalledTimes(2);
+    expect(grantMocks.fulfillMembershipGrant).toHaveBeenLastCalledWith(
+      adminDb, "purchase-1", "2027-06-01T00:00:00.000Z",
     );
-    expect(purchasesMocks.markPurchaseFulfilled).toHaveBeenCalledWith(adminDb, "purchase-1");
-    const grant = usersMocks.updateUserInfoById.mock.invocationCallOrder.at(-1)!;
-    const stamp = purchasesMocks.markPurchaseFulfilled.mock.invocationCallOrder.at(-1)!;
-    expect(grant).toBeLessThan(stamp);
+    expect(purchasesMocks.markPurchaseFulfilled).not.toHaveBeenCalled();
+    expect(revalidationMocks.revalidatePurchasePaths).toHaveBeenCalledWith(adminDb, "purchase-1");
   });
 
   it("does not re-fulfill an already-fulfilled purchase", async () => {
@@ -708,7 +701,7 @@ describe("membership fulfillment", () => {
 
     await executeCheckoutForUser(user, membershipInput);
 
-    expect(usersMocks.updateUserInfoById).not.toHaveBeenCalled();
+    expect(grantMocks.fulfillMembershipGrant).not.toHaveBeenCalled();
     // Still scheduled, so a send that failed on an earlier pass gets retried.
     expect(afterMocks.after).toHaveBeenCalled();
   });
@@ -931,7 +924,7 @@ describe("refund webhooks", () => {
       "payment.membership_refunded",
       expect.objectContaining({ purchaseId: "purchase-1" })
     );
-    expect(usersMocks.updateUserInfoById).not.toHaveBeenCalled();
+    expect(grantMocks.fulfillMembershipGrant).not.toHaveBeenCalled();
   });
 
   it("does nothing on a duplicate delivery", async () => {

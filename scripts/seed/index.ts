@@ -1252,6 +1252,13 @@ async function main(): Promise<void> {
     }
   }
 
+  if (policy.users && shouldRun(options, "users") && !options.dryRun && options.prune && profileIds.size > 0) {
+    const { error } = await supabase.rpc("reset_fixture_membership_history", {
+      p_person_ids: [...profileIds.values()],
+    });
+    if (error) throw new Error(`Reconciling fixture membership history failed: ${error.message}`);
+  }
+
   console.log(summary.join("\n"));
   console.log(
     options.dryRun

@@ -33,7 +33,7 @@ import {
   markSquareWebhookEventProcessed,
   updatePurchase,
 } from "@/lib/supabase-helpers/purchases";
-import { updateUserInfoById } from "@/lib/supabase-helpers/users";
+import { fulfillMembershipGrant } from "@/lib/supabase-helpers/membership-history";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { hasAdminAccess } from "@/lib/auth/roles";
 import {
@@ -101,24 +101,12 @@ async function fulfillMembershipPurchase(purchaseId: string) {
     throw new Error("Membership purchase is missing a membership type.");
   }
 
-  // Grant first and stamp `fulfilled_at` last: every retry (a webhook
-  // redelivery, a checkout reconciliation) skips a stamped purchase, so a
-  // stamp written before a grant that then failed would lose the membership
-  // for good. Granting again is harmless: the expiry is measured from the
-  // purchase, so a retry writes the same values.
   const termEndsAt = await fetchMembershipTermEndsAt(adminDb);
   const purchasedAt = purchase.created_at ? new Date(purchase.created_at) : undefined;
-
-  await updateUserInfoById(adminDb, purchase.user_id, {
-    membership_expires_at: resolveMembershipExpiry(termEndsAt, purchasedAt),
-    membership_pre_ordered_type_id: null,
-    membership_type_id: purchase.membership_type_id,
-    ...(purchase.square_customer_id
-      ? { square_customer_id: purchase.square_customer_id }
-      : {}),
-  });
-
-  const updatedPurchase = await markPurchaseFulfilled(adminDb, purchase.id);
+  // Grant, fulfillment marker and membership history commit atomically.
+  const updatedPurchase = await fulfillMembershipGrant(
+    adminDb, purchase.id, resolveMembershipExpiry(termEndsAt, purchasedAt),
+  );
 
   await revalidatePurchasePaths(adminDb, purchase.id);
   return updatedPurchase;

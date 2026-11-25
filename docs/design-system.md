@@ -1154,3 +1154,114 @@ height and truncation. Keep an associated label or `aria-label` on the trigger.
 Enabled Select triggers show a pointer cursor; disabled triggers retain
 `cursor-not-allowed`. See `/dev/components/select` for long labels and overnight
 date context.
+
+
+### Statistics surfaces and charts
+
+`StatisticsCard` (`components/shared/StatisticsCard`) composes Card, EmptyState
+and shaped Skeletons: compact distributions have a 120px minimum (124px on
+wide screens), charts a 290px minimum. Titles remain pinned in loading, empty
+and error states; long content can grow the surface. Optional `titleAction`
+places a help control immediately to the right of the heading and retains it in
+loading/empty/error states; `action` remains the separate data-control slot. Chart
+headers wrap that control to another row when space is limited, keeping the
+heading and help control together. The compact loaded layout
+keeps its title/control in the first column. Center the chart/metric group in
+the second column with a full-width, 16rem maximum wrapper and automatic side
+margins. Reserve the remaining width beside the non-shrinking donut for metrics,
+so selected labels, counts and percentages cannot change the group width or
+shift the donut horizontally. Text wraps within its reserved space.
+
+`MetricBadge` (`components/ui/metric-badge`) is a neutral numeric-context pill,
+with an optional 16px trend icon. It never communicates success/error status.
+Existing StatCard consumers retain their existing API and appearance.
+
+`DistributionChart` (`components/shared/DistributionChart`) draws every segment
+using neutral marks, card-coloured boundaries and a primary selection/hover.
+`onSelect(label)` optionally lets pointer/touch segment clicks update caller-owned
+selection alongside a dropdown. Selecting never replaces other segments or changes the denominator. Its textual
+list always includes every label, count, share and selection. Callers can hide
+only the visual with `visualClassName`; never hide its accessible equivalent.
+Dashboard narrow cards omit the donut under accepted D-14. The donut has explicit
+85px chart dimensions, so hiding it never measures a zero-size parent.
+Dashboard marks retain the approved pale treatment: unselected donut segments
+use `border`, bars use `border-subtle`, and selection/hover stays `primary`.
+These pale neutral marks remain an exception to the general 3:1 chart-mark
+contrast target, per dashboard decision D-22.
+`ChartContainer` (`components/ui/chart`) defaults to responsive measurement and
+accepts `initialDimension` for its initial render. Use `responsive={false}` only
+when the child chart supplies explicit width/height; configuration, theme colours
+and tooltip context remain available in either mode. `ChartConfig` supports
+`theme: { light, dark }`; dark overrides target the application’s
+`[data-theme="dark"]` ancestor and follow light → dark → light changes. The resizable real dashboard
+card at `/dev/components/distribution-chart` demonstrates hide/show and long labels.
+
+`ScrollableBarChart` (`components/shared/ScrollableBarChart`) takes ordered
+`ChartPeriod` rows (id, label, nullable count, coverage). Complete zero is a
+reported zero; partial counts carry an incomplete marker by default; unavailable/future
+periods never become zero-height actuals. Hover, focus and tap show identical
+values; a focused/tapped bar retains its value when mouse hover leaves, until
+focus moves away. With no bar active, the status line notes only unavailable
+(—) and incomplete (*) periods; future periods show their value only when
+hovered, focused or tapped. A native horizontal scrollbar can be dragged, arrows step one period
+and disable at boundaries, up to seven bars fit when labels/space allow. No
+wheel interception, zoom handler or animation. `initialScroll="start"` starts at
+the left edge and resets when period IDs change; the default `"end"` preserves
+latest-period positioning. `showPartialCoverage={false}` suppresses only partial
+annotations across bars, details and accessible data; missing/future markers and
+original counts remain intact. `chartPeriodValue(period, false)` shares this
+presentation. `ChartPeriodMenu` offers a Yearly
+overview and a Monthly submenu of caller-named reporting years, using the shared
+DropdownMenu and Button controls. Caller order is preserved; Club Members
+supplies academic years newest first. Feature code owns reporting semantics.
+
+See `/dev/components/statistics-card` for imports and narrow/wide, selection,
+Unknown, missing/partial/zero/future, loading and error examples, plus explicit
+light/dark configuration in responsive and fixed sizing modes. The gallery's
+theme/density controls apply; keyboard/touch work without hover or motion.
+
+### Event preview and quick links
+
+`EventBanner` supplies a fixed 200px decorative image frame with a configured
+header-colour or calendar fallback, including failed image URLs. Hover scales
+only the artwork by 5%; the functional `duration-slow` token keeps admin motion
+within the library budget. Reduced motion disables scaling and transitions.
+
+`EventPreview` composes that banner, a bordered Card, a wrapping linked title,
+StatusBadge slot, labelled icon facts and caller-owned actions. At phone widths
+actions stack; from `sm` they use two columns. Content grows without clipping.
+`EventPreviewSkeleton` reserves the banner, details and action shapes. Domain
+state, publication, destination availability and action behaviour stay with callers.
+The existing square EventCard remains the list/timeline component.
+
+`QuickLink` centres a service icon and left-aligned title/subtitle. Enabled links
+open externally; a missing URL disables navigation and exposes an availability
+tooltip on hover and keyboard focus. Phone tiles are at least 60px tall with a
+20px icon; wider tiles use a 30px icon and at least 68px height. Labels wrap.
+See `/dev/components/event-preview`, `/dev/components/event-banner` and
+`/dev/components/quick-link` for wide/narrow, loading, missing/broken image,
+empty/error and disabled examples under the gallery theme/density controls.
+
+
+### Grouped action search
+
+`shared/ActionSearch` composes SearchField and a non-modal anchored Popover for
+navigation commands. The caller controls query, open state, groups, lookup states
+and selection; it owns authorization, recents and destinations. Item IDs must be
+unique across groups. Optional leading icons and descriptions support typed
+results. Disabled options remain visible with an explanation and are skipped by
+keyboard navigation. No action executes until a row is selected.
+
+Input focus stays in the combobox: arrows move the active descendant, Enter
+selects, Escape dismisses while preserving text, and Tab/outside interaction
+dismisses; when a context or retry button is present, Tab first reaches that
+control. Popup buttons follow their visual order; Shift+Tab from the first
+returns to the input, and Tab from the last returns to the input and closes
+the popup. An optional `contextAction` provides scoped
+back navigation with focus restoration. Clear restores input focus. Async callers must remove stale options
+while loading. The live status provides loading, empty and error/retry feedback;
+retry restores input focus. Menus match anchor width, stay within the viewport
+and scroll with available height; rows wrap and retain phone touch targets.
+SearchField and SearchableDropdown retain their existing contracts. See
+`/dev/components/action-search` for Recent/Suggested, typed/long results, narrow,
+loading, empty and retry examples with gallery theme/density controls.

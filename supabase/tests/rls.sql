@@ -2670,6 +2670,7 @@ $$;
 \ir application-decisions.sql
 \ir event-cancellation.sql
 \ir application-emails.sql
+\ir membership-history.sql
 \ir event-reminders.sql
 
 do $$ begin

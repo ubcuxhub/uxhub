@@ -26,6 +26,11 @@ vi.mock("./confirmation-email", () => ({
 }));
 vi.mock("./revalidation", () => ({ revalidatePurchasePaths: vi.fn() }));
 
+// Integration files run in parallel and purchase-safety also claims `it-` events,
+// so this file cleans up only webhook events it created.
+const WEBHOOK_EVENT_PREFIX = "it-fulfillment-";
+const webhookEventId = () => `${WEBHOOK_EVENT_PREFIX}${randomUUID()}`;
+
 const square = vi.hoisted(() => ({
   create: vi.fn(),
   complete: vi.fn(),
@@ -239,7 +244,7 @@ describe("event ticket checkout", () => {
         .single();
 
       await processSquarePaymentEvent({
-        eventId: `it-${randomUUID()}`,
+        eventId: webhookEventId(),
         type: "payment.updated",
         data: {
           object: {
@@ -250,7 +255,7 @@ describe("event ticket checkout", () => {
 
       expect(await purchaseFor(purchaseId)).toMatchObject({ status: "canceled" });
       expect(await ticketsFor(event.id)).toEqual([]);
-      await db.from("square_webhook_events").delete().like("event_id", "it-%");
+      await db.from("square_webhook_events").delete().like("event_id", `${WEBHOOK_EVENT_PREFIX}%`);
     }));
 
   it("lets admins and managers test-register on free drafts only, and never holds a card for a paid one", () =>
@@ -409,7 +414,7 @@ describe("Square refunds", () => {
     });
   }
 
-  function refundEvent(paymentId: string, eventId = `it-${randomUUID()}`): SquareRefundEvent {
+  function refundEvent(paymentId: string, eventId = webhookEventId()): SquareRefundEvent {
     return {
       eventId,
       type: "refund.updated",
@@ -449,7 +454,7 @@ describe("Square refunds", () => {
   }
 
   afterEach(async () => {
-    await db.from("square_webhook_events").delete().like("event_id", "it-%");
+    await db.from("square_webhook_events").delete().like("event_id", `${WEBHOOK_EVENT_PREFIX}%`);
   });
 
   it("takes back the ticket and frees the seat on a full refund before check-in", () =>
@@ -543,7 +548,7 @@ describe("Square refunds", () => {
       expect(await ticketsFor(event.id)).toEqual([]);
 
       await processSquarePaymentEvent({
-        eventId: `it-${randomUUID()}`,
+        eventId: webhookEventId(),
         type: "payment.updated",
         data: { object: { payment: { id: paymentId, status: "COMPLETED" } } },
       } as never);

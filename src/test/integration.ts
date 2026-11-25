@@ -242,6 +242,12 @@ export class Fixtures {
       this.rows.filter((row) => row.table === table).map((row) => row.id);
     const eventIds = idsOf("events");
     const userIds = idsOf("user_info");
+    // Production deletion preserves awards. Only this local test harness clears
+    // its own people; the ledger trigger reconciles their summary deltas.
+    if (userIds.length > 0) {
+      const { error } = await this.supabase.from("membership_awards").delete().in("person_id", userIds);
+      if (error) failures.push(error);
+    }
 
     for (const table of [
       "event_tickets",

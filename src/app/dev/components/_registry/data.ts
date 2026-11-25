@@ -5,6 +5,46 @@ import type { RegistryEntry } from "./types";
  * `forms.ts` for how shards work.
  */
 export const dataEntries: readonly RegistryEntry[] = [
+  ...[
+    { slug: "event-banner", title: "Event banner", name: "EventBanner" },
+    { slug: "event-preview", title: "Event preview", name: "EventPreview" },
+    { slug: "quick-link", title: "Quick link", name: "QuickLink" },
+  ].map(({ slug, title, name }) => ({
+    slug, title, category: "Data display" as const, tier: "composite" as const,
+    description: "Responsive event preview and service tiles with wrapping content, artwork fallbacks, loading, focus and disabled states.",
+    importPath: `@/components/shared/${name}`, importNames: [name],
+    source: `src/components/shared/${name}.tsx`, spec: "Dashboard presentation extensions", layout: "page" as const,
+  })),
+  {
+    slug: "metric-badge", title: "Metric badge", category: "Data display", tier: "primitive",
+    description: "Neutral numeric context with optional trend icon. Shares and additions never imply a success/error state.",
+    importPath: "@/components/ui/metric-badge", importNames: ["MetricBadge"],
+    source: "src/components/ui/metric-badge.tsx", spec: "Statistics extensions", layout: "page",
+  },
+  {
+    slug: "distribution-chart", title: "Distribution chart", category: "Data display", tier: "composite",
+    description: "Full-population donut with primary selection, neutral segments and an accessible count/share list. Fixed 85px sizing survives hidden/visible transitions. Optional segment clicks synchronize caller selection without filtering the denominator.",
+    importPath: "@/components/shared/DistributionChart", importNames: ["DistributionChart"],
+    source: "src/components/shared/DistributionChart.tsx", spec: "Statistics extensions", layout: "page",
+  },
+  {
+    slug: "scrollable-bar-chart", title: "Scrollable bar chart", category: "Data display", tier: "composite",
+    description: "Native draggable scrolling, bounded period arrows and equivalent hover/focus/touch values. Configurable start/end positioning and partial annotations preserve missing/future counts.",
+    importPath: "@/components/shared/ScrollableBarChart", importNames: ["ScrollableBarChart"],
+    source: "src/components/shared/ScrollableBarChart.tsx", spec: "Statistics extensions", layout: "page",
+  },
+  {
+    slug: "chart-period-menu", title: "Chart period menu", category: "Data display", tier: "composite",
+    description: "Yearly overview and Monthly detail for caller-labelled reporting years, using an accessible dropdown submenu.",
+    importPath: "@/components/shared/ChartPeriodMenu", importNames: ["ChartPeriodMenu"],
+    source: "src/components/shared/ChartPeriodMenu.tsx", spec: "Statistics extensions", layout: "page",
+  },
+  {
+    slug: "statistics-card", title: "Statistics card and charts", category: "Data display", tier: "composite",
+    description: "Bordered statistics surfaces with wrapping chart headers, optional title help controls, neutral numeric pills, full-distribution donuts and scrollable reporting periods with explicit missing, partial, zero and future data. Keyboard, touch and pointer values share one contract. Includes light/dark ChartConfig examples in responsive and fixed sizing modes.",
+    importPath: "@/components/shared/StatisticsCard", importNames: ["StatisticsCard"],
+    source: "src/components/shared/StatisticsCard.tsx", spec: "§3.5 · Statistics extensions", layout: "page",
+  },
   {
     slug: "checkout",
     title: "Checkout",

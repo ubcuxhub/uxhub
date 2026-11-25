@@ -5,6 +5,7 @@ import {
   endsOnLaterDay,
   formatEventDate,
   formatEventDateLabel,
+  formatEventDateRange,
   formatEventDateTimeLines,
   formatEventDateTimeRange,
   formatEventTime,
@@ -354,4 +355,12 @@ describe("strictPacificTimestamp", () => {
     const { strictPacificTimestamp } = await import("./date");
     expect(strictPacificTimestamp("2026-11-14T09:00")).toBe("2026-11-14T16:00:00.000Z");
   });
+});
+
+it("formats preview date ranges in Pacific time, including overnight and year boundaries", () => {
+  expect(formatEventDateRange(null)).toBeNull();
+  expect(formatEventDateRange("2026-11-08T01:00:00Z", "2026-11-22T01:00:00Z")).toBe("November 7–21, 2026");
+  expect(formatEventDateRange("2026-11-08T01:00:00Z", "2026-11-08T08:00:00Z")).toBe("November 7, 2026");
+  expect(formatEventDateRange("2026-11-30T20:00:00Z", "2026-12-02T20:00:00Z")).toBe("November 30–December 2, 2026");
+  expect(formatEventDateRange("2026-12-31T20:00:00Z", "2027-01-02T20:00:00Z")).toBe("December 31, 2026–January 2, 2027");
 });

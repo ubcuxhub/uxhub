@@ -661,7 +661,10 @@ Pacific moments; entered values need a complete, unambiguous date and time, and
 confirmation follows release when both are set. Release decisions on sits
 behind a switch: turning it off saves no release, and asks first when that
 would show decisions still hidden; the switch is locked once applicants can see
-decisions. Release decisions on holds
+decisions. While the switch is on, a complete release date and time is required
+to save; clearing both fields keeps the switch on and requires a new moment.
+Use the switch to remove the release and confirm the warning when decisions
+are still hidden. Release decisions on holds
 decisions back from applicants ([Decision release](#decision-release)) and
 can't move into the future once applicants can see decisions. Confirm by is
 the default deadline for new offers; changing it doesn't move outstanding

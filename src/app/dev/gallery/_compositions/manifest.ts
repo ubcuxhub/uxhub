@@ -85,6 +85,14 @@ export const MANIFEST = [
   },
   // Column 3: Admin data, check-in and alerts
   {
+    id: "dashboard-preview", column: 3,
+    uses: ["action-search", "event-banner", "event-preview", "quick-link", "status-badge", "button"],
+  },
+  {
+    id: "reporting-statistics", column: 3,
+    uses: ["statistics-card", "distribution-chart", "scrollable-bar-chart", "chart-period-menu", "metric-badge"],
+  },
+  {
     id: "admin-stats",
     column: 3,
     uses: ["stat-card"],

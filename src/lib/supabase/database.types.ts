@@ -1120,6 +1120,63 @@ export type Database = {
         }
         Relationships: []
       }
+      membership_award_months: {
+        Row: {
+          month: string
+          total: number
+        }
+        ComputedFields: never
+        Insert: {
+          month: string
+          total: number
+        }
+        Update: {
+          month?: string
+          total?: number
+        }
+        Relationships: []
+      }
+      membership_awards: {
+        Row: {
+          academic_year: number
+          awarded_at: string
+          month: string
+          person_id: string
+          source: string
+        }
+        ComputedFields: never
+        Insert: {
+          academic_year: number
+          awarded_at: string
+          month: string
+          person_id: string
+          source: string
+        }
+        Update: {
+          academic_year?: number
+          awarded_at?: string
+          month?: string
+          person_id?: string
+          source?: string
+        }
+        Relationships: []
+      }
+      membership_history_coverage: {
+        Row: {
+          complete_from: string
+          id: boolean
+        }
+        ComputedFields: never
+        Insert: {
+          complete_from: string
+          id?: boolean
+        }
+        Update: {
+          complete_from?: string
+          id?: boolean
+        }
+        Relationships: []
+      }
       membership_types: {
         Row: {
           active: boolean
@@ -1636,6 +1693,18 @@ export type Database = {
         Returns: boolean
       }
       admin_event_team_settings: { Args: { p_event_id: string }; Returns: Json }
+      admin_major_distribution: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      admin_membership_history: {
+        Args: { p_first_year?: number; p_last_year?: number; p_now?: string }
+        Returns: Json
+      }
+      admin_recent_membership_additions: {
+        Args: { p_now?: string }
+        Returns: Json
+      }
       agenda_draft_instant: {
         Args: { p_date: string; p_time: string }
         Returns: string
@@ -1861,6 +1930,36 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      fulfill_membership_purchase: {
+        Args: { p_expires_at: string; p_purchase_id: string }
+        Returns: {
+          amount_cents: number
+          confirmation_email_attempted_at: string | null
+          confirmation_email_sent_at: string | null
+          created_at: string | null
+          currency: string
+          event_id: string | null
+          failure_reason: string | null
+          fulfilled_at: string | null
+          id: string
+          idempotency_key: string
+          kind: string
+          membership_type_id: string | null
+          refunded_at: string | null
+          refunded_cents: number
+          square_customer_id: string | null
+          square_payment_id: string | null
+          status: string
+          updated_at: string | null
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "purchases"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       get_my_event_applications: {
         Args: { p_event_ids: string[] }
         Returns: {
@@ -1924,6 +2023,14 @@ export type Database = {
       }
       publish_due_events: { Args: Record<PropertyKey, never>; Returns: number }
       purchase_is_live: { Args: { p_purchase_id: string }; Returns: boolean }
+      rebuild_membership_history: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      record_membership_award: {
+        Args: { p_awarded_at: string; p_person_id: string; p_source: string }
+        Returns: undefined
+      }
       regenerate_event_ticket_token: {
         Args: { p_ticket_id: string }
         Returns: boolean
@@ -1955,6 +2062,10 @@ export type Database = {
           failure_reason: string
           ticket_id: string
         }[]
+      }
+      reset_fixture_membership_history: {
+        Args: { p_person_ids: string[] }
+        Returns: undefined
       }
       safe_event_content_url: { Args: { p_url: string }; Returns: boolean }
       safe_staff_schedule_url: { Args: { p_url: string }; Returns: boolean }
