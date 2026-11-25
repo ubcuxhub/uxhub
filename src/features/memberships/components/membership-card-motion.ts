@@ -9,7 +9,7 @@
  */
 export const CARD = {
   /** How far the card leans toward a hovering pointer at a corner (motion handoff, Home). */
-  HOVER_TILT_DEG: 4,
+  HOVER_TILT_DEG: 6,
   /** How far a press pushes the point under the pointer away, on top of the hover tilt. */
   PRESS_TILT_DEG: 3,
   /** Pointer movement before a press becomes a drag. */
@@ -19,7 +19,7 @@ export const CARD = {
   /** How much spin speed survives each 60fps frame after a release ("slight" inertia). */
   INERTIA_FRICTION: 0.92,
   /** Below this speed (degrees per 60fps frame), inertia ends and the card snaps to a face. */
-  INERTIA_STOP_DEG_PER_FRAME: 0.3,
+  INERTIA_STOP_DEG_PER_FRAME: 3,
   /** A release this long after the last movement counts as held still: no inertia. */
   RELEASE_STILL_MS: 80,
   /** Time resting on the back, with the pointer off the card, before it flips to the front. */
@@ -32,9 +32,9 @@ export const CARD = {
    * Peak opacity of the sheen over the front. Higher than the back's, since
    * soft-light shows less on the front's lighter orchid than on the back's blue.
    */
-  FRONT_SHEEN_OPACITY: 0.55,
+  FRONT_SHEEN_OPACITY: 0.3,
   /** Peak opacity of the glint on the dither cells. */
-  GLINT_OPACITY: 0.5,
+  GLINT_OPACITY: 0.1,
 } as const;
 
 /** The frame length `INERTIA_FRICTION` and `INERTIA_STOP_DEG_PER_FRAME` are written for. */

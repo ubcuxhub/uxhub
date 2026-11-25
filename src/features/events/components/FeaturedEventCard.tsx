@@ -50,7 +50,7 @@ export function FeaturedEventCard({
     <article
       data-slot="featured-event-card"
       className={cn(
-        "group relative isolate flex aspect-[492/309] flex-col justify-end overflow-hidden rounded-lg has-[a:focus-visible]:focus-ring",
+        "group relative isolate flex aspect-[492/309] flex-col justify-end overflow-hidden rounded-xl has-[a:focus-visible]:focus-ring",
         className,
       )}
       style={{ backgroundImage: featuredCardGradient(eventColour) }}
