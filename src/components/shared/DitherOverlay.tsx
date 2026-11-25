@@ -13,10 +13,11 @@ import { cn } from "@/lib/utils";
  *
  * `reflective` (off by default; only the membership card turns it on) adds a
  * glint: a white highlight, `color-dodge`, that shows only through the dither
- * cells. Its mask (`dither-mask.png`) is the same tile with each cell's grey
- * level as its alpha, every cell doubled so it stays sharp at 2x, so lighter
- * cells catch more light. The parent places and fades it with `--shine-x`,
- * `--shine-y` and `--glint-intensity`.
+ * cells. Its mask (`dither-mask.png`) is the same tile, every cell doubled so
+ * it stays sharp at 2x: the darker half of the cells (grey 0 to 109) stay
+ * dark, and the lighter half glint at 70%, 77%, 83% and 90% by grey level, the
+ * range of the membership card back's dither mask. The parent places and
+ * fades it with `--shine-x`, `--shine-y` and `--glint-intensity`.
  */
 export function DitherOverlay({
   className,
@@ -41,8 +42,8 @@ export function DitherOverlay({
           data-slot="dither-glint"
           className={cn(
             "pointer-events-none absolute inset-0 rounded-[inherit] mix-blend-color-dodge [image-rendering:pixelated] forced-colors:hidden",
-            "bg-[radial-gradient(circle_at_var(--shine-x,50%)_var(--shine-y,50%),white,transparent_35%)] [opacity:var(--glint-intensity,1)]",
-            "[mask-image:url(/textures/dither-mask.png)] [mask-repeat:repeat] [mask-size:16px_16px]",
+            "bg-[radial-gradient(circle_at_var(--shine-x,50%)_var(--shine-y,50%),white,transparent_35%)] opacity-(--glint-intensity,1)",
+            "mask-[url(/textures/dither-mask.png)] mask-size-[16px_16px] mask-repeat",
             className,
           )}
         />

@@ -26,8 +26,13 @@ export const CARD = {
   BACK_IDLE_MS: 2000,
   /** How far the light travels across a face per unit of sin(rotation), in face widths. */
   SHINE_TRAVEL: 4,
-  /** Peak opacity of the soft sheen over the whole face. */
+  /** Peak opacity of the soft sheen over the back. */
   SHEEN_OPACITY: 0.35,
+  /**
+   * Peak opacity of the sheen over the front. Higher than the back's, since
+   * soft-light shows less on the front's lighter orchid than on the back's blue.
+   */
+  FRONT_SHEEN_OPACITY: 0.55,
   /** Peak opacity of the glint on the dither cells. */
   GLINT_OPACITY: 0.5,
 } as const;

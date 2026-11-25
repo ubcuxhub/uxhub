@@ -104,13 +104,14 @@ it("draws a decorative back with the logo, facing away", () => {
   expect(back.querySelector("img")?.getAttribute("src")).toContain("icon-light.svg");
 });
 
-it("tilts up to 4 degrees toward a mouse pointer and settles back when it leaves", () => {
+it("tilts up to HOVER_TILT_DEG toward a mouse pointer and settles back when it leaves", () => {
   const { card, frame } = renderCard();
 
   pointer(frame, "pointermove", 400, 0); // top-right corner
   flushFrames();
-  expect(card.style.getPropertyValue("--tilt-x")).toBe("4.00deg");
-  expect(card.style.getPropertyValue("--tilt-y")).toBe("4.00deg");
+  const corner = `${CARD.HOVER_TILT_DEG.toFixed(2)}deg`;
+  expect(card.style.getPropertyValue("--tilt-x")).toBe(corner);
+  expect(card.style.getPropertyValue("--tilt-y")).toBe(corner);
 
   pointer(frame, "pointermove", 200, 100); // centre
   flushFrames();
@@ -120,11 +121,12 @@ it("tilts up to 4 degrees toward a mouse pointer and settles back when it leaves
   expect(card.style.getPropertyValue("--tilt-x")).toBe("");
 });
 
-it("dips 3 degrees further where it is pressed, and lets go on release", () => {
+it("dips PRESS_TILT_DEG further where it is pressed, and lets go on release", () => {
   const { card, frame } = renderCard();
   pointer(frame, "pointerdown", 0, 200); // bottom-left corner
-  expect(card.style.getPropertyValue("--press-x")).toBe("-3.00deg");
-  expect(card.style.getPropertyValue("--press-y")).toBe("-3.00deg");
+  const corner = `${(-CARD.PRESS_TILT_DEG).toFixed(2)}deg`;
+  expect(card.style.getPropertyValue("--press-x")).toBe(corner);
+  expect(card.style.getPropertyValue("--press-y")).toBe(corner);
 
   pointer(frame, "pointerup", 0, 200);
   expect(card.style.getPropertyValue("--press-x")).toBe("");

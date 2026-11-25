@@ -13,6 +13,7 @@ import "./membership-card.css";
 const SHINE_STYLE = {
   "--shine-travel": CARD.SHINE_TRAVEL,
   "--sheen-opacity": CARD.SHEEN_OPACITY,
+  "--front-sheen-opacity": CARD.FRONT_SHEEN_OPACITY,
   "--glint-opacity": CARD.GLINT_OPACITY,
 } as CSSProperties;
 

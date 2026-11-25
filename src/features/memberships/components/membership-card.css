@@ -73,8 +73,8 @@
  * The light: one lamp in front of the viewer. The highlight slides away from
  * the way a face turns (turned right, it moves left) and fades as the face
  * turns away. Each face reads its own angle, so the back lights correctly when
- * it faces the viewer. `--shine-travel`, `--sheen-opacity` and
- * `--glint-opacity` come from CARD in membership-card-motion.ts.
+ * it faces the viewer. `--shine-travel`, `--sheen-opacity`,
+ * `--front-sheen-opacity` and `--glint-opacity` come from CARD in membership-card-motion.ts.
  */
 .membership-card-face {
   -webkit-backface-visibility: hidden;
@@ -113,6 +113,10 @@
   );
   mix-blend-mode: soft-light;
   opacity: calc(var(--face-light) * var(--sheen-opacity));
+}
+
+.membership-card-front .membership-card-sheen {
+  opacity: calc(var(--face-light) * var(--front-sheen-opacity));
 }
 
 /*
