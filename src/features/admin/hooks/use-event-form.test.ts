@@ -545,7 +545,7 @@ describe("event form check-in sessions", () => {
 
 it("loads staff-only timing and sends Pacific moments separately from event and offer fields", async () => {
   vi.mocked(saveAdminEventAction).mockResolvedValue({ id: event.id, checkInSessionIds: ["session-1"], questionIds: [] });
-  const settings = { event_id: event.id, decisions_release_at: "2026-11-16T18:00:00Z", confirmation_deadline: "2026-11-17T18:00:00Z", questions_locked_at: null };
+  const settings = { event_id: event.id, decisions_release_at: "2026-11-16T18:00:00Z", confirmation_deadline: "2026-11-17T18:00:00Z", questions_locked_at: null, offer_window_days: null, offer_deadline_time: null };
   const { result } = renderHook(() => useEventForm({ eventId: event.id, initialEvent: event, initialApplicationSettings: settings, initialCheckInSessions: [{ id: "session-1", event_id: event.id, agenda_item_id: null, created_at: null, updated_at: null, name: "Doors", start_time: event.starts_at, end_time: event.ends_at }] }));
   expect(result.current.formState.decisions_release_at).toBe("2026-11-16T11:00");
   act(() => result.current.handleFieldChange("confirmation_deadline", "2026-11-18T11:00"));

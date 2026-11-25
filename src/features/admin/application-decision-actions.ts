@@ -1,9 +1,10 @@
 "use server";
 
 import { requireAdmin } from "@/lib/auth/guards";
-import { log } from "@/lib/log";
+import { errorFields, log } from "@/lib/log";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { formatTimestamp } from "@/lib/date";
+import { recordOfferWindow } from "@/lib/supabase-helpers/event-application-settings";
 import {
   decideEventApplication,
   fetchEventApplicationById,
@@ -13,6 +14,7 @@ import {
 import type { SubmittedApplicationRow } from "@/lib/supabase/models";
 import {
   buildApplicationDecisionUpdate,
+  offerWindowFor,
   type ApplicationDecision,
 } from "./lib/application-review";
 
@@ -42,6 +44,20 @@ function decisionRefusal(reason: ApplicationDecisionFailure, decisionsReleaseAt:
       return "This decision can’t be made any more. Reload to see the latest.";
     case "OVER_CAPACITY":
       return "The event is full.";
+  }
+}
+
+/**
+ * Keeps the accept's window as the event's next default deadline. The
+ * decision is already saved, so a failure here only loses the default.
+ */
+async function rememberOfferWindow(eventId: string, offerExpiresAt: string, decisionsReleaseAt: string | null) {
+  const window = offerWindowFor(offerExpiresAt, decisionsReleaseAt);
+  if (!window) return;
+  try {
+    await recordOfferWindow(supabaseAdmin, eventId, window);
+  } catch (error) {
+    log.error("application.offer_window_not_saved", { eventId, ...errorFields(error) });
   }
 }
 
@@ -87,6 +103,9 @@ export async function updateApplicationDecisionAction(
     status: decided.status,
     overCapacity: decided.overCapacity,
   });
+  if (decision === "accept" && decided.eventId && result.update.offer_expires_at) {
+    await rememberOfferWindow(decided.eventId, result.update.offer_expires_at, decided.decisionsReleaseAt);
+  }
   if (decided.overCapacity) {
     log.warn("application.accepted_over_capacity", {
       applicationId,

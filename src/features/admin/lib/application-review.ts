@@ -1,7 +1,11 @@
 import type { DateTimeValue } from "@/components/ui/date-time-field";
 import { formatMembershipTypeName } from "@/features/memberships/lib/display";
 import { STUDENT_STATUSES, YEAR_LABELS } from "@/lib/constants";
-import { pacificDate, timestamptzToDatetimeLocal } from "@/lib/date";
+import {
+  datetimeLocalToTimestamptz,
+  pacificDate,
+  timestamptzToDatetimeLocal,
+} from "@/lib/date";
 import type { IsoDate, WallTime } from "@/lib/date-input";
 import type {
   EventApplicationRow,
@@ -104,25 +108,65 @@ export function decisionsReleased(
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/** The offer window used when the event has none remembered yet. */
+const FALLBACK_WINDOW = { days: 7, time: "23:45" } as const;
+
+/** An offer can't end before decisions are released: the later of now and the release. */
+function earliestOfferStart(decisionsReleaseAt: string | null | undefined, now: Date): number {
+  const release = decisionsReleaseAt ? Date.parse(decisionsReleaseAt) : Number.NaN;
+  return Math.max(now.getTime(), Number.isFinite(release) ? release : 0);
+}
+
+const dayNumber = (date: string) => {
+  const [year, month, day] = date.split("-").map(Number);
+  return Date.UTC(year, month - 1, day) / DAY_MS;
+};
+
+const addDays = (date: string, days: number) =>
+  new Date((dayNumber(date) + days) * DAY_MS).toISOString().slice(0, 10) as IsoDate;
+
+/**
+ * The window an accept's deadline gave, to remember for the event's next
+ * accept: Pacific calendar days from the earliest moment the offer could
+ * start (now, or the release while that's ahead) and the deadline's time of
+ * day. `null` for a deadline that isn't after that moment, or more than a
+ * year out.
+ */
+export function offerWindowFor(
+  offerExpiresAt: string,
+  decisionsReleaseAt: string | null,
+  now: Date = new Date()
+): { days: number; time: string } | null {
+  const earliest = earliestOfferStart(decisionsReleaseAt, now);
+  if (!(Date.parse(offerExpiresAt) > earliest)) return null;
+  const [date, time] = timestamptzToDatetimeLocal(offerExpiresAt).split("T");
+  const start = pacificDate(new Date(earliest).toISOString());
+  if (!date || !time || !start) return null;
+  const days = dayNumber(date) - dayNumber(start);
+  return days >= 0 && days <= 366 ? { days, time } : null;
+}
+
 /**
  * The offer deadline the decision card starts from (docs/event-states.md,
  * "Decision release"). An offer can't end before decisions are released, so
  * the earliest moment is the later of now and the release. The event's
- * "Confirm by" is used when it's after that moment; otherwise a week after
- * it, at 11:45 PM Pacific. Changing "Confirm by" never moves offers already
- * made.
+ * "Confirm by" is used when it's after that moment. Otherwise the window of
+ * the event's last offer (`offer_window_days` days after that moment's
+ * Pacific date, at `offer_deadline_time`), or a week at 11:45 PM before any;
+ * a day later when that lands before the moment itself. Changing "Confirm by"
+ * never moves offers already made.
  */
 export function defaultOfferDeadline(
   settings: Pick<
     EventApplicationSettingsRow,
     "decisions_release_at" | "confirmation_deadline"
-  > | null,
+  > &
+    Partial<
+      Pick<EventApplicationSettingsRow, "offer_window_days" | "offer_deadline_time">
+    > | null,
   now: Date = new Date()
 ): DateTimeValue {
-  const release = settings?.decisions_release_at
-    ? Date.parse(settings.decisions_release_at)
-    : Number.NaN;
-  const earliest = Math.max(now.getTime(), Number.isFinite(release) ? release : 0);
+  const earliest = earliestOfferStart(settings?.decisions_release_at, now);
   const confirmBy = settings?.confirmation_deadline ?? null;
 
   if (confirmBy && Date.parse(confirmBy) > earliest) {
@@ -130,10 +174,16 @@ export function defaultOfferDeadline(
     if (date && time) return { date: date as IsoDate, time: time as WallTime };
   }
 
-  return {
-    date: pacificDate(new Date(earliest + 7 * DAY_MS).toISOString()) as IsoDate,
-    time: "23:45" as WallTime,
-  };
+  const remembered =
+    settings?.offer_window_days != null && settings.offer_deadline_time
+      ? { days: settings.offer_window_days, time: settings.offer_deadline_time.slice(0, 5) }
+      : null;
+  const window = remembered ?? FALLBACK_WINDOW;
+  const start = pacificDate(new Date(earliest).toISOString());
+  let date = addDays(start, window.days);
+  const lands = datetimeLocalToTimestamptz(`${date}T${window.time}`);
+  if (!lands || Date.parse(lands) <= earliest) date = addDays(date, 1);
+  return { date, time: window.time as WallTime };
 }
 
 const DECISION_STATUS: Record<ApplicationDecision, SubmittedApplicationStatus> = {

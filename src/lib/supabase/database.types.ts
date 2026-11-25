@@ -531,6 +531,8 @@ export type Database = {
           confirmation_deadline: string | null
           decisions_release_at: string | null
           event_id: string
+          offer_deadline_time: string | null
+          offer_window_days: number | null
           questions_locked_at: string | null
         }
         ComputedFields: never
@@ -538,12 +540,16 @@ export type Database = {
           confirmation_deadline?: string | null
           decisions_release_at?: string | null
           event_id: string
+          offer_deadline_time?: string | null
+          offer_window_days?: number | null
           questions_locked_at?: string | null
         }
         Update: {
           confirmation_deadline?: string | null
           decisions_release_at?: string | null
           event_id?: string
+          offer_deadline_time?: string | null
+          offer_window_days?: number | null
           questions_locked_at?: string | null
         }
         Relationships: [

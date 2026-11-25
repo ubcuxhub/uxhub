@@ -6,6 +6,7 @@ import {
   countReviewStates,
   decisionsReleased,
   defaultOfferDeadline,
+  offerWindowFor,
   filterReviewItems,
   getApplicationDecisions,
   getApplicationReviewState,
@@ -116,6 +117,71 @@ describe("defaultOfferDeadline", () => {
         now
       )
     ).toEqual({ date: "2026-10-27", time: "23:45" });
+  });
+
+  const remembered = {
+    decisions_release_at: null,
+    confirmation_deadline: null,
+    offer_window_days: 3,
+    offer_deadline_time: "17:00:00",
+  };
+
+  it("uses the event's last offer window instead of a week", () => {
+    expect(defaultOfferDeadline(remembered, now)).toEqual({ date: "2026-10-23", time: "17:00" });
+    // Counted from the release while it's ahead: every offer lands together.
+    expect(
+      defaultOfferDeadline({ ...remembered, decisions_release_at: "2026-10-22T16:00:00.000Z" }, now)
+    ).toEqual({ date: "2026-10-25", time: "17:00" });
+  });
+
+  it("still prefers a future Confirm by over the remembered window", () => {
+    expect(
+      defaultOfferDeadline({ ...remembered, confirmation_deadline: "2026-10-25T06:59:00.000Z" }, now)
+    ).toEqual({ date: "2026-10-24", time: "23:59" });
+  });
+
+  it("moves a same-day window whose time has passed to the next day", () => {
+    // 5:00 AM Pacific now; a 0-day window at 4:00 AM has already gone by.
+    expect(
+      defaultOfferDeadline({ ...remembered, offer_window_days: 0, offer_deadline_time: "04:00:00" }, now)
+    ).toEqual({ date: "2026-10-21", time: "04:00" });
+    expect(
+      defaultOfferDeadline({ ...remembered, offer_window_days: 0, offer_deadline_time: "23:45:00" }, now)
+    ).toEqual({ date: "2026-10-20", time: "23:45" });
+  });
+});
+
+describe("offerWindowFor", () => {
+  it("counts Pacific calendar days from now and keeps the time of day", () => {
+    // Oct 23, 5:00 PM Pacific.
+    expect(offerWindowFor("2026-10-24T00:00:00.000Z", null, now)).toEqual({ days: 3, time: "17:00" });
+  });
+
+  it("counts from the release while it's ahead", () => {
+    // Release Oct 22, 9:00 AM; deadline Oct 25, 11:45 PM Pacific.
+    expect(
+      offerWindowFor("2026-10-26T06:45:00.000Z", "2026-10-22T16:00:00.000Z", now)
+    ).toEqual({ days: 3, time: "23:45" });
+  });
+
+  it("round-trips through defaultOfferDeadline", () => {
+    const window = offerWindowFor("2026-10-26T06:45:00.000Z", null, now)!;
+    expect(
+      defaultOfferDeadline(
+        {
+          decisions_release_at: null,
+          confirmation_deadline: null,
+          offer_window_days: window.days,
+          offer_deadline_time: window.time,
+        },
+        now
+      )
+    ).toEqual({ date: "2026-10-25", time: "23:45" });
+  });
+
+  it("ignores a deadline that isn't after the earliest start", () => {
+    expect(offerWindowFor("2026-10-20T11:00:00.000Z", null, now)).toBeNull();
+    expect(offerWindowFor("2026-10-21T16:00:00.000Z", "2026-10-22T16:00:00.000Z", now)).toBeNull();
   });
 });
 
