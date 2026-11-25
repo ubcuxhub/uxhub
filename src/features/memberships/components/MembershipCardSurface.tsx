@@ -1,23 +1,36 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import Image from "next/image";
+import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 
 import { DitherOverlay } from "@/components/shared/DitherOverlay";
 import { FINE_POINTER_QUERY, REDUCED_MOTION_QUERY, useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
+import { attachCardMotion, CARD } from "./membership-card-motion";
+import "./membership-card.css";
 
-/** The furthest the card leans at a corner (motion handoff, Home). */
-const MAX_TILT_DEG = 4;
+/** The light's tuning, handed to membership-card.css. */
+const SHINE_STYLE = {
+  "--shine-travel": CARD.SHINE_TRAVEL,
+  "--sheen-opacity": CARD.SHEEN_OPACITY,
+  "--glint-opacity": CARD.GLINT_OPACITY,
+} as CSSProperties;
 
 /**
- * The membership card's fill (its diagonal gradient under the shared dither
- * texture) and its hover tilt (Portal Motion handoff, Home, "Membership
- * card"): with a mouse, it tilts up to 4° toward the pointer and settles back
- * when the pointer leaves (`expressive`, `ease-expressive`). The approved
- * exception to "cards never lift". No tilt on touch or under reduced motion.
+ * The membership card's surface: its diagonal gradient under the shared dither
+ * texture, and a card you can play with (Portal Motion handoff, Home,
+ * "Membership card"; the 3D membership card PRD). With a mouse or trackpad it
+ * tilts up to 4° toward the pointer, dips 3° further where it's pressed, and
+ * spins about its vertical axis when dragged sideways, with slight inertia and
+ * a snap to the nearest face. Left on its back, it turns home after two
+ * seconds. A sheen and a glint on the dither cells follow the turn.
+ *
+ * Fully static on touch (for now) and under reduced motion: no tilt, spin or
+ * shine, and the back is never drawn.
  *
  * The outer element measures the pointer and holds the perspective; only the
- * inner card turns, so its own tilt never skews the measurement.
+ * card inside it turns, so its own tilt never skews the measurement. The
+ * front's content stays real, selectable text; the back is decorative.
  */
 export function MembershipCardSurface({
   className,
@@ -27,66 +40,67 @@ export function MembershipCardSurface({
   children: ReactNode;
 }) {
   const frameRef = useRef<HTMLDivElement>(null);
-  const cardRef = useRef<HTMLElement>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
   const finePointer = useMediaQuery(FINE_POINTER_QUERY);
   const reducedMotion = useMediaQuery(REDUCED_MOTION_QUERY);
-  const canTilt = finePointer && !reducedMotion;
+  const interactive = finePointer && !reducedMotion;
 
   useEffect(() => {
     const frame = frameRef.current;
     const card = cardRef.current;
-    if (!frame || !card || !canTilt) return;
-    let raf = 0;
-    let x = 0;
-    let y = 0;
-
-    const apply = () => {
-      raf = 0;
-      // Lean so the point under the pointer dips away from the viewer.
-      card.style.setProperty("--tilt-x", `${(-y * 2 * MAX_TILT_DEG).toFixed(2)}deg`);
-      card.style.setProperty("--tilt-y", `${(x * 2 * MAX_TILT_DEG).toFixed(2)}deg`);
-    };
-    const onMove = (event: PointerEvent) => {
-      if (event.pointerType !== "mouse") return;
-      const rect = frame.getBoundingClientRect();
-      x = Math.min(0.5, Math.max(-0.5, (event.clientX - rect.left) / rect.width - 0.5));
-      y = Math.min(0.5, Math.max(-0.5, (event.clientY - rect.top) / rect.height - 0.5));
-      if (!raf) raf = requestAnimationFrame(apply);
-    };
-    const reset = () => {
-      cancelAnimationFrame(raf);
-      raf = 0;
-      card.style.removeProperty("--tilt-x");
-      card.style.removeProperty("--tilt-y");
-    };
-
-    frame.addEventListener("pointermove", onMove);
-    frame.addEventListener("pointerleave", reset);
-    return () => {
-      frame.removeEventListener("pointermove", onMove);
-      frame.removeEventListener("pointerleave", reset);
-      reset();
-    };
-  }, [canTilt]);
+    if (!frame || !card || !interactive) return;
+    return attachCardMotion(frame, card);
+  }, [interactive]);
 
   return (
-    <div ref={frameRef} className={cn("@container perspective-distant", className)}>
-      <section
+    <div
+      ref={frameRef}
+      className={cn("@container perspective-distant", className)}
+      style={interactive ? SHINE_STYLE : undefined}
+    >
+      <div
         ref={cardRef}
-        className={cn(
-          // `isolate` keeps the dither's overlay blend to the card's own fill.
-          "relative isolate overflow-hidden rounded-xl bg-membership-card text-white shadow-sm",
-          // At least Figma's 492 × 309 shape (a minimum height from the frame's
-          // width), and taller whenever the content needs it, so nothing is
-          // clipped on narrow screens. Not `aspect-ratio`: with the overflow
-          // clipped (for the tilt and dither) it holds the shape and crops.
-          "flex min-h-[calc(100cqw*309/492)] flex-col",
-          "transform-[rotateX(var(--tilt-x,0deg))_rotateY(var(--tilt-y,0deg))] transition-transform duration-expressive ease-expressive",
-        )}
+        data-slot="membership-card"
+        className="membership-card relative data-dragging:cursor-grabbing data-dragging:select-none"
       >
-        <DitherOverlay />
-        <div className="relative flex flex-1 flex-col">{children}</div>
-      </section>
+        <section
+          className={cn(
+            // `isolate` keeps the dither's overlay blend to the card's own fill.
+            "membership-card-face membership-card-front relative isolate overflow-hidden rounded-xl bg-membership-card text-white shadow-sm",
+            // At least Figma's 492 × 309 shape (a minimum height from the frame's
+            // width), and taller whenever the content needs it, so nothing is
+            // clipped on narrow screens. Not `aspect-ratio`: with the overflow
+            // clipped (for the dither and shine) it holds the shape and crops.
+            "flex min-h-[calc(100cqw*309/492)] flex-col",
+          )}
+        >
+          <DitherOverlay reflective={interactive} />
+          {interactive ? <span aria-hidden className="membership-card-sheen" /> : null}
+          <div className="relative flex flex-1 flex-col">{children}</div>
+        </section>
+
+        {interactive ? (
+          // The back (D3): the reversed gradient, the soft-block dither and the mark.
+          <div
+            aria-hidden
+            data-slot="membership-card-back"
+            className="membership-card-face membership-card-back absolute inset-0 isolate flex items-center justify-center overflow-hidden rounded-xl shadow-sm"
+          >
+            <span className="membership-card-back-dither" />
+            <span className="membership-card-back-glint" />
+            <span className="membership-card-sheen" />
+            {/* The front's mark; its 1000-unit box pads the mark, so 60px draws it 44px wide. */}
+            <Image
+              src="/icons/icon-light.svg"
+              alt=""
+              width={60}
+              height={60}
+              draggable={false}
+              className="relative size-15"
+            />
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 }
