@@ -584,7 +584,7 @@ it.each(["new schedule", "cleared hidden schedule"])("requires a complete releas
       initialApplicationQuestions: [question],
       initialApplicationSettings: {
         event_id: event.id, decisions_release_at: release, confirmation_deadline: null,
-        questions_locked_at: null, offer_window_days: null, offer_deadline_time: null,
+        questions_locked_at: null, offer_window_days: null, offer_deadline_time: null, last_offer_expires_at: null,
       },
     });
     return createElement("form", { onSubmit: form.handleSubmit },
