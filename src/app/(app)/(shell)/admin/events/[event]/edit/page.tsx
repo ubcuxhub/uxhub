@@ -11,7 +11,7 @@ import { EventCreateModify } from "@/features/admin/components/EventCreateModify
 import { resolveAdminEventId } from "@/features/admin/lib/resolve-event-param";
 import { requireAdmin } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
-import { fetchApplicationQuestions } from "@/lib/supabase-helpers/event-applications";
+import { countDecidedApplications, fetchApplicationQuestions } from "@/lib/supabase-helpers/event-applications";
 import { fetchCheckInSessions } from "@/lib/supabase-helpers/check-ins";
 import { fetchEventPricingLocked } from "@/lib/supabase-helpers/events";
 import {
@@ -55,6 +55,7 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
     teamInfo,
     content,
     historyInfo,
+    decidedApplications,
   ] = await Promise.all([
     fetchEventWithDraft(supabase, eventId),
     fetchCheckInSessions(supabase, eventId),
@@ -70,6 +71,7 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
     fetchEventTeamSettingsInfo(supabase, eventId),
     fetchEventContent(supabase, eventId),
     fetchEventHistoryInfo(supabase, eventId),
+    countDecidedApplications(supabase, eventId),
   ]);
 
   if (!loaded) notFound();
@@ -82,6 +84,7 @@ export default async function EditEventPage({ params }: EditEventPageProps) {
         initialContent={content}
         teamInfo={teamInfo}
         initialApplicationSettings={applicationSettings}
+        decidedApplications={decidedApplications}
         initialDateLocation={dateLocation}
         registrationInfo={registrationInfo}
         pricingLocked={pricingLocked}
