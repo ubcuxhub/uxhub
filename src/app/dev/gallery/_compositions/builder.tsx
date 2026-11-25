@@ -304,7 +304,7 @@ function DateLocationForm() {
       { key: "sunday", session_id: null, date: "2099-11-15", start: "10:00", end: "17:00", label: "Workshops", location: null },
     ],
   } as EventDateLocationDraft) });
-  return <div className="space-y-4"><EventAgenda enabled={state.agenda_enabled} onEnabledChange={agenda_enabled => setState(current => ({ ...current, agenda_enabled }))} value={state.date_location} disabled={false} showErrors={true} onChange={date_location => setState(current => ({ ...current, date_location }))} /><EventRegistration state={state} disabled={false} info={{ locked: false, seats: 0 }} onChange={(key, value) => setState(current => ({ ...current, [key]: value }))} /></div>;
+  return <div className="space-y-4"><EventAgenda enabled={state.agenda_enabled} onEnabledChange={agenda_enabled => setState(current => ({ ...current, agenda_enabled }))} value={state.date_location} disabled={false} showErrors={true} onChange={date_location => setState(current => ({ ...current, date_location }))} /><EventRegistration state={state} disabled={false} info={{ seats: 0 }} onChange={(key, value) => setState(current => ({ ...current, [key]: value }))} /></div>;
 }
 
 export const BUILDER_COMPONENTS = {

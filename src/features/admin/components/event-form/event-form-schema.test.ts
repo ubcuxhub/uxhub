@@ -373,6 +373,15 @@ describe("publication issue collection", () => {
     ]));
     expect(validateEventForm(validFormState, [], []).issues).toEqual([]);
   });
+  it("files the window and the application settings under Applications on an event that takes them", () => {
+    const state = { ...validFormState, requires_application: true, registration_opens_at: "2099-08-02T12:00", registration_closes_at: "2099-08-01T12:00" };
+    const issues = validateEventForm(state, [], []).issues;
+    expect(issues).toEqual(expect.arrayContaining([
+      expect.objectContaining({ section: "applications", target: "registration_closes_at-date", message: "Applications must close after they open." }),
+      expect.objectContaining({ section: "applications", target: "builder-applications", required: true }),
+    ]));
+    expect(issues.some(issue => issue.section === "registration")).toBe(false);
+  });
   it("does not count optional sections and rejects publication at or after registration closes", () => {
     expect(validateEventForm({ ...validFormState, max_capacity: "0", marketing_mode: "disabled", description: "" }, [], []).issues).toEqual([]);
     const result = validateEventForm({ ...validFormState, publish_at: "2099-08-01T10:00", registration_closes_at: "2099-08-01T10:00" }, [], []);

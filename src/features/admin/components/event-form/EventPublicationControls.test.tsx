@@ -9,7 +9,7 @@ vi.mock("@/components/shared/Hubbo", () => ({ Hubbo: ({ emotion, className }: { 
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 it.each([{ status: "active", updated: false }, { status: "draft", updated: false }, { status: "active", updated: true }])("uses saved data and the correct Hubbo for $status success (updated: $updated)", async ({ status, updated }) => {
   const close = vi.fn();
-  const form = { publicationSuccess: { updated, id: "saved-event", name: "Saved event name", status, publish_at: status === "draft" ? "2099-08-01T17:00:00Z" : null, registration_opens_at: "2099-08-02T17:00:00Z", registration_closes_at: null, completed_at: Date.parse("2024-01-01T00:00:00Z") }, setPublicationSuccess: close } as unknown as ReturnType<typeof useEventForm>;
+  const form = { publicationSuccess: { updated, id: "saved-event", name: "Saved event name", status, publish_at: status === "draft" ? "2099-08-01T17:00:00Z" : null, registration_opens_at: "2099-08-02T17:00:00Z", registration_closes_at: null, completed_at: Date.parse("2024-01-01T00:00:00Z") }, setPublicationSuccess: close, formState: { requires_application: false } } as unknown as ReturnType<typeof useEventForm>;
   const content = (current: typeof form) => <><div id="event-builder-header"><button type="button">Update event</button></div><EventPublicationSuccess form={current} /></>;
   const { rerender } = render(content(form));
   expect(screen.getByRole("dialog", { name: updated ? "Event updated" : status === "draft" ? "Event scheduled" : "Event published" })).toBeTruthy();
@@ -25,7 +25,7 @@ it.each([{ status: "active", updated: false }, { status: "draft", updated: false
 
 
 it("returns focus to the header's Publish trigger, not the More actions menu, when the opener is gone", async () => {
-  const form = { publicationSuccess: { updated: false, id: "saved-event", name: "Saved event name", status: "draft", publish_at: "2099-08-01T17:00:00Z", registration_opens_at: null, registration_closes_at: null, completed_at: Date.parse("2024-01-01T00:00:00Z") }, setPublicationSuccess: vi.fn() } as unknown as ReturnType<typeof useEventForm>;
+  const form = { publicationSuccess: { updated: false, id: "saved-event", name: "Saved event name", status: "draft", publish_at: "2099-08-01T17:00:00Z", registration_opens_at: null, registration_closes_at: null, completed_at: Date.parse("2024-01-01T00:00:00Z") }, setPublicationSuccess: vi.fn(), formState: { requires_application: false } } as unknown as ReturnType<typeof useEventForm>;
   const content = (current: typeof form) => <><div id="event-builder-header"><button type="button" aria-haspopup="menu" aria-label="More actions" /><button type="button" aria-haspopup="menu" data-publish-trigger>Publish</button></div><EventPublicationSuccess form={current} /></>;
   const { rerender } = render(content(form));
   rerender(content({ ...form, publicationSuccess: null }));
