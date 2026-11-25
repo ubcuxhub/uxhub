@@ -279,6 +279,13 @@ application-emails secret, or publication health secret to client components.
   in `scripts/seed/data/users.ts` — into a form. Take automated verification as
   far as it goes (lint, types, Vitest, `pnpm build`, direct `psql` queries),
   then hand the reviewer a list of what still needs checking by hand and why.
+- Browser automation (for example Playwright) may drive pages that need no
+  session: `/dev/*`, marketing and event pages, and auth screens without
+  submitting them. For authenticated pages it may reuse a browser storage state
+  that a person saved by signing in themselves, against the local app only.
+  Agents never create, refresh, read, print or copy that state, and never
+  mint sessions another way (service-role keys, auth admin APIs, forged
+  cookies). If the state is missing or expired, ask the person to save it again.
 
 ## UI
 
