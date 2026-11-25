@@ -1,7 +1,7 @@
 import type { Json } from "@/lib/supabase/database.types";
 import { describe, expect, it } from "vitest";
 import { clientAs, withFixtures, type Fixtures } from "@/test/integration";
-import { fetchEventApplicationSettings } from "@/lib/supabase-helpers/event-application-settings";
+import { fetchEventApplicationSettings, recordOfferWindow } from "@/lib/supabase-helpers/event-application-settings";
 
 function save(fixtures: Fixtures, eventId: string, timing?: Record<string, Json>, questions: object[] = [], event: Record<string, Json> = {}) {
   return fixtures.supabase.rpc("save_admin_event_atomically", {
@@ -26,6 +26,22 @@ describe("application form configuration", () => {
     expect((await fixtures.supabase.from("event_applications").select().eq("id", offer.data.id)).data).toEqual([offer.data]);
     expect((await save(fixtures, event.id, { decisions_release_at: null, confirmation_deadline: null })).error).toBeNull();
     expect(await fetchEventApplicationSettings(fixtures.supabase, event.id)).toMatchObject({ decisions_release_at: null, confirmation_deadline: null, questions_locked_at: stored?.questions_locked_at });
+  }));
+
+  it("remembers the last offer window apart from the builder's timing", () => withFixtures(async fixtures => {
+    const event = await fixtures.createEvent();
+    await recordOfferWindow(fixtures.supabase, event.id, { days: 3, time: "17:00" });
+    expect(await fetchEventApplicationSettings(fixtures.supabase, event.id)).toMatchObject({ offer_window_days: 3, offer_deadline_time: "17:00:00", decisions_release_at: null });
+    expect((await save(fixtures, event.id, timing)).error).toBeNull();
+    await recordOfferWindow(fixtures.supabase, event.id, { days: 0, time: "23:45" });
+    expect(await fetchEventApplicationSettings(fixtures.supabase, event.id)).toMatchObject({
+      offer_window_days: 0, offer_deadline_time: "23:45:00",
+      decisions_release_at: "2026-11-16T18:00:00+00:00", confirmation_deadline: "2026-11-17T18:00:00+00:00",
+    });
+    expect((await save(fixtures, event.id, { decisions_release_at: null, confirmation_deadline: null })).error).toBeNull();
+    expect(await fetchEventApplicationSettings(fixtures.supabase, event.id)).toMatchObject({ offer_window_days: 0, offer_deadline_time: "23:45:00" });
+    await expect(recordOfferWindow(fixtures.supabase, event.id, { days: -1, time: "12:00" })).rejects.toBeTruthy();
+    expect((await fixtures.supabase.from("event_application_settings").update({ offer_deadline_time: null }).eq("event_id", event.id)).error).not.toBeNull();
   }));
 
   it("rejects reversed timing atomically and accepts elapsed moments or a single setting", () => withFixtures(async fixtures => {

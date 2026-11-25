@@ -343,9 +343,14 @@ does and returns why it refused instead of failing:
   Two accepts for the last seat serialize on the lock, so only one takes it.
 - **Deadline.** `offer_expires_at` must be after now and after the release
   (`DEADLINE_TOO_EARLY`). The review page starts from `defaultOfferDeadline`:
-  the event's Confirm by when that's after the later of now and the release,
-  otherwise a week after that moment at 11:45 PM Pacific. Changing Confirm by
-  never moves offers already made.
+  the event's Confirm by when that's after the later of now and the release.
+  Otherwise it repeats the event's last offer window: each accept records how
+  many Pacific calendar days its deadline fell after that moment, and the time
+  of day (`event_application_settings.offer_window_days`,
+  `offer_deadline_time`), so offers made before the release all land together
+  and rolling offers each get the same number of days. Before any accept it is
+  a week after that moment at 11:45 PM Pacific. Changing Confirm by never moves
+  offers already made.
 - Other refusals: `NOT_FOUND`, `NOT_SUBMITTED` (a draft), `HAS_TICKET` (the
   offer is registered), `NOT_ALLOWED` (a move the table forbids after release).
 
@@ -651,7 +656,10 @@ The admin builder saves application timing in staff-only
 `event_application_settings`, separately from public event rows and existing
 per-offer `offer_expires_at`. Release decisions on and Confirm by are optional
 Pacific moments; entered values need a complete, unambiguous date and time, and
-confirmation follows release when both are set. Release decisions on holds
+confirmation follows release when both are set. Release decisions on sits
+behind a switch: turning it off saves no release, and asks first when that
+would show decisions still hidden; the switch is locked once applicants can see
+decisions. Release decisions on holds
 decisions back from applicants ([Decision release](#decision-release)) and
 can't move into the future once applicants can see decisions. Confirm by is
 the default deadline for new offers; changing it doesn't move outstanding

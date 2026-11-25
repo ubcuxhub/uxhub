@@ -470,3 +470,17 @@ export async function fetchEventApplicationStatusCounts(
   }
   return counts;
 }
+
+/**
+ * How many of the event's applications have a decision (accepted, waitlisted
+ * or rejected), whether or not applicants can see it yet. Staff only.
+ */
+export async function countDecidedApplications(client: DbClient, eventId: string): Promise<number> {
+  const { count, error } = await client
+    .from(TABLES.eventApplications)
+    .select("id", { count: "exact", head: true })
+    .eq("event_id", eventId)
+    .in("status", ["accepted", "waitlisted", "rejected"]);
+  if (error) throw error;
+  return count ?? 0;
+}
