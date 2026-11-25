@@ -29,7 +29,6 @@ export function ScrollableBarChart({ periods, label, wideLabels = false, initial
   const coverageNote = [
     periods.some((period) => period.coverage === "unavailable") && "Data unavailable (—)",
     showPartialCoverage && periods.some((period) => period.coverage === "partial") && "* Incomplete coverage",
-    periods.some((period) => period.coverage === "future") && "Not yet reported (·)",
   ].filter(Boolean).join(" · ");
   const maximum = Math.max(1, ...periods.map((period) => period.count ?? 0));
   function measure() {

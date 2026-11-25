@@ -1199,7 +1199,9 @@ card at `/dev/components/distribution-chart` demonstrates hide/show and long lab
 reported zero; partial counts carry an incomplete marker by default; unavailable/future
 periods never become zero-height actuals. Hover, focus and tap show identical
 values; a focused/tapped bar retains its value when mouse hover leaves, until
-focus moves away. A native horizontal scrollbar can be dragged, arrows step one period
+focus moves away. With no bar active, the status line notes only unavailable
+(—) and incomplete (*) periods; future periods show their value only when
+hovered, focused or tapped. A native horizontal scrollbar can be dragged, arrows step one period
 and disable at boundaries, up to seven bars fit when labels/space allow. No
 wheel interception, zoom handler or animation. `initialScroll="start"` starts at
 the left edge and resets when period IDs change; the default `"end"` preserves

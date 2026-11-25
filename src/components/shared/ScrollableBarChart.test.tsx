@@ -31,7 +31,7 @@ describe("scrollable reporting chart", () => {
     render(<ScrollableBarChart periods={periods} label="Members" />);
     expect(screen.getByRole("status").textContent).toContain("Data unavailable (—)");
     expect(screen.getByRole("status").textContent).toContain("* Incomplete coverage");
-    expect(screen.getByRole("status").textContent).toContain("Not yet reported (·)");
+    expect(screen.getByRole("status").textContent).not.toContain("Not yet reported");
     const partial = screen.getByRole("button", { name: "2023–2024: 10 · Incomplete coverage" });
     fireEvent.mouseEnter(partial);
     expect(screen.getByRole("status").textContent).toBe("2023–2024: 10 · Incomplete coverage");
@@ -55,7 +55,7 @@ describe("scrollable reporting chart", () => {
     expect(document.activeElement).toBe(bar);
     expect(screen.getByRole("status").textContent).toBe("2023–2024: 10 · Incomplete coverage");
     act(() => bar.blur());
-    expect(screen.getByRole("status").textContent).toContain("Not yet reported (·)");
+    expect(screen.getByRole("status").textContent).toBe("Data unavailable (—) · * Incomplete coverage");
   });
 
   it("starts at the newest end, steps one period, follows thumb scrolling and disables at boundaries", () => {
