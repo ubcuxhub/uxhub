@@ -90,6 +90,11 @@ export const MANIFEST = [
     uses: ["stat-card"],
   },
   {
+    id: "event-registrations",
+    column: 3,
+    uses: ["card", "detail-row"],
+  },
+  {
     id: "attendee-table",
     column: 3,
     uses: ["table", "table-toolbar", "search-field", "sort-filter-panel", "select", "filter-chip", "checkbox", "avatar", "status-badge", "pagination", "button"],
@@ -128,12 +133,7 @@ export const MANIFEST = [
   {
     id: "applicant",
     column: 4,
-    uses: ["card", "badge", "status-badge"],
-  },
-  {
-    id: "application-response",
-    column: 4,
-    uses: ["card"],
+    uses: ["card", "avatar", "icon-button", "tooltip", "toast"],
   },
   {
     id: "reviewer-notes",
@@ -143,12 +143,7 @@ export const MANIFEST = [
   {
     id: "reviewer-notes-states",
     column: 4,
-    uses: ["segmented-toggle", "card", "empty-state", "skeleton", "button"],
-  },
-  {
-    id: "application-decision",
-    column: 4,
-    uses: ["card", "field", "input", "button", "spinner", "confirm-dialog", "success-overlay", "toast"],
+    uses: ["segmented-toggle", "card", "empty-state", "spinner", "button"],
   },
   {
     id: "application-form",

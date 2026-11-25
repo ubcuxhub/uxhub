@@ -13,7 +13,8 @@ import EventsPage from "./page";
 import { MarketingEventCard } from "@/features/marketing/components/MarketingEventCard";
 
 const event = (id: string, over: Record<string, unknown> = {}) => ({
-  id, slug: id, name: id, configured_marketing_mode: null, configured_marketing_url: null, marketing_url: null, ...over,
+  id, slug: id, name: id, starts_at: "2099-01-01T18:00:00Z", ends_at: "2099-01-01T20:00:00Z",
+  configured_marketing_mode: null, configured_marketing_url: null, marketing_url: null, ...over,
 });
 
 function cards(node: unknown): ReactElement<{ event: { id: string }; href: string; external: boolean }>[] {
@@ -44,6 +45,25 @@ it("leaves out events with the marketing page off and links external ones out", 
 it("shows the empty state when every event is off", async () => {
   mocks.list.mockResolvedValue([event("off", { configured_marketing_mode: "disabled" })]);
   expect(cards(await EventsPage())).toEqual([]);
+});
+
+it("lists upcoming events soonest first, then past ones most recent first", async () => {
+  mocks.list.mockResolvedValue([
+    event("oldest", { starts_at: "2020-01-01T18:00:00Z", ends_at: "2020-01-01T20:00:00Z" }),
+    event("recent", { starts_at: "2021-01-01T18:00:00Z", ends_at: null }),
+    event("soon", { starts_at: "2099-01-01T18:00:00Z" }),
+    event("later", { starts_at: "2099-06-01T18:00:00Z" }),
+  ]);
+  const tree = await EventsPage();
+  expect(cards(tree).map((c) => c.props.event.id)).toEqual(["soon", "later", "recent", "oldest"]);
+  expect(JSON.stringify(tree)).toContain("Past Events");
+});
+
+it("says events are coming soon when only past events exist", async () => {
+  mocks.list.mockResolvedValue([event("old", { starts_at: "2020-01-01T18:00:00Z", ends_at: null })]);
+  const tree = await EventsPage();
+  expect(JSON.stringify(tree)).toContain("Events coming soon");
+  expect(cards(tree).map((c) => c.props.event.id)).toEqual(["old"]);
 });
 
 it("still redirects while the feature is gated", async () => {

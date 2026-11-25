@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 
 import { Hubbo } from "@/components/shared/Hubbo";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { withDeadline } from "@/lib/async/deadline";
-import { useNavigationRecovery } from "@/hooks/use-navigation-recovery";
+import { NAVIGATED, useGuardedSubmit } from "@/hooks/use-guarded-submit";
 import { createClient } from "@/lib/supabase/client";
 
 import {
@@ -62,31 +62,16 @@ export function LinkExpiredMessage({
   );
   const [typedEmail, setTypedEmail] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [isSending, setIsSending] = useState(false);
-  const sendingRef = useRef(false);
-  const recoverStalledNavigation = useNavigationRecovery(() => {
-    sendingRef.current = false;
-    setIsSending(false);
-    setError("The email was sent, but the next page did not load. Check your inbox.");
-  });
+  const { pending: isSending, run } = useGuardedSubmit(() =>
+    setError("The email was sent, but the next page did not load. Check your inbox."),
+  );
 
   const knownEmail = pendingEmail;
   const email = (knownEmail || typedEmail).trim().toLowerCase();
   const { lead, destination } = COPY[type];
 
-  const handleSend = async (event: React.FormEvent) => {
-    event.preventDefault();
-    if (sendingRef.current) return;
-
-    if (!isPlausibleEmail(email)) {
-      setError(INVALID_EMAIL_MESSAGE);
-      return;
-    }
-
-    sendingRef.current = true;
-    setIsSending(true);
+  const send = async () => {
     setError(null);
-    let navigationStarted = false;
 
     try {
       const supabase = createClient();
@@ -120,8 +105,7 @@ export function LinkExpiredMessage({
           ? `${destination}?next=${encodeURIComponent(nextPath)}`
           : destination,
       );
-      navigationStarted = true;
-      recoverStalledNavigation();
+      return NAVIGATED;
     } catch (sendError: unknown) {
       const cooldown = getResendCooldownSeconds(sendError);
       setError(
@@ -129,12 +113,18 @@ export function LinkExpiredMessage({
           ? getResendCooldownMessage(cooldown)
           : getAuthActionErrorMessage(sendError, AUTH_ACTION_ERRORS.resend),
       );
-    } finally {
-      if (!navigationStarted) {
-        sendingRef.current = false;
-        setIsSending(false);
-      }
     }
+  };
+
+  const handleSend = (event: React.FormEvent) => {
+    event.preventDefault();
+
+    if (!isPlausibleEmail(email)) {
+      setError(INVALID_EMAIL_MESSAGE);
+      return;
+    }
+
+    void run(send);
   };
 
   return (

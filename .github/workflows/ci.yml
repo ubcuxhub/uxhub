@@ -15,10 +15,19 @@ jobs:
 
       # Merging deploys, and the production build pushes migrations in name
       # order, so a migration older than main's newest would fail that deploy.
+      # A pull request is checked against its base as fetched when its CI ran,
+      # so a stale one merged after a newer migration landed (the admin bypass
+      # does not wait for a re-run) would slip through. The push to main checks
+      # again, against the main it replaced, and names the file to rename.
       - name: Check migration order
-        if: github.event_name == 'pull_request'
+        env:
+          BASE_REF: ${{ github.event_name == 'pull_request' && github.base_ref || github.event.before }}
         run: |
-          git fetch --no-tags --depth=1 origin "$GITHUB_BASE_REF"
+          if [ -z "$BASE_REF" ] || [ "$BASE_REF" = "0000000000000000000000000000000000000000" ]; then
+            echo "No previous commit to compare against."
+            exit 0
+          fi
+          git fetch --no-tags --depth=1 origin "$BASE_REF"
           bash scripts/check-migration-order.sh FETCH_HEAD
 
       - uses: pnpm/action-setup@v4

@@ -5,7 +5,7 @@ as often as you like.
 
 ```bash
 pnpm seed                  # local: make the database match the seed data
-pnpm seed --target=prod    # prod: add and update demo data, never delete
+pnpm seed --target=prod    # prod: add and refresh demo events, never delete
 pnpm seed --dry-run        # print the plan, write nothing
 pnpm seed --no-prune       # local: sync without deleting
 pnpm seed --only=events    # storage | memberships | events | users
@@ -22,18 +22,46 @@ mispaste fails instead of hitting the wrong project.
 | URL                    | `NEXT_PUBLIC_SUPABASE_URL`    | `SEED_PROD_SUPABASE_URL`        |
 | Key                    | `SUPABASE_SECRET_KEY`         | `SEED_PROD_SUPABASE_SECRET_KEY` |
 | Deletes stale rows     | yes, unless `--no-prune`      | **never**                       |
+| Existing event with a seed slug | overwritten           | only if untouched (below), else skipped whole |
+| Existing mentor or sponsor (same name or logo) | overwritten | linked as is, never rewritten |
+| People and sponsor links | rewritten whole (added only with `--no-prune`) | added, never removed |
 | Login fixtures         | yes                           | **never**                       |
 | Crowd accounts         | yes                           | **never**                       |
 | Membership tiers       | yes                           | **never** (edited in Club Settings) |
 | Event status           | as written in `data/events.ts`| forced to `draft`               |
 | `first_published_at`   | as written (one fixture)      | never written                   |
 | Working drafts (`data/drafts.ts`) | yes                | **never**                       |
-| Builder documents on seeded events | discarded         | kept (an admin's unsaved work)  |
+| Builder documents on seeded events | discarded         | the event is skipped (an admin's unsaved work) |
 | `event-images` bucket  | created if missing            | must already exist              |
 
 Both live in `.env.local`. The prod keys are deliberately not `NEXT_PUBLIC_*`:
 the dev server reads the same file, and that prefix would inline a service-role
 key into the client bundle.
+
+### Which events prod writes
+
+A slug is not proof the seed owns a row: seed slugs are ordinary event names,
+and an admin can turn a seeded demo event into the real one. So prod writes an
+event only when it creates it, or when the existing row still looks exactly as
+an earlier prod run left it (`planProdEvents` in `lib/event-ownership.ts`):
+
+- a draft, never published (`first_published_at`), not scheduled
+  (`publish_at`) and not canceled
+- no builder document (`working_document`)
+- name, short overview and long overview equal to the seed data's
+- no purchase, ticket, application, team membership or reviewer note
+
+Anything else is skipped whole, the event row and everything hanging off it
+(check-in sessions, questions, agenda, people, sponsors, links, builder
+settings), and the run lists each skipped slug with the reason. That includes a
+demo event whose name or overview the seed data has since changed (a name with
+a year in it changes at the turn of the year): delete it in the admin UI and the
+next run recreates it.
+
+Mentors and sponsors are shared directories, so prod links an existing one with
+the same name (or logo) as it is and never rewrites it, and it only ever adds
+people and sponsor links. A builder's event-owned copy (`owner_event_id`) is
+never matched, on either target.
 
 ### Why prod forces drafts
 
@@ -66,10 +94,14 @@ Deletion is scoped by ownership, not by table:
 | Reviewer notes the fixture accounts wrote, other than `data/review-notes.ts`'s | Reviewer notes by any other account   |
 | Cover images under the `seed/covers/` storage prefix       |                                                      |
 
-An extra event survives if a non-fixture purchase points at it —
-`purchases.event_id` is `on delete restrict`, so somebody else's ticket keeps
-the event alive and the run says which. Same for mentors, sponsors, and tiers,
-which are `restrict` from their link tables.
+An extra event survives if an account created by hand holds anything on it: a
+purchase, ticket, application, team membership or reviewer note. Only purchases
+are `on delete restrict`; the rest cascade off `events`, so the prune checks for
+all of them before it deletes (`findEventHolders` in `lib/event-ownership.ts`)
+and the run, dry or real, names the event and what kept it. The seed's own
+accounts (login fixtures, retired fixtures, the former reviewer and Auth-less
+crowd profiles) never keep an event. Mentors, sponsors, and tiers survive the
+same way through their `restrict` link tables.
 
 ## Fixtures
 
@@ -95,8 +127,8 @@ A local run writes `working_document: null` on these rows. They are finished
 events; a document left by an older builder Save draft would otherwise survive the run
 and win over the seeded columns wherever a draft is presented, and on the
 scheduled fixture it made the run fail (only an unscheduled draft may hold one).
-Prod keeps the document, since it may be an admin's unsaved work and prod
-writes no schedule for it to conflict with.
+Prod leaves an event holding a document alone altogether, since it may be an
+admin's unsaved work.
 
 ### Banners
 
@@ -262,6 +294,8 @@ index, so every run builds the same people. Addresses are on
 a ubc.ca address matching their own); those domains are how the prune
 recognises the crowd, so never sign up with one. They cover:
 
+- Someone with one name: `kai@crowd.uxhub.test` has an empty last name, as
+  sign-up allows.
 - Every user type, every tier, and no membership; two lapsed members
   (`membership_expires_at` in the past, for the renewal flow), one of them with
   a renewal pending (`membership_pre_ordered_type_id` and a `pending` purchase,
@@ -317,6 +351,7 @@ Copy a production edit here by hand to keep local in step.
 | `lib/review-notes.ts`    | reviewer notes and their former-reviewer author: checks, reconcile, prune |
 | `lib/pdf.ts`             | the one-page PDF behind seeded file answers                   |
 | `lib/prune.ts`           | pure delete planning — the ownership rules live here         |
+| `lib/event-ownership.ts` | which existing events prod may write, and who holds records on an event the local prune would delete |
 | `lib/images.ts`          | cover upload, URL building, and stale-image cleanup          |
 | `lib/user-fixtures.ts`   | fixture validation, run before anything is written           |
 | `lib/relative-dates.ts`  | date helpers that keep the timeline relative to the run      |
@@ -334,7 +369,9 @@ real run cannot disagree about what would go.
 4. `pnpm seed --dry-run`, then `pnpm seed`.
 
 Changing a slug is safe locally: prune removes the row under the old slug. On
-prod it leaves the old row behind, to be deleted by hand.
+prod it leaves the old row behind, to be deleted by hand. Changing an event's
+name or overview makes prod skip the existing demo row (see "Which events prod
+writes") until it is deleted by hand.
 
 ## Production payment smoke test
 

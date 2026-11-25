@@ -90,6 +90,9 @@ Gaps found (none block this design):
 `ReviewApplicationsClient` / `ApplicationListCard` (list) and
 `ApplicationReviewClient` / `ApplicantInfoCard` / `ApplicationResponseCard` /
 `StatusUpdateSection` (one application), built Dec 2025 without a design.
+Since then (Nov 2026), `ApplicantProfileCard` has replaced `ApplicantInfoCard`
+and the unused `ApplicationListCard`; the audit below describes the pages as
+they were.
 
 List:
 
@@ -151,8 +154,9 @@ review URL can also be pasted to another exec ("can you look at this one?").
 
 ### List (`/admin/events/[event]/review-applications`)
 
-- Title "Applications", subtitle with event name, close date and event date.
-  Back to Manage Events.
+- The event manager's Applications tab: its header names the event and holds
+  Back to Manage Events. Title "Applications", subtitle with the close date
+  and event date. The application page shows inside the same tab.
 - Three `StatCard`s: To review (submitted), Offers out (accepted, no ticket),
   Seats filled (rate of capacity). Accepting is a capacity decision; this
   puts the number in front of the reviewer.

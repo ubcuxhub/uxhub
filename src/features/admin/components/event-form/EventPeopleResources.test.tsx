@@ -96,7 +96,7 @@ it("adds Volunteer Schedule as a normal link row with fixed staff access, HTTPS 
   fireEvent.click(screen.getByRole("button", { name: "Volunteer Schedule" }));
   const audience = screen.getByRole("combobox", { name: "Who can see it" }) as HTMLButtonElement;
   expect(audience.disabled).toBe(true);
-  expect(audience.textContent).toContain("Only staff");
+  expect(audience.textContent).toContain("Only UX Hub execs");
   expect((screen.getByRole("button", { name: "Volunteer Schedule" }) as HTMLButtonElement).disabled).toBe(true);
   fireEvent.change(screen.getByLabelText("Link"), { target: { value: "http://example.test/shifts" } });
   expect(screen.getByText("Use an absolute HTTPS URL without a username or password.")).toBeTruthy();

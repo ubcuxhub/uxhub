@@ -1,11 +1,9 @@
 import Image from "next/image";
-import { IdCard } from "lucide-react";
 
-import { FlowLink } from "@/components/shared/FlowLink";
-import { Button } from "@/components/ui/button";
 import { formatEventDate } from "@/lib/date";
 import { formatMembershipTypeName } from "@/features/memberships/lib/display";
 import type { MembershipTypeRow } from "@/lib/supabase/models";
+import { cn } from "@/lib/utils";
 import { MembershipCardSurface } from "./MembershipCardSurface";
 
 /**
@@ -21,18 +19,20 @@ export function MembershipCard({
   cardholder,
   expiresAt,
   membershipType,
+  className,
 }: {
   cardholder: string;
   /** Effective expiry, already capped by the club-wide term end. */
   expiresAt: string | null;
   membershipType: Pick<MembershipTypeRow, "description" | "name">;
+  className?: string;
 }) {
   const expiryDate = formatEventDate(expiresAt);
 
   // Figma 3262:3182: the label and logo, the cardholder and tier, the
   // benefit, and the door note with the expiry along the bottom.
   return (
-    <MembershipCardSurface className="max-w-[492px]">
+    <MembershipCardSurface className={cn("max-w-[492px]", className)}>
       <div className="flex flex-1 flex-col justify-between gap-6 p-6">
         <div className="flex flex-col">
           <div className="flex items-start justify-between gap-4">
@@ -59,28 +59,5 @@ export function MembershipCard({
         </div>
       </div>
     </MembershipCardSurface>
-  );
-}
-
-/** What the same slot shows before someone has bought a membership. */
-export function MembershipCardEmptyState() {
-  return (
-    <section className="max-w-xl rounded-2xl border border-dashed p-6">
-      <div className="flex items-start gap-3">
-        <div className="rounded-full bg-primary/10 p-2">
-          <IdCard className="size-5 text-primary" aria-hidden />
-        </div>
-        <div>
-          <h2 className="text-subheading">You don&rsquo;t have a membership yet</h2>
-          <p className="mt-1 text-small text-muted-foreground">
-            Join UX Hub for member pricing on every event, plus perks reserved
-            for members.
-          </p>
-        </div>
-      </div>
-      <Button asChild className="mt-5">
-        <FlowLink href="/portal/membership/join">Become a member</FlowLink>
-      </Button>
-    </section>
   );
 }

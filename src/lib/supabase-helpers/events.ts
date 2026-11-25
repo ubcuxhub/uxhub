@@ -1,8 +1,8 @@
 import type { DbClient } from "./types";
 import { TABLES } from "./tables";
 import { eventPresentation } from "@/features/admin/lib/event-presentation";
+import { isUuid } from "@/lib/uuid";
 import type {
-  EventInsert,
   EventRow,
   EventStatus,
   EventUpdate,
@@ -47,6 +47,31 @@ export async function fetchEvents(
   return (data ?? []).map(eventPresentation);
 }
 
+/**
+ * The event Home features: the soonest published, uncanceled event an admin
+ * marked "Feature on the portal home" that hasn't ended yet (one in progress
+ * still counts, as on the timeline). Null when none qualifies.
+ */
+export async function fetchFeaturedEvent(
+  supabase: DbClient,
+  now: Date = new Date()
+): Promise<EventRow | null> {
+  const at = now.toISOString();
+  const { data, error } = await supabase
+    .from(TABLES.events)
+    .select("*")
+    .eq("status", "active")
+    .eq("is_featured", true)
+    .is("canceled_at", null)
+    .or(`ends_at.gte.${at},and(ends_at.is.null,starts_at.gte.${at})`)
+    .order("starts_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ? eventPresentation(data) : null;
+}
+
 export async function fetchEventById(
   supabase: DbClient,
   id: string
@@ -82,11 +107,20 @@ export async function fetchEventBySlug(
   return data ? eventPresentation(data) : null;
 }
 
-/** Canonical IDs and recorded legacy routes share the same permanent event. */
-export async function fetchEventByLegacyDraftId(supabase: DbClient, id: string) {
+/** The stored event row by its id or a recorded legacy draft id: canonical IDs
+ * and legacy routes share the same permanent event. The id goes into a
+ * PostgREST `.or()` filter string, so anything but a UUID is unknown. */
+export async function fetchEventRowByIdOrLegacyDraftId(supabase: DbClient, id: string): Promise<EventRow | null> {
+  if (!isUuid(id)) return null;
   const { data, error } = await supabase.from(TABLES.events).select("*").or(`id.eq.${id},legacy_draft_ids.cs.{${id}}`).maybeSingle();
   if (error) throw error;
-  return data ? eventPresentation(data) : null;
+  return data;
+}
+
+/** The event by its id or a legacy draft id, as the admin pages present it. */
+export async function fetchEventByLegacyDraftId(supabase: DbClient, id: string) {
+  const row = await fetchEventRowByIdOrLegacyDraftId(supabase, id);
+  return row ? eventPresentation(row) : null;
 }
 
 /**
@@ -123,38 +157,6 @@ export async function fetchEventSlugsByPrefix(
     .map((row: { slug: string | null }) => row.slug)
     .filter((slug): slug is string => slug !== null);
   return [...new Set(slugs)];
-}
-
-export async function insertEvent(
-  supabase: DbClient,
-  payload: EventInsert
-): Promise<{ id: string }> {
-  const { data, error } = await supabase
-    .from(TABLES.events)
-    .insert(payload)
-    .select("id")
-    .maybeSingle();
-
-  if (error) throw error;
-  if (!data?.id) throw new Error("No event id returned from Supabase.");
-  return data;
-}
-
-export async function updateEvent(
-  supabase: DbClient,
-  id: string,
-  payload: EventUpdate
-): Promise<{ id: string }> {
-  const { data, error } = await supabase
-    .from(TABLES.events)
-    .update(payload)
-    .eq("id", id)
-    .select("id")
-    .maybeSingle();
-
-  if (error) throw error;
-  if (!data?.id) throw new Error("No event id returned from Supabase.");
-  return data;
 }
 
 /** The columns the admin overview's quick edit changes. */

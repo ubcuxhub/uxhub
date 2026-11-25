@@ -24,6 +24,14 @@ const currentUserMocks = vi.hoisted(() => ({
 
 vi.mock("next/navigation", () => ({ redirect: navigationMocks.redirect }));
 
+const logMocks = vi.hoisted(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+}));
+
+vi.mock("@/lib/log", () => ({ log: logMocks, errorFields: vi.fn() }));
+
 vi.mock("@/lib/auth/current-user", () => ({
   loadCurrentUser: currentUserMocks.loadCurrentUser,
 }));
@@ -94,16 +102,41 @@ describe("requireAuth", () => {
     );
   });
 
+  it("asks a signed-in user without a name to add one, keeping the path", async () => {
+    currentUserMocks.loadCurrentUser.mockResolvedValue({
+      status: "needs_profile",
+    });
+
+    await expectRedirect(
+      () => requireAuth("/portal/membership/join"),
+      "/auth/complete-profile?next=%2Fportal%2Fmembership%2Fjoin"
+    );
+  });
+
+  it("sanitizes the path it carries to the add-your-name form", async () => {
+    currentUserMocks.loadCurrentUser.mockResolvedValue({
+      status: "needs_profile",
+    });
+
+    await expectRedirect(
+      () => requireAuth("//evil.example"),
+      "/auth/complete-profile?next=%2Fportal"
+    );
+  });
+
   it("surfaces a profile-loading error on the auth error page", async () => {
     currentUserMocks.loadCurrentUser.mockResolvedValue({
       status: "error",
-      message: "Unable to load your profile.",
+      code: "profile_unavailable",
     });
 
     await expectRedirect(
       () => requireAuth(),
-      "/auth/error?error=Unable%20to%20load%20your%20profile."
+      "/auth/error?code=profile_unavailable"
     );
+    // `loadCurrentUser` logged the cause; the redirect adds no second line.
+    expect(logMocks.warn).not.toHaveBeenCalled();
+    expect(logMocks.error).not.toHaveBeenCalled();
   });
 });
 
@@ -198,15 +231,26 @@ describe("redirectIfAuthenticated", () => {
     );
   });
 
+  it("sends a signed-in user without a name to add one first", async () => {
+    currentUserMocks.loadCurrentUser.mockResolvedValue({
+      status: "needs_profile",
+    });
+
+    await expectRedirect(
+      () => redirectIfAuthenticated("/portal/events/x/checkout"),
+      "/auth/complete-profile?next=%2Fportal%2Fevents%2Fx%2Fcheckout"
+    );
+  });
+
   it("surfaces a profile-loading error instead of redirecting", async () => {
     currentUserMocks.loadCurrentUser.mockResolvedValue({
       status: "error",
-      message: "Your profile could not be loaded.",
+      code: "linked_elsewhere",
     });
 
     await expectRedirect(
       () => redirectIfAuthenticated(),
-      "/auth/error?error=Your%20profile%20could%20not%20be%20loaded."
+      "/auth/error?code=linked_elsewhere"
     );
   });
 });

@@ -75,7 +75,13 @@ export default function Navbar() {
           </div>
         </div>
 
-        <div className="ml-auto md:hidden">
+        {/* Phones get the one page link that isn't on the homepage itself. */}
+        <div className="ml-auto flex items-center gap-4 md:hidden">
+          {FLAGS.studentEvents && (
+            <Link href="/events" className={navLink}>
+              Events
+            </Link>
+          )}
           {!loading && user ? (
             <Button
               variant={isMember ? "primary" : "secondary"}

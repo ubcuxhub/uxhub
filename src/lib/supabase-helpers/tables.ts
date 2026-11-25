@@ -29,6 +29,7 @@ export const TABLES = {
   eventSponsors: "event_sponsors",
   membershipTypes: "membership_types",
   purchases: "purchases",
+  purchaseRefundEmails: "purchase_refund_emails",
   squareWebhookEvents: "square_webhook_events",
   eventAgendaDays: "event_agenda_days",
   eventAgendaItems: "event_agenda_items",
@@ -39,7 +40,6 @@ export const TABLES = {
   // Initial-link creation uses the service-only create_staff_volunteer_schedule RPC.
   eventStaffVolunteerSchedules: "event_staff_volunteer_schedules",
   eventLinks: "event_links",
-  eventPrivateDetails: "event_private_details",
 } as const;
 
 export type TableName = (typeof TABLES)[keyof typeof TABLES];

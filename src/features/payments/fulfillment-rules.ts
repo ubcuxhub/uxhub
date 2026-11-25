@@ -60,6 +60,51 @@ export function completedRefundCents(
   return Number(total);
 }
 
+/**
+ * How long after it last changed a completed refund still gets an email.
+ * Longer than Square's three days of webhook retries, so a failed send is
+ * retried; short enough that a refund from before refund emails existed, seen
+ * again when a later refund on the same payment arrives, stays quiet.
+ */
+export const REFUND_EMAIL_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** A completed refund that the buyer should hear about. */
+export interface EmailableRefund {
+  id: string;
+  amountCents: number;
+  currency: string;
+}
+
+/**
+ * The refunds to email the buyer about: COMPLETED ones, in the payment's
+ * currency, that changed within `REFUND_EMAIL_WINDOW_MS`. A PENDING refund can
+ * still fail, and REJECTED and FAILED ones returned nothing.
+ */
+export function emailableRefunds(
+  payment: { amountMoney?: SquareMoney },
+  refunds: ({
+    id?: string;
+    status?: string | null;
+    amountMoney?: SquareMoney;
+    updatedAt?: string;
+  } | undefined)[],
+  now = Date.now(),
+): EmailableRefund[] {
+  const paymentCurrency = payment.amountMoney?.currency;
+  const emailable: EmailableRefund[] = [];
+  for (const refund of refunds) {
+    if (!refund?.id || refund.status !== "COMPLETED") continue;
+    const currency = refund.amountMoney?.currency ?? paymentCurrency;
+    if (!currency || (paymentCurrency && currency !== paymentCurrency)) continue;
+    const amountCents = Number(refund.amountMoney?.amount ?? 0);
+    if (!(amountCents > 0)) continue;
+    const changedAt = refund.updatedAt ? Date.parse(refund.updatedAt) : Number.NaN;
+    if (Number.isFinite(changedAt) && now - changedAt > REFUND_EMAIL_WINDOW_MS) continue;
+    emailable.push({ id: refund.id, amountCents, currency });
+  }
+  return emailable;
+}
+
 export function normalizeSquareStatus(status: string | undefined) {
   switch (status) {
     case "APPROVED":
@@ -214,6 +259,50 @@ export function isDefinitiveSquareFailure(error: unknown) {
 }
 
 /**
+ * Square refused the request itself (a 4xx other than a timeout, a conflict
+ * or rate limiting), so it created no payment: an expired card token, an
+ * unknown customer or location, a rotated access token, an amount of 0.
+ * Unlike a transport or 5xx error, nothing can settle later, so the attempt
+ * is dead. Only meaningful for the call that would have created the payment:
+ * a 4xx on a later call (capturing one) says nothing about whether money
+ * moved. The ambiguous codes stay ambiguous whatever their status.
+ */
+export function isRejectedSquareRequest(error: unknown) {
+  if (!(error instanceof SquareError)) return false;
+  const status = error.statusCode;
+  if (status === undefined || status < 400 || status >= 500) return false;
+  if (status === 408 || status === 409 || status === 429) return false;
+  return !error.errors.some((entry) => AMBIGUOUS_SQUARE_CODES.has(entry.code));
+}
+
+/**
+ * The buyer-facing message for an attempt Square refused outright. A card
+ * decline keeps its specific wording; anything else (a configuration problem
+ * on our side) gets a generic line instead of Square's developer `detail`.
+ */
+export function getRejectedPaymentMessage(error: unknown) {
+  if (isDefinitiveSquareFailure(error)) return getSquareErrorMessage(error);
+  if (error instanceof SquareError) {
+    const known = formatSquareErrorCode(error.errors[0]?.code);
+    if (known) return known;
+  }
+  return "Payment could not be processed. Please try again, or contact UX Hub if it keeps happening.";
+}
+
+/**
+ * How long a purchase may stay pending without a Square payment ID before it
+ * counts as abandoned: the request to create the payment never reached Square,
+ * or Square refused it. A create call settles within seconds, so this only
+ * needs to outlast a slow one. If Square did take the payment after all, its
+ * signed webhook still finds the purchase through `referenceId` and records
+ * it. `fail_abandoned_purchases` (pg_cron) uses the same interval.
+ */
+export const ABANDONED_PURCHASE_AFTER_MS = 15 * 60 * 1000;
+
+export const ABANDONED_PURCHASE_REASON =
+  "This payment did not go through. Please try again.";
+
+/**
  * The buyer-facing message is stored on the purchase, so keep the raw Square
  * codes for the server log. Free text (Square's `detail`, an error message) is
  * left out: logs also reach Sentry, and a message can quote request or row data.
@@ -244,6 +333,15 @@ export function getSquareErrorDiagnostic(error: unknown) {
   return typeof error;
 }
 
+export const MEMBERSHIP_PRICE_CHANGED =
+  "This membership's price has changed. Refresh checkout to review the current price.";
+
+export const MEMBERSHIP_PURCHASE_IN_PROGRESS =
+  "Another membership payment of yours is still processing. Check Purchases, and try again once it finishes.";
+
+export const FREE_MEMBERSHIP_UNAVAILABLE =
+  "This membership can't be bought online right now. Please contact UX Hub.";
+
 export function formatReservationFailure(reason: string | null | undefined) {
   switch (reason) {
     case "PRICE_CHANGED":
@@ -273,8 +371,4 @@ export function formatReservationFailure(reason: string | null | undefined) {
     default:
       return "We could not reserve a ticket for this event.";
   }
-}
-
-export function getPurchaseRedirectPath() {
-  return "/portal#settings/purchases";
 }

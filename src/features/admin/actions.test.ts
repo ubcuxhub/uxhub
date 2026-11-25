@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { UserInfoRow } from "@/lib/supabase/models";
 import { defaultFormState } from "./components/event-form/event-form-schema";
+import { ActiveProfileNotFoundError } from "@/lib/supabase-helpers/admin-user-profile";
 
 vi.mock("server-only", () => ({}));
 
@@ -22,11 +23,6 @@ const events = vi.hoisted(() => ({
 const eventImageIsReferenced = vi.hoisted(() => vi.fn());
 const eventDrafts = vi.hoisted(() => ({ saveEventDraft: vi.fn(), fetchEventDraft: vi.fn() }));
 vi.mock("@/lib/supabase-helpers/event-drafts", () => ({ eventImageIsReferenced, ...eventDrafts }));
-const checkIns = vi.hoisted(() => ({
-  fetchCheckInAttendees: vi.fn(),
-  fetchCheckInSessions: vi.fn(),
-  fetchCheckInStatuses: vi.fn(),
-}));
 const applications = vi.hoisted(() => ({
   decideEventApplication: vi.fn(),
   fetchEventApplicationById: vi.fn(),
@@ -42,7 +38,7 @@ const saveAdminProfile = vi.hoisted(() => vi.fn());
 const fetchMembershipTypeById = vi.hoisted(() => vi.fn());
 vi.mock("@/lib/supabase-helpers/memberships", () => ({ fetchMembershipTypeById }));
 const fetchActiveProfile = vi.hoisted(() => vi.fn());
-vi.mock("@/lib/supabase-helpers/admin-user-profile", () => ({ saveAdminProfile, fetchActiveProfile }));
+vi.mock("@/lib/supabase-helpers/admin-user-profile", async (importOriginal) => ({ ...(await importOriginal<object>()), saveAdminProfile, fetchActiveProfile }));
 
 const adminRpc = vi.hoisted(() => vi.fn());
 const serverRpc = vi.hoisted(() => vi.fn());
@@ -52,7 +48,6 @@ vi.mock("next/cache", () => ({ revalidatePath }));
 vi.mock("@/lib/auth/guards", () => guards);
 vi.mock("@/lib/supabase-helpers/admin-server", () => adminServer);
 vi.mock("@/lib/supabase-helpers/events", () => events);
-vi.mock("@/lib/supabase-helpers/check-ins", () => checkIns);
 vi.mock("@/lib/supabase-helpers/event-applications", () => applications);
 vi.mock("@/lib/supabase-helpers/application-files", () => applicationFiles);
 vi.mock("@/lib/supabase-helpers/event-people", () => eventPeople);
@@ -67,13 +62,11 @@ vi.mock("@/lib/supabase/server", () => ({
 import {
   deleteAdminEventAction,
   discardUnusedEventImageAction,
-  fetchAdminCheckInSnapshotAction,
   saveAdminEventAction,
   savePastEventResourcesAction,
   saveAdminEventDraftAction,
   setMembershipTermEndsAtAction,
   updateApplicationDecisionAction,
-  updateManagerUserAction,
   saveManagerUserDetailsAction,
   updateMembershipTypeAction,
   updateUserRoleAction,
@@ -94,11 +87,16 @@ beforeEach(() => {
   adminRpc.mockResolvedValue({ data: { id: "event-1" }, error: null });
 });
 
+
 // ---------------------------------------------------------------------------
 // The manager column allowlist
 // ---------------------------------------------------------------------------
 
-describe("updateManagerUserAction: the column allowlist", () => {
+describe("saveManagerUserDetailsAction: the column allowlist", () => {
+  beforeEach(() => {
+    saveAdminProfile.mockResolvedValue({ id: "user-1" });
+  });
+
   it.each([
     "role_access",
     "id",
@@ -109,108 +107,121 @@ describe("updateManagerUserAction: the column allowlist", () => {
     "created_at",
   ])("refuses to write the unlisted column %s", async (field) => {
     await expect(
-      updateManagerUserAction("user-1", field, "anything"),
-    ).rejects.toThrow("This user field cannot be edited.");
+      saveManagerUserDetailsAction("user-1", { [field]: "anything" }),
+    ).resolves.toEqual({ ok: false, error: "This user field cannot be edited." });
 
     // This write goes through the service role, which bypasses RLS. The
     // allowlist is the only thing between a manager and a privilege
     // escalation, so nothing may reach the helper.
-    expect(adminServer.adminUpdateUserInfoById).not.toHaveBeenCalled();
+    expect(saveAdminProfile).not.toHaveBeenCalled();
   });
 
   it.each([
     "first_name",
     "last_name",
-    "email",
     "phone",
-    "newsletter",
     "student_number",
     "faculty",
     "major",
     "membership_type_id",
   ])("writes the allowlisted column %s", async (field) => {
-    await updateManagerUserAction("user-1", field, "value");
+    await expect(saveManagerUserDetailsAction("user-1", { [field]: "value" })).resolves.toEqual({ ok: true, user: { id: "user-1" } });
 
-    expect(adminServer.adminUpdateUserInfoById).toHaveBeenCalledWith("user-1", {
+    expect(saveAdminProfile).toHaveBeenCalledWith(expect.anything(), "user-1", {
       [field]: "value",
     });
     expect(revalidatePath).toHaveBeenCalledWith("/admin/users", "layout");
   });
 
-  it("maps the form's order_date onto the deprecated column", async () => {
-    await updateManagerUserAction("user-1", "order_date", "2026-01-05");
+  it("refuses an email another account already uses", async () => {
+    fetchActiveProfile.mockResolvedValue({ auth_user_id: null, email: "typo@exmaple.com" });
+    saveAdminProfile.mockRejectedValue({ code: "23505", message: 'duplicate key value violates unique constraint "user_info_old_email_key"' });
 
-    expect(adminServer.adminUpdateUserInfoById).toHaveBeenCalledWith("user-1", {
+    await expect(saveManagerUserDetailsAction("user-1", { email: "taken@example.com" })).resolves.toEqual({ ok: false, error: "Another account already uses this email." });
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it.each([["  604 555 0100 ", "604 555 0100"], ["  ", null], [null, null]])("stores the phone %j as %j", async (phone, stored) => {
+    await saveManagerUserDetailsAction("user-1", { phone });
+
+    expect(saveAdminProfile).toHaveBeenCalledWith(expect.anything(), "user-1", { phone: stored });
+  });
+
+  it("refuses an overlong phone number", async () => {
+    await expect(saveManagerUserDetailsAction("user-1", { phone: "1".repeat(41) })).resolves.toEqual({ ok: false, error: "Enter a valid phone number." });
+    expect(saveAdminProfile).not.toHaveBeenCalled();
+  });
+
+  it("refuses a save for a user whose account was deleted", async () => {
+    saveAdminProfile.mockRejectedValue(new ActiveProfileNotFoundError());
+
+    await expect(saveManagerUserDetailsAction("user-1", { major: "Art" })).resolves.toEqual({ ok: false, error: "This user no longer exists. Reload the user directory." });
+  });
+
+  it("lets a database fault through as itself", async () => {
+    const fault = { code: "57014", message: "canceling statement due to statement timeout" };
+    saveAdminProfile.mockRejectedValue(fault);
+
+    await expect(saveManagerUserDetailsAction("user-1", { major: "Art" })).rejects.toBe(fault);
+  });
+
+  it("maps the form's order_date onto the deprecated column", async () => {
+    await saveManagerUserDetailsAction("user-1", { order_date: "2026-01-05" });
+
+    expect(saveAdminProfile).toHaveBeenCalledWith(expect.anything(), "user-1", {
       order_date_deprecated: "2026-01-05",
     });
   });
 
-  it("trims whitespace around a name", async () => {
-    await updateManagerUserAction("user-1", "first_name", "  Jamie  ");
-
-    expect(adminServer.adminUpdateUserInfoById).toHaveBeenCalledWith("user-1", {
-      first_name: "Jamie",
+  it("rejects a blank first name", async () => {
+    await expect(saveManagerUserDetailsAction("user-1", { first_name: "   " })).resolves.toEqual({
+      ok: false,
+      error: "First name is required.",
     });
+    expect(saveAdminProfile).not.toHaveBeenCalled();
   });
 
-  it.each([
-    ["first_name", "First name is required."],
-    ["last_name", "Last name is required."],
-  ])("rejects a blank %s", async (field, message) => {
-    await expect(updateManagerUserAction("user-1", field, "   ")).rejects.toThrow(
-      message,
-    );
-    expect(adminServer.adminUpdateUserInfoById).not.toHaveBeenCalled();
+  it.each(["   ", null])("clears the last name of a member with one name (%j)", async (lastName) => {
+    await saveManagerUserDetailsAction("user-1", { last_name: lastName });
+    expect(saveAdminProfile).toHaveBeenCalledWith(expect.anything(), "user-1", { last_name: "" });
+  });
+
+  it("trims a last name", async () => {
+    await saveManagerUserDetailsAction("user-1", { last_name: "  Lovelace " });
+    expect(saveAdminProfile).toHaveBeenCalledWith(expect.anything(), "user-1", { last_name: "Lovelace" });
   });
 
   it("rejects a name that is not a string", async () => {
     await expect(
-      updateManagerUserAction("user-1", "first_name", 7),
-    ).rejects.toThrow("First name is required.");
-    expect(adminServer.adminUpdateUserInfoById).not.toHaveBeenCalled();
+      saveManagerUserDetailsAction("user-1", { first_name: 7 }),
+    ).resolves.toEqual({ ok: false, error: "First name is required." });
+    await expect(
+      saveManagerUserDetailsAction("user-1", { last_name: 7 }),
+    ).resolves.toEqual({ ok: false, error: "Invalid user field value." });
+    expect(saveAdminProfile).not.toHaveBeenCalled();
   });
 
   it.each(["6", "0", "first", ""])(
     "rejects the university year %s",
     async (year) => {
       await expect(
-        updateManagerUserAction("user-1", "year", year),
-      ).rejects.toThrow("Invalid university year.");
-      expect(adminServer.adminUpdateUserInfoById).not.toHaveBeenCalled();
+        saveManagerUserDetailsAction("user-1", { year }),
+      ).resolves.toEqual({ ok: false, error: "Invalid university year." });
+      expect(saveAdminProfile).not.toHaveBeenCalled();
     },
   );
 
-  it.each(["1", "2", "3", "4", "5+"])("accepts the year %s", async (year) => {
-    await updateManagerUserAction("user-1", "year", year);
+  it.each(["1", "2", "3", "4", "5+", null])("accepts the year %s", async (year) => {
+    await saveManagerUserDetailsAction("user-1", { year });
 
-    expect(adminServer.adminUpdateUserInfoById).toHaveBeenCalledWith("user-1", {
-      year,
-    });
-  });
-
-  it("allows clearing the year", async () => {
-    await updateManagerUserAction("user-1", "year", null);
-
-    expect(adminServer.adminUpdateUserInfoById).toHaveBeenCalledWith("user-1", {
-      year: null,
-    });
+    expect(saveAdminProfile).toHaveBeenCalledWith(expect.anything(), "user-1", { year });
   });
 
   it("requires a user id", async () => {
-    await expect(updateManagerUserAction("", "major", "Art")).rejects.toThrow(
+    await expect(saveManagerUserDetailsAction("", { major: "Art" })).rejects.toThrow(
       "A user id is required.",
     );
-    expect(adminServer.adminUpdateUserInfoById).not.toHaveBeenCalled();
-  });
-
-  it("checks the manager guard before validating anything", async () => {
-    const redirect = new Error("NEXT_REDIRECT");
-    guards.requireManager.mockRejectedValue(redirect);
-
-    await expect(updateManagerUserAction("user-1", "major", "Art")).rejects.toBe(
-      redirect,
-    );
-    expect(adminServer.adminUpdateUserInfoById).not.toHaveBeenCalled();
+    expect(saveAdminProfile).not.toHaveBeenCalled();
   });
 });
 
@@ -224,7 +235,7 @@ describe("updateUserRoleAction: the role check", () => {
     async (role) => {
       serverRpc.mockResolvedValue({ data: role, error: null });
 
-      await expect(updateUserRoleAction("user-1", role)).resolves.toBe(role);
+      await expect(updateUserRoleAction("user-1", role)).resolves.toEqual({ ok: true, role });
 
       expect(serverRpc).toHaveBeenCalledWith("set_user_role", {
         p_target_user_id: "user-1",
@@ -256,6 +267,16 @@ describe("updateUserRoleAction: the role check", () => {
     serverRpc.mockResolvedValue({ data: null, error: failure });
 
     await expect(updateUserRoleAction("user-1", "admin")).rejects.toBe(failure);
+    expect(revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("returns the last manager's demotion as a refusal the manager can read", async () => {
+    serverRpc.mockResolvedValue({ data: null, error: { code: "P0001", message: "The final manager cannot be demoted" } });
+
+    await expect(updateUserRoleAction("user-1", "admin")).resolves.toEqual({
+      ok: false,
+      error: expect.stringMatching(/only manager/),
+    });
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
@@ -398,7 +419,7 @@ describe("saveAdminEventAction", () => {
 
   it.each(["invalid", "2027-08-01T18:00", ""])("rejects invalid publish timestamps: %s", async (publish_at) => {
     await expect(saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, status: "draft", publish_at } }))
-      .rejects.toThrow("Publish date must be a valid timestamp with a timezone.");
+      .resolves.toEqual({ error: "Publish date must be a valid timestamp with a timezone." });
     expect(adminRpc).not.toHaveBeenCalled();
   });
 
@@ -406,7 +427,7 @@ describe("saveAdminEventAction", () => {
     await expect(saveAdminEventAction({
       ...saveInput,
       event: { ...saveInput.event, status: "active", publish_at: "2099-08-01T18:00:00Z" },
-    })).rejects.toThrow("Only draft events can have a publish date.");
+    })).resolves.toEqual({ error: "Only draft events can have a publish date." });
     expect(adminRpc).not.toHaveBeenCalled();
   });
 
@@ -414,7 +435,7 @@ describe("saveAdminEventAction", () => {
     await expect(saveAdminEventAction({
       ...saveInput,
       event: { ...saveInput.event, status: "draft", publish_at: "2020-01-01T18:00:00Z" },
-    })).rejects.toThrow("Publish date must be in the future.");
+    })).resolves.toEqual({ error: "Publish date must be in the future." });
     expect(adminRpc).not.toHaveBeenCalled();
   });
 
@@ -501,7 +522,7 @@ describe("saveAdminEventAction", () => {
 
     await expect(
       saveAdminEventAction({ ...saveInput, eventId: "event-1" }),
-    ).rejects.toThrow(/cover image was changed somewhere else/);
+    ).resolves.toEqual({ error: expect.stringMatching(/cover image was changed somewhere else/) });
   });
 
   it("returns the session and question ids the save gave, in the order sent", async () => {
@@ -705,44 +726,34 @@ describe("saveAdminEventAction", () => {
 // ---------------------------------------------------------------------------
 
 describe("deleteAdminEventAction", () => {
-  it("deletes the event and then its cover image", async () => {
-    events.fetchEventById.mockResolvedValue({
-      id: "event-1",
-      image_url: "https://store/cover.png",
-    });
-    adminRpc.mockResolvedValue({ error: null });
+  it("deletes the event with its receipt, then the images and files it returns", async () => {
+    adminRpc.mockResolvedValue({ data: { images: ["https://store/cover.png"], files: ["u/a/q/cv.pdf"] }, error: null });
 
-    await deleteAdminEventAction("event-1");
+    await deleteAdminEventAction("event-1", "operation-1");
 
-    expect(adminRpc).toHaveBeenCalledWith("delete_event_atomically", {
-      target_event_id: "event-1",
+    expect(adminRpc).toHaveBeenCalledWith("delete_admin_event_safely", {
+      p_event_id: "event-1",
+      p_operation_id: "operation-1",
     });
     expect(adminServer.adminDeleteEventImageByUrl).toHaveBeenCalledWith(
       "https://store/cover.png",
     );
+    expect(applicationFiles.removeApplicationFiles).toHaveBeenCalledWith(expect.anything(), ["u/a/q/cv.pdf"]);
     expect(revalidatePath).toHaveBeenCalledWith("/admin/events", "layout");
   });
 
-  it("keeps the image when the delete fails", async () => {
+  it("keeps the images when the delete fails", async () => {
     const failure = new Error("foreign key violation");
-    events.fetchEventById.mockResolvedValue({
-      id: "event-1",
-      image_url: "https://store/cover.png",
-    });
-    adminRpc.mockResolvedValue({ error: failure });
+    adminRpc.mockResolvedValue({ data: null, error: failure });
 
-    await expect(deleteAdminEventAction("event-1")).rejects.toBe(failure);
+    await expect(deleteAdminEventAction("event-1", "operation-1")).rejects.toBe(failure);
     expect(adminServer.adminDeleteEventImageByUrl).not.toHaveBeenCalled();
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
   it("returns the database's refusal when members or live purchases protect the event", async () => {
-    events.fetchEventById.mockResolvedValue({ id: "event-1", image_url: "https://store/cover.png" });
-    adminRpc.mockResolvedValue({ error: { message: "refused", hint: "EVENT_DELETE_PROTECTED" } });
+    adminRpc.mockResolvedValue({ data: null, error: { message: "refused", hint: "EVENT_DELETE_PROTECTED" } });
 
-    await expect(deleteAdminEventAction("event-1")).resolves.toEqual({
-      error: expect.stringMatching(/can’t be deleted/),
-    });
     await expect(deleteAdminEventAction("event-1", "operation-1")).resolves.toEqual({
       error: expect.stringMatching(/can’t be deleted/),
     });
@@ -750,20 +761,10 @@ describe("deleteAdminEventAction", () => {
     expect(revalidatePath).not.toHaveBeenCalled();
   });
 
-  it("copes with an event that has no cover image", async () => {
-    events.fetchEventById.mockResolvedValue({ id: "event-1", image_url: null });
-    adminRpc.mockResolvedValue({ error: null });
+  it("copes with an event that had no images or files", async () => {
+    adminRpc.mockResolvedValue({ data: null, error: null });
 
-    await deleteAdminEventAction("event-1");
-
-    expect(adminServer.adminDeleteEventImageByUrl).not.toHaveBeenCalled();
-  });
-
-  it("copes with an event that no longer exists", async () => {
-    events.fetchEventById.mockResolvedValue(null);
-    adminRpc.mockResolvedValue({ error: null });
-
-    await expect(deleteAdminEventAction("event-1")).resolves.toBeUndefined();
+    await expect(deleteAdminEventAction("event-1", "operation-1")).resolves.toBeUndefined();
     expect(adminServer.adminDeleteEventImageByUrl).not.toHaveBeenCalled();
   });
 
@@ -771,31 +772,11 @@ describe("deleteAdminEventAction", () => {
     const redirect = new Error("NEXT_REDIRECT");
     guards.requireAdmin.mockRejectedValue(redirect);
 
-    await expect(deleteAdminEventAction("event-1")).rejects.toBe(redirect);
+    await expect(deleteAdminEventAction("event-1", "operation-1")).rejects.toBe(redirect);
     expect(adminRpc).not.toHaveBeenCalled();
   });
 });
 
-// ---------------------------------------------------------------------------
-// Check-in
-// ---------------------------------------------------------------------------
-
-describe("fetchAdminCheckInSnapshotAction", () => {
-  it("returns the three sources as one snapshot with statuses serialized", async () => {
-    checkIns.fetchCheckInSessions.mockResolvedValue([{ id: "session-1" }]);
-    checkIns.fetchCheckInAttendees.mockResolvedValue([{ id: "ticket-1" }]);
-    checkIns.fetchCheckInStatuses.mockResolvedValue(
-      new Map([["ticket-1_session-1", "2026-10-20T18:00:00.000Z"]]),
-    );
-
-    await expect(fetchAdminCheckInSnapshotAction("event-1")).resolves.toEqual({
-      sessions: [{ id: "session-1" }],
-      attendees: [{ id: "ticket-1" }],
-      // A Map cannot cross the server-action boundary, so it ships as entries.
-      statuses: [["ticket-1_session-1", "2026-10-20T18:00:00.000Z"]],
-    });
-  });
-});
 
 // ---------------------------------------------------------------------------
 // The rest of the file, so a rejection anywhere in it stops short of a write
@@ -989,9 +970,15 @@ describe("updateMembershipTypeAction", () => {
   });
 
   it("requires a tier id", async () => {
-    await expect(updateMembershipTypeAction("", tier as never)).rejects.toThrow(
-      "Membership tier not found.",
-    );
+    await expect(updateMembershipTypeAction("", tier as never)).resolves.toEqual({
+      ok: false,
+      error: "Membership tier not found.",
+    });
+    expect(adminServer.adminUpdateMembershipTypeById).not.toHaveBeenCalled();
+  });
+
+  it("returns a tier the server-side check refuses, writing nothing", async () => {
+    await expect(updateMembershipTypeAction("tier-1", { ...tier, description: "" } as never)).resolves.toMatchObject({ ok: false });
     expect(adminServer.adminUpdateMembershipTypeById).not.toHaveBeenCalled();
   });
 
@@ -1000,7 +987,7 @@ describe("updateMembershipTypeAction", () => {
 
     await expect(
       updateMembershipTypeAction("tier-1", tier as never),
-    ).rejects.toThrow("Membership tier not found.");
+    ).resolves.toEqual({ ok: false, error: "Membership tier not found." });
   });
 
   it("returns the price as a number", async () => {
@@ -1011,9 +998,8 @@ describe("updateMembershipTypeAction", () => {
     await expect(
       updateMembershipTypeAction("tier-1", tier as never),
     ).resolves.toEqual({
-      active: true,
-      description: "Full year access",
-      price: 15,
+      ok: true,
+      tier: { active: true, description: "Full year access", price: 15 },
     });
   });
 });
@@ -1026,7 +1012,7 @@ describe("saveManagerUserDetailsAction", () => {
     expect(guards.requireManager).toHaveBeenCalledOnce();
     expect(saveAdminProfile).toHaveBeenCalledOnce();
     expect(saveAdminProfile).toHaveBeenCalledWith(expect.anything(), "user-1", { first_name: "Jamie", newsletter: false, birth_date: "2000-02-29", interests: ["Design"], order_date_deprecated: "2026-01-01" });
-    expect(saved).toEqual({ id: "user-1", first_name: "Jamie" });
+    expect(saved).toEqual({ ok: true, user: { id: "user-1", first_name: "Jamie" } });
   });
 
   it.each([
@@ -1038,13 +1024,13 @@ describe("saveManagerUserDetailsAction", () => {
     { first_name: "Jamie", interests: [""] },
     { first_name: "Jamie", year: "6" },
   ])("rejects the entire patch before writing if any field is invalid: %j", async (patch) => {
-    await expect(saveManagerUserDetailsAction("user-1", patch)).rejects.toThrow();
+    await expect(saveManagerUserDetailsAction("user-1", patch)).resolves.toMatchObject({ ok: false });
     expect(saveAdminProfile).not.toHaveBeenCalled();
   });
 
   it.each(["ubcStudent", "faculty", null])("rejects school changes for %s accounts before saving any fields", async (user_type) => {
     fetchActiveProfile.mockResolvedValue({ user_type, membership_type_id: "ubc-tier", school_institution: null });
-    await expect(saveManagerUserDetailsAction("user-1", { first_name: "Jamie", school_institution: "Another school" })).rejects.toThrow("School can only be changed for Non-UBC members.");
+    await expect(saveManagerUserDetailsAction("user-1", { first_name: "Jamie", school_institution: "Another school" })).resolves.toEqual({ ok: false, error: "School can only be changed for Non-UBC members." });
     expect(saveAdminProfile).not.toHaveBeenCalled();
   });
 
@@ -1068,7 +1054,7 @@ describe("saveManagerUserDetailsAction", () => {
   it.each([null, "ubc-tier"])("rejects changed schools when the resulting membership is %s", async (membership_type_id) => {
     fetchActiveProfile.mockResolvedValue({ user_type: "nonUbc", membership_type_id: "non-ubc", school_institution: "Old school" });
     fetchMembershipTypeById.mockResolvedValue({ name: "explorer" });
-    await expect(saveManagerUserDetailsAction("user-1", { membership_type_id, school_institution: "SFU" })).rejects.toThrow("School can only be changed for Non-UBC members.");
+    await expect(saveManagerUserDetailsAction("user-1", { membership_type_id, school_institution: "SFU" })).resolves.toEqual({ ok: false, error: "School can only be changed for Non-UBC members." });
     expect(saveAdminProfile).not.toHaveBeenCalled();
   });
 
@@ -1076,6 +1062,28 @@ describe("saveManagerUserDetailsAction", () => {
     fetchActiveProfile.mockResolvedValue({ membership_type_id: "ubc-tier", school_institution: null });
     await saveManagerUserDetailsAction("user-1", { first_name: "Jamie", school_institution: "" });
     expect(fetchMembershipTypeById).not.toHaveBeenCalled();
+    expect(saveAdminProfile).toHaveBeenCalledWith(expect.anything(), "user-1", { first_name: "Jamie" });
+  });
+
+  it("normalizes a corrected email on a profile nobody signs in to yet", async () => {
+    fetchActiveProfile.mockResolvedValue({ auth_user_id: null, email: "typo@exmaple.com" });
+    await saveManagerUserDetailsAction("user-1", { email: "  Member@Example.com " });
+    expect(saveAdminProfile).toHaveBeenCalledWith(expect.anything(), "user-1", { email: "member@example.com" });
+  });
+
+  it.each([
+    [{ auth_user_id: "auth-1", email: "member@example.com" }, "someone@example.com", "signs in with this email"],
+    [{ auth_user_id: null, email: "member@example.com" }, "not an email", "valid email"],
+    [{ auth_user_id: null, email: "member@example.com" }, 42, "valid email"],
+  ])("refuses an email change on %j to %j", async (profile, email, message) => {
+    fetchActiveProfile.mockResolvedValue(profile);
+    await expect(saveManagerUserDetailsAction("user-1", { first_name: "Jamie", email })).resolves.toEqual({ ok: false, error: expect.stringMatching(message) });
+    expect(saveAdminProfile).not.toHaveBeenCalled();
+  });
+
+  it("ignores an unchanged sign-in email", async () => {
+    fetchActiveProfile.mockResolvedValue({ auth_user_id: "auth-1", email: "member@example.com" });
+    await saveManagerUserDetailsAction("user-1", { first_name: "Jamie", email: "Member@example.com" });
     expect(saveAdminProfile).toHaveBeenCalledWith(expect.anything(), "user-1", { first_name: "Jamie" });
   });
 
@@ -1088,9 +1096,9 @@ describe("saveManagerUserDetailsAction", () => {
 
 
 describe("overview write validation", () => {
-  it.each([{ short_description: "x".repeat(51) }, { description: "x".repeat(3001) }])("enforces the same limits on the server", fields => expect(saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, ...fields } })).rejects.toThrow(/character limit/));
+  it.each([{ short_description: "x".repeat(121) }, { description: "x".repeat(3001) }])("enforces the same limits on the server", fields => expect(saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, ...fields } })).resolves.toEqual({ error: expect.stringMatching(/character limit/) }));
   it("rejects unsafe rich links before persistence", async () => {
-    await expect(saveAdminEventAction({ ...saveInput, event: { description: "Link", description_rich: [{ type: "paragraph", spans: [{ text: "Link", href: "javascript:alert(1)" }] }] } })).rejects.toThrow(/formatting/);
+    await expect(saveAdminEventAction({ ...saveInput, event: { description: "Link", description_rich: [{ type: "paragraph", spans: [{ text: "Link", href: "javascript:alert(1)" }] }] } })).resolves.toEqual({ error: expect.stringMatching(/formatting/) });
     expect(adminRpc).not.toHaveBeenCalled();
   });
 });
@@ -1104,7 +1112,7 @@ describe("event configuration server validation", () => {
     { configured_pricing_mode: "paid", configured_price: -1 },
     { configured_pricing_mode: "paid", configured_price: 1.001 },
   ])("rejects invalid configuration before the mutation: %j", async fields => {
-    await expect(saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, ...fields } })).rejects.toThrow();
+    await expect(saveAdminEventAction({ ...saveInput, event: { ...saveInput.event, ...fields } })).resolves.toEqual({ error: expect.any(String) });
     expect(adminRpc).not.toHaveBeenCalled();
   });
   it("normalizes international external hostnames without changing the effective destination", async () => {

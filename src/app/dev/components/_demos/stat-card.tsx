@@ -23,18 +23,24 @@ function StatCardDemo() {
             change={{ delta: 24, period: "since last term" }}
           />
         </Specimen>
+        <Specimen label="Value with detail" className="w-56">
+          <StatCard label="Team deadline" kind="value" value="Jan 10" detail="Passed · teams are locked" />
+        </Specimen>
         <Specimen label="Rate" className="w-56">
           <StatCard
             className="h-full w-full"
-            label="Active members"
+            label="Registered"
             kind="rate"
             count={412}
             total={528}
-            noun="registrants"
+            noun="seats"
           />
         </Specimen>
-        <Specimen label="Rate with count detail" className="w-56">
-          <StatCard label="Seats held" kind="rate" count={3} total={40} noun="seats" detail="2 tickets, 1 offer" />
+        <Specimen label="Rate with detail" className="w-56">
+          <StatCard label="Seats held" kind="rate" count={3} total={40} noun="seats" detail="2 going, 1 offer out" />
+        </Specimen>
+        <Specimen label="Rate, no capacity" className="w-56">
+          <StatCard label="Registered" kind="rate" count={0} total={0} noun="seats" />
         </Specimen>
         <Specimen label="Not enough data" className="w-56">
           <StatCard

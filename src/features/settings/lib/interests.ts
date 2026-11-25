@@ -7,9 +7,9 @@ const TAXONOMY = new Set<string>(INTEREST_OPTIONS.map((option) => option.id));
 
 /**
  * The interests to store when a member edits theirs in Settings: their
- * chosen taxonomy ids, plus every free tag a manager added (which members
- * can't see as chips, so mustn't lose by saving). A tag that matches a chosen
- * id ignoring case is dropped, since the column is unique ignoring case.
+ * chosen taxonomy ids, plus every free tag an exec added. The member sees
+ * those tags but can't edit them, so saving keeps them. A tag that matches a
+ * chosen id ignoring case is dropped, since the column is unique ignoring case.
  */
 export function mergeMemberInterests(existing: readonly string[], chosen: readonly InterestId[]): string[] {
   const picked = [...new Set(chosen)];

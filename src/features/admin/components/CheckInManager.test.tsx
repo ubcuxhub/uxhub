@@ -11,10 +11,11 @@ vi.mock("@/features/admin/check-in-actions", () => actions);
 vi.mock("./CheckInTicketMenu", () => ({
   CheckInTicketMenu: ({ onVoided }: { onVoided: (id: string) => void }) => <button onClick={() => onVoided("ticket")}>Void attendee ticket</button>,
 }));
+const realtime = vi.hoisted(() => ({ subscriptions: [] as { table: string; filter?: string }[] }));
 vi.mock("@/lib/supabase/client", () => ({
   createClient: () => ({
     channel: () => {
-      const ch = { on: () => ch, subscribe: () => ch };
+      const ch = { on: (_kind: string, options: { table: string; filter?: string }) => { realtime.subscriptions.push(options); return ch; }, subscribe: () => ch };
 
       return ch;
     }, removeChannel: vi.fn()
@@ -38,12 +39,23 @@ afterEach(cleanup);
 function mount(initial = snapshot, item: string | null = "a") {
   return render(<CheckInManager eventId="event" event={event} initialItemId={item} initialSnapshot={initial} phoneLinks={{ a: <svg aria-label="Phone scanner QR" /> }} />);
 }
+it("listens only to check-ins at the selected item's session and to this event's tickets", async () => {
+  realtime.subscriptions.length = 0;
+  mount({ ...snapshot, sessionId: "session-a" });
+
+  await act(async () => { });
+
+  expect(realtime.subscriptions).toContainEqual(expect.objectContaining({ table: "check_ins", filter: "check_in_session_id=eq.session-a" }));
+  expect(realtime.subscriptions).toContainEqual(expect.objectContaining({ table: "event_tickets", filter: "event_id=eq.event" }));
+  expect(realtime.subscriptions.every(subscription => subscription.filter)).toBe(true);
+});
 it("retains selected target in scanner and phone QR paths", async () => {
   mount();
 
   await act(async () => { });
 
   expect(screen.getByRole("link", { name: "Scan tickets" }).getAttribute("href")).toBe("/admin/events/event/check-in/scan?item=a");
+  expect(screen.getByRole("region", { name: "Scan tickets" }).textContent).toContain("Opening · ");
 
   fireEvent.click(screen.getByRole("button", { name: "Open scanner on phone" }));
 
@@ -163,10 +175,10 @@ it("retains agenda origin in Back and scanner links after a refresh", async () =
   await act(async () => {});
   expect(screen.getByRole("link", { name: "Back to Agenda" }).getAttribute("href")).toBe(returnTo);
 });
-it("uses Manage Events for direct links and unsafe destinations", async () => {
+it("leaves the way back to the manager header for direct links and unsafe destinations", async () => {
   render(<CheckInManager eventId="event" event={event} initialItemId="a" initialSnapshot={snapshot} phoneLinks={{}} returnTo="//evil.test" />);
   await act(async () => {});
-  expect(screen.getByRole("link", { name: "Back to Manage Events" }).getAttribute("href")).toBe("/admin/events");
+  expect(screen.queryByRole("link", { name: /^Back to/ })).toBeNull();
 });
 
 it("refreshes the item attendee list and counts after a ticket is voided", async () => {

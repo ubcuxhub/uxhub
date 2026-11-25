@@ -15,9 +15,10 @@ const fixtures = vi.hoisted(() => ({
   user: { id: "user-1", first_name: "Ada", last_name: "Lovelace", email: "ada@example.test", membership_type_id: "tier", membership_expires_at: "2099-01-01T00:00:00Z" },
   event: { id: "event-1", slug: "sprint", name: "Design Sprint", status: "active", starts_at: "2099-01-01T18:00:00Z", ends_at: "2099-01-01T20:00:00Z", agenda_enabled: false, mentors_enabled: false, sponsors_enabled: false, description: "An event.", pricing_policy: "figma", regular_price: 20, member_price: 0 },
   ticket: { id: "ticket-1", event_id: "event-1", user_id: "user-1", qr_token: "ticket-qr-token" },
+  flags: { studentEvents: true },
 }));
 vi.mock("@/lib/log", () => ({ log: { error: vi.fn() }, errorFields: vi.fn() }));
-vi.mock("@/lib/flags", () => ({ FLAGS: { studentEvents: true } }));
+vi.mock("@/lib/flags", () => ({ FLAGS: fixtures.flags }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 vi.mock("@/lib/auth/guards", () => ({ requireAuth: async () => fixtures.user }));
 vi.mock("@/lib/supabase/server", () => ({ createClient: async () => ({}) }));
@@ -75,6 +76,7 @@ beforeEach(() => {
   fixtures.event.pricing_policy = "figma";
   fixtures.event.status = "active";
   fixtures.event.regular_price = 20;
+  fixtures.flags.studentEvents = true;
 });
 
 it("shows a scannable ticket on the event page after registration, alongside Going", async () => {
@@ -185,51 +187,67 @@ it.each([
   ).toBe(shown);
 });
 
-// Staff test registration on a draft is free events only (docs/event-states.md).
-it.each([
-  ["free", 0, true],
-  ["paid", 20, false],
-] as const)("offers staff test registration on a %s draft: %s", async (_label, price, offered) => {
+// A draft shows admins and managers the panel a member sees on the published
+// event; only what the database refuses is disabled (docs/event-states.md,
+// "Drafts for admins").
+it("offers Apply on a draft that takes applications", async () => {
   fixtures.event.status = "draft";
-  fixtures.event.regular_price = price;
-  fixtures.state = { kind: "reg-open", closesAt: null };
+  fixtures.state = { kind: "app-open", closesAt: null };
   await renderPage();
-  expect(Boolean(screen.queryByText("Test registration (staff only)"))).toBe(offered);
-  expect(Boolean(screen.queryByText(/This creates a real registration/))).toBe(offered);
-  const disabled = screen.queryByRole("button", { name: "Paid drafts can’t be test-registered" });
-  expect(Boolean(disabled)).toBe(!offered);
-  if (disabled) expect((disabled as HTMLButtonElement).disabled).toBe(true);
-  expect(screen.queryByText("Registration")).toBeNull();
+  expect(screen.getByText("Applications are open")).toBeTruthy();
+  expect(screen.getByRole("link", { name: "Apply" }).getAttribute("href")).toBe("/portal/events/sprint/apply");
+  expect(screen.queryByText(/Test registration|UX Hub execs only|This creates a real registration/)).toBeNull();
 });
 
-it("offers no test registration on a published event", async () => {
+it("offers Register on a free draft", async () => {
+  fixtures.event.status = "draft";
+  fixtures.event.regular_price = 0;
   fixtures.state = { kind: "reg-open", closesAt: null };
   await renderPage();
-  expect(screen.queryByText("Test registration (staff only)")).toBeNull();
+  expect(screen.getByText("Registration is open")).toBeTruthy();
+  // FlowLink is a span here; the real one links to the checkout.
+  expect(screen.getByText("Register").closest("button")).toBeNull();
+  expect(screen.queryByText(/Paid events take registrations/)).toBeNull();
+  expect(screen.queryByText(/Test registration|UX Hub execs only/)).toBeNull();
 });
 
-it("passes only links attached to an agenda item to the agenda, keyed by item", async () => {
+it("disables Register on a paid draft, saying why", async () => {
+  fixtures.event.status = "draft";
   fixtures.state = { kind: "reg-open", closesAt: null };
-  fixtures.agenda = [{ id: "day-1", date: "2099-01-01", title: "Kickoff", location_overridden: false, location: null, items: [
-    { id: "item-1", title: "Final presentations", starts_at: null, ends_at: null, description: null, check_in: false, location_overridden: false, location: null },
-  ] }];
-  fixtures.fetchLinks.mockResolvedValue([
-    { id: "slides", type: "other", label: "Slides", url: "https://example.test/slides", agenda_item_id: "item-1" },
-    { id: "slack", type: "slack_workspace", label: null, url: "https://example.test/slack", agenda_item_id: null },
-  ]);
   await renderPage();
-  expect(fixtures.fetchLinks).toHaveBeenCalledWith(expect.anything(), "event-1");
-  expect(fixtures.agendaProps).toHaveBeenCalledWith(expect.objectContaining({
-    itemLinks: { "item-1": "https://example.test/slides" },
-    today: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
-  }));
+  const register = screen.getByRole("button", { name: "Register" }) as HTMLButtonElement;
+  expect(register.disabled).toBe(true);
+  expect(screen.getByText("Paid events take registrations once they’re published.")).toBeTruthy();
 });
 
-it("doesn't fetch links for agenda items when the event has no agenda", async () => {
+it("still offers Apply on a paid draft, and disables Confirm once accepted", async () => {
+  fixtures.event.status = "draft";
+  fixtures.state = { kind: "app-open", closesAt: null };
+  await renderPage();
+  expect(screen.getByRole("link", { name: "Apply" })).toBeTruthy();
+  cleanup();
+
+  fixtures.state = { kind: "app-accepted", offerExpiresAt: null };
+  await renderPage();
+  expect((screen.getByRole("button", { name: "Confirm" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.getByText("Paid events take registrations once they’re published.")).toBeTruthy();
+});
+
+it("disables a draft's Apply while student events are off, since the form is behind the flag", async () => {
+  fixtures.flags.studentEvents = false;
+  fixtures.event.status = "draft";
+  fixtures.state = { kind: "app-open", closesAt: null };
+  await renderPage();
+  expect((screen.getByRole("button", { name: "Apply" }) as HTMLButtonElement).disabled).toBe(true);
+  expect(screen.getByText("Applications open once student events launch.")).toBeTruthy();
+});
+
+it("leaves a published event's Register enabled", async () => {
   fixtures.state = { kind: "reg-open", closesAt: null };
   await renderPage();
-  expect(fixtures.fetchLinks).not.toHaveBeenCalled();
-  expect(fixtures.agendaProps).toHaveBeenCalledWith(expect.objectContaining({ itemLinks: {} }));
+  expect(screen.queryByRole("button", { name: "Register" })).toBeNull();
+  expect(screen.getByText("Register")).toBeTruthy();
+  expect(screen.queryByText(/Paid events take registrations/)).toBeNull();
 });
 
 const loadPage = () => PortalEventPage({ params: Promise.resolve({ event: "sprint" }), searchParams: Promise.resolve({}) });
@@ -262,4 +280,48 @@ it("lets a failed event query reach error.tsx instead of showing it as removed",
   const failure = new Error("fetch failed");
   fixtures.fetchEvent.mockRejectedValue(failure);
   await expect(loadPage()).rejects.toBe(failure);
+});
+
+it("passes only links attached to an agenda item to the agenda, keyed by item", async () => {
+  fixtures.state = { kind: "reg-open", closesAt: null };
+  fixtures.agenda = [{ id: "day-1", date: "2099-01-01", title: "Kickoff", location_overridden: false, location: null, items: [
+    { id: "item-1", title: "Final presentations", starts_at: null, ends_at: null, description: null, check_in: false, location_overridden: false, location: null },
+  ] }];
+  fixtures.fetchLinks.mockResolvedValue([
+    { id: "slides", type: "other", label: "Slides", url: "https://example.test/slides", agenda_item_id: "item-1" },
+    { id: "slack", type: "slack_workspace", label: null, url: "https://example.test/slack", agenda_item_id: null },
+  ]);
+  await renderPage();
+  expect(fixtures.fetchLinks).toHaveBeenCalledWith(expect.anything(), "event-1");
+  expect(fixtures.agendaProps).toHaveBeenCalledWith(expect.objectContaining({
+    itemLinks: { "item-1": "https://example.test/slides" },
+    today: expect.stringMatching(/^\d{4}-\d{2}-\d{2}$/),
+  }));
+});
+
+it("doesn't fetch links for agenda items when the event has no agenda", async () => {
+  fixtures.state = { kind: "reg-open", closesAt: null };
+  await renderPage();
+  expect(fixtures.fetchLinks).not.toHaveBeenCalled();
+  expect(fixtures.agendaProps).toHaveBeenCalledWith(expect.objectContaining({ itemLinks: {} }));
+});
+
+it("dates an overnight event on its start day alone, as the timeline does", async () => {
+  const event = fixtures.event;
+  fixtures.fetchEvent.mockResolvedValue({ ...event, starts_at: "2099-12-05T03:00:00Z", ends_at: "2099-12-05T09:00:00Z" });
+  await renderPage();
+  // The header's date row: "Fri, Dec 4, 2099", with no range to the 5th.
+  expect(screen.getByText(/^\w{3}, Dec 4, 2099$/)).toBeTruthy();
+  expect(screen.queryByText(/Dec 5, 2099/)).toBeNull();
+});
+
+it("reads the links and the ticket once for a going student with an agenda", async () => {
+  fixtures.agenda = [{ id: "day-1", date: "2099-01-01", title: "Kickoff", location_overridden: false, location: null, items: [
+    { id: "item-1", title: "Talk", starts_at: null, ends_at: null, description: null, check_in: false, location_overridden: false, location: null },
+  ] }];
+  fixtures.fetchLinks.mockResolvedValue([slackLink]);
+  await renderPage();
+  expect(fixtures.fetchLinks).toHaveBeenCalledTimes(1);
+  expect(fixtures.fetchTicket).toHaveBeenCalledTimes(1);
+  expect(screen.getByRole("link", { name: /^Open Slack/ })).toBeTruthy();
 });

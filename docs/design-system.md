@@ -736,23 +736,25 @@ scrolls there and closes. Enter/Space opens, arrows move, Esc returns focus.
 - Top bar at 40px (12px on phones) with 20px icons (§2.7): double-chevron
   close first (tooltip names action and shortcut); the record's actions on the
   right (Edit user, Edit event).
-- Users open only in the drawer: no full page, no expand. An event's "Edit
-  event", and the expand button beside close ("Open as full page"), open its
-  builder, a full page that keeps the portal's page width and margins and
-  wears the same top bar in place of a back pill: close returns to the list
-  (tooltip names it), collapse ("Collapse to drawer") to the list with the
-  event's drawer open. The builder's unsaved-changes guard asks before either.
-  Below `sm` the drawer fills the screen and the page shows close only, and on
-  phones the builder hides the app header, as the drawer covers it.
-- Expand (and "Edit event") and collapse are one panel resizing: the drawer
-  grows leftward into the builder's page, or the page shrinks back into the
-  drawer, the two cross-fading inside it, while the list fades out or in
-  behind (200ms ease-out, §2.8). It is a React `<ViewTransition>` pair
-  (`RecordFrame` ↔ `RecordPage`, list in `RecordList`), switched on only by
-  those links' transition types: opening from a row still slides in, close
-  slides out, swapping records doesn't animate, and close from the builder
-  is instant. No morph on phones, with reduced motion, or without View
-  Transitions support; the page swaps instantly there.
+- Users open only in the drawer: no full page, no expand. An event's expand
+  button beside close ("Open as full page") opens its manager (the Overview
+  tab), a full page that wears the same top bar on every tab in place of a
+  back pill: close returns to the list (tooltip names it), collapse ("Collapse
+  to drawer") to the list with the event's drawer open. Below `sm` the drawer
+  fills the screen and the page shows close only, and on phones the manager
+  hides the app header, as the drawer covers it. "Edit event" opens the
+  builder, a plain page whose header starts with a "Back to event" pill to the
+  manager's Overview; its unsaved-changes guard asks before that link, as
+  before any other.
+- Expand and collapse are one panel resizing: the drawer grows leftward into
+  the manager's page, or the page shrinks back into the drawer, the two
+  cross-fading inside it, while the list fades out or in behind (200ms
+  ease-out, §2.8). It is a React `<ViewTransition>` pair (`RecordFrame` ↔
+  `RecordPage`, list in `RecordList`), switched on only by those links'
+  transition types: opening from a row still slides in, close slides out,
+  swapping records doesn't animate, and close from the manager is instant.
+  No morph on phones, with reduced motion, or without View Transitions
+  support; the page swaps instantly there.
 - Viewing: label/value text rows, not disabled inputs. Editing: fields with a
   pinned Cancel / Save changes footer; closing with unsaved changes asks first.
 - Profile header: name in 24/32 with verified icon and pronouns. Interests are
@@ -1058,7 +1060,9 @@ retains edits; callers expand and focus errors before navigation. Disable lone-i
 See `/dev/components/sortable-section` for interactive collapse/reorder examples.
 
 Entry photos/logos reuse ImageUpload with `requirements={{ square: false }}`:
-JPG/PNG up to 4 MB without cover/header minimum dimensions. The authorized
+JPG/PNG up to 20 MB, with no crop and no minimum dimensions; the picker shrinks
+anything over the 4 MB upload limit in the browser. Icons crop to a square and
+headers to 4:1 (`requirements.aspect`) in a crop dialog first. The authorized
 entry upload validates file bytes server-side; it does not enable SVG uploads.
 
 

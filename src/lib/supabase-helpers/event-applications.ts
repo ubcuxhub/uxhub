@@ -1,13 +1,18 @@
-import { listApplicationFiles, removeApplicationFiles } from "./application-files";
+import { hasActiveMembership } from "@/features/memberships/lib/expiry";
+
+import { fetchAllPages } from "./all-pages";
+import { fetchMembershipTermEndsAt } from "./app-settings";
 import type { DbClient } from "./types";
 import { TABLES } from "./tables";
 import type {
-  EventApplicationQuestionInsert,
   EventApplicationQuestionRow,
   EventApplicationResponseInsert,
   EventApplicationRow,
+  StudentStatus,
   SubmittedApplicationRow,
   SubmittedApplicationStatus,
+  UniversityYear,
+  UserInfoRow,
 } from "@/lib/supabase/models";
 import { formatUserName } from "@/lib/user-name";
 
@@ -42,29 +47,6 @@ export async function fetchApplicationQuestions(
   return data ?? [];
 }
 
-export async function insertApplicationQuestions(
-  supabase: DbClient,
-  questions: EventApplicationQuestionInsert[]
-): Promise<void> {
-  const { error } = await supabase
-    .from(TABLES.eventApplicationQuestions)
-    .insert(questions);
-
-  if (error) throw error;
-}
-
-export async function deleteApplicationQuestionsForEvent(
-  supabase: DbClient,
-  eventId: string
-): Promise<void> {
-  const { error } = await supabase
-    .from(TABLES.eventApplicationQuestions)
-    .delete()
-    .eq("event_id", eventId);
-
-  if (error) throw error;
-}
-
 /** Narrows an application to one its applicant has submitted. */
 export function isSubmittedApplication(
   application: EventApplicationRow
@@ -80,6 +62,13 @@ export interface ApplicationSummary {
   email: string;
   /** Their major, else faculty, for a second line under the name. */
   program: string | null;
+  year: UniversityYear | null;
+  studentStatus: StudentStatus | null;
+  /**
+   * Their membership tier's stored name (`explorer`, `nonUbc`) while it is
+   * active, else null: a lapsed member reads as a non-member.
+   */
+  membership: string | null;
   /** When it was submitted. */
   appliedAt: string;
   status: SubmittedApplicationStatus;
@@ -172,55 +161,71 @@ export async function fetchEventApplicationSummaries(
   supabase: DbClient,
   eventId: string
 ): Promise<ApplicationSummary[]> {
-  const [applicationsResult, ticketsResult] = await Promise.all([
-    supabase
-      .from(TABLES.eventApplications)
-      .select("*")
-      .eq("event_id", eventId)
-      .neq("status", "draft")
-      .order("submitted_at", { ascending: false, nullsFirst: false })
-      .order("created_at", { ascending: false }),
-    supabase
-      .from(TABLES.eventTickets)
-      .select("user_id")
-      .eq("event_id", eventId),
+  // The applicant is embedded through the foreign key rather than read by a
+  // second `.in("id", ...)` query, whose id list would travel in the URL and
+  // outgrow the gateway's limit at a few hundred applicants. Both lists are
+  // paged past PostgREST's row cap.
+  const [rows, tickets, termEndsAt] = await Promise.all([
+    fetchAllPages((from, to) =>
+      supabase
+        .from(TABLES.eventApplications)
+        .select(
+          "*, applicant:user_info!user_id(first_name, last_name, email, major, faculty, year, student_status, membership_type_id, membership_expires_at, membership_types!membership_type_id(name))"
+        )
+        .eq("event_id", eventId)
+        .neq("status", "draft")
+        .order("submitted_at", { ascending: false, nullsFirst: false })
+        .order("created_at", { ascending: false })
+        .order("id")
+        .range(from, to)
+    ),
+    fetchAllPages((from, to) =>
+      supabase
+        .from(TABLES.eventTickets)
+        .select("user_id")
+        .eq("event_id", eventId)
+        .order("id")
+        .range(from, to)
+    ),
+    fetchMembershipTermEndsAt(supabase),
   ]);
 
-  if (applicationsResult.error) throw applicationsResult.error;
-  if (ticketsResult.error) throw ticketsResult.error;
+  const ticketHolders = new Set(tickets.map((ticket) => ticket.user_id));
 
-  const applications = (applicationsResult.data ?? []).filter(
-    isSubmittedApplication
-  );
-  if (applications.length === 0) return [];
-
-  const ticketHolders = new Set(
-    (ticketsResult.data ?? []).map((ticket) => ticket.user_id)
-  );
-  const { data: users, error: usersError } = await supabase
-    .from(TABLES.userInfo)
-    .select("id, first_name, last_name, email, major, faculty")
-    .in(
-      "id",
-      applications.map((application) => application.user_id)
-    );
-  if (usersError) throw usersError;
-  const userById = new Map((users ?? []).map((user) => [user.id, user]));
-
-  return applications.map((application) => {
-    const user = userById.get(application.user_id);
-    return {
+  return rows.flatMap(({ applicant: user, ...application }) => {
+    if (!isSubmittedApplication(application)) return [];
+    return [{
       applicationId: application.id,
       userId: application.user_id,
       name: user ? formatUserName(user) : "Unknown User",
       email: user?.email ?? "",
       program: user?.major || user?.faculty || null,
+      year: user?.year ?? null,
+      studentStatus: user?.student_status ?? null,
+      membership: user ? activeMembershipName(user, termEndsAt) : null,
       appliedAt: application.submitted_at ?? application.created_at,
       status: application.status,
       offerExpiresAt: application.offer_expires_at,
       hasTicket: ticketHolders.has(application.user_id),
-    };
+    }];
   });
+}
+
+/**
+ * The tier name of a membership that is still active (its own expiry and the
+ * club-wide term end both ahead), else null.
+ */
+export function activeMembershipName(
+  user: Pick<UserInfoRow, "membership_type_id" | "membership_expires_at"> & {
+    membership_types?: { name: string } | { name: string }[] | null;
+  },
+  termEndsAt: string | null
+): string | null {
+  if (!hasActiveMembership(user, termEndsAt)) return null;
+  const tier = Array.isArray(user.membership_types)
+    ? user.membership_types[0]
+    : user.membership_types;
+  return tier?.name ?? null;
 }
 
 /**
@@ -248,29 +253,6 @@ export async function createDraftApplication(
   }
   if (error) throw error;
   return { ...data, decisions_release_at: null };
-}
-
-/**
- * Deletes the caller's draft and the files uploaded for it. Files go first,
- * while Storage still sees a draft; responses cascade with the row. Returns
- * false when there was no draft to delete (already submitted, or gone).
- */
-export async function deleteDraftApplication(
-  supabase: DbClient,
-  input: { applicationId: string; userInfoId: string }
-): Promise<boolean> {
-  const files = await listApplicationFiles(supabase, input);
-  await removeApplicationFiles(supabase, files);
-
-  const { data, error } = await supabase
-    .from(TABLES.eventApplications)
-    .delete()
-    .eq("id", input.applicationId)
-    .eq("status", "draft")
-    .select("id");
-
-  if (error) throw error;
-  return (data ?? []).length > 0;
 }
 
 /** Why `submitEventApplication` did not submit, or `SUBMITTED`. */
@@ -487,4 +469,18 @@ export async function fetchEventApplicationStatusCounts(
     counts.total += count;
   }
   return counts;
+}
+
+/**
+ * How many of the event's applications have a decision (accepted, waitlisted
+ * or rejected), whether or not applicants can see it yet. Staff only.
+ */
+export async function countDecidedApplications(client: DbClient, eventId: string): Promise<number> {
+  const { count, error } = await client
+    .from(TABLES.eventApplications)
+    .select("id", { count: "exact", head: true })
+    .eq("event_id", eventId)
+    .in("status", ["accepted", "waitlisted", "rejected"]);
+  if (error) throw error;
+  return count ?? 0;
 }

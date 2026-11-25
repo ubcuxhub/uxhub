@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../actions", () => ({
   finishSetupAction: vi.fn(),
+  saveBirthDateAction: vi.fn(),
   saveSetupAboutAction: vi.fn(),
   saveSetupDietaryAction: vi.fn(),
   saveSetupPhotoAction: vi.fn(),
@@ -23,7 +24,10 @@ globalThis.ResizeObserver ??= class {
   disconnect() {}
 };
 
+import { FUTURE_BIRTH_DATE, INVALID_BIRTH_DATE } from "@/lib/birth-date";
+
 import { USER_TYPE_LOCKED_MESSAGE, type SetupState } from "../lib/state";
+import { BIRTHDAY_HINT } from "./BirthdayField";
 import { NO_ABOUT_ANSWER, NO_DIETARY_ANSWER, NO_PHOTO_CHOICE, SetupFlow } from "./SetupFlow";
 import type { SetupClient } from "./setup-client";
 
@@ -37,6 +41,7 @@ const BLANK: SetupState = {
   avatarPreset: null,
   profilePhotoPath: null,
   interests: [],
+  birthDate: null,
 };
 
 function fakeClient(): SetupClient & { [K in keyof SetupClient]: ReturnType<typeof vi.fn> } {
@@ -46,6 +51,7 @@ function fakeClient(): SetupClient & { [K in keyof SetupClient]: ReturnType<type
       ok: true,
       setup: await echo({ userType, userTypeConfirmed: true, step: "dietary" }),
     })),
+    saveBirthDate: vi.fn((birthDate) => echo({ birthDate })),
     saveDietary: vi.fn((needs) => echo({ ...needs, step: "photo" })),
     savePhoto: vi.fn(({ avatarPreset }) => echo({ avatarPreset, step: "interests" })),
     finish: vi.fn(({ interests }) => echo({ interests, step: "done" })),
@@ -145,6 +151,102 @@ describe("SetupFlow", () => {
     it("has no Back, since there's nothing before it", () => {
       renderFlow({ step: "about" });
       expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
+    });
+
+    describe("birthday", () => {
+      const birthday = () => screen.getByLabelText(/^Birthday/) as HTMLInputElement;
+      const setBirthday = (value: string) => fireEvent.change(birthday(), { target: { value } });
+      const submit = () => fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+
+      it("is optional: continuing without one saves only the answer", async () => {
+        renderFlow({ step: "about" });
+        expect(birthday().type).toBe("date");
+        expect(birthday().value).toBe("");
+        expect(screen.getByText(BIRTHDAY_HINT)).toBeTruthy();
+        fireEvent.click(radio(/not from UBC/));
+        submit();
+        await waitFor(() => expect(heading().textContent).toBe("Any dietary needs?"));
+        expect(client.saveBirthDate).not.toHaveBeenCalled();
+      });
+
+      it("saves a new birthday with the answer", async () => {
+        renderFlow({ step: "about" });
+        fireEvent.click(radio(/not from UBC/));
+        setBirthday("2004-03-14");
+        submit();
+        await waitFor(() => expect(heading().textContent).toBe("Any dietary needs?"));
+        expect(client.saveBirthDate).toHaveBeenCalledWith("2004-03-14");
+        expect(client.saveAbout).toHaveBeenCalledWith({ userType: "nonUbc" });
+      });
+
+      it("shows a stored birthday, leaves it alone unchanged, and clears it when emptied", async () => {
+        // The real action returns every setup column, the birthday included.
+        client.saveAbout.mockImplementation(async ({ userType }) => ({
+          ok: true,
+          setup: { ...BLANK, userType, userTypeConfirmed: true, step: "done", birthDate: "1988-09-25" },
+        }));
+        renderFlow({ step: "done", userType: "faculty", userTypeConfirmed: true, birthDate: "1988-09-25" });
+        expect(birthday().value).toBe("1988-09-25");
+        submit();
+        await waitFor(() => expect(heading().textContent).toBe("Any dietary needs?"));
+        expect(client.saveBirthDate).not.toHaveBeenCalled();
+
+        fireEvent.click(screen.getAllByRole("button", { name: "Back" })[0]);
+        setBirthday("");
+        submit();
+        await waitFor(() => expect(client.saveBirthDate).toHaveBeenCalledWith(null));
+      });
+
+      it("refuses a future date with the shared message, saving nothing", async () => {
+        renderFlow({ step: "about" });
+        fireEvent.click(radio(/not from UBC/));
+        setBirthday("2999-01-01");
+        expect(screen.queryByText(FUTURE_BIRTH_DATE)).toBeNull();
+        fireEvent.blur(birthday());
+        expect(screen.getByText(FUTURE_BIRTH_DATE)).toBeTruthy();
+        expect(birthday().getAttribute("aria-invalid")).toBe("true");
+
+        submit();
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        expect(client.saveBirthDate).not.toHaveBeenCalled();
+        expect(client.saveAbout).not.toHaveBeenCalled();
+        expect(heading().textContent).toBe("What best describes you?");
+
+        setBirthday("2004-03-14");
+        expect(screen.queryByText(FUTURE_BIRTH_DATE)).toBeNull();
+      });
+
+      it("treats a half-typed date as invalid, not as cleared", async () => {
+        renderFlow({ step: "about", birthDate: "2004-03-14" });
+        fireEvent.click(radio(/not from UBC/));
+        // What a browser reports while a segment of the date is blank.
+        Object.defineProperty(birthday(), "validity", { value: { badInput: true }, configurable: true });
+        setBirthday("");
+        submit();
+        expect(await screen.findByText(INVALID_BIRTH_DATE)).toBeTruthy();
+        expect(client.saveBirthDate).not.toHaveBeenCalled();
+        expect(client.saveAbout).not.toHaveBeenCalled();
+      });
+
+      it("isn't saved by Skip for now", async () => {
+        renderFlow({ step: "about" });
+        setBirthday("2004-03-14");
+        fireEvent.click(screen.getByRole("button", { name: "Skip for now" }));
+        await waitFor(() => expect(heading().textContent).toBe("Any dietary needs?"));
+        expect(client.saveBirthDate).not.toHaveBeenCalled();
+      });
+
+      it("keeps a saved birthday when the type is refused, without saving it twice", async () => {
+        client.saveAbout.mockResolvedValue({ ok: false, error: USER_TYPE_LOCKED_MESSAGE });
+        renderFlow({ step: "about" });
+        fireEvent.click(radio(/faculty member/));
+        setBirthday("2004-03-14");
+        submit();
+        expect((await screen.findByRole("alert")).textContent).toBe(USER_TYPE_LOCKED_MESSAGE);
+        submit();
+        await waitFor(() => expect(client.saveAbout).toHaveBeenCalledTimes(2));
+        expect(client.saveBirthDate).toHaveBeenCalledTimes(1);
+      });
     });
   });
 
@@ -293,9 +395,14 @@ describe("SetupFlow", () => {
       expect(screen.getByRole("link", { name: "Go to your portal" }).getAttribute("href")).toBe("/portal");
     });
 
-    it("leaves out managers' free tags it can't show as chips", () => {
+    it("shows execs' free tags read-only beside the chips, and sends only the chips", async () => {
       renderFlow({ step: "interests", interests: ["Figma whiz", "uxathon"] });
-      expect(screen.getByText("1 selected")).toBeTruthy();
+      expect(screen.getByText("2 selected")).toBeTruthy();
+      expect(screen.getByText("Added by UX Hub execs")).toBeTruthy();
+      expect(screen.getByText("Figma whiz")).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Figma whiz" })).toBeNull();
+      fireEvent.click(screen.getByRole("button", { name: "Finish setup" }));
+      await waitFor(() => expect(client.finish).toHaveBeenCalledWith({ interests: ["uxathon"] }));
     });
 
     it("shows a busy, width-keeping button while saving", async () => {

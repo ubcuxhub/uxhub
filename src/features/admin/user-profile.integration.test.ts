@@ -8,15 +8,14 @@ import { clientAs, createIntegrationClient, withFixtures, type Fixtures } from "
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
-const guard = vi.hoisted(() => ({ requireManager: vi.fn() }));
-vi.mock("@/lib/auth/guards", () => guard);
+const guard = vi.hoisted(() => ({ requireManager: vi.fn(), loadCurrentUser: vi.fn() }));
+vi.mock("@/lib/auth/guards", () => ({ requireManager: guard.requireManager }));
+vi.mock("@/lib/auth/current-user", () => ({ loadCurrentUser: guard.loadCurrentUser }));
 
 import { POST } from "@/app/api/admin/users/[userId]/photo/route";
 import { parseProfilePhoto } from "@/features/admin/lib/user-profile";
-import {
-  removeUserProfilePhotoAction, saveUserBirthDateAction,
-  saveUserInterestsAction, setStudentVerificationAction,
-} from "@/features/admin/user-profile-actions";
+import { saveManagerUserDetailsAction } from "@/features/admin/actions";
+import { removeUserProfilePhotoAction, setStudentVerificationAction } from "@/features/admin/user-profile-actions";
 import { adminDeleteAccount } from "@/lib/supabase-helpers/admin-server";
 import { fetchActiveProfile, replaceProfilePhoto, saveAdminProfile } from "@/lib/supabase-helpers/admin-user-profile";
 
@@ -39,25 +38,30 @@ function withProfiles(fn: (profiles: Profiles, fixtures: Fixtures) => Promise<vo
       fixtures.trackStorage("profile-photos", `profiles/${profile.id}`);
     }
     guard.requireManager.mockReset().mockResolvedValue(profiles.manager);
+    guard.loadCurrentUser.mockReset().mockResolvedValue({ status: "authenticated", user: profiles.manager });
     await fn(profiles, fixtures);
   });
 }
 
 describe("admin profile persistence against local Supabase", () => {
   it("saves, reads and clears birth dates and normalized tags through actions", () => withProfiles(async ({ user }) => {
-    await saveUserBirthDateAction(user.id, "2000-02-29");
-    await saveUserInterestsAction(user.id, [" Design ", "design", "Research"]);
+    expect(await saveManagerUserDetailsAction(user.id, { birth_date: "2000-02-29", interests: [" Design ", "design", "Research"] })).toMatchObject({ ok: true });
     const saved = await fetchActiveProfile(db, user.id);
     expect(saved.birth_date).toBe("2000-02-29");
     expect(saved.interests).toEqual(["Design", "Research"]);
-    await expect(saveUserBirthDateAction(user.id, "2001-02-29")).rejects.toThrow("valid birth date");
-    await expect(saveUserBirthDateAction(user.id, "2999-01-01")).rejects.toThrow("future");
-    await expect(saveUserInterestsAction(user.id, [" "])).rejects.toThrow();
-    await expect(saveUserInterestsAction(user.id, Array.from({ length: 21 }, (_, i) => `tag${i}`))).rejects.toThrow();
+    expect(await saveManagerUserDetailsAction(user.id, { birth_date: "2001-02-29" })).toEqual({ ok: false, error: expect.stringMatching("valid birth date") });
+    expect(await saveManagerUserDetailsAction(user.id, { birth_date: "2999-01-01" })).toEqual({ ok: false, error: expect.stringMatching("future") });
+    expect(await saveManagerUserDetailsAction(user.id, { interests: [" "] })).toMatchObject({ ok: false });
+    expect(await saveManagerUserDetailsAction(user.id, { interests: Array.from({ length: 21 }, (_, i) => `tag${i}`) })).toMatchObject({ ok: false });
     expect((await db.from("user_info").update({ birth_date: "2999-01-01" }).eq("id", user.id)).error).toBeTruthy();
     expect((await db.from("user_info").update({ interests: ["Design", "design"] }).eq("id", user.id)).error).toBeTruthy();
-    await saveUserBirthDateAction(user.id, null); await saveUserInterestsAction(user.id, []);
+    await saveManagerUserDetailsAction(user.id, { birth_date: null, interests: [] });
     expect(await fetchActiveProfile(db, user.id)).toMatchObject({ birth_date: null, interests: [] });
+  }));
+
+  it("refuses another account's email, saving nothing", () => withProfiles(async ({ user, admin }) => {
+    expect(await saveManagerUserDetailsAction(user.id, { major: "Art", email: admin.email.toUpperCase() })).toMatchObject({ ok: false });
+    expect(await fetchActiveProfile(db, user.id)).toMatchObject({ email: user.email, major: user.major });
   }));
 
   it("records the manager, clears verification on eligibility edits and allows manual clearing", () => withProfiles(async ({ user, manager }) => {
@@ -134,18 +138,21 @@ describe("admin profile persistence against local Supabase", () => {
     expect((await POST(new NextRequest(`${url}/test`, { method: "POST", body: stale }), { params: Promise.resolve({ userId: user.id }) })).status).toBe(409);
   }));
 
-  it("requires manager authorization for every action and upload route", () => withProfiles(async ({ user }) => {
+  it("requires manager authorization for every action and upload route", () => withProfiles(async ({ user, admin }) => {
     guard.requireManager.mockRejectedValue(new Error("Manager required"));
-    await expect(saveUserBirthDateAction(user.id, "2000-01-01")).rejects.toThrow("Manager required");
-    await expect(saveUserInterestsAction(user.id, ["Design"])).rejects.toThrow("Manager required");
+    await expect(saveManagerUserDetailsAction(user.id, { birth_date: "2000-01-01", interests: ["Design"] })).rejects.toThrow("Manager required");
     await expect(setStudentVerificationAction(user.id, true)).rejects.toThrow("Manager required");
     await expect(removeUserProfilePhotoAction(user.id, null)).rejects.toThrow("Manager required");
-    await expect(POST(new NextRequest(`${url}/test`, { method: "POST" }), { params: Promise.resolve({ userId: user.id }) })).rejects.toThrow("Manager required");
+    // The route answers JSON a fetch can parse, rather than the guards' redirect to an HTML page.
+    guard.loadCurrentUser.mockResolvedValue({ status: "authenticated", user: admin });
+    const refused = await POST(new NextRequest(`${url}/test`, { method: "POST" }), { params: Promise.resolve({ userId: user.id }) });
+    expect(refused.status).toBe(403);
+    expect((await refused.json()).error).toMatch(/Only managers/);
     expect(await fetchActiveProfile(db, user.id)).toMatchObject({ birth_date: null, interests: [], student_verified_at: null });
   }));
 
   it("anonymizes all new fields, removes the photo and rejects later writes", () => withProfiles(async ({ user }) => {
-    await saveUserBirthDateAction(user.id, "2000-01-01"); await saveUserInterestsAction(user.id, ["Design"]); await setStudentVerificationAction(user.id, true);
+    await saveManagerUserDetailsAction(user.id, { birth_date: "2000-01-01", interests: ["Design"] }); await setStudentVerificationAction(user.id, true);
     const saved = await replaceProfilePhoto(db, user.id, null, photo);
     const stalePath = `profiles/${user.id}/${randomUUID()}.png`;
     const staleUpload = await db.storage.from("profile-photos").upload(stalePath, png, { contentType: "image/png" });
@@ -156,7 +163,7 @@ describe("admin profile persistence against local Supabase", () => {
     expect(deleted.data?.deleted_at).toBeTruthy();
     expect((await db.storage.from("profile-photos").download(saved.profile_photo_path!)).error).toBeTruthy();
     expect((await db.storage.from("profile-photos").list(`profiles/${user.id}`)).data).toHaveLength(0);
-    await expect(saveUserBirthDateAction(user.id, "2000-01-01")).rejects.toThrow();
+    expect(await saveManagerUserDetailsAction(user.id, { birth_date: "2000-01-01" })).toEqual({ ok: false, error: expect.stringMatching("no longer exists") });
     await expect(replaceProfilePhoto(db, user.id, null, photo)).rejects.toThrow();
   }));
 });

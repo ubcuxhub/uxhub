@@ -3,7 +3,7 @@
  *
  *   pnpm seed                      # local: make the database match the seed data
  *   pnpm seed --no-prune           # local: sync, but keep rows the data dropped
- *   pnpm seed --target=prod        # prod: add and update demo data, never delete
+ *   pnpm seed --target=prod        # prod: add and refresh demo events, never delete
  *   pnpm seed --dry-run            # print the plan, write nothing
  *   pnpm seed --only=events        # storage | memberships | events | users
  *
@@ -23,7 +23,9 @@
  * `--target=prod` exists to give admins demo events to work with while the
  * student-facing events feature is unlaunched. It never deletes, never writes
  * user fixtures, and forces every event to `draft` so nothing fabricated is
- * reachable through the public API. See `lib/targets.ts`.
+ * reachable through the public API. It only writes an event it creates, or one
+ * it wrote earlier that nobody has touched since: a matching slug alone is not
+ * enough (`lib/event-ownership.ts`). See `lib/targets.ts`.
  *
  * Table names mirror TABLES in src/lib/supabase-helpers/tables.ts, and BUCKET
  * mirrors BUCKETS in src/lib/supabase-helpers/buckets.ts. Those modules cannot
@@ -41,6 +43,12 @@ import {
   type ReconcileOptions,
 } from "./lib/reconcile.ts";
 import { describeSkippedPrune, planPrune } from "./lib/prune.ts";
+import {
+  describeSkippedEvents,
+  fetchSeedOwnedProfileIds,
+  findEventHolders,
+  inspectProdEvents,
+} from "./lib/event-ownership.ts";
 import {
   pruneSeedImages,
   seedImageUrl,
@@ -74,6 +82,7 @@ import {
   parseTarget,
   resolveTarget,
   type SeedTarget,
+  type TargetPolicy,
 } from "./lib/targets.ts";
 
 /**
@@ -117,7 +126,6 @@ const TABLE = {
   eventPeopleSections: "event_people_sections",
   eventSponsors: "event_sponsors",
   eventLinks: "event_links",
-  eventPrivateDetails: "event_private_details",
   eventAgendaDays: "event_agenda_days",
   eventAgendaItems: "event_agenda_items",
   teams: "teams",
@@ -330,47 +338,34 @@ async function prunePass(
       [...seedEvents.map((seed) => seed.event.slug), ...draftSlugs]
     );
 
-    // `purchases.event_id` is `on delete restrict`, so an event somebody bought
-    // a ticket for survives the prune. That is the guardrail working: by this
-    // point the fixture accounts' purchases are already gone, so anything still
-    // pointing here belongs to an account created by hand.
-    //
-    // A real run discovers this from the failed delete. A dry run has to ask,
-    // otherwise it would promise deletions that will not happen — so it looks
-    // for purchases held by anyone outside the fixture set.
-    const blockedIds = new Set<string>();
-
-    if (options.dryRun && plan.remove.length > 0) {
-      let query = supabase
-        .from(TABLE.purchases)
-        .select("event_id")
-        .in(
-          "event_id",
-          plan.remove.map((entry) => entry.row.id)
-        );
-
-      const fixtureIds = [...profileIds.values()];
-      if (fixtureIds.length > 0) {
-        query = query.not("user_id", "in", `(${fixtureIds.join(",")})`);
-      }
-
-      const { data: blockingPurchases, error: purchaseError } = await query;
-      if (purchaseError) {
-        throw new Error(`Reading purchases failed: ${purchaseError.message}`);
-      }
-
-      for (const row of (blockingPurchases ?? []) as { event_id: string | null }[]) {
-        if (row.event_id) blockedIds.add(row.event_id);
-      }
-    }
+    // Applications, tickets, teams and reviewer notes cascade off `events`, so
+    // a delete would take a hand-made account's records with it. By this point
+    // the fixture accounts' stale records are already gone (and a dry run
+    // leaves them out), so an event holding anyone else's is kept, and the run
+    // says why. Purchases are `on delete restrict` and would stop the delete
+    // anyway; they are checked too so a dry run reports the same thing.
+    const ownedProfileIds =
+      plan.remove.length > 0
+        ? await fetchSeedOwnedProfileIds(supabase, seedUsers, RETIRED_FIXTURE_EMAILS)
+        : [];
+    const holders = await findEventHolders(
+      supabase,
+      plan.remove.map((entry) => entry.row.id),
+      ownedProfileIds
+    );
 
     let pruned = 0;
-    const blocked: string[] = [];
+    const held: string[] = [];
+    const failed: string[] = [];
 
     for (const entry of plan.remove) {
+      const holdings = holders.get(entry.row.id);
+      if (holdings) {
+        held.push(`${entry.key} (${holdings.join(", ")})`);
+        continue;
+      }
       if (options.dryRun) {
-        if (blockedIds.has(entry.row.id)) blocked.push(entry.key);
-        else pruned += 1;
+        pruned += 1;
         continue;
       }
 
@@ -379,8 +374,10 @@ async function prunePass(
         .delete()
         .eq("id", entry.row.id);
 
+      // A fixture purchase under `--only=events`, which leaves the users'
+      // prune out: `restrict` keeps the event.
       if (deleteError) {
-        blocked.push(entry.key);
+        failed.push(`${entry.key} (${deleteError.message})`);
         continue;
       }
       pruned += 1;
@@ -388,10 +385,13 @@ async function prunePass(
 
     const line = formatPruned("Events", pruned);
     if (line) lines.push(line);
-    if (blocked.length > 0) {
+    if (held.length > 0) {
       lines.push(
-        `  ! Events kept because a non-fixture purchase references them: ${blocked.join(", ")}`
+        `  ! Events kept because a hand-made account holds records there: ${held.join(", ")}`
       );
+    }
+    if (failed.length > 0) {
+      lines.push(`  ! Events kept because the delete failed: ${failed.join(", ")}`);
     }
   }
 
@@ -501,17 +501,27 @@ async function prunePass(
 
 type SeedPerson = NonNullable<SeedEvent["peopleSections"]>[number]["people"][number];
 
-/** The mentors row for a seeded person, matched by name, kept up to date. */
+/**
+ * The mentors row for a seeded person, matched by name in the shared directory
+ * (never an event's own copy, `owner_event_id`). Kept up to date when the
+ * target lets the seed claim rows by key; on prod an existing person may be a
+ * real one, so it is linked as it is.
+ */
 async function upsertMentor(
   supabase: SupabaseClient,
-  person: SeedPerson
+  person: SeedPerson,
+  policy: TargetPolicy
 ): Promise<string> {
-  const { data: existing, error: readError } = await supabase
+  // Not maybeSingle: names are not unique, and a duplicate must not fail the run.
+  const { data: matches, error: readError } = await supabase
     .from(TABLE.mentors)
     .select("id")
     .eq("full_name", person.name)
-    .maybeSingle();
+    .is("owner_event_id", null)
+    .order("created_at")
+    .limit(1);
   if (readError) throw readError;
+  const existing = matches?.[0];
 
   const payload = {
     full_name: person.name,
@@ -521,6 +531,7 @@ async function upsertMentor(
     profile_image_path: person.image_url ?? null,
   };
   if (existing) {
+    if (!policy.claimsByKey) return existing.id as string;
     const { error } = await supabase
       .from(TABLE.mentors)
       .update(payload)
@@ -538,14 +549,16 @@ async function upsertMentor(
 }
 
 /**
- * The event's people sections, in page order, and the people in each. The
- * links are rewritten whole each run, as the sponsors are.
+ * The event's people sections, in page order, and the people in each. With
+ * pruning the links are rewritten whole each run, as the sponsors are; without
+ * it (prod, `--no-prune`) missing ones are added and none removed.
  */
 async function reconcilePeopleSections(
   supabase: SupabaseClient,
   eventId: string,
   seed: SeedEvent,
-  options: Options
+  options: Options,
+  policy: TargetPolicy
 ): Promise<Counts> {
   const sections = seed.peopleSections ?? [];
   const counts = await reconcileChildren(
@@ -571,11 +584,13 @@ async function reconcilePeopleSections(
     (rows ?? []).map((row) => [row.title as string, row.id as string])
   );
 
-  const { error: clearError } = await supabase
-    .from(TABLE.eventMentors)
-    .delete()
-    .eq("event_id", eventId);
-  if (clearError) throw clearError;
+  if (options.prune) {
+    const { error: clearError } = await supabase
+      .from(TABLE.eventMentors)
+      .delete()
+      .eq("event_id", eventId);
+    if (clearError) throw clearError;
+  }
 
   for (const section of sections) {
     const sectionId = sectionIds.get(section.title);
@@ -585,32 +600,43 @@ async function reconcilePeopleSections(
       links.push({
         event_id: eventId,
         section_id: sectionId,
-        mentor_id: await upsertMentor(supabase, person),
+        mentor_id: await upsertMentor(supabase, person, policy),
         sort_order: sortOrder,
       });
     }
     if (links.length > 0) {
-      const { error } = await supabase.from(TABLE.eventMentors).insert(links);
+      const { error } = await supabase
+        .from(TABLE.eventMentors)
+        .upsert(links, { onConflict: "section_id,mentor_id", ignoreDuplicates: true });
       if (error) throw error;
     }
   }
   return counts;
 }
 
-/** The event's sponsors, matched by logo, with their details kept up to date. */
+/**
+ * The event's sponsors, matched by logo in the shared directory. Their details
+ * are kept up to date, and the links rewritten whole, only where the target
+ * allows it, as for people.
+ */
 async function reconcileSponsors(
   supabase: SupabaseClient,
   eventId: string,
-  seed: SeedEvent
+  seed: SeedEvent,
+  options: Options,
+  policy: TargetPolicy
 ): Promise<void> {
   const sponsorIds: string[] = [];
   for (const sponsor of seed.sponsors ?? []) {
-    const { data: existing, error: readError } = await supabase
+    const { data: matches, error: readError } = await supabase
       .from(TABLE.sponsors)
       .select("id")
       .eq("brand_logo_path", sponsor.logo)
-      .maybeSingle();
+      .is("owner_event_id", null)
+      .order("created_at")
+      .limit(1);
     if (readError) throw readError;
+    const existing = matches?.[0];
 
     const payload = {
       name: sponsor.name,
@@ -619,11 +645,13 @@ async function reconcileSponsors(
       website_url: sponsor.website_url,
     };
     if (existing) {
-      const { error } = await supabase
-        .from(TABLE.sponsors)
-        .update(payload)
-        .eq("id", existing.id);
-      if (error) throw error;
+      if (policy.claimsByKey) {
+        const { error } = await supabase
+          .from(TABLE.sponsors)
+          .update(payload)
+          .eq("id", existing.id);
+        if (error) throw error;
+      }
       sponsorIds.push(existing.id as string);
     } else {
       const { data, error } = await supabase
@@ -636,18 +664,21 @@ async function reconcileSponsors(
     }
   }
 
-  const { error: clearError } = await supabase
-    .from(TABLE.eventSponsors)
-    .delete()
-    .eq("event_id", eventId);
-  if (clearError) throw clearError;
+  if (options.prune) {
+    const { error: clearError } = await supabase
+      .from(TABLE.eventSponsors)
+      .delete()
+      .eq("event_id", eventId);
+    if (clearError) throw clearError;
+  }
   if (sponsorIds.length > 0) {
-    const { error } = await supabase.from(TABLE.eventSponsors).insert(
+    const { error } = await supabase.from(TABLE.eventSponsors).upsert(
       sponsorIds.map((sponsorId, sortOrder) => ({
         event_id: eventId,
         sponsor_id: sponsorId,
         sort_order: sortOrder,
-      }))
+      })),
+      { onConflict: "event_id,sponsor_id", ignoreDuplicates: true }
     );
     if (error) throw error;
   }
@@ -697,37 +728,6 @@ async function reconcileEventLinks(
     }),
     options
   );
-}
-
-/** The event's online meeting details: one row, or none. */
-async function reconcilePrivateDetails(
-  supabase: SupabaseClient,
-  eventId: string,
-  seed: SeedEvent,
-  options: Options
-): Promise<Counts> {
-  const counts = emptyCounts();
-  if (seed.privateDetails) {
-    counts.updated += 1;
-    if (options.dryRun) return counts;
-    const { error } = await supabase.from(TABLE.eventPrivateDetails).upsert({
-      event_id: eventId,
-      meeting_id: null,
-      meeting_passcode: null,
-      ...seed.privateDetails,
-    });
-    if (error) throw error;
-    return counts;
-  }
-
-  if (!options.prune || options.dryRun) return counts;
-  const { count, error } = await supabase
-    .from(TABLE.eventPrivateDetails)
-    .delete({ count: "exact" })
-    .eq("event_id", eventId);
-  if (error) throw error;
-  counts.pruned += count ?? 0;
-  return counts;
 }
 
 /** The event's agenda days, keyed by date, and each day's items, keyed by title. */
@@ -992,7 +992,9 @@ async function main(): Promise<void> {
   const notices: string[] = [];
 
   if (options.target === "prod") {
-    notices.push(`Target: prod (${host}) — adds and updates only, never deletes.`);
+    notices.push(
+      `Target: prod (${host}) — never deletes, and only updates demo events nobody has touched.`
+    );
     if (policy.forceDraft) {
       notices.push("Every seeded event is forced to draft.");
     }
@@ -1017,8 +1019,29 @@ async function main(): Promise<void> {
   });
 
   const summary: string[] = [];
+
+  // Locally every event with a seed slug is the seed's. On prod a slug proves
+  // nothing, so only events the seed can tell it owns are written; the rest are
+  // left whole, row and children (see lib/event-ownership.ts).
+  let eventSeeds = seedEvents;
+  if (!policy.claimsByKey && shouldRun(options, "events")) {
+    const decisions = await inspectProdEvents(supabase, seedEvents);
+    const writable = new Set(
+      decisions.filter((decision) => decision.action !== "skip").map((decision) => decision.slug)
+    );
+    eventSeeds = seedEvents.filter((seed) => writable.has(seed.event.slug));
+    const skipped = describeSkippedEvents(decisions);
+    if (skipped.length > 0) {
+      summary.push(
+        `Events skipped: ${skipped.length}. Delete a demo event in the admin UI to have the next run recreate it.`,
+        ...skipped,
+        ""
+      );
+    }
+  }
+
   if (shouldRun(options, "events")) {
-    const converted = await prepareLegacySeedPricing(supabase, seedEvents, seedUsers, {
+    const converted = await prepareLegacySeedPricing(supabase, eventSeeds, seedUsers, {
       ...options, users: !skipUsers && shouldRun(options, "users"),
     });
     if (converted) summary.push(`Legacy event pricing: ${converted} fixture events prepared for conversion`);
@@ -1050,11 +1073,11 @@ async function main(): Promise<void> {
   }
 
   if (shouldRun(options, "events")) {
-    if (!options.dryRun) await prepareBuilderDateSettings(supabase, seedEvents);
+    if (!options.dryRun) await prepareBuilderDateSettings(supabase, eventSeeds);
     const { idsBySlug, counts: eventCounts } = await upsertBySlug(
       supabase,
       TABLE.events,
-      seedEvents.map((seed) => ({
+      eventSeeds.map((seed) => ({
         ...seed.event,
         // See TargetPolicy.forceDraft: an active row stays readable through the
         // anon API even while the studentEvents flag hides every page for it.
@@ -1081,8 +1104,8 @@ async function main(): Promise<void> {
         // A builder save leaves its document here. These rows are finished
         // events, so a local run discards one, which also lets the scheduled
         // fixture keep its schedule (only unscheduled drafts may hold one).
-        // Prod keeps an admin's unsaved builder work: it writes no schedule,
-        // so nothing there conflicts with a document.
+        // Prod skips an event holding one (an admin's unsaved builder work),
+        // so it never has one to discard.
         ...(policy.prune ? { working_document: null } : {}),
         // Only a fresh row takes this (the guard pins it on update). Prod's
         // forced drafts were never published.
@@ -1101,10 +1124,9 @@ async function main(): Promise<void> {
     const questionCounts = emptyCounts();
     const sectionCounts = emptyCounts();
     const linkCounts = emptyCounts();
-    const privateDetailCounts = emptyCounts();
     const agendaCounts = emptyCounts();
 
-    for (const seed of seedEvents) {
+    for (const seed of eventSeeds) {
       const eventId = idsBySlug.get(seed.event.slug);
 
       if (!eventId) {
@@ -1146,18 +1168,14 @@ async function main(): Promise<void> {
 
       addCounts(
         sectionCounts,
-        await reconcilePeopleSections(supabase, eventId, seed, options)
+        await reconcilePeopleSections(supabase, eventId, seed, options, policy)
       );
       if (!options.dryRun) {
-        await reconcileSponsors(supabase, eventId, seed);
+        await reconcileSponsors(supabase, eventId, seed, options, policy);
       }
       // The agenda first: a link can name one of its items.
       addCounts(agendaCounts, await reconcileAgenda(supabase, eventId, seed, options));
       addCounts(linkCounts, await reconcileEventLinks(supabase, eventId, seed, options));
-      addCounts(
-        privateDetailCounts,
-        await reconcilePrivateDetails(supabase, eventId, seed, options)
-      );
       if (!options.dryRun) await reconcileBuilderSettings(supabase, eventId, seed);
     }
 
@@ -1174,7 +1192,6 @@ async function main(): Promise<void> {
     summary.push(format("Application questions", questionCounts));
     summary.push(format("People sections", sectionCounts));
     summary.push(format("Event links", linkCounts));
-    summary.push(format("Meeting details", privateDetailCounts));
     summary.push(format("Agenda days", agendaCounts));
   }
 

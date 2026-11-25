@@ -24,6 +24,13 @@ it.each([{ status: "active", updated: false }, { status: "draft", updated: false
 });
 
 
+it("returns focus to the header's Publish trigger, not the More actions menu, when the opener is gone", async () => {
+  const form = { publicationSuccess: { updated: false, id: "saved-event", name: "Saved event name", status: "draft", publish_at: "2099-08-01T17:00:00Z", registration_opens_at: null, registration_closes_at: null, completed_at: Date.parse("2024-01-01T00:00:00Z") }, setPublicationSuccess: vi.fn() } as unknown as ReturnType<typeof useEventForm>;
+  const content = (current: typeof form) => <><div id="event-builder-header"><button type="button" aria-haspopup="menu" aria-label="More actions" /><button type="button" aria-haspopup="menu" data-publish-trigger>Publish</button></div><EventPublicationSuccess form={current} /></>;
+  const { rerender } = render(content(form));
+  rerender(content({ ...form, publicationSuccess: null }));
+  await waitFor(() => expect(document.activeElement).toBe(screen.getByRole("button", { name: "Publish" })));
+});
 it.each([
   { method: "keyboard", publishAt: null },
   { method: "pointer", publishAt: null },

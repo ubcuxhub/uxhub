@@ -7,15 +7,15 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { SearchField } from "@/components/ui/search-field";
 import { SegmentedToggle, SegmentedToggleItem } from "@/components/ui/segmented-toggle";
-import type { EventBadge } from "@/features/events/types";
-import type { EventRow } from "@/lib/supabase/models";
+import type { EventBadge, TimelineEvent } from "@/features/events/types";
 import { groupEventsByMonth, normalizeString } from "@/features/events/lib/event-timeline";
 import { writeEventsView } from "@/features/events/lib/events-view";
 import { EventTimelineRail } from "./EventTimelineRail";
 
 interface EventTimelineProps {
-  upcomingEvents: EventRow[];
-  pastEvents: EventRow[];
+  /** Narrow rows with `toTimelineEvent` on the server: this is a client component. */
+  upcomingEvents: TimelineEvent[];
+  pastEvents: TimelineEvent[];
   /**
    * Each event's badge, keyed by event id; build it with `eventBadgeFor`.
    * An event without one shows "past" in the past list and no badge otherwise.

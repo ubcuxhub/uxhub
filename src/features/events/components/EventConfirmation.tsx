@@ -1,13 +1,13 @@
 "use client";
 
-import { useCallback } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Check, CircleAlert, LoaderCircle } from "lucide-react";
-
-import { Button } from "@/components/ui/button";
 import type { PurchaseWithDetails } from "@/lib/supabase-helpers/purchases";
-import { useConfirmationPolling } from "@/features/payments/use-confirmation-polling";
+import {
+  PurchaseConfirmation,
+  STALLED_BODY,
+  failureBody,
+  type ConfirmationCopy,
+  type ConfirmationState,
+} from "@/features/payments/components/PurchaseConfirmation";
 
 export function EventConfirmation({
   purchase,
@@ -16,58 +16,43 @@ export function EventConfirmation({
   purchase: PurchaseWithDetails;
   slug: string;
 }) {
-  const router = useRouter();
   const free = purchase.amount_cents === 0;
-  const completed = purchase.status === "completed";
-  const failed = purchase.status === "failed" || purchase.status === "canceled";
-  const pending = !completed && !failed;
   const eventName = purchase.events?.name ?? "the event";
-  const eventHref = `/portal/events/${purchase.events?.slug ?? slug}`;
-  const refresh = useCallback(() => router.refresh(), [router]);
-  const pollingCutoffReached = useConfirmationPolling(pending, refresh);
+  const backToEvent = { href: `/portal/events/${purchase.events?.slug ?? slug}`, label: "Back to event" };
 
-  return (
-    <div className="text-center">
-      <div className="max-w-lg">
-        {completed ? (
-          <Check className="mx-auto size-16 rounded-full bg-success-foreground/10 p-3 text-success-foreground" />
-        ) : failed ? (
-          <CircleAlert className="mx-auto size-16 rounded-full bg-destructive/10 p-3 text-destructive" />
-        ) : (
-          <LoaderCircle className="mx-auto size-16 animate-spin text-primary" />
-        )}
-        <h1 className="mt-6 text-h1">
-          {completed
-            ? free ? "Registration confirmed" : "Payment successful"
-            : failed
-              ? "Payment wasn’t completed"
-              : pollingCutoffReached
-                ? "Payment is still processing"
-                : "Payment processing"}
-        </h1>
-        <p className="mt-3 text-muted-foreground">
-          {completed
-            ? purchase.confirmation_email_sent_at
-              ? `You’re registered for ${eventName}. A confirmation email has been sent to your inbox.`
-              : `You’re registered for ${eventName}.`
-            : failed
-              ? purchase.failure_reason ?? "Your payment could not be completed."
-              : pollingCutoffReached
-                ? "This is taking longer than expected. You can leave this page and check your purchases later; we won’t submit another charge."
-                : "We’re still confirming your payment and event registration."}
-        </p>
-        <Button asChild className="mt-8">
-          <Link
-            href={
-              pollingCutoffReached
-                ? "/portal#settings/purchases"
-                : eventHref
-            }
-          >
-            {pollingCutoffReached ? "View purchases" : "Back to event"}
-          </Link>
-        </Button>
-      </div>
-    </div>
-  );
+  // A full refund takes the ticket back, so a revisit must not read "registered".
+  const copy = (state: ConfirmationState): ConfirmationCopy => {
+    switch (state) {
+      case "completed":
+        return {
+          title: free ? "Registration confirmed" : "Payment successful",
+          body: purchase.confirmation_email_sent_at
+            ? `You’re registered for ${eventName}. A confirmation email has been sent to your inbox.`
+            : `You’re registered for ${eventName}.`,
+          action: backToEvent,
+        };
+      case "refunded":
+        return {
+          title: "Payment refunded",
+          body: `Your payment for ${eventName} was refunded in full.`,
+          action: backToEvent,
+        };
+      case "failed":
+        return { title: "Payment wasn’t completed", body: failureBody(purchase), action: backToEvent };
+      case "stalled":
+        return {
+          title: "Payment is still processing",
+          body: STALLED_BODY,
+          action: { href: "/portal#settings/purchases", label: "View purchases" },
+        };
+      case "pending":
+        return {
+          title: "Payment processing",
+          body: "We’re still confirming your payment and event registration.",
+          action: backToEvent,
+        };
+    }
+  };
+
+  return <PurchaseConfirmation purchase={purchase} copy={copy} />;
 }

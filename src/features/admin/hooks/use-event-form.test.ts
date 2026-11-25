@@ -273,7 +273,7 @@ describe("event form publishing schedule", () => {
       "configured_marketing_mode", "configured_marketing_url", "configured_slug", "configured_slug_edited", "created_at", "description", "description_rich", "ends_at", "event_colour", "event_type", "header_colour", "header_image_url", "image_url", "is_featured",
       "location_address_url", "location_building", "location_room",
       "max_capacity", "max_team_size", "mentors_enabled", "min_team_size", "name", "publish_at",
-      "registration_closes_at", "registration_opens_at",
+      "registration_closes_at", "registration_opens_at", "reminder_schedule",
       "requires_application", "short_description", "sponsors_enabled",
       "starts_at", "status", "team_deadline", "teams_enabled",
     ]);
@@ -545,7 +545,7 @@ describe("event form check-in sessions", () => {
 
 it("loads staff-only timing and sends Pacific moments separately from event and offer fields", async () => {
   vi.mocked(saveAdminEventAction).mockResolvedValue({ id: event.id, checkInSessionIds: ["session-1"], questionIds: [] });
-  const settings = { event_id: event.id, decisions_release_at: "2026-11-16T18:00:00Z", confirmation_deadline: "2026-11-17T18:00:00Z", questions_locked_at: null };
+  const settings = { event_id: event.id, decisions_release_at: "2026-11-16T18:00:00Z", confirmation_deadline: "2026-11-17T18:00:00Z", questions_locked_at: null, offer_window_days: null, offer_deadline_time: null };
   const { result } = renderHook(() => useEventForm({ eventId: event.id, initialEvent: event, initialApplicationSettings: settings, initialCheckInSessions: [{ id: "session-1", event_id: event.id, agenda_item_id: null, created_at: null, updated_at: null, name: "Doors", start_time: event.starts_at, end_time: event.ends_at }] }));
   expect(result.current.formState.decisions_release_at).toBe("2026-11-16T11:00");
   act(() => result.current.handleFieldChange("confirmation_deadline", "2026-11-18T11:00"));

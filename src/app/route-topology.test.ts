@@ -30,6 +30,7 @@ const handlers = [
   "/api/admin/users/[userId]/photo",
   "/api/internal/application-emails",
   "/api/internal/event-publication",
+  "/api/internal/event-reminders",
   "/api/profile-photo",
   "/api/square/webhook",
   "/api/upload-event-image",

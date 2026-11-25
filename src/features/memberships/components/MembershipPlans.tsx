@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { FlowLink } from "@/components/shared/FlowLink";
 import { Button } from "@/components/ui/button";
+import { formatDollars } from "@/lib/money";
 import type { MembershipTypeRow, UserType } from "@/lib/supabase/models";
 import { cn } from "@/lib/utils";
 import { withReturnTo } from "@/lib/auth/paths";
@@ -44,10 +45,7 @@ export function MembershipPlans({
       <div className="mt-8 grid gap-4">
         {membershipTiers.map((tier) => {
           const selected = selectedSlug === tier.slug;
-          const price = new Intl.NumberFormat("en-CA", {
-            style: "currency",
-            currency: "CAD",
-          }).format(tier.price);
+          const price = formatDollars(tier.price);
 
           return (
             <button

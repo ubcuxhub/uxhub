@@ -16,8 +16,9 @@ import {
 } from "@/components/ui/select";
 import { AutosaveStatus } from "@/features/applications/components/AutosaveStatus";
 import { AvatarPicker, type AvatarChoice } from "@/features/setup/components/AvatarPicker";
+import { BirthdayField } from "@/features/setup/components/BirthdayField";
 import { DietaryFields, type DietaryValue } from "@/features/setup/components/DietaryFields";
-import { InterestFields } from "@/features/setup/components/InterestFields";
+import { InterestFields, pickExecInterestTags } from "@/features/setup/components/InterestFields";
 import type { InterestId } from "@/features/setup/lib/options";
 import { FACULTIES, STUDENT_STATUSES, YEAR_LEVELS } from "@/lib/constants";
 import { formatEventDate } from "@/lib/date";
@@ -97,6 +98,10 @@ export function ProfileTab({
   onRetry,
   defaultPhotoOpen = false,
 }: ProfileTabProps) {
+  // Everything stored in `interests` shows: the chips the member picks, plus
+  // any free tags execs added, which saving keeps (`mergeMemberInterests`).
+  const execTags = pickExecInterestTags(user.interests ?? []);
+  const interestCount = interests.length + execTags.length;
   const photoPanelId = useId();
   const photoButtonRef = useRef<HTMLButtonElement>(null);
   const photoPanelRef = useRef<HTMLDivElement>(null);
@@ -187,11 +192,9 @@ export function ProfileTab({
           />
           <TextField
             label="Last name"
+            optional
             value={form.last_name}
             onChange={(last_name) => onFormChange({ last_name })}
-            onBlur={() => onFieldBlur?.("last_name")}
-            error={errors.last_name}
-            required
             autoComplete="family-name"
           />
           <TextField
@@ -209,6 +212,12 @@ export function ProfileTab({
             onChange={(phone) => onFormChange({ phone })}
             placeholder="e.g. 604 555 0134"
             autoComplete="tel"
+          />
+          <BirthdayField
+            value={form.birth_date}
+            onChange={(birth_date) => onFormChange({ birth_date })}
+            onBlur={() => onFieldBlur?.("birth_date")}
+            error={errors.birth_date}
           />
         </FieldGrid>
       </ProfileSection>
@@ -296,13 +305,13 @@ export function ProfileTab({
         description="Helps us plan events you'll enjoy."
         meta={
           <Badge variant="neutral" aria-live="polite">
-            {interests.length ? `${interests.length} selected` : "None selected"}
+            {interestCount ? `${interestCount} selected` : "None selected"}
           </Badge>
         }
         saveState={saveStates.interests}
         onRetry={() => onRetry("interests")}
       >
-        <InterestFields value={interests} onChange={onInterestsChange} />
+        <InterestFields value={interests} onChange={onInterestsChange} execTags={execTags} />
       </ProfileSection>
 
       <ProfileSection

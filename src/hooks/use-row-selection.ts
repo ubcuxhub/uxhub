@@ -14,6 +14,9 @@ import { useLayoutEffect, useRef, useState } from "react";
  *
  * Every action is a functional update against the latest state, so several
  * calls in one handler (`ids.forEach(selection.toggle)`) all land.
+ *
+ * Documented with the table (`/dev/components/table`); no product list uses
+ * row selection yet.
  */
 export function useRowSelection<Id extends string>(currentIds: readonly Id[]) {
   const [selected, setIds] = useState<ReadonlySet<Id>>(() => new Set());

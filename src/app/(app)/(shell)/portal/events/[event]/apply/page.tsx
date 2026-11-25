@@ -6,6 +6,8 @@ import {
   applicationWindow,
   formatYearLevel,
 } from "@/features/applications/lib/application-form";
+import { isCanceledEvent } from "@/features/events/lib/event-cancellation";
+import { hasEventEnded } from "@/features/events/lib/event-rules";
 import { requireAuth } from "@/lib/auth/guards";
 import { formatEventDate, formatEventTime } from "@/lib/date";
 import { FLAGS } from "@/lib/flags";
@@ -34,7 +36,8 @@ function formatDeadline(value: string | null): string | null {
 /**
  * The member's application to an event that requires one. Drafts are edited
  * here; a submitted application is shown read-only. Decided ones go back to
- * the event page, which shows the decision.
+ * the event page, which shows the decision, as does a canceled or ended
+ * event, which the database no longer takes applications for.
  */
 export default async function ApplyPage({ params }: ApplyPageProps) {
   if (!FLAGS.studentEvents) notFound();
@@ -46,7 +49,7 @@ export default async function ApplyPage({ params }: ApplyPageProps) {
   if (!event) notFound();
 
   const eventPath = `/portal/events/${event.slug ?? slug}`;
-  if (!event.requires_application) redirect(eventPath);
+  if (!event.requires_application || isCanceledEvent(event) || hasEventEnded(event)) redirect(eventPath);
 
   const [questions, application] = await Promise.all([
     fetchApplicationQuestions(supabase, event.id),
@@ -79,7 +82,6 @@ export default async function ApplyPage({ params }: ApplyPageProps) {
     <ApplicationForm
       event={{ id: event.id, slug: event.slug ?? slug, name: event.name }}
       status={!application ? "new" : application.status === "submitted" ? "submitted" : "draft"}
-      applicationId={application?.id ?? null}
       window={applicationWindow(event)}
       opensAt={formatDeadline(event.registration_opens_at)}
       closesAt={formatDeadline(event.registration_closes_at)}

@@ -4,6 +4,8 @@ import type { CheckInSessionDraft } from "@/features/admin/types";
 import { ResponseType, type ApplicationQuestionTemplate } from "@/features/events/types";
 import { defaultFormState, type EventFormState, type MentorDraft, type SponsorDraft } from "../components/event-form/event-form-schema";
 import { parseEventDescription, descriptionText } from "@/lib/event-description";
+import { shortOverviewTooLong } from "./event-overview";
+import { isReminderSchedule } from "@/lib/supabase-helpers/event-reminders";
 
 export interface EventWorkingDocument {
   version: 1;
@@ -48,7 +50,9 @@ export function parseWorkingDocument(input: unknown): EventWorkingDocument {
     } else if (typeof value !== typeof initial) throw new Error("Invalid draft field.");
   }
   if (!["disabled", "hosted", "external"].includes(state.marketing_mode) || !["legacy", "free", "paid"].includes(state.pricing_mode)) throw new Error("Invalid draft configuration.");
-  if (state.short_description.length > 50 || state.description.length > 3000) throw new Error("Overview exceeds its character limit.");
+  // Documents saved before reminders existed take the default, "off".
+  if (!isReminderSchedule(state.reminder_schedule)) throw new Error("Invalid draft configuration.");
+  if (shortOverviewTooLong(state.short_description) || state.description.length > 3000) throw new Error("Overview exceeds its character limit.");
   if (state.description_rich && descriptionText(state.description_rich) !== state.description) throw new Error("Invalid long overview formatting.");
   for (const key of ["image_url", "header_image_url"] as const) {
     if (state[key] && !/^https?:\/\//i.test(state[key]) && !state[key].startsWith("/")) throw new Error("Upload the selected image before saving.");

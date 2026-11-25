@@ -114,6 +114,41 @@ describe("EventCard", () => {
     expect(container.querySelector("[data-slot=event-card-thumbnail] svg")).toBeTruthy();
   });
 
+  it("stacks a full-width square image above the text on phones, beside it from sm up", () => {
+    const { container, rerender } = render(
+      <EventCard
+        title="UXathon"
+        href="/x"
+        when="Sat, Jan 9"
+        image={{ src: "/a.png" }}
+        status={{ status: "draft", label: "Draft event" }}
+      />,
+    );
+    const classes = (selector: string) =>
+      (container.querySelector(selector) as HTMLElement).className.split(/\s+/);
+    const card = classes("[data-slot=event-card]");
+    const thumb = classes("[data-slot=event-card-thumbnail]");
+
+    // Phones: a column with the thumbnail (last in the DOM) on top, as wide
+    // as the card and 140px tall.
+    expect(card).toContain("flex-col-reverse");
+    expect(thumb).toEqual(expect.arrayContaining(["w-full", "h-35"]));
+
+    // From sm up: a row with the fixed square beside the text, as before.
+    expect(card).toEqual(expect.arrayContaining(["sm:flex-row", "sm:items-center", "sm:p-5"]));
+    expect(thumb).toEqual(expect.arrayContaining(["sm:size-40", "rounded-xl"]));
+
+    // The link and the badge are unchanged by the stacking.
+    expect(screen.getAllByRole("link")).toHaveLength(1);
+    expect(screen.getByText("Draft event")).toBeTruthy();
+
+    // The no-image placeholder takes the same shape at both widths.
+    rerender(<EventCard title="UXathon" href="/x" when="Sat, Jan 9" />);
+    expect(classes("[data-slot=event-card-thumbnail]")).toEqual(
+      expect.arrayContaining(["w-full", "h-35", "sm:size-40"]),
+    );
+  });
+
   it("falls back to the calendar icon when the image fails to load", () => {
     const { container, rerender } = render(
       <EventCard title="UXathon" href="/x" when="Sat, Jan 9" image={{ src: "/gone.png" }} />,

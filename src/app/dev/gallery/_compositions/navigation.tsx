@@ -20,6 +20,7 @@ import {
   RecordField,
   RecordFrame,
   RecordSection,
+  RecordThumbnail,
   RecordView,
 } from "@/components/shared/RecordDrawer";
 import { SponsorLogoGrid } from "@/components/shared/SponsorLogoGrid";
@@ -371,6 +372,7 @@ function EventRecordPeek() {
           key={session}
           title="UXathon 2027"
           subtitle="Saturday, January 16, 2027 · 9:00 AM"
+          media={<RecordThumbnail src="/about-us-1.png" />}
           status={<StatusBadge status="registration_open" />}
           details={
             <>

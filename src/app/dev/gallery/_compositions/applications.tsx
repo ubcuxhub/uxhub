@@ -4,8 +4,6 @@ import { useId, useState } from "react";
 import { CircleAlert, Info, TriangleAlert } from "lucide-react";
 
 import { BackButton } from "@/components/shared/BackButton";
-import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
-import { SuccessOverlay } from "@/components/shared/SuccessOverlay";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Avatar } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -34,15 +32,9 @@ import {
 } from "@/components/ui/segmented-toggle";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "@/components/ui/toast";
-import { ApplicantInfoCard } from "@/features/admin/components/ApplicantInfoCard";
+import { ApplicantProfileCard } from "@/features/admin/components/ApplicantProfileCard";
 import { ApplicantPager } from "@/features/admin/components/ApplicantPager";
-import { ApplicationResponseCard } from "@/features/admin/components/ApplicationResponseCard";
 import { ReviewStateBadge } from "@/features/admin/components/ReviewStateBadge";
-import { StatusUpdateSection } from "@/features/admin/components/StatusUpdateSection";
-import {
-  type ApplicationDecision,
-  type ApplicationReviewState,
-} from "@/features/admin/lib/application-review";
 import {
   ReviewerNotes,
   type ReviewerNote,
@@ -61,28 +53,20 @@ import {
 import { LIFT, Panel } from "./frame";
 import type { Components } from "./types";
 
+/** A long name and email that wrap, and a profile with gaps ("—"). */
 function Applicant() {
   return (
     <div className={`rounded-xl ${LIFT} [&>[data-slot=card]]:border-border-subtle`}>
-      <ApplicantInfoCard
-        name="Priya Raman"
-        email="priya.raman@student.ubc.ca"
-        applicationDate="2026-10-28T19:42:00Z"
-        state="accepted"
-        offerExpiresAt="2026-11-14T23:59:00-08:00"
-      />
-    </div>
-  );
-}
-
-function Response() {
-  return (
-    <div className={`rounded-xl ${LIFT} [&>[data-slot=card]]:border-border-subtle`}>
-      <ApplicationResponseCard
-        question="Why do you want to join UXathon?"
-        response={
-          "I ran usability tests for our faculty’s course planner last term and want to try the whole loop, research to prototype, in one weekend.\n\nI’d love a team that includes a developer."
-        }
+      <ApplicantProfileCard
+        applicant={{
+          name: "Maximiliano Fernández-Castellanos",
+          email: "maximiliano.fernandez-castellanos@alumni.ubc.ca",
+          program: null,
+          year: null,
+          studentStatus: null,
+          membership: null,
+        }}
+        submittedAt="2026-11-06T22:14:00Z"
       />
     </div>
   );
@@ -213,72 +197,6 @@ function ApplicantHeader() {
   );
 }
 
-const DONE: Record<ApplicationDecision, string> = {
-  accept: "Priya was offered a spot. She has until her deadline to register.",
-  waitlist: "Priya is on the waitlist. Offer her a spot when one opens.",
-  reject: "Priya’s application was rejected.",
-};
-const NEXT: Record<ApplicationDecision, ApplicationReviewState> = {
-  accept: "accepted",
-  waitlist: "waitlisted",
-  reject: "rejected",
-};
-
-function Decision() {
-  const [state, setState] = useState<ApplicationReviewState>("submitted");
-  const [updating, setUpdating] = useState(false);
-  const [rejecting, setRejecting] = useState(false);
-  const [done, setDone] = useState<string | null>(null);
-
-  const decide = (decision: ApplicationDecision) => {
-    setUpdating(true);
-    setTimeout(() => {
-      setUpdating(false);
-      setState(NEXT[decision]);
-      setDone(DONE[decision]);
-    }, 700);
-  };
-
-  return (
-    // The overlay is `position: fixed`; the transform keeps it inside the card.
-    <div
-      className={`relative overflow-hidden rounded-xl [transform:translateZ(0)] ${LIFT} [&>[data-slot=card]]:border-border-subtle [&_.gap-4:has(>button)]:flex-wrap [&_.gap-4:has(>button)]:gap-2 [&_.gap-4>button]:px-3`}
-    >
-      <StatusUpdateSection
-        state={state}
-        isUpdating={updating}
-        error={null}
-        onDecision={(decision) => {
-          if (decision === "reject") setRejecting(true);
-          else decide(decision);
-        }}
-      />
-      <ConfirmDialog
-        open={rejecting}
-        onOpenChange={setRejecting}
-        icon={<CircleAlert aria-hidden />}
-        title="Reject Priya’s application?"
-        description="She’s told by email, and the decision is final."
-        cancelLabel="Keep reviewing"
-        confirmLabel="Reject"
-        onConfirm={() => {
-          setRejecting(false);
-          decide("reject");
-        }}
-      />
-      {done ? (
-        <SuccessOverlay
-          message={done}
-          onClose={() => {
-            setDone(null);
-            toast("Decision saved");
-          }}
-        />
-      ) : null}
-    </div>
-  );
-}
-
 function Alerts() {
   return (
     <Panel className="gap-3 px-4 py-4">
@@ -389,11 +307,9 @@ function ApplicationForm() {
 
 export const APPLICATION_COMPONENTS = {
   "applicant": Applicant,
-  "application-response": Response,
   "reviewer-notes": Notes,
   "reviewer-notes-states": NotesStates,
   "applicant-header": ApplicantHeader,
-  "application-decision": Decision,
   "alerts": Alerts,
   "application-form": ApplicationForm,
 } satisfies Components;

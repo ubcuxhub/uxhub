@@ -19,7 +19,6 @@ describe("existing checkout results", () => {
       ).toEqual({
         ok: true,
         purchaseId: "purchase-1",
-        redirectTo: "/portal#settings/purchases",
         resolution: "processing",
       });
     },

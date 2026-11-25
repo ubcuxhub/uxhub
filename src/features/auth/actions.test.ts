@@ -59,11 +59,21 @@ describe("completeProfileAction", () => {
     expect(profileMocks.ensureUserInfo).not.toHaveBeenCalled();
   });
 
-  it("requires both names", async () => {
+  it("requires a first name", async () => {
     await expect(
-      completeProfileAction({ firstName: "Ada", lastName: "  " }),
-    ).resolves.toEqual({ ok: false, error: "First and last name are required." });
+      completeProfileAction({ firstName: "  ", lastName: "Lovelace" }),
+    ).resolves.toEqual({ ok: false, error: "First name is required." });
     expect(profileMocks.ensureUserInfo).not.toHaveBeenCalled();
+  });
+
+  it("creates the profile of someone with one name", async () => {
+    await expect(
+      completeProfileAction({ firstName: " Prince ", lastName: "  " }),
+    ).resolves.toEqual({ ok: true });
+    expect(profileMocks.ensureUserInfo).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "auth-user-1" }),
+      { firstName: "Prince", lastName: "" },
+    );
   });
 
   it("creates the profile with trimmed names", async () => {

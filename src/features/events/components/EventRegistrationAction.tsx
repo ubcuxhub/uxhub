@@ -1,70 +1,33 @@
-"use client";
+import Link from "next/link";
 
-import { useEffect, useState } from "react";
 import { FlowLink } from "@/components/shared/FlowLink";
 import { Button } from "@/components/ui/button";
-import { createClient } from "@/lib/supabase/client";
-import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";
-import { fetchUserEventTicket } from "@/lib/supabase-helpers/event-tickets";
+import type { PublicEventAction } from "@/features/events/lib/public-event-action";
 
-interface EventRegistrationActionProps {
-  eventId: string;
-  eventSlug: string;
-  registrationAvailable: boolean;
-  unavailableLabel: string;
-}
-
-export function EventRegistrationAction({
-  eventId,
-  eventSlug,
-  registrationAvailable,
-  unavailableLabel,
-}: EventRegistrationActionProps) {
-  const [alreadyRegistered, setAlreadyRegistered] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-    const supabase = createClient();
-
-    async function checkRegistration() {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session?.user) return;
-
-      const user = await fetchUserInfoByAuthId(supabase, session.user.id);
-      if (!user) return;
-      const ticket = await fetchUserEventTicket(supabase, eventId, user.id);
-      if (active) setAlreadyRegistered(Boolean(ticket));
-    }
-
-    void checkRegistration().catch(() => undefined);
-    return () => {
-      active = false;
-    };
-  }, [eventId]);
-
-  if (alreadyRegistered) {
-    return (
-      <Button disabled className="self-start">
-        Already Registered
-      </Button>
-    );
+/**
+ * The public event page's registration button, as `publicEventActionFor`
+ * decides it on the server: register, apply, go to the portal, or a disabled
+ * button saying why not.
+ */
+export function EventRegistrationAction({ action }: { action: PublicEventAction }) {
+  switch (action.kind) {
+    case "disabled":
+      return (
+        <Button disabled className="self-start">
+          {action.label}
+        </Button>
+      );
+    case "link":
+      return (
+        <Button asChild className="self-start">
+          <Link href={action.href}>{action.label}</Link>
+        </Button>
+      );
+    case "checkout":
+      return (
+        <Button asChild className="self-start">
+          <FlowLink href={action.href}>{action.label}</FlowLink>
+        </Button>
+      );
   }
-
-  if (!registrationAvailable) {
-    return (
-      <Button disabled className="self-start">
-        {unavailableLabel}
-      </Button>
-    );
-  }
-
-  return (
-    <Button asChild className="self-start">
-      <FlowLink href={`/portal/events/${eventSlug}/checkout`}>
-        Register Now
-      </FlowLink>
-    </Button>
-  );
 }

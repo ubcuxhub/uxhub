@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { EventRow } from "@/lib/supabase/models";
 
-import { groupEventsByMonth, splitEventsByTime } from "./event-timeline";
+import { groupEventsByMonth, splitEventsByTime, toTimelineEvent } from "./event-timeline";
 
 const event = (id: string, starts_at: string | null, ends_at: string | null = null) =>
   ({ id, starts_at, ends_at }) as EventRow;
@@ -90,5 +90,18 @@ describe("normalizeString", () => {
     expect(normalizeString("Résumé")).toBe("resume");
     expect(normalizeString("naïve")).toBe("naive");
     expect(normalizeString(undefined)).toBe("");
+  });
+});
+describe("toTimelineEvent", () => {
+  it("keeps only what a timeline card shows", () => {
+    const row = {
+      id: "a", slug: "a", name: "A", starts_at: "2026-11-01T00:00:00Z", ends_at: null,
+      location_building: "Nest", location_room: "2306", image_url: null,
+      description_rich: { type: "doc" }, working_document: { draft: true }, agenda: [],
+    } as unknown as EventRow;
+    expect(toTimelineEvent(row)).toEqual({
+      id: "a", slug: "a", name: "A", starts_at: "2026-11-01T00:00:00Z", ends_at: null,
+      location_building: "Nest", location_room: "2306", image_url: null,
+    });
   });
 });

@@ -129,6 +129,23 @@ describe("getPanelSpec", () => {
     });
   });
 
+  it("disables the buttons it's told can't work, with the reason", () => {
+    const unavailable = { register: "No checkout here.", apply: "No form here." };
+    expect(spec("reg-open", { unavailable }).props).toMatchObject({
+      action: { label: "Register", disabledReason: "No checkout here." },
+    });
+    expect(spec("app-accepted", { unavailable }).props).toMatchObject({
+      primary: { label: "Confirm", disabledReason: "No checkout here." },
+    });
+    expect(spec("app-open", { unavailable }).props).toMatchObject({
+      action: { label: "Apply", disabledReason: "No form here." },
+    });
+    expect(spec("app-draft", { unavailable: { register: "No checkout here." } }).props).not.toHaveProperty(
+      "action.disabledReason"
+    );
+    expect(spec("reg-open").props).not.toHaveProperty("action.disabledReason");
+  });
+
   it("offers the participant package only when the event has one", () => {
     expect(spec("reg-going").props).toMatchObject({
       primary: { kind: "view-ticket" },

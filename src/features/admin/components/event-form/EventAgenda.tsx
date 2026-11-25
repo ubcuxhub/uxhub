@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import type { IsoDate, WallTime } from "@/lib/date-input";
+import { formatDateInput, type IsoDate, type WallTime } from "@/lib/date-input";
 import { agendaProjection, dateLocationIssues, emptyAgendaDay, emptyAgendaItem, emptyLocation, type AgendaItemDraft, type EventDateDraft, type EventDateLocationDraft } from "../../lib/event-date-location";
 import { EventSchedule } from "./EventSchedule";
 
@@ -34,16 +34,16 @@ function AgendaItem({ day, item, index, restricted, onChange, onRemove, showErro
     <CardContent className="space-y-4 px-4">
       <Field validationKey={`${uid}-label`}><FieldLabel htmlFor={`${uid}-label`}>Item label</FieldLabel><Input id={`${uid}-label`} value={item.label} onChange={event => onChange({ ...item, label: event.target.value })} /></Field>
       <div className="grid gap-4 lg:grid-cols-3">
-        <Field validationKey={`${uid}-start`}><FieldLabel htmlFor={`${uid}-start`}>Starts</FieldLabel><TimeField id={`${uid}-start`} ambiguousStart="daytime" value={(item.start || null) as WallTime | null} onValueChange={start => onChange({ ...item, start: start ?? "" })} onValidityChange={report("start")} /><FieldDescription>On the day’s date.</FieldDescription></Field>
+        <Field validationKey={`${uid}-start`}><FieldLabel htmlFor={`${uid}-start`}>Starts</FieldLabel><TimeField id={`${uid}-start`} ambiguousStart="daytime" value={(item.start || null) as WallTime | null} onValueChange={start => onChange({ ...item, start: start ?? "" })} onValidityChange={report("start")} /><FieldDescription>Starts on {day.date ? `${formatDateInput(day.date as IsoDate)}, the day’s date` : "the day’s date"}. Change End date if it runs past midnight.</FieldDescription></Field>
         <Field validationKey={`${uid}-end_date`}><FieldLabel htmlFor={`${uid}-end_date`}>End date</FieldLabel><DateField id={`${uid}-end_date`} value={(item.end_date || null) as IsoDate | null} onValueChange={end_date => onChange({ ...item, end_date: end_date ?? "" })} onValidityChange={report("end_date")} /></Field>
         <Field validationKey={`${uid}-end`}><FieldLabel htmlFor={`${uid}-end`}>Ends</FieldLabel><TimeField id={`${uid}-end`} ambiguousStart="daytime" value={(item.end || null) as WallTime | null} onValueChange={end => onChange({ ...item, end: end ?? "" })} onValidityChange={report("end")} /></Field>
       </div>
       {controlError && <FieldError>{controlError}</FieldError>}
       {issues.map(issue => <FieldError key={issue.target}>{issue.message}</FieldError>)}
-      <Field><FieldLabel htmlFor={`${uid}-description`}>Participant description (optional)</FieldLabel><Textarea id={`${uid}-description`} value={item.description} onChange={event => onChange({ ...item, description: event.target.value })} /></Field>
+      <Field><FieldLabel htmlFor={`${uid}-description`}>Details for attendees (optional)</FieldLabel><Textarea id={`${uid}-description`} value={item.description} onChange={event => onChange({ ...item, description: event.target.value })} /><FieldDescription>What to bring or expect.</FieldDescription></Field>
       <Field orientation="horizontal"><FieldContent><FieldLabel htmlFor={`${uid}-override`}>Use a different location</FieldLabel><FieldDescription>Otherwise this item uses the day’s location.</FieldDescription></FieldContent><Switch id={`${uid}-override`} checked={item.location !== null} onCheckedChange={override => onChange({ ...item, location: override ? { ...day.location! } : null })} /></Field>
       {item.location && <LocationEditor prefix={item.key} value={item.location} restricted={restricted} onChange={location => onChange({ ...item, location })} />}
-      <Field orientation="horizontal"><FieldContent><FieldLabel htmlFor={`${uid}-check-in`}>Enable check-in</FieldLabel><FieldDescription id={`${uid}-check-in-help`}>{item.attended ? "Attendance has been recorded. This item cannot be removed or have check-in disabled." : "Staff can record attendance for this item. Check-in is optional."}</FieldDescription></FieldContent><Switch id={`${uid}-check-in`} aria-describedby={`${uid}-check-in-help`} checked={item.check_in} disabled={item.attended} onCheckedChange={check_in => onChange({ ...item, check_in })} /></Field>
+      <Field orientation="horizontal"><FieldContent><FieldLabel htmlFor={`${uid}-check-in`}>Check attendees in</FieldLabel><FieldDescription id={`${uid}-check-in-help`}>{item.attended ? "Attendance has been recorded. This item cannot be removed or have check-in disabled." : "Adds this item to the check-in page, where UX Hub execs scan tickets at the door."}</FieldDescription></FieldContent><Switch id={`${uid}-check-in`} aria-describedby={`${uid}-check-in-help`} checked={item.check_in} disabled={item.attended} onCheckedChange={check_in => onChange({ ...item, check_in })} /></Field>
     </CardContent>
   </Card>;
 }
@@ -65,7 +65,8 @@ function AgendaDay({ day, index, restricted, onChange, onRemove, showErrors }: {
       <div id={`${uid}-items`} tabIndex={-1} className="space-y-4">
         {!day.items?.length && <FieldDescription>No items yet. Add an item to set this day’s timing.</FieldDescription>}
         {day.items?.map((item, itemIndex) => <AgendaItem key={item.key} day={day} item={item} index={itemIndex} restricted={restricted} showErrors={showErrors} onChange={next => onChange({ ...day, items: day.items!.map(existing => existing.key === item.key ? next : existing) })} onRemove={() => setRemoveItem(item.key)} />)}
-        <Button type="button" variant="outline" className="w-full border-dashed" onClick={() => onChange({ ...day, items: [...day.items ?? [], emptyAgendaItem(day.date)] })}>+ Add item</Button>
+        {/* "Add at least one agenda item" is reported against the day's items. */}
+        <Field validationKey={`${uid}-items`}><Button type="button" variant="outline" className="w-full border-dashed" onClick={() => onChange({ ...day, items: [...day.items ?? [], emptyAgendaItem(day.date)] })}>+ Add item</Button></Field>
       </div>
     </CardContent>
     <ConfirmDialog open={removeItem !== null} onOpenChange={open => { if (!open) setRemoveItem(null); }} title="Remove this agenda item?" description="The item and its configuration will be removed when you save." confirmLabel="Remove item" onConfirm={() => { onChange({ ...day, items: day.items?.filter(item => item.key !== removeItem) }); setRemoveItem(null); }} />
@@ -82,9 +83,10 @@ export function EventAgenda({ value, enabled, onEnabledChange, onChange, disable
   return <fieldset disabled={disabled} className="min-w-0 space-y-4">
     <legend className="sr-only">Agenda settings</legend>
     <EventSchedule enabled={enabled} onChange={onEnabledChange} />
-    <Card className="gap-4 py-5"><CardHeader className="px-5"><CardTitle>Location visibility</CardTitle><CardDescription>Applies to each day and item. Times use Pacific Time (Vancouver).</CardDescription></CardHeader><CardContent className="px-5"><RadioGroup aria-label="Who can see the location" value={value.audience} onValueChange={audience => update({ ...value, audience: audience as EventDateLocationDraft["audience"] })} className="sm:grid-cols-2">{([["everyone", "Everyone"], ["going", "Confirmed attendees only"]] as const).map(([choice, label]) => <FieldLabel key={choice} htmlFor={`${uid}-${choice}`}><Field orientation="horizontal"><RadioGroupItem id={`${uid}-${choice}`} value={choice} /><FieldContent><span>{label}</span><FieldDescription>{choice === "going" ? "Going ticket holders and staff. An accepted offer alone does not grant access." : "Anyone who can see the event."}</FieldDescription></FieldContent></Field></FieldLabel>)}</RadioGroup></CardContent></Card>
+    <Card className="gap-4 py-5"><CardHeader className="px-5"><CardTitle>Location visibility</CardTitle><CardDescription>Applies to each day and item. Times use Pacific Time (Vancouver).</CardDescription></CardHeader><CardContent className="px-5"><RadioGroup aria-label="Who can see the location" value={value.audience} onValueChange={audience => update({ ...value, audience: audience as EventDateLocationDraft["audience"] })} className="sm:grid-cols-2">{([["everyone", "Everyone"], ["going", "Confirmed attendees only"]] as const).map(([choice, label]) => <FieldLabel key={choice} htmlFor={`${uid}-${choice}`}><Field orientation="horizontal"><RadioGroupItem id={`${uid}-${choice}`} value={choice} /><FieldContent><span>{label}</span><FieldDescription>{choice === "going" ? "Going ticket holders and UX Hub execs. An accepted offer alone does not grant access." : "Anyone who can see the event."}</FieldDescription></FieldContent></Field></FieldLabel>)}</RadioGroup></CardContent></Card>
     {value.dates.map((day, index) => <AgendaDay key={day.key} day={day} index={index} restricted={value.audience === "going"} showErrors={showErrors} onChange={next => update({ ...value, dates: value.dates.map(existing => existing.key === day.key ? next : existing) })} onRemove={() => setRemoveDay(day.key)} />)}
-    <Button type="button" variant="outline" className="w-full border-dashed" onClick={() => update({ ...value, dates: [...value.dates, emptyAgendaDay()] })}>+ Add day</Button>
+    {/* Agenda-wide problems ("Add at least one event date.") are reported against the section. */}
+    <Field validationKey="builder-agenda"><Button type="button" variant="outline" className="w-full border-dashed" onClick={() => update({ ...value, dates: [...value.dates, emptyAgendaDay()] })}>+ Add day</Button></Field>
     <ConfirmDialog open={removeDay !== null} onOpenChange={open => { if (!open) setRemoveDay(null); }} title="Remove this agenda day?" description="The day and all its items will be removed when you save." confirmLabel="Remove day" onConfirm={() => { update({ ...value, dates: value.dates.filter(day => day.key !== removeDay) }); setRemoveDay(null); }} />
   </fieldset>;
 }

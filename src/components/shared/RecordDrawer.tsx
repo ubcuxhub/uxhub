@@ -4,7 +4,7 @@ import * as React from "react";
 import { ViewTransition } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { History, Minimize2, SearchX } from "lucide-react";
+import { History, Image as ImageIcon, Minimize2, SearchX } from "lucide-react";
 
 import { DetailList, DetailRow } from "@/components/shared/DetailRow";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -24,6 +24,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 
 /*
@@ -34,8 +35,8 @@ import { cn } from "@/lib/utils";
  * `RecordFrame` around its `children`, so the drawer opens whenever the URL is
  * one of the list's records, on a row click and on a refresh alike, and the
  * list stays mounted behind it while records are swapped. Users have no other
- * view of a record; an event's "Edit event" opens its builder, a page of its
- * own that wears the drawer's top bar (`RecordPage`).
+ * view of a record; an event's expand opens its manager (the Overview tab), a
+ * page of its own that wears the drawer's top bar (`RecordPage`).
  *
  * The content (`RecordView` and its sections and fields) fills the drawer and
  * never needs to know how it was opened.
@@ -44,7 +45,7 @@ import { cn } from "@/lib/utils";
  * morph one panel into the other: the drawer's panel (in `RecordFrame`) and
  * the page (`RecordPage`) are a named `<ViewTransition>` pair, and the list
  * (`RecordList`) fades out or in behind them. Only navigations from the
- * expand, "Edit event" and collapse links carry the transition types that
+ * expand and collapse links carry the transition types that
  * switch the pair on (`useRecordMorphTypes`); every other way in or out
  * (opening from a row, closing, swapping rows, Back) keeps the drawer's own
  * slide, or none.
@@ -68,21 +69,6 @@ const LIST_EXIT = { [RECORD_EXPAND]: "record-fade", default: "none" };
  */
 const MORPH_QUERY = "(min-width: 640px) and (prefers-reduced-motion: no-preference)";
 
-function subscribeMorph(onChange: () => void) {
-  if (typeof window.matchMedia !== "function") return () => {};
-  const query = window.matchMedia(MORPH_QUERY);
-  query.addEventListener("change", onChange);
-  return () => query.removeEventListener("change", onChange);
-}
-
-function getMorphSnapshot() {
-  return (
-    typeof window.matchMedia === "function" &&
-    window.matchMedia(MORPH_QUERY).matches &&
-    "startViewTransition" in document
-  );
-}
-
 /**
  * The `transitionTypes` for a link from a record's drawer to its full page
  * (`expand`) or back (`collapse`), so the panel morphs between them. None on
@@ -90,7 +76,7 @@ function getMorphSnapshot() {
  * swaps instantly, as any other navigation does.
  */
 export function useRecordMorphTypes(direction: "expand" | "collapse"): string[] | undefined {
-  const morph = React.useSyncExternalStore(subscribeMorph, getMorphSnapshot, () => false);
+  const morph = useMediaQuery(MORPH_QUERY) && "startViewTransition" in document;
   if (!morph) return undefined;
   return [direction === "expand" ? RECORD_EXPAND : RECORD_COLLAPSE];
 }
@@ -190,7 +176,7 @@ export interface RecordFrameProps {
  * Close (the chevron, Esc) returns to the list: `router.back()` when the
  * record was opened from the list (so Back and Forward still make sense),
  * otherwise `router.replace` to the list (a refresh, a shared link, the
- * builder's collapse). Browser Back closes it too. A row click while a record
+ * manager's collapse). Browser Back closes it too. A row click while a record
  * is open replaces it, so Back skips the records looked at.
  *
  * While the content reports unsaved changes, leaving any way the app can see
@@ -327,7 +313,7 @@ export interface RecordPageTopBarProps {
 }
 
 /**
- * The drawer's top bar for a record's full page (an event's builder): close
+ * The drawer's top bar for a record's full page (an event's manager): close
  * returns to the list, collapse to the list with this record's drawer open.
  * Both are plain links, so the page's own unsaved-changes guard sees them.
  * Collapse is hidden below `sm`, as expand is in the drawer. The shell's
@@ -370,7 +356,7 @@ export interface RecordPageProps extends RecordPageTopBarProps {
 }
 
 /**
- * A record's full page (an event's builder): `RecordPageTopBar` over the
+ * A record's full page (an event's manager): `RecordPageTopBar` over the
  * content, as one panel that the record's drawer grows into on expand and
  * shrinks back into on collapse.
  */
@@ -398,18 +384,20 @@ export interface RecordViewProps {
   titleAdornment?: React.ReactNode;
   /** Under the title: "User since July 21, 2026". */
   subtitle?: React.ReactNode;
-  /** Beside the identity, before the title: an Avatar. */
+  /**
+   * Beside the identity, before the title: a person's 64 px Avatar
+   * (`size={64}`), or a `RecordThumbnail` for a record with a picture (an
+   * event's icon, 96 px).
+   */
   media?: React.ReactNode;
-  /** Full width above the identity: an event's 16:9 cover. */
-  cover?: React.ReactNode;
   /** Under the subtitle: status Badges. */
   status?: React.ReactNode;
   /** Top bar buttons ("Edit user", "Edit event"). Hidden while editing, when the footer takes over. */
   actions?: React.ReactNode;
   /**
-   * The record's full page (an event's builder). Shows an expand button
+   * The record's full page (an event's manager). Shows an expand button
    * beside close, the twin of the page's collapse; hidden below `sm`. Another
-   * link to the page (an "Edit event" action) morphs into it too when it
+   * link to the page (another button in the drawer) morphs into it too when it
    * passes `useRecordMorphTypes("expand")` as its `transitionTypes`.
    */
   fullPageHref?: string;
@@ -446,7 +434,6 @@ export function RecordView({
   titleAdornment,
   subtitle,
   media,
-  cover,
   status,
   actions,
   fullPageHref,
@@ -488,20 +475,17 @@ export function RecordView({
   const showActions = !editing && actions;
 
   const identity = (
-    <div className="flex flex-col gap-6">
-      {cover ? <div className="overflow-hidden rounded-xl">{cover}</div> : null}
-      <div className="flex min-w-0 items-start gap-4 sm:gap-5">
-        {media ? <div className="shrink-0">{media}</div> : null}
-        <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <SidePeekDrawerTitle ref={titleRef} className="min-w-0 break-words">
-              {title}
-            </SidePeekDrawerTitle>
-            {titleAdornment}
-          </div>
-          {subtitle ? <p className="text-small text-muted-foreground">{subtitle}</p> : null}
-          {status ? <div className="flex flex-wrap items-center gap-2 pt-1">{status}</div> : null}
+    <div className="flex min-w-0 items-start gap-4 sm:gap-5">
+      {media ? <div className="shrink-0">{media}</div> : null}
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <SidePeekDrawerTitle ref={titleRef} className="min-w-0 break-words">
+            {title}
+          </SidePeekDrawerTitle>
+          {titleAdornment}
         </div>
+        {subtitle ? <p className="text-small text-muted-foreground">{subtitle}</p> : null}
+        {status ? <div className="flex flex-wrap items-center gap-2 pt-1">{status}</div> : null}
       </div>
     </div>
   );
@@ -554,6 +538,47 @@ export function RecordView({
         </SidePeekDrawerFooter>
       ) : null}
     </RecordViewContext.Provider>
+  );
+}
+
+export interface RecordThumbnailProps {
+  /** The picture: an event's square icon. Without one, `fallback` shows. */
+  src?: string | null;
+  /** Shown with no picture, or when it fails to load. Defaults to an image icon. */
+  fallback?: React.ReactNode;
+  className?: string;
+}
+
+/**
+ * A record's square picture for `RecordView`'s `media`, where a person has
+ * their Avatar: 96 px (80 px on phones, so a long title keeps room beside it),
+ * the size of the portal event page's icon, rounded, the image cropped to fill, with a
+ * hairline edge so a pale picture still reads as a tile. With no picture, or
+ * one that fails to load, it shows `fallback` on the muted fill, as the event
+ * builder's header preview does. Decorative: the title beside it names the
+ * record.
+ */
+export function RecordThumbnail({ src, fallback, className }: RecordThumbnailProps) {
+  // The src that failed to load, so a new src gets its own try.
+  const [failed, setFailed] = React.useState<string | null>(null);
+  const image = src && src !== failed ? src : null;
+  return (
+    <div
+      data-slot="record-thumbnail"
+      aria-hidden
+      className={cn(
+        "relative flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-muted text-muted-foreground sm:size-24 [&_svg]:size-8",
+        className,
+      )}
+    >
+      {image ? (
+        // eslint-disable-next-line @next/next/no-img-element -- storage URLs, as on EventCard
+        <img src={image} alt="" className="size-full object-cover" onError={() => setFailed(image)} />
+      ) : (
+        (fallback ?? <ImageIcon />)
+      )}
+      <span className="pointer-events-none absolute inset-0 rounded-[inherit] ring-1 ring-inset ring-border-subtle" />
+    </div>
   );
 }
 

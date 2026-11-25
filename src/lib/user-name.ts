@@ -1,3 +1,8 @@
+/**
+ * A member's names. The last name is optional, for people with one name: it's
+ * stored as the empty string, never null. Join them with `formatUserName`,
+ * which drops an empty part.
+ */
 export interface UserName {
   first_name: string;
   last_name: string;
@@ -37,9 +42,16 @@ function metadataString(
   return "";
 }
 
-export function getUserNameFromMetadata(
+/**
+ * The names auth metadata does supply, each possibly empty: password sign-up
+ * writes `first_name`/`last_name`, OAuth providers `given_name`/`family_name`
+ * or a single `full_name`/`name`. A one-word full name gives a first name
+ * only, a complete name for someone with one. Without a first name, the
+ * add-your-name form asks for it, prefilled with whatever is here.
+ */
+export function getPartialUserNameFromMetadata(
   metadata: Record<string, unknown>
-): UserName | null {
+): UserName {
   const firstName = metadataString(metadata, ["first_name", "given_name"]);
   const lastName = metadataString(metadata, ["last_name", "family_name"]);
 
@@ -49,10 +61,10 @@ export function getUserNameFromMetadata(
 
   const fullName = metadataString(metadata, ["full_name", "name"]);
   const splitName = splitUserName(fullName);
-  const resolvedFirstName = firstName || splitName?.first_name || "";
-  const resolvedLastName = lastName || splitName?.last_name || "";
+  const firstWord = fullName.split(/\s+/, 1)[0] ?? "";
 
-  return resolvedFirstName && resolvedLastName
-    ? { first_name: resolvedFirstName, last_name: resolvedLastName }
-    : null;
+  return {
+    first_name: firstName || splitName?.first_name || firstWord,
+    last_name: lastName || splitName?.last_name || "",
+  };
 }

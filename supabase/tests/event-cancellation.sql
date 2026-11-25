@@ -21,7 +21,7 @@ begin
       'public.guard_event_unpublish()',
       'public.guard_canceled_event()',
       'public.guard_canceled_event_check_in()',
-      'public.save_admin_event_builder_before_cancellation(uuid, uuid, integer, jsonb, text, text, text, jsonb, jsonb, jsonb, jsonb)'
+      'public.save_admin_event_builder(uuid, uuid, integer, jsonb, text, text, text, jsonb, jsonb, jsonb, jsonb)'
     ] loop
       if has_function_privilege(role_name, fn, 'execute') then
         raise exception '% can execute %', role_name, fn;

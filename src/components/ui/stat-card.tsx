@@ -7,8 +7,11 @@ import { cn } from "@/lib/utils";
 type StatCardProps = { label: string; className?: string } & (
   | {
       kind: "value";
-      value: number;
+      /** A number is formatted ("1,234"); a string ("Jan 10") shows as is. */
+      value: number | string;
       change?: { delta: number; period: string };
+      /** A line of context under the value: "6 full · 6 with open spots". */
+      detail?: string;
     }
   | { kind: "count"; count: number; total: number; noun: string; showRate?: boolean }
   | {
@@ -16,7 +19,7 @@ type StatCardProps = { label: string; className?: string } & (
       count: number;
       total: number;
       noun: string;
-      /** Follows "3 of 40 seats" after a middle dot: what makes up the count. */
+      /** A line under the fraction: what makes up the count, "2 going, 1 offer out". */
       detail?: string;
     }
   | { kind: "insufficient"; reason: string }
@@ -51,8 +54,7 @@ function Change({ delta, period }: { delta: number; period: string }) {
 
 function StatCard({ label, className, ...stat }: StatCardProps) {
   const labelId = useId();
-  const rateHasData = stat.kind !== "rate" || stat.total > 0;
-  const insufficient = stat.kind === "insufficient" || !rateHasData;
+  const insufficient = stat.kind === "insufficient";
 
   return (
     <div
@@ -84,9 +86,7 @@ function StatCard({ label, className, ...stat }: StatCardProps) {
             Not enough data
           </p>
           <p className="text-label font-normal text-muted-foreground">
-            {stat.kind === "insufficient"
-              ? stat.reason
-              : `No ${stat.noun} to calculate a rate.`}
+            {stat.reason}
           </p>
         </>
       ) : stat.kind === "count" ? (
@@ -99,24 +99,36 @@ function StatCard({ label, className, ...stat }: StatCardProps) {
         </>
       ) : stat.kind === "rate" ? (
         <>
-          <p className="flex items-baseline text-h1 text-foreground tabular-nums">
-            {Math.round((stat.count / stat.total) * 100)}
-            <span className="ml-0.5 text-body-medium text-muted-foreground">
-              %
+          <p className="text-h1 text-foreground tabular-nums">
+            {numberFormatter.format(stat.count)}
+            <span className="text-body-medium text-muted-foreground">
+              {" "}
+              / {numberFormatter.format(stat.total)} {stat.noun}
             </span>
           </p>
-          <p className="text-label font-normal text-muted-foreground">
+          <span className="sr-only">
             {numberFormatter.format(stat.count)} of{" "}
             {numberFormatter.format(stat.total)} {stat.noun}
-            {stat.detail ? ` · ${stat.detail}` : null}
-          </p>
+          </span>
+          {stat.detail ? (
+            <p className="text-label font-normal text-muted-foreground">
+              {stat.detail}
+            </p>
+          ) : null}
         </>
       ) : (
         <>
           <p className="text-h1 text-foreground tabular-nums">
-            {numberFormatter.format(stat.value)}
+            {typeof stat.value === "number"
+              ? numberFormatter.format(stat.value)
+              : stat.value}
           </p>
           {stat.change ? <Change {...stat.change} /> : null}
+          {stat.detail ? (
+            <p className="text-label font-normal text-muted-foreground">
+              {stat.detail}
+            </p>
+          ) : null}
         </>
       )}
     </div>

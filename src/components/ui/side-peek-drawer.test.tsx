@@ -141,11 +141,8 @@ describe("SidePeekDrawer", () => {
   });
 
   describe("top bar", () => {
-    it("starts 40px down from sm up and is compact on phones, hiding expand there but not close", () => {
+    it("hides expand on phones but not close", () => {
       render(<Example fullPageHref="/admin/users/1" />);
-      const bar = document.querySelector<HTMLElement>('[data-slot="side-peek-drawer-header"]')!;
-      expect(bar.className).toContain("pt-3");
-      expect(bar.className).toContain("sm:pt-10");
       const expand = screen.getByRole("link", { name: "Open as full page" });
       expect(expand.closest('[data-slot="side-peek-drawer-resize"]')?.className).toContain("max-sm:hidden");
       expect(screen.getByRole("button", { name: "Close panel (Esc)" }).closest('[data-slot="side-peek-drawer-resize"]')).toBeNull();

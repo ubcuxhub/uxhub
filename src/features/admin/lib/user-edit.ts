@@ -1,3 +1,4 @@
+import { isYearLevel } from "@/lib/constants";
 import type { RoleAccess } from "@/lib/supabase/models";
 import type { MembershipTypeOption, UserRecord } from "../types";
 import { normalizeInterests, validateBirthDate } from "./user-profile";
@@ -52,16 +53,26 @@ export function userEditChanges(user: UserRecord, draft: UserEditDraft, membersh
   for (const field of USER_EDIT_FIELDS) {
     if (draft.fields[field] === original.fields[field]) continue;
     const value = draft.fields[field];
-    if (field === "first_name" || field === "last_name") {
-      if (!value.trim()) throw new Error(`${field === "first_name" ? "First" : "Last"} name is required.`);
+    if (field === "first_name") {
+      if (!value.trim()) throw new Error("First name is required.");
       changes[field] = value.trim();
+    } else if (field === "last_name") {
+      // Optional: a member with one name has an empty last name.
+      changes[field] = value.trim();
+    } else if (field === "email") {
+      // Mirrors saveManagerUserDetailsAction: a linked account's address is its sign-in email.
+      const email = value.trim().toLowerCase();
+      if (email === user.email) continue;
+      if (user.auth_user_id) throw new Error("This member signs in with this email, so it can't be changed here.");
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Enter a valid email address.");
+      changes[field] = email;
     } else if (field === "newsletter") changes[field] = value === "true";
     else if (field === "student_number") {
       if (value && (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)))) throw new Error("Enter a valid student number.");
       changes[field] = value ? Number(value) : null;
     } else if (field === "membership_type_id") changes[field] = value || null;
     else if (field === "year") {
-      if (value && !["1", "2", "3", "4", "5+"].includes(value)) throw new Error("Invalid university year.");
+      if (value && !isYearLevel(value)) throw new Error("Invalid university year.");
       changes[field] = value || null;
     } else if (field === "school_institution") {
       // A school draft may remain after switching away from Non-UBC; omit the locked field.

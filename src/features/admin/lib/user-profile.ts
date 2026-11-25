@@ -1,19 +1,9 @@
 import { getImageDimensions, resolveEventImageType } from "@/lib/event-image";
 
-export const PROFILE_PHOTO_MAX_BYTES = 4 * 1024 * 1024;
+// Shared with member setup and Settings › Profile.
+export { validateBirthDate } from "@/lib/birth-date";
 
-export function validateBirthDate(value: unknown): string | null {
-  if (value === null || value === "") return null;
-  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    throw new Error("Enter a valid birth date.");
-  }
-  const date = new Date(`${value}T00:00:00Z`);
-  if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value || value < "0001-01-01") {
-    throw new Error("Enter a valid birth date.");
-  }
-  if (value > new Date().toISOString().slice(0, 10)) throw new Error("Birth date cannot be in the future.");
-  return value;
-}
+export const PROFILE_PHOTO_MAX_BYTES = 4 * 1024 * 1024;
 
 export function normalizeInterests(value: unknown): string[] {
   if (!Array.isArray(value) || value.some((tag) => typeof tag !== "string")) {

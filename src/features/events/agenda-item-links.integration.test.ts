@@ -1,12 +1,17 @@
 /**
- * Agenda item links (20261119073211) against the local database: a link names
- * at most one agenda item of its own event and goes when the item does, and
- * the participant agenda says which days set their own location.
+ * Agenda item links (20261124011401) against the local database: a link names
+ * at most one agenda item of its own event and goes when the item does,
+ * builder resource saves keep it, and the participant agenda says which days
+ * set their own location.
  */
+import { randomUUID } from "node:crypto";
 import { describe, expect, it } from "vitest";
+
+import { emptyContent, type EventContent } from "@/features/admin/lib/event-content";
 
 import { fetchEventLinks } from "@/lib/supabase-helpers/event-links";
 import { fetchEventParticipantContent } from "@/lib/supabase-helpers/event-agenda";
+import type { Json } from "@/lib/supabase/database.types";
 import { clientAs, createIntegrationClient, withFixtures, type Fixtures } from "@/test/integration";
 
 const db = createIntegrationClient();
@@ -78,6 +83,55 @@ describe("event_links.agenda_item_id", () => {
 
       const { count } = await db.from("event_links").select("*", { count: "exact", head: true }).eq("id", link.data.id);
       expect(count).toBe(0);
+    }));
+});
+
+/** The builder's view of a link: it never sends agenda_item_id. */
+function builderLink(id: string, url = "https://slides.example.test") {
+  return { id, type: "other" as const, label: "Slides", url, visibility: "everyone" as const };
+}
+
+async function agendaItemOf(linkId: string) {
+  const { data, error } = await db.from("event_links").select("agenda_item_id").eq("id", linkId).single();
+  if (error) throw error;
+  return data.agenda_item_id;
+}
+
+describe("resource saves", () => {
+  it("keep a link's agenda item through a builder save", () =>
+    withFixtures(async (fixtures) => {
+      const { event, itemId } = await eventWithItem(fixtures);
+      const link = await insertLink(event.id, itemId);
+      if (link.error) throw link.error;
+
+      const content: EventContent = { ...emptyContent(), links: [builderLink(link.data.id, "https://slides.example.test/v2")] };
+      const { error } = await db.rpc("save_admin_event_atomically", {
+        p_event_id: event.id, p_event: { _content: content } as unknown as Json, p_slug: null!, p_expected_image_url: null!,
+        p_check_in_sessions: [], p_application_questions: [], p_mentors: [], p_sponsors: [],
+      });
+      expect(error).toBeNull();
+      expect(await agendaItemOf(link.data.id)).toBe(itemId);
+    }));
+
+  it("keep a link's agenda item through a past-event resources save", () =>
+    withFixtures(async (fixtures) => {
+      const event = await fixtures.createEvent({ status: "active", starts_at: "2020-01-01T00:00:00Z", ends_at: "2020-01-02T00:00:00Z" });
+      const day = await db.from("event_agenda_days").insert({ event_id: event.id, date: "2020-01-01", title: "Kickoff" }).select("id").single();
+      if (day.error) throw day.error;
+      const item = await db.from("event_agenda_items").insert({ event_agenda_day_id: day.data.id, title: "Final presentations", start_time: "10:00", end_time: "12:00" }).select("id").single();
+      if (item.error) throw item.error;
+      const link = await insertLink(event.id, item.data.id);
+      if (link.error) throw link.error;
+      const unlinked = randomUUID();
+
+      const { data: current } = await db.from("events").select("revision").eq("id", event.id).single();
+      const { error } = await db.rpc("save_past_event_resources", {
+        p_event_id: event.id, p_revision: current!.revision, p_operation_id: fixtures.track("admin_event_mutations", randomUUID()),
+        p_links: [builderLink(link.data.id), builderLink(unlinked, "https://recording.example.test")] as unknown as Json,
+      });
+      expect(error).toBeNull();
+      expect(await agendaItemOf(link.data.id)).toBe(item.data.id);
+      expect(await agendaItemOf(unlinked)).toBeNull();
     }));
 });
 

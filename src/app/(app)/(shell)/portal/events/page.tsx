@@ -4,7 +4,7 @@ import { EventTimeline } from "@/features/events/components/EventTimeline";
 import { EventsComingSoon } from "@/features/events/components/EventsComingSoon";
 import { timelineBadgeFor } from "@/features/events/lib/event-badge";
 import { loadEventStates } from "@/features/events/lib/event-states";
-import { splitEventsByTime } from "@/features/events/lib/event-timeline";
+import { splitEventsByTime, toTimelineEvent } from "@/features/events/lib/event-timeline";
 import {
   DRAFT_EVENTS_NOTE,
   portalEventStatuses,
@@ -46,8 +46,8 @@ export default async function PortalEvents() {
       )}
 
       <EventTimeline
-        upcomingEvents={upcomingEvents}
-        pastEvents={pastEvents}
+        upcomingEvents={upcomingEvents.map(toTimelineEvent)}
+        pastEvents={pastEvents.map(toTimelineEvent)}
         badges={badges}
         now={now.toISOString()}
       />

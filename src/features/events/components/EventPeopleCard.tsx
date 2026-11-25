@@ -8,15 +8,21 @@ import type { MentorRow, SponsorRow } from "@/lib/supabase/models";
  * One card is one people section (titled by the event's builder: Judges,
  * Mentors, Speakers, Panelists or a custom name) or the sponsors list.
  */
-type EventPeopleCardProps =
+type EventPeopleCardProps = (
   | { type: "people"; title: string; people: MentorRow[] }
-  | { type: "sponsors"; people: SponsorRow[] };
+  | { type: "sponsors"; people: SponsorRow[] }
+) & {
+  /** The title's level: "h2" where the cards sit right under the page's own heading. */
+  headingAs?: "h2" | "h3";
+};
 
 /** What a row renders, whichever table it came from. */
 interface PersonItem {
   id: string;
   name: string;
   subtitle: string | null;
+  /** A line or two about them, under the subtitle. */
+  description: string | null;
   imageUrl: string | null;
   link: { href: string; label: string; ariaLabel: string; icon: LucideIcon } | null;
 }
@@ -44,6 +50,7 @@ function mentorItem(mentor: MentorRow): PersonItem {
     id: mentor.id,
     name: mentor.full_name,
     subtitle: mentor.position,
+    description: mentor.description,
     imageUrl: mentor.profile_image_path,
     link: mentor.linkedin_url
       ? {
@@ -61,7 +68,9 @@ function sponsorItem(sponsor: SponsorRow): PersonItem {
   return {
     id: sponsor.id,
     name: sponsor.name,
+    // The sponsor's line about itself sits where a person's position does.
     subtitle: sponsor.description?.trim() || null,
+    description: null,
     imageUrl: sponsor.brand_logo_path,
     link: website
       ? { href: website, label: "Website", ariaLabel: `${sponsor.name} website`, icon: Globe }
@@ -73,6 +82,7 @@ function sponsorItem(sponsor: SponsorRow): PersonItem {
 export function EventPeopleCard(props: EventPeopleCardProps) {
   if (props.people.length === 0) return null;
 
+  const Heading = props.headingAs ?? "h3";
   const { title, noun, items } =
     props.type === "people"
       ? { title: props.title, noun: sectionNoun(props.title), items: props.people.map(mentorItem) }
@@ -83,7 +93,7 @@ export function EventPeopleCard(props: EventPeopleCardProps) {
     <Card className="gap-0 py-0">
       <CardHeader className="gap-0.5 border-b px-5 pt-5 [.border-b]:pb-4">
         <CardTitle>
-          <h2>{title}</h2>
+          <Heading>{title}</Heading>
         </CardTitle>
         <CardDescription>
           {items.length} {items.length === 1 ? noun.singular : noun.plural}
@@ -101,6 +111,9 @@ export function EventPeopleCard(props: EventPeopleCardProps) {
               <div className="flex min-w-0 flex-1 flex-col">
                 <p className="text-body-medium wrap-anywhere">{person.name}</p>
                 {person.subtitle && <p className="text-small text-muted-foreground wrap-anywhere">{person.subtitle}</p>}
+                {person.description && (
+                  <p className="mt-1 text-small whitespace-pre-line text-muted-foreground wrap-anywhere">{person.description}</p>
+                )}
               </div>
 
               {person.link && (

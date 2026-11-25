@@ -148,7 +148,7 @@ returning id \gset other_team_
 insert into public.team_members (event_id, team_id, user_id)
 values (:'event_id', :'team_a_id', :'user_a_id'), (:'event_id', :'team_a_id', :'user_b_id');
 
--- One link per visibility, and meeting details. The event has no dates, so it
+-- One link per visibility. The event has no dates, so it
 -- never ends and its after-event link stays hidden.
 insert into public.event_links (event_id, type, url, visibility)
 values
@@ -158,9 +158,6 @@ values
 
 insert into public.event_links (event_id, type, url)
 values (:'draft_event_id', 'slack_workspace', 'https://draft-slack.example.test');
-
-insert into public.event_private_details (event_id, meeting_url)
-values (:'event_id', 'https://zoom.example.test/j/1');
 
 set local role anon;
 do $$
@@ -277,15 +274,9 @@ begin
     raise exception 'anon can read a draft event link';
   end if;
 
-  if has_table_privilege('anon', 'public.event_private_details', 'SELECT') then
-    raise exception 'anon can read private event details';
-  end if;
-
   if has_table_privilege('anon', 'public.event_links', 'INSERT')
-     or has_table_privilege('authenticated', 'public.event_links', 'INSERT')
-     or has_table_privilege('authenticated', 'public.event_private_details', 'INSERT')
-     or has_table_privilege('authenticated', 'public.event_private_details', 'UPDATE') then
-    raise exception 'browser roles can write event links or private details';
+     or has_table_privilege('authenticated', 'public.event_links', 'INSERT') then
+    raise exception 'browser roles can write event links';
   end if;
 end;
 $$;
@@ -340,19 +331,12 @@ begin
   end if;
 
   -- User A holds a ticket: the going link too, but not the recap before the
-  -- event ends, and the meeting details.
+  -- event ends.
   select count(*) into visible_count
   from public.event_links
   where event_id = current_setting('rls.event_id')::uuid;
   if visible_count <> 2 then
     raise exception 'ticket holder should see the everyone and going links, saw %', visible_count;
-  end if;
-
-  select count(*) into visible_count
-  from public.event_private_details
-  where event_id = current_setting('rls.event_id')::uuid;
-  if visible_count <> 1 then
-    raise exception 'ticket holder cannot read the meeting details';
   end if;
 end;
 $$;
@@ -386,6 +370,40 @@ begin
   if changed_count <> 1 then
     raise exception 'user A could not update a safe profile field';
   end if;
+
+  -- A member with one name stores an empty last name; it must still be
+  -- trimmed, and the first name stays required.
+  update public.user_info
+  set last_name = ''
+  where auth_user_id = auth.uid();
+  get diagnostics changed_count = row_count;
+  if changed_count <> 1 then
+    raise exception 'user A could not clear their last name';
+  end if;
+
+  begin
+    update public.user_info
+    set last_name = '  x '
+    where auth_user_id = auth.uid();
+    raise exception 'user A saved an untrimmed last name';
+  exception
+    when check_violation then
+      null;
+  end;
+
+  begin
+    update public.user_info
+    set first_name = ''
+    where auth_user_id = auth.uid();
+    raise exception 'user A cleared their first name';
+  exception
+    when check_violation then
+      null;
+  end;
+
+  update public.user_info
+  set last_name = 'User A'
+  where auth_user_id = auth.uid();
 
   begin
     update public.user_info
@@ -934,7 +952,79 @@ begin
 end;
 $$;
 
+-- Not even a manager inserts or hard-deletes profiles from the browser:
+-- profiles come from the service role, and deletion anonymizes through
+-- delete_account.
+do $$
+begin
+  begin
+    delete from public.user_info
+    where id = current_setting('rls.user_b_id')::uuid;
+    raise exception 'a manager hard-deleted a profile from the browser client';
+  exception when insufficient_privilege then null;
+  end;
+
+  begin
+    insert into public.user_info (email, first_name, last_name, role_access)
+    values ('rls-manager-insert@example.test', 'Evil', 'Insert', 'manager');
+    raise exception 'a manager inserted a profile from the browser client';
+  exception when insufficient_privilege then null;
+  end;
+end;
+$$;
+
 reset role;
+
+do $$
+begin
+  if has_table_privilege('anon', 'public.user_info', 'INSERT')
+     or has_table_privilege('anon', 'public.user_info', 'DELETE')
+     or has_table_privilege('authenticated', 'public.user_info', 'INSERT')
+     or has_table_privilege('authenticated', 'public.user_info', 'DELETE') then
+    raise exception 'clients can still insert or delete user_info rows';
+  end if;
+
+  if exists (
+    select 1 from pg_policies
+    where schemaname = 'public' and tablename = 'user_info'
+      and cmd in ('INSERT', 'DELETE')
+  ) then
+    raise exception 'user_info still has an insert or delete policy';
+  end if;
+
+  if to_regprocedure('public.get_user_info_id()') is not null
+     or to_regprocedure('public.is_authenticated()') is not null then
+    raise exception 'the legacy SECURITY DEFINER functions are back';
+  end if;
+end;
+$$;
+
+-- delete_account keeps the final manager, as set_user_role does. User A is
+-- the only manager here.
+select set_config('rls.user_a_auth_user_id', :'user_a_auth_user_id', true) \g /dev/null
+
+do $$
+begin
+  begin
+    perform public.delete_account(current_setting('rls.user_a_auth_user_id')::uuid);
+    raise exception 'the final manager deleted their account';
+  exception
+    when object_not_in_prerequisite_state then
+      if sqlerrm <> 'The final manager cannot delete their account' then
+        raise;
+      end if;
+  end;
+
+  if not exists (
+    select 1 from public.user_info
+    where id = current_setting('rls.user_a_id')::uuid
+      and role_access = 'manager'::public.role_access_enum
+      and deleted_at is null
+  ) then
+    raise exception 'a refused deletion still changed the final manager';
+  end if;
+end;
+$$;
 
 do $$
 declare
@@ -997,7 +1087,7 @@ begin
       'public.event_member_commitments(uuid)',
       'public.remove_event_ticket(uuid)',
       'public.event_ticket_eligibility(uuid, uuid, bigint)',
-      'public.delete_event_before_safe_mutations(uuid)'
+      'public.delete_event_atomically(uuid)'
     ] loop
       if has_function_privilege(role_name, fn, 'execute') then
         raise exception '% can execute %', role_name, fn;
@@ -1056,6 +1146,32 @@ begin
      or not has_function_privilege('service_role', 'public.void_event_ticket(uuid)', 'execute')
      or not has_function_privilege('service_role', 'public.regenerate_event_ticket_token(uuid)', 'execute') then
     raise exception 'service_role lost execute on the refund or ticket actions';
+  end if;
+end;
+$$;
+
+-- Refund emails are claimed and marked by the server alone: no member may read
+-- or forge a claim, and the table has no policies to widen that.
+do $$
+declare
+  role_name text;
+  privilege text;
+begin
+  if not (select relrowsecurity from pg_class where oid = 'public.purchase_refund_emails'::regclass) then
+    raise exception 'purchase_refund_emails lost row level security';
+  end if;
+  if exists (select 1 from pg_policies where schemaname = 'public' and tablename = 'purchase_refund_emails') then
+    raise exception 'purchase_refund_emails gained a policy; it is service role only';
+  end if;
+  foreach role_name in array array['anon', 'authenticated'] loop
+    foreach privilege in array array['SELECT', 'INSERT', 'UPDATE', 'DELETE'] loop
+      if has_table_privilege(role_name, 'public.purchase_refund_emails', privilege) then
+        raise exception '% has % on purchase_refund_emails', role_name, privilege;
+      end if;
+    end loop;
+  end loop;
+  if not has_table_privilege('service_role', 'public.purchase_refund_emails', 'UPDATE') then
+    raise exception 'service_role lost access to purchase_refund_emails';
   end if;
 end;
 $$;
@@ -2554,6 +2670,7 @@ $$;
 \ir application-decisions.sql
 \ir event-cancellation.sql
 \ir application-emails.sql
+\ir event-reminders.sql
 
 do $$ begin
   if has_table_privilege('authenticated','public.check_in_activity','insert')

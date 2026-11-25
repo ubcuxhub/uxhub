@@ -16,9 +16,12 @@ const processMocks = vi.hoisted(() => ({
 
 vi.mock("server-only", () => ({}));
 
+const InProgress = vi.hoisted(() => class SquareWebhookInProgressError extends Error {});
+
 vi.mock("@/features/payments/fulfillment", () => ({
   processSquarePaymentEvent: processMocks.processSquarePaymentEvent,
   processSquareRefundEvent: processMocks.processSquareRefundEvent,
+  SquareWebhookInProgressError: InProgress,
 }));
 
 vi.mock("@/lib/square/client", () => ({
@@ -166,9 +169,27 @@ describe("POST /api/square/webhook", () => {
           object: { refund: expect.objectContaining({ id: "refund-1", paymentId: "payment-1" }) },
         }),
       }),
-      expect.objectContaining({ event_id: "refund-event-1" })
+      "https://request.example"
     );
     expect(processMocks.processSquarePaymentEvent).not.toHaveBeenCalled();
+  });
+
+  it("passes on the origin of the endpoint whose signature matched, for email links", async () => {
+    processMocks.getSquareWebhookEndpoints.mockReturnValue([
+      { notificationUrl: "https://a.example/webhook", signatureKey: "key-a" },
+      { notificationUrl: "https://www.site.example/api/square/webhook", signatureKey: "key-b" },
+    ]);
+    const body = JSON.stringify(refundPayload);
+    const response = await post(
+      body,
+      sign("https://www.site.example/api/square/webhook", body, "key-b")
+    );
+
+    expect(response.status).toBe(200);
+    expect(processMocks.processSquareRefundEvent).toHaveBeenCalledWith(
+      expect.anything(),
+      "https://www.site.example"
+    );
   });
 
   it("rejects a refund event without a payment ID", async () => {
@@ -210,8 +231,21 @@ describe("POST /api/square/webhook", () => {
         eventId: "event-1",
         type: "payment.updated",
       }),
-      expect.objectContaining({ event_id: "event-1" })
+      "https://request.example"
     );
+  });
+
+  // Acknowledging a duplicate while the first delivery is still running would
+  // lose the event if that first delivery then failed.
+  it("asks Square to retry, without alerting, while another delivery is processing the event", async () => {
+    processMocks.processSquarePaymentEvent.mockRejectedValue(new InProgress());
+
+    const body = JSON.stringify(paymentUpdatedPayload);
+    const response = await post(body, sign(url, body, signatureKey));
+
+    expect(response.status).toBe(503);
+    expect(response.headers.get("Retry-After")).toBe("60");
+    expect(consoleError).not.toHaveBeenCalled();
   });
 
   // Square retries a webhook delivery on a 5xx response, so a processing

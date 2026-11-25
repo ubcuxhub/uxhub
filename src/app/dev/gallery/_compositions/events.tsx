@@ -34,7 +34,11 @@ import { Separator } from "@/components/ui/separator";
 import { StatusBadge, type Status } from "@/components/ui/status-badge";
 import { ToastView, toast } from "@/components/ui/toast";
 import { EventTicket } from "@/features/events/components/EventTicket";
-import { EventRegistrationTicket } from "@/features/events/components/EventRegistrationTicket";
+import { QrCode } from "@/features/events/components/QrCode";
+import { TicketDialog } from "@/features/events/components/TicketDialog";
+import { RegistrationTicket } from "@/components/shared/RegistrationTicket";
+import { Ticket } from "@/components/shared/Ticket";
+import { DRAFT_EVENT_BADGE } from "@/features/events/lib/event-badge";
 
 import { ART_BLUE, HERE, PEOPLE, QR_TOKEN } from "../_fixtures";
 import { LIFT, Panel } from "./frame";
@@ -128,23 +132,41 @@ function EventRegistration() {
   );
 }
 
+// On a phone the gallery is one full-width column and the cards stack their
+// image on top. On the canvas a 360px column is narrow but the viewport is
+// not, so the cards keep the row with a smaller square thumbnail.
+const FEATURED_CARD = `sm:items-start sm:gap-4 sm:p-4 [&_[data-slot=event-card-thumbnail]]:sm:size-22 [&_[data-slot=event-card-thumbnail]]:sm:rounded-2xl ${LIFT}`;
+
 function FeaturedEvent() {
   return (
-    <EventCard
-      title="Portfolio Night"
-      href={HERE}
-      venue="UBC Nest Room 3300"
-      when={
-        <EventCardDates
-          lines={[{ day: "Sat, Jan 30", time: "6:00 – 9:00 PM" }]}
-        />
-      }
-      status={{ status: "register_by", date: "Jan 20" }}
-      image={{ src: ART_BLUE }}
-      // A 360px card is phone-sized, but the viewport is not: keep the
-      // thumbnail stacked above the text as it is on phones.
-      className={`sm:flex-col-reverse sm:items-stretch sm:gap-4 sm:p-4 [&_[data-slot=event-card-thumbnail]]:sm:h-35 [&_[data-slot=event-card-thumbnail]]:sm:w-full ${LIFT}`}
-    />
+    <div className="flex flex-col gap-3">
+      <EventCard
+        title="Portfolio Night"
+        href={HERE}
+        venue="UBC Nest Room 3300"
+        when={
+          <EventCardDates
+            lines={[{ day: "Sat, Jan 30", time: "6:00 – 9:00 PM" }]}
+          />
+        }
+        status={{ status: "register_by", date: "Jan 20" }}
+        image={{ src: ART_BLUE }}
+        className={FEATURED_CARD}
+      />
+      {/* No image: the calendar placeholder, with the staff-only draft badge. */}
+      <EventCard
+        title="Spring Design Sprint"
+        href={HERE}
+        venue="UBC Nest Room 2306"
+        when={
+          <EventCardDates
+            lines={[{ day: "Sat, Mar 6", time: "10:00 AM – 4:00 PM" }]}
+          />
+        }
+        status={DRAFT_EVENT_BADGE}
+        className={FEATURED_CARD}
+      />
+    </div>
   );
 }
 
@@ -159,13 +181,14 @@ function ScannableTicket() {
   );
 }
 
+/** The portal registration panel's ticket layout, with its "Your ticket" dialog. */
 function RegisteredEvent() {
-  return <EventRegistrationTicket
-    eventName="Portfolio Review Night"
-    holderName="Aubrey Ventura"
-    checkedIn={false}
-    qrToken={QR_TOKEN}
-    participantPackages={[]}
+  const ticket = { eventName: "Portfolio Review Night", holderName: "Aubrey Ventura" };
+  return <RegistrationTicket
+    title={`You’re going to ${ticket.eventName}`}
+    description="Show your ticket at check-in."
+    ticket={<Ticket {...ticket} state="active" code={<QrCode token={QR_TOKEN} className="size-full" />} />}
+    actions={<TicketDialog {...ticket} qrToken={QR_TOKEN} trigger={<Button>View ticket</Button>} />}
   />;
 }
 

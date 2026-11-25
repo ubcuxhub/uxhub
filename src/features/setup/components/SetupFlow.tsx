@@ -8,11 +8,13 @@ import { Hubbo } from "@/components/shared/Hubbo";
 import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { AuthPanel } from "@/features/auth/components/AuthPanel";
+import { birthDateError } from "@/lib/birth-date";
 
 import { SETUP_STEPS, type InterestId, type SetupStepId, type UserTypeId } from "../lib/options";
 import type { SetupState } from "../lib/state";
 import { AboutFields } from "./AboutFields";
 import { AvatarPicker, type AvatarChoice } from "./AvatarPicker";
+import { BirthdayField } from "./BirthdayField";
 import {
   DietaryFields,
   isDietaryEmpty,
@@ -20,7 +22,7 @@ import {
   toDietaryValue,
   type DietaryValue,
 } from "./DietaryFields";
-import { InterestFields, pickInterestIds, selectedCountLabel } from "./InterestFields";
+import { InterestFields, pickExecInterestTags, pickInterestIds, selectedCountLabel } from "./InterestFields";
 import { SAVE_FAILED, serverSetupClient, type SetupClient } from "./setup-client";
 
 export type SetupView = SetupStepId | "welcome";
@@ -95,8 +97,9 @@ interface SetupFlowProps {
 
 /**
  * Member setup at `/portal/setup` (review §4 and §7 #6–#9): what best
- * describes you, dietary needs, a photo and interests, then Welcome. Every step can be skipped; nothing
- * here gates registration or checkout.
+ * describes you (and an optional birthday), dietary needs, a photo and
+ * interests, then Welcome. Every step can be skipped; nothing here gates
+ * registration or checkout.
  *
  * The step lives in component state, not the URL: a visit resumes at the
  * stored `setup_step`, and Back only moves between screens (it saves
@@ -122,6 +125,11 @@ export function SetupFlow({
   );
   const [choice, setChoice] = useState<AvatarChoice>(() => initialChoice(initial));
   const [interests, setInterests] = useState<InterestId[]>(() => pickInterestIds(initial.interests));
+  // Free tags execs added: shown read-only, and finishing keeps them.
+  const [execTags] = useState(() => pickExecInterestTags(initial.interests));
+  const [birthDate, setBirthDate] = useState(initial.birthDate ?? "");
+  // Its error shows once the member has left the field or tried to continue.
+  const [birthDateChecked, setBirthDateChecked] = useState(false);
   const [pending, setPending] = useState<"save" | "skip" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [announcement, setAnnouncement] = useState("");
@@ -191,23 +199,41 @@ export function SetupFlow({
   if (view === "about") {
     primaryLabel = "Continue";
     body = (
-      <AboutFields
-        label={SETUP_COPY.about.title}
-        value={userType}
-        onChange={(value) => {
-          setError(null);
-          setUserType(value);
-        }}
-        lockedTo={userTypeLocked ? setup.userType : null}
-        invalid={error === NO_ABOUT_ANSWER}
-        disabled={busy}
-      />
+      <>
+        <AboutFields
+          label={SETUP_COPY.about.title}
+          value={userType}
+          onChange={(value) => {
+            setError(null);
+            setUserType(value);
+          }}
+          lockedTo={userTypeLocked ? setup.userType : null}
+          invalid={error === NO_ABOUT_ANSWER}
+          disabled={busy}
+        />
+        <BirthdayField
+          value={birthDate}
+          onChange={setBirthDate}
+          onBlur={() => setBirthDateChecked(true)}
+          error={birthDateChecked ? birthDateError(birthDate) : null}
+          disabled={busy}
+          className="sm:max-w-72"
+        />
+      </>
     );
     onSubmit = () => {
+      const birthDateInvalid = birthDateError(birthDate) !== null;
+      if (birthDateInvalid) setBirthDateChecked(true);
       if (!userType) return setError(NO_ABOUT_ANSWER);
+      if (birthDateInvalid) return;
+      const birthDateToSave = birthDate || null;
       void run(
         "save",
         async () => {
+          // Saved first and on its own: a refused type below keeps it.
+          if (birthDateToSave !== setup.birthDate) {
+            setSetup(await client.saveBirthDate(birthDateToSave));
+          }
           const result = await client.saveAbout({ userType });
           if (!result.ok) throw new SetupRefusal(result.error);
           return result.setup;
@@ -261,8 +287,8 @@ export function SetupFlow({
     };
   } else {
     primaryLabel = "Finish setup";
-    meta = selectedCountLabel(interests.length);
-    body = <InterestFields value={interests} onChange={setInterests} disabled={busy} />;
+    meta = selectedCountLabel(interests.length + execTags.length);
+    body = <InterestFields value={interests} onChange={setInterests} disabled={busy} execTags={execTags} />;
     onSubmit = () => void run("save", () => client.finish({ interests }), "welcome");
   }
 

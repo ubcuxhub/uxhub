@@ -35,9 +35,10 @@ vi.mock("@/lib/square/client", () => ({
   SQUARE_CURRENCY: "CAD",
 }));
 
-const eventsMocks = vi.hoisted(() => ({ fetchEventBySlug: vi.fn() }));
+const eventsMocks = vi.hoisted(() => ({ fetchEventBySlug: vi.fn(), fetchEventById: vi.fn() }));
 vi.mock("@/lib/supabase-helpers/events", () => ({
   fetchEventBySlug: eventsMocks.fetchEventBySlug,
+  fetchEventById: eventsMocks.fetchEventById,
 }));
 
 // Reserving and releasing stay real so the RPCs they call are asserted.
@@ -53,24 +54,48 @@ vi.mock("@/lib/supabase-helpers/event-tickets", async (importOriginal) => ({
 
 const membershipsMocks = vi.hoisted(() => ({
   fetchMembershipTypeBySlug: vi.fn(),
+  fetchMembershipTypeById: vi.fn(),
 }));
 vi.mock("@/lib/supabase-helpers/memberships", () => membershipsMocks);
 
 const purchasesMocks = vi.hoisted(() => ({
   createPurchase: vi.fn(),
-  fetchNonterminalMembershipPurchase: vi.fn(),
+  fetchLiveMembershipPurchase: vi.fn(),
+  applySquarePaymentStatus: vi.fn(),
+  failAbandonedPurchase: vi.fn(),
+  markPurchaseFulfilled: vi.fn(),
+  markSquareWebhookEventProcessed: vi.fn(),
+  isUniqueViolation: (error: unknown) => (error as { code?: string } | null)?.code === "23505",
   fetchPurchaseById: vi.fn(),
   fetchPurchaseByIdempotencyKey: vi.fn(),
   fetchPurchaseBySquarePaymentId: vi.fn(),
   applyPurchaseRefund: vi.fn(),
+  claimPurchaseRefundEmail: vi.fn(),
+  releasePurchaseRefundEmailClaim: vi.fn(),
+  markPurchaseRefundEmailSent: vi.fn(),
   forgetSquareWebhookEvent: vi.fn(),
-  recordSquareWebhookEvent: vi.fn(),
+  claimSquareWebhookEvent: vi.fn(),
   updatePurchase: vi.fn(),
 }));
 vi.mock("@/lib/supabase-helpers/purchases", () => purchasesMocks);
 
-const usersMocks = vi.hoisted(() => ({ updateUserInfoById: vi.fn() }));
+const usersMocks = vi.hoisted(() => ({
+  updateUserInfoById: vi.fn(),
+  fetchUserInfoContactById: vi.fn(),
+}));
 vi.mock("@/lib/supabase-helpers/users", () => usersMocks);
+
+// The refund email runs for real on top of these, so its claim is exercised
+// through the sync that schedules it.
+const emailMocks = vi.hoisted(() => ({ sendEmail: vi.fn() }));
+vi.mock("@/lib/email/client", () => ({
+  sendEmail: emailMocks.sendEmail,
+  EmailSendError: class EmailSendError extends Error {
+    constructor(readonly code: string, message: string) {
+      super(message);
+    }
+  },
+}));
 
 const appSettingsMocks = vi.hoisted(() => ({
   fetchMembershipTermEndsAt: vi.fn(),
@@ -152,9 +177,7 @@ const membershipInput: CheckoutRequestInput = {
   slug: "annual-membership",
   token: "cnon:card-nonce-ok",
   idempotencyKey: "idem-1",
-  buyerFirstName: "Jamie",
-  buyerLastName: "Lee",
-  buyerEmail: "jamie@example.com",
+  expectedAmountCents: 2000,
 };
 
 const ticketInput: CheckoutRequestInput = {
@@ -162,16 +185,14 @@ const ticketInput: CheckoutRequestInput = {
   slug: "design-night",
   token: "cnon:card-nonce-ok",
   idempotencyKey: "idem-1",
-  buyerFirstName: "Jamie",
-  buyerLastName: "Lee",
-  buyerEmail: "jamie@example.com",
+  expectedAmountCents: 2000,
 };
 
 beforeEach(() => {
   vi.clearAllMocks();
 
   purchasesMocks.fetchPurchaseByIdempotencyKey.mockResolvedValue(null);
-  purchasesMocks.fetchNonterminalMembershipPurchase.mockResolvedValue(null);
+  purchasesMocks.fetchLiveMembershipPurchase.mockResolvedValue(null);
   purchasesMocks.createPurchase.mockImplementation(
     async (_db: unknown, payload: Partial<PurchaseRow>) =>
       purchase({ ...payload, id: "purchase-1" })
@@ -181,7 +202,21 @@ beforeEach(() => {
       purchase({ id, ...payload })
   );
   purchasesMocks.fetchPurchaseById.mockResolvedValue(purchase());
-  purchasesMocks.recordSquareWebhookEvent.mockResolvedValue(true);
+  purchasesMocks.claimSquareWebhookEvent.mockResolvedValue("claimed");
+  purchasesMocks.markSquareWebhookEventProcessed.mockResolvedValue(undefined);
+  purchasesMocks.applySquarePaymentStatus.mockImplementation(
+    async (db: unknown, id: string, payment: { status: string; squarePaymentId: string | null; squareCustomerId: string | null }) => ({
+      purchase: await purchasesMocks.updatePurchase(db, id, {
+        status: payment.status,
+        square_payment_id: payment.squarePaymentId,
+        ...(payment.squareCustomerId ? { square_customer_id: payment.squareCustomerId } : {}),
+      }),
+      applied: true,
+    })
+  );
+  purchasesMocks.markPurchaseFulfilled.mockImplementation(
+    async (db: unknown, id: string) => purchasesMocks.updatePurchase(db, id, { fulfilled_at: "2026-11-24T00:00:00.000Z" })
+  );
   purchasesMocks.forgetSquareWebhookEvent.mockResolvedValue(undefined);
 
   ticketsMocks.initializeEventCheckout.mockResolvedValue({ purchase_id: "purchase-1", amount_cents: 2000, failure_reason: null, created: true });
@@ -333,7 +368,6 @@ describe("event ticket checkout", () => {
     expect(result).toEqual({
       ok: true,
       purchaseId: "purchase-1",
-      redirectTo: "/portal#settings/purchases",
       resolution: "processing",
     });
     expect(squareMocks.cancel).not.toHaveBeenCalled();
@@ -441,13 +475,17 @@ describe("idempotent retries", () => {
   });
 
   it("reuses a pending membership purchase for the same tier instead of charging again", async () => {
-    purchasesMocks.fetchNonterminalMembershipPurchase.mockResolvedValue(
+    purchasesMocks.fetchLiveMembershipPurchase.mockResolvedValue(
       purchase({
         kind: "membership",
         membership_type_id: "membership-type-1",
         square_payment_id: "payment-1",
         status: "pending",
       })
+    );
+    purchasesMocks.updatePurchase.mockImplementation(
+      async (_db: unknown, id: string, payload: Partial<PurchaseRow>) =>
+        purchase({ id, kind: "membership", membership_type_id: "membership-type-1", ...payload })
     );
     squareMocks.get.mockResolvedValue({
       payment: { id: "payment-1", status: "APPROVED" },
@@ -457,6 +495,121 @@ describe("idempotent retries", () => {
 
     expect(squareMocks.create).not.toHaveBeenCalled();
     expect(result).toMatchObject({ ok: true, resolution: "processing" });
+  });
+
+  it("refuses another tier while a membership payment is still processing", async () => {
+    purchasesMocks.fetchLiveMembershipPurchase.mockResolvedValue(
+      purchase({ kind: "membership", membership_type_id: "other-tier", square_payment_id: "payment-1", status: "pending" })
+    );
+    purchasesMocks.updatePurchase.mockImplementation(
+      async (_db: unknown, id: string, payload: Partial<PurchaseRow>) =>
+        purchase({ id, kind: "membership", membership_type_id: "other-tier", ...payload })
+    );
+    squareMocks.get.mockResolvedValue({ payment: { id: "payment-1", status: "PENDING" } });
+
+    const result = await executeCheckoutForUser(user, membershipInput);
+
+    expect(squareMocks.create).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ ok: false, terminal: true });
+  });
+
+  it("fails an abandoned pending attempt (no Square payment) and charges afresh", async () => {
+    const stale = purchase({
+      id: "stale-1",
+      kind: "membership",
+      membership_type_id: "membership-type-1",
+      status: "pending",
+      created_at: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
+    });
+    purchasesMocks.fetchLiveMembershipPurchase.mockResolvedValue(stale);
+    purchasesMocks.failAbandonedPurchase.mockResolvedValue({ ...stale, status: "failed" });
+
+    await executeCheckoutForUser(user, membershipInput);
+
+    expect(purchasesMocks.failAbandonedPurchase).toHaveBeenCalledWith(
+      adminDb, "stale-1", expect.any(String), "This payment did not go through. Please try again."
+    );
+    expect(squareMocks.create).toHaveBeenCalledOnce();
+  });
+
+  it("leaves a recent pending attempt alone", async () => {
+    purchasesMocks.fetchLiveMembershipPurchase.mockResolvedValue(
+      purchase({ kind: "membership", membership_type_id: "membership-type-1", status: "pending", created_at: new Date().toISOString() })
+    );
+
+    const result = await executeCheckoutForUser(user, membershipInput);
+
+    expect(purchasesMocks.failAbandonedPurchase).not.toHaveBeenCalled();
+    expect(squareMocks.create).not.toHaveBeenCalled();
+    expect(result).toMatchObject({ ok: true, resolution: "processing" });
+  });
+});
+
+describe("membership checkout guards", () => {
+  it("refuses a price that changed since checkout loaded, before charging", async () => {
+    const result = await executeCheckoutForUser(user, { ...membershipInput, expectedAmountCents: 1500 });
+
+    expect(result).toMatchObject({ ok: false, terminal: true, error: expect.stringContaining("price has changed") });
+    expect(purchasesMocks.createPurchase).not.toHaveBeenCalled();
+    expect(squareMocks.create).not.toHaveBeenCalled();
+  });
+
+  it("refuses a request without the expected amount (an older client)", async () => {
+    const { expectedAmountCents: _omitted, ...withoutAmount } = membershipInput;
+    void _omitted;
+    const result = await executeCheckoutForUser(user, withoutAmount);
+
+    expect(result).toMatchObject({ ok: false, terminal: true });
+    expect(squareMocks.create).not.toHaveBeenCalled();
+  });
+
+  it("grants a free tier as a completed purchase with no Square call", async () => {
+    membershipsMocks.fetchMembershipTypeBySlug.mockResolvedValue({ id: "membership-type-1", price: 0 });
+    purchasesMocks.fetchPurchaseById.mockResolvedValue(
+      purchase({ kind: "membership", membership_type_id: "membership-type-1", amount_cents: 0, status: "completed" })
+    );
+
+    const result = await executeCheckoutForUser(user, { ...membershipInput, token: null, expectedAmountCents: 0 });
+
+    expect(result).toMatchObject({ ok: true, resolution: "completed" });
+    expect(purchasesMocks.createPurchase).toHaveBeenCalledWith(adminDb, expect.objectContaining({ amount_cents: 0, status: "completed" }));
+    expect(customerMocks.ensureSquareCustomerId).not.toHaveBeenCalled();
+    expect(squareMocks.create).not.toHaveBeenCalled();
+    expect(usersMocks.updateUserInfoById).toHaveBeenCalled();
+  });
+
+  it("answers with the purchase that won when a concurrent checkout inserted first", async () => {
+    purchasesMocks.createPurchase.mockRejectedValue({ code: "23505" });
+    purchasesMocks.fetchLiveMembershipPurchase
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(purchase({ id: "winner", kind: "membership", membership_type_id: "membership-type-1", status: "pending" }));
+
+    const result = await executeCheckoutForUser(user, membershipInput);
+
+    expect(result).toEqual({ ok: true, purchaseId: "winner", resolution: "processing" });
+    expect(squareMocks.create).not.toHaveBeenCalled();
+  });
+
+  it("fails the attempt when Square refuses the request outright, so it blocks nothing", async () => {
+    squareMocks.create.mockRejectedValue(
+      new SquareError({ statusCode: 400, body: { errors: [{ category: "INVALID_REQUEST_ERROR", code: "INVALID_LOCATION" }] } })
+    );
+
+    const result = await executeCheckoutForUser(user, membershipInput);
+
+    expect(result).toMatchObject({ ok: false, terminal: true });
+    expect(purchasesMocks.updatePurchase).toHaveBeenCalledWith(adminDb, "purchase-1", expect.objectContaining({ status: "failed" }));
+  });
+
+  it("keeps a timed-out request processing, since Square may have taken it", async () => {
+    squareMocks.create.mockRejectedValue(
+      new SquareError({ statusCode: 504, body: { errors: [{ category: "API_ERROR", code: "GATEWAY_TIMEOUT" }] } })
+    );
+
+    const result = await executeCheckoutForUser(user, membershipInput);
+
+    expect(result).toMatchObject({ ok: true, resolution: "processing" });
+    expect(purchasesMocks.updatePurchase).not.toHaveBeenCalledWith(adminDb, "purchase-1", expect.objectContaining({ status: "failed" }));
   });
 });
 
@@ -501,6 +654,44 @@ describe("membership fulfillment", () => {
         square_customer_id: "customer-1",
       }
     );
+  });
+
+  it("grants the membership before marking the purchase fulfilled, so a failed grant is retried", async () => {
+    squareMocks.create.mockResolvedValue({
+      payment: { id: "payment-1", customerId: "customer-1", status: "COMPLETED" },
+    });
+    purchasesMocks.fetchPurchaseById.mockResolvedValue(
+      purchase({ kind: "membership", membership_type_id: "membership-type-1" })
+    );
+    usersMocks.updateUserInfoById.mockRejectedValueOnce(new Error("connection reset"));
+
+    // The grant fails: the purchase must not be stamped, so a retry grants it.
+    await executeCheckoutForUser(user, membershipInput);
+    expect(purchasesMocks.markPurchaseFulfilled).not.toHaveBeenCalled();
+
+    await processSquarePaymentEvent({
+      eventId: "event-retry",
+      type: "payment.updated",
+      data: { object: { payment: { id: "payment-1", status: "COMPLETED" } } },
+    } as never);
+    purchasesMocks.fetchPurchaseBySquarePaymentId.mockResolvedValue(
+      purchase({ kind: "membership", membership_type_id: "membership-type-1", square_payment_id: "payment-1" })
+    );
+    await processSquarePaymentEvent({
+      eventId: "event-retry-2",
+      type: "payment.updated",
+      data: { object: { payment: { id: "payment-1", status: "COMPLETED" } } },
+    } as never);
+
+    expect(usersMocks.updateUserInfoById).toHaveBeenLastCalledWith(
+      adminDb,
+      "user-1",
+      expect.objectContaining({ membership_type_id: "membership-type-1" })
+    );
+    expect(purchasesMocks.markPurchaseFulfilled).toHaveBeenCalledWith(adminDb, "purchase-1");
+    const grant = usersMocks.updateUserInfoById.mock.invocationCallOrder.at(-1)!;
+    const stamp = purchasesMocks.markPurchaseFulfilled.mock.invocationCallOrder.at(-1)!;
+    expect(grant).toBeLessThan(stamp);
   });
 
   it("does not re-fulfill an already-fulfilled purchase", async () => {
@@ -631,7 +822,7 @@ describe("webhook-driven reconciliation", () => {
   });
 
   it("does nothing on a duplicate webhook delivery", async () => {
-    purchasesMocks.recordSquareWebhookEvent.mockResolvedValue(false);
+    purchasesMocks.claimSquareWebhookEvent.mockResolvedValue("processed");
 
     await processSquarePaymentEvent(event);
 
@@ -744,7 +935,7 @@ describe("refund webhooks", () => {
   });
 
   it("does nothing on a duplicate delivery", async () => {
-    purchasesMocks.recordSquareWebhookEvent.mockResolvedValue(false);
+    purchasesMocks.claimSquareWebhookEvent.mockResolvedValue("processed");
 
     await processSquareRefundEvent(refundEvent);
 
@@ -799,5 +990,271 @@ describe("refund webhooks", () => {
     expect(adminDb.rpc).not.toHaveBeenCalledWith("reserve_event_ticket", expect.anything());
     expect(logMocks.warn).toHaveBeenCalledWith("payment.refunded_before_fulfillment", { purchaseId: "purchase-1" });
     expect(afterMocks.after).not.toHaveBeenCalled();
+  });
+});
+
+describe("refund emails", () => {
+  const ticketPurchase = purchase({
+    event_id: "event-1",
+    square_payment_id: "payment-1",
+    status: "completed",
+    fulfilled_at: "2026-11-01T00:00:00Z",
+  });
+
+  function refundEvent(eventId: string) {
+    return {
+      eventId,
+      type: "refund.updated",
+      data: {
+        object: {
+          refund: {
+            id: "refund-1",
+            paymentId: "payment-1",
+            amountMoney: { amount: BigInt(2000), currency: "CAD" as const },
+          },
+        },
+      },
+    };
+  }
+
+  function payment(refundIds: string[], refunded: number) {
+    return {
+      payment: {
+        id: "payment-1",
+        status: "COMPLETED",
+        amountMoney: { amount: BigInt(2000), currency: "CAD" },
+        refundedMoney: { amount: BigInt(refunded), currency: "CAD" },
+        refundIds,
+      },
+    };
+  }
+
+  const squareRefunds = new Map<string, { status: string; amount: number }>();
+
+  /**
+   * The claim as the database keeps it: one row per refund, claimed when no
+   * one has, released after a send that didn't happen, then marked sent.
+   */
+  const claims = new Map<string, { attempted: boolean; sent: boolean }>();
+
+  /** Runs what the sync scheduled with `after`, as Next does after the response. */
+  async function runAfter() {
+    const callbacks = afterMocks.after.mock.calls.map(([callback]) => callback as () => Promise<void>);
+    afterMocks.after.mockClear();
+    await Promise.all(callbacks.map((callback) => callback()));
+  }
+
+  beforeEach(() => {
+    squareRefunds.clear();
+    claims.clear();
+    squareRefunds.set("refund-1", { status: "COMPLETED", amount: 2000 });
+
+    purchasesMocks.fetchPurchaseBySquarePaymentId.mockResolvedValue(ticketPurchase);
+    purchasesMocks.fetchPurchaseById.mockResolvedValue({ ...ticketPurchase, refunded_cents: 2000 });
+    purchasesMocks.applyPurchaseRefund.mockResolvedValue({
+      refundedCents: 2000,
+      fullyRefunded: true,
+      amountIncreased: true,
+      ticketRemoved: true,
+      keptCheckedInTicket: false,
+    });
+    squareMocks.get.mockResolvedValue(payment(["refund-1"], 2000));
+    squareMocks.getRefund.mockImplementation(async ({ refundId }: { refundId: string }) => {
+      const refund = squareRefunds.get(refundId)!;
+      return {
+        refund: {
+          id: refundId,
+          status: refund.status,
+          amountMoney: { amount: BigInt(refund.amount), currency: "CAD" },
+        },
+      };
+    });
+    ticketsMocks.fetchEventTicketByPurchaseId.mockResolvedValue(null);
+    eventsMocks.fetchEventById.mockResolvedValue({ id: "event-1", name: "Design Night" });
+    usersMocks.fetchUserInfoContactById.mockResolvedValue({
+      id: "user-1",
+      email: "ada@example.com",
+      first_name: "Ada",
+      last_name: "Lovelace",
+    });
+    emailMocks.sendEmail.mockResolvedValue(true);
+
+    purchasesMocks.claimPurchaseRefundEmail.mockImplementation(
+      async (_db: unknown, input: { squareRefundId: string }) => {
+        // Yield first, so concurrent passes interleave before the check.
+        await Promise.resolve();
+        const row = claims.get(input.squareRefundId) ?? { attempted: false, sent: false };
+        claims.set(input.squareRefundId, row);
+        if (row.attempted || row.sent) return false;
+        row.attempted = true;
+        return true;
+      }
+    );
+    purchasesMocks.releasePurchaseRefundEmailClaim.mockImplementation(
+      async (_db: unknown, refundId: string) => {
+        const row = claims.get(refundId);
+        if (row && !row.sent) row.attempted = false;
+      }
+    );
+    purchasesMocks.markPurchaseRefundEmailSent.mockImplementation(
+      async (_db: unknown, refundId: string) => {
+        claims.get(refundId)!.sent = true;
+      }
+    );
+  });
+
+  it("emails the buyer once a refund completes, with the site's purchase link", async () => {
+    await processSquareRefundEvent(refundEvent("e-1"), "https://www.site.example");
+    await runAfter();
+
+    expect(emailMocks.sendEmail).toHaveBeenCalledOnce();
+    const [{ to, subject, html }] = emailMocks.sendEmail.mock.calls[0];
+    expect(to).toBe("ada@example.com");
+    expect(subject).toBe("Your refund for Design Night");
+    expect(html).toContain("is no longer valid");
+    expect(html).toContain("https://www.site.example/portal#settings/purchases");
+    expect(purchasesMocks.claimPurchaseRefundEmail).toHaveBeenCalledWith(adminDb, {
+      squareRefundId: "refund-1",
+      purchaseId: "purchase-1",
+      amountCents: 2000,
+      currency: "CAD",
+    });
+    expect(purchasesMocks.markPurchaseRefundEmailSent).toHaveBeenCalledWith(adminDb, "refund-1");
+  });
+
+  it("sends once across repeated deliveries of the same refund", async () => {
+    await processSquareRefundEvent(refundEvent("e-1"));
+    await runAfter();
+    // The amount is already recorded now, as the database would report.
+    purchasesMocks.fetchPurchaseBySquarePaymentId.mockResolvedValue({ ...ticketPurchase, refunded_cents: 2000 });
+    await processSquareRefundEvent(refundEvent("e-2"));
+    await processSquarePaymentEvent({
+      eventId: "e-3",
+      type: "payment.updated",
+      data: { object: { payment: payment(["refund-1"], 2000).payment as never } },
+    });
+    await runAfter();
+
+    expect(emailMocks.sendEmail).toHaveBeenCalledOnce();
+  });
+
+  it("sends once when deliveries of the same refund run concurrently", async () => {
+    await Promise.all([
+      processSquareRefundEvent(refundEvent("e-1")),
+      processSquareRefundEvent(refundEvent("e-2")),
+      processSquareRefundEvent(refundEvent("e-3")),
+    ]);
+    await runAfter();
+
+    expect(emailMocks.sendEmail).toHaveBeenCalledOnce();
+  });
+
+  it("sends one email per refund when a purchase takes two partial refunds", async () => {
+    squareRefunds.set("refund-1", { status: "COMPLETED", amount: 500 });
+    squareMocks.get.mockResolvedValue(payment(["refund-1"], 500));
+    purchasesMocks.applyPurchaseRefund.mockResolvedValue({
+      refundedCents: 500,
+      fullyRefunded: false,
+      amountIncreased: true,
+      ticketRemoved: false,
+      keptCheckedInTicket: false,
+    });
+    ticketsMocks.fetchEventTicketByPurchaseId.mockResolvedValue({ id: "ticket-1" });
+    purchasesMocks.fetchPurchaseById.mockResolvedValue({ ...ticketPurchase, refunded_cents: 500 });
+
+    await processSquareRefundEvent(refundEvent("e-1"));
+    await runAfter();
+
+    squareRefunds.set("refund-2", { status: "COMPLETED", amount: 700 });
+    squareMocks.get.mockResolvedValue(payment(["refund-1", "refund-2"], 1200));
+    purchasesMocks.fetchPurchaseBySquarePaymentId.mockResolvedValue({ ...ticketPurchase, refunded_cents: 500 });
+    purchasesMocks.fetchPurchaseById.mockResolvedValue({ ...ticketPurchase, refunded_cents: 1200 });
+
+    await processSquareRefundEvent(refundEvent("e-2"));
+    await runAfter();
+
+    expect(emailMocks.sendEmail).toHaveBeenCalledTimes(2);
+    const [first, second] = emailMocks.sendEmail.mock.calls.map(([email]) => email.html as string);
+    expect(first).toContain("$5.00 CAD");
+    expect(first).not.toContain("no longer valid");
+    expect(second).toContain("$7.00 CAD");
+    expect(second).toContain("$12.00 CAD of $20.00 CAD");
+  });
+
+  it.each(["PENDING", "FAILED", "REJECTED"])("sends nothing for a %s refund", async (status) => {
+    squareRefunds.set("refund-1", { status, amount: 2000 });
+    squareMocks.get.mockResolvedValue(payment(["refund-1"], 0));
+
+    await processSquareRefundEvent(refundEvent("e-1"));
+    await runAfter();
+
+    expect(purchasesMocks.claimPurchaseRefundEmail).not.toHaveBeenCalled();
+    expect(emailMocks.sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("waits while Square's refunded total lags its refund list", async () => {
+    squareMocks.get.mockResolvedValue(payment(["refund-1"], 0));
+
+    await processSquareRefundEvent(refundEvent("e-1"));
+    await runAfter();
+
+    expect(emailMocks.sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("says nothing about a refund that completed long ago", async () => {
+    squareMocks.getRefund.mockResolvedValue({
+      refund: {
+        id: "refund-1",
+        status: "COMPLETED",
+        amountMoney: { amount: BigInt(2000), currency: "CAD" },
+        updatedAt: "2026-01-01T00:00:00Z",
+      },
+    });
+
+    await processSquareRefundEvent(refundEvent("e-1"));
+    await runAfter();
+
+    expect(emailMocks.sendEmail).not.toHaveBeenCalled();
+  });
+
+  it("still succeeds when the send throws, and a later delivery retries it", async () => {
+    emailMocks.sendEmail.mockRejectedValueOnce(new Error("Resend is down"));
+
+    await expect(processSquareRefundEvent(refundEvent("e-1"))).resolves.toBeUndefined();
+    await expect(runAfter()).resolves.toBeUndefined();
+
+    expect(purchasesMocks.applyPurchaseRefund).toHaveBeenCalled();
+    expect(purchasesMocks.forgetSquareWebhookEvent).not.toHaveBeenCalled();
+    expect(logMocks.warn).toHaveBeenCalledWith(
+      "payment.refund_email_failed",
+      expect.objectContaining({ purchaseId: "purchase-1" })
+    );
+    expect(logMocks.error).not.toHaveBeenCalled();
+    expect(purchasesMocks.releasePurchaseRefundEmailClaim).toHaveBeenCalledWith(adminDb, "refund-1");
+
+    await processSquareRefundEvent(refundEvent("e-2"));
+    await runAfter();
+
+    expect(emailMocks.sendEmail).toHaveBeenCalledTimes(2);
+    expect(purchasesMocks.markPurchaseRefundEmailSent).toHaveBeenCalledOnce();
+  });
+
+  it("emails about a membership refund too", async () => {
+    const membership = purchase({
+      kind: "membership",
+      membership_type_id: "type-1",
+      square_payment_id: "payment-1",
+      status: "completed",
+    });
+    purchasesMocks.fetchPurchaseBySquarePaymentId.mockResolvedValue(membership);
+    purchasesMocks.fetchPurchaseById.mockResolvedValue({ ...membership, refunded_cents: 2000 });
+    membershipsMocks.fetchMembershipTypeById.mockResolvedValue({ id: "type-1", name: "Student" });
+
+    await processSquareRefundEvent(refundEvent("e-1"));
+    await runAfter();
+
+    expect(emailMocks.sendEmail).toHaveBeenCalledOnce();
+    expect(emailMocks.sendEmail.mock.calls[0][0].subject).toBe("Your refund for Student");
+    expect(emailMocks.sendEmail.mock.calls[0][0].html).not.toContain("ticket");
   });
 });

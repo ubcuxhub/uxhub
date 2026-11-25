@@ -35,28 +35,38 @@ import {
   TableRow,
   TableRowLink,
 } from "@/components/ui/table";
+import { ChipFilterSection } from "@/features/admin/components/ChipFilterSection";
 import {
   REVIEW_STATE_BADGES,
   ReviewStateBadge,
 } from "@/features/admin/components/ReviewStateBadge";
 import {
   DEFAULT_REVIEW_SORT,
+  EMPTY_REVIEW_FILTERS,
+  NO_MEMBERSHIP,
   REVIEW_PAGE_SIZE,
   REVIEW_SORTS,
   REVIEW_STATE_QUEUE,
+  STUDENT_STATUS_LABELS,
+  countReviewFilters,
   countReviewStates,
   filterReviewItems,
+  membershipLabel,
   parseReviewListQuery,
+  programOptions,
   serializeReviewListQuery,
   type ApplicationReviewState,
+  type ReviewFilters,
   type ReviewListItem,
   type ReviewListQuery,
   type ReviewSort,
 } from "@/features/admin/lib/application-review";
+import { YEAR_LABELS } from "@/lib/constants";
 import { formatEventDate } from "@/lib/date";
 
 interface ReviewApplicationsClientProps {
   eventId: string;
+  /** Named by the event manager's header. */
   eventName: string;
   /** "Applications closed Nov 3 · Event Jan 9–10", composed on the server. */
   subtitle?: string;
@@ -72,6 +82,42 @@ interface ReviewApplicationsClientProps {
 }
 
 const NOUN = { one: "applicant", other: "applicants" };
+
+type Option = { value: string; label: string };
+
+const YEAR_OPTIONS = Object.entries(YEAR_LABELS).map(([value, label]) => ({
+  value: value as keyof typeof YEAR_LABELS,
+  label,
+}));
+const STUDENT_STATUS_OPTIONS = Object.entries(STUDENT_STATUS_LABELS).map(
+  ([value, label]) => ({ value: value as keyof typeof STUDENT_STATUS_LABELS, label })
+);
+
+/** Options plus any value the URL selected that no applicant has, so it can be cleared. */
+function withSelected(options: Option[], selected: readonly string[]): Option[] {
+  const known = new Set(options.map((option) => option.value));
+  return [
+    ...options,
+    ...selected
+      .filter((value) => !known.has(value))
+      .map((value) => ({ value, label: value })),
+  ];
+}
+
+/** The tiers applicants hold, by name, then Non-member. */
+function membershipOptions(items: readonly ReviewListItem[]): Option[] {
+  const tiers = [...new Set(items.flatMap((item) => (item.membership ? [item.membership] : [])))]
+    .map((value) => ({ value, label: membershipLabel(value) }))
+    .sort((a, b) => a.label.localeCompare(b.label, "en"));
+  const nonMembers = items.some((item) => !item.membership);
+  return [
+    ...tiers,
+    ...(nonMembers ? [{ value: NO_MEMBERSHIP, label: membershipLabel(null) }] : []),
+  ];
+}
+
+const toggled = <T extends string>(list: readonly T[], value: T): T[] =>
+  list.includes(value) ? list.filter((item) => item !== value) : [...list, value];
 
 const shortDate = (iso: string) =>
   formatEventDate(iso, { month: "short", year: undefined }) ?? iso;
@@ -124,7 +170,6 @@ function useReviewListQuery() {
 
 export function ReviewApplicationsClient({
   eventId,
-  eventName,
   subtitle,
   capacity = 0,
   seats,
@@ -160,20 +205,27 @@ export function ReviewApplicationsClient({
       ),
     });
 
+  const toggleFilter = <K extends keyof ReviewFilters>(
+    key: K,
+    value: ReviewFilters[K][number]
+  ) =>
+    update({
+      [key]: toggled(query[key] as readonly string[], value),
+    } as Partial<ReviewListQuery>);
+
+  const filterCount = countReviewFilters(query);
+  const memberships = withSelected(membershipOptions(applications), query.memberships);
+  const programs = withSelected(programOptions(applications), query.programs);
+
   const rowQuery = { ...query, from: undefined };
   const columns = showNotes ? 4 : 3;
 
   return (
-    <PageContainer
-      backHref="/admin/events"
-      backLabel="Back to Manage Events"
-      className="flex flex-col gap-8"
-    >
+    // The event manager's header names the event and holds the way back.
+    <PageContainer className="flex flex-col gap-8">
       <header className="flex flex-col gap-2">
-        <h1 className="text-h1 tracking-tight">Applications</h1>
-        <p className="text-muted-foreground">
-          {[eventName, subtitle].filter(Boolean).join(" · ")}
-        </p>
+        <h2 className="text-h2 tracking-tight">Applications</h2>
+        {subtitle ? <p className="text-muted-foreground">{subtitle}</p> : null}
       </header>
 
       {applications.length === 0 ? (
@@ -218,9 +270,15 @@ export function ReviewApplicationsClient({
               }
               actions={
                 <SortFilterPanel
-                  activeCount={query.sort === DEFAULT_REVIEW_SORT ? 0 : 1}
+                  activeCount={
+                    filterCount + (query.sort === DEFAULT_REVIEW_SORT ? 0 : 1)
+                  }
                   summary={`${results.length} ${results.length === 1 ? NOUN.one : NOUN.other}`}
-                  onClearAll={() => update({ sort: DEFAULT_REVIEW_SORT })}
+                  onClearAll={() =>
+                    update({ sort: DEFAULT_REVIEW_SORT, ...EMPTY_REVIEW_FILTERS })
+                  }
+                  // Four chip groups can outgrow a short screen: scroll inside.
+                  className="max-h-[var(--radix-popover-content-available-height)] overflow-y-auto"
                 >
                   <SortFilterSection title="Sort by">
                     <Select
@@ -239,6 +297,32 @@ export function ReviewApplicationsClient({
                       </SelectContent>
                     </Select>
                   </SortFilterSection>
+                  <ChipFilterSection
+                    title="Membership"
+                    options={memberships}
+                    selected={new Set(query.memberships)}
+                    onToggle={(value) => toggleFilter("memberships", value)}
+                  />
+                  <ChipFilterSection
+                    title="Year"
+                    options={YEAR_OPTIONS}
+                    selected={new Set(query.years)}
+                    onToggle={(value) => toggleFilter("years", value)}
+                  />
+                  <ChipFilterSection
+                    title="Student status"
+                    options={STUDENT_STATUS_OPTIONS}
+                    selected={new Set(query.studentStatuses)}
+                    onToggle={(value) => toggleFilter("studentStatuses", value)}
+                  />
+                  {programs.length > 0 ? (
+                    <ChipFilterSection
+                      title="Program"
+                      options={programs}
+                      selected={new Set(query.programs)}
+                      onToggle={(value) => toggleFilter("programs", value)}
+                    />
+                  ) : null}
                 </SortFilterPanel>
               }
             />
@@ -343,7 +427,7 @@ export function ReviewApplicationsClient({
                       },
                     }}
                     onClearFilters={() => {
-                      update({ q: "", statuses: [] });
+                      update({ q: "", statuses: [], ...EMPTY_REVIEW_FILTERS });
                       searchRef.current?.focus();
                     }}
                   />

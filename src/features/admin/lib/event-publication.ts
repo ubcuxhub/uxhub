@@ -50,15 +50,6 @@ export function publishAtProblem(
   return null;
 }
 
-/** Throws `publishAtProblem`'s message, for actions that throw. */
-export function assertPublishAt(
-  status: EventStatus | null | undefined,
-  publishAt: unknown,
-  now = Date.now()
-) {
-  const problem = publishAtProblem(status, publishAt, now);
-  if (problem) throw new Error(problem);
-}
 
 /** Leads every refusal to publish an event the builder wouldn't save. */
 export const FINISH_IN_EDIT = "Finish the event in Edit before publishing.";

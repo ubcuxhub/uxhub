@@ -23,15 +23,6 @@ export interface ApplicationQuestionTemplate {
   response_options: string[];
 }
 
-/** Display-ready event details for a ticket; build one with `toTicketEvent`. */
-export interface TicketEvent {
-  eventColour?: string;
-  name: string;
-  date: string | null;
-  time: string | null;
-  location: string | null;
-}
-
 /**
  * The badge on a student's event card and event page, naming their event
  * state (docs/event-states.md). `date` completes "Opens" and "Register by".
@@ -53,14 +44,25 @@ export interface EventBadge {
     | "register_by"
     | "not_selected"
     | "applications_closed"
+    | "offer_expired"
     | "canceled";
   date?: string;
   /** Replaces the status's label, as for a draft event (`DRAFT_EVENT_BADGE`). */
   label?: string;
 }
 
+/**
+ * The event fields a timeline card shows. The portal narrows its rows to these
+ * on the server (`toTimelineEvent`), so the client timeline never receives a
+ * rich description, an agenda or a draft's working document.
+ */
+export type TimelineEvent = Pick<
+  EventRow,
+  "id" | "slug" | "name" | "starts_at" | "ends_at" | "location_building" | "location_room" | "image_url"
+>;
+
 export interface EventGroup {
   key: string;
   label: string;
-  events: EventRow[];
+  events: TimelineEvent[];
 }

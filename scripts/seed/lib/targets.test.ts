@@ -126,10 +126,11 @@ describe("target policies", () => {
       memberships: true,
       forceDraft: false,
       workingDrafts: true,
+      claimsByKey: true,
     });
   });
 
-  it("keeps prod additive, fixture-free, off the live tiers, and out of the public API", () => {
+  it("keeps prod additive, fixture-free, off the live tiers, off real events, and out of the public API", () => {
     // Each of these is load-bearing. Flipping one silently changes what a
     // `--target=prod` run can do to the deployed database.
     expect(TARGET_POLICIES.prod).toEqual({
@@ -138,6 +139,7 @@ describe("target policies", () => {
       memberships: false,
       forceDraft: true,
       workingDrafts: false,
+      claimsByKey: false,
     });
   });
 });

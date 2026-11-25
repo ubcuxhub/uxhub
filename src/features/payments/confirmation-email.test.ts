@@ -21,13 +21,10 @@ vi.mock("@/lib/supabase-helpers/purchases", () => ({
 }));
 
 const fetchUserMembershipExpiryById = vi.fn();
+const fetchUserInfoContactById = vi.fn();
 vi.mock("@/lib/supabase-helpers/users", () => ({
-  fetchUserInfoContactById: async () => ({
-    email: "ada@example.com",
-    first_name: "Ada",
-    id: "user-1",
-    last_name: "Lovelace",
-  }),
+  fetchUserInfoContactById: (...args: unknown[]) =>
+    fetchUserInfoContactById(...args),
   fetchUserMembershipExpiryById: (...args: unknown[]) =>
     fetchUserMembershipExpiryById(...args),
 }));
@@ -74,6 +71,28 @@ describe("sendPurchaseConfirmationEmail", () => {
       membership_type_id: "membership-1",
     });
     fetchMembershipTermEndsAt.mockResolvedValue(null);
+    fetchUserInfoContactById.mockResolvedValue({
+      email: "ada@example.com",
+      first_name: "Ada",
+      id: "user-1",
+      last_name: "Lovelace",
+    });
+  });
+
+  it("greets a member with one name by it alone", async () => {
+    fetchPurchaseById.mockResolvedValue(completedMembershipPurchase);
+    fetchUserInfoContactById.mockResolvedValue({
+      email: "prince@example.com",
+      first_name: "Prince",
+      id: "user-1",
+      last_name: "",
+    });
+
+    await sendPurchaseConfirmationEmail(adminDb, "purchase-1");
+
+    const { html } = sendEmail.mock.calls[0][0] as { html: string };
+    expect(html).toContain("Hi Prince, thanks for joining.");
+    expect(html).not.toContain("Prince ,");
   });
 
   it("puts the member's effective expiry in the membership receipt", async () => {

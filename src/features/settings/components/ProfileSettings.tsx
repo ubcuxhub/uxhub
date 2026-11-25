@@ -42,8 +42,13 @@ import { ProfileTab } from "./profile/ProfileTab";
 /** How long a change waits for the next one before it saves. */
 const AUTOSAVE_MS = 800;
 
+interface ProfileSettingsProps {
+  /** Called after each change the server accepted; not on a failed or skipped save. */
+  onSaved?: () => void;
+}
+
 /** Settings › Profile for the signed-in member. */
-export function ProfileSettings() {
+export function ProfileSettings({ onSaved }: ProfileSettingsProps = {}) {
   const { user, membershipTermEndsAt, refreshUser } = useUser();
   const [client] = useState(createServerProfileClient);
   // A refresh that briefly can't read the row mustn't unmount the editor
@@ -66,6 +71,7 @@ export function ProfileSettings() {
       user={shown}
       membershipTermEndsAt={membershipTermEndsAt}
       refreshUser={refreshUser}
+      onSaved={onSaved}
       client={client}
     />
   );
@@ -76,6 +82,8 @@ interface ProfileEditorProps {
   user: UserInfoRow;
   membershipTermEndsAt: string | null;
   refreshUser: () => Promise<void>;
+  /** Called after each change the server accepted; not on a failed or skipped save. */
+  onSaved?: () => void;
   client: ProfileClient;
   /** The debounce and the waits before retrying a failed save (tests shorten them). */
   timing?: { delayMs?: number; retryDelaysMs?: readonly number[] };
@@ -100,6 +108,7 @@ export function ProfileEditor({
   user,
   membershipTermEndsAt,
   refreshUser,
+  onSaved,
   client,
   timing,
 }: ProfileEditorProps) {
@@ -149,9 +158,9 @@ export function ProfileEditor({
     preset: initial.choice?.kind === "preset" ? initial.choice.preset : null,
     photoPath: user.profile_photo_path,
   });
-  const context = useRef({ user, client, refreshUser, canEditEligibility });
+  const context = useRef({ user, client, refreshUser, onSaved, canEditEligibility });
   useEffect(() => {
-    context.current = { user, client, refreshUser, canEditEligibility };
+    context.current = { user, client, refreshUser, onSaved, canEditEligibility };
   });
 
   const autosaves = useRef<SectionAutosaves | null>(null);
@@ -162,9 +171,11 @@ export function ProfileEditor({
     };
     const report = (section: ProfileSectionId) => (state: ProfileSaveStates[ProfileSectionId]) =>
       setSaveStates((states) => ({ ...states, [section]: state }));
-    // The rest of the app (sidebar avatar, membership pages) reads the row.
+    // The rest of the app (sidebar avatar, membership pages) reads the row,
+    // and the dialog refreshes server-rendered pages once it closes.
     const refresh = () => {
       context.current.refreshUser().catch(() => {});
+      context.current.onSaved?.();
     };
     const blocked = (section: "about" | "studies") =>
       sectionBlocked(
@@ -185,8 +196,18 @@ export function ProfileEditor({
           const values = pickFields(current.current.form, ABOUT_FIELDS);
           return sameFields(values, saved.current.about) ? null : values;
         },
+        // The details and the birthday take different paths; each is sent
+        // only when it changed, and a half-done save remembers the half.
         write: async (values) => {
-          await context.current.client.saveAbout(context.current.user, values);
+          const { birth_date: birthDate, ...details } = values;
+          const { birth_date: savedBirthDate, ...savedDetails } = saved.current.about;
+          if (!sameFields(details, savedDetails)) {
+            await context.current.client.saveAbout(context.current.user, details);
+            saved.current.about = { ...details, birth_date: savedBirthDate };
+          }
+          if (birthDate !== savedBirthDate) {
+            await context.current.client.saveBirthDate(birthDate || null);
+          }
           saved.current.about = values;
           refresh();
           return "saved";
@@ -326,6 +347,7 @@ export function ProfileEditor({
       setPhotoPath(setup.profilePhotoPath);
       setSaveStates((states) => ({ ...states, photo: { kind: "saved", at: Date.now() } }));
       context.current.refreshUser().catch(() => {});
+      context.current.onSaved?.();
     } catch (error) {
       setSaveStates((states) => ({ ...states, photo: photoAutosave.state() }));
       throw error;
@@ -350,8 +372,8 @@ export function ProfileEditor({
       }
       errors={{
         first_name: touched.has("first_name") ? errors.first_name : null,
-        last_name: touched.has("last_name") ? errors.last_name : null,
         student_number: touched.has("student_number") ? errors.student_number : null,
+        birth_date: touched.has("birth_date") ? errors.birth_date : null,
       }}
       canEditEligibility={canEditEligibility}
       avatarChoice={choice}

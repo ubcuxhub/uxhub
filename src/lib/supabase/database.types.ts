@@ -531,6 +531,8 @@ export type Database = {
           confirmation_deadline: string | null
           decisions_release_at: string | null
           event_id: string
+          offer_deadline_time: string | null
+          offer_window_days: number | null
           questions_locked_at: string | null
         }
         ComputedFields: never
@@ -538,12 +540,16 @@ export type Database = {
           confirmation_deadline?: string | null
           decisions_release_at?: string | null
           event_id: string
+          offer_deadline_time?: string | null
+          offer_window_days?: number | null
           questions_locked_at?: string | null
         }
         Update: {
           confirmation_deadline?: string | null
           decisions_release_at?: string | null
           event_id?: string
+          offer_deadline_time?: string | null
+          offer_window_days?: number | null
           questions_locked_at?: string | null
         }
         Relationships: [
@@ -794,42 +800,6 @@ export type Database = {
           },
         ]
       }
-      event_private_details: {
-        Row: {
-          created_at: string
-          event_id: string
-          meeting_id: string | null
-          meeting_passcode: string | null
-          meeting_url: string
-          updated_at: string
-        }
-        ComputedFields: never
-        Insert: {
-          created_at?: string
-          event_id: string
-          meeting_id?: string | null
-          meeting_passcode?: string | null
-          meeting_url: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          event_id?: string
-          meeting_id?: string | null
-          meeting_passcode?: string | null
-          meeting_url?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "event_private_details_event_id_fkey"
-            columns: ["event_id"]
-            isOneToOne: true
-            referencedRelation: "events"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       event_sponsors: {
         Row: {
           event_id: string
@@ -1017,6 +987,7 @@ export type Database = {
           registration_closes_at: string | null
           registration_opens_at: string | null
           regular_price: number | null
+          reminder_schedule: string
           requires_application: boolean
           revision: number
           short_description: string | null
@@ -1074,6 +1045,7 @@ export type Database = {
           registration_closes_at?: string | null
           registration_opens_at?: string | null
           regular_price?: number | null
+          reminder_schedule?: string
           requires_application?: boolean
           revision?: number
           short_description?: string | null
@@ -1129,6 +1101,7 @@ export type Database = {
           registration_closes_at?: string | null
           registration_opens_at?: string | null
           regular_price?: number | null
+          reminder_schedule?: string
           requires_application?: boolean
           revision?: number
           short_description?: string | null
@@ -1222,6 +1195,45 @@ export type Database = {
             columns: ["owner_event_id"]
             isOneToOne: false
             referencedRelation: "events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      purchase_refund_emails: {
+        Row: {
+          amount_cents: number
+          created_at: string
+          currency: string
+          email_attempted_at: string | null
+          email_sent_at: string | null
+          purchase_id: string
+          square_refund_id: string
+        }
+        ComputedFields: never
+        Insert: {
+          amount_cents: number
+          created_at?: string
+          currency: string
+          email_attempted_at?: string | null
+          email_sent_at?: string | null
+          purchase_id: string
+          square_refund_id: string
+        }
+        Update: {
+          amount_cents?: number
+          created_at?: string
+          currency?: string
+          email_attempted_at?: string | null
+          email_sent_at?: string | null
+          purchase_id?: string
+          square_refund_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "purchase_refund_emails_purchase_id_fkey"
+            columns: ["purchase_id"]
+            isOneToOne: false
+            referencedRelation: "purchases"
             referencedColumns: ["id"]
           },
         ]
@@ -1362,23 +1374,26 @@ export type Database = {
           created_at: string | null
           event_id: string
           event_type: string
-          payload: NonNullable<Json>
+          payload: Json | null
           processed_at: string | null
+          square_payment_id: string | null
         }
         ComputedFields: never
         Insert: {
           created_at?: string | null
           event_id: string
           event_type: string
-          payload: NonNullable<Json>
+          payload?: Json | null
           processed_at?: string | null
+          square_payment_id?: string | null
         }
         Update: {
           created_at?: string | null
           event_id?: string
           event_type?: string
-          payload?: NonNullable<Json>
+          payload?: Json | null
           processed_at?: string | null
+          square_payment_id?: string | null
         }
         Relationships: []
       }
@@ -1674,9 +1689,34 @@ export type Database = {
           starts_at: string
         }[]
       }
+      claim_event_reminders: {
+        Args: { p_event_ids?: string[]; p_limit?: number }
+        Returns: {
+          attempts: number
+          email: string
+          ends_at: string
+          event_id: string
+          event_name: string
+          event_slug: string
+          first_name: string
+          kind: string
+          location: Json
+          send_id: string
+          starts_at: string
+          ticket_id: string
+        }[]
+      }
       complete_application_email: {
         Args: { p_delivery_id: string; p_error_code?: string; p_sent: boolean }
         Returns: number
+      }
+      complete_event_reminder: {
+        Args: { p_error_code?: string; p_send_id: string; p_sent: boolean }
+        Returns: number
+      }
+      create_one_live_membership_index: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
       }
       create_staff_volunteer_schedule: {
         Args: { p_event_id: string; p_operation_id: string; p_url: string }
@@ -1728,10 +1768,6 @@ export type Database = {
         Args: { target_event_id: string }
         Returns: undefined
       }
-      delete_event_before_safe_mutations: {
-        Args: { target_event_id: string }
-        Returns: undefined
-      }
       delete_team: {
         Args: { p_team_id: string; p_user_id: string }
         Returns: string
@@ -1743,6 +1779,10 @@ export type Database = {
       draft_event_number: { Args: { value: string }; Returns: number }
       draft_event_timestamp: { Args: { value: string }; Returns: string }
       draft_event_wall_time: { Args: { value: string }; Returns: string }
+      end_event_offer: {
+        Args: { p_event_id: string; p_user_id: string }
+        Returns: undefined
+      }
       event_checkout_amount: {
         Args: { p_event_id: string; p_user_id: string }
         Returns: number
@@ -1814,6 +1854,10 @@ export type Database = {
         Args: { p_amount_cents?: number; p_event_id: string; p_user_id: string }
         Returns: string
       }
+      fail_abandoned_purchases: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       get_my_event_applications: {
         Args: { p_event_ids: string[] }
         Returns: {
@@ -1828,7 +1872,6 @@ export type Database = {
           user_id: string
         }[]
       }
-      get_user_info_id: { Args: Record<PropertyKey, never>; Returns: string }
       initialize_event_checkout: {
         Args: {
           p_event_id: string
@@ -1845,7 +1888,6 @@ export type Database = {
         }[]
       }
       is_admin: { Args: Record<PropertyKey, never>; Returns: boolean }
-      is_authenticated: { Args: Record<PropertyKey, never>; Returns: boolean }
       is_manager: { Args: Record<PropertyKey, never>; Returns: boolean }
       join_team: {
         Args: { p_invite_code: string; p_user_id: string }
@@ -1887,6 +1929,10 @@ export type Database = {
         Args: { p_delivery_ids: string[]; p_reason?: string }
         Returns: number
       }
+      release_event_reminders: {
+        Args: { p_reason?: string; p_send_ids: string[] }
+        Returns: number
+      }
       release_event_ticket: {
         Args: { p_purchase_id: string }
         Returns: undefined
@@ -1922,58 +1968,6 @@ export type Database = {
         }
         Returns: Json
       }
-      save_admin_event_before_agenda: {
-        Args: {
-          p_application_questions: Json
-          p_check_in_sessions: Json
-          p_event: Json
-          p_event_id: string
-          p_expected_image_url: string
-          p_mentors: Json
-          p_slug: string
-          p_sponsors: Json
-        }
-        Returns: Json
-      }
-      save_admin_event_before_application_settings: {
-        Args: {
-          p_application_questions: Json
-          p_check_in_sessions: Json
-          p_event: Json
-          p_event_id: string
-          p_expected_image_url: string
-          p_mentors: Json
-          p_slug: string
-          p_sponsors: Json
-        }
-        Returns: Json
-      }
-      save_admin_event_before_content: {
-        Args: {
-          p_application_questions: Json
-          p_check_in_sessions: Json
-          p_event: Json
-          p_event_id: string
-          p_expected_image_url: string
-          p_mentors: Json
-          p_slug: string
-          p_sponsors: Json
-        }
-        Returns: Json
-      }
-      save_admin_event_before_date_locations: {
-        Args: {
-          p_application_questions: Json
-          p_check_in_sessions: Json
-          p_event: Json
-          p_event_id: string
-          p_expected_image_url: string
-          p_mentors: Json
-          p_slug: string
-          p_sponsors: Json
-        }
-        Returns: Json
-      }
       save_admin_event_builder: {
         Args: {
           p_application_questions: Json
@@ -1990,96 +1984,7 @@ export type Database = {
         }
         Returns: Json
       }
-      save_admin_event_builder_before_agenda_timing: {
-        Args: {
-          p_application_questions: Json
-          p_check_in_sessions: Json
-          p_draft_id: string
-          p_draft_revision: number
-          p_event: Json
-          p_event_id: string
-          p_expected_header_image_url: string
-          p_expected_image_url: string
-          p_mentors: Json
-          p_slug: string
-          p_sponsors: Json
-        }
-        Returns: Json
-      }
-      save_admin_event_builder_before_cancellation: {
-        Args: {
-          p_application_questions: Json
-          p_check_in_sessions: Json
-          p_draft_id: string
-          p_draft_revision: number
-          p_event: Json
-          p_event_id: string
-          p_expected_header_image_url: string
-          p_expected_image_url: string
-          p_mentors: Json
-          p_slug: string
-          p_sponsors: Json
-        }
-        Returns: Json
-      }
-      save_admin_event_builder_before_publication: {
-        Args: {
-          p_application_questions: Json
-          p_check_in_sessions: Json
-          p_draft_id: string
-          p_draft_revision: number
-          p_event: Json
-          p_event_id: string
-          p_expected_header_image_url: string
-          p_expected_image_url: string
-          p_mentors: Json
-          p_slug: string
-          p_sponsors: Json
-        }
-        Returns: Json
-      }
-      save_admin_event_builder_before_safe_mutations: {
-        Args: {
-          p_application_questions: Json
-          p_check_in_sessions: Json
-          p_draft_id: string
-          p_draft_revision: number
-          p_event: Json
-          p_event_id: string
-          p_expected_header_image_url: string
-          p_expected_image_url: string
-          p_mentors: Json
-          p_slug: string
-          p_sponsors: Json
-        }
-        Returns: Json
-      }
-      save_admin_event_builder_before_unified_drafts: {
-        Args: {
-          p_application_questions: Json
-          p_check_in_sessions: Json
-          p_draft_id: string
-          p_draft_revision: number
-          p_event: Json
-          p_event_id: string
-          p_expected_header_image_url: string
-          p_expected_image_url: string
-          p_mentors: Json
-          p_slug: string
-          p_sponsors: Json
-        }
-        Returns: Json
-      }
       save_admin_event_draft: {
-        Args: {
-          p_document: Json
-          p_event_id: string
-          p_id: string
-          p_revision: number
-        }
-        Returns: Json
-      }
-      save_admin_event_draft_before_url_activation: {
         Args: {
           p_document: Json
           p_event_id: string
@@ -2192,6 +2097,7 @@ export type Database = {
           registration_closes_at: string | null
           registration_opens_at: string | null
           regular_price: number | null
+          reminder_schedule: string
           requires_application: boolean
           revision: number
           short_description: string | null

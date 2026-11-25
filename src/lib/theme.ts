@@ -34,16 +34,50 @@ export function setTheme(theme: Theme) {
   listeners.forEach((listener) => listener());
 }
 
-/** Subscribe to theme changes (in-tab toggles and cross-tab storage events). */
+const DARK_QUERY = "(prefers-color-scheme: dark)";
+
+function systemTheme(): Theme {
+  return window.matchMedia?.(DARK_QUERY).matches ? "dark" : "light";
+}
+
+/**
+ * Re-apply the stored choice, or the system's without one, after it changed
+ * outside this tab's toggle. On a forced-light route (auth, marketing) it
+ * updates the theme to restore on leaving instead, so the route stays light.
+ */
+function syncTheme() {
+  if (!FLAGS.darkMode) return;
+  const theme = getStoredTheme() ?? systemTheme();
+  const root = document.documentElement;
+  if (root.hasAttribute(FORCED_LIGHT_PREVIOUS_ATTR)) root.setAttribute(FORCED_LIGHT_PREVIOUS_ATTR, theme);
+  else applyTheme(theme);
+}
+
+/**
+ * Subscribe to theme changes: in-tab toggles, a toggle in another tab (a
+ * `storage` event), and the OS switching between light and dark while no
+ * choice is stored. The last two apply the new theme here before notifying.
+ */
 export function subscribeTheme(listener: () => void) {
   listeners.add(listener);
   const onStorage = (event: StorageEvent) => {
-    if (event.key === THEME_STORAGE_KEY) listener();
+    // `null`: another tab cleared all storage.
+    if (event.key !== THEME_STORAGE_KEY && event.key !== null) return;
+    syncTheme();
+    listener();
   };
+  const onSystemChange = () => {
+    if (getStoredTheme()) return;
+    syncTheme();
+    listener();
+  };
+  const system = window.matchMedia?.(DARK_QUERY);
   window.addEventListener("storage", onStorage);
+  system?.addEventListener?.("change", onSystemChange);
   return () => {
     listeners.delete(listener);
     window.removeEventListener("storage", onStorage);
+    system?.removeEventListener?.("change", onSystemChange);
   };
 }
 

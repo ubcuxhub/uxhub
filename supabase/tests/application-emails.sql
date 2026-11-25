@@ -233,3 +233,83 @@ begin
     raise exception 'a registered applicant is due a reminder';
   end if;
 end $$;
+
+-- A draft event: staff testing the flow get the decision and the reminder;
+-- a member left on an unpublished event gets neither (its page is a 404 to
+-- them).
+insert into public.events (
+  short_description, starts_at, ends_at,
+  name, description, regular_price, member_price, max_capacity, slug,
+  registration_opens_at, registration_closes_at, status, requires_application
+)
+values (
+  'RLS draft emails', now() + interval '5 days', now() + interval '6 days', 'RLS Draft Emails',
+  'RLS application emails on a draft', 0, 0, 10, 'rls-application-emails-draft',
+  now() - interval '2 days', now() - interval '1 hour', 'draft', true
+)
+returning id \gset email_draft_event_
+
+insert into public.event_application_settings (event_id, decisions_release_at)
+values (:'email_draft_event_id', now() - interval '1 hour');
+
+insert into public.user_info (email, first_name, last_name, role_access)
+values ('rls-email-exec@example.test', 'Email', 'Exec', 'manager')
+returning id \gset email_exec_
+
+insert into public.event_applications (event_id, user_id, status, offer_expires_at)
+values (:'email_draft_event_id', :'email_exec_id', 'accepted', now() + interval '12 hours')
+returning id \gset email_exec_application_
+
+insert into public.event_applications (event_id, user_id, status, offer_expires_at)
+values (:'email_draft_event_id', :'email_reminded_id', 'accepted', now() + interval '12 hours')
+returning id \gset email_draft_member_application_
+
+select set_config('rls.email_draft_event_id', :'email_draft_event_id', true);
+select set_config('rls.email_exec_application_id', :'email_exec_application_id', true);
+select set_config('rls.email_draft_member_application_id', :'email_draft_member_application_id', true);
+
+do $$
+declare
+  v_event uuid := current_setting('rls.email_draft_event_id')::uuid;
+  v_exec uuid := current_setting('rls.email_exec_application_id')::uuid;
+  v_member uuid := current_setting('rls.email_draft_member_application_id')::uuid;
+  v_claim record;
+begin
+  if exists (select 1 from application_emails.due_work(array[v_event]) where application_id = v_member) then
+    raise exception 'a member is due an email on a draft event';
+  end if;
+
+  -- The acceptance is due, and claimed once.
+  select * into v_claim from public.claim_application_emails(25, array[v_event]) c
+  where c.application_id = v_exec;
+  if v_claim.kind is distinct from 'accepted' then
+    raise exception 'an exec''s acceptance on a draft was not claimed: %', row_to_json(v_claim);
+  end if;
+  perform public.complete_application_email(v_claim.delivery_id, true, null);
+
+  -- Sent two days ago: the reminder is due on the draft too.
+  update application_emails.deliveries set sent_at = now() - interval '2 days'
+  where application_id = v_exec and kind = 'accepted';
+  select * into v_claim from public.claim_application_emails(25, array[v_event]) c
+  where c.application_id = v_exec;
+  if v_claim.kind is distinct from 'offer_reminder' then
+    raise exception 'an exec''s reminder on a draft was not claimed: %', row_to_json(v_claim);
+  end if;
+  perform public.complete_application_email(v_claim.delivery_id, true, null);
+
+  -- Finished: nothing more, even for a new deadline.
+  update public.event_applications set offer_expires_at = now() + interval '20 hours'
+  where id = v_exec;
+  if not exists (select 1 from application_emails.due_work(array[v_event]) where application_id = v_exec) then
+    raise exception 'the exec''s moved deadline was not due';
+  end if;
+  update public.events
+  set registration_opens_at = now() - interval '5 days',
+      registration_closes_at = now() - interval '4 days',
+      starts_at = now() - interval '3 days',
+      ends_at = now() - interval '2 days'
+  where id = v_event;
+  if exists (select 1 from application_emails.due_work(array[v_event])) then
+    raise exception 'an email is due on a finished draft';
+  end if;
+end $$;

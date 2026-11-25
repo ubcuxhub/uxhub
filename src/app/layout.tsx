@@ -22,7 +22,8 @@ const lora = Lora({
 
 export const metadata: Metadata = {
   title: "UBC UX Hub",
-  description: "A collaborative whiteboard and design hub",
+  description:
+    "UBC UX Hub is UBC's student user experience design club: workshops, events and a community for anyone exploring UX.",
   icons: {
     icon: [
       { url: "/favicon/favicon.ico", sizes: "any" },
@@ -36,7 +37,8 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
-  userScalable: false,
+  // No `userScalable: false` or `maximumScale`: pinch zoom must keep working
+  // (WCAG 1.4.4). Inputs use 16px text, so iOS doesn't zoom on focus anyway.
   viewportFit: "cover",
 };
 

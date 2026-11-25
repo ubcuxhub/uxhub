@@ -1,14 +1,26 @@
 import { cache } from "react";
 
+import type { AuthErrorCode } from "@/lib/auth/auth-error";
 import type { UserInfoRow } from "@/lib/supabase/models";
 import { createClient } from "@/lib/supabase/server";
-import { ensureUserInfo } from "@/lib/auth/ensure-user-info";
+import {
+  PROFILE_CONFLICT_EVENTS,
+  ensureUserInfo,
+} from "@/lib/auth/ensure-user-info";
+import { errorFields, log } from "@/lib/log";
 import { fetchUserInfoByAuthId } from "@/lib/supabase-helpers/users";
 
 export type CurrentUserResult =
   | { status: "authenticated"; user: UserInfoRow }
   | { status: "unauthenticated" }
-  | { status: "error"; message: string };
+  /**
+   * Signed in, but no profile row and no first name to build one from (an
+   * OAuth account that shared none). The guards send them to
+   * `/auth/complete-profile`.
+   */
+  | { status: "needs_profile" }
+  /** The guards send it to `/auth/error` with this code. */
+  | { status: "error"; code: AuthErrorCode };
 
 /**
  * Resolves the signed-in user once per request.
@@ -40,9 +52,18 @@ export const loadCurrentUser = cache(async (): Promise<CurrentUserResult> => {
     return { status: "unauthenticated" };
   }
 
-  const existing = await fetchUserInfoByAuthId(supabase, authUser.id).catch(
-    () => null
-  );
+  // A failed read is not "no profile": treating it as one would run the
+  // repair below, which writes, on a database hiccup.
+  let existing: UserInfoRow | null;
+  try {
+    existing = await fetchUserInfoByAuthId(supabase, authUser.id);
+  } catch (error) {
+    log.error("auth.profile_read_failed", {
+      ...errorFields(error),
+      authUserId: authUser.id,
+    });
+    return { status: "error", code: "profile_unavailable" };
+  }
 
   if (existing) {
     return { status: "authenticated", user: existing };
@@ -55,16 +76,34 @@ export const loadCurrentUser = cache(async (): Promise<CurrentUserResult> => {
   // once per request instead of once per guard call.
   const ensured = await ensureUserInfo(authUser);
 
-  if (ensured.status === "conflict") {
-    return { status: "error", message: ensured.message };
+  if (ensured.status === "missing_name") {
+    return { status: "needs_profile" };
   }
 
-  const repaired = await fetchUserInfoByAuthId(supabase, authUser.id).catch(
-    () => null
-  );
+  // Logged here, once per request, so the guards that turn these into an
+  // /auth/error redirect don't log the same cause again.
+  if (ensured.status === "conflict") {
+    log.warn(PROFILE_CONFLICT_EVENTS[ensured.reason], {
+      authUserId: authUser.id,
+      source: "current_user",
+    });
+    return { status: "error", code: ensured.reason };
+  }
+
+  let repaired: UserInfoRow | null;
+  try {
+    repaired = await fetchUserInfoByAuthId(supabase, authUser.id);
+  } catch (error) {
+    log.error("auth.profile_read_failed", {
+      ...errorFields(error),
+      authUserId: authUser.id,
+    });
+    return { status: "error", code: "profile_unavailable" };
+  }
 
   if (!repaired) {
-    return { status: "error", message: "Unable to load your profile." };
+    log.warn("auth.profile_repair_missing", { authUserId: authUser.id });
+    return { status: "error", code: "profile_unavailable" };
   }
 
   return { status: "authenticated", user: repaired };

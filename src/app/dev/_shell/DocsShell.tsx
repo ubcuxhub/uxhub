@@ -25,12 +25,13 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { FLAGS } from "@/lib/flags";
 import { applyTheme, getStoredTheme, subscribeTheme, type Theme } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 
 import { DocsContext } from "./context";
-import { filterNav, INDEX_PATH, TOP_LINKS, type NavGroup } from "./nav";
+import { filterNav, INDEX_PATH, isServedPage, TOP_LINKS, type NavGroup } from "./nav";
 import { OnThisPage } from "./OnThisPage";
 import { docsHref, parseDisplayParams, type DisplayParams } from "./params";
 import { isCanvasPath } from "./standalone";
@@ -51,20 +52,6 @@ function userTheme(): Theme {
 
 function useUserTheme(): Theme {
   return useSyncExternalStore(subscribeTheme, userTheme, () => "light");
-}
-
-function subscribeWide(onChange: () => void) {
-  const query = window.matchMedia(WIDE_QUERY);
-  query.addEventListener("change", onChange);
-  return () => query.removeEventListener("change", onChange);
-}
-
-function useWide() {
-  return useSyncExternalStore(
-    subscribeWide,
-    () => window.matchMedia(WIDE_QUERY).matches,
-    () => false,
-  );
 }
 
 /** What the phone header names: the current page and the group it sits in. */
@@ -95,12 +82,13 @@ export function DocsShell({
   const params = parseDisplayParams(useSearchParams());
   const { theme, density, open } = params;
   const current = currentPage(pathname, groups);
-  const wide = useWide();
+  const wide = useMediaQuery(WIDE_QUERY);
   const user = useUserTheme();
   const [query, setQuery] = useState("");
   const [menuOpen, setMenuOpen] = useState(false);
   const contentRef = useRef<HTMLElement>(null);
-  const canvas = isCanvasPath(pathname);
+  // Where the gallery isn't served, its address is an ordinary not-found page.
+  const canvas = isServedPage(pathname) && isCanvasPath(pathname);
 
   // Side by side only exists on wide screens; elsewhere it falls back to its
   // light column.

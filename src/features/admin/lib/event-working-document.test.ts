@@ -14,7 +14,7 @@ describe("working document boundary", () => {
     const incomplete = { ...document, checkInEvents: [{ name: "Doors", start_time: "", end_time: "" }], sponsors: [{ name: "Unfinished", brand_logo_path: "", isEditing: true }] };
     expect(parseWorkingDocument(JSON.parse(JSON.stringify(incomplete)))).toEqual(incomplete);
   });
-  it.each([{ ...document, formState: { ...defaultFormState, agenda_enabled: "false" } }, { ...document, checkInEvents: [{}] }, { ...document, formState: { ...defaultFormState, name: 5 } }, { ...document, formState: { ...defaultFormState, image_url: "data:local-file" } }, { ...document, formState: { ...defaultFormState, short_description: "x".repeat(51) } }])("rejects malformed fields or unsaved file previews", value => expect(() => parseWorkingDocument(value)).toThrow());
+  it.each([{ ...document, formState: { ...defaultFormState, agenda_enabled: "false" } }, { ...document, checkInEvents: [{}] }, { ...document, formState: { ...defaultFormState, name: 5 } }, { ...document, formState: { ...defaultFormState, image_url: "data:local-file" } }, { ...document, formState: { ...defaultFormState, short_description: "x".repeat(121) } }])("rejects malformed fields or unsaved file previews", value => expect(() => parseWorkingDocument(value)).toThrow());
 });
 
 it("keeps saved session and question IDs without retired file-control fields", () => {
@@ -26,4 +26,16 @@ it("keeps saved session and question IDs without retired file-control fields", (
   expect(parseWorkingDocument(JSON.parse(JSON.stringify(current)))).toEqual(current);
   expect(() => parseWorkingDocument({ ...current, checkInEvents: [{ ...current.checkInEvents[0], id: 1 }] })).toThrow();
   expect(() => parseWorkingDocument({ ...current, applicationTemplate: [{ ...current.applicationTemplate[0], id: 1 }] })).toThrow();
+});
+
+describe("reminder schedule", () => {
+  it("turns reminders off for a draft saved before they existed", () => {
+    const oldState = Object.fromEntries(Object.entries({ ...defaultFormState, reminder_schedule: "1d" }).filter(([key]) => key !== "reminder_schedule"));
+    expect(parseWorkingDocument({ ...document, formState: oldState }).formState.reminder_schedule).toBe("off");
+  });
+
+  it("keeps a saved choice and rejects an unknown one", () => {
+    expect(parseWorkingDocument({ ...document, formState: { ...defaultFormState, reminder_schedule: "both" } }).formState.reminder_schedule).toBe("both");
+    expect(() => parseWorkingDocument({ ...document, formState: { ...defaultFormState, reminder_schedule: "weekly" } })).toThrow();
+  });
 });

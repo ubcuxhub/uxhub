@@ -15,6 +15,7 @@ import {
   RecordPage,
   RecordPageTopBar,
   RecordSection,
+  RecordThumbnail,
   RecordView,
   useRecordFrame,
 } from "./RecordDrawer";
@@ -317,5 +318,46 @@ describe("loading and not found", () => {
     const error = vi.spyOn(console, "error").mockImplementation(() => {});
     expect(() => render(<UserRecord />)).toThrow("inside RecordFrame");
     error.mockRestore();
+  });
+});
+
+describe("RecordThumbnail", () => {
+  it("shows the picture as a decorative square, cropped to fill", () => {
+    const { container } = render(<RecordThumbnail src="https://store/icon.png" />);
+    const tile = container.querySelector("[data-slot='record-thumbnail']")!;
+    expect(tile.getAttribute("aria-hidden")).toBe("true");
+    const image = tile.querySelector("img")!;
+    expect(image.getAttribute("src")).toBe("https://store/icon.png");
+    expect(image.getAttribute("alt")).toBe("");
+    expect(image.className).toContain("object-cover");
+  });
+
+  it("shows the placeholder without a picture", () => {
+    const { container } = render(<RecordThumbnail src={null} />);
+    expect(container.querySelector("img")).toBeNull();
+    expect(container.querySelector("svg")).not.toBeNull();
+  });
+
+  it("falls back when the picture fails to load, and tries a new one", () => {
+    const fallback = <span>No icon</span>;
+    const { container, rerender } = render(<RecordThumbnail src="https://store/gone.png" fallback={fallback} />);
+    fireEvent.error(container.querySelector("img")!);
+    expect(container.querySelector("img")).toBeNull();
+    expect(screen.getByText("No icon")).toBeTruthy();
+    rerender(<RecordThumbnail src="https://store/new.png" fallback={fallback} />);
+    expect(container.querySelector("img")?.getAttribute("src")).toBe("https://store/new.png");
+  });
+
+  it("sits before the title in RecordView's media slot", async () => {
+    pathname = "/admin/events/1";
+    render(
+      <RecordFrame listHref="/admin/events">
+        <RecordView title="Portfolio Night" media={<RecordThumbnail src="https://store/icon.png" />} details={null} />
+      </RecordFrame>,
+    );
+    const dialog = await screen.findByRole("dialog", { name: "Portfolio Night" });
+    const tile = dialog.querySelector("[data-slot='record-thumbnail']")!;
+    const heading = within(dialog).getByRole("heading", { name: "Portfolio Night" });
+    expect(tile.compareDocumentPosition(heading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });

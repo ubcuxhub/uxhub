@@ -4,6 +4,8 @@ import { useRef, useEffect, useCallback, useMemo } from "react";
 import { gsap } from "gsap";
 import { InertiaPlugin } from "gsap/InertiaPlugin";
 
+import { REDUCED_MOTION_QUERY, useMediaQuery } from "@/hooks/use-media-query";
+
 gsap.registerPlugin(InertiaPlugin);
 
 const throttle = <T extends unknown[]>(func: (...args: T) => void, limit: number) => {
@@ -51,6 +53,17 @@ interface Dot {
   _inertiaApplied: boolean;
 }
 
+/** Where the pointer starts: nowhere near a dot, so none lights up before it moves. */
+const NO_POINTER = -1e6;
+
+/**
+ * A grid of dots that light up near the pointer and scatter when it moves
+ * fast or clicks. It draws on demand, not every frame: once when the grid is
+ * laid out, when the pointer moves, and on each frame only while a dot is
+ * still moving back. Nothing draws while the grid is off screen or the tab
+ * is hidden, and under reduced motion it is a still grid that ignores the
+ * pointer.
+ */
 const DotGrid = ({
   dotSize = 8,
   gap = 32,
@@ -69,9 +82,13 @@ const DotGrid = ({
   const wrapperRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dotsRef = useRef<Dot[]>([]);
+  // Dots with a tween running: while any are, every frame draws.
+  const movingRef = useRef(new Set<Dot>());
+  // Asks for one draw on the next frame; set by the drawing effect.
+  const requestDrawRef = useRef<() => void>(() => {});
   const pointerRef = useRef({
-    x: 0,
-    y: 0,
+    x: NO_POINTER,
+    y: NO_POINTER,
     vx: 0,
     vy: 0,
     speed: 0,
@@ -79,20 +96,10 @@ const DotGrid = ({
     lastX: 0,
     lastY: 0,
   });
+  const reducedMotion = useMediaQuery(REDUCED_MOTION_QUERY);
 
   const baseRgb = useMemo(() => hexToRgb(baseColor), [baseColor]);
   const activeRgb = useMemo(() => hexToRgb(activeColor), [activeColor]);
-
-  const circlePath = useMemo(() => {
-    // Check if Path2D is available (not available in SSR)
-    if (typeof Path2D !== 'undefined') {
-      const p = new Path2D();
-      p.arc(0, 0, dotSize / 2, 0, Math.PI * 2);
-      return p;
-    }
-    // Fallback: return null and we'll use ctx.arc() instead
-    return null;
-  }, [dotSize]);
 
   const buildGrid = useCallback(() => {
     const wrap = wrapperRef.current;
@@ -131,21 +138,29 @@ const DotGrid = ({
       }
     }
     dotsRef.current = dots;
+    // Resizing the canvas cleared it.
+    requestDrawRef.current();
   }, [dotSize, gap]);
 
   useEffect(() => {
-    let rafId: number;
+    let rafId = 0;
+    let onScreen = true;
     const proxSq = proximity * proximity;
+    const radius = dotSize / 2;
 
     const draw = () => {
+      rafId = 0;
       const canvas = canvasRef.current;
-      if (!canvas) return;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) return;
+      const ctx = canvas?.getContext("2d");
+      if (!canvas || !ctx) return;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
       const { x: px, y: py } = pointerRef.current;
+      const lit: { x: number; y: number; style: string }[] = [];
 
+      // Every unlit dot in one path and one fill.
+      ctx.fillStyle = baseColor;
+      ctx.beginPath();
       for (const dot of dotsRef.current) {
         const ox = dot.cx + dot.xOffset;
         const oy = dot.cy + dot.yOffset;
@@ -153,36 +168,55 @@ const DotGrid = ({
         const dy = dot.cy - py;
         const dsq = dx * dx + dy * dy;
 
-        let style = baseColor;
         if (dsq <= proxSq) {
-          const dist = Math.sqrt(dsq);
-          const t = 1 - dist / proximity;
+          const t = 1 - Math.sqrt(dsq) / proximity;
           const r = Math.round(baseRgb.r + (activeRgb.r - baseRgb.r) * t);
           const g = Math.round(baseRgb.g + (activeRgb.g - baseRgb.g) * t);
           const b = Math.round(baseRgb.b + (activeRgb.b - baseRgb.b) * t);
-          style = `rgb(${r},${g},${b})`;
+          lit.push({ x: ox, y: oy, style: `rgb(${r},${g},${b})` });
+          continue;
         }
+        ctx.moveTo(ox + radius, oy);
+        ctx.arc(ox, oy, radius, 0, Math.PI * 2);
+      }
+      ctx.fill();
 
-        ctx.save();
-        ctx.translate(ox, oy);
-        ctx.fillStyle = style;
-        if (circlePath) {
-          ctx.fill(circlePath);
-        } else {
-          // Fallback: use standard canvas arc method
-          ctx.beginPath();
-          ctx.arc(0, 0, dotSize / 2, 0, Math.PI * 2);
-          ctx.fill();
-        }
-        ctx.restore();
+      for (const dot of lit) {
+        ctx.fillStyle = dot.style;
+        ctx.beginPath();
+        ctx.arc(dot.x, dot.y, radius, 0, Math.PI * 2);
+        ctx.fill();
       }
 
-      rafId = requestAnimationFrame(draw);
+      if (movingRef.current.size > 0) requestDraw();
     };
 
-    draw();
-    return () => cancelAnimationFrame(rafId);
-  }, [proximity, baseColor, activeRgb, baseRgb, circlePath, dotSize]);
+    const requestDraw = () => {
+      if (rafId || !onScreen || document.hidden) return;
+      rafId = requestAnimationFrame(draw);
+    };
+    requestDrawRef.current = requestDraw;
+
+    let observer: IntersectionObserver | null = null;
+    if (typeof IntersectionObserver !== "undefined" && wrapperRef.current) {
+      observer = new IntersectionObserver(([entry]) => {
+        onScreen = entry.isIntersecting;
+        requestDraw();
+      });
+      observer.observe(wrapperRef.current);
+    }
+    // A hidden tab stops drawing; catch up when it's shown again.
+    const onVisibility = () => requestDraw();
+    document.addEventListener("visibilitychange", onVisibility);
+
+    requestDraw();
+    return () => {
+      cancelAnimationFrame(rafId);
+      observer?.disconnect();
+      document.removeEventListener("visibilitychange", onVisibility);
+      requestDrawRef.current = () => {};
+    };
+  }, [proximity, baseColor, activeRgb, baseRgb, dotSize]);
 
   useEffect(() => {
     buildGrid();
@@ -208,6 +242,31 @@ const DotGrid = ({
   }, [buildGrid]);
 
   useEffect(() => {
+    // A still grid: no highlight, no scatter.
+    if (reducedMotion) return;
+    const moving = movingRef.current;
+    const pointer = pointerRef.current;
+
+    /** Throws a dot by `pushX`/`pushY`, then springs it back. */
+    const scatter = (dot: Dot, pushX: number, pushY: number) => {
+      dot._inertiaApplied = true;
+      gsap.killTweensOf(dot);
+      moving.add(dot);
+      gsap.to(dot, {
+        inertia: { xOffset: pushX, yOffset: pushY, resistance },
+        onComplete: () => {
+          gsap.to(dot, {
+            xOffset: 0,
+            yOffset: 0,
+            duration: returnDuration,
+            ease: "elastic.out(1,0.75)",
+            onComplete: () => moving.delete(dot),
+          });
+          dot._inertiaApplied = false;
+        },
+      });
+    };
+
     // React detaches the canvas ref before this effect's cleanup removes the
     // window listeners, so an event in between finds no canvas.
     const onMove = (e: MouseEvent) => {
@@ -241,24 +300,11 @@ const DotGrid = ({
       for (const dot of dotsRef.current) {
         const dist = Math.hypot(dot.cx - pr.x, dot.cy - pr.y);
         if (speed > speedTrigger && dist < proximity && !dot._inertiaApplied) {
-          dot._inertiaApplied = true;
-          gsap.killTweensOf(dot);
-          const pushX = dot.cx - pr.x + vx * 0.005;
-          const pushY = dot.cy - pr.y + vy * 0.005;
-          gsap.to(dot, {
-            inertia: { xOffset: pushX, yOffset: pushY, resistance },
-            onComplete: () => {
-              gsap.to(dot, {
-                xOffset: 0,
-                yOffset: 0,
-                duration: returnDuration,
-                ease: "elastic.out(1,0.75)",
-              });
-              dot._inertiaApplied = false;
-            },
-          });
+          scatter(dot, dot.cx - pr.x + vx * 0.005, dot.cy - pr.y + vy * 0.005);
         }
       }
+      // The highlight follows the pointer even when nothing scatters.
+      requestDrawRef.current();
     };
 
     const onClick = (e: MouseEvent) => {
@@ -270,40 +316,34 @@ const DotGrid = ({
       for (const dot of dotsRef.current) {
         const dist = Math.hypot(dot.cx - cx, dot.cy - cy);
         if (dist < shockRadius && !dot._inertiaApplied) {
-          dot._inertiaApplied = true;
-          gsap.killTweensOf(dot);
           const falloff = Math.max(0, 1 - dist / shockRadius);
-          const pushX = (dot.cx - cx) * shockStrength * falloff;
-          const pushY = (dot.cy - cy) * shockStrength * falloff;
-          gsap.to(dot, {
-            inertia: { xOffset: pushX, yOffset: pushY, resistance },
-            onComplete: () => {
-              gsap.to(dot, {
-                xOffset: 0,
-                yOffset: 0,
-                duration: returnDuration,
-                ease: "elastic.out(1,0.75)",
-              });
-              dot._inertiaApplied = false;
-            },
-          });
+          scatter(dot, (dot.cx - cx) * shockStrength * falloff, (dot.cy - cy) * shockStrength * falloff);
         }
       }
+      requestDrawRef.current();
     };
 
     const throttledMove = throttle(onMove, 50);
-    if (typeof window !== 'undefined') {
-      window.addEventListener("mousemove", throttledMove, { passive: true });
-      window.addEventListener("click", onClick);
-    }
+    window.addEventListener("mousemove", throttledMove, { passive: true });
+    window.addEventListener("click", onClick);
 
     return () => {
-      if (typeof window !== 'undefined') {
-        window.removeEventListener("mousemove", throttledMove);
-        window.removeEventListener("click", onClick);
+      window.removeEventListener("mousemove", throttledMove);
+      window.removeEventListener("click", onClick);
+      // Settle every dot, so a still grid (or the next run) starts at rest.
+      for (const dot of dotsRef.current) {
+        gsap.killTweensOf(dot);
+        dot.xOffset = 0;
+        dot.yOffset = 0;
+        dot._inertiaApplied = false;
       }
+      moving.clear();
+      pointer.x = NO_POINTER;
+      pointer.y = NO_POINTER;
+      requestDrawRef.current();
     };
   }, [
+    reducedMotion,
     maxSpeed,
     speedTrigger,
     proximity,

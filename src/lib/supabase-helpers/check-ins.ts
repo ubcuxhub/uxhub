@@ -1,8 +1,7 @@
 import type { DbClient } from "./types";
-import { fetchCheckInPages } from "./check-in-pages";
+import { fetchAllPages } from "./all-pages";
 import { TABLES } from "./tables";
 import type {
-  CheckInSessionInsert,
   EventTicketRow,
 } from "@/lib/supabase/models";
 import type {
@@ -24,13 +23,14 @@ type AttendeeNameFields = {
   last_name: string | null;
 } | null;
 
-function attendeeName(userInfo: AttendeeNameFields): string {
-  return userInfo?.first_name && userInfo.last_name
-    ? formatUserName({
-        first_name: userInfo.first_name,
-        last_name: userInfo.last_name,
-      })
-    : "Unknown User";
+/** A member with one name has an empty last name, and is named by it alone. */
+export function attendeeName(userInfo: AttendeeNameFields): string {
+  return (
+    formatUserName({
+      first_name: userInfo?.first_name ?? "",
+      last_name: userInfo?.last_name ?? "",
+    }) || "Unknown User"
+  );
 }
 
 export async function fetchCheckInSessions(
@@ -52,7 +52,7 @@ export async function fetchCheckInAttendees(
   supabase: DbClient,
   eventId: string
 ): Promise<CheckInAttendee[]> {
-  const data = await fetchCheckInPages<CheckInAttendeeQueryRow>((from, to) => supabase
+  const data = await fetchAllPages<CheckInAttendeeQueryRow>((from, to) => supabase
     .from(TABLES.eventTickets)
     .select("id,user_id,user_info!user_id(first_name,last_name,email)")
     .eq("event_id", eventId)
@@ -94,27 +94,4 @@ export async function fetchCheckInStatuses(
   }
 
   return statusMap;
-}
-
-export async function insertCheckInSessions(
-  supabase: DbClient,
-  sessions: CheckInSessionInsert[]
-): Promise<void> {
-  const { error } = await supabase
-    .from(TABLES.checkInSessions)
-    .insert(sessions);
-
-  if (error) throw error;
-}
-
-export async function deleteCheckInSessionsForEvent(
-  supabase: DbClient,
-  eventId: string
-): Promise<void> {
-  const { error } = await supabase
-    .from(TABLES.checkInSessions)
-    .delete()
-    .eq("event_id", eventId);
-
-  if (error) throw error;
 }

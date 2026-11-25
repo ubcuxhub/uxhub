@@ -69,9 +69,9 @@ beforeEach(() => {
     const saved = { ...savedUsers.get(id)!, ...changes };
     if ("student_number" in changes) { saved.student_verified_at = null; saved.student_verified_by = null; }
     savedUsers.set(id, saved);
-    return saved;
+    return { ok: true, user: saved };
   });
-  mocks.updateRole.mockImplementation(async (_id: string, role: string) => role);
+  mocks.updateRole.mockImplementation(async (_id: string, role: string) => ({ ok: true, role }));
   mocks.verifyStudent.mockImplementation(async (id: string, verified: boolean) => {
     const saved = { ...savedUsers.get(id)!, student_verified_at: verified ? "2026-10-14T19:00:00Z" : null, student_verified_by: verified ? "me" : null };
     savedUsers.set(id, saved);
@@ -302,7 +302,7 @@ describe("AdminUserRecord: editing", () => {
 
   it("disables the form while saving and shows the saved values after", async () => {
     let finish!: (saved: UserRecord) => void;
-    mocks.saveDetails.mockReturnValue(new Promise<UserRecord>((resolve) => { finish = resolve; }));
+    mocks.saveDetails.mockReturnValue(new Promise((resolve) => { finish = (saved) => resolve({ ok: true, user: saved }); }));
     renderRecord();
     edit();
     fireEvent.change(textbox("First name"), { target: { value: "  Dorothy  " } });
@@ -317,12 +317,12 @@ describe("AdminUserRecord: editing", () => {
   });
 
   it("keeps the draft after a failed save and retries it", async () => {
-    mocks.saveDetails.mockRejectedValueOnce(new Error("Unable to save user information."));
+    mocks.saveDetails.mockResolvedValueOnce({ ok: false, error: "This user no longer exists. Reload the user directory." });
     renderRecord();
     edit();
     fireEvent.change(textbox("First name"), { target: { value: "Dorothy" } });
     fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
-    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("Unable to save user information."));
+    await waitFor(() => expect(screen.getByRole("alert").textContent).toContain("This user no longer exists."));
     expect(textbox("First name").value).toBe("Dorothy");
     expect(mocks.router.refresh).not.toHaveBeenCalled();
     await saveAndFinish();
@@ -338,6 +338,21 @@ describe("AdminUserRecord: editing", () => {
     expect(screen.getByRole("alert").textContent).toContain("future");
     expect(mocks.saveDetails).not.toHaveBeenCalled();
     expect(mocks.verifyStudent).not.toHaveBeenCalled();
+  });
+
+  it("clears the last name of a member with one name, and refuses a blank first name", async () => {
+    renderRecord();
+    edit();
+    fireEvent.change(textbox("First name"), { target: { value: " " } });
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    expect(screen.getByRole("alert").textContent).toContain("First name is required.");
+    expect(mocks.saveDetails).not.toHaveBeenCalled();
+
+    fireEvent.change(textbox("First name"), { target: { value: "Dora" } });
+    fireEvent.change(textbox("Last name"), { target: { value: "  " } });
+    await saveAndFinish();
+    expect(mocks.saveDetails).toHaveBeenCalledWith("dora", { last_name: "" });
+    expect(screen.getByRole("heading", { level: 2, name: "Dora" })).toBeTruthy();
   });
 
   it("saves nothing when nothing changed", async () => {
@@ -376,7 +391,7 @@ describe("AdminUserRecord: role changes", () => {
   });
 
   it("shows a failed role change in the confirmation, after the rest saved", async () => {
-    mocks.updateRole.mockRejectedValueOnce(new Error("You can't remove the last manager."));
+    mocks.updateRole.mockResolvedValueOnce({ ok: false, error: "You can't remove the last manager." });
     renderRecord({ record: savedUsers.get("iris")! });
     edit();
     fireEvent.change(textbox("First name"), { target: { value: "Irene" } });
@@ -476,5 +491,72 @@ describe("AdminUserRecord: photo", () => {
     await saveAndFinish();
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(mocks.saveDetails).toHaveBeenCalledOnce();
+  });
+});
+
+describe("AdminUserRecord: avatar", () => {
+  // jsdom never loads images, so Radix's Avatar would always show initials.
+  class LoadedImage {
+    complete = true;
+    naturalWidth = 1;
+    src = "";
+    referrerPolicy = "";
+    crossOrigin: string | null = null;
+    addEventListener() {}
+    removeEventListener() {}
+  }
+  beforeEach(() => {
+    vi.stubGlobal("Image", LoadedImage);
+    URL.createObjectURL = vi.fn(() => "blob:photo");
+    URL.revokeObjectURL = vi.fn();
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  /** What an avatar shows: its image's src, else its initials. */
+  function avatar(size: 64 | 40) {
+    const root = document.querySelector(`[data-slot="avatar"][data-size="${size}"]`);
+    if (!root) throw new Error(`No ${size}px avatar`);
+    return root.querySelector("img")?.getAttribute("src") ?? root.textContent;
+  }
+  const withUser = (overrides: Partial<UserRecord>) => savedUsers.set("dora", user(overrides));
+
+  it("shows the uploaded photo over a preset, in the header and the edit preview", () => {
+    withUser({ profile_photo_path: "profiles/dora/photo.png", avatar_preset: "flower" });
+    renderRecord();
+    expect(avatar(64)).toBe("http://localhost/profiles/dora/photo.png");
+    edit();
+    expect(avatar(40)).toBe("http://localhost/profiles/dora/photo.png");
+  });
+
+  it("shows the member's avatar preset when there's no photo", () => {
+    withUser({ avatar_preset: "flower" });
+    renderRecord();
+    expect(avatar(64)).toBe("/auth/shapes/flower.png");
+    edit();
+    expect(avatar(40)).toBe("/auth/shapes/flower.png");
+    // A preset isn't a photo: there's nothing to remove.
+    expect(screen.getByRole("button", { name: "Upload photo" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Remove photo" })).toBeNull();
+  });
+
+  it("shows initials with neither a photo nor a preset", () => {
+    renderRecord();
+    expect(avatar(64)).toBe("DH");
+    edit();
+    expect(avatar(40)).toBe("DH");
+  });
+
+  it("falls back to the preset when a photo is removed, and previews a staged photo over it", () => {
+    withUser({ profile_photo_path: "profiles/dora/photo.png", avatar_preset: "sparkle" });
+    renderRecord();
+    edit();
+    fireEvent.click(screen.getByRole("button", { name: "Remove photo" }));
+    expect(avatar(40)).toBe("/auth/shapes/sparkle.png");
+    expect(avatar(64)).toBe("/auth/shapes/sparkle.png");
+    fireEvent.change(screen.getByLabelText("Profile photo", { selector: "input" }), {
+      target: { files: [new File(["image"], "photo.png", { type: "image/png" })] },
+    });
+    expect(avatar(40)).toBe("blob:photo");
+    expect(avatar(64)).toBe("blob:photo");
   });
 });

@@ -13,15 +13,15 @@ won't scan. Target: Nov 12, 2026.
   shows the event, the holder, and the check-in QR code. Its badge is one of
   the student-facing badges in `docs/event-states.md`. The code shows for Going
   and Checked in, drawn from the `qrToken` prop with
-  [`QrCode`](../src/features/events/components/QrCode.tsx). Build its `event`
-  prop with [`toTicketEvent`](../src/features/events/lib/ticket.ts).
+  [`QrCode`](../src/features/events/components/QrCode.tsx).
 - **Check-in data:** `check_in_sessions` (one or more per event) and
   `check_ins` (one row per ticket per session, unique on that pair).
-  `/admin/events/[event]/check-in` lists tickets with a search box and a
+  `/admin/events/[event]/check-in`, the event manager's Check-in tab
+  (`[event]/(manager)/check-in`), lists tickets with a search box and a
   per-session check-in toggle (`toggleCheckInAction`), and links to the
   scanner.
 - **Scanner:** `/admin/events/[event]/check-in/scan`, a phone camera scanner
-  with a "Can't scan?" lookup by name or email.
+  with a "Search attendees" lookup by name or email.
 
 ## Which token
 
@@ -120,29 +120,48 @@ older un-check left with no time is stamped.
 ### 3. Scanner page (done)
 
 `/admin/events/[event]/check-in/scan`, under the existing admin guard
-([`CheckInScanner`](../src/features/admin/components/CheckInScanner.tsx)).
+([`CheckInScanner`](../src/features/admin/components/CheckInScanner.tsx)). It
+fills the viewport in a dark `ScannerFrame` (`(scanner)` route group, no
+sidebar). The header says "Scan tickets" and "Event name · 12 of 46 checked
+in", with a close link back to the check-in page.
 
 - **Camera:** `qr-scanner` with the rear camera, since iOS Safari has no
   built-in QR reader (`BarcodeDetector`). Camera access needs HTTPS, so test on
-  a phone through a preview deploy, not `localhost`. A blocked or missing
-  camera says what to do, and the lookup still works.
-- **Session picker:** defaults to the session running now, else the next one,
-  else the last one.
-- **Result card:** green with the name for a fresh check-in, amber with
-  "Already checked in at 10:02 AM", red with the reason for a rejection. The
-  camera pauses until the admin taps "Scan next", so one code is submitted
-  once. Right after "Scan next", the same code is ignored for 3 seconds, so a
-  ticket still in view doesn't come back as "Already checked in".
-- **Phone only:** the scanner shows when `(pointer: coarse)` matches. On a
-  laptop it says "Open this on your phone" with a QR linking to the page. This
-  is a UX gate, not security; `requireAdmin()` stays the access control.
+  a phone through a preview deploy, not `localhost`. A camera that is blocked,
+  missing, on an insecure page, or fails to start says what to do in place of
+  the preview, with "Try again" and "Search attendees".
+- **Item picker:** check-in is per agenda item. The picker defaults to the
+  item running now, else the next one, else the last one. Times only pick the
+  default; they never block a check-in.
+- **Result panel:** the result replaces the camera, and is announced through
+  a polite live region without moving focus:
+  - **Checked in** (green): the name and time, "Undo check-in" and "Scan
+    next". It returns to scanning after 4 seconds; "Scan next" skips the
+    wait. The countdown holds while the pointer or focus is in the panel, and
+    while the undo confirmation is open.
+  - **Already checked in** (amber): the name and the first check-in time;
+    nothing changes. It waits for "Scan next".
+  - **Ticket not recognized** (red): a code that is not a ticket for this
+    event, with "Search attendees" and "Scan next". A canceled event says so
+    and offers only "Scan next".
+
+  The camera is off while a result shows, so one code is submitted once.
+  When scanning resumes, the code behind the last result is ignored for 3
+  seconds, so a ticket still in view doesn't come back as "Already checked
+  in"; any other code scans at once. "Scan next" and a confirmed undo put
+  focus on the camera region.
+- **Phones:** there is no device gate. The check-in page's Scan tickets card
+  links to the scanner, and above the `sm` breakpoint it also offers "Open
+  scanner on phone", a QR code linking to the same page. A laptop that opens
+  the link scans with its own camera. `requireAdmin()` is the access control.
 
 ### 4. Manual lookup (done)
 
-"Can't scan?" swaps the camera for a name or email search over the event's
+"Search attendees" swaps the camera for a name or email search over the event's
 tickets, the same search as the check-in page (`searchCheckInAttendees`). It
 reloads the list when opened, so tickets bought since the page loaded show up.
-Picking someone calls `checkInTicketAction` and shows the same result card.
+Picking someone checks them in and shows the same result panel; "Scan next"
+returns to the camera.
 
 ## Testing
 
@@ -180,4 +199,3 @@ Afterwards, leave the event in Draft, or delete it and its tickets.
 
 - Free events: there is no free-ticket path yet, so how does a free attendee
   get a ticket and a code? (Proposed schema assumption 3.)
-- Do we need an "undo check-in" on the result card for a mis-scan?

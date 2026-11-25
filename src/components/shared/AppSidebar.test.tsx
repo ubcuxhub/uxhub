@@ -8,7 +8,10 @@ import ShellLayout from "@/app/(app)/(shell)/layout";
 const nav = vi.hoisted(() => ({ pathname: "/portal" }));
 const cookieJar = vi.hoisted(() => ({ value: undefined as string | undefined }));
 
-vi.mock("next/navigation", () => ({ usePathname: () => nav.pathname }));
+vi.mock("next/navigation", () => ({
+  usePathname: () => nav.pathname,
+  useRouter: () => ({ refresh: () => {} }),
+}));
 vi.mock("next/headers", () => ({
   cookies: async () => ({
     get: (name: string) =>
@@ -47,12 +50,16 @@ vi.mock("@/features/settings/components/PurchaseHistorySettings", () => ({
 
 function setViewport(width: number) {
   window.innerWidth = width;
-  window.matchMedia = ((query: string) => ({
-    matches: false,
-    media: query,
-    addEventListener: () => {},
-    removeEventListener: () => {},
-  })) as unknown as typeof window.matchMedia;
+  window.matchMedia = ((query: string) => {
+    // Enough of a media engine for the sidebar's `(max-width: Npx)` check.
+    const maxWidth = /max-width:\s*(\d+)px/.exec(query);
+    return {
+      matches: maxWidth ? width <= Number(maxWidth[1]) : false,
+      media: query,
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    };
+  }) as unknown as typeof window.matchMedia;
 }
 
 const layout = async () => ShellLayout({ children: <p>page</p> });

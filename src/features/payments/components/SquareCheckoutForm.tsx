@@ -22,8 +22,6 @@ import { useRouter } from "next/navigation";
 import { submitCheckoutAction } from "@/features/payments/actions";
 import type { PurchaseKind } from "@/features/payments/types";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   ASYNC_DEADLINES,
   getAsyncErrorMessage,
@@ -44,16 +42,22 @@ import {
   type Theme,
 } from "@/lib/theme";
 
+/** Where a checkout goes when the page gives no confirmation route. */
+const PURCHASES_HREF = "/portal#settings/purchases";
+
 interface SquareCheckoutFormProps {
   amountCents: number;
   amountLabel: string;
   buttonLabel: string;
-  /** The submit label for a free event ticket, which takes no card. */
+  /** The submit label for a free ticket or membership, which takes no card. */
   freeButtonLabel?: string;
-  collectBuyerDetails?: boolean;
   kind: PurchaseKind;
   slug: string;
   successHref?: string | ((purchaseId: string) => string);
+  /**
+   * The buyer's profile, for the billing contact the bank's verification
+   * sees. The server charges with the profile it holds, not these.
+   */
   initialEmail: string;
   initialFirstName: string;
   initialLastName: string;
@@ -143,10 +147,9 @@ export function SquareCheckoutForm({
   amountLabel,
   buttonLabel,
   freeButtonLabel = "Confirm spot",
-  collectBuyerDetails = true,
   kind,
   slug,
-  successHref,
+  successHref = PURCHASES_HREF,
   initialEmail,
   initialFirstName,
   initialLastName,
@@ -159,18 +162,14 @@ export function SquareCheckoutForm({
   userId,
 }: SquareCheckoutFormProps) {
   const router = useRouter();
-  const freeEvent = kind === "event_ticket" && amountCents === 0;
+  // A free ticket or membership takes no card and never reaches Square.
+  const free = amountCents === 0;
   const theme = useSyncExternalStore(
     subscribeTheme,
     getThemeSnapshot,
     getThemeServerSnapshot,
   );
   const containerId = useId().replace(/:/g, "");
-  const [buyerFirstName, setBuyerFirstName] = useState(initialFirstName);
-  const [buyerLastName, setBuyerLastName] = useState(initialLastName);
-  const [buyerEmail, setBuyerEmail] = useState(initialEmail);
-  const [buyerPhone, setBuyerPhone] = useState(initialPhone ?? "");
-  const [billingPostalCode, setBillingPostalCode] = useState("");
   const [card, setCard] = useState<Card | null>(null);
   const [squarePayments, setSquarePayments] = useState<Payments | null>(null);
   const squareConfigured = Boolean(
@@ -178,7 +177,7 @@ export function SquareCheckoutForm({
       process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID,
   );
   const [loadingCard, setLoadingCard] = useState(true);
-  const initializing = !freeEvent && !disabled && squareConfigured && loadingCard;
+  const initializing = !free && !disabled && squareConfigured && loadingCard;
   const [submitting, setSubmitting] = useState(false);
   /**
    * The redirect to the confirmation page is a transition, so it stays pending
@@ -191,7 +190,7 @@ export function SquareCheckoutForm({
   const [message, setMessage] = useState(disabledMessage ?? "");
   const shownMessage =
     message ||
-    (!freeEvent && !disabled && !squareConfigured
+    (!free && !disabled && !squareConfigured
       ? "Square is not configured yet for this environment."
       : "");
   const recoverStalledNavigation = useNavigationRecovery(() => {
@@ -230,7 +229,7 @@ export function SquareCheckoutForm({
     const applicationId = process.env.NEXT_PUBLIC_SQUARE_APP_ID;
     const locationId = process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID;
 
-    if (freeEvent || disabled || !applicationId || !locationId) {
+    if (free || disabled || !applicationId || !locationId) {
       return;
     }
 
@@ -308,7 +307,7 @@ export function SquareCheckoutForm({
       mounted = false;
       void nextCard?.destroy();
     };
-  }, [containerId, disabled, freeEvent]);
+  }, [containerId, disabled, free]);
 
   useEffect(() => {
     onSubmittingChange?.(busy);
@@ -329,7 +328,7 @@ export function SquareCheckoutForm({
 
     if (
       disabled ||
-      (!freeEvent && (!card || !squarePayments)) ||
+      (!free && (!card || !squarePayments)) ||
       busy
     ) {
       return;
@@ -344,14 +343,13 @@ export function SquareCheckoutForm({
     try {
       let token: string | null = null;
       let verificationToken: string | null = null;
-      if (!freeEvent) {
+      if (!free) {
         const billingContact: BillingContact = {
           countryCode: "CA",
-          email: buyerEmail,
-          familyName: buyerLastName,
-          givenName: buyerFirstName,
-          phone: buyerPhone || undefined,
-          postalCode: billingPostalCode || undefined,
+          email: initialEmail,
+          familyName: initialLastName || undefined,
+          givenName: initialFirstName,
+          phone: initialPhone || undefined,
         };
         const verificationDetails: ChargeCardVerificationDetails = {
           amount: (amountCents / 100).toFixed(2),
@@ -383,6 +381,12 @@ export function SquareCheckoutForm({
          * authorize a card-not-present payment. This runs the buyer through the
          * bank's challenge when one is needed, and the resulting token is what
          * tells Square the buyer was verified.
+         *
+         * Square's SCA guide now says `tokenize(verificationDetails)` handles
+         * authentication itself and marks `verifyBuyer()` deprecated (it still
+         * runs its own SCA check when called). Dropping it changes what reaches
+         * `payments.create`, so that waits for a sandbox test of a challenged
+         * card rather than being changed blind.
          */
         let verification;
         try {
@@ -417,11 +421,6 @@ export function SquareCheckoutForm({
       const result = await withDeadline(
         () =>
           submitCheckoutAction({
-            billingPostalCode,
-            buyerEmail,
-            buyerFirstName,
-            buyerLastName,
-            buyerPhone,
             idempotencyKey,
             kind,
             slug,
@@ -430,7 +429,7 @@ export function SquareCheckoutForm({
             expectedAmountCents: amountCents,
           }),
         {
-          operation: freeEvent ? "Confirming registration" : "Confirming payment",
+          operation: free ? (kind === "membership" ? "Confirming membership" : "Confirming registration") : "Confirming payment",
           timeoutMs: ASYNC_DEADLINES.checkout,
         },
       );
@@ -459,7 +458,7 @@ export function SquareCheckoutForm({
         const destination =
           typeof successHref === "function"
             ? successHref(result.purchaseId)
-            : successHref || result.redirectTo;
+            : successHref;
         router.replace(destination);
       });
       recoverStalledNavigation();
@@ -477,69 +476,6 @@ export function SquareCheckoutForm({
 
   return (
     <form onSubmit={handleCheckout} className="space-y-4">
-      {collectBuyerDetails && !freeEvent ? (
-        <>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor={`${containerId}-first-name`}>First name</Label>
-              <Input
-                id={`${containerId}-first-name`}
-                autoComplete="given-name"
-                onChange={(event) => setBuyerFirstName(event.target.value)}
-                required
-                value={buyerFirstName}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor={`${containerId}-last-name`}>Last name</Label>
-              <Input
-                id={`${containerId}-last-name`}
-                autoComplete="family-name"
-                onChange={(event) => setBuyerLastName(event.target.value)}
-                required
-                value={buyerLastName}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor={`${containerId}-email`}>Email</Label>
-            <Input
-              id={`${containerId}-email`}
-              autoComplete="email"
-              onChange={(event) => setBuyerEmail(event.target.value)}
-              required
-              type="email"
-              value={buyerEmail}
-            />
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor={`${containerId}-phone`}>Phone</Label>
-              <Input
-                id={`${containerId}-phone`}
-                autoComplete="tel"
-                onChange={(event) => setBuyerPhone(event.target.value)}
-                placeholder="+1 604 555 1234"
-                value={buyerPhone}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor={`${containerId}-postal`}>Postal code</Label>
-              <Input
-                id={`${containerId}-postal`}
-                autoComplete="postal-code"
-                onChange={(event) => setBillingPostalCode(event.target.value)}
-                placeholder="V6T 1Z4"
-                value={billingPostalCode}
-              />
-            </div>
-          </div>
-        </>
-      ) : null}
-
       {showAmount ? (
         <div className="rounded-md border bg-background p-3 text-small">
           <div className="flex items-center justify-between">
@@ -549,12 +485,12 @@ export function SquareCheckoutForm({
         </div>
       ) : null}
 
-      {!freeEvent && <div id={containerId} className="min-h-24" />}
+      {!free && <div id={containerId} className="min-h-24" />}
 
       {shownMessage ? (
         <p role="alert" className="text-small text-destructive">{shownMessage}</p>
-      ) : freeEvent ? (
-        <p className="text-small text-muted-foreground">No payment details are needed. Confirm to reserve your ticket.</p>
+      ) : free ? (
+        <p className="text-small text-muted-foreground">{kind === "membership" ? "No payment details are needed. Confirm to start your membership." : "No payment details are needed. Confirm to reserve your ticket."}</p>
       ) : showSecurityMessage ? (
         <p className="text-small text-muted-foreground">
           Your card details are tokenized by Square. Prices and eligibility are
@@ -568,11 +504,11 @@ export function SquareCheckoutForm({
           disabled ||
           initializing ||
           busy ||
-          (!freeEvent && (!card || !squarePayments))
+          (!free && (!card || !squarePayments))
         }
         type="submit"
       >
-        {busy ? "Processing..." : freeEvent ? freeButtonLabel : buttonLabel}
+        {busy ? "Processing..." : free ? freeButtonLabel : buttonLabel}
       </Button>
     </form>
   );
