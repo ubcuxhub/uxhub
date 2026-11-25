@@ -33,6 +33,14 @@ describe("EventPageHeader", () => {
     expect(icon(container)?.querySelector("img")?.getAttribute("src")).toBe("/icon.png");
   });
 
+  it("draws the icon as a fixed 96px bordered tile, 32px in and half below the banner (Figma 1.3)", () => {
+    const { container } = render(<EventPageHeader iconSrc="/icon.png" />);
+    expect(icon(container)?.className).toEqual(
+      expect.stringMatching(/(?=.*\bsize-24\b)(?=.*\bleft-8\b)(?=.*\brounded-xl\b)(?=.*\bborder-4\b)(?=.*\bborder-card\b)/)
+    );
+    expect(container.querySelector('[aria-hidden].h-12')).not.toBeNull();
+  });
+
   it("leaves the icon out when there is none, unless a placeholder is asked for", () => {
     const { container, rerender } = render(<EventPageHeader />);
     expect(icon(container)).toBeNull();
