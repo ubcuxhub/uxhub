@@ -44,6 +44,8 @@ import {
 import { useEventForm } from "@/features/admin/hooks/use-event-form";
 import { PrimaryDetailsSection } from "./event-form/PrimaryDetailsSection";
 import { EventRegistration } from "./event-form/EventRegistration";
+import { ApplicationsToggle } from "./event-form/EventApplications";
+import { RegistrationWindowCard } from "./event-form/RegistrationTimes";
 import { type EventDateLocationDraft } from "../lib/event-date-location";
 import { EventPeopleEditor, EventResourcesEditor } from "./event-form/EventPeopleResources";
 import { emptyContent, type EventContent } from "../lib/event-content";
@@ -139,7 +141,7 @@ export const EventCreateModify = ({
   const draft = !published && !scheduled;
   // Revert hides a live event again; an ended or canceled one stays as it was.
   const canRevert = published && !form.past;
-  const issueSections: EventFormIssue["section"][] = ["basics", "description", "agenda", "registration", "teams", "people", "resources", "publish"];
+  const issueSections: EventFormIssue["section"][] = ["basics", "description", "agenda", "registration", "applications", "teams", "people", "resources", "publish"];
   const issues = [...new Map([...form.validation.issues, ...form.serverIssues, ...inputIssues].map(issue => [`${issue.section}:${issue.target}`, issue])).values()].filter(issue => !form.past || issue.section === "resources").sort((a, b) => issueSections.indexOf(a.section) - issueSections.indexOf(b.section));
   const publicationReady = issues.length === 0;
   const visibleIssues = issues.filter(issue => form.publishAttempted || !issue.required);
@@ -166,19 +168,21 @@ export const EventCreateModify = ({
     "builder-basics": { number: 1, description: "What the event is called, where its page lives, how it looks and what it costs." },
     "builder-description": { number: 2, description: "How the event is described across the portal and the club website." },
     "builder-agenda": { number: 3, description: "Every day, location and timed item, including optional check-in." },
-    "builder-registration": { number: 4, description: "How members sign up, how many can and how they check in." },
-    "builder-teams": { number: 5, description: "Team events show a Your Team card with an invite link on the event page." },
-    "builder-people": { number: 6 },
-    "builder-resources": { number: 7, description: "Community links, files and the event recap for this event." },
+    "builder-registration": { number: 4, description: "How many can come, the reminder email and check-in, and when registration opens for events without applications." },
+    "builder-applications": { number: 5, description: "Whether members apply first, when they can, what they answer and when they hear back." },
+    "builder-teams": { number: 6, description: "Team events show a Your Team card with an invite link on the event page." },
+    "builder-people": { number: 7 },
+    "builder-resources": { number: 8, description: "Community links, files and the event recap for this event." },
   };
   const sections: NavigatorSection[] = [
     { id: "builder-basics", number: 1, title: "Basics", state: "complete", required: true },
     { id: "builder-description", number: 2, title: "Description", state: "complete", required: true },
     { id: "builder-agenda", number: 3, title: "Agenda", state: "complete", required: true },
     { id: "builder-registration", number: 4, title: "Registration", state: "complete", required: true },
-    { id: "builder-teams", number: 5, title: "Teams", state: form.formState.teams_enabled ? "complete" : "optional", required: false },
-    { id: "builder-people", number: 6, title: "People and sponsors", state: form.formState.content?.sections.length ? "complete" : "optional", required: false },
-    { id: "builder-resources", number: 7, title: "Links and resources", state: form.formState.content?.links.length ? "complete" : "optional", required: false },
+    { id: "builder-applications", number: 5, title: "Applications", state: form.formState.requires_application ? "complete" : "optional", required: false },
+    { id: "builder-teams", number: 6, title: "Teams", state: form.formState.teams_enabled ? "complete" : "optional", required: false },
+    { id: "builder-people", number: 7, title: "People and sponsors", state: form.formState.content?.sections.length ? "complete" : "optional", required: false },
+    { id: "builder-resources", number: 8, title: "Links and resources", state: form.formState.content?.links.length ? "complete" : "optional", required: false },
   ].map((section): NavigatorSection => {
     const key = section.id.replace("builder-", "");
     const all = issues.filter(issue => issue.section === key);
@@ -247,7 +251,8 @@ export const EventCreateModify = ({
           {section("builder-basics", "Basics", <><PrimaryDetailsSection showConfigurationErrors={form.publishAttempted} urlLocked={form.urlLocked} formState={form.formState} onFieldChange={form.handleFieldChange} /><EventBranding state={form.formState} disabled={form.isSubmitting} onChange={form.handleFieldChange} onIcon={form.setPendingImageFile} onHeader={form.setPendingHeaderFile} /><EventFeatured state={form.formState} onChange={form.handleFieldChange} /><EventPricing showErrors={form.publishAttempted} state={form.formState} locked={pricingLocked} effectivePrices={initialEvent && initialEvent.regular_price != null && initialEvent.member_price != null ? { regular: initialEvent.regular_price, member: initialEvent.member_price } : undefined} onChange={form.handleFieldChange} /></>)}
           {section("builder-description", "Description", <EventDescriptionEditor validationManaged key={`${form.resetKey}-${form.legacyDraftRecovered ? "legacy-recovered" : "initial"}`} short={form.formState.short_description} value={form.formState.description} rich={form.formState.description_rich} disabled={form.isSubmitting || form.past} onChange={(short, text, rich) => { form.handleFieldChange("short_description", short); form.handleFieldChange("description", text); form.handleFieldChange("description_rich", rich); }} />)}
           {section("builder-agenda", "Agenda", <EventAgenda enabled={form.formState.agenda_enabled} onEnabledChange={enabled => form.handleFieldChange("agenda_enabled", enabled)} key={form.formState.date_location_revision} value={form.formState.date_location!} disabled={form.isSubmitting} showErrors={form.publishAttempted} onChange={value => form.handleFieldChange("date_location", value)} />)}
-          {section("builder-registration", "Registration", <><EventRegistration state={form.formState} disabled={form.isSubmitting} info={registrationInfo} onChange={form.handleFieldChange} /><ApplicationQuestionsSection locked={!!initialApplicationSettings?.questions_locked_at} onMove={form.moveApplicationQuestion} registrationModeOwned enabled={form.formState.requires_application} applicationTemplate={form.applicationTemplate} questionErrors={form.publishAttempted ? form.validation.questionErrors : form.questionErrors} onEnabledChange={enabled => form.handleFieldChange("requires_application", enabled)} onAdd={form.addApplicationQuestion} onRemove={form.removeApplicationQuestion} onUpdate={form.updateApplicationQuestion} onAddResponseOption={form.addResponseOption} onUpdateResponseOption={form.updateResponseOption} onRemoveResponseOption={form.removeResponseOption} />{form.formState.requires_application && <ApplicationTiming state={form.formState} savedReleaseAt={initialApplicationSettings?.decisions_release_at ?? null} decidedApplications={decidedApplications} showErrors={form.publishAttempted || visibleIssues.some(issue => issue.section === "registration")} onChange={form.handleFieldChange} />}</>)}
+          {section("builder-registration", "Registration", <EventRegistration state={form.formState} disabled={form.isSubmitting} info={registrationInfo} onChange={form.handleFieldChange} />)}
+          {section("builder-applications", "Applications", <><ApplicationsToggle enabled={form.formState.requires_application} locked={registrationInfo.locked} onChange={enabled => form.handleFieldChange("requires_application", enabled)} />{form.formState.requires_application && <><RegistrationWindowCard registration_opens_at={form.formState.registration_opens_at} registration_closes_at={form.formState.registration_closes_at} applications onFieldChange={form.handleFieldChange} /><ApplicationQuestionsSection locked={!!initialApplicationSettings?.questions_locked_at} onMove={form.moveApplicationQuestion} registrationModeOwned enabled applicationTemplate={form.applicationTemplate} questionErrors={form.publishAttempted ? form.validation.questionErrors : form.questionErrors} onEnabledChange={enabled => form.handleFieldChange("requires_application", enabled)} onAdd={form.addApplicationQuestion} onRemove={form.removeApplicationQuestion} onUpdate={form.updateApplicationQuestion} onAddResponseOption={form.addResponseOption} onUpdateResponseOption={form.updateResponseOption} onRemoveResponseOption={form.removeResponseOption} /><ApplicationTiming state={form.formState} savedReleaseAt={initialApplicationSettings?.decisions_release_at ?? null} decidedApplications={decidedApplications} showErrors={form.publishAttempted || visibleIssues.some(issue => issue.section === "applications")} onChange={form.handleFieldChange} /></>}</>)}
           {section("builder-teams", "Teams", <EventTeams state={form.formState} info={teamInfo} showErrors={form.publishAttempted || visibleIssues.some(issue => issue.section === "teams")} onChange={form.handleFieldChange} />)}
           {section("builder-people", "People and sponsors", <EventPeopleEditor content={form.formState.content ?? emptyContent()} onChange={content => form.handleFieldChange("content", content)} people={mentorOptions} sponsors={sponsorOptions} showErrors={form.showConfigurationErrors} />)}
           {section("builder-resources", "Links and resources", <EventResourcesEditor content={form.formState.content ?? emptyContent()} onChange={content => form.handleFieldChange("content", content)} showErrors={form.showConfigurationErrors} />)}

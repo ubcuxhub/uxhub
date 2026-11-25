@@ -42,6 +42,7 @@ import {
 } from "../lib/event-publication";
 import {
   registrationWindow,
+  windowLabels,
   type RegistrationWindow,
 } from "../lib/event-registration-window";
 import { momentEndsTooEarly, pacificMomentProblem } from "../lib/pacific-moment";
@@ -79,9 +80,9 @@ function sameDraft(a: ScheduleDraft, b: ScheduleDraft) {
  * repeats converts to a guess, so both are caught here, by the same rule as
  * the builder (`pacificMomentProblem`).
  */
-function momentsProblem(draft: ScheduleDraft): string | null {
+function momentsProblem(draft: ScheduleDraft, requiresApplication: boolean): string | null {
   for (const value of [draft.registration_opens_at, draft.registration_closes_at]) {
-    const problem = pacificMomentProblem(value, "Registration dates require both a date and time.");
+    const problem = pacificMomentProblem(value, windowLabels(requiresApplication).incomplete);
     if (problem) return problem;
   }
   if (draft.status === "draft") {
@@ -197,15 +198,18 @@ function MomentField({
 export function RegistrationBadge({
   state,
   opensAt,
+  applications = false,
 }: {
   state: RegistrationWindow;
   opensAt: string | null;
+  /** The window is for applying, so open and closed say Applications. */
+  applications?: boolean;
 }) {
   // TODO(#244): use eventBadgeFor() once it lands, so this can also say Full
   // and Past the way the student pages do.
   switch (state) {
     case "open":
-      return <StatusBadge status="registration_open" />;
+      return <StatusBadge status={applications ? "applications_open" : "registration_open"} />;
     case "upcoming":
       return (
         <StatusBadge
@@ -214,7 +218,7 @@ export function RegistrationBadge({
         />
       );
     case "closed":
-      return <StatusBadge status="registration_closed" />;
+      return <StatusBadge status={applications ? "applications_closed" : "registration_closed"} />;
     default:
       return null;
   }
@@ -314,7 +318,7 @@ export function useEventScheduleEditor(loaded: EventRow) {
       return;
     }
     const input = toInput(draft, event);
-    const problem = momentsProblem(draft) ?? eventScheduleProblem(input);
+    const problem = momentsProblem(draft, event.requires_application) ?? eventScheduleProblem(input);
     if (problem) {
       setError(problem);
       return;
@@ -335,7 +339,7 @@ export function useEventScheduleEditor(loaded: EventRow) {
       field === "registration_closes_at" &&
       momentEndsTooEarly(draft.registration_opens_at, draft.registration_closes_at)
     ) {
-      return "Registration end time must be after the start time.";
+      return windowLabels(event.requires_application).reversed;
     }
     return null;
   };
@@ -369,6 +373,7 @@ export type EventScheduleEditor = ReturnType<typeof useEventScheduleEditor>;
 /** The event's status and registration schedule as read-only rows. */
 export function EventScheduleFields({ event, now }: { event: EventRow; now: string }) {
   const registration = registrationWindow(event, new Date(now));
+  const labels = windowLabels(event.requires_application);
   return (
     <>
       <RecordField
@@ -384,22 +389,22 @@ export function EventScheduleFields({ event, now }: { event: EventRow; now: stri
       <RecordField label="Starts" value={formatTimestamp(event.starts_at)} />
       <RecordField label="Ends" value={formatTimestamp(event.ends_at)} />
       <RecordField
-        label="Registration"
+        label={event.requires_application ? "Applications" : "Registration"}
         value={
           registration === "not-applicable" ? (
             "Opens once the event is active"
           ) : (
-            <RegistrationBadge state={registration} opensAt={event.registration_opens_at} />
+            <RegistrationBadge state={registration} opensAt={event.registration_opens_at} applications={event.requires_application} />
           )
         }
       />
       <RecordField
-        label="Registration opens"
+        label={labels.opens}
         value={formatTimestamp(event.registration_opens_at) ?? "As soon as it’s active"}
       />
       <RecordField
-        label="Registration closes"
-        value={formatTimestamp(event.registration_closes_at) ?? "No closing date"}
+        label={labels.closes}
+        value={formatTimestamp(event.registration_closes_at) ?? (event.requires_application ? "When the event ends" : "No closing date")}
       />
     </>
   );
@@ -421,13 +426,14 @@ export function EventScheduleSection({
   const ids = useId();
   const { event, draft, editing, saving, update, reportField, momentError } = editor;
   const canceled = event.canceled_at !== null;
+  const labels = windowLabels(event.requires_application);
   const publishingNow = draft !== null && event.status === "draft" && draft.status === "active";
   const unpublishingNow = draft !== null && event.status === "active" && draft.status === "draft";
 
   return (
     <>
       <RecordSection
-        title="Status and registration schedule"
+        title={`Status and ${event.requires_application ? "application" : "registration"} schedule`}
         kind={editing ? "content" : "fields"}
         action={
           editing || canceled ? null : (
@@ -436,7 +442,7 @@ export function EventScheduleSection({
               variant="secondary"
               size="sm"
               onClick={editor.startEditing}
-              aria-label="Change status and registration schedule"
+              aria-label={`Change status and ${event.requires_application ? "application" : "registration"} schedule`}
             >
               <Pencil aria-hidden />
               Change
@@ -493,26 +499,26 @@ export function EventScheduleSection({
             <FieldDescription>Event timing comes from agenda items. <Link href={`/admin/events/${event.id}/edit#builder-agenda`}>Edit the agenda</Link> to change dates and times.</FieldDescription>
             <MomentField
               id={`${ids}-opens`}
-              label="Registration opens"
-              dateLabel="Registration opening date"
-              timeLabel="Registration opening time"
+              label={labels.opens}
+              dateLabel={labels.openingDate}
+              timeLabel={labels.openingTime}
               value={draft.registration_opens_at}
               onChange={(value) => update("registration_opens_at", value)}
               onValidityChange={reportField("registration_opens_at")}
               error={momentError("registration_opens_at")}
-              clearLabel="Clear registration opens"
+              clearLabel={`Clear ${labels.opens.toLowerCase()}`}
             />
             <MomentField
               id={`${ids}-closes`}
-              label="Registration closes"
-              dateLabel="Registration closing date"
-              timeLabel="Registration closing time"
+              label={labels.closes}
+              dateLabel={labels.closingDate}
+              timeLabel={labels.closingTime}
               value={draft.registration_closes_at}
               onChange={(value) => update("registration_closes_at", value)}
               onValidityChange={reportField("registration_closes_at")}
               start={draft.registration_opens_at}
               error={momentError("registration_closes_at")}
-              clearLabel="Clear registration closes"
+              clearLabel={`Clear ${labels.closes.toLowerCase()}`}
             />
           </fieldset>
         ) : (
