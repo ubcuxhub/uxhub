@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
-import { act, cleanup, renderHook } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, renderHook, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { FormEvent } from "react";
+import { createElement, type FormEvent } from "react";
+import { ApplicationTiming } from "../components/event-form/ApplicationTiming";
 import { defaultFormState, checkInDraftsFromRows, formStateFromEvent, getInitialFormState, questionsFromRows } from "../components/event-form/event-form-schema";
 import type { EventApplicationQuestionRow, EventRow } from "@/lib/supabase/models";
 import { useEventForm } from "./use-event-form";
@@ -146,6 +147,7 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 const event = {
@@ -565,6 +567,61 @@ it("refuses to save an incomplete application or incomplete timing", async () =>
   expect(result.current.error).not.toBeNull();
   expect(saveAdminEventAction).not.toHaveBeenCalled();
   expect(saveAdminEventDraftAction).not.toHaveBeenCalled();
+});
+
+it.each(["new schedule", "cleared hidden schedule"])("requires a complete release before saving a %s", async (scenario) => {
+  vi.stubGlobal("ResizeObserver", class { observe() {} unobserve() {} disconnect() {} });
+  const release = scenario === "cleared hidden schedule" ? "2099-01-01T17:00:00Z" : null;
+  const question: EventApplicationQuestionRow = {
+    id: "question-1", event_id: event.id, created_at: null, updated_at: null,
+    question: "Why?", description: null, response_type: "short_text", is_required: false,
+    sort_order: 0, max_char_limit: 500, response_options: null, restrict_file_types: false,
+    allowed_file_types: null, max_file_size_bytes: null,
+  };
+  function Form() {
+    const form = useEventForm({
+      eventId: event.id, initialEvent: { ...draftEvent, requires_application: true },
+      initialApplicationQuestions: [question],
+      initialApplicationSettings: {
+        event_id: event.id, decisions_release_at: release, confirmation_deadline: null,
+        questions_locked_at: null, offer_window_days: null, offer_deadline_time: null,
+      },
+    });
+    return createElement("form", { onSubmit: form.handleSubmit },
+      createElement(ApplicationTiming, {
+        state: form.formState, onChange: form.handleFieldChange, showErrors: form.publishAttempted,
+        savedReleaseAt: release, decidedApplications: release ? 3 : 0,
+      }),
+      createElement("button", { type: "submit" }, "Save event"));
+  }
+  render(createElement(Form));
+  const toggle = screen.getByRole("switch", { name: "Release decisions at a set time" });
+  if (release) {
+    for (const label of ["Release decisions on", "Release decisions on time"]) {
+      const input = screen.getByLabelText(label);
+      fireEvent.change(input, { target: { value: "" } });
+      fireEvent.blur(input);
+    }
+  } else {
+    fireEvent.click(toggle);
+  }
+  expect(toggle.getAttribute("aria-checked")).toBe("true");
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Save event" })); });
+  expect(screen.getAllByText(/valid, unambiguous Pacific/).length).toBeGreaterThan(0);
+  expect(saveAdminEventAction).not.toHaveBeenCalled();
+  expect(saveAdminEventDraftAction).not.toHaveBeenCalled();
+
+  const date = screen.getByLabelText("Release decisions on");
+  fireEvent.change(date, { target: { value: "01/02/2099" } });
+  fireEvent.blur(date);
+  const time = screen.getByLabelText("Release decisions on time");
+  fireEvent.change(time, { target: { value: "10 am" } });
+  fireEvent.blur(time);
+  await act(async () => { fireEvent.click(screen.getByRole("button", { name: "Save event" })); });
+  await waitFor(() => expect(saveAdminEventAction).toHaveBeenCalledOnce());
+  expect(saveAdminEventAction).toHaveBeenCalledWith(expect.objectContaining({
+    applicationTiming: { decisions_release_at: "2099-01-02T17:00:00.000Z", confirmation_deadline: null },
+  }));
 });
 
 describe("drafts with saved event children", () => {

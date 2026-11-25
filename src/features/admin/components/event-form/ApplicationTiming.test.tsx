@@ -59,6 +59,26 @@ it("asks before showing decisions that are still hidden", () => {
   expect(stored().decisions_release_at).toBe("");
 });
 
+it("keeps an emptied release enabled until the confirmed switch action removes it", () => {
+  render(<Form initial={{ ...defaultFormState, decisions_release_at: "2099-01-01T09:00" }} savedReleaseAt="2099-01-01T17:00:00Z" decidedApplications={3} />);
+  for (const label of ["Release decisions on", "Release decisions on time"]) {
+    const input = screen.getByLabelText(label);
+    fireEvent.change(input, { target: { value: "" } });
+    fireEvent.blur(input);
+  }
+  expect(toggle().getAttribute("aria-checked")).toBe("true");
+  expect(screen.getAllByText(/valid, unambiguous Pacific/).length).toBeGreaterThan(0);
+  fireEvent.click(toggle());
+  expect(screen.getByText(/3 decisions are hidden/)).toBeTruthy();
+  fireEvent.click(screen.getByRole("button", { name: "Keep the release time" }));
+  expect(toggle().getAttribute("aria-checked")).toBe("true");
+  fireEvent.click(toggle());
+  fireEvent.click(screen.getByRole("button", { name: "Turn off" }));
+  expect(toggle().getAttribute("aria-checked")).toBe("false");
+  expect(stored().decisions_release_at).toBe("");
+  expect(screen.queryByText(/valid, unambiguous Pacific/)).toBeNull();
+});
+
 it("locks the switch once applicants can see decisions", () => {
   render(<Form decidedApplications={1} />);
   expect(toggle().hasAttribute("disabled")).toBe(true);

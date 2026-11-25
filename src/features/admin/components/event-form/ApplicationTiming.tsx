@@ -32,7 +32,6 @@ export function ApplicationTiming({ state, showErrors, onChange, savedReleaseAt 
 }) {
   const [errors, setErrors] = useState<Record<string, string | null>>({});
   const [now] = useState(() => Date.now());
-  const [switchedOn, setSwitchedOn] = useState(false);
   const [confirmingOff, setConfirmingOff] = useState(false);
   const stashedRelease = useRef("");
   const problem = showErrors ? applicationTimingProblem(state) : null;
@@ -40,20 +39,20 @@ export function ApplicationTiming({ state, showErrors, onChange, savedReleaseAt 
   const saved = savedReleaseAt ? Date.parse(savedReleaseAt) : null;
   const decisionsVisible = saved !== null ? saved <= now : decidedApplications > 0;
   const decisionsHidden = saved !== null && saved > now && decidedApplications > 0;
-  const holding = switchedOn || state.decisions_release_at !== "";
+  const holding = state.decisions_release_at !== "";
 
   const clearErrors = (key: MomentKey) => setErrors(current => ({ ...current, [key]: null, [`${key}-time`]: null }));
   const turnOff = () => {
     stashedRelease.current = state.decisions_release_at;
-    setSwitchedOn(false);
     setConfirmingOff(false);
     clearErrors("decisions_release_at");
     onChange("decisions_release_at", "");
   };
   const onHoldingChange = (next: boolean) => {
     if (next) {
-      setSwitchedOn(true);
-      if (stashedRelease.current) onChange("decisions_release_at", stashedRelease.current);
+      // An empty date/time pair is still an incomplete moment while enabled.
+      // Keep it in form state so Save validates it and tracks unsaved changes.
+      onChange("decisions_release_at", stashedRelease.current || "T");
     } else if (decisionsHidden) {
       setConfirmingOff(true);
     } else {
@@ -66,7 +65,8 @@ export function ApplicationTiming({ state, showErrors, onChange, savedReleaseAt 
     const dateError = errors[key];
     const timeError = errors[`${key}-time`];
     const errorId = `${key}-error`;
-    const update = (nextDate: string, nextTime: string) => onChange(key, !nextDate && !nextTime ? "" : `${nextDate}T${nextTime}`);
+    const update = (nextDate: string, nextTime: string) => onChange(key,
+      key === "confirmation_deadline" && !nextDate && !nextTime ? "" : `${nextDate}T${nextTime}`);
     return <Field data-invalid={!!(dateError || timeError || problem)}>
       <FieldLabel htmlFor={`${key}-date`}>{label}{optional ? " (optional)" : ""}</FieldLabel>
       <DateTimeFieldPair timeWidth="wide" date={<DateField id={`${key}-date`} value={(date || null) as IsoDate | null} aria-describedby={errorId} onValueChange={next => update(next ?? "", time)} onValidityChange={error => setErrors(current => ({ ...current, [key]: error }))} />} time={<TimeField id={`${key}-time`} aria-label={`${label} time`} aria-describedby={errorId} ambiguousStart="daytime" value={(time || null) as WallTime | null} onValueChange={next => update(date, next ?? "")} onValidityChange={error => setErrors(current => ({ ...current, [`${key}-time`]: error }))} />} />
