@@ -150,11 +150,12 @@ export function offerWindowFor(
  * The offer deadline the decision card starts from (docs/event-states.md,
  * "Decision release"). An offer can't end before decisions are released, so
  * the earliest moment is the later of now and the release. The event's
- * "Confirm by" is used when it's after that moment. Otherwise the window of
- * the event's last offer (`offer_window_days` days after that moment's
- * Pacific date, at `offer_deadline_time`), or a week at 11:45 PM before any;
- * a day later when that lands before the moment itself. Changing "Confirm by"
- * never moves offers already made.
+ * "Confirm by" is used when it's after that moment, then the exact deadline of
+ * the event's last offer (`last_offer_expires_at`) while that's after it.
+ * Otherwise the last offer's window (`offer_window_days` days after that
+ * moment's Pacific date, at `offer_deadline_time`), or a week at 11:45 PM
+ * before any; a day later when that lands before the moment itself. Changing
+ * "Confirm by" never moves offers already made.
  */
 export function defaultOfferDeadline(
   settings: Pick<
@@ -162,15 +163,17 @@ export function defaultOfferDeadline(
     "decisions_release_at" | "confirmation_deadline"
   > &
     Partial<
-      Pick<EventApplicationSettingsRow, "offer_window_days" | "offer_deadline_time">
+      Pick<
+        EventApplicationSettingsRow,
+        "offer_window_days" | "offer_deadline_time" | "last_offer_expires_at"
+      >
     > | null,
   now: Date = new Date()
 ): DateTimeValue {
   const earliest = earliestOfferStart(settings?.decisions_release_at, now);
-  const confirmBy = settings?.confirmation_deadline ?? null;
-
-  if (confirmBy && Date.parse(confirmBy) > earliest) {
-    const [date, time] = timestamptzToDatetimeLocal(confirmBy).split("T");
+  for (const moment of [settings?.confirmation_deadline, settings?.last_offer_expires_at]) {
+    if (!moment || !(Date.parse(moment) > earliest)) continue;
+    const [date, time] = timestamptzToDatetimeLocal(moment).split("T");
     if (date && time) return { date: date as IsoDate, time: time as WallTime };
   }
 

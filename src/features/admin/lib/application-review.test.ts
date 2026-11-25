@@ -140,6 +140,23 @@ describe("defaultOfferDeadline", () => {
     ).toEqual({ date: "2026-10-24", time: "23:59" });
   });
 
+  it("repeats the last offer's exact deadline while it's still ahead", () => {
+    // Oct 25, 11:45 PM Pacific.
+    const last = { ...remembered, last_offer_expires_at: "2026-10-26T06:45:00.000Z" };
+    expect(defaultOfferDeadline(last, now)).toEqual({ date: "2026-10-25", time: "23:45" });
+    // A future Confirm by still comes first.
+    expect(
+      defaultOfferDeadline({ ...last, confirmation_deadline: "2026-10-25T06:59:00.000Z" }, now)
+    ).toEqual({ date: "2026-10-24", time: "23:59" });
+    // Once it has passed, or it isn't after the release, the window takes over.
+    expect(
+      defaultOfferDeadline({ ...last, last_offer_expires_at: "2026-10-19T00:00:00.000Z" }, now)
+    ).toEqual({ date: "2026-10-23", time: "17:00" });
+    expect(
+      defaultOfferDeadline({ ...last, decisions_release_at: "2026-10-27T16:00:00.000Z" }, now)
+    ).toEqual({ date: "2026-10-30", time: "17:00" });
+  });
+
   it("moves a same-day window whose time has passed to the next day", () => {
     // 5:00 AM Pacific now; a 0-day window at 4:00 AM has already gone by.
     expect(

@@ -531,6 +531,7 @@ export type Database = {
           confirmation_deadline: string | null
           decisions_release_at: string | null
           event_id: string
+          last_offer_expires_at: string | null
           offer_deadline_time: string | null
           offer_window_days: number | null
           questions_locked_at: string | null
@@ -540,6 +541,7 @@ export type Database = {
           confirmation_deadline?: string | null
           decisions_release_at?: string | null
           event_id: string
+          last_offer_expires_at?: string | null
           offer_deadline_time?: string | null
           offer_window_days?: number | null
           questions_locked_at?: string | null
@@ -548,6 +550,7 @@ export type Database = {
           confirmation_deadline?: string | null
           decisions_release_at?: string | null
           event_id?: string
+          last_offer_expires_at?: string | null
           offer_deadline_time?: string | null
           offer_window_days?: number | null
           questions_locked_at?: string | null
