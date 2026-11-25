@@ -20,6 +20,15 @@ function labelColour(eventColour: string) {
 }
 
 describe("Ticket", () => {
+  it("wraps a long event name, cutting it short only where the ticket runs out of room", () => {
+    const name = () => document.querySelector("[data-slot='ticket-event-name']") as HTMLElement;
+    const { rerender } = render(<Ticket {...base} eventName="UBC UX Hub Portfolio Review Night and Industry Mixer" />);
+    expect(name().className).not.toContain("truncate");
+    expect(name().className).toContain("line-clamp-3");
+    rerender(<Ticket {...base} state="pending" caption="Confirm by Nov 14" />);
+    expect(name().className).toContain("line-clamp-2");
+  });
+
   it("is an article named for the event, and prints the holder", () => {
     render(<Ticket {...base} />);
 

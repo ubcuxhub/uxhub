@@ -1,13 +1,20 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { EventRow } from "@/lib/supabase/models";
 
 import { EventTimeline } from "./EventTimeline";
 
-afterEach(cleanup);
+vi.mock("next/navigation", () => ({
+  useSearchParams: () => new URLSearchParams(window.location.search),
+}));
+
+afterEach(() => {
+  cleanup();
+  window.history.replaceState(null, "", "/portal/events");
+});
 
 const event = (slug: string, name: string, starts_at: string, extra: Partial<EventRow> = {}) =>
   ({
@@ -31,52 +38,59 @@ const PAST = [event("mixer", "Spring Mixer", "2026-03-18T18:00:00Z")];
 
 const search = () => screen.getByRole("searchbox", { name: "Search events" }) as HTMLInputElement;
 const type = (text: string) => fireEvent.change(search(), { target: { value: text } });
-const toggle = () => screen.getByRole("switch", { name: "Show past events" });
-const links = () => screen.queryAllByRole("link");
 const status = () => screen.queryByRole("status")?.textContent ?? null;
 
 describe("EventTimeline", () => {
-  it("lists only upcoming events until the switch is on", () => {
-    render(<EventTimeline upcomingEvents={UPCOMING} pastEvents={PAST} />);
-    expect(links()).toHaveLength(3);
-    expect(screen.queryByRole("heading", { name: "Past events" })).toBeNull();
-    expect(screen.queryByText("Spring Mixer")).toBeNull();
-  });
-
-  it("adds past events after the upcoming ones, most recent first", () => {
-    const past = [
-      event("recent", "Recent Talk", "2026-09-10T18:00:00Z"),
-      event("mid", "Mid Talk", "2026-09-02T18:00:00Z"),
-      event("old", "Old Mixer", "2026-03-18T18:00:00Z"),
-    ];
-    render(<EventTimeline upcomingEvents={UPCOMING} pastEvents={past} />);
-    fireEvent.click(toggle());
-
-    const order = Array.from(
-      document.querySelectorAll("a, section > h2, section > h3"),
-      (node) => node.textContent
-    ).filter((text) => /Kickoff|Workshop|Café|Past events|Talk|Mixer|2027|2026/.test(text ?? ""));
-    expect(order.map((t) => t?.replace(/\s+/g, " ").slice(0, 14))).toEqual([
-      "January 2027",
-      "Kickoff",
-      "Figma Workshop",
-      "February 2027",
-      "Café Chat",
-      "Past events",
-      "September 2026",
-      "Recent Talk",
-      "Mid Talk",
-      "March 2026",
-      "Old Mixer",
+  it("lists what's running under Ongoing, and the rest of this month under its month", () => {
+    const series = event("studio", "Open Studio", "2026-05-19T17:00:00Z", { ends_at: "2028-11-19T18:30:00Z" });
+    const sprint = event("sprint", "Design Sprint", "2026-11-13T17:00:00Z", { ends_at: "2026-11-18T23:00:00Z" });
+    const jam = event("jam", "Design Jam", "2026-11-29T17:00:00Z");
+    const tour = event("tour", "Office Tour", "2026-12-10T20:00:00Z");
+    render(
+      <EventTimeline upcomingEvents={[series, sprint, jam, tour]} pastEvents={[]} now="2026-11-16T19:00:00Z" />
+    );
+    expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual([
+      "Ongoing",
+      "November 2026",
+      "December 2026",
     ]);
-    expect(screen.getAllByRole("heading", { name: "Past events" })).toHaveLength(1);
   });
 
-  it("turning the switch off again hides the past section", () => {
+  it("shows no Ongoing heading when nothing is running", () => {
+    const tour = event("tour", "Office Tour", "2026-12-10T20:00:00Z");
+    render(<EventTimeline upcomingEvents={[tour]} pastEvents={[]} now="2026-11-16T19:00:00Z" />);
+    expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent)).toEqual(["December 2026"]);
+  });
+
+  it("remembers the view for the event page's Back to Events", () => {
     render(<EventTimeline upcomingEvents={UPCOMING} pastEvents={PAST} />);
-    fireEvent.click(toggle());
-    fireEvent.click(toggle());
-    expect(links()).toHaveLength(3);
+    expect(window.sessionStorage.getItem("uxhub:events-view")).toBe("upcoming");
+    fireEvent.click(screen.getByRole("radio", { name: "Past" }));
+    expect(window.sessionStorage.getItem("uxhub:events-view")).toBe("past");
+  });
+
+  it("keeps the view in the URL, so coming back to the page keeps Past", () => {
+    window.history.replaceState(null, "", "/portal/events");
+    const first = render(<EventTimeline upcomingEvents={UPCOMING} pastEvents={PAST} />);
+    fireEvent.click(screen.getByRole("radio", { name: "Past" }));
+    expect(window.location.search).toBe("?view=past");
+    first.unmount();
+
+    // Back from an event page: the page renders again with ?view=past.
+    render(<EventTimeline upcomingEvents={UPCOMING} pastEvents={PAST} />);
+    expect(screen.getByRole("radio", { name: "Past" }).getAttribute("aria-checked")).toBe("true");
+    expect(screen.getByText("Spring Mixer")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("radio", { name: "Upcoming" }));
+    expect(window.location.search).toBe("");
+  });
+
+  it("lists upcoming events, and past ones behind the Past toggle", () => {
+    render(<EventTimeline upcomingEvents={UPCOMING} pastEvents={PAST} />);
+    expect(screen.getAllByRole("link")).toHaveLength(3);
+
+    fireEvent.click(screen.getByRole("radio", { name: "Past" }));
+    expect(screen.getAllByRole("link").map((link) => link.textContent)).toEqual(["Spring Mixer"]);
   });
 
   it("shows each event's badge, including dated ones", () => {
@@ -105,9 +119,13 @@ describe("EventTimeline", () => {
         badges={{ mixer: { status: "checked_in" } }}
       />
     );
-    fireEvent.click(toggle());
+    fireEvent.click(screen.getByRole("radio", { name: "Past" }));
     expect(screen.getByText("Checked in")).toBeTruthy();
-    expect(screen.getByText("Past")).toBeTruthy();
+    // The badge, not the toggle's own "Past" option.
+    const badges = screen
+      .getAllByText("Past")
+      .filter((element) => !element.closest("[data-slot='segmented-toggle']"));
+    expect(badges).toHaveLength(1);
   });
 
   it("announces nothing until there is a query", () => {
@@ -144,66 +162,13 @@ describe("EventTimeline", () => {
     expect(screen.getAllByRole("link")).toHaveLength(3);
   });
 
-  it("searches both sections, and drops a section with no match", () => {
-    render(<EventTimeline upcomingEvents={UPCOMING} pastEvents={PAST} />);
-    fireEvent.click(toggle());
-
-    type("i");
-    expect(links().map((l) => l.textContent)).toEqual(
-      expect.arrayContaining(["Kickoff", "Figma Workshop", "Spring Mixer"])
-    );
-    expect(screen.getByRole("heading", { name: "Past events" })).toBeTruthy();
-
-    type("mixer");
-    expect(links()).toHaveLength(1);
-    expect(screen.getByRole("heading", { name: "Past events" })).toBeTruthy();
-    expect(screen.queryByRole("heading", { name: "No upcoming events" })).toBeNull();
-    expect(status()).toBe("1 result");
-
-    type("kickoff");
-    expect(links()).toHaveLength(1);
-    expect(screen.queryByRole("heading", { name: "Past events" })).toBeNull();
-  });
-
-  it("does not search past events while the switch is off", () => {
-    render(<EventTimeline upcomingEvents={UPCOMING} pastEvents={PAST} />);
-    type("mixer");
-    expect(screen.getByRole("heading", { name: "No events match “mixer”" })).toBeTruthy();
-  });
-
-  it("shows no match when neither section has one", () => {
-    render(<EventTimeline upcomingEvents={UPCOMING} pastEvents={PAST} />);
-    fireEvent.click(toggle());
-    type("zzz");
-    expect(screen.getByRole("heading", { name: "No events match “zzz”" })).toBeTruthy();
-    expect(screen.queryByRole("heading", { name: "Past events" })).toBeNull();
-  });
-
-  describe("empty states", () => {
-    it("says events are coming soon with nothing at all, with no clear action", () => {
-      render(<EventTimeline upcomingEvents={[]} pastEvents={[]} />);
-      expect(screen.getByRole("heading", { name: "Events coming soon" })).toBeTruthy();
-      fireEvent.click(toggle());
-      expect(screen.getByRole("heading", { name: "Events coming soon" })).toBeTruthy();
-      expect(screen.queryByRole("button", { name: "Clear search" })).toBeNull();
-    });
-
-    it("says there is nothing upcoming when only past events exist", () => {
-      render(<EventTimeline upcomingEvents={[]} pastEvents={PAST} />);
-      expect(screen.getByRole("heading", { name: "Events coming soon" })).toBeTruthy();
-
-      fireEvent.click(toggle());
-      expect(screen.getByRole("heading", { name: "No upcoming events" })).toBeTruthy();
-      expect(screen.getByRole("heading", { name: "Past events" })).toBeTruthy();
-      expect(links().map((l) => l.textContent)).toEqual(["Spring Mixer"]);
-    });
-
-    it("says there are no past events when only upcoming ones exist", () => {
-      render(<EventTimeline upcomingEvents={UPCOMING} pastEvents={[]} />);
-      fireEvent.click(toggle());
-      expect(links()).toHaveLength(3);
-      expect(screen.getByRole("heading", { name: "Past events" })).toBeTruthy();
-      expect(screen.getByRole("heading", { name: "No past events" })).toBeTruthy();
-    });
+  it.each([
+    [false, "Events coming soon"],
+    [true, "No past events"],
+  ])("says so when there are no events (past: %s), with no clear action", (past, title) => {
+    render(<EventTimeline upcomingEvents={[]} pastEvents={[]} />);
+    if (past) fireEvent.click(screen.getByRole("radio", { name: "Past" }));
+    expect(screen.getByRole("heading", { name: title })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Clear search" })).toBeNull();
   });
 });

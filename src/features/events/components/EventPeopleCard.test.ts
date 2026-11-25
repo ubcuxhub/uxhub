@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { sectionNoun } from "./EventPeopleCard";
+import { initials, sectionNoun } from "./EventPeopleCard";
 
 describe("sectionNoun", () => {
   it("counts the standard sections by their own noun", () => {
@@ -16,5 +16,13 @@ describe("sectionNoun", () => {
 
   it("counts people in a custom section", () => {
     expect(sectionNoun("Organizers")).toEqual({ singular: "person", plural: "people" });
+  });
+});
+
+describe("initials", () => {
+  it("takes the first and last name's letters", () => {
+    expect(initials("Sarah Jenkins")).toBe("SJ");
+    expect(initials("  Ana María de la Cruz ")).toBe("AC");
+    expect(initials("Harvest")).toBe("H");
   });
 });

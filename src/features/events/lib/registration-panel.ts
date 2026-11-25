@@ -40,7 +40,8 @@ export interface AlertLayoutProps {
 export interface ActionLayoutProps {
   title: string;
   description?: string;
-  action: PanelAction;
+  /** Left out for plain copy, such as a past event the student didn't go to. */
+  action?: PanelAction;
 }
 
 export interface TicketLayoutProps {
@@ -51,7 +52,7 @@ export interface TicketLayoutProps {
   description: string;
   /** What the price will be, before they've paid: "CA$15.00 for non-members". */
   priceLine?: string;
-  /** `locked` until they register; `used` once checked in; `expired` once the event ends. */
+  /** `locked` until they register; `expired` once the event ends; live otherwise, checked in included. */
   ticketState: "active" | "used" | "locked" | "expired";
   /** A line under the ticket: "No longer valid" on an expired one. */
   ticketNote?: string;
@@ -203,7 +204,9 @@ export function getPanelSpec(state: EventState, context: PanelContext): PanelSpe
         layout: "ticket",
         props: {
           description: "You’re checked in",
-          ticketState: "used",
+          // Still live (Figma 6.1, 6.3): the copy and the header badge say
+          // checked in, and a multi-day event scans the same code again.
+          ticketState: "active",
           ...ticketActions,
         },
       };
@@ -224,16 +227,17 @@ export function getPanelSpec(state: EventState, context: PanelContext): PanelSpe
         layout: "alert",
         props: {
           variant: "neutral",
+          icon: Lock,
           title: "Registration is closed",
           description: `Registration closed on ${longDate(state.closedAt)}. ${KEEP_AN_EYE_OUT}`,
         },
       };
     case "reg-past":
+      // Plain copy, not an alert: nothing went wrong (Figma 1.17).
       return {
         title: "Registration",
-        layout: "alert",
+        layout: "action",
         props: {
-          variant: "neutral",
           title: "Registration is closed",
           description: context.endsAt
             ? `This event ended on ${longDate(context.endsAt)}.`
@@ -325,7 +329,8 @@ export function getPanelSpec(state: EventState, context: PanelContext): PanelSpe
           variant: "warning",
           icon: Hourglass,
           title: "You’re on the waitlist",
-          description: "If a spot opens up, we’ll email you and it’ll show here.",
+          description:
+            "You’ll be notified here on the portal and by email if you’re offered a spot. You don’t need to do anything until then.",
         },
       };
     case "app-accepted":

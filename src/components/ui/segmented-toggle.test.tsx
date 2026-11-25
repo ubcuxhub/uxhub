@@ -34,6 +34,21 @@ function Toggle({
 }
 
 describe("SegmentedToggle", () => {
+  it("is md by default, and lg on request (Figma 3759:15793)", () => {
+    const { rerender } = render(<Toggle />);
+    expect(screen.getByRole("radiogroup").getAttribute("data-size")).toBe("md");
+    expect(screen.getByRole("radio", { name: "Past" }).className).toContain("text-label");
+    rerender(
+      <SegmentedToggle aria-label="Show events" size="lg" defaultValue="upcoming">
+        <SegmentedToggleItem value="upcoming">Upcoming</SegmentedToggleItem>
+        <SegmentedToggleItem value="past">Past</SegmentedToggleItem>
+      </SegmentedToggle>
+    );
+    expect(screen.getByRole("radiogroup").getAttribute("data-size")).toBe("lg");
+    expect(screen.getByRole("radiogroup").className).not.toContain("border-border-subtle");
+    expect(screen.getByRole("radio", { name: "Upcoming" }).className).toContain("text-button");
+  });
+
   it("is a named radiogroup of radio items with the selected one checked", () => {
     render(<Toggle />);
     expect(screen.getByRole("radiogroup", { name: "Show events" })).toBeTruthy();

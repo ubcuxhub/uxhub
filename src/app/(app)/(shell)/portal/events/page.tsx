@@ -49,6 +49,7 @@ export default async function PortalEvents() {
         upcomingEvents={upcomingEvents.map(toTimelineEvent)}
         pastEvents={pastEvents.map(toTimelineEvent)}
         badges={badges}
+        now={now.toISOString()}
       />
     </PageContainer>
   );

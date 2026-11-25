@@ -14,8 +14,16 @@ interface SegmentedToggleProps
   defaultValue?: string;
   /** Never called with `""`: pressing the selected option again does nothing. */
   onValueChange?: (value: string) => void;
+  /**
+   * `md` (default) is the form control. `lg` is the page-level view switch
+   * (Figma 3759:15793, the events timeline's Upcoming | Past): 34px options
+   * with 16px labels on a borderless track, 4px padding all round.
+   */
+  size?: SegmentedToggleSize;
   "aria-label": string;
 }
+
+type SegmentedToggleSize = "md" | "lg";
 
 /**
  * Pill switch between two or three views of the same list (§3.2). It switches
@@ -30,12 +38,14 @@ interface SegmentedToggleProps
 const SelectContext = React.createContext<((value: string) => void) | null>(
   null,
 );
+const SizeContext = React.createContext<SegmentedToggleSize>("md");
 
 function SegmentedToggle({
   className,
   value,
   defaultValue,
   onValueChange,
+  size = "md",
   ...props
 }: SegmentedToggleProps) {
   const [inner, setInner] = React.useState(defaultValue);
@@ -55,18 +65,25 @@ function SegmentedToggle({
         if (next !== current) handleChange(next);
       }}
     >
-      <ToggleGroupPrimitive.Root
-        data-slot="segmented-toggle"
-        type="single"
-        value={current ?? ""}
-        onValueChange={handleChange}
-        className={cn(
-          "inline-flex h-11 items-stretch gap-0.5 rounded-full border border-border-subtle bg-muted p-[3px] sm:h-[calc(var(--size-control)-4px)]",
-          "[&.w-full>[data-slot=segmented-toggle-item]]:flex-1",
-          className,
-        )}
-        {...props}
-      />
+      <SizeContext.Provider value={size}>
+        <ToggleGroupPrimitive.Root
+          data-slot="segmented-toggle"
+          data-size={size}
+          type="single"
+          value={current ?? ""}
+          onValueChange={handleChange}
+          className={cn(
+            "inline-flex h-11 items-stretch rounded-full bg-muted",
+            size === "md" &&
+              "gap-0.5 border border-border-subtle p-[3px] sm:h-[calc(var(--size-control)-4px)]",
+            // 4px apart and 4px around them: a 42px track from `sm`, 44px on phones.
+            size === "lg" && "gap-1 p-1 sm:h-[42px]",
+            "[&.w-full>[data-slot=segmented-toggle-item]]:flex-1",
+            className,
+          )}
+          {...props}
+        />
+      </SizeContext.Provider>
     </SelectContext.Provider>
   );
 }
@@ -78,6 +95,7 @@ function SegmentedToggleItem({
   ...props
 }: React.ComponentProps<typeof ToggleGroupPrimitive.Item>) {
   const select = React.useContext(SelectContext);
+  const size = React.useContext(SizeContext);
   return (
     <ToggleGroupPrimitive.Item
       data-slot="segmented-toggle-item"
@@ -93,8 +111,10 @@ function SegmentedToggleItem({
         }
       }}
       className={cn(
-        "inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-full border border-transparent px-3 text-label whitespace-nowrap text-muted-foreground transition-colors duration-150 select-none hover:text-foreground focus-visible:focus-ring [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
-        "data-[state=on]:border-border data-[state=on]:bg-card data-[state=on]:text-foreground",
+        "inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-full border border-transparent px-3 whitespace-nowrap text-muted-foreground transition-colors duration-150 select-none hover:text-foreground focus-visible:focus-ring [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+        size === "md" && "text-label data-[state=on]:border-border",
+        size === "lg" && "text-button data-[state=on]:border-border-subtle",
+        "data-[state=on]:bg-card data-[state=on]:text-foreground",
         "disabled:cursor-not-allowed disabled:text-disabled-foreground disabled:opacity-60 disabled:hover:text-disabled-foreground",
         className,
       )}

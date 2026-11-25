@@ -1,13 +1,11 @@
 import { cache } from "react";
 import type { Metadata } from "next";
 import { EventDescription } from "@/components/shared/EventDescription";
-import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
-import { EventLocation } from "@/components/shared/EventLocation";
 import { EventPageHeader } from "@/features/events/components/EventPageHeader";
 import { EventAgendaTable } from "@/features/events/components/EventAgendaTable";
 import { PageContainer } from "@/components/shared/PageContainer";
@@ -18,11 +16,12 @@ import { fetchEventBySlug } from "@/lib/supabase-helpers/events";
 import { fetchEventParticipantContent } from "@/lib/supabase-helpers/event-agenda";
 import { fetchEventLinks } from "@/lib/supabase-helpers/event-links";
 import { fetchUserEventTicket } from "@/lib/supabase-helpers/event-tickets";
-import { Calendar, Link2, MapPin } from "lucide-react";
-import { endsOnLaterDay, formatEventDate, formatEventTime, pacificDate } from "@/lib/date";
+import { pacificDate } from "@/lib/date";
 import { resolveImagePreviewSrc } from "@/lib/event-image";
 import { fetchEventPeopleSections, fetchEventSponsors } from "@/lib/supabase-helpers/event-people";
 import { EventPeopleCard } from "@/features/events/components/EventPeopleCard";
+import { EventsBackPill } from "@/features/events/components/EventsBackPill";
+import { displayUrl, EventHeaderDetails, type EventWebsite } from "@/features/events/components/EventHeaderDetails";
 import { eventBadgeFor } from "@/features/events/lib/event-badge";
 import { loadEventStates } from "@/features/events/lib/event-states";
 import { DRAFT_EVENTS_NOTE, draftRegistrationBlocks, isDraftEvent } from "@/features/events/lib/event-visibility";
@@ -105,96 +104,69 @@ export default async function PortalEventPage({
     ? links.find((link) => link.type === "slack_workspace")?.url ?? null
     : null;
   const website = publicMarketingDestination(event);
-
-  const startTime = formatEventTime(event.starts_at);
-  const endTime = formatEventTime(event.ends_at);
-  // A 7 PM to 1 AM social is one day, as on the timeline card.
-  const multiDay = endsOnLaterDay(event.starts_at, event.ends_at);
+  const hostedPath = `/events/${event.slug}`;
+  const websiteRow: EventWebsite | null =
+    website.kind === "external"
+      ? { kind: "external", href: website.url, display: displayUrl(website.url) }
+      : website.kind === "hosted"
+        ? { kind: "hosted", href: hostedPath, display: displayUrl(`${originHost(origin)}${hostedPath}`) }
+        : null;
 
   return (
-    <PageContainer backHref="/portal/events" backLabel="Back to Events" className="space-y-6">
+    <PageContainer className="space-y-6">
+      {/* Back to the timeline view the student came from (Upcoming or Past). */}
+      <EventsBackPill />
       {/* RLS returns a draft to admins and managers only, so only they see this. */}
       {isDraftEvent(event) && (
         <Alert>This is a draft event. {DRAFT_EVENTS_NOTE}</Alert>
       )}
       
-      <div className="border-border-subtle rounded-md border">
+      {/* Header: the banner (shared with the builder's preview, so what an
+          admin crops is what students see), then the title and badge, the
+          facts and the description (Figma 1.3). */}
+      <section className="overflow-hidden rounded-xl border border-border bg-card">
         <EventPageHeader
-          className="rounded-t-md"
+          className="rounded-t-xl"
           imageSrc={event.header_image_url ? resolveImagePreviewSrc(event.header_image_url) : undefined}
           colour={event.header_colour ?? undefined}
           iconSrc={event.image_url ? resolveImagePreviewSrc(event.image_url) : undefined}
+          // An image icon stands in without an event image, so the header keeps its shape.
+          iconPlaceholder
         />
-        <div className="px-6 pb-6">
-          <div className="my-10 flex flex-col gap-6">
-            <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-end sm:justify-between">
-              <div className="flex flex-col items-start gap-3">
-                <h1 className="text-h1">{event.name}</h1>
-                {badge && <StatusBadge {...badge} size="large" />}
-              </div>
-              {slackUrl && (
-                <Button asChild variant="secondary" className="px-5">
-                  <a href={slackUrl} target="_blank" rel="noopener noreferrer">
-                    {/* The Slack mark keeps its brand colours, so it's an image, not a Lucide icon. */}
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="/icons/slack.svg" width={16} height={16} alt="" />
-                    Open Slack
-                    <span className="sr-only"> (opens in a new tab)</span>
-                  </a>
-                </Button>
-              )}
+        <div className="px-8 pb-8">
+          <div className="flex flex-col items-start gap-5 pt-5 sm:flex-row sm:items-end sm:justify-between">
+            <div className="flex flex-col items-start gap-3">
+              <h1 className="text-h2">{event.name}</h1>
+              {badge && <StatusBadge {...badge} size="large" />}
             </div>
-
-            <hr className="w-full border-border-subtle" />
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 items-start">
-              <div className="flex items-start gap-3 text-small">
-                <span className="flex size-12 shrink-0 items-center justify-center rounded-md border-[0.8px] text-muted-foreground"><Calendar className="size-5" aria-hidden /></span>
-                <div className="flex min-w-0 flex-col gap-1 break-words">
-                  <p className="font-medium">
-                    {formatEventDate(event.starts_at, { year: "numeric", month: "short" }) ?? "TBD"}
-                    {multiDay
-                      ? ` – ${formatEventDate(event.ends_at, { year: "numeric", month: "short" }) ?? "TBD"}`
-                      : ""}
-                  </p>
-                  {startTime && (
-                    <p className="text-muted-foreground">
-                      {startTime}
-                      {endTime ? ` – ${endTime}` : ""}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-start gap-3 text-small">
-                <span className="flex size-12 shrink-0 items-center justify-center rounded-md border-[0.8px] text-muted-foreground"><MapPin className="size-5" aria-hidden /></span>
-                <div className="flex min-w-0 flex-col gap-1 break-words">
-                  {participant.location ? <EventLocation location={participant.location} /> : <p>{event.location_building || "TBD"}</p>}
-                </div>
-              </div>
-
-              {website.kind !== "none" && (
-                <div className="flex items-start gap-3 text-small">
-                  <span className="flex size-12 shrink-0 items-center justify-center rounded-md border-[0.8px] text-muted-foreground"><Link2 className="size-5" aria-hidden /></span>
-                  <div className="flex min-w-0 flex-col gap-1 break-words">
-                    <p className="font-medium">Event details</p>
-                    {website.kind === "external" ? (
-                      <a href={website.url} target="_blank" rel="noopener noreferrer" className="text-muted-foreground">
-                        {event.name} website
-                      </a>
-                    ) : (
-                      <Link href={`/events/${event.slug}`} className="text-muted-foreground">
-                        {event.name} website
-                      </Link>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+            {slackUrl && (
+              <Button asChild variant="secondary" className="px-5">
+                <a href={slackUrl} target="_blank" rel="noopener noreferrer">
+                  {/* The Slack mark keeps its brand colours, so it's an image, not a Lucide icon. */}
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/icons/slack.svg" width={16} height={16} alt="" />
+                  Open Slack
+                  <span className="sr-only"> (opens in a new tab)</span>
+                </a>
+              </Button>
+            )}
           </div>
-          <EventDescription rich={event.description_rich} text={event.description} />
+
+          <div className="pt-6">
+            <EventHeaderDetails
+              startsAt={event.starts_at}
+              endsAt={event.ends_at}
+              location={participant.location}
+              fallbackBuilding={event.location_building}
+              website={websiteRow}
+            />
+          </div>
+
+          <div className="max-w-180 pt-6 text-body">
+            <EventDescription rich={event.description_rich} text={event.description} />
+          </div>
         </div>
-      </div>
+      </section>
 
       {/* Registration and Your team side by side (Figma 4640:2): equal columns,
           stretched to the same height. Registration takes the full width when
@@ -236,4 +208,13 @@ export default async function PortalEventPage({
       {!eventWorkingDocument(event) && <EventPeopleCard type="sponsors" people={sponsors} />}
     </PageContainer>
   );
+}
+
+/** "ubcuxhub.ca" from the request origin, or nothing when it's unknown. */
+function originHost(origin: string): string {
+  try {
+    return new URL(origin).host;
+  } catch {
+    return "";
+  }
 }

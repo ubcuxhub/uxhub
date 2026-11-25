@@ -161,9 +161,9 @@ function ActionLayout({ title, description, action }: ActionLayoutProps) {
       <div className="flex min-w-0 flex-col gap-1">
         <p className="text-body font-medium">{title}</p>
         {description ? <p className="text-small text-muted-foreground">{description}</p> : null}
-        {action.disabledReason ? <p className="text-small text-muted-foreground">{action.disabledReason}</p> : null}
+        {action?.disabledReason ? <p className="text-small text-muted-foreground">{action.disabledReason}</p> : null}
       </div>
-      <PanelButton action={action} className="@max-xl:w-full" />
+      {action ? <PanelButton action={action} className="@max-xl:w-full" /> : null}
     </div>
   );
 }

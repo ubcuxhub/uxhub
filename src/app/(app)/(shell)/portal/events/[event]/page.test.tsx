@@ -53,6 +53,8 @@ async function resolveRegistrationPanel(node: ReactNode): Promise<ReactNode> {
   }
   if (node.props.children === undefined) return node;
   const children = await Promise.all(Children.toArray(node.props.children).map(resolveRegistrationPanel));
+  // Spread, so a single child stays single: an `asChild` Button (Open Slack)
+  // needs exactly one element, not an array of one.
   return cloneElement(node, {}, ...children);
 }
 
@@ -308,7 +310,8 @@ it("dates an overnight event on its start day alone, as the timeline does", asyn
   const event = fixtures.event;
   fixtures.fetchEvent.mockResolvedValue({ ...event, starts_at: "2099-12-05T03:00:00Z", ends_at: "2099-12-05T09:00:00Z" });
   await renderPage();
-  expect(screen.getByText("Dec 4, 2099")).toBeTruthy();
+  // The header's date row: "Fri, Dec 4, 2099", with no range to the 5th.
+  expect(screen.getByText(/^\w{3}, Dec 4, 2099$/)).toBeTruthy();
   expect(screen.queryByText(/Dec 5, 2099/)).toBeNull();
 });
 
