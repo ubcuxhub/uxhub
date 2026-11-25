@@ -1688,7 +1688,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      admin_event_analytics: { Args: { p_now?: string }; Returns: Json }
       admin_event_pricing_locked: {
         Args: { p_event_id: string }
         Returns: boolean
@@ -1698,7 +1697,6 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
-      admin_membership_analytics: { Args: { p_now?: string }; Returns: Json }
       admin_membership_history: {
         Args: { p_first_year?: number; p_last_year?: number; p_now?: string }
         Returns: Json

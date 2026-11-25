@@ -48,10 +48,9 @@ The donut and metrics form a centered group within their content column. A
 keeping it horizontally stationary when the selected label/count/share changes.
 
 The old membership-tier/event carousel and feature zoom/pan code are removed.
-The two legacy analytics RPCs remain deployed for compatibility with the old
-application during rollout; no new migration drops them. Their TypeScript-only
-wrappers and obsolete carousel tests are removed. Current data regressions cover
-the supported aggregates and upcoming-event helpers.
+The analytics RPCs drafted for it were never deployed and are not part of the
+schema. Current data regressions cover the supported aggregates and
+upcoming-event helpers.
 
 ## Durable membership history and all-account majors
 
@@ -69,6 +68,7 @@ It does not reconstruct deleted purchase evidence or infer manual grant dates.
 
 Successful purchase fulfillment commits the profile grant, fulfillment marker
 and recording together through the service-only `fulfill_membership_purchase`.
+A purchase without a Square customer ID keeps the profile's existing one.
 Both existing admin profile-edit paths record qualifying manual assignments
 through a database trigger on changes to the membership tier column. Re-saving
 the same tier does not turn undated existing membership into a new grant. Incomplete purchases,
@@ -133,9 +133,9 @@ normal account deletion never takes this fixture-only maintenance path.
 
 ## Deployment and verification
 
-The additive history migration precedes this UI release; old analytics RPCs
-remain available during deployment/rollback. Tables and generated types are
-unchanged by the presentation ticket. Database authorization/counting remain
+The additive history migration precedes this UI release; production code
+calls none of the RPCs it adds until the release ships. Tables and generated
+types are unchanged by the presentation ticket. Database authorization/counting remain
 covered by integration and RLS suites. UI regressions cover selection, reporting
 periods, honest coverage, independent failure/loading and native interaction.
 

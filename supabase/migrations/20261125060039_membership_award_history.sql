@@ -104,6 +104,7 @@ for each row execute function public.record_manual_membership_award();
 
 -- Commit the actual grant, fulfillment marker and ledger together. Caller still
 -- computes expiry with the existing JS policy; no expiry/checkout rules change.
+-- A purchase without a Square customer keeps the profile's existing one.
 create function public.fulfill_membership_purchase(p_purchase_id uuid, p_expires_at timestamptz)
 returns public.purchases language plpgsql security definer set search_path = '' as $$
 declare p public.purchases; prior_setting text := current_setting('uxhub.membership_purchase', true);
@@ -119,7 +120,7 @@ begin
   perform set_config('uxhub.membership_purchase', 'on', true);
   update public.user_info set membership_expires_at = p_expires_at,
     membership_pre_ordered_type_id = null, membership_type_id = p.membership_type_id,
-    square_customer_id = p.square_customer_id where id = p.user_id;
+    square_customer_id = coalesce(p.square_customer_id, user_info.square_customer_id) where id = p.user_id;
   update public.purchases set fulfilled_at = now() where id = p.id returning * into p;
   perform set_config('uxhub.membership_purchase', coalesce(prior_setting, ''), true);
   return p;
