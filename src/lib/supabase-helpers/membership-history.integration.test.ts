@@ -173,6 +173,40 @@ describe("durable membership history", () => {
     expect((await db.from("purchases").select("fulfilled_at").eq("id", unavailable.id).single()).data?.fulfilled_at).toBeNull();
   }));
 
+  it.each([
+    { profileId: "existing-customer", purchaseId: null, expected: "existing-customer" },
+    { profileId: "existing-customer", purchaseId: "purchase-customer", expected: "purchase-customer" },
+    { profileId: null, purchaseId: null, expected: null },
+  ])("fulfillment preserves or replaces Square customer IDs: $profileId / $purchaseId", ({ profileId, purchaseId, expected }) => withFixtures(async (f) => {
+    const db = f.supabase;
+    const tier = await f.createMembershipType();
+    const person = await f.createUser({ square_customer_id: profileId });
+    const purchase = await db.from("purchases").insert({
+      user_id: person.id, kind: "membership", status: "completed", membership_type_id: tier.id,
+      amount_cents: 1000, currency: "CAD", idempotency_key: randomUUID(), square_customer_id: purchaseId,
+    }).select("id").single();
+    check(purchase.error);
+    const fulfill = () => db.rpc("fulfill_membership_purchase", { p_purchase_id: purchase.data!.id, p_expires_at: "2040-01-01T00:00:00Z" });
+    const first = await fulfill();
+    check(first.error);
+    expect(first.data!.fulfilled_at).not.toBeNull();
+    const awardsBefore = await db.from("membership_awards").select("*").eq("person_id", person.id);
+    check(awardsBefore.error);
+    const month = Number(new Intl.DateTimeFormat("en", { timeZone: "America/Vancouver", month: "numeric" }).format(new Date()));
+    expect(awardsBefore.data).toHaveLength(month >= 5 && month <= 8 ? 0 : 1);
+    for (let retry = 0; retry < 2; retry++) {
+      const result = await fulfill();
+      check(result.error);
+      expect(result.data!.fulfilled_at).toBe(first.data!.fulfilled_at);
+      const profile = await db.from("user_info").select("square_customer_id,membership_type_id").eq("id", person.id).single();
+      check(profile.error);
+      expect(profile.data).toEqual({ square_customer_id: expected, membership_type_id: tier.id });
+      const awards = await db.from("membership_awards").select("*").eq("person_id", person.id);
+      check(awards.error);
+      expect(awards.data).toEqual(awardsBefore.data);
+    }
+  }));
+
   it("aggregates all-account majors, allows staff aggregates only, and denies direct history access and trusted writes", () => withFixtures(async (f) => {
     const admin = await f.createUser({ role_access: "admin" });
     const manager = await f.createUser({ role_access: "manager" });

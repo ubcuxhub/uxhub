@@ -1182,17 +1182,24 @@ list always includes every label, count, share and selection. Callers can hide
 only the visual with `visualClassName`; never hide its accessible equivalent.
 Dashboard narrow cards omit the donut under accepted D-14. The donut has explicit
 85px chart dimensions, so hiding it never measures a zero-size parent.
+Dashboard marks retain the approved pale treatment: unselected donut segments
+use `border`, bars use `border-subtle`, and selection/hover stays `primary`.
+These pale neutral marks remain an exception to the general 3:1 chart-mark
+contrast target, per dashboard decision D-22.
 `ChartContainer` (`components/ui/chart`) defaults to responsive measurement and
 accepts `initialDimension` for its initial render. Use `responsive={false}` only
 when the child chart supplies explicit width/height; configuration, theme colours
-and tooltip context remain available in either mode. The resizable real dashboard
+and tooltip context remain available in either mode. `ChartConfig` supports
+`theme: { light, dark }`; dark overrides target the application’s
+`[data-theme="dark"]` ancestor and follow light → dark → light changes. The resizable real dashboard
 card at `/dev/components/distribution-chart` demonstrates hide/show and long labels.
 
 `ScrollableBarChart` (`components/shared/ScrollableBarChart`) takes ordered
 `ChartPeriod` rows (id, label, nullable count, coverage). Complete zero is a
 reported zero; partial counts carry an incomplete marker by default; unavailable/future
 periods never become zero-height actuals. Hover, focus and tap show identical
-values. A native horizontal scrollbar can be dragged, arrows step one period
+values; a focused/tapped bar retains its value when mouse hover leaves, until
+focus moves away. A native horizontal scrollbar can be dragged, arrows step one period
 and disable at boundaries, up to seven bars fit when labels/space allow. No
 wheel interception, zoom handler or animation. `initialScroll="start"` starts at
 the left edge and resets when period IDs change; the default `"end"` preserves
@@ -1205,7 +1212,8 @@ DropdownMenu and Button controls. Caller order is preserved; Club Members
 supplies academic years newest first. Feature code owns reporting semantics.
 
 See `/dev/components/statistics-card` for imports and narrow/wide, selection,
-Unknown, missing/partial/zero/future, loading and error examples. The gallery's
+Unknown, missing/partial/zero/future, loading and error examples, plus explicit
+light/dark configuration in responsive and fixed sizing modes. The gallery's
 theme/density controls apply; keyboard/touch work without hover or motion.
 
 ### Event preview and quick links

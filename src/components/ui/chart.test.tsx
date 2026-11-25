@@ -28,3 +28,15 @@ it("renders fixed children directly while retaining theme configuration", () => 
   expect(container.querySelector("style")?.textContent).toContain("--color-count: var(--primary)");
   expect(container.querySelector("style")?.textContent).toContain("--color-count: var(--foreground)");
 });
+
+// Both layouts must generate the same selectors used by the app theme controls.
+it.each([true, false])("targets data-theme for theme colors (responsive=%s)", (responsive) => {
+  const { container } = render(<ChartContainer id="themed" responsive={responsive} config={{ count: { theme: { light: "#111111", dark: "#eeeeee" } } }}>
+    <svg aria-label="Themed chart" />
+  </ChartContainer>);
+  const css = container.querySelector("style")!.textContent!;
+  expect(css).toContain('[data-theme="dark"] [data-chart=chart-themed] {\n  --color-count: #eeeeee;');
+  expect(css).toContain('[data-chart=chart-themed] {\n  --color-count: #111111;');
+  expect(css).not.toContain(".dark");
+  expect(Boolean(screen.queryByTestId("responsive"))).toBe(responsive);
+});

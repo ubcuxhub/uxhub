@@ -46,6 +46,18 @@ describe("scrollable reporting chart", () => {
     expect(list.textContent).toContain("2024–2025: 0");
   });
 
+  it("retains the tapped or keyboard-focused value when synthesized mouse hover leaves", () => {
+    render(<ScrollableBarChart periods={periods} label="Members" />);
+    const bar = screen.getByRole("button", { name: "2023–2024: 10 · Incomplete coverage" });
+    act(() => bar.focus());
+    fireEvent.click(bar);
+    fireEvent.mouseLeave(bar);
+    expect(document.activeElement).toBe(bar);
+    expect(screen.getByRole("status").textContent).toBe("2023–2024: 10 · Incomplete coverage");
+    act(() => bar.blur());
+    expect(screen.getByRole("status").textContent).toContain("Not yet reported (·)");
+  });
+
   it("starts at the newest end, steps one period, follows thumb scrolling and disables at boundaries", () => {
     vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(300);
     vi.spyOn(HTMLElement.prototype, "scrollWidth", "get").mockReturnValue(700);

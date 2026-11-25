@@ -61,7 +61,7 @@ export function ScrollableBarChart({ periods, label, wideLabels = false, initial
             const shown = active === period.id;
             const reported = period.count !== null && period.coverage !== "future" && period.coverage !== "unavailable";
             return <button type="button" key={period.id} aria-label={`${period.label}: ${chartPeriodValue(period, showPartialCoverage)}`}
-              onMouseEnter={() => setActive(period.id)} onMouseLeave={() => setActive(null)} onFocus={() => setActive(period.id)} onBlur={() => setActive(null)} onClick={() => setActive(period.id)}
+              onMouseEnter={() => setActive(period.id)} onMouseLeave={(event) => { if (event.currentTarget !== document.activeElement) setActive(null); }} onFocus={() => setActive(period.id)} onBlur={() => setActive(null)} onClick={() => setActive(period.id)}
               className="group flex h-[132px] min-w-0 shrink-0 flex-col items-center justify-end gap-0.5 rounded-sm focus-visible:focus-ring"
               style={{ width: "max(var(--bar-min-width), calc((100% - 84px) / 7))" }}>
               <span aria-hidden="true" className={cn("flex h-28 w-full flex-col items-center justify-end gap-1", !reported && "text-muted-foreground")}>

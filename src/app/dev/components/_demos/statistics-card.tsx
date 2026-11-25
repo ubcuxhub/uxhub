@@ -1,5 +1,7 @@
 "use client";
 
+import { Bar, BarChart } from "recharts";
+import { ChartContainer, type ChartConfig } from "@/components/ui/chart";
 import { DashboardAreaOfStudy } from "@/features/admin/components/dashboard/DashboardAreaOfStudy";
 import { useState } from "react";
 import { Info } from "lucide-react";
@@ -12,6 +14,9 @@ import { MetricBadge } from "@/components/ui/metric-badge";
 import { Button } from "@/components/ui/button";
 import { Specimen, SpecimenGroup } from "@/app/dev/_shell/Specimen";
 
+const themeConfig = { count: { label: "Accounts", theme: { light: "var(--primary)", dark: "var(--foreground)" } } } satisfies ChartConfig;
+const themeData = [{ label: "Accounts", count: 25 }];
+
 const segments = [{ label: "Cognitive Systems", count: 12 }, { label: "Unknown", count: 8 }, { label: "A very long academic major that wraps across multiple lines", count: 5 }];
 const periods: ChartPeriod[] = Array.from({ length: 12 }, (_, i) => ({ id: String(i), label: `${2017 + i}–${2018 + i}`, count: i < 2 || i === 11 ? null : i === 3 ? 0 : i * 7, coverage: i < 2 ? "unavailable" : i === 11 ? "future" : i === 2 ? "partial" : "complete" }));
 
@@ -20,6 +25,15 @@ export default function StatisticsCardDemo() {
   const [period, setPeriod] = useState<"year" | "month">("year");
   const [year, setYear] = useState(2026);
   return <div className="flex flex-col gap-8">
+    <SpecimenGroup title="Light/dark chart configuration" description='ChartConfig theme.light/theme.dark follows data-theme="dark". Toggle the gallery theme light → dark → light: these bars switch from primary to foreground and back in both sizing modes.'>
+      {[true, false].map((responsive) => <Specimen key={String(responsive)} label={responsive ? "Responsive theme configuration" : "Fixed theme configuration"}>
+        <ChartContainer data-theme-example={responsive ? "responsive" : "fixed"} config={themeConfig} responsive={responsive} className="h-32 w-64 bg-card">
+          <BarChart data={themeData} width={responsive ? undefined : 256} height={responsive ? undefined : 128} accessibilityLayer>
+            <Bar dataKey="count" fill="var(--color-count)" isAnimationActive={false} />
+          </BarChart>
+        </ChartContainer>
+      </Specimen>)}
+    </SpecimenGroup>
     <SpecimenGroup title="Donut hide/show transition" description="Resize this real dashboard card across 380px outer width (330px content). The visual hides, the full accessible distribution and selection remain. Long labels must not shift the donut.">
       <Specimen label="Resizable Area of Study" className="w-full" wide><div data-donut-resize className="w-[491px] min-w-[280px] max-w-full resize-x overflow-auto"><DashboardAreaOfStudy data={{ totalAccounts: 25, majors: segments.map(({ label, count }) => ({ major: label, count })) }} /></div></Specimen>
     </SpecimenGroup>
@@ -36,7 +50,7 @@ export default function StatisticsCardDemo() {
       <Specimen label="Loading" className="w-[350px]"><StatisticsCard title="Area of Study" size="compact" loading /></Specimen>
       <Specimen label="Chart loading" className="w-[421px]"><StatisticsCard title="Club Members" loading /></Specimen>
     </SpecimenGroup>
-    <SpecimenGroup title="Scrollable periods" description="Monthly starts at September and hides partial annotations; Yearly keeps coverage annotations and starts at the latest period. Hover, Tab/focus, or tap a bar for the same actual count and coverage. Arrows step one period; drag the native scrollbar. Up to seven bars fit, with fewer for long labels/narrow containers. Wheel scrolling and browser zoom stay native. The period control wraps onto its own row before crowding the title/info group. No chart animation.">
+    <SpecimenGroup title="Scrollable periods" description="Monthly starts at September and hides partial annotations; Yearly keeps coverage annotations and starts at the latest period. Hover, Tab/focus, or tap a bar for the same actual count and coverage. Focused/tapped values remain visible after mouse hover leaves until focus moves away. Arrows step one period; drag the native scrollbar. Up to seven bars fit, with fewer for long labels/narrow containers. Wheel scrolling and browser zoom stay native. The period control wraps onto its own row before crowding the title/info group. No chart animation.">
       {[280, 350, 616, 1000].map((width) => <Specimen key={width} label={`${width}px · unknown, partial, exact zero and future`} className="w-full" wide>
         <div className="min-w-0 max-w-full" style={{ width }}><StatisticsCard title="Club Members" titleAction={<IconButton label="Reporting periods use the selected academic year" variant="ghost" size="icon-sm"><Info /></IconButton>} action={<ChartPeriodMenu period={period} selectedYear={year} years={[{ value: 2026, label: "2026–2027" }, { value: 2025, label: "2025–2026" }]} onChange={(p, y) => { setPeriod(p); setYear(y); }} />}>
           <p className="text-h1">70 <MetricBadge trend>+11 past 30 days</MetricBadge></p>
