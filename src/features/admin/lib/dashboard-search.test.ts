@@ -10,8 +10,9 @@ describe("dashboard search model", () => {
   });
   it("bounds/deduplicates reference history and rejects untrusted stored data", () => {
     const ref = { kind: "user", id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa" } as const;
-    expect(parseRecentReferences([null, {}, { kind: "action", id: "export" }, { kind: "user", id: "../../bad" }, { ...ref, label: "Untrusted name" }])).toEqual([ref]);
+    expect(parseRecentReferences([null, {}, { kind: "action", id: "unknown" }, { kind: "user", id: "../../bad" }, { ...ref, label: "Untrusted name" }])).toEqual([ref]);
     expect(parseRecentReferences("invalid")).toEqual([]);
+    expect(parseRecentReferences([{ kind: "action", id: "export" }])).toEqual([{ kind: "action", id: "export" }]);
     expect(addRecentReference([ref, { kind: "action", id: "statistics" }], ref)).toEqual([ref, { kind: "action", id: "statistics" }]);
     expect(addRecentReference(Array.from({ length: 8 }, (_, i) => ({ kind: "event", id: String(i) })), ref)).toHaveLength(5);
   });

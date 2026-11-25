@@ -11,7 +11,7 @@ const groups: ActionSearchGroup[] = [
   { label: "Suggested", items: [
     { id: "upcoming", label: "Upcoming events", leading: <Search aria-hidden /> },
     { id: "pending", label: "Pending applications", leading: <Search aria-hidden /> },
-    { id: "export", label: "Export user data", leading: <Search aria-hidden />, disabled: true, description: "Not available yet" },
+    { id: "export", label: "Export user data", leading: <Search aria-hidden /> },
   ] },
 ];
 function Example({ state = "normal", narrow = false, forceOpen = false, initialQuery = "" }: { initialQuery?: string; forceOpen?: boolean; state?: "normal" | "loading" | "empty" | "error"; narrow?: boolean }) {

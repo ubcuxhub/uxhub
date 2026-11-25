@@ -7,8 +7,7 @@ export const SEARCH_ACTIONS: readonly DashboardSearchResult[] = [
   { kind: "action", id: "upcoming", label: "Upcoming events" },
   { kind: "action", id: "pending", label: "Pending applications" },
   { kind: "action", id: "statistics", label: "Club statistics" },
-  // ADR-005 implements this dispatch branch; it must remain unavailable until then.
-  { kind: "action", id: "export", label: "Export user data", description: "Not available yet" },
+  { kind: "action", id: "export", label: "Export user data" },
 ];
 export function searchKey(item: SearchReference) { return `${item.kind}:${item.id}`; }
 export function searchDestination(item: SearchReference) {
@@ -24,7 +23,7 @@ export function parseRecentReferences(value: unknown): SearchReference[] {
   if (!Array.isArray(value)) return [];
   return value.filter((item): item is SearchReference => Boolean(item && typeof item === "object" &&
     ["user", "event", "application", "action"].includes(item.kind) && typeof item.id === "string" &&
-    (item.kind === "action" ? SEARCH_ACTIONS.some((action) => action.id === item.id && action.id !== "export") :
+    (item.kind === "action" ? SEARCH_ACTIONS.some((action) => action.id === item.id) :
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.id)))).slice(0, RECENT_LIMIT).map(({ kind, id }) => ({ kind, id }));
 }
 export function addRecentReference(items: SearchReference[], item: SearchReference) {

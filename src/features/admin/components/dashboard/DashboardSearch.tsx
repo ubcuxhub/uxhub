@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CalendarDays, Clock, FileText, Search, User } from "lucide-react";
 import { ActionSearch, type ActionSearchGroup } from "@/components/shared/ActionSearch";
 import { useUser } from "@/lib/auth/user-context";
+import { useUserExport } from "@/features/admin/lib/use-user-export";
 import { dashboardSearchAction } from "@/features/admin/dashboard-search-actions";
 import { addRecentReference, matchingActions, parseRecentReferences, searchDestination, searchKey, type DashboardSearchResult, type SearchReference, type SearchScope } from "@/features/admin/lib/dashboard-search";
 
@@ -22,6 +23,7 @@ export function DashboardSearch({ sessionKey, userId }: { sessionKey: string | n
 }
 function SearchSession({ storageKey }: { storageKey: string | null }) {
   const router = useRouter();
+  const userExport = useUserExport();
   const [query, setQuery] = useState("");
   const [scope, setScope] = useState<SearchScope>("all");
   const [open, setOpen] = useState(false);
@@ -60,7 +62,9 @@ function SearchSession({ storageKey }: { storageKey: string | null }) {
     if (storageKey) writeRecents(storageKey, references.current);
   }
   function select(item: DashboardSearchResult) {
-    if (item.kind === "action" && item.id === "export") return;
+    if (item.kind === "action" && item.id === "export") {
+      remember(item); void userExport.download(); setOpen(false); return;
+    }
     if (item.kind === "action" && (item.id === "upcoming" || item.id === "pending")) {
       version.current = Symbol(); remember(item); setScope(item.id); setQuery(""); return;
     }
@@ -99,7 +103,7 @@ function SearchSession({ storageKey }: { storageKey: string | null }) {
     available.set(id, item);
     const Icon = group.recent ? Clock : item.kind === "user" ? User : item.kind === "application" ? FileText :
       item.kind === "event" ? CalendarDays : Search;
-    return { id, label: item.label, description: group.recent ? undefined : item.description, disabled: item.id === "export" && item.kind === "action", leading: <Icon aria-hidden /> };
+    return { id, label: item.label, description: item.id === "export" && userExport.pending ? "Preparing user data…" : group.recent ? undefined : item.description, disabled: item.id === "export" && item.kind === "action" && userExport.pending, leading: <Icon aria-hidden /> };
   }) }));
   return <ActionSearch className="lg:w-[42%] lg:shrink-0" label="Search dashboard" placeholder="What are you searching for?"
     query={query} onQueryChange={(value) => { version.current = Symbol(); setQuery(value); }} open={open} onOpenChange={(next) => { if (next !== open) version.current = Symbol(); setOpen(next); if (next && !open) setRetry((value) => value + 1); }}

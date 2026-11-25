@@ -1,28 +1,53 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DashboardSearch } from "./DashboardSearch";
 import { dashboardSearchAction } from "@/features/admin/dashboard-search-actions";
 import type { DashboardSearchResult } from "@/features/admin/lib/dashboard-search";
 
-const mocks = vi.hoisted(() => ({ push: vi.fn(), user: { id: "admin" } as { id: string } | null }));
+const mocks = vi.hoisted(() => ({ push: vi.fn(), download: vi.fn(), pending: false, user: { id: "admin" } as { id: string } | null }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push: mocks.push }) }));
 vi.mock("@/lib/auth/user-context", () => ({ useUser: () => ({ user: mocks.user }) }));
 vi.mock("@/features/admin/dashboard-search-actions", () => ({ dashboardSearchAction: vi.fn() }));
+vi.mock("@/features/admin/lib/use-user-export", () => ({ useUserExport: () => ({ download: mocks.download, pending: mocks.pending }) }));
 const action = vi.mocked(dashboardSearchAction);
 const person: DashboardSearchResult = { kind: "user", id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", label: "Alex", description: "alex@example.test" };
 beforeEach(() => {
+  mocks.download.mockReset(); mocks.pending = false;
   sessionStorage.clear(); mocks.user = { id: "admin" }; mocks.push.mockReset(); action.mockReset();
   action.mockResolvedValue({ results: [], recents: [] });
 });
 afterEach(cleanup);
 async function open() { fireEvent.focus(screen.getByRole("combobox")); await screen.findByRole("option", { name: "Upcoming events" }); }
 describe("DashboardSearch", () => {
-  it("dispatches working statistics and scoped searches and leaves export disabled", async () => {
+  it("dispatches export by keyboard independently of typed search and disables only while pending", async () => {
+    const { rerender } = render(<DashboardSearch userId="admin" sessionKey="login-1" />);
+    await open();
+    const input = screen.getByRole("combobox");
+    act(() => input.focus());
+    fireEvent.change(input, { target: { value: "export" } });
+    await screen.findByRole("option", { name: "Export user data" });
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(mocks.download).toHaveBeenCalledWith();
+    expect(screen.queryByRole("listbox")).toBeNull();
+    expect(document.activeElement).toBe(input);
+    mocks.pending = true;
+    rerender(<DashboardSearch userId="admin" sessionKey="login-1" />);
+    fireEvent.focus(input);
+    const item = await screen.findByRole("option", { name: /Export user data/ });
+    expect(item.getAttribute("aria-disabled")).toBe("true");
+    fireEvent.click(item);
+    expect(mocks.download).toHaveBeenCalledOnce();
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(screen.queryByRole("listbox")).toBeNull();
+  });
+
+  it("dispatches working statistics and scoped searches", async () => {
     const scroll = vi.fn();
     render(<><DashboardSearch userId="admin" sessionKey="login-1" /><h2 id="statistics-heading" tabIndex={-1} ref={(node) => { if (node) node.scrollIntoView = scroll; }}>Statistics</h2></>);
     await open();
-    expect(screen.getByRole("option", { name: /Export user data/ }).getAttribute("aria-disabled")).toBe("true");
+    expect(screen.getByRole("option", { name: /Export user data/ }).getAttribute("aria-disabled")).toBe(null);
     fireEvent.change(screen.getByRole("combobox"), { target: { value: "statistics" } });
     fireEvent.click(await screen.findByRole("option", { name: "Club statistics" }));
     expect(scroll).toHaveBeenCalledOnce();

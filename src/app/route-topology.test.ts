@@ -28,6 +28,7 @@ function matchRoutes(defaultAppPaths = defaults) {
 
 const handlers = [
   "/api/admin/users/[userId]/photo",
+  "/api/admin/users/export",
   "/api/internal/application-emails",
   "/api/internal/event-publication",
   "/api/internal/event-reminders",
