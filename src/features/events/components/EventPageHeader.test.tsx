@@ -14,6 +14,8 @@ describe("EventPageHeader", () => {
   it("draws the banner at the aspect the header picker crops to", () => {
     const { container } = render(<EventPageHeader />);
     expect(banner(container).className).toContain(`aspect-${EVENT_HEADER_ASPECT}/1`);
+    // Never under 160px tall, so phones get Figma 9.1's banner.
+    expect(banner(container).className).toContain("min-h-40");
   });
 
   it("draws the header image over the colour", () => {

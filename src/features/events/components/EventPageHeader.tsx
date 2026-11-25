@@ -32,7 +32,9 @@ interface EventPageHeaderProps {
  * event builder's "Header preview" renders this same component, so the two
  * can't crop or place the icon differently.
  *
- * The banner scales with its width; the icon doesn't (Figma 1.3): a 96px tile
+ * The banner scales with its width down to 160px tall, which it holds on
+ * phones (Figma 9.1); below 640px wide a 4:1 image is cropped at the sides to
+ * fill it. The icon doesn't scale (Figma 1.3, 9.1): a 96px tile
  * with 12px corners and a 4px card-coloured border, 32px in from the left so
  * it lines up with the page's text, and hanging half its height (48px) below
  * the banner. Without an icon image it shows a grey image icon. The space for
@@ -51,7 +53,9 @@ export function EventPageHeader({
     <div data-slot="event-page-header" className={cn("relative", className)}>
       <div
         data-slot="event-page-header-banner"
-        className="relative aspect-4/1 w-full overflow-hidden rounded-[inherit] bg-muted"
+        // 4:1, but never under 160px (Figma 9.1): 4:1 is exactly 160px at 640px
+        // wide, so phones get a 160px banner and wider screens the full 4:1.
+        className="relative aspect-4/1 min-h-40 w-full overflow-hidden rounded-[inherit] bg-muted"
         style={{ backgroundColor: colour || undefined }}
       >
         {imageSrc && <Image src={imageSrc} alt="" fill className="object-cover" unoptimized />}
