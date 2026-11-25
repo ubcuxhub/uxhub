@@ -18,6 +18,7 @@ import type {
   CheckInSessionInput,
 } from "@/features/admin/types";
 import { APPLICATION_FILE_MAX_BYTES } from "@/lib/supabase-helpers/application-files";
+import { windowLabels } from "../../lib/event-registration-window";
 import { isReminderSchedule, type ReminderSchedule } from "@/lib/supabase-helpers/event-reminders";
 import {
   datetimeLocalToTimestamptz,
@@ -283,7 +284,7 @@ export function createFormSnapshot(
   });
 }
 
-export type BuilderSection = "basics" | "description" | "agenda" | "registration" | "teams" | "people" | "resources" | "publish";
+export type BuilderSection = "basics" | "description" | "agenda" | "registration" | "applications" | "teams" | "people" | "resources" | "publish";
 export interface EventFormIssue {
   section: BuilderSection;
   target: string;
@@ -324,7 +325,7 @@ export function validateEventForm(
     if (formState.status !== "draft") add("publish", "publish-date", "Only draft events can have a publish date.");
     else if (!strictPacificTimestamp(formState.publish_at)) add("publish", "publish-date", "Publish date must be a valid date and time in Pacific time.");
     else if (Date.parse(strictPacificTimestamp(formState.publish_at)!) <= Date.now()) add("publish", "publish-date", "Publish date must be in the future.");
-    else if (formState.registration_closes_at && strictPacificTimestamp(formState.registration_closes_at) && strictPacificTimestamp(formState.publish_at)! >= strictPacificTimestamp(formState.registration_closes_at)!) add("publish", "publish-date", "Publish time must be before registration closes.");
+    else if (formState.registration_closes_at && strictPacificTimestamp(formState.registration_closes_at) && strictPacificTimestamp(formState.publish_at)! >= strictPacificTimestamp(formState.registration_closes_at)!) add("publish", "publish-date", `Publish time must be before ${formState.requires_application ? "applications close" : "registration closes"}.`);
   }
   if (formState.date_location) {
     issues.push(...dateLocationIssues(formState.date_location).map(issue => ({ ...issue, section: "agenda" as const })));
@@ -334,10 +335,13 @@ export function validateEventForm(
     if (!checkInEvents.every(item => item.name && item.start_time && item.end_time)) add("registration", "builder-registration", "All check-in sessions require name, start time, and end time.", true);
     else if (checkInEvents.some(item => isDateTimeRangeInvalid(item.start_time, item.end_time))) add("registration", "builder-registration", "Check-in end time must be after the start time.");
   }
+  // The window sits under Applications on an event that takes them.
+  const windowSection = formState.requires_application ? "applications" : "registration";
+  const window = windowLabels(formState.requires_application);
   for (const field of ["registration_opens_at", "registration_closes_at"] as const) {
-    if (formState[field] && !strictPacificTimestamp(formState[field])) add("registration", `${field}-date`, "Registration dates require both a date and time.");
+    if (formState[field] && !strictPacificTimestamp(formState[field])) add(windowSection, `${field}-date`, window.incomplete);
   }
-  if (isDateTimeRangeInvalid(formState.registration_opens_at, formState.registration_closes_at)) add("registration", "registration_closes_at-date", "Registration end time must be after the start time.");
+  if (isDateTimeRangeInvalid(formState.registration_opens_at, formState.registration_closes_at)) add(windowSection, "registration_closes_at-date", window.reversed);
   const questionErrors: Record<number, string> = {};
   if (formState.requires_application && !applicationTemplate.length) questionErrors[-1] = "Applications require at least one valid question before publication.";
   applicationTemplate.forEach((item, index) => {
@@ -364,9 +368,9 @@ export function validateEventForm(
   });
 
   invalidSections.applications = Object.keys(questionErrors).length > 0;
-  for (const [index, message] of Object.entries(questionErrors)) add("registration", Number(index) < 0 ? "builder-registration" : `question_${index}`, message, true);
+  for (const [index, message] of Object.entries(questionErrors)) add("applications", Number(index) < 0 ? "builder-applications" : `question_${index}`, message, true);
   add("teams", "builder-teams", teamSettingsProblem(formState));
-  add("registration", "builder-registration", applicationTimingProblem(formState));
+  add("applications", "builder-applications", applicationTimingProblem(formState));
   if (formState.content) {
     const content = formState.content;
     for (const section of content.sections) {
@@ -380,7 +384,7 @@ export function validateEventForm(
   }
   // Keep the public result's existing question error message for callers.
   const first = issues[0];
-  const error = first && first.section === "registration" && first.target.startsWith("question_") ? "Please fix the errors in application questions." : first?.message ?? null;
+  const error = first && first.section === "applications" && first.target.startsWith("question_") ? "Please fix the errors in application questions." : first?.message ?? null;
   return { error, issues, questionErrors, invalidSections };
 }
 

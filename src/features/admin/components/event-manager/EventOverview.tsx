@@ -43,7 +43,7 @@ export interface EventOverviewProps {
 const plural = (value: number, one: string, many: string) =>
   `${value} ${value === 1 ? one : many}`;
 
-function NeedsActionRow({ item, eventId }: { item: NeedsActionItem; eventId: string }) {
+function NeedsActionRow({ item, eventId, applications }: { item: NeedsActionItem; eventId: string; applications: boolean }) {
   const Icon = item.type === "todo" ? CircleAlert : CalendarClock;
   let title: string;
   let description: string | null = null;
@@ -66,7 +66,7 @@ function NeedsActionRow({ item, eventId }: { item: NeedsActionItem; eventId: str
       description = "Applicants see their decisions then.";
       break;
     case "registration-closes":
-      title = `Registration closes ${formatTimestamp(item.at)}`;
+      title = `${applications ? "Applications close" : "Registration closes"} ${formatTimestamp(item.at)}`;
       break;
   }
   return (
@@ -81,7 +81,7 @@ function NeedsActionRow({ item, eventId }: { item: NeedsActionItem; eventId: str
   );
 }
 
-function NeedsActionCard({ items, eventId }: { items: NeedsActionItem[]; eventId: string }) {
+function NeedsActionCard({ items, eventId, applications }: { items: NeedsActionItem[]; eventId: string; applications: boolean }) {
   return (
     <Card className="gap-4">
       <CardHeader>
@@ -98,7 +98,7 @@ function NeedsActionCard({ items, eventId }: { items: NeedsActionItem[]; eventId
         ) : (
           <ul className="flex flex-col divide-y divide-border-subtle">
             {items.map((item) => (
-              <NeedsActionRow key={item.kind} item={item} eventId={eventId} />
+              <NeedsActionRow key={item.kind} item={item} eventId={eventId} applications={applications} />
             ))}
           </ul>
         )}
@@ -220,7 +220,7 @@ export function EventOverview({
     <PageContainer>
       <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
         <div className="flex min-w-0 flex-col gap-6">
-          <NeedsActionCard items={needsAction} eventId={event.id} />
+          <NeedsActionCard items={needsAction} eventId={event.id} applications={event.requires_application} />
           <RegistrationsListCard registrations={registrations} />
         </div>
         <div className="flex min-w-0 flex-col gap-6">

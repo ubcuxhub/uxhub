@@ -57,7 +57,8 @@ export const BUILDER_SECTIONS: readonly NavigatorSection[] = [
   { id: "description", number: 2, title: "Description", state: "complete", required: true },
   { id: "agenda", number: 3, title: "Agenda", state: "attention", issues: 1, required: true },
   { id: "registration", number: 4, title: "Registration", state: "not-started", required: true },
-  { id: "teams", number: 5, title: "Teams", state: "optional", required: false },
-  { id: "people", number: 6, title: "People and sponsors", state: "optional", required: false },
-  { id: "resources", number: 7, title: "Links and resources", state: "optional", required: false },
+  { id: "applications", number: 5, title: "Applications", state: "optional", required: false },
+  { id: "teams", number: 6, title: "Teams", state: "optional", required: false },
+  { id: "people", number: 7, title: "People and sponsors", state: "optional", required: false },
+  { id: "resources", number: 8, title: "Links and resources", state: "optional", required: false },
 ];

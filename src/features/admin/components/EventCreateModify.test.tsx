@@ -55,20 +55,43 @@ it("ends at Links and resources, with no Summary or Other settings section", () 
   const { container } = render(<EventCreateModify />);
   const sections = [...container.querySelectorAll("[data-builder-section]")].map(section => section.id);
   expect(sections.at(-1)).toBe("builder-resources");
-  expect(sections).toHaveLength(7);
+  expect(sections).toHaveLength(8);
   expect(container.querySelector("#builder-summary, #builder-settings")).toBeNull();
   expect(screen.queryByRole("heading", { name: "Summary" })).toBeNull();
   expect(screen.queryByRole("heading", { name: "Other settings" })).toBeNull();
-  const navigator = screen.getByRole("button", { name: /section 1 of 7/ });
+  const navigator = screen.getByRole("button", { name: /section 1 of 8/ });
   fireEvent.keyDown(navigator, { key: "Enter" });
   const items = within(screen.getByRole("menu")).getAllByRole("menuitem");
-  expect(items).toHaveLength(7);
+  expect(items).toHaveLength(8);
   expect(items.at(-1)?.textContent).toMatch(/Links and resources/);
   // The footer is unnumbered and stays out of the navigator.
   const footer = container.querySelector<HTMLElement>("#builder-publish")!;
   expect(footer.hasAttribute("data-builder-section")).toBe(false);
   expect(within(footer).queryByText(/^Section/)).toBeNull();
   expect(container.querySelector("#builder-resources")!.compareDocumentPosition(footer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+});
+
+it("keeps applications in their own section behind a switch", () => {
+  const { container } = render(<EventCreateModify />);
+  const registration = within(container.querySelector<HTMLElement>("#builder-registration")!);
+  const applications = within(container.querySelector<HTMLElement>("#builder-applications")!);
+  expect(registration.getByText("Registration window")).toBeTruthy();
+  expect(applications.queryByText("Application window")).toBeNull();
+  const toggle = applications.getByRole("switch", { name: "Members apply before they register" });
+  fireEvent.click(toggle);
+  expect(toggle.getAttribute("aria-checked")).toBe("true");
+  expect(registration.queryByText("Registration window")).toBeNull();
+  expect(applications.getByText("Application window")).toBeTruthy();
+  expect(applications.getByLabelText("Applications open")).toBeTruthy();
+  expect(applications.getAllByText("Application questions").length).toBeGreaterThan(0);
+  expect(applications.getByText("Application timing")).toBeTruthy();
+});
+
+it("locks the applications switch once registrations or payments exist", () => {
+  const { container } = render(<EventCreateModify registrationInfo={{ locked: true, seats: 1 }} />);
+  const applications = within(container.querySelector<HTMLElement>("#builder-applications")!);
+  expect(applications.getByRole("switch", { name: "Members apply before they register" }).hasAttribute("disabled")).toBe(true);
+  expect(applications.getByText(/Locked because registrations or payments exist/)).toBeTruthy();
 });
 
 it("lists what's left in the Publish footer and jumps to each section", async () => {

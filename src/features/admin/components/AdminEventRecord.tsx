@@ -77,7 +77,7 @@ export function AdminEventRecord({
           {canceled ? (
             <StatusBadge status="canceled" />
           ) : (
-            <RegistrationBadge state={registration} opensAt={event.registration_opens_at} />
+            <RegistrationBadge state={registration} opensAt={event.registration_opens_at} applications={event.requires_application} />
           )}
         </>
       }
@@ -132,7 +132,7 @@ export function AdminEventRecord({
           </RecordSection>
 
           <RecordSection
-            title="Status and registration schedule"
+            title={`Status and ${event.requires_application ? "application" : "registration"} schedule`}
             action={
               canceled ? null : (
                 <Button asChild variant="secondary" size="sm">

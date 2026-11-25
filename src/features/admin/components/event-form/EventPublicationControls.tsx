@@ -77,7 +77,8 @@ export function EventPublicationSuccess({ form }: { form: Form }) {
   const saved = form.publicationSuccess;
   const opener = useRef<HTMLElement | null>(null);
   const scheduled = saved?.status === "draft" && !!saved.publish_at;
-  const registration = saved?.registration_opens_at && Date.parse(saved.registration_opens_at) > saved.completed_at ? `Registration opens ${publicationTimeLabel(saved.registration_opens_at)}.` : saved?.registration_closes_at && Date.parse(saved.registration_closes_at) <= saved.completed_at ? "Registration has closed." : "Registration is open.";
+  const applications = form.formState.requires_application;
+  const registration = saved?.registration_opens_at && Date.parse(saved.registration_opens_at) > saved.completed_at ? `${applications ? "Applications open" : "Registration opens"} ${publicationTimeLabel(saved.registration_opens_at)}.` : saved?.registration_closes_at && Date.parse(saved.registration_closes_at) <= saved.completed_at ? (applications ? "Applications have closed." : "Registration has closed.") : applications ? "Applications are open." : "Registration is open.";
   return <Dialog open={!!saved} onOpenChange={open => { if (!open) form.setPublicationSuccess(null); }}>
     <DialogContent showCloseButton={false} className="max-w-[482px] gap-4 px-7 pt-11 pb-8" onOpenAutoFocus={() => { opener.current = document.activeElement instanceof HTMLElement && document.activeElement !== document.body ? document.activeElement : null; }} onCloseAutoFocus={event => { event.preventDefault(); if (opener.current?.isConnected) opener.current.focus(); else (document.querySelector<HTMLButtonElement>("#event-builder-header [data-publish-trigger]") ?? document.querySelector<HTMLButtonElement>("#event-builder-header button"))?.focus(); }}>
       <Hubbo emotion={saved?.updated ? "proud" : "excited"} size="hero" className="mx-auto h-50" />

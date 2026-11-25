@@ -91,7 +91,7 @@ describe("EventOverview", () => {
     expect(screen.getByRole("link", { name: "Review" }).getAttribute("href")).toBe(
       `/admin/events/${EVENT_ID}/review-applications`
     );
-    expect(screen.getByText(/^Registration closes Nov 25, 2026, /)).toBeTruthy();
+    expect(screen.getByText(/^Applications close Nov 25, 2026, /)).toBeTruthy();
   });
 
   it("lists registrations newest first, each Going", () => {
@@ -118,6 +118,7 @@ describe("EventOverview", () => {
   it("leaves applications out of the numbers for an open-registration event", () => {
     renderOverview({ event: { ...event, requires_application: false } });
     expect(screen.queryByRole("group", { name: "Applications" })).toBeNull();
+    expect(screen.getByText("Registration opens")).toBeTruthy();
   });
 
   it("shows the event's details and opens the schedule quick edit", () => {
@@ -126,7 +127,7 @@ describe("EventOverview", () => {
     expect(screen.getByText("Nest, 2500")).toBeTruthy();
     expect(screen.getByText("$15.00 · $10.00 for members")).toBeTruthy();
 
-    fireEvent.click(screen.getByRole("button", { name: "Change status and registration schedule" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change status and application schedule" }));
     expect(screen.getByRole("button", { name: "Save schedule" })).toBeTruthy();
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     expect(screen.queryByRole("button", { name: "Save schedule" })).toBeNull();
@@ -135,13 +136,14 @@ describe("EventOverview", () => {
   it("saves the schedule from the quick edit", async () => {
     updateEventScheduleAction.mockResolvedValue({ ok: true, event });
     renderOverview();
-    fireEvent.click(screen.getByRole("button", { name: "Change status and registration schedule" }));
+    fireEvent.click(screen.getByRole("button", { name: "Change status and application schedule" }));
 
-    const date = screen.getByLabelText("Registration opening date");
+    expect(screen.getByText("Applications close")).toBeTruthy();
+    const date = screen.getByLabelText("Applications opening date");
     fireEvent.focus(date);
     fireEvent.change(date, { target: { value: "Nov 10, 2026" } });
     fireEvent.blur(date);
-    const time = screen.getByLabelText("Registration opening time");
+    const time = screen.getByLabelText("Applications opening time");
     fireEvent.focus(time);
     fireEvent.change(time, { target: { value: "9:00 AM" } });
     fireEvent.blur(time);
