@@ -1,7 +1,7 @@
 import type { Json } from "@/lib/supabase/database.types";
 import { describe, expect, it } from "vitest";
 import { clientAs, withFixtures, type Fixtures } from "@/test/integration";
-import { fetchEventApplicationSettings, recordOfferWindow } from "@/lib/supabase-helpers/event-application-settings";
+import { fetchEventApplicationSettings, recordLastOffer } from "@/lib/supabase-helpers/event-application-settings";
 
 function save(fixtures: Fixtures, eventId: string, timing?: Record<string, Json>, questions: object[] = [], event: Record<string, Json> = {}) {
   return fixtures.supabase.rpc("save_admin_event_atomically", {
@@ -28,19 +28,22 @@ describe("application form configuration", () => {
     expect(await fetchEventApplicationSettings(fixtures.supabase, event.id)).toMatchObject({ decisions_release_at: null, confirmation_deadline: null, questions_locked_at: stored?.questions_locked_at });
   }));
 
-  it("remembers the last offer window apart from the builder's timing", () => withFixtures(async fixtures => {
+  it("remembers the last offer apart from the builder's timing", () => withFixtures(async fixtures => {
     const event = await fixtures.createEvent();
-    await recordOfferWindow(fixtures.supabase, event.id, { days: 3, time: "17:00" });
-    expect(await fetchEventApplicationSettings(fixtures.supabase, event.id)).toMatchObject({ offer_window_days: 3, offer_deadline_time: "17:00:00", decisions_release_at: null });
+    await recordLastOffer(fixtures.supabase, event.id, { expiresAt: "2026-12-02T01:00:00Z", window: { days: 3, time: "17:00" } });
+    expect(await fetchEventApplicationSettings(fixtures.supabase, event.id)).toMatchObject({ last_offer_expires_at: "2026-12-02T01:00:00+00:00", offer_window_days: 3, offer_deadline_time: "17:00:00", decisions_release_at: null });
     expect((await save(fixtures, event.id, timing)).error).toBeNull();
-    await recordOfferWindow(fixtures.supabase, event.id, { days: 0, time: "23:45" });
+    await recordLastOffer(fixtures.supabase, event.id, { expiresAt: "2026-12-03T07:45:00Z", window: { days: 0, time: "23:45" } });
     expect(await fetchEventApplicationSettings(fixtures.supabase, event.id)).toMatchObject({
-      offer_window_days: 0, offer_deadline_time: "23:45:00",
+      last_offer_expires_at: "2026-12-03T07:45:00+00:00", offer_window_days: 0, offer_deadline_time: "23:45:00",
       decisions_release_at: "2026-11-16T18:00:00+00:00", confirmation_deadline: "2026-11-17T18:00:00+00:00",
     });
     expect((await save(fixtures, event.id, { decisions_release_at: null, confirmation_deadline: null })).error).toBeNull();
-    expect(await fetchEventApplicationSettings(fixtures.supabase, event.id)).toMatchObject({ offer_window_days: 0, offer_deadline_time: "23:45:00" });
-    await expect(recordOfferWindow(fixtures.supabase, event.id, { days: -1, time: "12:00" })).rejects.toBeTruthy();
+    expect(await fetchEventApplicationSettings(fixtures.supabase, event.id)).toMatchObject({ last_offer_expires_at: "2026-12-03T07:45:00+00:00", offer_window_days: 0, offer_deadline_time: "23:45:00" });
+    // A deadline without a window keeps the window it had.
+    await recordLastOffer(fixtures.supabase, event.id, { expiresAt: "2028-01-01T00:00:00Z", window: null });
+    expect(await fetchEventApplicationSettings(fixtures.supabase, event.id)).toMatchObject({ last_offer_expires_at: "2028-01-01T00:00:00+00:00", offer_window_days: 0, offer_deadline_time: "23:45:00" });
+    await expect(recordLastOffer(fixtures.supabase, event.id, { expiresAt: "2026-12-03T07:45:00Z", window: { days: -1, time: "12:00" } })).rejects.toBeTruthy();
     expect((await fixtures.supabase.from("event_application_settings").update({ offer_deadline_time: null }).eq("event_id", event.id)).error).not.toBeNull();
   }));
 
