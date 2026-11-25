@@ -10,7 +10,7 @@ let frames: FrameRequestCallback[] = [];
 let now = 0;
 
 beforeEach(() => {
-  matches = { "(hover: hover) and (pointer: fine)": true, "(prefers-reduced-motion: reduce)": false };
+  matches = { "(prefers-reduced-motion: no-preference)": true };
   vi.stubGlobal("matchMedia", (query: string) => ({
     matches: matches[query] ?? false,
     addEventListener: () => {},
@@ -64,12 +64,18 @@ function pointer(
   type: string,
   clientX: number,
   clientY: number,
-  { pointerType = "mouse", timeStamp = now }: { pointerType?: string; timeStamp?: number } = {},
+  {
+    pointerType = "mouse",
+    pointerId = 1,
+    isPrimary = true,
+    timeStamp = now,
+  }: { pointerType?: string; pointerId?: number; isPrimary?: boolean; timeStamp?: number } = {},
 ) {
   const event = new MouseEvent(type, { bubbles: true, clientX, clientY, button: 0 });
   Object.defineProperties(event, {
     pointerType: { value: pointerType },
-    pointerId: { value: 1 },
+    pointerId: { value: pointerId },
+    isPrimary: { value: isPrimary },
     timeStamp: { value: timeStamp },
   });
   act(() => {
@@ -210,31 +216,75 @@ it("keeps the back up while the pointer rests on the card", () => {
   expect(card.dataset.spin).toBe("return");
 });
 
-it("ignores touch and pen", () => {
+it("never tilts for touch or pen, which have no hover", () => {
   const { card, frame } = renderCard();
   pointer(frame, "pointermove", 400, 0, { pointerType: "touch" });
-  pointer(frame, "pointerdown", 400, 0, { pointerType: "pen" });
+  pointer(frame, "pointermove", 400, 0, { pointerType: "pen" });
+  flushFrames();
+  expect(card.style.getPropertyValue("--tilt-x")).toBe("");
+});
+
+it("presses and spins on a sideways swipe", () => {
+  const { card, frame } = renderCard();
+  const touch = { pointerType: "touch" };
+  pointer(frame, "pointerdown", 400, 0, touch);
+  expect(card.style.getPropertyValue("--press-x")).not.toBe("");
+
+  pointer(frame, "pointermove", 420, 4, touch); // mostly sideways
+  expect(card.dataset.dragging).toBe("");
+  expect(card.style.getPropertyValue("--press-x")).toBe("");
+  pointer(frame, "pointermove", 520, 30, touch);
+  expect(spinOf(card)).toBeCloseTo(100 * CARD.DRAG_DEG_PER_PX);
+});
+
+it("leaves a swipe up or down to the page, without spinning", () => {
+  const { card, frame } = renderCard();
+  const touch = { pointerType: "touch" };
+  pointer(frame, "pointerdown", 200, 100, touch);
+  pointer(frame, "pointermove", 204, 120, touch); // mostly down
+  expect(card.dataset.dragging).toBeUndefined();
+  expect(card.style.getPropertyValue("--press-x")).toBe("");
+
+  pointer(frame, "pointermove", 300, 120, touch); // a later sideways drift stays the page's
+  expect(spinOf(card)).toBe(0);
+  pointer(frame, "pointercancel", 300, 120, touch); // the browser takes it to scroll
+  expect(spinOf(card)).toBe(0);
+});
+
+it("turns home from the back once the finger lifts, even over the card", () => {
+  const { card, frame } = renderCard();
+  const touch = (timeStamp: number) => ({ pointerType: "touch", timeStamp });
+  pointer(frame, "pointerdown", 50, 100, touch(0));
+  pointer(frame, "pointermove", 60, 100, touch(0));
+  pointer(frame, "pointermove", 340, 100, touch(1000)); // 140°, inside the card
+  pointer(frame, "pointerup", 340, 100, touch(2000));
+  finishTransition(card);
+  expect(spinOf(card)).toBe(180);
+
+  act(() => vi.advanceTimersByTime(CARD.BACK_IDLE_MS));
+  expect(card.dataset.spin).toBe("return");
+});
+
+it("follows one finger at a time", () => {
+  const { card, frame } = renderCard();
+  pointer(frame, "pointerdown", 200, 100, { pointerType: "touch" });
+  pointer(frame, "pointerdown", 300, 100, { pointerType: "touch", pointerId: 2, isPrimary: false });
+  pointer(frame, "pointermove", 380, 100, { pointerType: "touch", pointerId: 2, isPrimary: false });
+  expect(card.dataset.dragging).toBeUndefined();
+  expect(spinOf(card)).toBe(0);
+});
+
+it("stays fully static under reduced motion", () => {
+  matches = { "(prefers-reduced-motion: no-preference)": false };
+  const { card, front, frame } = renderCard();
+  pointer(frame, "pointermove", 400, 0);
+  pointer(frame, "pointerdown", 400, 0, { pointerType: "touch" });
+  pointer(frame, "pointermove", 300, 0, { pointerType: "touch" });
   flushFrames();
   expect(card.style.getPropertyValue("--tilt-x")).toBe("");
   expect(card.style.getPropertyValue("--press-x")).toBe("");
-});
-
-it("stays fully static under reduced motion or without a fine pointer", () => {
-  matches["(prefers-reduced-motion: reduce)"] = true;
-  const reduced = renderCard();
-  pointer(reduced.frame, "pointermove", 400, 0);
-  pointer(reduced.frame, "pointerdown", 400, 0);
-  flushFrames();
-  expect(reduced.card.style.getPropertyValue("--tilt-x")).toBe("");
-  expect(reduced.card.style.getPropertyValue("--press-x")).toBe("");
-  expect(reduced.card.querySelector('[data-slot="membership-card-back"]')).toBeNull();
-  expect(reduced.front.querySelector('[data-slot="dither-glint"]')).toBeNull();
-  cleanup();
-
-  matches = { "(hover: hover) and (pointer: fine)": false };
-  const coarse = renderCard();
-  pointer(coarse.frame, "pointermove", 400, 0);
-  flushFrames();
-  expect(coarse.card.style.getPropertyValue("--tilt-x")).toBe("");
-  expect(coarse.card.querySelector('[data-slot="membership-card-back"]')).toBeNull();
+  expect(spinOf(card)).toBe(0);
+  expect(frame.className).not.toContain("touch-pan-y");
+  expect(card.querySelector('[data-slot="membership-card-back"]')).toBeNull();
+  expect(front.querySelector('[data-slot="dither-glint"]')).toBeNull();
 });

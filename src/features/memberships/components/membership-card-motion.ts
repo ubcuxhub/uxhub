@@ -12,7 +12,10 @@ export const CARD = {
   HOVER_TILT_DEG: 6,
   /** How far a press pushes the point under the pointer away, on top of the hover tilt. */
   PRESS_TILT_DEG: 3,
-  /** Pointer movement before a press becomes a drag. */
+  /**
+   * Pointer movement before a press becomes a drag. On touch, the direction of
+   * that first movement decides: sideways spins the card, up or down scrolls the page.
+   */
   DRAG_THRESHOLD_PX: 6,
   /** Spin sensitivity: degrees of turn per pixel dragged. */
   DRAG_DEG_PER_PX: 0.5,
@@ -29,8 +32,8 @@ export const CARD = {
   /** Peak opacity of the soft sheen over the back. */
   SHEEN_OPACITY: 0.35,
   /**
-   * Peak opacity of the sheen over the front. Higher than the back's, since
-   * soft-light shows less on the front's lighter orchid than on the back's blue.
+   * Peak opacity of the sheen over the front, tuned apart from the back's:
+   * soft-light shows differently on the front's lighter orchid than on the back's blue.
    */
   FRONT_SHEEN_OPACITY: 0.3,
   /** Peak opacity of the glint on the dither cells. */
@@ -71,8 +74,12 @@ const deg = (value: number) => `${value.toFixed(2)}deg`;
 /**
  * Wires the interactions onto the card. `frame` is the untransformed element
  * around the card that measures the pointer; `card` is the element that turns.
- * Mouse and trackpad only. Returns a cleanup that leaves the card flat on its
- * front.
+ * Returns a cleanup that leaves the card flat on its front.
+ *
+ * Only a mouse (or trackpad) hovers. Touch and pen press and spin the same
+ * way, except that a first movement up or down hands the gesture to the page
+ * to scroll (the frame is `touch-action: pan-y`), and the flip home from the
+ * back starts once the finger lifts and the card has settled.
  *
  * The card's turn lives in registered CSS properties on `card` (`--tilt-*`,
  * `--press-*`, `--spin`), so the CSS can derive the shine from the same
@@ -227,7 +234,9 @@ export function attachCardMotion(frame: HTMLElement, card: HTMLElement): () => v
     delete card.dataset.dragging;
     if (frame.hasPointerCapture?.(event.pointerId)) frame.releasePointerCapture(event.pointerId);
     const rect = frame.getBoundingClientRect();
+    // A lifted finger isn't hovering, wherever it lifted.
     hovering =
+      event.pointerType === "mouse" &&
       event.clientX >= rect.left &&
       event.clientX <= rect.left + rect.width &&
       event.clientY >= rect.top &&
@@ -236,16 +245,29 @@ export function attachCardMotion(frame: HTMLElement, card: HTMLElement): () => v
     fling();
   };
 
+  /** A touch that set off up or down: the page scrolls, so the press lets go. */
+  const yieldToScroll = () => {
+    press = null;
+    clearPress();
+    spinTo(nearestFace(spin), "snap");
+  };
+
   const onPointerMove = (event: PointerEvent) => {
-    if (event.pointerType !== "mouse") return;
+    const mouse = event.pointerType === "mouse";
     if (press && event.pointerId === press.id && !dragging) {
-      const moved = Math.hypot(event.clientX - press.x, event.clientY - press.y);
-      if (moved > CARD.DRAG_THRESHOLD_PX) startDrag(event);
+      const dx = event.clientX - press.x;
+      const dy = event.clientY - press.y;
+      if (Math.hypot(dx, dy) > CARD.DRAG_THRESHOLD_PX) {
+        // A mouse drag spins whichever way it starts; a touch locks to its first direction.
+        if (mouse || Math.abs(dx) > Math.abs(dy)) startDrag(event);
+        else yieldToScroll();
+      }
     }
     if (dragging) {
-      drag(event);
+      if (event.pointerId === press?.id) drag(event);
       return;
     }
+    if (!mouse) return;
     // Resting the pointer on the card counts as activity: the back stays up.
     hovering = true;
     clearIdle();
@@ -254,9 +276,10 @@ export function attachCardMotion(frame: HTMLElement, card: HTMLElement): () => v
   };
 
   const onPointerDown = (event: PointerEvent) => {
-    if (event.pointerType !== "mouse" || event.button !== 0) return;
+    // One finger at a time; a second one while the first is down does nothing.
+    if (press || !event.isPrimary || event.button !== 0) return;
     halt();
-    hovering = true;
+    if (event.pointerType === "mouse") hovering = true;
     press = { id: event.pointerId, x: event.clientX, y: event.clientY };
     const lean = leanAway(
       pointerOffset(frame.getBoundingClientRect(), event.clientX, event.clientY),

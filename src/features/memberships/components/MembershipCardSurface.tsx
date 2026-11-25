@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 
 import { DitherOverlay } from "@/components/shared/DitherOverlay";
-import { FINE_POINTER_QUERY, REDUCED_MOTION_QUERY, useMediaQuery } from "@/hooks/use-media-query";
+import { MOTION_OK_QUERY, useMediaQuery } from "@/hooks/use-media-query";
 import { cn } from "@/lib/utils";
 import { attachCardMotion, CARD } from "./membership-card-motion";
 import "./membership-card.css";
@@ -20,13 +20,14 @@ const SHINE_STYLE = {
 /**
  * The membership card's surface: its diagonal gradient under the shared dither
  * texture, and a card you can play with (Portal Motion handoff, Home,
- * "Membership card"; the 3D membership card PRD). With a mouse or trackpad it
- * tilts up to 4° toward the pointer, dips 3° further where it's pressed, and
- * spins about its vertical axis when dragged sideways, with slight inertia and
- * a snap to the nearest face. Left on its back, it turns home after two
- * seconds. A sheen and a glint on the dither cells follow the turn.
+ * "Membership card"; the 3D membership card PRD). A mouse tilts it toward the
+ * pointer. A press dips it further where it's pressed, and a sideways drag or
+ * swipe spins it about its vertical axis, with slight inertia and a snap to
+ * the nearest face; a swipe up or down still scrolls the page. Left on its
+ * back, it turns home after two seconds. A sheen and a glint on the dither
+ * cells follow the turn. The angles and timings are in `CARD`.
  *
- * Fully static on touch (for now) and under reduced motion: no tilt, spin or
+ * Fully static under reduced motion (and until hydration): no tilt, spin or
  * shine, and the back is never drawn.
  *
  * The outer element measures the pointer and holds the perspective; only the
@@ -42,9 +43,7 @@ export function MembershipCardSurface({
 }) {
   const frameRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLDivElement>(null);
-  const finePointer = useMediaQuery(FINE_POINTER_QUERY);
-  const reducedMotion = useMediaQuery(REDUCED_MOTION_QUERY);
-  const interactive = finePointer && !reducedMotion;
+  const interactive = useMediaQuery(MOTION_OK_QUERY);
 
   useEffect(() => {
     const frame = frameRef.current;
@@ -56,7 +55,12 @@ export function MembershipCardSurface({
   return (
     <div
       ref={frameRef}
-      className={cn("@container perspective-distant", className)}
+      className={cn(
+        "@container perspective-distant",
+        // Sideways touch is the card's to spin; up and down stay the page's to scroll.
+        interactive && "touch-pan-y",
+        className,
+      )}
       style={interactive ? SHINE_STYLE : undefined}
     >
       <div
