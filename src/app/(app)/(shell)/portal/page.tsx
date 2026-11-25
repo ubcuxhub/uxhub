@@ -22,6 +22,7 @@ import { loadEventStates } from "@/features/events/lib/event-states";
 import { FLAGS } from "@/lib/flags";
 import { formatUserName } from "@/lib/user-name";
 import { createClient } from "@/lib/supabase/server";
+import { cn } from "@/lib/utils";
 import { getMembershipTermEndsAt } from "@/features/memberships/lib/term";
 import { fetchMembershipTypeById } from "@/lib/supabase-helpers/memberships";
 import { fetchFeaturedEvent } from "@/lib/supabase-helpers/events";
@@ -69,7 +70,13 @@ export default async function PortalHome() {
         <div className="grid gap-8 lg:grid-cols-2">
           {featured && (
             <FeaturedEventCard
-              className="order-2 w-full max-w-[490px] lg:order-1"
+              className={cn(
+                "order-2 w-full max-w-[490px] lg:order-1",
+                // Side by side, it drops its fixed shape and stretches to the
+                // row, so it matches the membership card, which grows taller
+                // when its column is narrow.
+                membershipType && "lg:aspect-auto",
+              )}
               title={featured.name}
               href={`/portal/events/${featured.slug}`}
               colour={featured.event_colour}
