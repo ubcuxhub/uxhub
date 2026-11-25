@@ -518,7 +518,9 @@ Hubbo and the white logo don't change. Contrast on the dark page: primary
   ("Forgot password?").
 - **Select:** one choice from five or more. For two to four, SegmentedToggle or
   radio cards.
-- **SegmentedToggle:** 2–3 options; switches a view, never submits.
+- **SegmentedToggle:** 2–3 options; switches a view, never submits. `size="lg"`
+  (34px options, 16px labels, 4px padding, no track border) is the page-level view switch,
+  such as the events timeline's Upcoming | Past.
 - **Checkbox:** saved with the form; supports Indeterminate and a description.
 - **Switch:** takes effect immediately; thumb shows a check when on.
 - Labels always visible (placeholder is a hint; passwords have none). Errors in

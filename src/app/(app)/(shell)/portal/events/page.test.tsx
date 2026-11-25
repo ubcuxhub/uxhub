@@ -11,6 +11,8 @@ const fixtures = vi.hoisted(() => ({
   fetchEvents: vi.fn(),
 }));
 vi.mock("@/lib/flags", () => ({ FLAGS: { studentEvents: true } }));
+// The timeline keeps its Upcoming | Past view in the URL.
+vi.mock("next/navigation", () => ({ useSearchParams: () => new URLSearchParams() }));
 vi.mock("@/lib/auth/guards", () => ({
   requireAuth: async () => ({ id: "user-1", role_access: fixtures.role }),
 }));

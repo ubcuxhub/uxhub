@@ -34,6 +34,12 @@ function SegmentedToggleDemo() {
         <Specimen label="Upcoming / Past, controlled">
           <ControlledToggle />
         </Specimen>
+        <Specimen label="size lg: a page-level view switch (events timeline)">
+          <SegmentedToggle aria-label="Which events" size="lg" defaultValue="upcoming">
+            <SegmentedToggleItem value="upcoming">Upcoming</SegmentedToggleItem>
+            <SegmentedToggleItem value="past">Past</SegmentedToggleItem>
+          </SegmentedToggle>
+        </Specimen>
         <Specimen label="three options">
           <SegmentedToggle aria-label="Application view" defaultValue="all">
             <SegmentedToggleItem value="all">All</SegmentedToggleItem>

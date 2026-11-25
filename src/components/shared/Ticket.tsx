@@ -77,7 +77,8 @@ function notchMaskStyle(
   };
 }
 
-const NOTCH_X = "calc(75% - 10px)";
+/** The perforation: 120.57px from the right edge, so the 111px stub stays pinned there. */
+const NOTCH_X = "calc(100% - 120.57px)";
 /**
  * Six punches, as in the design system Ticket: one at each corner, and the
  * two stubs either end of the perforation. The corners are square, so the
@@ -168,7 +169,9 @@ function Ticket({
       data-state={state}
       aria-label={`Ticket for ${eventName}${stateName ? `, ${stateName}` : ""}`}
       className={cn(
-        "relative grid aspect-[444/178] w-full max-w-[444px] grid-cols-[1fr_25%]",
+        // 178px tall at every width from 308 to 444 (design system Ticket):
+        // the text column narrows while the 111px stub stays pinned right.
+        "relative grid h-[178px] w-full max-w-[444px] grid-cols-[minmax(0,1fr)_111px]",
         // Greyed, the fill takes on the surface, so the label follows the theme.
         pending && "text-foreground",
         className,
@@ -191,10 +194,10 @@ function Ticket({
         <DitherOverlay />
         {/* Only a live ticket shines; a greyed, expired or checked-in one stays still. */}
         {state === "active" || locked ? <TicketSheen /> : null}
-        <span className="absolute inset-y-3.5 right-[calc(25%+10px)] w-0 border-l-2 border-dotted border-current opacity-60" />
+        <span className="absolute inset-y-3.5 right-[120.57px] w-0 border-l-2 border-dotted border-current opacity-60" />
       </div>
 
-      <div className="relative flex min-w-0 flex-col items-start justify-between gap-3 px-5 py-5 sm:px-7 sm:py-6">
+      <div className="relative flex min-w-0 flex-col items-start justify-between gap-3 py-6 pr-5 pl-7">
         {captionContent || action ? (
           <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             {captionContent ? (
@@ -213,7 +216,18 @@ function Ticket({
         )}
         <div className="flex min-w-0 max-w-full flex-col gap-0.5">
           <p className="text-label">Ticket</p>
-          <p className="truncate text-subheading">{eventName}</p>
+          {/* The name wraps, and is cut short only when it would run out of
+              the 130px text column: 3 lines on its own, 2 under a caption,
+              1 beside an action. Long words break rather than overflow. */}
+          <p
+            data-slot="ticket-event-name"
+            className={cn(
+              "text-subheading wrap-anywhere",
+              action ? "line-clamp-1" : captionContent ? "line-clamp-2" : "line-clamp-3",
+            )}
+          >
+            {eventName}
+          </p>
           <p className="truncate text-small">{holderName}</p>
         </div>
       </div>
@@ -225,13 +239,14 @@ function Ticket({
         {pending ? (
           <span
             aria-hidden
-            className="aspect-square w-[65%] max-w-18 rounded-xl border border-dashed border-current opacity-50"
+            className="size-22 rounded-xl border border-dashed border-current opacity-50"
           />
         ) : (
           // The code needs a light ground to scan, so this tile stays white in every theme.
           <span
             className={cn(
-              "flex aspect-square w-[65%] max-w-18 items-center justify-center overflow-hidden rounded-xl border border-border-subtle bg-white text-black",
+              // An 88px white tile with the 72px code inside it.
+              "flex size-22 items-center justify-center overflow-hidden rounded-xl border border-border-subtle bg-white p-[7px] text-black",
               used && "opacity-50",
               expired && "opacity-60",
             )}

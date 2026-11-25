@@ -63,7 +63,7 @@ function Section() {
 
       <Composition
         title="Mobile width"
-        description="The ticket scales down with its container, and long names truncate."
+        description="From 444 down to 308 wide the ticket keeps its 178px height and the stub stays pinned right; the name column narrows and long names truncate."
       >
         <div className="flex flex-wrap items-start gap-6">
           <div className="w-80 max-w-full">

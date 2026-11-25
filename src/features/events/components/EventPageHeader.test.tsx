@@ -14,6 +14,8 @@ describe("EventPageHeader", () => {
   it("draws the banner at the aspect the header picker crops to", () => {
     const { container } = render(<EventPageHeader />);
     expect(banner(container).className).toContain(`aspect-${EVENT_HEADER_ASPECT}/1`);
+    // Never under 160px tall, so phones get Figma 9.1's banner.
+    expect(banner(container).className).toContain("min-h-40");
   });
 
   it("draws the header image over the colour", () => {
@@ -31,6 +33,14 @@ describe("EventPageHeader", () => {
   it("shows the icon over the banner's corner", () => {
     const { container } = render(<EventPageHeader iconSrc="/icon.png" />);
     expect(icon(container)?.querySelector("img")?.getAttribute("src")).toBe("/icon.png");
+  });
+
+  it("draws the icon as a fixed 96px bordered tile, 32px in and half below the banner (Figma 1.3)", () => {
+    const { container } = render(<EventPageHeader iconSrc="/icon.png" />);
+    expect(icon(container)?.className).toEqual(
+      expect.stringMatching(/(?=.*\bsize-24\b)(?=.*\bleft-8\b)(?=.*\brounded-xl\b)(?=.*\bborder-4\b)(?=.*\bborder-card\b)/)
+    );
+    expect(container.querySelector('[aria-hidden].h-12')).not.toBeNull();
   });
 
   it("leaves the icon out when there is none, unless a placeholder is asked for", () => {

@@ -1,14 +1,15 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Label } from "@/components/ui/label";
 import { SearchField } from "@/components/ui/search-field";
-import { Switch } from "@/components/ui/switch";
+import { SegmentedToggle, SegmentedToggleItem } from "@/components/ui/segmented-toggle";
 import type { EventBadge, TimelineEvent } from "@/features/events/types";
 import { groupEventsByMonth, normalizeString } from "@/features/events/lib/event-timeline";
+import { writeEventsView } from "@/features/events/lib/events-view";
 import { EventTimelineRail } from "./EventTimelineRail";
 
 interface EventTimelineProps {
@@ -20,34 +21,61 @@ interface EventTimelineProps {
    * An event without one shows "past" in the past list and no badge otherwise.
    */
   badges?: Record<string, EventBadge>;
+  /**
+   * Now, as an ISO instant from the server (so the server and browser agree).
+   * Upcoming events that have started by then are listed under Ongoing.
+   */
+  now?: string;
 }
 
 export function EventTimeline({
   upcomingEvents,
   pastEvents,
   badges = {},
+  now,
 }: EventTimelineProps) {
-  const showPastId = useId();
-  const pastHeadingId = useId();
   const searchRef = useRef<HTMLInputElement>(null);
-  const [showPastEvents, setShowPastEvents] = useState(false);
+  // The view lives in the URL (`?view=past`), so coming back from an event
+  // opened from Past lands on Past again. `replaceState` updates it without a
+  // server round trip or a new history entry.
+  const searchParams = useSearchParams();
+  const [showPastEvents, setShowPastEvents] = useState(searchParams.get("view") === "past");
+  // Remember the view for this tab, so an event page's Back to Events returns
+  // to it (the back button gets it from the URL).
+  useEffect(() => writeEventsView(showPastEvents ? "past" : "upcoming"), [showPastEvents]);
+  const showView = (view: string) => {
+    const past = view === "past";
+    setShowPastEvents(past);
+    const params = new URLSearchParams(window.location.search);
+    if (past) params.set("view", "past");
+    else params.delete("view");
+    const search = params.toString();
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${window.location.pathname}${search ? `?${search}` : ""}`
+    );
+  };
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Search filters both sections.
-  const query = normalizeString(searchQuery);
-  const matches = (event: TimelineEvent) =>
-    !query ||
-    normalizeString(event.name).includes(query) ||
-    (event.location_building && normalizeString(event.location_building).includes(query)) ||
-    (event.location_room && normalizeString(event.location_room).includes(query));
+  const displayedEvents = showPastEvents ? pastEvents : upcomingEvents;
 
-  const filteredUpcoming = upcomingEvents.filter(matches);
-  const filteredPast = showPastEvents ? pastEvents.filter(matches) : [];
-  const resultCount = filteredUpcoming.length + filteredPast.length;
+  // filter events based on search query
+  const query = normalizeString(searchQuery);
+  const filteredEvents = (query) ? displayedEvents.filter((event) => {
+    return (
+      normalizeString(event.name).includes(query) ||
+      (event.location_building && normalizeString(event.location_building).includes(query)) ||
+      (event.location_room && normalizeString(event.location_room).includes(query))
+    )
+  }) : displayedEvents;
 
   // group events by month
-  const upcomingGroups = groupEventsByMonth(filteredUpcoming);
-  const pastGroups = groupEventsByMonth(filteredPast);
+  // Upcoming opens with Ongoing, the events already running, then each month
+  // by start date. Past groups everything by the month it started.
+  const filteredGroups = groupEventsByMonth(filteredEvents, {
+    ongoingAt: showPastEvents ? undefined : now,
+  });
 
   const clearSearch = () => {
     setSearchQuery("");
@@ -64,21 +92,22 @@ export function EventTimeline({
           value={searchQuery}
           onValueChange={setSearchQuery}
           // Announce the count only while searching, not on every page load.
-          resultCount={query ? resultCount : undefined}
+          resultCount={query ? filteredEvents.length : undefined}
         />
-        <div className="flex w-fit shrink-0 items-center whitespace-nowrap text-foreground">
-          <Label htmlFor={showPastId} className="mr-2">
-            Show past events
-          </Label>
-          <Switch
-            id={showPastId}
-            checked={showPastEvents}
-            onCheckedChange={setShowPastEvents}
-          />
-        </div>
+        {/* Upcoming or Past (Figma 3759:15793): two views of the same list. */}
+        <SegmentedToggle
+          aria-label="Which events"
+          size="lg"
+          className="shrink-0"
+          value={showPastEvents ? "past" : "upcoming"}
+          onValueChange={showView}
+        >
+          <SegmentedToggleItem value="upcoming">Upcoming</SegmentedToggleItem>
+          <SegmentedToggleItem value="past">Past</SegmentedToggleItem>
+        </SegmentedToggle>
       </div>
 
-      {resultCount === 0 ? (
+      {filteredGroups.length === 0 ? (
         query ? (
           <EmptyState
             size="inline"
@@ -97,50 +126,17 @@ export function EventTimeline({
             size="inline"
             titleAs="h2"
             className="my-8"
-            title="Events coming soon"
+            title={showPastEvents ? "No past events" : "Events coming soon"}
           />
         )
       ) : (
-        <>
-          {upcomingGroups.length > 0 ? (
-            <EventTimelineRail
-              className="mb-8"
-              groups={upcomingGroups}
-              statusFor={(event) => badges[event.id] ?? null}
-            />
-          ) : (
-            // Only with the switch on and nothing searched: the past list
-            // below is all there is, so say so rather than start it cold.
-            !query && (
-              <EmptyState
-                size="inline"
-                titleAs="h2"
-                className="mb-8"
-                title="No upcoming events"
-              />
-            )
-          )}
-
-          {showPastEvents && (!query || pastGroups.length > 0) && (
-            <section aria-labelledby={pastHeadingId} className="mb-8">
-              <h2
-                id={pastHeadingId}
-                className="mb-6 border-t border-border-subtle pt-8 text-h1 tracking-tight"
-              >
-                Past events
-              </h2>
-              {pastGroups.length > 0 ? (
-                <EventTimelineRail
-                  monthHeadingAs="h3"
-                  groups={pastGroups}
-                  statusFor={(event) => badges[event.id] ?? "past"}
-                />
-              ) : (
-                <EmptyState size="inline" titleAs="h3" title="No past events" />
-              )}
-            </section>
-          )}
-        </>
+        <EventTimelineRail
+          className="mb-8"
+          groups={filteredGroups}
+          statusFor={(event) =>
+            badges[event.id] ?? (showPastEvents ? "past" : null)
+          }
+        />
       )}
     </>
   );

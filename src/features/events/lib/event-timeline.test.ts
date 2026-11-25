@@ -56,6 +56,33 @@ describe("groupEventsByMonth", () => {
   });
 });
 
+describe("groupEventsByMonth with an ongoing cutoff", () => {
+  // Monday, November 16, 2026, noon in Vancouver.
+  const now = "2026-11-16T12:00:00-07:00";
+  const series = event("series", "2026-05-19T17:00:00Z", "2028-11-19T18:30:00Z");
+  const running = event("sprint", "2026-11-13T17:00:00Z", "2026-11-18T23:00:00Z");
+  const laterThisMonth = event("jam", "2026-11-29T17:00:00Z");
+  const nextMonth = event("tour", "2026-12-10T20:00:00Z");
+
+  it("puts what has started under Ongoing, and later events under their own month", () => {
+    const groups = groupEventsByMonth([series, running, laterThisMonth, nextMonth], { ongoingAt: now });
+    expect(groups.map((group) => [group.label, group.events.map((e) => e.id)])).toEqual([
+      ["Ongoing", ["series", "sprint"]],
+      ["November 2026", ["jam"]],
+      ["December 2026", ["tour"]],
+    ]);
+  });
+
+  it("has no Ongoing group when nothing has started yet", () => {
+    const groups = groupEventsByMonth([laterThisMonth, nextMonth], { ongoingAt: now });
+    expect(groups.map((group) => group.label)).toEqual(["November 2026", "December 2026"]);
+  });
+
+  it("groups by start month without a cutoff, as the past list does", () => {
+    expect(groupEventsByMonth([series, nextMonth]).map((group) => group.key)).toEqual(["2026-05", "2026-12"]);
+  });
+});
+
 describe("normalizeString", () => {
   it("normalizes strings by trimming whitespace, lowercasing, and removing diacritics", async () => {
     const { normalizeString } = await import("./event-timeline");

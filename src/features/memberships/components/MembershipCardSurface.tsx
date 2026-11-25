@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 const MAX_TILT_DEG = 4;
 
 /**
- * The membership card's fill (the UX Hub gradient under the shared dither
+ * The membership card's fill (its diagonal gradient under the shared dither
  * texture) and its hover tilt (Portal Motion handoff, Home, "Membership
  * card"): with a mouse, it tilts up to 4° toward the pointer and settles back
  * when the pointer leaves (`expressive`, `ease-expressive`). The approved
@@ -70,17 +70,22 @@ export function MembershipCardSurface({
   }, [canTilt]);
 
   return (
-    <div ref={frameRef} className={cn("perspective-distant", className)}>
+    <div ref={frameRef} className={cn("@container perspective-distant", className)}>
       <section
         ref={cardRef}
         className={cn(
           // `isolate` keeps the dither's overlay blend to the card's own fill.
-          "relative isolate overflow-hidden rounded-2xl bg-ux-hub text-white shadow-sm",
+          "relative isolate overflow-hidden rounded-xl bg-membership-card text-white shadow-sm",
+          // At least Figma's 492 × 309 shape (a minimum height from the frame's
+          // width), and taller whenever the content needs it, so nothing is
+          // clipped on narrow screens. Not `aspect-ratio`: with the overflow
+          // clipped (for the tilt and dither) it holds the shape and crops.
+          "flex min-h-[calc(100cqw*309/492)] flex-col",
           "transform-[rotateX(var(--tilt-x,0deg))_rotateY(var(--tilt-y,0deg))] transition-transform duration-expressive ease-expressive",
         )}
       >
         <DitherOverlay />
-        <div className="relative">{children}</div>
+        <div className="relative flex flex-1 flex-col">{children}</div>
       </section>
     </div>
   );

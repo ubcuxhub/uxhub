@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
+import { ExternalLink, Globe, type LucideIcon } from "lucide-react";
 
-import { Separator } from "@/components/ui/separator";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { safeContentUrl } from "@/features/admin/lib/event-content";
 import type { MentorRow, SponsorRow } from "@/lib/supabase/models";
 
 /**
@@ -23,13 +24,8 @@ interface PersonItem {
   /** A line or two about them, under the subtitle. */
   description: string | null;
   imageUrl: string | null;
-  link: { href: string; label: string; ariaLabel: string; icon: ReactNode } | null;
+  link: { href: string; label: string; ariaLabel: string; icon: LucideIcon } | null;
 }
-
-const linkedInIcon = (
-  // eslint-disable-next-line @next/next/no-img-element
-  <img src="/icons/linkedin.svg" width={16} height={16} alt="" />
-);
 
 /**
  * The count line's noun for the standard section titles. A custom title
@@ -61,25 +57,24 @@ function mentorItem(mentor: MentorRow): PersonItem {
           href: mentor.linkedin_url,
           label: "LinkedIn",
           ariaLabel: `${mentor.full_name} on LinkedIn`,
-          icon: linkedInIcon,
+          icon: ExternalLink,
         }
       : null,
   };
 }
 
-// `sponsors` has description and website_url columns now. To show them, map
-// the description to `subtitle` and the website to:
-//   { href: sponsor.website_url, label: "Website", ariaLabel: `${sponsor.name} website`,
-//     icon: <Link2 className="size-4 shrink-0 text-muted-foreground" aria-hidden /> }
-// with `Link2` from lucide-react.
 function sponsorItem(sponsor: SponsorRow): PersonItem {
+  const website = sponsor.website_url && safeContentUrl(sponsor.website_url) ? sponsor.website_url : null;
   return {
     id: sponsor.id,
     name: sponsor.name,
-    subtitle: null,
+    // The sponsor's line about itself sits where a person's position does.
+    subtitle: sponsor.description?.trim() || null,
     description: null,
     imageUrl: sponsor.brand_logo_path,
-    link: null,
+    link: website
+      ? { href: website, label: "Website", ariaLabel: `${sponsor.name} website`, icon: Globe }
+      : null,
   };
 }
 
@@ -93,51 +88,59 @@ export function EventPeopleCard(props: EventPeopleCardProps) {
       ? { title: props.title, noun: sectionNoun(props.title), items: props.people.map(mentorItem) }
       : { title: "Sponsors", noun: SPONSOR_NOUN, items: props.people.map(sponsorItem) };
 
+  // The same card as Registration and Agenda (Figma 1.3, "Judges").
   return (
-    <section className="flex flex-col gap-5 rounded-md border border-border-subtle p-6">
-      <div className="flex flex-col gap-6">
-        <div className="flex flex-col gap-3">
-          <Heading className="text-h3">{title}</Heading>
-          <p className="text-muted-foreground">
-            Displaying {items.length} {items.length === 1 ? noun.singular : noun.plural}
-          </p>
-        </div>
-        <Separator />
-      </div>
+    <Card className="gap-0 py-0">
+      <CardHeader className="gap-0.5 border-b px-5 pt-5 [.border-b]:pb-4">
+        <CardTitle>
+          <Heading>{title}</Heading>
+        </CardTitle>
+        <CardDescription>
+          {items.length} {items.length === 1 ? noun.singular : noun.plural}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="p-5">
+        <ul className="flex flex-col gap-3">
+          {items.map((person) => (
+            <li
+              key={person.id}
+              className="flex items-center gap-3 rounded-lg border border-border-subtle bg-section px-4 py-3"
+            >
+              <PersonAvatar name={person.name} imageUrl={person.imageUrl} />
 
-      <ul className="flex flex-col gap-5">
-        {items.map((person) => (
-          <li
-            key={person.id}
-            className="flex flex-wrap items-center gap-x-4 gap-y-3 rounded-sm border bg-(--background-secondary) p-4"
-          >
-            <PersonAvatar name={person.name} imageUrl={person.imageUrl} />
+              <div className="flex min-w-0 flex-1 flex-col">
+                <p className="text-body-medium wrap-anywhere">{person.name}</p>
+                {person.subtitle && <p className="text-small text-muted-foreground wrap-anywhere">{person.subtitle}</p>}
+                {person.description && (
+                  <p className="mt-1 text-small whitespace-pre-line text-muted-foreground wrap-anywhere">{person.description}</p>
+                )}
+              </div>
 
-            <div className="flex min-w-40 flex-1 flex-col gap-1">
-              <p className="text-subheading">{person.name}</p>
-              {person.subtitle && <p className="text-muted-foreground">{person.subtitle}</p>}
-              {person.description && (
-                <p className="whitespace-pre-line text-small text-muted-foreground">{person.description}</p>
+              {person.link && (
+                <a
+                  href={person.link.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`${person.link.ariaLabel} (opens in a new tab)`}
+                  className="flex shrink-0 items-center gap-2 rounded-sm text-small text-foreground underline-offset-2 hover:underline"
+                >
+                  <person.link.icon className="size-3.5" strokeWidth={1.5} aria-hidden />
+                  {person.link.label}
+                </a>
               )}
-            </div>
-
-            {person.link && (
-              <a
-                href={person.link.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={person.link.ariaLabel}
-                className="flex shrink-0 items-center gap-2 text-button underline underline-offset-2 hover:text-primary-hover"
-              >
-                {person.link.icon}
-                {person.link.label}
-              </a>
-            )}
-          </li>
-        ))}
-      </ul>
-    </section>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
   );
+}
+
+/** "Sarah Jenkins" → "SJ"; one word gives one letter. */
+export function initials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const letters = words.length > 1 ? [words[0], words[words.length - 1]] : words;
+  return letters.map((word) => Array.from(word)[0]?.toUpperCase() ?? "").join("");
 }
 
 function PersonAvatar({ name, imageUrl }: { name: string; imageUrl: string | null }) {
@@ -145,15 +148,14 @@ function PersonAvatar({ name, imageUrl }: { name: string; imageUrl: string | nul
     return (
       <div
         aria-hidden
-        className="flex size-16 shrink-0 items-center justify-center rounded-full bg-muted text-subheading text-muted-foreground"
+        className="flex size-10 shrink-0 items-center justify-center rounded-full bg-muted text-small font-semibold text-muted-foreground"
       >
-        {name.charAt(0)}
+        {initials(name)}
       </div>
     );
   }
-
   return (
     // eslint-disable-next-line @next/next/no-img-element
-    <img src={imageUrl} alt="" className="size-16 shrink-0 rounded-full object-cover" />
+    <img src={imageUrl} alt="" className="size-10 shrink-0 rounded-full object-cover" />
   );
 }

@@ -49,7 +49,7 @@ it("lays the shared dither texture over the gradient, hidden from assistive tech
   const { card } = renderCard();
   const dither = card.querySelector('[data-slot="dither-overlay"]');
   expect(dither?.getAttribute("aria-hidden")).toBe("true");
-  expect(card.className).toContain("bg-ux-hub");
+  expect(card.className).toContain("bg-membership-card");
 });
 
 it("tilts up to 4 degrees toward a mouse pointer and settles back when it leaves", () => {

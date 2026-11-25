@@ -29,37 +29,34 @@ export function MembershipCard({
 }) {
   const expiryDate = formatEventDate(expiresAt);
 
+  // Figma 3262:3182: the label and logo, the cardholder and tier, the
+  // benefit, and the door note with the expiry along the bottom.
   return (
-    <MembershipCardSurface className={cn("max-w-[490px]", className)}>
-      <div className="p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-badge uppercase tracking-widest text-white/70">
+    <MembershipCardSurface className={cn("max-w-[492px]", className)}>
+      <div className="flex flex-1 flex-col justify-between gap-6 p-6">
+        <div className="flex flex-col">
+          <div className="flex items-start justify-between gap-4">
+            <p className="text-badge font-semibold tracking-[0.08em] text-white/70 uppercase">
               Membership
             </p>
-            <p className="mt-2 text-h2">{cardholder}</p>
+            <Image src="/icons/icon-light.svg" alt="" width={32} height={32} className="size-8 shrink-0" />
           </div>
-          <Image
-            src="/icons/icon-light.svg"
-            alt=""
-            width={40}
-            height={40}
-            className="size-10 shrink-0 opacity-90"
-          />
+
+          <div className="flex max-w-80 flex-col gap-5">
+            <div className="flex flex-col items-start gap-2.5">
+              <p className="text-h2 wrap-anywhere">{cardholder}</p>
+              <span className="inline-flex items-center rounded-full border border-white/25 bg-white/10 px-3 py-1 text-badge font-semibold">
+                {formatMembershipTypeName(membershipType.name)} Member
+              </span>
+            </div>
+            <p className="text-small leading-[1.4]">{membershipType.description}</p>
+          </div>
         </div>
 
-        <span className="mt-3 inline-flex items-center rounded-full bg-white/15 px-3 py-1.5 text-badge ring-1 ring-inset ring-white/25">
-          {formatMembershipTypeName(membershipType.name)} member
-        </span>
-
-        <p className="mt-6 border-t border-white/20 pt-6 text-small text-white/90">
-          {membershipType.description}
-        </p>
-      </div>
-
-      <div className="border-t border-white/20 bg-black/10 px-6 py-4 text-small text-white/80">
-        <p>Show this card at the door. You still need to register for each event.</p>
-        {expiryDate && <p className="mt-1">Valid until {expiryDate}</p>}
+        <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2 text-badge font-normal leading-[1.4]">
+          <p className="max-w-50">Show this card at the door. You still need to register for each event.</p>
+          {expiryDate && <p className="shrink-0">Valid until {expiryDate}</p>}
+        </div>
       </div>
     </MembershipCardSurface>
   );
