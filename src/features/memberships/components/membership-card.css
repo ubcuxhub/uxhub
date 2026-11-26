@@ -1,0 +1,158 @@
+/*
+ * The membership card in 3D: two faces on one turning element, and the light
+ * that follows its rotation. The interactions are in membership-card-motion.ts,
+ * which writes the rotation into the registered properties below.
+ *
+ * Nothing between `.membership-card` and its faces may clip, fade, filter,
+ * mask or blend: any of those flattens the 3D, and the back never shows. The
+ * rounding, clipping, shine and masks all live on each face.
+ */
+
+/* Registered, so they ease by transition and the light can do maths on them. */
+@property --tilt-x {
+  syntax: "<angle>";
+  inherits: true;
+  initial-value: 0deg;
+}
+@property --tilt-y {
+  syntax: "<angle>";
+  inherits: true;
+  initial-value: 0deg;
+}
+@property --press-x {
+  syntax: "<angle>";
+  inherits: true;
+  initial-value: 0deg;
+}
+@property --press-y {
+  syntax: "<angle>";
+  inherits: true;
+  initial-value: 0deg;
+}
+@property --spin {
+  syntax: "<angle>";
+  inherits: true;
+  initial-value: 0deg;
+}
+
+.membership-card {
+  --rx: calc(var(--tilt-x) + var(--press-x));
+  --ry: calc(var(--tilt-y) + var(--press-y) + var(--spin));
+  /* The hover tilt eases as it always has (expressive); a press is quicker. */
+  --membership-card-tilt-transition:
+    --tilt-x var(--duration-expressive) var(--ease-expressive),
+    --tilt-y var(--duration-expressive) var(--ease-expressive),
+    --press-x var(--duration-fast) var(--ease-out),
+    --press-y var(--duration-fast) var(--ease-out);
+  transform: rotateX(var(--rx)) rotateY(var(--ry));
+  transform-style: preserve-3d;
+  transition: var(--membership-card-tilt-transition);
+}
+
+/* Snapping to the nearest face after a spin. */
+.membership-card[data-spin="snap"] {
+  transition:
+    var(--membership-card-tilt-transition),
+    --spin var(--duration-expressive) var(--ease-expressive);
+}
+
+/* Turning home to the front after resting on the back. */
+.membership-card[data-spin="return"] {
+  transition:
+    var(--membership-card-tilt-transition),
+    --spin var(--duration-expressive) var(--ease-in-out);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .membership-card {
+    transition: none;
+  }
+}
+
+/*
+ * The light: one lamp in front of the viewer. The highlight slides away from
+ * the way a face turns (turned right, it moves left) and fades as the face
+ * turns away. Each face reads its own angle, so the back lights correctly when
+ * it faces the viewer. `--shine-travel`, `--sheen-opacity`,
+ * `--front-sheen-opacity` and `--glint-opacity` come from CARD in membership-card-motion.ts.
+ */
+.membership-card-face {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  --shine-x: calc(50% - sin(var(--face-ry)) * var(--shine-travel) * 100%);
+  --shine-y: calc(50% + sin(var(--rx)) * var(--shine-travel) * 100%);
+  --face-light: max(0, cos(var(--face-ry)));
+  --glint-intensity: calc(var(--face-light) * var(--glint-opacity));
+}
+
+.membership-card-front {
+  --face-ry: var(--ry);
+}
+
+.membership-card-back {
+  --face-ry: calc(var(--ry) + 180deg);
+  transform: rotateY(180deg);
+  /* The front's 2px pixel checker isn't on this card, so the back takes the
+     brand surface's (auth shell) over its reversed gradient. */
+  background-image:
+    repeating-conic-gradient(rgb(255 255 255 / 0.07) 0 25%, transparent 0 50%),
+    var(--gradient-membership-card-back);
+  background-size: 2px 2px, auto;
+}
+
+/* A wide, soft sheen over the whole face. */
+.membership-card-sheen {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at var(--shine-x) var(--shine-y),
+    rgb(255 255 255 / 0.9),
+    transparent 70%
+  );
+  mix-blend-mode: soft-light;
+  opacity: calc(var(--face-light) * var(--sheen-opacity));
+}
+
+.membership-card-front .membership-card-sheen {
+  opacity: calc(var(--face-light) * var(--front-sheen-opacity));
+}
+
+/*
+ * The back's soft-block dither (D3), white at its final opacity, and its glint
+ * through the full-strength mask of the same pixels. Both are 4x the card and
+ * sized to its width, pinned to the bottom, so a card that grows taller on a
+ * narrow screen adds plain gradient at the top instead of stretching them.
+ * Sized and placed identically, they line up at every pixel density.
+ */
+.membership-card-back-dither,
+.membership-card-back-glint {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.membership-card-back-dither {
+  background: url(/textures/membership-back-dither.png) bottom / 100% auto no-repeat;
+}
+
+.membership-card-back-glint {
+  background: radial-gradient(
+    circle at var(--shine-x) var(--shine-y),
+    white,
+    transparent 35%
+  );
+  mask: url(/textures/membership-back-dither-mask.png) bottom / 100% auto no-repeat;
+  mix-blend-mode: color-dodge;
+  opacity: var(--glint-intensity);
+}
+
+@media (forced-colors: active) {
+  .membership-card-sheen,
+  .membership-card-back-dither,
+  .membership-card-back-glint {
+    display: none;
+  }
+}

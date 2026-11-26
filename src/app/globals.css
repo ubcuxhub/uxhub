@@ -68,6 +68,7 @@
 
   --background-image-ux-hub: var(--gradient-ux-hub);
   --background-image-membership-card: var(--gradient-membership-card);
+  --background-image-membership-card-back: var(--gradient-membership-card-back);
 
   /* ── shadcn semantic tokens ─────────────────────────────────────── */
   --color-background: var(--background);
@@ -250,6 +251,14 @@
     rgb(182 127 198) 0.17%,
     rgb(122 112 197) 48.95%,
     rgb(58 95 196) 98.67%
+  );
+  /* Its back: the same angle with the stops reversed, so it is blue where
+     the front is orchid. */
+  --gradient-membership-card-back: linear-gradient(
+    122.68deg,
+    rgb(58 95 196) 1.33%,
+    rgb(122 112 197) 51.05%,
+    rgb(182 127 198) 99.83%
   );
 
   --background: var(--background-default);

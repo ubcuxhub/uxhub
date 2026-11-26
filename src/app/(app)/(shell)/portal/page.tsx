@@ -22,6 +22,7 @@ import { loadEventStates } from "@/features/events/lib/event-states";
 import { FLAGS } from "@/lib/flags";
 import { formatUserName } from "@/lib/user-name";
 import { createClient } from "@/lib/supabase/server";
+import { cn } from "@/lib/utils";
 import { getMembershipTermEndsAt } from "@/features/memberships/lib/term";
 import { fetchMembershipTypeById } from "@/lib/supabase-helpers/memberships";
 import { fetchFeaturedEvent } from "@/lib/supabase-helpers/events";
@@ -67,22 +68,28 @@ export default async function PortalHome() {
       {(featured || membershipType) && (
         // Featured left and the card right on desktop; the card first on phones.
         <div className="grid gap-8 lg:grid-cols-2">
+          {membershipType && (
+            <MembershipCard
+            className="order-1"
+            cardholder={formatUserName(user) || firstName}
+            expiresAt={getEffectiveMembershipExpiry(user, termEndsAt)}
+            membershipType={membershipType}
+            />
+          )}
           {featured && (
             <FeaturedEventCard
-              className="order-2 w-full max-w-[490px] lg:order-1"
+              className={cn(
+                "order-2 w-full max-w-[490px]",
+                // Side by side, it drops its fixed shape and stretches to the
+                // row, so it matches the membership card, which grows taller
+                // when its column is narrow.
+                membershipType && "lg:aspect-auto",
+              )}
               title={featured.name}
               href={`/portal/events/${featured.slug}`}
               colour={featured.event_colour}
               image={featured.header_image_url ?? featured.image_url}
               badge={featuredState ? eventBadgeFor(featuredState) : null}
-            />
-          )}
-          {membershipType && (
-            <MembershipCard
-              className="order-1 lg:order-2"
-              cardholder={formatUserName(user) || firstName}
-              expiresAt={getEffectiveMembershipExpiry(user, termEndsAt)}
-              membershipType={membershipType}
             />
           )}
         </div>
