@@ -136,7 +136,8 @@ function SidebarProvider({
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
-        event.key.toLowerCase() !== SIDEBAR_KEYBOARD_SHORTCUT ||
+        // Autofill fires keydown events without a key.
+        event.key?.toLowerCase() !== SIDEBAR_KEYBOARD_SHORTCUT ||
         !(event.metaKey || event.ctrlKey) ||
         event.shiftKey ||
         event.altKey ||
