@@ -164,4 +164,12 @@ describe("Ctrl/Cmd+B", () => {
     fireEvent.keyDown(document.body, { key: "b", ctrlKey: true, repeat: true });
     expect(state()).toBe("expanded");
   });
+
+  it("ignores a keydown that has no key, as autofill fires", () => {
+    renderSidebar();
+    const autofill = new KeyboardEvent("keydown", { ctrlKey: true, bubbles: true });
+    Object.defineProperty(autofill, "key", { value: undefined });
+    expect(() => document.body.dispatchEvent(autofill)).not.toThrow();
+    expect(state()).toBe("expanded");
+  });
 });
